@@ -64,13 +64,6 @@ pub fn json_arg() -> Arg {
         .help("Output diagnostics as JSON")
 }
 
-pub fn raw_arg() -> Arg {
-    Arg::new("raw")
-        .long("raw")
-        .action(ArgAction::SetTrue)
-        .help("Include anonymous nodes (literals, punctuation)")
-}
-
 pub fn query_view_arg() -> Arg {
     Arg::new("query_view")
         .long("query-view")

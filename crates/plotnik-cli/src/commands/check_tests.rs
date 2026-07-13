@@ -36,15 +36,15 @@ fn rejects_byte_oriented_regex_predicate() {
 }
 
 #[test]
-fn rejects_value_less_definition() {
-    // `Q = .` compiles to a module with no entry points.
+fn rejects_definition_with_positional_only_body() {
+    // `.` constrains a position inside a node; it is not a definition pattern by itself.
     assert!(matches!(check_js("Q = ."), Err(CliError::No)));
 }
 
 #[test]
-fn rejects_dropped_value_less_def_among_valid() {
-    // A value-less def is silently dropped from the module even when another def
-    // compiles fine; `check` must still flag it instead of exiting 0.
+fn rejects_positional_only_definition_among_valid_definitions() {
+    // A positional-only definition never reaches analysis, even when another
+    // definition compiles; `check` must still flag it instead of exiting 0.
     assert!(matches!(
         check_js("Bad = .\nGood = (identifier) @id"),
         Err(CliError::No)

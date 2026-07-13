@@ -137,7 +137,7 @@ impl<'a> NfaBuilder<'a> {
             .expect("regular capture has a validated name");
         let member = self
             .lookup_member_in_scope(&name.text()[1..])
-            .expect("capture field resolves in its output scope");
+            .expect("captured result field resolves in its result scope");
         let mut entry = Vec::new();
         let mut effects = vec![EffectIR::with_member(EffectKind::RecordSet, member)];
         if let Some(id) = self.span_id(capture.syntax(), SpanKind::Capture) {
@@ -252,7 +252,7 @@ impl CaptureTypeLowerer<'_, '_> {
                             exit: match_close,
                             nav,
                             capture: CaptureEffects::default(),
-                            value: false,
+                            observe_value: false,
                         };
                         this.compile_nullable_pattern(pattern, pattern_ctx, skip_exit)
                     })
@@ -291,7 +291,7 @@ impl CaptureTypeLowerer<'_, '_> {
                         exit: match_exit,
                         nav,
                         capture: CaptureEffects::default(),
-                        value: false,
+                        observe_value: false,
                     };
                     this.compile_nullable_pattern(pattern, pattern_ctx, skip_exit)
                 })
@@ -318,7 +318,7 @@ impl CaptureTypeLowerer<'_, '_> {
             exit: self.exits.match_exit(),
             nav: self.nav,
             capture: CaptureEffects::new_post(effects),
-            value: false,
+            observe_value: false,
         };
         self.compiler.dispatch_pattern(pattern, pattern_ctx)
     }

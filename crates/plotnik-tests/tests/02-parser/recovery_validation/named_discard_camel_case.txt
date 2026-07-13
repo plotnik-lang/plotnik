@@ -11,4 +11,4 @@ help: use `@_foo_bar`
 1 - Q = (a) @_fooBar
 1 + Q = (a) @_foo_bar
   |
-help: captures become fields in the output
+help: capture names become result field names

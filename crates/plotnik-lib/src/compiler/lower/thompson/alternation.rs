@@ -281,13 +281,13 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         if alternatives.is_empty() {
             return exit;
         }
 
-        // In a suppressed region there is no output shape to keep stable (and a
+        // In a suppressed region there is no result shape to keep stable (and a
         // value-producing labeled alternation routed here still flows `Value(variant)`, not a record).
         let alternation_type_id = if self.is_suppressed() {
             None
@@ -322,7 +322,7 @@ impl NfaBuilder<'_> {
             let alternative_exit = alternative_routing.alternative_exit(alternative_idx, exit);
 
             // Complete every merged field this alternative does not itself
-            // produce, so the output shape stays stable. "Produces" means a top-level
+            // produce, so the result shape stays stable. "Produces" means a top-level
             // (bubbling) field — a capture nested in a child scope (`{...} @item`)
             // belongs to that scope, not here. The alternative's inferred bubble is the
             // single source of truth; a syntactic capture walk would miscount nested
@@ -383,7 +383,7 @@ impl NfaBuilder<'_> {
                     exit,
                     nav: alternative_nav,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
                 let entry = self.compile_nullable_pattern(&body, pattern_ctx, SkipExit::Fail);
                 let mut pre = alternative_capture.pre;
@@ -402,7 +402,7 @@ impl NfaBuilder<'_> {
                     exit: alternative_exit,
                     nav: alternative_nav,
                     capture: alternative_capture,
-                    value: false,
+                    observe_value: false,
                 };
                 self.dispatch_pattern(&body, pattern_ctx)
             };
@@ -432,7 +432,7 @@ impl NfaBuilder<'_> {
                     exit: empty_exit,
                     nav: alternative_nav,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
                 let empty_entry = self.compile_empty_outcome(&body, pattern_ctx);
                 empty.push(self.wrap_entry_pre(empty_entry, alternative_capture.pre));
@@ -502,7 +502,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         let alternatives: Vec<_> = alternation.alternatives().collect();
         if alternatives.is_empty() {
@@ -518,7 +518,7 @@ impl NfaBuilder<'_> {
             .type_id()
             .expect("an analyzed labeled alternation must produce a variant type");
 
-        // BTreeMap order gives stable variant indices independent of AST iteration order.
+        // BTreeMap order gives stable variant-case member indices independent of AST iteration order.
         let TypeShape::Variant(cases) = self
             .ctx
             .analysis
@@ -591,7 +591,7 @@ impl NfaBuilder<'_> {
                         exit: close_exit,
                         nav: alternative_nav,
                         capture: CaptureEffects::default(),
-                        value: true,
+                        observe_value: true,
                     };
                     let inner_entry =
                         this.compile_nullable_pattern(&body, pattern_ctx, SkipExit::Fail);
@@ -618,7 +618,7 @@ impl NfaBuilder<'_> {
                         exit: alternative_exit,
                         nav: alternative_nav,
                         capture: alternative_capture,
-                        value: false,
+                        observe_value: false,
                     };
                     this.dispatch_pattern(&body, pattern_ctx)
                 }
@@ -648,7 +648,7 @@ impl NfaBuilder<'_> {
                         exit: empty_exit,
                         nav: alternative_nav,
                         capture: CaptureEffects::default(),
-                        value: true,
+                        observe_value: true,
                     };
                     this.compile_empty_outcome(&body, pattern_ctx)
                 });

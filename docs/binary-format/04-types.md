@@ -23,7 +23,7 @@ Type system metadata for code generation and runtime validation. Describes the s
 
 ### Node Semantics
 
-The `Node` type represents a platform-dependent handle to a tree-sitter syntax-tree node:
+The `Node` type represents a platform-dependent handle to a Tree-sitter syntax-tree node:
 
 | Context    | Representation                                                         |
 | :--------- | :--------------------------------------------------------------------- |
@@ -118,7 +118,7 @@ Sorted lexicographically by name (resolved via String Table) for binary search.
 ## Examples
 
 > **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes
-> them first in order (`NoValue`, `Node`, `Text`, `Bool`), then custom output types.
+> them first in order (`NoValue`, `Node`, `Text`, `Bool`), then custom result types.
 
 ### Simple Record
 

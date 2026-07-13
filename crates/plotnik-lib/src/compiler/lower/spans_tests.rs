@@ -24,7 +24,7 @@ fn assigns_dense_spans_in_walk_order() {
             SpanKind::Pattern,
             SpanKind::Capture,
             SpanKind::CaptureType,
-            SpanKind::Field,
+            SpanKind::GrammarField,
             SpanKind::Pattern,
         ]
     );
@@ -38,7 +38,10 @@ fn token_spans_cover_capture_quantifier_field_and_capture_type_tokens() {
 
     assert_eq!(span_text(src, find_kind(&spans, SpanKind::Capture)), "@id");
     assert_eq!(span_text(src, find_kind(&spans, SpanKind::Quantifier)), "?");
-    assert_eq!(span_text(src, find_kind(&spans, SpanKind::Field)), "name");
+    assert_eq!(
+        span_text(src, find_kind(&spans, SpanKind::GrammarField)),
+        "name"
+    );
 
     let capture_type = find_kind(&spans, SpanKind::CaptureType);
     assert_eq!(span_text(src, capture_type), ":: Ident");

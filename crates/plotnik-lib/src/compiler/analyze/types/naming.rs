@@ -1,7 +1,7 @@
-//! Type naming pass: every output type gets its name at compile time.
+//! Type naming pass: every result type gets its name at compile time.
 //!
 //! Runs after inference, before the analysis freezes. Names come from exactly
-//! three places, mirroring where output syntax is written:
+//! three places, mirroring where result-producing syntax is written:
 //!
 //! - A definition's result type carries the definition's name.
 //! - A composite reached through field `f` of a type named `T` is `T` +
@@ -197,7 +197,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                             self.warn_redundant_capture_type(
                                 capture_type.span,
                                 &format!(
-                                    "this capture already has type `{generated}`; naming it `{generated}` has no effect"
+                                    "this capture already has type `{generated}`; naming it `{generated}` won't have an effect"
                                 ),
                             );
                         }
@@ -232,7 +232,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     let declaration_name = self.interner.resolve(declaration_name).to_owned();
                     let written_name = self.interner.resolve(capture_type.name).to_owned();
                     let detail = format!(
-                        "this capture already has type `{declaration_name}`; naming it `{written_name}` has no effect"
+                        "this capture already has type `{declaration_name}`; naming it `{written_name}` won't have an effect"
                     );
                     self.warn_redundant_capture_type(capture_type.span, &detail);
                     return;
@@ -257,7 +257,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 };
                 self.warn_redundant_capture_type(
                     capture_type.span,
-                    "this capture already has type `Node`; naming it `Node` has no effect",
+                    "this capture already has type `Node`; naming it `Node` won't have an effect",
                 );
             }
             TypeShape::Text | TypeShape::Bool | TypeShape::List { .. } | TypeShape::Option(_) => {}
@@ -273,7 +273,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             self.warn_redundant_capture_type(
                 capture_type.span,
                 &format!(
-                    "this capture already has type `{existing}`; naming it `{existing}` has no effect"
+                    "this capture already has type `{existing}`; naming it `{existing}` won't have an effect"
                 ),
             );
         } else {
@@ -282,7 +282,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             self.warn_redundant_capture_type(
                 capture_type.span,
                 &format!(
-                    "this capture already has type `{existing}`; naming it `{written}` has no effect"
+                    "this capture already has type `{existing}`; naming it `{written}` won't have an effect"
                 ),
             );
         }

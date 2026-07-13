@@ -83,7 +83,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         let entry = self.fresh_label();
         let node_kind = self.resolve_named_node_kind(node);
@@ -372,7 +372,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
@@ -533,7 +533,7 @@ impl NfaBuilder<'_> {
     /// - Bare ref to a match-only or node-valued definition: `Call → exit`
     ///   (nothing to discard)
     ///
-    /// `ctx.value` selects value-producing lowering even with no consumer effect at
+    /// `ctx.observe_value` selects value-producing lowering even with no attaching effect at
     /// this site: the callee's pending value must survive the call because it
     /// is the caller's own return value (a quantifier at a definition's root).
     fn compile_ref_call(
@@ -548,7 +548,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
 
         // Entry points are compiled eagerly; fragments arrive here through a
@@ -600,9 +600,9 @@ impl NfaBuilder<'_> {
             RefLowering::SuppressedCall => {
                 // Suppress bracket keeps the structural match but discards the
                 // definition's output events, matching the no-value flow that
-                // inference assigns to a bare reference. Non-consuming post effects (an
-                // enclosing variant type's VariantClose, a scope close) run after the
-                // bracket, outside the discarded region.
+                // inference assigns to a bare reference. Post effects that do not attach
+                // the pending value (an enclosing variant type's VariantClose or a scope
+                // close) run after the bracket, outside the discarded region.
                 let mut close_effects = vec![EffectIR::suppress_end()];
                 close_effects.extend(capture.post);
                 let suppress_end =
@@ -703,7 +703,7 @@ impl NfaBuilder<'_> {
     }
 
     /// [`compile_ref_inline`](Self::compile_ref_inline) with `keep_value`: the
-    /// body's pending value survives with no consumer effect at this site (see
+    /// body's pending value survives with no attaching effect at this site (see
     /// [`compile_ref_call`](Self::compile_ref_call)).
     pub(super) fn compile_ref_inline_keep_value(
         &mut self,
@@ -719,12 +719,12 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: nav_override,
             capture: CaptureEffects::default(),
-            value: true,
+            observe_value: true,
         };
         self.compile_ref_inline_in(def_id, pattern_ctx, skip_exit)
     }
 
-    /// Call a definition keeping its pending value alive (no consumer effect).
+    /// Call a definition keeping its pending value alive (no attaching effect).
     pub(super) fn compile_ref_call_keep_value(
         &mut self,
         def_id: DefId,
@@ -738,7 +738,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture: CaptureEffects::default(),
-            value: true,
+            observe_value: true,
         };
         self.compile_ref_call(specialization, pattern_ctx, field_override)
     }
@@ -754,14 +754,14 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = matched;
         if self.inline_stack.contains(&def_id) {
             let pattern_ctx = PatternCtx {
                 exit: match_exit,
                 nav: nav_override,
                 capture,
-                value: needs_value,
+                observe_value: needs_value,
             };
             return self.compile_ref_guarded_call(def_id, pattern_ctx, skip_exit);
         }
@@ -819,7 +819,7 @@ impl NfaBuilder<'_> {
                     exit: body_match_exit,
                     nav: nav_override,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
@@ -827,7 +827,7 @@ impl NfaBuilder<'_> {
             self.emit_record_open_with_pre(body_entry, pre)
         } else if needs_value {
             // Non-record body: it leaves its value pending; the
-            // consumer chain runs after it on either continuation.
+            // attachment effects run after it on either continuation.
             let set_match = self.emit_effects_if_nonempty(match_exit, post.clone());
             let set_skip = match skip_exit {
                 SkipExit::To(skip) if skip == match_exit => SkipExit::To(set_match),
@@ -845,7 +845,7 @@ impl NfaBuilder<'_> {
                     exit: body_match_exit,
                     nav: nav_override,
                     capture: CaptureEffects::default(),
-                    value: true,
+                    observe_value: true,
                 };
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
@@ -856,8 +856,8 @@ impl NfaBuilder<'_> {
             // Suppression is compile-time here — captures are inert and
             // alternations tag nothing — which matches the no-value flow that
             // inference assigns without any runtime discard brackets.
-            // Non-consuming post effects (an enclosing scope's close) run
-            // after the body, outside the suppressed region.
+            // Post effects that do not attach the pending value (an enclosing
+            // scope's close) run after the body, outside the suppressed region.
             let end_match = self.emit_effects_if_nonempty(match_exit, post.clone());
             let end_skip = match skip_exit {
                 SkipExit::To(skip) if skip == match_exit => SkipExit::To(end_match),
@@ -875,7 +875,7 @@ impl NfaBuilder<'_> {
                     exit: body_match_exit,
                     nav: nav_override,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
@@ -902,10 +902,10 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: nav_override,
             capture,
-            value,
+            observe_value,
         } = matched;
         assert!(
-            !value,
+            !observe_value,
             "captured references inside recursive cycles are rejected by analysis"
         );
         let CaptureEffects { pre, post } = capture;
@@ -920,7 +920,7 @@ impl NfaBuilder<'_> {
                 exit: match_exit,
                 nav: None,
                 capture: CaptureEffects { pre, post },
-                value: false,
+                observe_value: false,
             };
             return self.compile_ref_call(specialization, pattern_ctx, None);
         };
@@ -987,7 +987,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: value_context,
+            observe_value,
         } = ctx;
         let value = field
             .value()
@@ -1000,7 +1000,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
-                value: value_context,
+                observe_value,
             };
             let value_ctx = self.bracket_pattern_ctx(&value, value_ctx);
             return self.compile_ref(r, value_ctx, node_field);
@@ -1016,7 +1016,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
-                value: value_context,
+                observe_value,
             };
             return self.compile_wrapped_field_value(&value, value_ctx, field_id);
         }
@@ -1025,7 +1025,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: value_context,
+            observe_value,
         };
         let value_entry = self.dispatch_pattern(&value, value_ctx);
 
@@ -1033,7 +1033,7 @@ impl NfaBuilder<'_> {
     }
 
     fn bracket_field_ctx(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> PatternCtx {
-        let Some(id) = self.span_id(field.syntax(), SpanKind::Field) else {
+        let Some(id) = self.span_id(field.syntax(), SpanKind::GrammarField) else {
             return ctx;
         };
 
@@ -1041,13 +1041,13 @@ impl NfaBuilder<'_> {
             exit,
             nav,
             capture,
-            value,
+            observe_value,
         } = ctx;
         PatternCtx {
             exit,
             nav,
             capture: capture.nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0)),
-            value,
+            observe_value,
         }
     }
 
@@ -1068,13 +1068,13 @@ impl NfaBuilder<'_> {
             exit,
             nav,
             capture,
-            value: value_context,
+            observe_value,
         } = ctx;
         let value_ctx = PatternCtx {
             exit,
             nav: None,
             capture,
-            value: value_context,
+            observe_value,
         };
         let value_entry = self.dispatch_pattern(value, value_ctx);
 
@@ -1212,7 +1212,7 @@ impl NfaBuilder<'_> {
                             exit: match_exit,
                             nav,
                             capture: combined,
-                            value: false,
+                            observe_value: false,
                         };
                         self.compile_nullable_pattern(&inner, pattern_ctx, skip_exit)
                     }
@@ -1241,8 +1241,10 @@ impl NfaBuilder<'_> {
         let CaptureEffects { pre, post } = outer_capture;
         let capture_state =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
-        let inner_entry =
-            self.dispatch_pattern(&inner, PatternCtx::with_value(capture_state, nav_override));
+        let inner_entry = self.dispatch_pattern(
+            &inner,
+            PatternCtx::observing_value(capture_state, nav_override),
+        );
         // The enclosing variant type's `VariantOpen` (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `RecordSet` state would drop it and unbalance the scope.
@@ -1264,7 +1266,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture: combined,
-            value: false,
+            observe_value: false,
         };
         self.dispatch_pattern(&inner, pattern_ctx)
     }
@@ -1294,7 +1296,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture: combined,
-            value: false,
+            observe_value: false,
         };
         self.dispatch_pattern(&inner, pattern_ctx)
     }
@@ -1304,7 +1306,7 @@ impl NfaBuilder<'_> {
     /// mode, so nothing in the region emits output effects — captures are
     /// inert, alternations tag nothing, skip paths inject no nulls. That
     /// matches the no-value flow that type inference produces without any runtime discard.
-    /// The one output source that survives is a definition call (shared code),
+    /// The one result-producing source that survives is a definition call (shared code),
     /// which the call site brackets itself (`RefLowering::SuppressedCall`).
     ///
     /// `outer.pre`/`outer.post` (e.g. a case's `VariantOpen`/`VariantClose`)
@@ -1366,7 +1368,7 @@ impl NfaBuilder<'_> {
                         exit: end_match,
                         nav: nav_override,
                         capture: CaptureEffects::default(),
-                        value: false,
+                        observe_value: false,
                     };
                     this.compile_nullable_pattern(inner, pattern_ctx, end_skip)
                 })

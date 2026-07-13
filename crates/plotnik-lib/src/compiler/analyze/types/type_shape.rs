@@ -43,14 +43,14 @@ impl DefinitionOutput {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum CasePayload {
-    None,
+    NoPayload,
     Record(TypeId),
 }
 
 impl CasePayload {
     pub fn type_id(self) -> Option<TypeId> {
         match self {
-            Self::None => None,
+            Self::NoPayload => None,
             Self::Record(type_id) => Some(type_id),
         }
     }

@@ -1,9 +1,9 @@
 Q = (pair key: !value)
 ------------------ DIAGNOSTICS -------------------
-error: a negated field cannot be a field value
+error: a negated grammar field cannot be a grammar-field value
  --> query.ptk:1:16
   |
 1 | Q = (pair key: !value)
   |                ^^^^^^
   |
-help: a negated field stands alone as a child: `(node -field)`
+help: a negated grammar field stands alone as a child: `(node -field)`

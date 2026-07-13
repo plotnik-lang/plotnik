@@ -1,4 +1,4 @@
-//! Materializes committed match journals into output values.
+//! Materializes committed match journals into result values.
 
 use crate::bytecode::{EntryPoint, Module};
 use crate::core::Colors;
@@ -82,7 +82,7 @@ impl<'a> ValueMaterializer<'a> {
         let mut stack: Vec<ValueAccumulator<'a>> = vec![];
         let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
 
-        // Pending output value consumed by `RecordSet` or `ArrayPush`.
+        // Pending result value attached by `RecordSet` or `ArrayPush`.
         let mut pending: Option<Value<'a>> = None;
 
         for (event_idx, event) in events.iter().enumerate() {

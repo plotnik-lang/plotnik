@@ -243,9 +243,9 @@ impl NfaBuilder<'_> {
 
     /// Whether this quantifier's value is observed by its continuation. The
     /// inferred `Value` flow is necessary but not enough: nested bare values are
-    /// structural unless a root/capture/ref context consumes the pending value.
-    fn is_value_collecting(&self, quant: &ast::QuantifiedPattern, value_context: bool) -> bool {
-        if self.is_suppressed() || !value_context {
+    /// structural unless a root/capture/ref context observes the pending value.
+    fn is_value_collecting(&self, quant: &ast::QuantifiedPattern, needs_value: bool) -> bool {
+        if self.is_suppressed() || !needs_value {
             return false;
         }
         let pattern = Pattern::QuantifiedPattern(quant.clone());
@@ -275,11 +275,11 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value,
+            observe_value,
         } = ctx;
-        let value_context = value || capture.post_consumes_value();
+        let needs_value = observe_value || capture.post_attaches_value();
 
-        if self.is_value_collecting(quant, value_context) {
+        if self.is_value_collecting(quant, needs_value) {
             return self.compile_valued_quantifier(
                 quant,
                 CaptureExits::Single(exit),
@@ -313,7 +313,7 @@ impl NfaBuilder<'_> {
                     exit,
                     nav: nav_override,
                     capture: element_capture,
-                    value: false,
+                    observe_value: false,
                 };
                 return self.dispatch_pattern(&inner, pattern_ctx);
             }
@@ -449,7 +449,7 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: nav_override,
             capture,
-            value: value_context,
+            observe_value,
         } = self.bracket_pattern_ctx(pattern, matched);
         // A captured `?`/`*` at this navigating position shares the single
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
@@ -481,7 +481,7 @@ impl NfaBuilder<'_> {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
-                    value: value_context,
+                    observe_value,
                 };
                 return self.compile_ref_inline(def_id, pattern_ctx, skip_exit);
             }
@@ -495,7 +495,7 @@ impl NfaBuilder<'_> {
                 exit: match_exit,
                 nav: nav_override,
                 capture,
-                value: value_context,
+                observe_value,
             };
             // Mirrors dispatch_pattern: only a labeled alternation whose value is
             // observed outside suppression emits variant events.
@@ -550,14 +550,14 @@ impl NfaBuilder<'_> {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
-                    value: value_context,
+                    observe_value,
                 };
                 return self.dispatch_pattern(&inner, pattern_ctx);
             }
             QuantifierForm::Quantified { inner, .. } => inner,
         };
 
-        if self.is_value_collecting(quant, value_context || capture.post_consumes_value()) {
+        if self.is_value_collecting(quant, observe_value || capture.post_attaches_value()) {
             return self.compile_valued_quantifier(
                 quant,
                 CaptureExits::Split {
@@ -782,7 +782,7 @@ impl NfaBuilder<'_> {
                 exit: match_exit,
                 nav: nav_override,
                 capture,
-                value: false,
+                observe_value: false,
             };
             return self.dispatch_pattern(pattern, pattern_ctx);
         };
@@ -794,7 +794,7 @@ impl NfaBuilder<'_> {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
-                    value: false,
+                    observe_value: false,
                 };
                 return self.dispatch_pattern(&inner, pattern_ctx);
             }
@@ -1056,7 +1056,7 @@ impl NfaBuilder<'_> {
     ///
     /// The element's value must survive as the pending call value, so a
     /// reference element compiles with the keep-value ref lowering (a plain
-    /// `RecordSet`-consumer chain doesn't exist at a definition's root); a node
+    /// `RecordSet` attachment doesn't exist at a definition's root); a node
     /// element pends its match via a `Node` effect, while structured
     /// elements leave their own value pending.
     fn compile_valued_optional(
@@ -1143,7 +1143,7 @@ impl NfaBuilder<'_> {
                         exit,
                         nav: Some(nav),
                         capture: CaptureEffects::new_post(post),
-                        value: !needs_node,
+                        observe_value: !needs_node,
                     },
                 )
             })
@@ -1189,7 +1189,7 @@ impl NfaBuilder<'_> {
                     exit,
                     nav: Some(nav),
                     capture,
-                    value: false,
+                    observe_value: false,
                 },
             ),
             IterationScope::RecordElement {
@@ -1205,7 +1205,7 @@ impl NfaBuilder<'_> {
                         exit,
                         nav: Some(nav),
                         capture,
-                        value: false,
+                        observe_value: false,
                     },
                 )
             }),

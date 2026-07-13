@@ -7,7 +7,7 @@ The Instructions section stores VM instructions in 8-byte bytecode words. A
 instructions_offset + CodeAddr * 8
 ```
 
-`CodeAddr(0)` is a valid instruction address, including as an entry-point target.
+`CodeAddr(0)` is a valid instruction address, including as an entry point target.
 In an encoded successor operand, raw `0` may instead mean terminal; non-terminal
 successors decode as `SuccessorAddr`, which cannot contain zero. Call targets and
 return addresses are always nonzero.
@@ -86,30 +86,30 @@ EffectOp (u16)
 └──────────────┴─────────────────────┘
 ```
 
-| Opcode | Name            | Payload       |
-| :----- | :-------------- | :------------ |
-| 0      | `Node`          | -             |
-| 1      | `ListOpen`      | -             |
-| 2      | `ArrayPush`     | -             |
-| 3      | `ListClose`     | -             |
-| 4      | `RecordOpen`    | -             |
-| 5      | `RecordSet`     | Member index  |
-| 6      | `RecordClose`   | -             |
-| 7      | `VariantOpen`   | Variant index |
-| 8      | `VariantClose`  | -             |
-| 9      | `Absent`        | -             |
-| 10     | `SuppressBegin` | -             |
-| 11     | `SuppressEnd`   | -             |
-| 12     | `SpanStartAt`   | Span index    |
-| 13     | `SpanStart`     | Span index    |
-| 14     | `SpanEnd`       | Span index    |
-| 15     | `ScalarOpen`    | -             |
-| 16     | `ScalarMark`    | -             |
-| 17     | `StrClose`      | -             |
-| 18     | `BoolClose`     | Boolean 0/1   |
-| 19     | `NodeStr`       | -             |
-| 20     | `NodeBool`      | -             |
-| 21     | `BoolValue`     | Boolean 0/1   |
+| Opcode | Name            | Payload      |
+| :----- | :-------------- | :----------- |
+| 0      | `Node`          | -            |
+| 1      | `ListOpen`      | -            |
+| 2      | `ArrayPush`     | -            |
+| 3      | `ListClose`     | -            |
+| 4      | `RecordOpen`    | -            |
+| 5      | `RecordSet`     | Member index |
+| 6      | `RecordClose`   | -            |
+| 7      | `VariantOpen`   | Member index |
+| 8      | `VariantClose`  | -            |
+| 9      | `Absent`        | -            |
+| 10     | `SuppressBegin` | -            |
+| 11     | `SuppressEnd`   | -            |
+| 12     | `SpanStartAt`   | Span index   |
+| 13     | `SpanStart`     | Span index   |
+| 14     | `SpanEnd`       | Span index   |
+| 15     | `ScalarOpen`    | -            |
+| 16     | `ScalarMark`    | -            |
+| 17     | `StrClose`      | -            |
+| 18     | `BoolClose`     | Boolean 0/1  |
+| 19     | `NodeStr`       | -            |
+| 20     | `NodeBool`      | -            |
+| 21     | `BoolValue`     | Boolean 0/1  |
 
 Match effects execute only after navigation and all match checks succeed, in
 the list order encoded on that instruction. Span payloads index the Spans
@@ -170,7 +170,7 @@ counts (u16)
 - `neg`: number of negated field IDs, max 7.
 - `succ`: number of successors, max 31.
 - `predicate`: one bit; when set, two payload slots hold the predicate.
-- `missing`: one bit; when set, the node must be a tree-sitter MISSING node (a
+- `missing`: one bit; when set, the node must be a Tree-sitter MISSING node (a
   zero-byte node inserted by error recovery) — the `(MISSING …)` constraint.
   Independent of `predicate`; it forces at least the `Match16` form since the
   `Match8` fast path has no counts word.
@@ -287,8 +287,8 @@ The loader verifies:
   every unit effect has a zero payload;
 - calls and returns uphold cursor-depth neutrality;
 - ordinary calls target matched-only bodies, split calls target bodies with
-  both outcomes, and entry-point wrappers return matched only;
-- the committed match journal cannot underflow the materializer stack or
-  suppression depth, and all list/record/variant/scalar frames are balanced;
+  both outcomes, and entry point wrappers return matched only;
+- every accepted output-event path keeps the materializer stack balanced;
+- suppression effects cannot underflow their depth and finish balanced;
 - the committed match journal cannot underflow or mis-nest the inspection span
   stack.

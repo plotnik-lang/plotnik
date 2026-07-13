@@ -1,8 +1,8 @@
 # Runtime Engine
 
-The VM executes compiled query graphs against a tree-sitter tree. It walks a
-validated bytecode module, records committed effects, and materializes the final
-JSON value after a match accepts.
+The VM executes compiled query graphs against a Tree-sitter tree. It walks a
+validated bytecode module, records a rollbackable match journal, and
+materializes the final JSON value after a match accepts.
 
 ## VM State
 
@@ -22,7 +22,7 @@ struct Frame {
 }
 ```
 
-`cursor` is restored through tree-sitter descendant indexes stored in
+`cursor` is restored through Tree-sitter descendant indexes stored in
 checkpoints. Under sustained wide backtracking, a bounded pool of cursor
 snapshots takes over: the newest checkpoints restore by copying a saved cursor
 (`reset_to`, O(depth)) instead of re-navigating from an index. `frames` is an
@@ -141,7 +141,8 @@ Events are appended only on paths that have not backtracked. Suppression (`@_`)
 increments a depth counter; ordinary output events are skipped while the counter
 is non-zero. Scalar marks bypass suppression so an enclosing `:: str` or
 `:: bool` value can retain provenance across a suppressed nested value. Scalar
-open and close events obey suppression, so `matches` records no scalar data.
+open and close events obey suppression, so `matches` records no scalar output
+events.
 
 ```rust
 pub enum JournalEvent<'t> {
@@ -192,7 +193,7 @@ matched node; a real zero-byte node contributes `Some(n..n)`. Consequently
 `BoolClose` takes its value only from its encoded boolean; marks provide
 result provenance and never implement truthiness.
 Direct node scalars use `NodeStr` or `NodeBool` instead of allocating a scalar
-frame; framed effects remain the general document-bounding-range representation.
+frame; framed events remain the general document-bounding-range representation.
 Non-inspection lowering has no consumer for boolean source provenance, so it
 emits `BoolValue(true)` for a present value instead of `NodeBool` or a balanced
 boolean frame. Inspection lowering retains the provenance-carrying forms.
@@ -205,16 +206,17 @@ entry point value:
 
 - Record result: `RecordOpen`, call body, `RecordClose`, return.
 - Node result: call body, `Node`, return.
-- Option/list/variant/scalar result: call body, return; the body already
+- Option, list, variant, or leaf result: call body, return; the body already
   produces the pending value.
 - Match-only output: call body, return; materialization produces `null`.
 
 ## Materialization
 
-The materializer is a stack machine over the committed match journal. Producers
-(`Node`, `Absent`, and close effects) place a value in a `pending` register.
-Consumers (`RecordSet`, `ArrayPush`) take that pending value and attach it to the current
-builder frame. Open effects push builder frames; close effects pop them and
+The materializer is a stack machine over `OutputEvents`, the logical
+result-construction view of the committed match journal. Producers (`Node`,
+`Absent`, and close events) place a value in a `pending` register.
+Attachment events (`RecordSet`, `ArrayPush`) take that pending value and add it
+to the current builder frame. Open events push builder frames; close events pop them and
 produce the completed value.
 
 Scalar frames are part of the same balanced frame algebra as lists, records,
@@ -239,10 +241,10 @@ so these materializer assertions are inside-zone invariants.
 A run is bounded by two resources, each a `Limit` (`Auto`, `Of(n)`, or
 `Unbounded`):
 
-| Resource | `Auto` default              | Bounds                                               |
-| -------- | --------------------------- | ---------------------------------------------------- |
-| Fuel     | `1M + 1024 * node_count`    | matcher work (one unit per dispatch today)           |
-| Memory   | `64 MiB + 256 * node_count` | live runtime heap (frame, checkpoint, effect arenas) |
+| Resource | `Auto` default              | Bounds                                                                     |
+| -------- | --------------------------- | -------------------------------------------------------------------------- |
+| Fuel     | `1M + 1024 * node_count`    | matcher work (one unit per dispatch today)                                 |
+| Memory   | `64 MiB + 256 * node_count` | live runtime heap (frame, checkpoint, journal, and cursor-snapshot arenas) |
 
 Both `Auto` ceilings scale linearly with the source's node count. Exhaustion
 returns `RuntimeError` (`OutOfFuel` or `MemoryLimitExceeded`), never a panic.
@@ -259,9 +261,11 @@ the bound (`LimitExceeded::DecodeDepth`) while `matches` suppresses output and
 never decodes a result. The VM does not track or enforce decode depth: its
 backtracking and materialization paths are iterative.
 
-## Trivia Handling
+## Navigation Node Classes
 
-The VM reads tree-sitter's per-node `is_extra` bit at runtime. `*Skip`
-navigation skips trivia (`!node.is_named() || node.is_extra()`); `*SkipExtras`
-skips only extras. A node is never skipped if it matches the current target, so
-`(comment)` still matches comments.
+The VM reads Tree-sitter's per-node `is_extra` bit at runtime. Low-level
+navigation calls a node _trivia_ when it is anonymous or extra; this is a
+Plotnik skip class, not a claim that the node is semantically insignificant.
+`*Skip` navigation admits that class, while `*SkipExtras` admits only extras. A
+node is never skipped if it matches the current target, so `(comment)` still
+matches comments.

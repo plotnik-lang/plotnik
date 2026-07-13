@@ -2,7 +2,7 @@ Q = (function_declaration
   condition: (identifier) @name
 ) @fn
 ------------------ DIAGNOSTICS -------------------
-error: field `condition` is not valid on this node kind
+error: grammar field `condition` is not valid on this node kind
  --> query.ptk:2:3
   |
 1 | Q = (function_declaration
@@ -10,4 +10,4 @@ error: field `condition` is not valid on this node kind
 2 |   condition: (identifier) @name
   |   ^^^^^^^^^
   |
-help: valid fields for `function_declaration`: `body`, `name`, `parameters`
+help: valid grammar fields for `function_declaration`: `body`, `name`, `parameters`

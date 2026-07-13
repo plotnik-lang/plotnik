@@ -1,6 +1,6 @@
 Q = (identifier) @x :: Node
 ------------------ DIAGNOSTICS -------------------
-warning: this capture already has type `Node`; naming it `Node` has no effect
+warning: this capture already has type `Node`; naming it `Node` won't have an effect
  --> query.ptk:1:24
   |
 1 | Q = (identifier) @x :: Node

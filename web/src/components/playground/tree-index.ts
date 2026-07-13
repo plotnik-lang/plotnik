@@ -8,7 +8,7 @@ import type { DumpChunk, DumpNode } from "./protocol";
    Pure text/offset logic only — everything that touches the DOM (pointer
    hit-testing, rect measurement) lives in tree-dom.ts. In the playground's
    join-table framing (docs/wip/playground-design.md §2) this is the tree
-   pane's table: dump range ↔ source range per node. */
+   pane's table: dump range ↔ document range per node. */
 
 export interface Range16 {
   from: number;

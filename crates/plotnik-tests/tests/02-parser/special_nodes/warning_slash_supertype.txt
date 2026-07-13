@@ -1,6 +1,6 @@
 Q = (expression/binary_expression)
 ------------------ DIAGNOSTICS -------------------
-warning: `supertype/subtype` paths are tree-sitter syntax
+warning: `supertype/subtype` paths are Tree-sitter syntax
  --> query.ptk:1:16
   |
 1 | Q = (expression/binary_expression)

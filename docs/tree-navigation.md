@@ -1,6 +1,6 @@
 # Tree Navigation
 
-How the VM navigates tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-instructions.md](binary-format/06-instructions.md).
+How the VM navigates Tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-instructions.md](binary-format/06-instructions.md).
 
 ## TreeCursor API
 
@@ -155,7 +155,9 @@ With `Nav::DownExact`:
 
 ## Trivia
 
-**Trivia** = anonymous nodes + nodes tree-sitter marks as `extra` for that specific parse instance.
+**Trivia** is the low-level Plotnik navigation class containing anonymous nodes
+and nodes Tree-sitter marks as `extra` for that parse instance. The name describes
+skip behavior; it does not claim every member is semantically insignificant.
 
 The `*Skip` modes skip trivia automatically but fail if a non-trivia node must be skipped.
 
@@ -165,17 +167,19 @@ The VM reads the parser's `Node::is_extra()` bit at runtime; there is no bytecod
 
 ## Anchor Lowering
 
-Anchors compile to `Nav` variants by spelling and operand type:
+Anchors compile to `Nav` variants by spelling and path-specific namedness:
 
-| Position              | Named-only `.`    | Anonymous-involved `.` | `.!` exact anchor |
-| --------------------- | ----------------- | ---------------------- | ----------------- |
-| Start of children     | `DownSkip`        | `DownSkipExtras`       | `DownExact`       |
-| Between sibling items | `NextSkip`        | `NextSkipExtras`       | `NextExact`       |
-| End of children       | `UpSkipTrivia(1)` | `UpSkipExtras(1)`      | `UpExact(1)`      |
+| Position              | Both sides named `.` | Either side not definitely named `.` | `.!` exact anchor |
+| --------------------- | -------------------- | ------------------------------------ | ----------------- |
+| Start of children     | `DownSkip`           | `DownSkipExtras`                     | `DownExact`       |
+| Between sibling items | `NextSkip`           | `NextSkipExtras`                     | `NextExact`       |
+| End of children       | `UpSkipTrivia(1)`    | `UpSkipExtras(1)`                    | `UpExact(1)`      |
 
 `.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows no child node in the constrained gap.
 
-Bare `_` is an anonymous wildcard, so `(a) . _` uses extras-only navigation. `(_)` is a named wildcard, so `(a) . (_)` uses trivia-skipping navigation.
+Bare `_` may match named or anonymous nodes, so it is not definitely named and
+`(a) . _` uses extras-only navigation. `(_)` matches only named nodes, so
+`(a) . (_)` uses trivia-skipping navigation.
 
 An anchor next to an alternation is classified per alternative on both sides. Before: `(a) . [(b) ","]` uses `NextSkip` for `(b)` and `NextSkipExtras` for `","`. After a named follower: `[(b) ","] . (a)` emits two copies of the follower's entry instruction — `NextSkip` and `NextSkipExtras`, sharing successors — and routes the named `(b)` path to the `NextSkip` copy and the `","` path to the `NextSkipExtras` copy. Only one copy runs per match path, so duplicated capture effects fire exactly once.
 

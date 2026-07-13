@@ -1,6 +1,6 @@
 //! Definition root-extent pre-pass.
 //!
-//! Root extent, unlike output types, needs no SCC deferral: a reference has its
+//! Root extent, unlike result types, needs no SCC deferral: a reference has its
 //! target's extent, computable to a fixpoint over the definition graph before
 //! inference runs. Inference then never guesses. The former optimistic
 //! `SingleNode` placeholder for recursive targets tainted every delegating

@@ -39,10 +39,6 @@ fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
         .arg(limits_preset_arg().hide(true))
 }
 
-fn with_hidden_raw_arg(cmd: Command) -> Command {
-    cmd.arg(raw_arg().hide(true))
-}
-
 fn with_hidden_json_arg(cmd: Command) -> Command {
     cmd.arg(json_arg().hide(true))
 }
@@ -173,8 +169,8 @@ pub fn check_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_runtime_limit_args(with_hidden_raw_arg(with_hidden_trace_args(
-        with_hidden_exec_args(with_hidden_source_args(cmd)),
+    with_hidden_runtime_limit_args(with_hidden_trace_args(with_hidden_exec_args(
+        with_hidden_source_args(cmd),
     )))
 }
 
@@ -199,8 +195,8 @@ pub fn dump_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_raw_arg(
-        with_hidden_trace_args(with_hidden_exec_args(with_hidden_source_args(cmd))),
+    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_trace_args(
+        with_hidden_exec_args(with_hidden_source_args(cmd)),
     )))
 }
 
@@ -232,8 +228,8 @@ pub fn infer_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_raw_arg(
-        with_hidden_trace_args(with_hidden_exec_args_partial(with_hidden_source_args(cmd))),
+    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_trace_args(
+        with_hidden_exec_args_partial(with_hidden_source_args(cmd)),
     )))
 }
 
@@ -270,7 +266,7 @@ pub fn run_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_raw_arg(with_hidden_trace_args(cmd)))
+    with_hidden_json_arg(with_hidden_trace_args(cmd))
 }
 
 pub fn trace_command() -> Command {
@@ -305,10 +301,10 @@ pub fn trace_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_raw_arg(
+    with_hidden_json_arg(
         cmd.arg(compact_arg().hide(true))
             .arg(include_points_arg().hide(true)),
-    ))
+    )
 }
 
 pub fn inspect_command() -> Command {
@@ -343,11 +339,9 @@ pub fn inspect_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_raw_arg(
-        cmd.arg(compact_arg().hide(true))
-            .arg(include_points_arg().hide(true))
-            .arg(no_result_arg().hide(true)),
-    )
+    cmd.arg(compact_arg().hide(true))
+        .arg(include_points_arg().hide(true))
+        .arg(no_result_arg().hide(true))
 }
 
 pub fn lang_command() -> Command {

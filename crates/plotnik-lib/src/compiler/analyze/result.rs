@@ -162,7 +162,7 @@ impl ResultTypeLayout {
                 (
                     type_id,
                     u32::try_from(index + usize::from(no_value))
-                        .expect("output type count fits the wire type space"),
+                        .expect("result type count fits the wire type space"),
                 )
             })
             .collect();
@@ -198,7 +198,7 @@ impl ResultTypeLayout {
         *self
             .output_ids
             .get(&type_id)
-            .expect("reachable output type has a projected identity")
+            .expect("reachable result type has a projected identity")
     }
 
     pub(crate) fn contains(&self, type_id: TypeId) -> bool {

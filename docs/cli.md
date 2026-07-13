@@ -1,6 +1,6 @@
 # Plotnik CLI Guide
 
-> Query language for tree-sitter syntax trees with type inference.
+> Query language for Tree-sitter syntax trees with type inference.
 
 ## Quick Start
 
@@ -102,19 +102,19 @@ Requires a language via `-l` or a shebang; node kinds are resolved to grammar ID
 
 ### check
 
-Validate a query. Like `cargo check`, this parses, analyzes, links, lowers, and
+Validate a query. Like `cargo check`, this parses, analyzes, binds, lowers, and
 verifies the shared executor contracts without selecting an emission target.
 
 ```sh
 # Validate syntax, types, recursion (no grammar)
 plotnik check -q 'Q = (identifier) @id'
 
-# Also validate node kinds and fields against grammar
+# Also validate node kinds and grammar fields
 plotnik check -q 'Q = (function_declaration) @fn' -l typescript
 ```
 
-Without `-l`: validates syntax, type inference, recursion rules, alt consistency.
-With `-l`: also validates node kinds and field names exist in grammar.
+Without `-l`: validates syntax, type inference, recursion rules, and alternative-label consistency.
+With `-l`: also validates that node kinds and grammar-field names exist.
 
 **Flags:**
 
@@ -177,7 +177,7 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 ### generate
 
 Generate a self-contained compiled matcher module. Rust is the first target;
-the generated file contains typed output types, `parse`/`matches` entry points,
+the generated file contains typed result types, `parse`/`matches` entry points,
 and the matcher that runs on `plotnik-rt`.
 
 ```sh
@@ -194,7 +194,7 @@ plotnik generate -q 'Q = (program)' --target rust -l javascript
 ```
 
 The output records the grammar name, SHA-256 of the exact `grammar.json` bytes,
-and its source. At runtime, the generated matcher verifies every kind and field
+and its source. At runtime, the generated matcher verifies every node-kind and grammar-field
 id it uses against the tree's live language. If verification fails, regenerate
 with `--grammar` pointing at the parser package used in production.
 
@@ -213,7 +213,7 @@ Language information and grammar tools.
 
 #### lang list
 
-List all supported tree-sitter languages with their aliases.
+List all supported Tree-sitter languages with their aliases.
 
 ```sh
 plotnik lang list
@@ -243,10 +243,10 @@ The output uses a syntax similar to Plotnik queries:
 - `"literal"` — anonymous node (queryable)
 - `(_hidden ...)` — hidden rule (not queryable, children inline)
 - `{...}` — sequence (ordered children)
-- `[...]` — alternation (first match)
+- `[...]` — alternation
 - `? * +` — quantifiers
 - `"x"!` — immediate token (no whitespace before)
-- `field: ...` — named field
+- `field: ...` — grammar-field constraint
 - `T :: supertype` — supertype declaration
 
 ### run

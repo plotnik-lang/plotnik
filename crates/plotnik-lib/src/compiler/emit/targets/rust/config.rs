@@ -48,7 +48,7 @@ impl Config {
         self
     }
 
-    /// Also emit `SerializeWithSource` impls for the output types.
+    /// Also emit `SerializeWithSource` impls for the result types.
     pub fn serde(mut self, enabled: bool) -> Self {
         self.rust_types = self.rust_types.serde(enabled);
         self

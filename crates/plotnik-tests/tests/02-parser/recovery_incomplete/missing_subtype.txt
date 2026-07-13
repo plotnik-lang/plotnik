@@ -1,6 +1,6 @@
 Q = (expression/)
 ------------------ DIAGNOSTICS -------------------
-error: expected a subtype after `/`
+error: expected a subtype after `#`
  --> query.ptk:1:17
   |
 1 | Q = (expression/)

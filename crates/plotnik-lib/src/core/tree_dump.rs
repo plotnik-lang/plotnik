@@ -47,7 +47,7 @@ pub struct DumpChunk {
 /// in pre-order, so ranges of a node's descendants nest inside its own.
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct DumpNode {
-    /// Byte range in the source text.
+    /// Document byte range in the source text.
     pub src_start: usize,
     pub src_end: usize,
     /// Byte range in the concatenated dump text.
@@ -76,7 +76,7 @@ enum Step<'t> {
 }
 
 /// Dump a parsed tree as chunks of Plotnik pattern syntax, plus a node table
-/// mapping each rendered node back to its source range.
+/// mapping each rendered node back to its document byte range.
 ///
 /// The source tree is untrusted and can nest past any native-stack budget, so
 /// the walk uses an explicit work stack rather than native recursion.

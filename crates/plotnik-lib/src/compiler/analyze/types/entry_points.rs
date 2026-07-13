@@ -1,4 +1,4 @@
-//! Definition-output checks derived from inferred types.
+//! Entry-point eligibility checks derived from inferred patterns.
 
 use std::collections::HashSet;
 
@@ -13,12 +13,13 @@ use crate::compiler::parse::ast::Root;
 
 use super::type_check::TypeAnalysis;
 
-/// Report every definition that produces no inferred output.
+/// Report every definition whose body never reached pattern analysis.
 ///
-/// Value-less bodies (`.`, `-field`, `.!`) produce no type, so they are absent
-/// from `TypeAnalysis::iter_def_output()`. The AST is the source of truth for the
-/// original definition list, including definitions that never reached the symbol
-/// table.
+/// Positional assertions (`.`, `-field`, `.!`) are not patterns by themselves,
+/// so definitions containing only one are absent from
+/// `TypeAnalysis::iter_def_output()`. The AST is the source of truth for the
+/// original definition list, including definitions that never reached name
+/// resolution.
 pub fn check_entry_points(
     ast_map: &IndexMap<SourceId, Root>,
     interner: &Interner,
@@ -26,7 +27,7 @@ pub fn check_entry_points(
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) {
-    let output_defs: HashSet<Symbol> = type_analysis
+    let analyzed_defs: HashSet<Symbol> = type_analysis
         .iter_def_output()
         .map(|(def_id, _)| dependency_analysis.def_name_sym(def_id))
         .collect();
@@ -36,10 +37,10 @@ pub fn check_entry_points(
         for def in root.defs() {
             any_defs = true;
             let Some(name) = def.name() else { continue };
-            let has_output = interner
+            let was_analyzed = interner
                 .get(name.text())
-                .is_some_and(|sym| output_defs.contains(&sym));
-            if !has_output {
+                .is_some_and(|sym| analyzed_defs.contains(&sym));
+            if !was_analyzed {
                 diag.report(
                     DiagnosticKind::NoEntryPoints,
                     Span::new(*source_id, name.text_range()),

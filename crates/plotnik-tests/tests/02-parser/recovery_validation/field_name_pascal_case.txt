@@ -1,6 +1,6 @@
 Q = (call Name: (a))
 ------------------ DIAGNOSTICS -------------------
-error: field names must be snake_case
+error: grammar field names must be snake_case
  --> query.ptk:1:11
   |
 1 | Q = (call Name: (a))
@@ -11,4 +11,4 @@ help: use `name`
 1 - Q = (call Name: (a))
 1 + Q = (call name: (a))
   |
-help: fields come from the grammar and are snake_case
+help: grammar field names are snake_case

@@ -27,7 +27,7 @@ pub enum DiagnosticKind {
 
     ExpectedExpression,
     ExpectedCaptureType,
-    ExpectedFieldName,
+    ExpectedGrammarFieldName,
     ExpectedSubtype,
     ExpectedPredicateValue,
 
@@ -40,13 +40,13 @@ pub enum DiagnosticKind {
     AnchorInAlternation,
     QuantifiedAnchor,
     CapturedAnchor,
-    AnchorAsFieldValue,
+    AnchorAsGrammarFieldValue,
     NegatedFieldInAlternation,
     NegatedFieldInSequence,
     QuantifiedNegatedField,
     CapturedNegatedField,
-    NegatedFieldAsFieldValue,
-    InvalidFieldEquals,
+    NegatedFieldAsGrammarFieldValue,
+    InvalidGrammarFieldEquals,
     InvalidSupertypeSyntax,
     InvalidCaptureTypeSyntax,
     ErrorTakesNoArguments,
@@ -61,7 +61,7 @@ pub enum DiagnosticKind {
     CaptureNameInvalid,
     DefNameInvalid,
     AlternativeLabelInvalid,
-    FieldNameInvalid,
+    GrammarFieldNameInvalid,
     CaptureTypeNameInvalid,
     TreeSitterSequenceSyntaxDeprecated,
     NegationSyntaxDeprecated,
@@ -73,7 +73,7 @@ pub enum DiagnosticKind {
     DuplicateAlternativeLabel,
     RecursionWithoutEscape,
     RecursionWithoutProgress,
-    FieldSequenceValue,
+    GrammarFieldSequenceValue,
     AnchorWithoutContext,
 
     IncompatibleTypes,
@@ -109,9 +109,9 @@ pub enum DiagnosticKind {
 
     UnknownNodeKind,
     MissingKindNotToken,
-    UnknownField,
-    FieldNotOnNodeKind,
-    InvalidFieldChildType,
+    UnknownGrammarField,
+    GrammarFieldNotOnNodeKind,
+    InvalidGrammarFieldChildKind,
     InvalidChildType,
     UnsupportedSupertype,
     BareSupertype,
@@ -174,7 +174,7 @@ impl DiagnosticKind {
             self,
             Self::ExpectedExpression
                 | Self::ExpectedCaptureType
-                | Self::ExpectedFieldName
+                | Self::ExpectedGrammarFieldName
                 | Self::ExpectedSubtype
                 | Self::ExpectedPredicateValue
         )
@@ -192,7 +192,7 @@ impl DiagnosticKind {
         let text = match self {
             Self::ExpectedSubtype => "e.g., `expression#binary_expression`",
             Self::ExpectedCaptureType => "e.g., `:: str` or `:: MyType` after a capture",
-            Self::ExpectedFieldName => "e.g., `-value`",
+            Self::ExpectedGrammarFieldName => "e.g., `-value`",
             Self::EmptyTree => "use `(_)` to match any named node, or `_` for any node",
             Self::EmptyAnonymousNode => {
                 "anonymous nodes match literal tokens, like `\"+\"` or `\";\"`"
@@ -206,12 +206,12 @@ impl DiagnosticKind {
             Self::CaptureTypeWithoutCapture => {
                 "capture types attach to a regular capture: `(node) @name :: str`"
             }
-            Self::CaptureNameInvalid => "captures become fields in the output",
-            Self::DefNameInvalid => "definitions become types in the output",
+            Self::CaptureNameInvalid => "capture names become result field names",
+            Self::DefNameInvalid => "definition names become result type names",
             Self::AlternativeLabelInvalid => {
                 "alternative labels name variant cases when the alternation produces a value"
             }
-            Self::FieldNameInvalid => "fields come from the grammar and are snake_case",
+            Self::GrammarFieldNameInvalid => "grammar field names are snake_case",
             Self::TreeSitterSequenceSyntaxDeprecated => {
                 "use `{(a) (b)}` to match a sequence of siblings"
             }
@@ -234,20 +234,20 @@ impl DiagnosticKind {
             Self::QuantifiedAnchor | Self::CapturedAnchor => {
                 "anchors constrain position and produce no value"
             }
-            Self::AnchorAsFieldValue => {
-                "anchors order siblings: `(parent (a) . (b))`; a field needs a pattern to match"
+            Self::AnchorAsGrammarFieldValue => {
+                "anchors order siblings: `(parent (a) . (b))`; a grammar field needs a pattern to match"
             }
             Self::NegatedFieldInAlternation => {
-                "negate the field inside a node alternative: `[(a -field) (b)]`"
+                "negate the grammar field inside a node alternative: `[(a -field) (b)]`"
             }
             Self::NegatedFieldInSequence => {
-                "a negated field applies to the enclosing node; make it a direct child: `(node -field {...})`"
+                "a negated grammar field applies to the enclosing node; make it a direct child: `(node -field {...})`"
             }
             Self::QuantifiedNegatedField | Self::CapturedNegatedField => {
-                "a negated field asserts absence and produces no value"
+                "a negated grammar field asserts absence and produces no value"
             }
-            Self::NegatedFieldAsFieldValue => {
-                "a negated field stands alone as a child: `(node -field)`"
+            Self::NegatedFieldAsGrammarFieldValue => {
+                "a negated grammar field stands alone as a child: `(node -field)`"
             }
             Self::UnusedAlternativeLabels => {
                 "capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them"
@@ -264,8 +264,8 @@ impl DiagnosticKind {
             Self::ExpectedPredicateValue => {
                 "e.g., `(identifier == \"foo\")` or `(identifier =~ /foo/)`"
             }
-            Self::FieldSequenceValue => {
-                "a field holds a single child node; match one pattern, or move the sequence outside the field"
+            Self::GrammarFieldSequenceValue => {
+                "a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint"
             }
             Self::UndefinedReference => {
                 "`(Name)` uses a definition; define `Name = ...` or check the spelling"
@@ -322,7 +322,7 @@ impl DiagnosticKind {
                 "wrap the pattern in the grammar's root node, e.g. `(program ...)`"
             }
             Self::NoEntryPoints => {
-                "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
+                "a definition selectable as an entry point must match exactly one root node; wrap constraints in a node pattern, e.g. `Q = (program .)`"
             }
             Self::EmptyQuery => "add a definition, e.g. `Q = (identifier) @id`",
             Self::UnsupportedSupertype | Self::BareSupertype => {
@@ -343,8 +343,8 @@ impl DiagnosticKind {
             Self::UnclosedString => "unterminated string",
             Self::ExpectedExpression => "expected an expression",
             Self::ExpectedCaptureType => "expected a capture type after `::`",
-            Self::ExpectedFieldName => "expected a field name",
-            Self::ExpectedSubtype => "expected a subtype after `/`",
+            Self::ExpectedGrammarFieldName => "expected a grammar field name",
+            Self::ExpectedSubtype => "expected a subtype after `#`",
             Self::ExpectedPredicateValue => "expected a string or regex after the operator",
             Self::EmptyTree => "empty `()` matches nothing",
             Self::EmptyAnonymousNode => "empty string matches nothing",
@@ -355,15 +355,17 @@ impl DiagnosticKind {
             Self::AnchorInAlternation => "anchors cannot appear directly in alternations",
             Self::QuantifiedAnchor => "anchors cannot be quantified",
             Self::CapturedAnchor => "anchors cannot be captured",
-            Self::AnchorAsFieldValue => "an anchor cannot be a field value",
+            Self::AnchorAsGrammarFieldValue => "an anchor cannot be a grammar-field value",
             Self::NegatedFieldInAlternation => {
-                "negated fields cannot appear directly in alternations"
+                "negated grammar fields cannot appear directly in alternations"
             }
-            Self::NegatedFieldInSequence => "negated fields cannot appear in sequences",
-            Self::QuantifiedNegatedField => "negated fields cannot be quantified",
-            Self::CapturedNegatedField => "negated fields cannot be captured",
-            Self::NegatedFieldAsFieldValue => "a negated field cannot be a field value",
-            Self::InvalidFieldEquals => "fields use `:`, not `=`",
+            Self::NegatedFieldInSequence => "negated grammar fields cannot appear in sequences",
+            Self::QuantifiedNegatedField => "negated grammar fields cannot be quantified",
+            Self::CapturedNegatedField => "negated grammar fields cannot be captured",
+            Self::NegatedFieldAsGrammarFieldValue => {
+                "a negated grammar field cannot be a grammar-field value"
+            }
+            Self::InvalidGrammarFieldEquals => "grammar fields use `:`, not `=`",
             Self::InvalidSupertypeSyntax => "references cannot have supertypes",
             Self::InvalidCaptureTypeSyntax => "capture types use `::`, not `:`",
             Self::ErrorTakesNoArguments => "`(ERROR)` cannot have children",
@@ -372,22 +374,22 @@ impl DiagnosticKind {
             }
             Self::RefCannotHaveChildren => "references cannot have children",
             Self::ErrorMissingOutsideParens => "`ERROR` and `MISSING` must be parenthesized",
-            Self::UnsupportedPredicate => "tree-sitter predicates are not supported",
+            Self::UnsupportedPredicate => "Tree-sitter predicates are not supported",
             Self::UnexpectedToken => "unexpected token",
             Self::CaptureWithoutTarget => "expected a capture name after `@`",
             Self::CaptureTypeWithoutCapture => "capture type has no capture",
             Self::CaptureNameInvalid => "capture names must be snake_case",
             Self::DefNameInvalid => "definition names must be PascalCase",
             Self::AlternativeLabelInvalid => "alternative labels must be PascalCase",
-            Self::FieldNameInvalid => "field names must be snake_case",
+            Self::GrammarFieldNameInvalid => "grammar field names must be snake_case",
             Self::CaptureTypeNameInvalid => {
                 "capture type names cannot contain punctuation or custom-name separators"
             }
             Self::TreeSitterSequenceSyntaxDeprecated => {
-                "parenthesized sequences are tree-sitter syntax"
+                "parenthesized sequences are Tree-sitter syntax"
             }
             Self::NegationSyntaxDeprecated => "`!field` negation is deprecated",
-            Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
+            Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are Tree-sitter syntax",
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAlternativeLabels => {
@@ -396,7 +398,7 @@ impl DiagnosticKind {
             Self::DuplicateAlternativeLabel => "duplicate alternative label",
             Self::RecursionWithoutEscape => "infinite recursion: no escape path",
             Self::RecursionWithoutProgress => "infinite recursion: cycle makes no progress",
-            Self::FieldSequenceValue => "field cannot match a sequence",
+            Self::GrammarFieldSequenceValue => "grammar field cannot match a sequence",
             Self::AnchorWithoutContext => "anchor needs an enclosing node",
             Self::IncompatibleTypes => "incompatible types",
             Self::UnusedAlternativeLabels => "alternative labels have no output effect here",
@@ -443,20 +445,20 @@ impl DiagnosticKind {
             Self::PredicateValueMismatch => "predicate operator and value do not match",
             Self::UnknownNodeKind => "unknown node kind",
             Self::MissingKindNotToken => "this kind is never inserted as a missing node",
-            Self::UnknownField => "unknown field",
-            Self::FieldNotOnNodeKind => "field not valid on this node kind",
-            Self::InvalidFieldChildType => "node kind not valid for this field",
+            Self::UnknownGrammarField => "unknown grammar field",
+            Self::GrammarFieldNotOnNodeKind => "grammar field not valid on this node kind",
+            Self::InvalidGrammarFieldChildKind => "node kind not valid for this grammar field",
             Self::InvalidChildType => "node kind not valid as child",
             Self::UnsupportedSupertype => "matching a supertype is not supported yet",
             Self::BareSupertype => "supertype is not a matchable node kind",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
-            Self::NegatedRequiredField => "this field is always present",
+            Self::NegatedRequiredField => "this grammar field is always present",
             Self::UnsatisfiablePattern => "pattern can never match",
             Self::QueryTooComplex => "query too complex to compile",
             Self::MissingDefName => "definition must be named",
             Self::TargetLimitExceeded => "emission target limit exceeded",
             Self::CompilerInvariantViolation => "compiler invariant violation",
-            Self::NoEntryPoints => "query produces no entry points",
+            Self::NoEntryPoints => "query defines no selectable entry point",
             Self::EmptyQuery => "query defines nothing",
         }
     }
@@ -470,7 +472,9 @@ impl DiagnosticKind {
             Self::RefCannotHaveChildren => {
                 "`{}` is a reference and cannot have children".to_string()
             }
-            Self::FieldSequenceValue => "field `{}` cannot match a sequence".to_string(),
+            Self::GrammarFieldSequenceValue => {
+                "grammar field `{}` cannot match a sequence".to_string()
+            }
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
             // The detail leads with the specific conflict; the kind name is not prefixed.
@@ -500,9 +504,11 @@ impl DiagnosticKind {
             Self::MissingKindNotToken => {
                 "`{}` has children — only leaf tokens can be missing nodes".to_string()
             }
-            Self::UnknownField => "`{}` is not a valid field".to_string(),
-            Self::FieldNotOnNodeKind => "field `{}` is not valid on this node kind".to_string(),
-            Self::InvalidFieldChildType => "{}".to_string(),
+            Self::UnknownGrammarField => "`{}` is not a valid grammar field".to_string(),
+            Self::GrammarFieldNotOnNodeKind => {
+                "grammar field `{}` is not valid on this node kind".to_string()
+            }
+            Self::InvalidGrammarFieldChildKind => "{}".to_string(),
             Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
             Self::UnsupportedSupertype => {
                 "matching the `{}#` supertype is not supported yet".to_string()

@@ -161,7 +161,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         }
     }
 
-    /// Conservative root-entry-point admissibility: return `false` only when the
+    /// Conservative entry point root admissibility: return `false` only when the
     /// definition's outermost node-consuming pattern is known not to be the grammar root.
     pub(super) fn pattern_can_match_root(
         &self,
@@ -230,7 +230,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 self.pattern_can_match_root(&located.wrap(first), grammar_root, seen_refs)
             }
             // Bare fields are already reported by grammar validation; avoid piling a
-            // root-entry-point warning onto malformed structure.
+            // entry point root warning onto malformed structure.
             Pattern::FieldPattern(_) => true,
         }
     }
@@ -492,7 +492,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             }
             Pattern::NodeWildcard(_) => {}
             // Alternations, quantifiers, and references are not checked here; a field value
-            // can't be a sequence (rejected earlier as `FieldSequenceValue`).
+            // can't be a sequence (rejected earlier as `GrammarFieldSequenceValue`).
             Pattern::Alternation(_)
             | Pattern::QuantifiedPattern(_)
             | Pattern::DefRef(_)

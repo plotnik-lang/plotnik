@@ -5,7 +5,7 @@ Q = (statement_block
   (binary_expression (Args))
 )
 ------------------ DIAGNOSTICS -------------------
-error: field `arguments` is not valid on this node kind
+error: grammar field `arguments` is not valid on this node kind
  --> query.ptk:1:8
   |
 1 | Args = arguments: (identifier)
@@ -14,7 +14,7 @@ error: field `arguments` is not valid on this node kind
 5 |   (binary_expression (Args))
   |    ----------------- on `binary_expression`
   |
-help: valid fields for `binary_expression`: `left`, `operator`, `right`
+help: valid grammar fields for `binary_expression`: `left`, `operator`, `right`
 
 error: `identifier` can't be the value of `arguments`
  --> query.ptk:1:20
@@ -22,7 +22,7 @@ error: `identifier` can't be the value of `arguments`
 1 | Args = arguments: (identifier)
   |        ---------   ^^^^^^^^^^
   |        |
-  |        field `arguments`
+  |        grammar field `arguments`
   |
 help: `arguments` accepts: `arguments`, `template_string`
 

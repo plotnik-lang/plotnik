@@ -28,7 +28,7 @@ warning: alternative labels have no output effect here: captures from the altern
   |
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 
-warning: parenthesized sequences are tree-sitter syntax
+warning: parenthesized sequences are Tree-sitter syntax
  --> query.ptk:3:10
   |
 3 |     Tag: (

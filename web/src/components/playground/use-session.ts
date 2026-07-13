@@ -24,7 +24,7 @@ export interface SessionInput {
   query: string;
   source: string;
   lang: string;
-  /** The user's entry-point pick; null means "default" (last entry point).
+  /** The user's entry point pick; null means "default" (last entry point).
       A pick absent from the compiled query falls back, and comes back when
       the entry point reappears. */
   entry: string | null;

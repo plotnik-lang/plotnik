@@ -22,12 +22,15 @@ impl InferVisitor<'_, '_> {
         let field_name = field
             .name()
             .map(|t| t.text().to_string())
-            .unwrap_or_else(|| "field".to_string());
+            .unwrap_or_else(|| "grammar field".to_string());
 
         let related = self.referenced_definition_range(value);
 
         let mut builder = self
-            .report(DiagnosticKind::FieldSequenceValue, value.text_range())
+            .report(
+                DiagnosticKind::GrammarFieldSequenceValue,
+                value.text_range(),
+            )
             .detail(field_name);
         if let Some((src, range)) = related {
             builder = builder.related_to(Span::new(src, range), "defined here");
@@ -318,8 +321,8 @@ fn capture_brackets(quant: &QuantifiedPattern) -> &'static str {
     }
 }
 
-/// Find same-named captures that belong to the alternation's output scope.
-/// Nested structured-capture scopes are excluded because their fields cannot
+/// Find same-named captures that belong to the alternation's result scope.
+/// Nested structured-capture scopes are excluded because their result fields cannot
 /// conflict here.
 fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
     let mut tokens = Vec::new();
@@ -331,7 +334,7 @@ fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
         .collect()
 }
 
-/// Collect captures that contribute fields to one output scope.
+/// Collect captures that contribute result fields to one result scope.
 fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToken>) {
     for child in scope_root.children() {
         if let Some(cap) = CapturedPattern::cast(child.clone()) {
@@ -347,7 +350,7 @@ fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToke
     }
 }
 
-/// Find the output scope that would receive the suggested capture.
+/// Find the result scope that would receive the suggested capture.
 fn enclosing_scope_root(node: &SyntaxNode) -> SyntaxNode {
     let mut root = node.clone();
     for ancestor in node.ancestors().skip(1) {
@@ -370,7 +373,7 @@ fn is_pattern_node(node: &SyntaxNode) -> bool {
     Pattern::cast(node.clone()).is_some()
 }
 
-/// Decide whether a capture exposes its inner fields to the surrounding output scope.
+/// Decide whether a capture exposes its inner result fields to the surrounding result scope.
 /// Plain node captures do; structured captures, repetition captures, and discards contain them.
 fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
     if cap.is_discard() {

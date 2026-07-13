@@ -4,7 +4,7 @@ Q = (program
   )* @funcs
 )
 -------------------- MATCHER ---------------------
-// Generated Plotnik query module: typed output types, `parse`/`matches` entry
+// Generated Plotnik query module: typed result types, `parse`/`matches` entry
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
@@ -236,7 +236,7 @@ mod matcher {
         run::<true, true, true>(tree, source, S23_Q_EP, resolved_limits(tree))
     }
 
-    /// Whether `Q` accepts, under [`LIMITS`], with data effects suppressed.
+    /// Whether `Q` accepts under [`LIMITS`] without recording output events.
     pub(super) fn q_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
         Ok(run::<true, true, false>(tree, source, S23_Q_EP, resolved_limits(tree))?.is_some())
     }
@@ -263,20 +263,20 @@ mod matcher {
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-    /// `RECORD_OUTPUT` controls whether data events are journaled; `matches`
+    /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
     /// disables it to avoid output allocation and decode-depth failures. (No
     /// let-chains: generated code targets the embedding crate's edition.)
-    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT: bool>(
+    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT_EVENTS: bool>(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         verify_language(tree);
-        let mut eng = if RECORD_OUTPUT {
+        let mut eng = if RECORD_OUTPUT_EVENTS {
             rt::Engine::new(tree.walk())
         } else {
-            rt::Engine::new_data_suppressed(tree.walk())
+            rt::Engine::new_match_only(tree.walk())
         };
         let mut fuel_used: u64 = 0;
         let mut ip = entry;
@@ -341,20 +341,20 @@ mod matcher {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::JournalEvent::ListClose);
-                eng.emit_data(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(funcs)
+                eng.emit_output_event(|_| rt::JournalEvent::ListClose);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(funcs)
                 Flow::Jump(S01_Q)
             }
             //   05  -ε-  [ListClose RecordSet(funcs)]     01
             S05_Q => {
-                eng.emit_data(|_| rt::JournalEvent::ListClose);
-                eng.emit_data(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(funcs)
+                eng.emit_output_event(|_| rt::JournalEvent::ListClose);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(funcs)
                 Flow::Jump(S01_Q)
             }
             //   07  -ε-  [RecordClose ArrayPush]          13, 03
             S07_Q => {
-                eng.emit_data(|_| rt::JournalEvent::RecordClose);
-                eng.emit_data(|_| rt::JournalEvent::ArrayPush);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
+                eng.emit_output_event(|_| rt::JournalEvent::ArrayPush);
                 eng.push_successors(&[S03_Q]);
                 Flow::Jump(S13_Q)
             }
@@ -363,7 +363,7 @@ mod matcher {
                 if !cand_s08_q(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::JournalEvent::RecordOpen);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
                 Flow::Jump(S10_Q)
             }
             //   09  ─‣┘  _                                07
@@ -409,7 +409,7 @@ mod matcher {
             }
             //   19  -ε-  [ListOpen]                       14, 05
             S19_Q => {
-                eng.emit_data(|_| rt::JournalEvent::ListOpen);
+                eng.emit_output_event(|_| rt::JournalEvent::ListOpen);
                 eng.push_successors(&[S05_Q]);
                 Flow::Jump(S14_Q)
             }
@@ -424,7 +424,7 @@ mod matcher {
             }
             //   21  -ε-  [RecordClose]                    20
             S21_Q_EP => {
-                eng.emit_data(|_| rt::JournalEvent::RecordClose);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
                 Flow::Jump(S20_Q_EP)
             }
             //   22       (Q)                              02 : 21
@@ -434,7 +434,7 @@ mod matcher {
             }
             //   23  -ε-  [RecordOpen]                     22
             S23_Q_EP => {
-                eng.emit_data(|_| rt::JournalEvent::RecordOpen);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
                 Flow::Jump(S22_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
@@ -483,8 +483,8 @@ mod matcher {
     /// what the original acceptance would have emitted.
     #[inline]
     fn finish_s10_q(eng: &mut rt::Engine<'_>) -> Flow {
-        eng.emit_data(|c| rt::JournalEvent::Node(c.node()));
-        eng.emit_data(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(name)
+        eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(name)
         Flow::Jump(S09_Q)
     }
 

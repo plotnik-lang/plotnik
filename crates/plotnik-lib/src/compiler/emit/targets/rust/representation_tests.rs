@@ -42,7 +42,7 @@ fn recursive_def(wrap: impl FnOnce(&mut TypeAnalysisBuilder, TypeId) -> TypeId) 
         RecordField::new(payload_ty),
     )]));
     let variants = BTreeMap::from([
-        (interner.intern("Leaf"), CasePayload::None),
+        (interner.intern("Leaf"), CasePayload::NoPayload),
         (interner.intern("Rec"), CasePayload::Record(payload)),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
@@ -94,7 +94,7 @@ fn shared_ref_node_boxes_only_inside_the_cycle() {
         RecordField::new(ref_ty),
     )]));
     let variants = BTreeMap::from([
-        (interner.intern("Leaf"), CasePayload::None),
+        (interner.intern("Leaf"), CasePayload::NoPayload),
         (interner.intern("Rec"), CasePayload::Record(payload)),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
@@ -220,8 +220,8 @@ fn node_free_enum_needs_no_lifetime() {
     builder.declare_definitions([(def, interner.intern("Holder"))]);
 
     let variants = BTreeMap::from([
-        (interner.intern("On"), CasePayload::None),
-        (interner.intern("Off"), CasePayload::None),
+        (interner.intern("On"), CasePayload::NoPayload),
+        (interner.intern("Off"), CasePayload::NoPayload),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     let holder = builder.intern_record(BTreeMap::from([(

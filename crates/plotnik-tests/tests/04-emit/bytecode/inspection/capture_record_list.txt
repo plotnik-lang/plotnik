@@ -62,7 +62,7 @@ P2 capture    71..77  source_id=0  T3.M1
 P3 quantifier 69..70  source_id=0
 P4 pattern    15..69  source_id=0
 P5 capture    60..65  source_id=0  T1.M0
-P6 field      41..45  source_id=0
+P6 grammar_field 41..45  source_id=0
 P7 pattern    47..59  source_id=0
 
 [instructions]

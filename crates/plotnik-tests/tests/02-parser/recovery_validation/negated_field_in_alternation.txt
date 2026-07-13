@@ -3,10 +3,10 @@ Q = [
   -key
 ]
 ------------------ DIAGNOSTICS -------------------
-error: negated fields cannot appear directly in alternations
+error: negated grammar fields cannot appear directly in alternations
  --> query.ptk:3:3
   |
 3 |   -key
   |   ^^^^
   |
-help: negate the field inside a node alternative: `[(a -field) (b)]`
+help: negate the grammar field inside a node alternative: `[(a -field) (b)]`

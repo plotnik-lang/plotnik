@@ -1,8 +1,8 @@
 # Plotnik Query Language Reference
 
-Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with definitions, recursion, and static type inference.
+Plotnik is a pattern-matching language for Tree-sitter syntax trees. It extends [Tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with definitions, recursion, and static type inference.
 
-**Pattern.** A _pattern_ is a query matcher over the source syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A named-node pattern `(kind)` matches a named node; an anonymous-node pattern `"text"` matches a literal token; `_` is the node wildcard. Sequences, alternations, quantifiers, fields, and captures are also patterns.
+**Pattern.** A _pattern_ is a query matcher over the source syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of `Pattern` nodes. A named-node pattern `(kind)` matches a named node; an anonymous-node pattern `"text"` matches a literal token; `_` is the node wildcard. Sequences, alternations, quantifiers, grammar-field constraints, and captures are also patterns.
 
 Tree-sitter predicates (`#eq?`, `#match?`) and directives (`#set!`) are not supported. Plotnik has its own inline predicate syntax (see [Predicates](#predicates)).
 
@@ -21,11 +21,11 @@ NFA-based cursor walk with backtracking.
   `?` or `*` quantifier, a group of nullable patterns, or a reference to such a definition)
   succeeds empty only after node-consuming outcomes are exhausted
 
-### Trivia Handling
+### Sibling Navigation
 
 Plotnik has three sibling-navigation tiers:
 
-1. **Default navigation is permissive.** Without an anchor, sibling patterns advance until they find a match, skipping named nodes, anonymous tokens, and tree-sitter `extra` nodes such as comments.
+1. **Default navigation is permissive.** Without an anchor, sibling patterns advance until they find a match, skipping named nodes, anonymous tokens, and Tree-sitter `extra` nodes such as comments.
 2. **`.` narrows navigation.** It always skips extras. When both sides are named, it also skips anonymous tokens such as punctuation. When either side is anonymous, it skips extras only.
 3. **`.!` is exact.** It allows no intervening syntax-tree node.
 
@@ -59,7 +59,9 @@ When either side is anonymous, `.` skips extras but not other anonymous tokens:
 (array "," . (string) @next)  ; comments tolerated, another token is not
 ```
 
-Bare `_` is anonymous, so `(a) . _` is extras-only. `(_)` is named, so `(a) . (_)` skips trivia.
+Bare `_` can match either a named or anonymous node, so `(a) . _` uses the
+extras-only policy. `(_)` matches only named nodes, so `(a) . (_)` may skip
+anonymous or extra nodes.
 
 An anchor next to an alternation applies per alternative on both sides. Before: `(a) . [(b) ","]` uses named-named soft adjacency for `(b)` and extras-only adjacency for `","`. After a named follower: `[(b) ","] . (a)` uses named-named soft adjacency for the `(b)` path and extras-only for the `","` path, so adding an anonymous alternative no longer makes the named alternatives stricter. When the follower is itself anonymous (`[(b) ","] . ","`), extras-only applies to every alternative, since both-sides-named never holds. (Some advanced forms still stay extras-only on every alternative — a reference or captured follower, a captured alternation, a quantified alternative, or an alternative that is a sequence containing punctuation; see [Tree Navigation](tree-navigation.md).)
 
@@ -81,9 +83,9 @@ Matches any `binary_expression` with an `identifier` in `left`, regardless of `o
 
 Sequences `{...}` advance through siblings in order, skipping non-matching nodes.
 
-### Field Constraints
+### Grammar-Field Constraints
 
-`field: pattern` requires the child to have that field AND match the pattern:
+`field: pattern` requires the child to occupy that grammar field and match the pattern:
 
 ```
 (binary_expression
@@ -92,7 +94,7 @@ Sequences `{...}` advance through siblings in order, skipping non-matching nodes
 )
 ```
 
-Fields participate in sequential matching — they're not independent lookups.
+Grammar fields participate in sequential matching — they're not independent lookups.
 
 ---
 
@@ -174,7 +176,7 @@ DeepSearch = [
 AllIdentifiers = (program (DeepSearch)* @found)
 ```
 
-The capture on the reference is what produces output — `found: DeepSearch[]`. A bare `(DeepSearch)*` would match the same structure and return nothing.
+The capture on the reference is what produces the result field — `found: DeepSearch[]`. A bare `(DeepSearch)*` would match the same structure and return nothing.
 
 ---
 
@@ -184,7 +186,7 @@ The capture on the reference is what produces output — `found: DeepSearch[]`. 
 | -------------------------- | ------------ | ------------------------------------ |
 | Definitions, labels, types | `PascalCase` | `Expr`, `Statement`, `BinaryOp`      |
 | Node kinds                 | `snake_case` | `function_declaration`, `identifier` |
-| Captures, fields           | `snake_case` | `@name`, `@func_body`                |
+| Captures, grammar fields   | `snake_case` | `@name`, `func_body:`                |
 
 Tree-sitter allows `@function.name`; Plotnik requires `@function_name` because captures map to result fields.
 
@@ -192,11 +194,11 @@ Tree-sitter allows `@function.name`; Plotnik requires `@function_name` because c
 
 ## Data Model
 
-Plotnik infers output types from your query. See [Type System](type-system.md) for full details.
+Plotnik infers result types from your query. See [Type System](type-system.md) for full details.
 
 ### Flat by Default
 
-Query nesting does NOT create output nesting. Within a definition, all captures bubble up to the nearest scope boundary:
+Query nesting does NOT create result nesting. Within a definition, all captures bubble up to the nearest scope boundary:
 
 ```
 (function_declaration
@@ -205,19 +207,19 @@ Query nesting does NOT create output nesting. Within a definition, all captures 
     (return_statement (expression) @retval)))
 ```
 
-Output type:
+Result type:
 
 ```typescript
 { name: Node, retval: Node }  // flat, not nested
 ```
 
-The pattern is 4 levels deep, but the output is flat. You're extracting specific pieces from a syntax tree, not reconstructing its shape.
+The pattern is 4 levels deep, but the result is flat. You're extracting specific pieces from a syntax tree, not reconstructing its shape.
 
-Definitions are the exception: references are **opaque**. A bare `(Item)` matches structurally and produces nothing; `(Item) @item` produces the definition's type. Fields never leak through a reference boundary. See [Type System: Definitions Are Types](type-system.md#definitions-are-types).
+Definitions are the exception: references are **opaque**. A bare `(Item)` matches structurally and produces nothing; `(Item) @item` produces the definition's type. Result fields never leak through a reference boundary. See [Type System: Definitions Are Types](type-system.md#definitions-are-types).
 
 ### Match-Only Definitions
 
-A definition with no output syntax is match-only. To return the matched root
+A definition with no result-producing syntax is match-only. To return the matched root
 node, capture it explicitly:
 
 ```
@@ -243,7 +245,7 @@ values. Add captures inside the definition, or capture a node pattern directly.
 item.**
 
 ```
-// ERROR: no boundary groups each iteration's fields
+// ERROR: no boundary groups each iteration's result fields
 (method_definition name: (identifier) @name)*
 
 // OK: @method groups one iteration; @methods collects the list
@@ -252,7 +254,7 @@ item.**
 ```
 
 This preserves record identity: each iteration produces one record instead of
-parallel lists that lose the association between fields.
+parallel lists that lose the association between result fields.
 
 Because references are opaque, repeating one is dimensionally simple — the definition's type is the element:
 
@@ -266,7 +268,7 @@ See [Type System: Repeated captures](type-system.md#repeated-captures-need-an-it
 
 ### The Node Type
 
-Default capture type — a reference to a tree-sitter node:
+Default capture type — a reference to a Tree-sitter node:
 
 ```
 interface Node {
@@ -281,22 +283,22 @@ zero-based `row` and a zero-based, byte-based `column`.
 
 ### Cardinality: Quantifiers → Lists
 
-Quantifiers determine whether a field is a single value, an option, or a list:
+Quantifiers determine whether a result field is a single value, an option, or a list:
 
-| Pattern   | Output Type      | Meaning                  |
+| Pattern   | Result Type      | Meaning                  |
 | --------- | ---------------- | ------------------------ |
 | `(x) @a`  | `a: T`           | exactly one              |
 | `(x)? @a` | `a: T \| null`   | zero or one              |
 | `(x)* @a` | `a: T[]`         | zero or more (node list) |
 | `(x)+ @a` | `a: [T, ...T[]]` | one or more (node list)  |
 
-Every declared field is **always present** in the output: a field with option type is
-`T | null` and materializes as `null` when it doesn't match (never an absent
-key), and a missing list is `[]` (never `null`). The output shape is stable.
+Every declared result field is **always present** in the result: an option-typed
+field is `T | null` and materializes as `null` when it doesn't match (never an
+absent key), and a list fallback is `[]` (never `null`). The result shape is stable.
 
 Node lists work when the quantified pattern has **no internal captures**. For patterns with internal captures, collect records:
 
-| Pattern         | Output Type       | Meaning              |
+| Pattern         | Result Type       | Meaning              |
 | --------------- | ----------------- | -------------------- |
 | `{...}* @items` | `items: T[]`      | zero or more records |
 | `{...}+ @items` | `items: [T, ...]` | one or more records  |
@@ -319,13 +321,13 @@ Capture a sequence `{...}` or alternation `[...]` to create a new scope. Braces 
 } @func
 ```
 
-Output type:
+Result type:
 
 ```typescript
 { func: { node: Node, name: Node, body: Node } }
 ```
 
-The `@func` capture on the sequence creates a nested scope. All captures inside (`@node`, `@name`, `@body`) become fields of that nested object.
+The `@func` capture on the sequence creates a nested scope. All captures inside (`@node`, `@name`, `@body`) become result fields of that nested object.
 
 ### Capture Types
 
@@ -344,15 +346,15 @@ not the built-in `str`. The common spellings `string` and `boolean` are
 diagnosed with fixes to `str` and `bool`.
 
 A built-in capture type is applied only after the ordinary capture has been
-validated, so it cannot legalize an invalid multi-node or valueless capture.
+validated, so it cannot legalize an invalid multi-node or no-value capture.
 `str` recursively preserves option and list dimensions: `Node?` becomes
 `string | null`, and `Node[]` becomes `string[]`. Every list item owns its
-own source range. A composite value becomes the source slice from its first
+own document byte range. A composite value becomes the source slice from its first
 matched node through its last; a valid zero-node value becomes `null`.
 
 `bool` means presence, not truthiness. A present option becomes `true` and its
 absent path becomes `false`; a required value is rejected unless the same
-field is omitted by an alternative. That alternative supplies `false`.
+result field is omitted by an alternative. That alternative supplies `false`.
 
 Replacing composite data with `str` or `bool` emits a warning.
 
@@ -371,12 +373,12 @@ compile error. `Node` and definition names are reserved. See
 subtree still matches structurally:
 
 ```
-; Structure required, no output at all
+; Structure required, no result value
 Q = (program
   (expression_statement (identifier) @x) @_
   (debugger_statement) @d
 )
-; Output: { d: Node }
+; Result: { d: Node }
 ```
 
 One use is intentionally discarding a labeled alternation's case identity. If a
@@ -386,12 +388,12 @@ warning:
 
 ```
 (program [A: (expression_statement) B: (debugger_statement)] @_)
-; matches, output is null, no warning
+; matches, JSON result is null, no warning
 ```
 
 Rules:
 
-- `@_` and `@_name` match like regular captures but produce no output
+- `@_` and `@_name` match structurally but discard the captured result
 - Named discards (`@_foo`) are equivalent to `@_` — the name is documentation only
 - Captures inside a discarded subtree are inert; they never collide with same-named captures outside it
 - Capture types are not allowed on discards
@@ -399,14 +401,14 @@ Rules:
 
 ### Summary
 
-| Pattern                 | Output                                  |
+| Pattern                 | Result                                  |
 | ----------------------- | --------------------------------------- |
-| `@name`                 | Field in current scope                  |
-| `(x)? @a`               | Field with option type                  |
+| `@name`                 | Result field in current scope           |
+| `(x)? @a`               | Result field with option type           |
 | `(x)* @a`               | Node list (no internal captures)        |
 | `{...}* @items`         | Record list (with internal captures)    |
 | `{...} @x` / `[...] @x` | Nested object (new scope)               |
-| `(Def)`                 | Structural match, no output             |
+| `(Def)`                 | Structural match, no result value       |
 | `(Def) @x`              | Definition type, or error if match-only |
 | `(Def)* @xs`            | List of the definition's type           |
 | `[...] @_`              | Match and discard                       |
@@ -441,7 +443,7 @@ With captures:
   (number) @right)
 ```
 
-Output type:
+Result type:
 
 ```typescript
 { left: Node, right: Node }
@@ -487,7 +489,7 @@ Filter nodes by their text content with inline predicates:
 - Multiline and CRLF modes (`(?m)`, `(?R)`, including scoped forms)
 - Word-boundary variants (`\<`, `\>`, `\b{start}`, `\b{end}`, and half-boundary forms)
 
-Predicates don't affect output types — they're structural constraints like anchors.
+Predicates don't affect result types — they're structural constraints like anchors.
 
 ### Anonymous Nodes
 
@@ -511,7 +513,7 @@ Anonymous nodes can be captured directly:
 "return" @keyword
 ```
 
-Output type:
+Result type:
 
 ```typescript
 {
@@ -558,7 +560,7 @@ patterns follow regex escaping rules.
 - `(MISSING identifier)` — matches a specific missing token kind
 - `(MISSING ";")` — matches a missing anonymous token
 
-Both match as leaves: a missing node has an empty source range, so neither
+Both match as leaves: a missing node has an empty document byte range, so neither
 `ERROR` nor `MISSING` accepts children. Because error recovery only ever inserts
 tokens, a `(MISSING kind)` argument must name a leaf token — a kind with children
 like `(MISSING binary_expression)` can never match and is rejected at compile time.
@@ -568,7 +570,7 @@ like `(MISSING binary_expression)` can never match and is rejected at compile ti
 (MISSING ";") @missing_semicolon
 ```
 
-Output type:
+Result type:
 
 ```typescript
 {
@@ -590,14 +592,14 @@ concrete subtypes with an alternation instead:
 [(binary_expression) (unary_expression)] @expr
 ```
 
-The separator is tight-binding — no whitespace around `#`. The tree-sitter spelling
+The separator is tight-binding — no whitespace around `#`. The Tree-sitter spelling
 `expression/binary_expression` is also accepted but deprecated in favor of `#`.
 
 ---
 
-## Fields
+## Grammar Fields
 
-Constrain children to named fields. A field value must be a node pattern, an alternation, or a quantifier applied to one of these. Sequences `{...}` are not allowed as direct field values.
+Constrain children to named grammar fields. A grammar-field value must be a node pattern, an alternation, or a quantifier applied to one of these. Sequences `{...}` are not allowed as direct grammar-field values.
 
 ```
 (assignment_expression
@@ -605,28 +607,28 @@ Constrain children to named fields. A field value must be a node pattern, an alt
   right: (call_expression) @value)
 ```
 
-Output type:
+Result type:
 
 ```typescript
 { target: Node, value: Node }
 ```
 
-### Quantifiers and Captures on Fields
+### Quantifiers and Captures on Grammar Fields
 
-Quantifiers and captures after a field value apply to the entire field constraint, not just the value:
+Quantifiers and captures after a grammar-field value apply to the entire grammar-field constraint, not just the value:
 
 ```
-decorator: (decorator)* @decorators   ; repeats the whole field
-value: [A: (x) B: (y)] @kind          ; captures the field (containing the alternation)
+decorator: (decorator)* @decorators   ; repeats the whole grammar field
+value: [A: (x) B: (y)] @kind          ; captures the grammar-field value
 ```
 
-This allows repeating fields (useful for things like decorators in JavaScript).
-The capture still produces the field value's inferred type. A labeled
+This allows repeating grammar fields (useful for things like decorators in JavaScript).
+The capture still produces the grammar-field value's inferred type. A labeled
 alternation therefore produces its variant type, not a raw node.
 
-### Negated Fields
+### Negated Grammar Fields
 
-Assert a field is absent with `-`:
+Assert a grammar field is absent with `-`:
 
 ```
 (function_declaration
@@ -634,7 +636,7 @@ Assert a field is absent with `-`:
   -type_parameters)
 ```
 
-Negated fields don't affect the output type — they're purely structural constraints:
+Negated grammar fields don't affect the result type — they're purely structural constraints:
 
 ```typescript
 {
@@ -656,7 +658,7 @@ Negated fields don't affect the output type — they're purely structural constr
 (function_declaration (decorator)+ @decorators)
 ```
 
-Output types:
+Result types:
 
 ```typescript
 { decorator: Node | null }
@@ -694,7 +696,7 @@ Match sibling patterns in order with braces.
 > Plotnik: `{(a) (b)}` — braces for sequences
 >
 > This avoids ambiguity: `(foo)` is always a node, `{...}` is always a sequence.
-> Using tree-sitter's `((a) (b))` syntax in Plotnik is a parse error.
+> Using Tree-sitter's `((a) (b))` syntax in Plotnik is a parse error.
 
 Plotnik uses `{...}` to visually distinguish grouping from node patterns, and adds scope creation when captured (`{...} @name`).
 
@@ -725,7 +727,7 @@ Capture elements inside a sequence:
 }
 ```
 
-Output type:
+Result type:
 
 ```typescript
 { decorators: Node[], fn: Node }
@@ -740,7 +742,7 @@ Capture the entire sequence with a type name:
 }+ @sections :: Section
 ```
 
-Output type:
+Result type:
 
 ```typescript
 interface Section {
@@ -763,9 +765,9 @@ An alternative that can match zero nodes (`[(a)? (b)]`) succeeds empty only
 as a last resort: every alternative's node-consuming match, at any candidate
 position, is preferred first. The empty outcome needs no candidate at all — it
 matches even in an empty parent — and leaves the cursor in place for any
-following pattern. In an unlabeled alternation it yields every merged field at
+following pattern. In an unlabeled alternation it yields every merged result field at
 its fallback (`null`, `[]`, or `false`); in a labeled alternation it selects a
-case whose payload fields use the same fallbacks.
+case whose payload result fields use the same fallbacks.
 
 ```
 [
@@ -776,12 +778,12 @@ case whose payload fields use the same fallbacks.
 
 ### Unlabeled Alternations
 
-Captures merge: a field produced by every alternative is required; a field
+Captures merge: a result field produced by every alternative is required; a result field
 produced by only some alternatives receives its fallback. Same-name captures
 must have compatible types.
 
 Alternatives must be type-compatible. A direct capture contributes its result
-field alongside fields from structured alternatives.
+result field alongside result fields from structured alternatives.
 
 ```
 (statement
@@ -791,7 +793,7 @@ field alongside fields from structured alternatives.
   ])
 ```
 
-Output type:
+Result type:
 
 ```typescript
 { left: Node | null, func: Node | null }  // each appears in one alternative only
@@ -806,7 +808,7 @@ When the same capture appears in every alternative:
 ]
 ```
 
-Output type:
+Result type:
 
 ```typescript
 {
@@ -825,10 +827,10 @@ Mixed presence:
 ]
 ```
 
-The second alternative `(identifier) @x` contributes the same `x` field as the
+The second alternative `(identifier) @x` contributes the same `x` result field as the
 first alternative.
 
-Output type:
+Result type:
 
 ```typescript
 { x: Node, y: Node | null }  // x in every alternative; y in one
@@ -850,7 +852,7 @@ alternative must match:
 ] @value
 ```
 
-Output type:
+Result type:
 
 ```typescript
 {
@@ -901,7 +903,7 @@ Q = (call_expression
   ] @target)
 ```
 
-Output type:
+Result type:
 
 ```typescript
 interface QTarget {
@@ -932,7 +934,8 @@ Anchors constrain sibling positions. They don't affect types — they're structu
 | `"x" . "y"`  | Allowed        | Disallowed              | Disallowed          |
 | `(a) .! (b)` | Disallowed     | Disallowed              | Disallowed          |
 
-Extras are nodes tree-sitter marks with the per-node `is_extra` bit; there is no bytecode extras or trivia table.
+Extras are nodes Tree-sitter marks with the per-node `is_extra` bit; there is no
+bytecode table for extras or the combined anonymous-or-extra navigation class.
 
 Explicit patterns always win over skipping. For example, this matches a comment node and then softly anchors the function after it:
 
@@ -985,9 +988,10 @@ When the item before an anchor is nullable (`?` or `*`), the anchor's meaning de
 ```
 
 - **When `@a` matches**, the anchor is enforced between the two siblings: `@b` must be the adjacent sibling, so `let x; debugger;` matches but `let x; foo; debugger;` does not.
-- **When `@a` is skipped**, the anchor degrades to a leading anchor relative to the parent — as if the query were `(program . (debugger_statement) @b)`. `@b` must be the first child (trivia aside): `debugger;` and `/* c */ debugger;` match, but `foo; debugger;` does not.
+- **When `@a` is skipped**, the anchor degrades to a leading anchor relative to the parent — as if the query were `(program . (debugger_statement) @b)`. `@b` must be the first child aside from anonymous or extra nodes: `debugger;` and `/* c */ debugger;` match, but `foo; debugger;` does not.
 
-The exact constraint carries through both paths: with `.!`, no trivia node is tolerated on either the adjacency or the leading interpretation.
+The exact constraint carries through both paths: with `.!`, no intervening
+syntax-tree node is tolerated on either the adjacency or the leading interpretation.
 
 The anchor pins where a **quantified follower** begins, not just a single node:
 
@@ -995,7 +999,7 @@ The anchor pins where a **quantified follower** begins, not just a single node:
 (program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement) @c})
 ```
 
-The anchor before `(debugger_statement)*` fixes its starting position the same way — adjacent to `@a` when present, the first child when `@a` is skipped. The repeated matches are then **back-to-back**: the quantifier consumes consecutive matching siblings (trivia aside) and stops at the first gap. So with `@a` skipped, `debugger; debugger; foo;` collects both debuggers, but `bar; debugger; foo;` does not match — `@b` may not skip past `bar;` to start later.
+The anchor before `(debugger_statement)*` fixes its starting position the same way — adjacent to `@a` when present, the first child when `@a` is skipped. The repeated matches are then **back-to-back** under the anchor's skip policy and stop at the first disallowed gap. So with `@a` skipped, `debugger; debugger; foo;` collects both debuggers, but `bar; debugger; foo;` does not match — `@b` may not skip past `bar;` to start later.
 
 A **trailing anchor** combines with the leading interpretation rather than overriding it:
 
@@ -1007,7 +1011,7 @@ When `@a` is skipped, `@b` must be both the first child (leading anchor) and the
 
 ### Anchors Over Empty Matches
 
-When every item in a child list is nullable and none of them matches, there is no matched child for an anchor to bind to. A leading or trailing anchor then degrades to an assertion about the node itself: it has no children the anchor's skip policy would reject — none beyond trivia for `.`, none at all for `.!` (the policy is chosen the same way as between siblings). When both anchors are present, the stricter one applies.
+When every item in a child list is nullable and none of them matches, there is no matched child for an anchor to bind to. A leading or trailing anchor then degrades to an assertion about the node itself: it has no children the anchor's skip policy would reject — none beyond the nodes admitted by `.` and none at all for `.!` (the policy is chosen the same way as between siblings). When both anchors are present, the stricter one applies.
 
 ```
 (program {(debugger_statement)* @b .})
@@ -1022,9 +1026,9 @@ The degenerate form is a body of anchors alone, which is the idiomatic emptiness
 (program .!)            ; a completely empty file
 ```
 
-### Output Types
+### Result Types
 
-Anchors are structural constraints only — they don't affect output types:
+Anchors are structural constraints only — they don't affect result types:
 
 ```typescript
 { first: Node }
@@ -1032,7 +1036,7 @@ Anchors are structural constraints only — they don't affect output types:
 { a: Node, b: Node }
 ```
 
-Anchors are not values and do not appear in output types.
+Anchors are not values and do not appear in result types.
 
 ### Anchor Placement Rules
 
@@ -1090,16 +1094,16 @@ Use as node kinds:
 (return_statement (BinaryOp) @expr)
 ```
 
-**Encapsulation**: `(Name)` matches but extracts nothing. Capture the reference to get the definition's typed result — `(BinaryOp) @expr` above produces `{ expr: BinaryOp }` where `BinaryOp` is `{ left: Node, op: Node, right: Node }`. This separates structural reuse from data extraction, and it means extracting a pattern into a definition never silently changes your output.
+**Encapsulation**: `(Name)` matches but extracts nothing. Capture the reference to get the definition's typed result — `(BinaryOp) @expr` above produces `{ expr: BinaryOp }` where `BinaryOp` is `{ left: Node, op: Node, right: Node }`. This separates structural reuse from data extraction, and it means extracting a pattern into a definition never silently changes your result.
 
 Definitions name both a reusable pattern and, when the body produces a value,
-its result type. A match-only single-node definition produces no data; capture
+its result type. A match-only single-node definition has no result value; capture
 the root node when the definition should carry a value:
 
 ```
 Expr = [(identifier) (number)] ; match-only: structural only
 ExprNode = [(identifier) (number)] @expr ; returns { expr: Node }
-(statement (Expr))     ; matches any statement containing an Expr, no output
+(statement (Expr))     ; matches any statement containing an Expr, no result value
 ```
 
 ---
@@ -1153,7 +1157,7 @@ Expression = [
 Root = (program (Statement)+ @statements)
 ```
 
-Output types:
+Result types:
 
 ```typescript
 export type Statement =
@@ -1178,27 +1182,27 @@ payloads never get standalone declarations.
 
 ## Quick Reference
 
-| Feature              | Tree-sitter        | Plotnik                     |
-| -------------------- | ------------------ | --------------------------- |
-| Capture              | `@name`            | `@name` (snake_case only)   |
-| Discard              |                    | `@_` or `@_name`            |
-| Capture type         |                    | `@x :: str`, `bool`, or `T` |
-| Named node           | `(type)`           | `(type)`                    |
-| Anonymous node       | `"text"`           | `"text"`                    |
-| Any node             | `_`                | `_`                         |
-| Any named node       | `(_)`              | `(_)`                       |
-| Field constraint     | `field: pattern`   | `field: pattern`            |
-| Negated field        | `!field`           | `-field`                    |
-| Quantifiers          | `?` `*` `+`        | `?` `*` `+`                 |
-| Lazy                 |                    | `??` `*?` `+?`              |
-| Sequence             | `((a) (b))`        | `{(a) (b)}`                 |
-| Alternation          | `[a b]`            | `[a b]`                     |
-| Labeled alternation  |                    | `[A: (a) B: (b)]`           |
-| Anchor               | `.`                | `.` soft, `.!` exact        |
-| Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`           |
-| Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`             |
-| Definition           |                    | `Name = pattern`            |
-| Definition reference |                    | `(Name)`                    |
+| Feature                  | Tree-sitter        | Plotnik                     |
+| ------------------------ | ------------------ | --------------------------- |
+| Capture                  | `@name`            | `@name` (snake_case only)   |
+| Discard                  |                    | `@_` or `@_name`            |
+| Capture type             |                    | `@x :: str`, `bool`, or `T` |
+| Named node               | `(type)`           | `(type)`                    |
+| Anonymous node           | `"text"`           | `"text"`                    |
+| Any node                 | `_`                | `_`                         |
+| Any named node           | `(_)`              | `(_)`                       |
+| Grammar-field constraint | `field: pattern`   | `field: pattern`            |
+| Negated grammar field    | `!field`           | `-field`                    |
+| Quantifiers              | `?` `*` `+`        | `?` `*` `+`                 |
+| Lazy                     |                    | `??` `*?` `+?`              |
+| Sequence                 | `((a) (b))`        | `{(a) (b)}`                 |
+| Alternation              | `[a b]`            | `[a b]`                     |
+| Labeled alternation      |                    | `[A: (a) B: (b)]`           |
+| Anchor                   | `.`                | `.` soft, `.!` exact        |
+| Predicate                | `(#eq? @x "foo")`  | `(node == "foo")`           |
+| Regex predicate          | `(#match? @x "p")` | `(node =~ /p/)`             |
+| Definition               |                    | `Name = pattern`            |
+| Definition reference     |                    | `(Name)`                    |
 
 ---
 

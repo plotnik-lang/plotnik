@@ -1,6 +1,6 @@
 Q = (call name = )
 ------------------ DIAGNOSTICS -------------------
-error: fields use `:`, not `=`
+error: grammar fields use `:`, not `=`
  --> query.ptk:1:16
   |
 1 | Q = (call name = )

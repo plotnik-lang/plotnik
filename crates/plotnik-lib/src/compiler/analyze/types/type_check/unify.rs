@@ -42,7 +42,7 @@ pub fn unify_flows(
 ///
 /// Rules:
 /// - NoValue ∪ NoValue → NoValue
-/// - NoValue ∪ Fields(s) → Fields(make_all_optional(s))
+/// - NoValue ∪ Fields(s) → Fields(relax_all_for_absence(s))
 /// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
 /// - Value is an uncaptured pending value (a bare reference); it is dropped
 ///   like any uncaptured match, so it unifies as NoValue.
@@ -95,7 +95,7 @@ fn drop_pending_value(flow: PatternFlow) -> PatternFlow {
     }
 }
 
-/// Relax a field that is absent from some alternative, keeping the output shape stable
+/// Relax a field that is absent from some alternative, keeping the result shape stable
 /// (every key present).
 ///
 /// A list stays present as a (possibly empty) list when the list itself is the

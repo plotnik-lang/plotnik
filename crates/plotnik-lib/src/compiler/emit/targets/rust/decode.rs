@@ -1,7 +1,7 @@
 //! Typed result-decoder emission and the `parse`/`matches` surface.
 //!
 //! The committed match journal is a tiny event format whose schema *is* the
-//! query's output type, so decoding is generated deserialization (serde-derive
+//! query's result type, so decoding is generated deserialization (serde-derive
 //! mental model), not interpretation: one decoder fn per named type, shared
 //! across every position that holds it, matching only the entries the type
 //! admits. It runs once, on the winning path; failed execution paths never reach it.
@@ -152,7 +152,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         DecoderFrameEstimator::new(self.model, self.decode).max_bytes()
     }
 
-    /// The `parse`/`matches` surface, one block per entry-point definition.
+    /// The `parse`/`matches` surface, one block per selectable definition.
     /// Selectable definitions are nominal (`parse` + `matches`) or match-only (`matches`).
     pub(super) fn parse_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
@@ -185,7 +185,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         self.matches_trait_impl(out, item);
     }
 
-    /// Inherent `parse`/`matches` on a nominal (struct/enum) output type.
+    /// Inherent `parse`/`matches` on a nominal Rust result type (`struct` or `enum`).
     fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
         let sig = InherentParseSignature::for_item(self.model, item);
         let decoder_fn = self.decoder_fn(item.name);
@@ -396,7 +396,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         }
         let _ = writeln!(
             out,
-            "        other => unreachable!(\"journal shape proven at emit: `{ident}` has no variant index {{other}}\"),"
+            "        other => unreachable!(\"journal shape proven at emit: `{ident}` has no variant case at member index {{other}}\"),"
         );
         out.push_str("    }\n");
         out.push_str("}\n");
@@ -487,7 +487,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             DecodeValue::Node => "decoder.expect_node()".to_string(),
             DecodeValue::Text => "decoder.expect_str()".to_string(),
             DecodeValue::Bool => "decoder.expect_bool()".to_string(),
-            DecodeValue::Nullable(inner) => self.nullable_expr(inner, context),
+            DecodeValue::Option(inner) => self.option_expr(inner, context),
             DecodeValue::List(element) => self.list_expr(element, context),
             DecodeValue::Nested { item, source_type } => {
                 let call = self.decoder_call(*item);
@@ -503,7 +503,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     /// `Absent` is the whole absent value — one flat absence, however many
     /// `Option` layers the type carries; a present value wraps `Some` at
     /// every layer (the VM never nests nulls).
-    fn nullable_expr(&self, inner: &DecodeValue, context: DecodeContext) -> String {
+    fn option_expr(&self, inner: &DecodeValue, context: DecodeContext) -> String {
         let p = indentation(context.level);
         let inner_expr = self.value_expr(inner, context.in_some_branch());
         let mut out = String::new();

@@ -64,7 +64,7 @@ pub trait EmitTarget: private::Sealed {
     fn emit(self, query: &CompiledQuery) -> QueryResult<Emission<Self::Output>>;
 }
 
-/// A source-target configuration capable of emitting output types.
+/// A source-target configuration capable of emitting result types.
 pub trait CodegenTarget: private::Sealed {
     type TypesOutput;
 
@@ -309,7 +309,7 @@ impl TypeScriptCodegenConfig {
         self
     }
 
-    pub(crate) fn legacy_config(&self) -> crate::compiler::emit::targets::typescript::Config {
+    pub(crate) fn emitter_config(&self) -> crate::compiler::emit::targets::typescript::Config {
         crate::compiler::emit::targets::typescript::Config::new()
             .export(self.export)
             .emit_node_interface(self.emit_node_interface)

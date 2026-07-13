@@ -75,7 +75,6 @@ fn shebang_parser() -> Command {
         .arg(entry_arg())
         .arg(color_arg())
         .arg(strict_arg())
-        .arg(raw_arg())
         .arg(json_arg())
         .arg(compact_arg())
         .arg(include_points_arg())

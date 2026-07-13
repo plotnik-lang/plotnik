@@ -33,7 +33,7 @@ const CHUNK_CLASS: Partial<Record<DumpChunk["kind"], string>> = {
 
 interface TreeViewProps {
   tree: TreeSnapshot | null;
-  /** Source range of the hovered node (UTF-16, in the snapshot's source
+  /** Document range of the hovered node (UTF-16, in the snapshot's source
       coordinates), or null; fires only on change. */
   onHover?: (src: Range16 | null) => void;
 }

@@ -11,4 +11,4 @@ help: use `Lowercase`
 1 - lowercase = (x)
 1 + Lowercase = (x)
   |
-help: definitions become types in the output
+help: definition names become result type names

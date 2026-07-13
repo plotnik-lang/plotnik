@@ -1,4 +1,4 @@
-//! Output value types for materialization.
+//! Result value types for materialization.
 
 use std::fmt::Write as _;
 
@@ -54,7 +54,7 @@ impl Serialize for NodeValue<'_> {
     }
 }
 
-/// Self-contained output value, borrowing node text from the document source and
+/// Self-contained result value, borrowing node text from the document source and
 /// field/case names from the bytecode string table (`'s` must outlive both).
 ///
 /// `Record` uses `Vec<(&str, Value)>` to preserve field order from type metadata.

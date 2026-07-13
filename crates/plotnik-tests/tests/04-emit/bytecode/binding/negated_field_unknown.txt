@@ -1,6 +1,6 @@
 Q = (function_declaration -nme) @fn
 ------------------ DIAGNOSTICS -------------------
-error: `nme` is not a valid field
+error: `nme` is not a valid grammar field
  --> query.ptk:1:28
   |
 1 | Q = (function_declaration -nme) @fn

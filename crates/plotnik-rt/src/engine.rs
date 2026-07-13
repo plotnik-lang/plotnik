@@ -32,7 +32,7 @@ pub struct Engine<'t> {
     checkpoints: CheckpointStack,
     journal: MatchJournal<'t>,
     recursion_depth: u32,
-    /// Suppression nesting on the active match path: when `> 0`, data events
+    /// Suppression nesting on the active match path: when `> 0`, output events
     /// are suppressed (not appended to the journal). `SuppressBegin` increments,
     /// `SuppressEnd` decrements. Each open scope lives inside an active call
     /// frame, so it is bounded by call-nesting depth (`recursion_depth`) times
@@ -55,10 +55,10 @@ impl<'t> Engine<'t> {
         Self::with_initial_suppression(cursor, 0)
     }
 
-    /// Start an engine for a yes/no run: all data events are suppressed from
+    /// Start an engine for a yes/no run: all output events are suppressed from
     /// the root, so matching can answer without building a committed value.
     /// Query-level suppression scopes still nest above this base depth.
-    pub fn new_data_suppressed(cursor: TreeCursor<'t>) -> Self {
+    pub fn new_match_only(cursor: TreeCursor<'t>) -> Self {
         Self::with_initial_suppression(cursor, 1)
     }
 
@@ -286,7 +286,7 @@ impl<'t> Engine<'t> {
         self.frames.is_empty()
     }
 
-    /// Open a suppression scope (bare-ref opacity). Returns whether data events
+    /// Open a suppression scope (bare-ref opacity). Returns whether output events
     /// were already suppressed *before* this open — what a tracer reports.
     pub fn suppress_begin(&mut self) -> bool {
         let was_suppressed = self.suppress_depth > 0;
@@ -297,7 +297,7 @@ impl<'t> Engine<'t> {
         was_suppressed
     }
 
-    /// Close a suppression scope. Returns whether data events are still
+    /// Close a suppression scope. Returns whether output events are still
     /// suppressed *after* this close — what a tracer reports.
     pub fn suppress_end(&mut self) -> bool {
         self.suppress_depth = self
@@ -307,11 +307,11 @@ impl<'t> Engine<'t> {
         self.suppress_depth > 0
     }
 
-    /// Emit a data event through the suppression gate. The event is built
+    /// Emit an output event through the suppression gate. The event is built
     /// lazily so a suppressed `Node` capture never reads the cursor. Returns
     /// the journaled event, or `None` when suppressed.
     #[inline]
-    pub fn emit_data(
+    pub fn emit_output_event(
         &mut self,
         make: impl FnOnce(&CursorWrapper<'t>) -> JournalEvent<'t>,
     ) -> Option<&JournalEvent<'t>> {
@@ -325,13 +325,13 @@ impl<'t> Engine<'t> {
 
     /// Emit an inspection-span event, bypassing suppression: uncaptured
     /// `(Foo)` bodies still produce document bounding ranges even when they carry no
-    /// output bindings.
+    /// result bindings.
     #[inline]
     pub fn emit_span(&mut self, event: JournalEvent<'t>) {
         self.journal.push(event);
     }
 
-    /// Open a scalar frame through the data-suppression gate.
+    /// Open a scalar frame through the output-event suppression gate.
     pub fn scalar_open(&mut self) -> Option<&JournalEvent<'t>> {
         if self.suppress_depth > 0 {
             return None;
@@ -345,7 +345,7 @@ impl<'t> Engine<'t> {
     }
 
     /// Mark the current node when any scalar frame is live. Marks deliberately
-    /// cross data-suppression brackets so an enclosing scalar retains the
+    /// cross output-event suppression brackets so an enclosing scalar retains the
     /// provenance of a suppressed nested value.
     pub fn scalar_mark(&mut self) -> Option<&JournalEvent<'t>> {
         if self.scalar_depth == 0 {
@@ -364,15 +364,15 @@ impl<'t> Engine<'t> {
     }
 
     pub fn node_str(&mut self) -> Option<&JournalEvent<'t>> {
-        self.emit_data(|cursor| JournalEvent::NodeStr(cursor.node()))
+        self.emit_output_event(|cursor| JournalEvent::NodeStr(cursor.node()))
     }
 
     pub fn node_bool(&mut self) -> Option<&JournalEvent<'t>> {
-        self.emit_data(|cursor| JournalEvent::NodeBool(cursor.node()))
+        self.emit_output_event(|cursor| JournalEvent::NodeBool(cursor.node()))
     }
 
     pub fn bool_value(&mut self, value: bool) -> Option<&JournalEvent<'t>> {
-        self.emit_data(|_| JournalEvent::BoolValue(value))
+        self.emit_output_event(|_| JournalEvent::BoolValue(value))
     }
 
     fn scalar_close(&mut self, event: JournalEvent<'t>) -> Option<&JournalEvent<'t>> {

@@ -36,7 +36,7 @@ pub fn dump(module: &Module, colors: Colors) -> String {
 
 /// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {
-    /// Maps instruction addresses to entry-point names for labeling.
+    /// Maps instruction addresses to entry point names for labeling.
     addr_labels: BTreeMap<CodeAddr, String>,
     /// Shared symbol/string decoding and match rendering.
     render: ModuleRenderContext,

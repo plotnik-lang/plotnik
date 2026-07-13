@@ -45,7 +45,7 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Definition names are PascalCase (they become types in the output).
+    /// Definition names are PascalCase because they name result types.
     pub(crate) fn validate_def_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if !starts_uppercase(name) || name.contains(['_', '-', '.']) {
@@ -75,7 +75,9 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if name.contains(['.', '-']) || starts_uppercase(name) {
             let suggested = to_snake_case(&name.replace(['.', '-'], "_"));
-            if let Some(report) = self.report_at(DiagnosticKind::FieldNameInvalid, ident.span()) {
+            if let Some(report) =
+                self.report_at(DiagnosticKind::GrammarFieldNameInvalid, ident.span())
+            {
                 report.fix(format!("use `{suggested}`"), suggested).emit();
             }
         }

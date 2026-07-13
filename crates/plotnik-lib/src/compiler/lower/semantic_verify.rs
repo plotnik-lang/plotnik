@@ -811,7 +811,7 @@ impl<'a> Program<'a> {
                 "VariantOpen does not reference a variant case",
             ));
         };
-        Ok(payload == CasePayload::None)
+        Ok(payload == CasePayload::NoPayload)
     }
 
     fn validate_record_set_member(

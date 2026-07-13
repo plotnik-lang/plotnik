@@ -14,7 +14,7 @@
 //!
 //! Generated matchers meter one more resource the VM does not: **decode
 //! depth**. The VM materializes output iteratively, but generated typed decoding
-//! can recurse through user-visible recursive output types, so recursive
+//! can recurse through user-visible recursive result types, so recursive
 //! decoders enter a [`DecodeDepth`] guard before constructing each nested value.
 
 use std::cell::Cell;

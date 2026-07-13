@@ -75,7 +75,7 @@ fn emit_builtins(
             TYPE_NODE => TypeKind::Node,
             TYPE_TEXT => TypeKind::Text,
             TYPE_BOOL => TypeKind::Bool,
-            _ => unreachable!("output type layout exposes only primitive built-ins"),
+            _ => unreachable!("result type layout exposes only primitive built-ins"),
         };
         types.push_mapped(builtin, TypeDef::builtin(kind))?;
     }
@@ -112,7 +112,7 @@ fn emit_type_names(
         }
         let bc_type_id = types
             .lookup(binding.type_id)
-            .expect("named output type must be mapped");
+            .expect("named result type must be mapped");
         let name = ctx.strings.intern(binding.name, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
@@ -128,7 +128,7 @@ fn emit_type_at_slot(
 ) -> Result<(), EmitError> {
     let wire_type = types
         .lookup(type_id)
-        .expect("reserved output type has a wire slot");
+        .expect("reserved result type has a wire slot");
     let slot_index = usize::from(u16::from(wire_type));
     let type_shape = ctx.type_analysis.expect_type_shape(type_id);
     match type_shape {

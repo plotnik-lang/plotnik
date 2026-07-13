@@ -22,10 +22,9 @@ enum SuffixMode {
 /// written constraint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PatternSlot {
-    /// `Name = <here>`. Anchors/negated fields parse, and the definition
-    /// then fails analysis with `NoEntryPoints`, which explains that a
-    /// definition must produce a value — a better teaching moment than a
-    /// parse error.
+    /// `Name = <here>`. Anchors and negated grammar fields parse, then analysis
+    /// explains that a definition body must contain a pattern. This is more
+    /// useful than rejecting the positional syntax during parsing.
     DefBody,
     /// `[Label: <here> ...]`.
     AlternativeBody,
@@ -44,8 +43,10 @@ impl PatternSlot {
             Self::AlternativeBody if is_negated_field => {
                 Some(DiagnosticKind::NegatedFieldInAlternation)
             }
-            Self::FieldValue if is_anchor => Some(DiagnosticKind::AnchorAsFieldValue),
-            Self::FieldValue if is_negated_field => Some(DiagnosticKind::NegatedFieldAsFieldValue),
+            Self::FieldValue if is_anchor => Some(DiagnosticKind::AnchorAsGrammarFieldValue),
+            Self::FieldValue if is_negated_field => {
+                Some(DiagnosticKind::NegatedFieldAsGrammarFieldValue)
+            }
             _ => None,
         }
     }

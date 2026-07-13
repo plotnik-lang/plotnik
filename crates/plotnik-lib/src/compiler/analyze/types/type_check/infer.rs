@@ -5,7 +5,7 @@
 //!
 //! # Output model
 //!
-//! Output exists exactly where output syntax is written: `@capture` makes a
+//! Result data exists exactly where result-producing syntax is written: `@capture` makes a
 //! field, an alternative label makes a variant case, `:: Name` names a type, and a
 //! definition name names the definition's result type. Everything else is
 //! structural: it matches, and produces nothing.
@@ -14,7 +14,7 @@
 //!
 //! - **References are opaque.** A definition has one context-free result type.
 //!   `(Foo) @val` stores that result in `val`; a bare `(Foo)` matches
-//!   structurally and contributes no output. Fields never bubble through a
+//!   structurally and contributes no result value. Fields never bubble through a
 //!   reference boundary, recursive or not.
 //! - **Labeled alternations produce variants in value contexts.** An alternation
 //!   `[A: … B: …]` produces a variant type when captured, collected by a
@@ -247,7 +247,7 @@ fn suggested_builtin_capture_type(name: &str) -> Option<&'static str> {
 /// carries the data.
 fn case_payload(flow: &PatternFlow) -> CasePayload {
     match flow {
-        PatternFlow::NoValue | PatternFlow::Value(_) => CasePayload::None,
+        PatternFlow::NoValue | PatternFlow::Value(_) => CasePayload::NoPayload,
         PatternFlow::Fields(type_id) => CasePayload::Record(*type_id),
     }
 }
@@ -402,7 +402,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternShape::new(RootExtent::SingleNode, self.merged_fields_flow(merged))
     }
 
-    /// Anonymous node (literal or wildcard): matches one position, produces nothing.
+    /// Anonymous-node pattern or node wildcard: matches one position, produces nothing.
     fn infer_anonymous_node(&mut self, _node: &AnonymousNodePattern) -> PatternShape {
         PatternShape::new(RootExtent::SingleNode, PatternFlow::NoValue)
     }
@@ -410,7 +410,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// Reference: an opaque boundary producing the definition's result value.
     ///
     /// The definition's fields never bubble here. A capture may materialize the
-    /// value, while a bare reference contributes no output in a fields context.
+    /// value, while a bare reference contributes no result value in a fields context.
     /// Every value-producing reference retains the definition identity as a
     /// `TypeShape::Ref`. The declaration body is structural, but a use of that
     /// declaration must not acquire some other name merely because its shape
@@ -447,7 +447,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .expect("definition root extents are precomputed before inference");
 
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
-            // A recursive target's output type is not known yet. Its
+            // A recursive target's result type is not known yet. Its
             // no-value flow, however, is real as soon as the definition is
             // registered: a completed match-only target must flow NoValue so
             // the single-referent check sees it. A same-SCC target
@@ -565,7 +565,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
             let Some(body_info) = self.infer_alternative_body(alternation, &alternative) else {
                 // Tag-only case has no payload.
-                cases.insert(label_sym, CasePayload::None);
+                cases.insert(label_sym, CasePayload::NoPayload);
                 continue;
             };
 
@@ -699,7 +699,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_captured_pattern(&mut self, cap: &Located<CapturedPattern>) -> PatternShape {
         let node = cap.node();
 
-        // Discards don't contribute to the output type. The inner
+        // Discards don't contribute to the result type. The inner
         // is still inferred for structural validation, but the explicit discard
         // needs neither an ineffective-label warning nor a collection boundary.
         if node.is_discard() {
@@ -1130,22 +1130,22 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // A captured `?` of a multi-node no-value group has no single node
                 // to bind (or null), just like a captured repeat. Otherwise the
                 // inner flow passes through untouched: the capture collects it
-                // as one nullable value — fields keep their true modality, the
-                // null lives on the capture field alone.
+                // as one option value — fields keep their true modality, and
+                // absence belongs to the capture field alone.
                 QuantifiedContext::Captured => {
                     self.report_quantified_capture_without_single_node(quant.node(), &inner_info);
                     inner_info.flow
                 }
                 // Internal captures of a bare `?` have nothing to collect them,
                 // exactly like a bare repeat: a skip would scatter correlated
-                // nulls into the enclosing scope. Recover with the legacy
+                // absence values into the enclosing scope. Recover with the
                 // bubbling shape so downstream inference stays coherent.
                 QuantifiedContext::Bare => {
                     self.report_uncollected_quantified_captures(quant.node(), &inner_info);
                     self.make_flow_optional(inner_info.flow)
                 }
                 QuantifiedContext::Discard => PatternFlow::NoValue,
-                // The definition collects the skip as its own null: the output
+                // The definition collects the skip as its own absence: the output
                 // is the option type itself, not a field-completion flag.
                 QuantifiedContext::DefinitionValue => {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
@@ -1213,10 +1213,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// Reject `*`/`+` whose element is a reference to an option- or
     /// list-valued definition that can match zero nodes: an empty
     /// iteration completes without consuming, so the loop collects a spurious
-    /// null/empty element at every non-matching candidate. Scoped to
+    /// absent/empty-list element at every non-matching candidate. Scoped to
     /// wrapper-shaped outputs — the surface quantifier-rooted definitions
-    /// introduce — so nullable record-valued definitions (a captured `?` at
-    /// the root) keep their existing repeat behavior.
+    /// introduce — so record-valued definitions whose body is nullable (a
+    /// captured `?` at the root) keep their existing repeat behavior.
     fn reject_nullable_repeat(&mut self, quant: &QuantifiedPattern, inner: &Located<Pattern>) {
         let mut element = inner.node().clone();
         while let Pattern::FieldPattern(f) = &element {
@@ -1534,7 +1534,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
 
         // Definition root extents are a syntactic fixpoint, computed up front
         // so references always report their target's real extent, including
-        // through recursion. Only output types need SCC deferral.
+        // through recursion. Only result types need SCC deferral.
         for (&def_id, &extent) in &self.analysis.structural_facts.definition_root_extents {
             self.ctx.record_def_root_extent(def_id, extent);
         }
@@ -1611,7 +1611,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             PatternFlow::Fields(type_id) => DefinitionOutput::Value(*type_id),
             // A root value is the definition's result only when a labeled
             // alternation or quantifier supplies it directly. A bare reference
-            // is structural: no capture, no output — the definition still
+            // is structural: no capture, no result value — the definition still
             // matches, like a capture-less regex.
             PatternFlow::Value(t) => {
                 if definition_value_root(&body) {

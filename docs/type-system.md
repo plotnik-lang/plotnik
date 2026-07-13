@@ -5,32 +5,32 @@ names — are retained in the target-neutral compiled query. Rust and TypeScript
 type emission project those same facts directly; bytecode is only constructed
 when the VM target is explicitly selected.
 
-## The Output Model
+## The Result Model
 
-**Output exists where output syntax is written.** Definitions name whatever
-result their body produces, but they do not implicitly capture the matched
-root node. Four constructs produce or name output:
+**Result data exists where result-producing syntax is written.** Definitions
+name whatever result their body produces, but they do not implicitly capture
+the matched root node. Four constructs produce or name result data:
 
-| Syntax      | Output                                               |
+| Syntax      | Result role                                          |
 | ----------- | ---------------------------------------------------- |
-| `@name`     | A field in the enclosing scope                       |
+| `@name`     | A result field in the enclosing scope                |
 | `Def = ...` | A named type for the body's result                   |
 | `Label:`    | A variant case when the alternation produces a value |
 | `:: type`   | A built-in or custom capture type                    |
 
 Everything else — nested node patterns, sequences, references, anchors,
-predicates — is structural unless one of those output positions materializes it.
+predicates — is structural unless result-producing syntax materializes it.
 To return the root node of a definition, capture it explicitly.
 
 ## Definitions Are Types
 
 A definition is both a reusable pattern and a named type. References to it are
-**opaque**: fields never leak through a reference boundary.
+**opaque**: result fields never leak through a reference boundary.
 
 ```
 Item = (expression_statement (identifier) @id)
 
-(program (Item))              ; matches structurally, no output
+(program (Item))              ; matches structurally, no result value
 (program (Item) @item)        ; { item: Item }
 (program (Item)* @items)      ; { items: Item[] }
 (program (Item)? @item)       ; { item: Item | null }
@@ -43,27 +43,27 @@ export interface Item {
 ```
 
 - A **bare reference** `(Item)` matches the definition's pattern and discards
-  its output — silently, by design. Use it for purely structural constraints.
+  its result — silently, by design. Use it for purely structural constraints.
 - A **captured reference** `(Item) @x` produces the definition's result type.
   If the definition is match-only, the capture is rejected because there is no value
   to bind.
 - This is uniform for recursive and non-recursive definitions, so extracting a
-  pattern into a definition never silently changes your output shape — you
+  pattern into a definition never silently changes your result shape — you
   always say `@x` where you want the value.
 
 ### Match-Only Definitions
 
-A definition whose body produces no output is match-only:
+A definition whose body produces no result value is match-only:
 
-- A single node root — named, anonymous, wildcard, with fields, predicates, or
-  anchors — matches structurally and returns no data.
-- An unlabeled alternation of match-only node alternatives also returns no data.
-- A sequence root is match-only because no output syntax materializes it.
+- A single node root — named, anonymous, wildcard, with grammar fields, predicates, or
+  anchors — matches structurally and returns no result value.
+- An unlabeled alternation of match-only node alternatives also returns no result value.
+- A sequence root is match-only because no result-producing syntax materializes it.
 - A labeled alternation used as a definition body produces a variant value;
   no-payload cases remain no-payload.
 - A `?`, `*`, or `+` root returns the option or list value described below.
 
-Captures define the result; there is no hybrid `{ $node, ... }` output.
+Captures define the result; there is no hybrid `{ $node, ... }` shape.
 
 ```
 Program = (program)                         ; Program = undefined
@@ -74,7 +74,7 @@ Pair = {(identifier) (number)}              ; Pair = undefined
 Named = (program (identifier) @id)          ; Named = { id: Node }
 ```
 
-A definition is **match-only** when its body produces no output:
+A definition is **match-only** when its body produces no result value:
 
 ```
 Id = (identifier) @id
@@ -158,7 +158,7 @@ Boundaries (a new scope starts):
 - **Captured sequences** `{...} @x` → nested record
 - **Captured alternations** `[...] @x` → merged record or variant value
 - **Definitions** — references are opaque (see above)
-- **Discard** `@_` — discards the whole subtree's output
+- **Discard** `@_` — discards the whole subtree's result
 
 ```
 {
@@ -177,14 +177,14 @@ Two rules keep repetition and captures honest:
 
 **1. A quantifier's internal captures must be collected by a capture on the
 quantifier.** All quantifiers, uniformly — `*`/`+` collect a list of records, `?`
-collects one nullable record; `@_` discards:
+collects an option of a record; `@_` discards:
 
 ```
 {(key) @k (value) @v}*            ; ERROR: captures repeat, nothing collects them
 {(key) @k (value) @v}* @entries   ; OK: entries: { k: Node, v: Node }[]
 {(key) @k (value) @v}?            ; ERROR: captures skip together, nothing collects them
 {(key) @k (value) @v}? @entry     ; OK: entry: { k: Node, v: Node } | null
-(func (id) @name)*                ; ERROR: same rule through node patterns
+(func (id) @name)*                ; ERROR: same requirement inside node patterns
 (func (id) @name)? @fn            ; OK: fn: { name: Node } | null
 ```
 
@@ -214,7 +214,7 @@ the definition's _type_ is the element, no matter how many captures it contains:
 ```
 Item = (pair key: (_) @k value: (_) @v)
 (Item)* @items                    ; OK: items: Item[]
-(Item)*                           ; OK: structural repeat, no output
+(Item)*                           ; OK: structural repeat, no result value
 ```
 
 ### Node Lists vs Record Lists
@@ -235,33 +235,33 @@ a record list:
 → { attrs: { mod: Node, dec: Node } | null }
 ```
 
-The fields keep their true modality — if the record matched, both are present —
+The result fields keep their true modality — if the record matched, both are present —
 and a skip yields `attrs: null`, never a hollow `{ mod: null, dec: null }`.
 A quantified named node collects the same way: `(pair (key) @k)? @p` gives
 `p: { k: Node } | null`, mirroring the records in `(pair (key) @k)* @ps`.
 
 There is no uncaptured fallback (the item-boundary rule): a bare
 `{(mod) @mod (dec) @dec}?` would scatter correlated nulls into the enclosing
-scope as independently option-typed fields — a type that permits states the match
+scope as independently option-typed result fields — a type that permits states the match
 can never produce. For a single node under `?` with no wrapper, put the capture
 on the quantifier: `(decorator)? @dec` → `dec: Node | null`. To match
 structurally and drop the captures, discard them: `{...}? @_`.
 
-### Null, Not Absent
+### Option Values, Not Missing Fields
 
-Every declared field is **always present** in the output. A field with option type
-renders as `T | null` and materializes as `null` when it doesn't match — never
-as a missing key. An absent list fallback is the empty JSON array `[]`, never `null`.
-The output shape is stable; consumers never guard for `undefined`.
+Every declared result field is **always present**. A result field with option type
+renders as `T | null` in TypeScript and materializes as JSON `null` when absent —
+never as a missing key. A list fallback is the empty JSON array `[]`, never `null`.
+The result shape is stable; consumers never guard for `undefined`.
 
 ## Cardinality
 
-| Pattern   | Output Type      | Meaning      |
-| --------- | ---------------- | ------------ |
-| `(A) @a`  | `a: T`           | exactly one  |
-| `(A)? @a` | `a: T \| null`   | zero or one  |
-| `(A)* @a` | `a: T[]`         | zero or more |
-| `(A)+ @a` | `a: [T, ...T[]]` | one or more  |
+| Pattern   | TypeScript result | Meaning      |
+| --------- | ----------------- | ------------ |
+| `(A) @a`  | `a: T`            | exactly one  |
+| `(A)? @a` | `a: T \| null`    | zero or one  |
+| `(A)* @a` | `a: T[]`          | zero or more |
+| `(A)+ @a` | `a: [T, ...T[]]`  | one or more  |
 
 `T` is `Node` for plain patterns, the definition's type for references, the
 record for captured groups, or the variant type for labeled alternations.
@@ -275,14 +275,14 @@ when the alternation produces a value.
 
 Captures from the alternatives merge into one record, one level deep:
 
-- A capture present in **every** alternative → required field.
-- A capture present in **some** alternatives → its fallback (`null`, `[]`, or `false`).
-- A missing **list** in an alternative → `[]`, not `null`.
+- A capture present in **every** alternative → required result field.
+- A capture present in **some** alternatives → its fallback (absence, an empty list, or `false`).
+- A missing **list** in an alternative → an empty list, rendered as `[]` in JSON.
 - The same capture must have the same type in every alternative; a mismatch is an
   error (`capture @x has incompatible types across alternatives`). Cardinality
   counts: a `+` list and a `*` list do not unify.
 - A bare node beside record-producing alternatives is fine — it simply
-  contributes no fields (or its own capture, if any).
+  contributes no result fields (or its own capture, if any).
 - A bare reference is a structural alternative: it
   contributes nothing to the merged record.
 
@@ -363,7 +363,7 @@ valid but produce nothing, and no unused-label warning fires:
 
 ```
 (program [A: (expression_statement) B: (debugger_statement)] @_)
-→ matches, output is null; no warning
+→ matches, JSON result is null; no warning
 ```
 
 Discarded captures never collide with returned ones: a `@x` inside a discarded
@@ -423,7 +423,7 @@ an independently valid capture.
 
 ### Built-in `str`
 
-`str` replaces each terminal value with the source range owned by that value
+`str` replaces each terminal value with the document byte range owned by that value
 and preserves its existing containers:
 
 | Ordinary type     | `:: str` result     |
@@ -434,14 +434,14 @@ and preserves its existing containers:
 | nonempty `Node[]` | nonempty `string[]` |
 | record/variant    | `string` (warning)  |
 
-List items keep distinct ranges; trivia between items belongs to neither.
-A composite value uses the smallest source span containing its contributing
-nodes. An admitted empty value is `null`, while a real zero-byte node is the
-present empty string `""`.
+List items keep distinct document byte ranges; intervening source text belongs
+to neither. A composite value uses the smallest document bounding range containing
+its contributing nodes. An absent option renders as `null`, while a real
+zero-byte node is the present empty string `""`.
 
 A capture on a non-leaf node replaces only that capture's `Node` value. Child
 captures that bubble independently into the enclosing scope remain ordinary
-fields. By contrast, converting a captured sequence or labeled alternation
+result fields. By contrast, converting a captured sequence or labeled alternation
 replaces the composite data it owns and warns once at the written capture type.
 
 ### Built-in `bool`
@@ -455,7 +455,7 @@ present -> true
 
 An option-typed non-boolean value becomes `boolean`. Nested options collapse to
 one boolean. A required node, list, record, or variant is rejected because the
-result would always be `true`, unless an alternative omits that exact field. In
+result would always be `true`, unless an alternative omits that exact result field. In
 that case the capture observes alternative presence and the omitted alternative
 receives `false`, not `null`. `bool` never means `any()` and does not map list
 elements.
@@ -476,9 +476,8 @@ and complete in the bytecode.
 ### Path Names
 
 A definition's result is named after the definition. Composite types created
-by captures are named `{ParentTypeName}{PascalCase(field)}`, following the
-capture path; lists and options are transparent (the name lands on the
-element):
+by captures are named `{ParentTypeName}{PascalCase(ResultFieldName)}` along the
+capture path; lists and options are transparent, so the name lands on the element:
 
 ```
 Foo = (function_declaration
@@ -501,8 +500,8 @@ export interface Foo {
 ```
 
 Variant case payloads are anonymous (inlined), so they take no name; a
-composite _inside_ a payload field is named
-`{VariantName}{VerbatimLabel}{PascalCase(field)}`:
+composite _inside_ a payload result field is named
+`{VariantName}{VerbatimLabel}{PascalCase(ResultFieldName)}`:
 
 ```
 Q = (program [
@@ -555,7 +554,7 @@ On a plain node capture, `:: Name` declares a named alias:
 ### Names Are Nominal
 
 - The same custom capture type name on **structurally identical** types denotes one
-  type — annotate two identical shapes `:: Info` and both fields share
+  type — annotate two identical shapes `:: Info` and both result fields share
   `Info`, declared once.
 - The same name on **different** shapes is a compile error, reported with
   both spans (`type name X is already used for a different type`).
@@ -574,8 +573,8 @@ On a plain node capture, `:: Name` declares a named alias:
   payloads never get standalone declarations.
 - Match-only queries render as `export type Q = undefined;` — the query matches
   or not, and carries no data.
-- Fields with option type are `T | null` (always present); non-empty lists are
-  `[T, ...T[]]`.
+- Option-typed result fields render as required properties whose values are
+  `T | null`; non-empty lists are `[T, ...T[]]`.
 
 ```typescript
 export type Statement =

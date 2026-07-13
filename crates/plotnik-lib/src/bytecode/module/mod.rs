@@ -502,7 +502,7 @@ pub struct EntryPointsView<'a> {
 
 impl<'a> EntryPointsView<'a> {
     pub fn get(&self, idx: usize) -> EntryPoint {
-        assert!(idx < self.count, "entry-point index out of bounds");
+        assert!(idx < self.count, "entry point index out of bounds");
         let offset = idx * EntryPoint::SIZE;
         EntryPoint::from_bytes(&self.bytes[offset..])
     }

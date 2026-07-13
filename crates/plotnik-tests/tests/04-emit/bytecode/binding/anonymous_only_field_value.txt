@@ -6,6 +6,6 @@ error: `identifier` can't be the value of `operator`
 1 | Q = (binary_expression operator: (identifier))
   |                        --------   ^^^^^^^^^^
   |                        |
-  |                        field `operator`
+  |                        grammar field `operator`
   |
 help: `operator` accepts only literal tokens — write `operator: "!="`

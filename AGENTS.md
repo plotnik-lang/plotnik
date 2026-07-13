@@ -106,14 +106,14 @@ Full spec: `docs/lang-reference.md`, `docs/type-system.md`. The essentials:
 | `(_)` / `_`         | Any named node / any node                   |
 | `@name`             | Capture (snake_case only)                   |
 | `@x :: T`           | Capture type (`str`, `bool`, or PascalCase) |
-| `field: pattern`    | Field constraint                            |
-| `-field`            | Negated field (assert absent)               |
+| `field: pattern`    | Grammar-field constraint                    |
+| `-field`            | Negated grammar-field constraint            |
 | `?` `*` `+`         | Quantifiers (lazy: `??` etc)                |
-| `.` / `.!`          | Soft / strict anchor                        |
+| `.` / `.!`          | Soft / exact anchor                         |
 | `{...}`             | Sequence (siblings in order)                |
-| `[...]`             | Union / enum (first match wins)             |
-| `Name = ...`        | Named definition (entrypoint)               |
-| `(Name)`            | Use named definition                        |
+| `[...]`             | Alternation                                 |
+| `Name = ...`        | Definition                                  |
+| `(Name)`            | Definition reference                        |
 | `(node == "x")`     | String predicate (== != ^= $= \*=)          |
 | `(node =~ /x/)`     | Regex predicate (=~ !~)                     |
 
@@ -122,37 +122,35 @@ Rules that trip everyone:
 - There is no implicit "search anywhere" (matching starts at the tree root):
   - `Q = (identifier) @id` matches nothing
   - `Q = (program (lexical_declaration (variable_declarator name: (identifier) @id)))` could match.
-- Sequences are `{(a) (b)}`, not tree-sitter's `((a) (b))`.
-- Predicates: `(id == "foo") @x`, not tree-sitter's `(#eq? @x "foo")`
+- Sequences are `{(a) (b)}`, not Tree-sitter's `((a) (b))`.
+- Predicates: `(id == "foo") @x`, not Tree-sitter's `(#eq? @x "foo")`
 - Capture names are snake_case: `@function_name`, not `@function.name`.
-- Output exists only where output syntax is written:
-  - `@capture` becomes a field
-  - `Foo = (...)` becomes a type
-  - `[Foo: (...) Bar: (...)]` creates `Foo` and `Bar` enum variants
-  - `@foo :: Name` helps to specify type name and avoid synthetic name
+- Result data exists only where result-producing syntax is written:
+  - `@capture` becomes a result field
+  - `Foo = (...)` declares a result type when the definition produces a value
+  - `[Foo: (...) Bar: (...)]` creates `Foo` and `Bar` variant cases when the alternation produces a value
+  - `@foo :: Name` supplies an explicit result type name
   - Think regex: no capture — no data
-  - Definition root is captured by default when possible ("group 0"): `Foo = (program)` produces `Node`
   - Refs are opaque:
     - `(Foo)` match structure only (no data from `Foo`)
-    - `(Foo) @x` match + capture `x: Foo` (error if `Foo` is void)
-- Strict dimensionality — a repeated capture must be collected into a list:
+    - `(Foo) @x` match + capture `x: Foo` (error if `Foo` is match-only)
+- A repeated capture must be collected into a list:
   - a capture under a `*`/`+`/`?` repeats once per match, so a capture on the repeat gathers them (or `@_` discards)
-  - No inner captures: `(id)* @ids` produces `ids: Node[]` (scalar list)
-  - Inner captures: `(f (id) @name)* @funcs` produces `funcs: { name }[]` (row list)
+  - No inner captures: `(id)* @ids` produces `ids: Node[]`
+  - Inner captures: `(f (id) @name)* @funcs` produces `funcs: { name }[]` (a list of records)
   - Inner captures with nothing collecting them: error
-- Unions and enums (`[...]`) — one branch matches, first wins:
-  - Union merges captures from each branch into a struct
-    - field is nullable unless every branch captures it
+- Alternations (`[...]`) use source-order preference with backtracking:
+  - An unlabeled alternation merges captures from its alternatives into a record
+    - a result field has option type unless every alternative captures it
     - merging is 1-level deep
     - example: `[(id) @a (num) @b]` produces `{ a: Node | null; b: Node | null }`
-  - Enum produces discriminated union with `$tag` and `$data` fields:
+  - A labeled alternation produces a variant, represented in JSON with `$tag` and `$data`:
     - example: `[Str: (s) @s Num: (n) @n]` produces `{ $tag: "Str"; $data: { s } } | { $tag: "Num"; $data: { n } }`
-    - an enum branch with no capture is tag-only: `{ $tag: "..." }`, no `$data`
-  - a `[...]` can't be part union, part enum
-  - the right framing: enums are unions with extra precision, unions are loose enums
+    - a no-payload case is tag-only: `{ $tag: "..." }`, no `$data`
+  - an alternation cannot mix labeled and unlabeled alternatives
 
 ```
-// field constraint
+// grammar-field constraint
 (binary_expression
   left: (identifier) @left
 )
@@ -166,12 +164,12 @@ Rules that trip everyone:
 // optional
 (function (decorator)? @dec)
 
-// rows: funcs: { name }[]
+// list of records: funcs: { name }[]
 (func
   (id) @name
 )* @funcs
 
-// recursive enum
+// recursive variant
 Expr = [
   Lit: (num) @n
   Rec: (Expr) @e

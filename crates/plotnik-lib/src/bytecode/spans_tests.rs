@@ -3,9 +3,37 @@ use super::*;
 #[test]
 fn span_kind_names_are_stable() {
     assert_eq!(SpanKind::Def.name(), "def");
-    assert_eq!(SpanKind::NegField.name(), "neg_field");
+    assert_eq!(SpanKind::GrammarField.name(), "grammar_field");
+    assert_eq!(
+        SpanKind::NegatedGrammarField.name(),
+        "negated_grammar_field"
+    );
+    assert_eq!(
+        SpanKind::Alternation(Labeling::Unlabeled).name(),
+        "unlabeled_alternation"
+    );
+    assert_eq!(
+        SpanKind::Alternation(Labeling::Labeled).name(),
+        "labeled_alternation"
+    );
     assert_eq!(SpanKind::CaptureType.name(), "capture_type");
     assert!(SpanKind::try_from_u8(13).is_none());
+}
+
+#[test]
+fn alternation_labeling_roundtrips_through_wire_kinds() {
+    for labeling in [Labeling::Unlabeled, Labeling::Labeled] {
+        let entry = SpanEntry {
+            source_id: 0,
+            kind: SpanKind::Alternation(labeling),
+            start: 0,
+            end: 2,
+            type_id: SPAN_NO_BINDING,
+            member: SPAN_NO_BINDING,
+        };
+
+        assert_eq!(SpanEntry::from_bytes(&entry.to_bytes()), entry);
+    }
 }
 
 #[test]

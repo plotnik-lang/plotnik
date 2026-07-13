@@ -1,6 +1,6 @@
 Q = ((expression_statement))
 ------------------ DIAGNOSTICS -------------------
-warning: parenthesized sequences are tree-sitter syntax
+warning: parenthesized sequences are Tree-sitter syntax
  --> query.ptk:1:5
   |
 1 | Q = ((expression_statement))

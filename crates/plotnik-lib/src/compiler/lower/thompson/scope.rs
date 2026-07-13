@@ -241,7 +241,7 @@ impl NfaBuilder<'_> {
                         exit: match_record_close,
                         nav,
                         capture: CaptureEffects::default(),
-                        value: false,
+                        observe_value: false,
                     };
                     this.compile_nullable_pattern(&inner, pattern_ctx, skip_record_close)
                 })
@@ -285,7 +285,7 @@ impl NfaBuilder<'_> {
             exit: actual_exit,
             nav,
             capture: inner_capture,
-            value: false,
+            observe_value: false,
         };
         self.dispatch_pattern(&inner, pattern_ctx)
     }

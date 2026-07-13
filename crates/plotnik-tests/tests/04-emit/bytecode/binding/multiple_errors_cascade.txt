@@ -13,7 +13,7 @@ help: did you mean `function_declaration`?
 1 | Q = (function_declaration
   |                       +
 
-error: `nme` is not a valid field
+error: `nme` is not a valid grammar field
  --> query.ptk:2:3
   |
 2 |   nme: (identifer) @name

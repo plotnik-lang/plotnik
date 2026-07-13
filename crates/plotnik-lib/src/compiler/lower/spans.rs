@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
-use crate::bytecode::{MAX_SPANS, SpanKind};
+use crate::bytecode::{Labeling as SpanLabeling, MAX_SPANS, SpanKind};
 use crate::compiler::analyze::types::BuiltInCaptureType;
 use crate::compiler::analyze::types::type_shape::{TYPE_BOOL, TYPE_TEXT};
 use crate::compiler::diagnostics::SourceId;
@@ -63,10 +63,9 @@ pub(crate) fn tier(kind: SpanKind) -> u8 {
         SpanKind::Alternative
         | SpanKind::Quantifier
         | SpanKind::Sequence
-        | SpanKind::UnlabeledAlternation
-        | SpanKind::LabeledAlternation => 3,
-        SpanKind::Field | SpanKind::CaptureType => 4,
-        SpanKind::NegField | SpanKind::Predicate => 5,
+        | SpanKind::Alternation(_) => 3,
+        SpanKind::GrammarField | SpanKind::CaptureType => 4,
+        SpanKind::NegatedGrammarField | SpanKind::Predicate => 5,
     }
 }
 
@@ -337,7 +336,7 @@ fn collect_pattern(
                 node: field.syntax().clone(),
                 source,
                 range: name.text_range(),
-                kind: SpanKind::Field,
+                kind: SpanKind::GrammarField,
                 binding: None,
             });
             if let Some(value) = field.value() {
@@ -345,11 +344,16 @@ fn collect_pattern(
             }
         }
         Pattern::Alternation(alternation) => {
-            let kind = match alternation.labeling() {
-                ast::Labeling::Labeled => SpanKind::LabeledAlternation,
-                ast::Labeling::Unlabeled | ast::Labeling::Mixed => SpanKind::UnlabeledAlternation,
+            let labeling = match alternation.labeling() {
+                ast::Labeling::Labeled => SpanLabeling::Labeled,
+                ast::Labeling::Unlabeled | ast::Labeling::Mixed => SpanLabeling::Unlabeled,
             };
-            push_pattern(source, kind, alternation.syntax(), out);
+            push_pattern(
+                source,
+                SpanKind::Alternation(labeling),
+                alternation.syntax(),
+                out,
+            );
             for alternative in alternation.alternatives() {
                 push_alternative(source, &alternative, out);
                 if let Some(body) = alternative.body() {

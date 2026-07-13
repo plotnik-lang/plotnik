@@ -5,7 +5,7 @@ Q = (foo
   }
 )
 ------------------ DIAGNOSTICS -------------------
-error: field `bar` cannot match a sequence
+error: grammar field `bar` cannot match a sequence
  --> query.ptk:2:8
   |
 2 |     bar: {
@@ -15,6 +15,6 @@ error: field `bar` cannot match a sequence
 5 | |   }
   | |___^
   |
-help: a field holds a single child node; match one pattern, or move the sequence outside the field
+help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint
 -------------------- SYMBOLS ---------------------
 Q

@@ -1,4 +1,4 @@
-//! Module-assembly emission phase: build the node-kind/field/entry-point wire
+//! Module-assembly emission phase: build the node-kind, grammar-field, and entry point wire
 //! tables, serialize every section, and frame the module with its header and
 //! checksum.
 
@@ -22,7 +22,7 @@ use super::layout::compute_layout;
 use super::string_table::seed_string_table;
 use super::type_table::build_type_table;
 
-/// The node-kind, field, and entry-point wire tables. Built together because all
+/// The node-kind, grammar-field, and entry point wire tables. Built together because all
 /// three intern their names into the one string table.
 pub struct ModuleTables {
     node_kinds: Vec<NodeKindEntry>,
@@ -76,7 +76,7 @@ impl<'a> EmitPipeline<'a> {
         &self.layout
     }
 
-    /// Assemble the node-kind, field, and entry-point tables, interning the last
+    /// Assemble the node-kind, grammar-field, and entry point tables, interning the last
     /// names into the string table. As the final string-table writer, this is where
     /// the string, type, and table capacities are sealed.
     pub(in crate::compiler::emit) fn build_tables(&mut self) -> Result<ModuleTables, EmitError> {

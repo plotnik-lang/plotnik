@@ -2,7 +2,7 @@ Q = (identifier
   name: (identifier) @inner
 ) @id
 ------------------ DIAGNOSTICS -------------------
-error: field `name` is not valid on this node kind
+error: grammar field `name` is not valid on this node kind
  --> query.ptk:2:3
   |
 1 | Q = (identifier
@@ -10,4 +10,4 @@ error: field `name` is not valid on this node kind
 2 |   name: (identifier) @inner
   |   ^^^^
   |
-help: `identifier` has no fields
+help: `identifier` has no grammar fields

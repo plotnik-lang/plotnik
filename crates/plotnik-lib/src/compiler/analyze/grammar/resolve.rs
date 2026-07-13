@@ -152,7 +152,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         let mut builder = self
             .diag
             .report(
-                DiagnosticKind::UnknownField,
+                DiagnosticKind::UnknownGrammarField,
                 Span::new(source, name_token.text_range()),
             )
             .detail(field_name);

@@ -43,7 +43,7 @@ import { pushQueryFeedback } from "./query-feedback";
 import { usePlaygroundSession } from "./use-session";
 
 /* The playground shell: owns the user's inputs (query / source / lang /
-   entry-point choice), feeds them to the session hook, and lays the panes
+   entry point choice), feeds them to the session hook, and lays the panes
    out. All engine orchestration lives in use-session.ts; all wire types in
    protocol.ts.
 
@@ -160,7 +160,7 @@ export default function Playground() {
     [lang],
   );
 
-  /* Hovering a tree node spotlights its source range in the editor. The
+  /* Hovering a tree node spotlights its document range in the editor. The
      range is in the snapshot's coordinates; the spotlight field maps it
      through any edits made since. */
   const handleTreeHover = useCallback((src: Range16 | null) => {

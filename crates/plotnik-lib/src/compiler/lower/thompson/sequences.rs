@@ -66,7 +66,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         let items: Vec<_> = seq.items().collect();
         if items.is_empty() {
@@ -226,7 +226,7 @@ impl NfaBuilder<'_> {
                     exit: current_exit,
                     nav: Some(Nav::StayExact),
                     capture: item_capture,
-                    value: false,
+                    observe_value: false,
                 };
                 let body = self.dispatch_pattern(pattern, pattern_ctx);
                 self.emit_position_search(nav, body)
@@ -235,7 +235,7 @@ impl NfaBuilder<'_> {
                     exit: current_exit,
                     nav: nav_override,
                     capture: item_capture,
-                    value: false,
+                    observe_value: false,
                 };
                 self.dispatch_pattern(pattern, pattern_ctx)
             };
@@ -347,7 +347,7 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: first_nav,
             capture: first_post,
-            value: false,
+            observe_value: false,
         };
         let entry = self.compile_nullable_pattern(first_pattern, pattern_ctx, skip_exit);
 

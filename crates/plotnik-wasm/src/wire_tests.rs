@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use plotnik_lib::bytecode::{SpanEntry, SpanKind};
+use plotnik_lib::bytecode::{Labeling, SpanEntry, SpanKind};
 use plotnik_lib::{QueryToken, TypeScriptBinding};
 
 use super::wire::{InfoParts, info_json, query_span_json};
@@ -49,7 +49,7 @@ fn query_span_qualifies_ids_and_separates_alternation_labeling() {
         3,
         SpanEntry {
             source_id: 2,
-            kind: SpanKind::LabeledAlternation,
+            kind: SpanKind::Alternation(Labeling::Labeled),
             start: 5,
             end: 12,
             type_id: 4,

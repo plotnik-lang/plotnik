@@ -107,7 +107,7 @@ impl Session {
 
     /// Generate the production Rust matcher for this query. Ordinary query
     /// diagnostics return `code: null`; the accompanying identity always says
-    /// which exact embedded grammar a successful module links against.
+    /// which exact embedded grammar a successful module is bound to.
     pub fn generate(&self, target: &str) -> Result<JsValue, JsValue> {
         if target != "rust" {
             return Err(JsValue::from_str("generation target must be 'rust'"));
@@ -218,7 +218,7 @@ fn resolve_entry_point(
         None => entry_points
             .last()
             .cloned()
-            .ok_or_else(|| "no entry points in module".to_string())?,
+            .ok_or_else(|| "bytecode module exports no entry points".to_string())?,
     };
 
     let Some(entry_point) = module.entry_point(&selected) else {

@@ -35,7 +35,7 @@ pub use entry_point::EntryPoint;
 pub use ids::{StringId, TypeId};
 pub use instructions::{CodeAddr, EncodeError};
 pub use module::{EntryPointsView, Module, StringsView, TypesView};
-pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
+pub use spans::{Labeling, SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 pub use type_system::{PrimitiveType, TypeKind};
 

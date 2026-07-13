@@ -1,10 +1,10 @@
 Q = .
 ------------------ DIAGNOSTICS -------------------
-error: query produces no entry points
+error: query defines no selectable entry point
  --> query.ptk:1:1
   |
 1 | Q = .
   | ^
   |
-help: every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing
+help: a definition selectable as an entry point must match exactly one root node; wrap constraints in a node pattern, e.g. `Q = (program .)`
 -------------------- SYMBOLS ---------------------

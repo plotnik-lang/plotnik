@@ -1,7 +1,7 @@
 //! Runtime engine for executing compiled Plotnik queries.
 //!
 //! The VM executes bytecode against tree-sitter syntax trees,
-//! producing a match journal that can be materialized into output values.
+//! producing a match journal that can be materialized into result values.
 
 mod error;
 mod execution_trace;

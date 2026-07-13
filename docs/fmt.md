@@ -15,7 +15,7 @@ Terminology follows the parser's CST (`compiler/parse/cst.rs`): `Def`,
 
 - **Input must parse cleanly.** The formatter formats the CST, not text. A
   file with parse errors is left untouched (recovery CSTs are not formattable).
-  Parse- or analyze-level _warnings_ (e.g. tree-sitter-style `((a) (b))`) do
+  Parse- or analyze-level _warnings_ (e.g. Tree-sitter-style `((a) (b))`) do
   not block formatting. A parse failure returns its diagnostics together with
   the matching source map, so callers can render it without rebuilding context.
 - **Semantics-preserving.** Output differs from input only in whitespace,

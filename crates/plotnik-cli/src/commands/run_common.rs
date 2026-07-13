@@ -107,7 +107,7 @@ pub fn resolve_entry_point(module: &Module, name: Option<&str>) -> Result<EntryP
             msg.push_str(&format!("\n\nAvailable entry points: {}", names.join(", ")));
             CliError::fatal(msg)
         }),
-        None => Err(CliError::fatal("no entry points in module")),
+        None => Err(CliError::fatal("bytecode module exports no entry points")),
     }
 }
 

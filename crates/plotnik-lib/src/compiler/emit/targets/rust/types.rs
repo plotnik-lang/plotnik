@@ -1,7 +1,7 @@
 //! Item collection and rendering.
 //!
 //! One item per named type: every value-producing definition (struct, enum, or a
-//! `pub type` alias for scalar/wrapper outputs), plus every named composite
+//! `pub type` alias for leaf/wrapper result types), plus every named composite
 //! its output reaches, emitted parent-first right after their owner. Names
 //! come verbatim from the naming pass; the only unnamed composites are enum
 //! variant payload structs, which render inline as struct variants.

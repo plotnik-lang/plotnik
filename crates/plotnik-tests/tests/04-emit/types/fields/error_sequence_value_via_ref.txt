@@ -5,7 +5,7 @@ Row = {
 
 Q = (variable_declarator name: (Row))
 ------------------ DIAGNOSTICS -------------------
-error: field `name` cannot match a sequence
+error: grammar field `name` cannot match a sequence
  --> query.ptk:6:32
   |
 1 |   Row = {
@@ -18,4 +18,4 @@ error: field `name` cannot match a sequence
 6 |   Q = (variable_declarator name: (Row))
   |                                  ^^^^^
   |
-help: a field holds a single child node; match one pattern, or move the sequence outside the field
+help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint

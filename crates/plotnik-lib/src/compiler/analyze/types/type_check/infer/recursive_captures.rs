@@ -65,7 +65,7 @@ impl InferVisitor<'_, '_> {
 
         match pattern {
             Pattern::CapturedPattern(cap) => {
-                // A suppressed subtree makes no output demands (inline checks
+                // A suppressed subtree makes no result-construction demands (inline checks
                 // skip it too).
                 if cap.is_discard() {
                     return;

@@ -11,4 +11,4 @@ help: use `@foo_bar`
 1 - Q = (node (a) @foo.bar name: (other))
 1 + Q = (node (a) @foo_bar name: (other))
   |
-help: captures become fields in the output
+help: capture names become result field names

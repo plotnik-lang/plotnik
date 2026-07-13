@@ -611,7 +611,6 @@ fn tree_help_shows_precise_tree_flags() {
 
     assert!(help.contains("--query-view"));
     assert!(help.contains("--include-anonymous"));
-    assert!(!help.contains("--raw"), "tree help should not show --raw");
 }
 
 #[test]
@@ -678,50 +677,6 @@ fn tree_params_extracts_all_fields() {
     assert!(params.include_anonymous);
     assert!(params.json);
     assert!(matches!(params.color, ColorChoice::Always));
-}
-
-#[test]
-fn dump_accepts_raw_flag() {
-    let cmd = dump_command();
-    let result = cmd.try_get_matches_from(["dump", "query.ptk", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "dump should accept --raw flag: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn run_accepts_raw_flag() {
-    let cmd = run_command();
-    let result = cmd.try_get_matches_from(["run", "query.ptk", "app.js", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "run should accept --raw flag: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn trace_accepts_raw_flag() {
-    let cmd = trace_command();
-    let result = cmd.try_get_matches_from(["trace", "query.ptk", "app.js", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "trace should accept --raw flag: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn check_accepts_raw_flag() {
-    let cmd = check_command();
-    let result = cmd.try_get_matches_from(["check", "query.ptk", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "check should accept --raw flag: {:?}",
-        result.err()
-    );
 }
 
 #[test]

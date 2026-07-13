@@ -152,7 +152,7 @@ module.exports = grammar({
       ),
 
     // `{...}`: siblings in order. Grouping only; never a field value's
-    // shape requirement or an output scope unless captured.
+    // shape requirement or a result scope unless captured.
     sequence: ($) => seq("{", repeat($._sequence_item), "}"),
 
     // `[...]`: alternatives tried in source order with backtracking. They are
@@ -233,7 +233,7 @@ module.exports = grammar({
     // `-field`: assert the field is absent.
     negated_field: ($) => seq("-", field("name", $.identifier)),
 
-    // `.` is soft adjacency, `.!` is exact adjacency.
+    // `.` is the soft anchor; `.!` is the exact anchor.
     anchor: (_) => choice(".", ".!"),
 
     // `_` matches any node; `(_)` any named node. The same token serves as
@@ -278,7 +278,7 @@ module.exports = grammar({
 
     capture: (_) => /@[a-z][a-z0-9_]*/,
 
-    // `@_` or `@_name`: match, then discard the output.
+    // `@_` or `@_name`: match, then discard the result.
     discard: (_) => /@_[a-z0-9_]*/,
 
     // `; line`, `// line`, and non-nesting `/* block */`. The block form

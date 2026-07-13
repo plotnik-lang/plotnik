@@ -542,14 +542,14 @@ impl CompiledQuery {
             .expect("valid compiled query is grammar-bound");
         let schema = ResultSchema::from_artifacts(bound.analysis_input())
             .expect("target-neutral compilation validated the result schema");
-        let legacy = config.legacy_config();
+        let emitter = config.emitter_config();
         let (source, bindings) = if config.colored_output() {
             (
-                crate::compiler::emit::targets::typescript::emit_schema(&schema, legacy),
+                crate::compiler::emit::targets::typescript::emit_schema(&schema, emitter),
                 Vec::new(),
             )
         } else {
-            crate::compiler::emit::targets::typescript::emit_schema_mapped(&schema, legacy)
+            crate::compiler::emit::targets::typescript::emit_schema_mapped(&schema, emitter)
         };
         Ok(Emission::success(
             TypeScriptTypesOutput::new(source, bindings),

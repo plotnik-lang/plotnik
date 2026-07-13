@@ -1,6 +1,6 @@
 Q = (function_declaration -condition) @fn
 ------------------ DIAGNOSTICS -------------------
-error: field `condition` is not valid on this node kind
+error: grammar field `condition` is not valid on this node kind
  --> query.ptk:1:28
   |
 1 | Q = (function_declaration -condition) @fn
@@ -8,4 +8,4 @@ error: field `condition` is not valid on this node kind
   |      |
   |      on `function_declaration`
   |
-help: valid fields for `function_declaration`: `body`, `name`, `parameters`
+help: valid grammar fields for `function_declaration`: `body`, `name`, `parameters`

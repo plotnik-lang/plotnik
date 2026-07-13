@@ -30,8 +30,8 @@ rejected at load.
 | 1     | `ref`                   |
 | 2     | `pattern`               |
 | 3     | `capture`               |
-| 4     | `field`                 |
-| 5     | `neg_field`             |
+| 4     | `grammar_field`         |
+| 5     | `negated_grammar_field` |
 | 6     | `predicate`             |
 | 7     | `quantifier`            |
 | 8     | `sequence`              |
@@ -40,7 +40,11 @@ rejected at load.
 | 11    | `alternative`           |
 | 12    | `capture_type`          |
 
-`capture_type` covers `:: T`, `:: str`, or `:: bool`. `neg_field` and
+Values 9 and 10 encode `SpanKind::Alternation(Labeling::Unlabeled)` and
+`SpanKind::Alternation(Labeling::Labeled)`; labeling does not create a second
+syntax construct.
+
+`capture_type` covers `:: T`, `:: str`, or `:: bool`. `negated_grammar_field` and
 `predicate` are reserved for
 inspection detail; v11 loaders accept the kind values, but the compiler does
 not emit them yet.
@@ -61,9 +65,9 @@ cursor already points at the matched node. The compiler asserts this on the
 fresh Thompson IR before optimization; later passes may move it only along
 cursor-preserving epsilon chains.
 
-Scalar capture types contribute their exact runtime provenance independently
+The `str` and `bool` capture types contribute their exact runtime provenance independently
 of inspection-detail spans. While a capture span is open, its scalar marks are
-folded into a possibly absent document source span: a present string highlights
+folded into a possibly absent document bounding range: a present string highlights
 precisely the text it returns, a present boolean may carry its document range, and
 `null`/fallback `false` has no invented range. A real zero-byte node retains a
 real empty span. This remains exact even when lower-priority pattern spans
@@ -72,7 +76,7 @@ are degraded away.
 Construction-time effect-stack validation tracks span depth, including inside
 suppression scopes, so malformed bytecode with unbalanced span brackets is
 rejected before execution. Span effects are still recorded under runtime
-suppression: a bare `(Foo)` reference suppresses `Foo`'s output values but not
+suppression: a bare `(Foo)` reference suppresses `Foo`'s result values but not
 its result-provenance span events.
 
 ## Degradation

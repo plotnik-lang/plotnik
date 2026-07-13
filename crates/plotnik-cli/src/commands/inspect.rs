@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::bytecode::{Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
+use plotnik_lib::bytecode::{Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RuntimeError,
     RuntimeLimitSpec, TraceRecorder, TypeScriptCodegenConfig, VM, extract_result_provenance,
@@ -327,13 +327,13 @@ fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
         SpanKind::Ref => ("reference", None),
         SpanKind::Pattern => ("pattern", None),
         SpanKind::Capture => ("capture", None),
-        SpanKind::Field => ("field", None),
-        SpanKind::NegField => ("negated_field", None),
+        SpanKind::GrammarField => ("grammar_field", None),
+        SpanKind::NegatedGrammarField => ("negated_grammar_field", None),
         SpanKind::Predicate => ("predicate", None),
         SpanKind::Quantifier => ("quantifier", None),
         SpanKind::Sequence => ("sequence", None),
-        SpanKind::UnlabeledAlternation => ("alternation", Some("unlabeled")),
-        SpanKind::LabeledAlternation => ("alternation", Some("labeled")),
+        SpanKind::Alternation(Labeling::Unlabeled) => ("alternation", Some("unlabeled")),
+        SpanKind::Alternation(Labeling::Labeled) => ("alternation", Some("labeled")),
         SpanKind::Alternative => ("alternative", None),
         SpanKind::CaptureType => ("capture_type", None),
     }

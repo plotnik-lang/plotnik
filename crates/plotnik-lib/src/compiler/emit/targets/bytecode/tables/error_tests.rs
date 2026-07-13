@@ -157,7 +157,7 @@ fn emit_error_classification_respects_limit_ownership() {
 fn effect_member_payload_overflow_is_emit_error() {
     // Members are indexed into a 10-bit effect payload (max 1023). Spread > 1024
     // globally-distinct captures across several definitions (each record staying
-    // under the 255-field limit) so a Set effect references an index past 1023.
+    // under the 255-field limit) so a RecordSet effect references an index past 1023.
     let mut query = String::new();
     for def in 0..5 {
         write!(query, "D{def} = (program").unwrap();

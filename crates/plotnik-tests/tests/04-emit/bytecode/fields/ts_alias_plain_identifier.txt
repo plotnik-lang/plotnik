@@ -9,6 +9,6 @@ error: `identifier` can't be the value of `name`
 2 |   name: (identifier) @name
   |   ----   ^^^^^^^^^^
   |   |
-  |   field `name`
+  |   grammar field `name`
   |
 help: `name` accepts: `type_identifier`

@@ -808,7 +808,7 @@ impl<'t> VM<'t> {
                 SpanEnd => JournalEvent::SpanEnd(op.payload as u16),
                 _ => unreachable!("bypass metadata only classifies spans and scalar marks"),
             },
-            EffectSuppression::Data => {
+            EffectSuppression::Output => {
                 let logged = match op.kind {
                     ScalarOpen => self.engine.scalar_open(),
                     StrClose => self.engine.scalar_close_str(),
@@ -816,7 +816,7 @@ impl<'t> VM<'t> {
                     NodeStr => self.engine.node_str(),
                     NodeBool => self.engine.node_bool(),
                     BoolValue => self.engine.bool_value(op.payload != 0),
-                    _ => self.engine.emit_data(|cursor| match op.kind {
+                    _ => self.engine.emit_output_event(|cursor| match op.kind {
                         Node => JournalEvent::Node(cursor.node()),
                         ListOpen => JournalEvent::ListOpen,
                         ArrayPush => JournalEvent::ArrayPush,
@@ -830,7 +830,7 @@ impl<'t> VM<'t> {
                         SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd
                         | ScalarOpen | ScalarMark | StrClose | BoolClose | NodeStr | NodeBool
                         | BoolValue => {
-                            unreachable!("metadata routes non-ordinary data effects first")
+                            unreachable!("metadata routes non-ordinary output effects first")
                         }
                     }),
                 };

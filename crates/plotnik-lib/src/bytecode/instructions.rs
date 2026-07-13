@@ -128,7 +128,7 @@ impl MatchCounts {
 
 /// Bytecode-word address in the instruction stream.
 ///
-/// Used for layout addresses, entry-point targets, bootstrap parameter, etc.
+/// Used for layout addresses, entry point targets, bootstrap parameter, etc.
 /// For decoded instruction successors (where 0 = terminal), use [`SuccessorAddr`] instead.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]

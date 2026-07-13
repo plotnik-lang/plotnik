@@ -7,7 +7,7 @@ use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{Alternative, Labeling, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
 
-pub fn validate_alt_kinds(input: ValidationInput) {
+pub fn validate_alternative_labels(input: ValidationInput) {
     let ValidationInput {
         source_id,
         ast,

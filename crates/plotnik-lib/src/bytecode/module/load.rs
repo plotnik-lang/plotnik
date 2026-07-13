@@ -238,7 +238,7 @@ impl Module {
     /// out-of-bounds slicing: the reserved bytes are zero, the CRC32 over the
     /// post-header body matches, the string/regex table sentinels are
     /// well-formed, the documented TypeDef member ranges stay in bounds, and
-    /// entry-point targets address real instructions.
+    /// entry point targets address real instructions.
     ///
     /// The CRC32 detects accidental corruption between emission and
     /// construction. It is not a substitute for structural validation, so a
@@ -797,7 +797,7 @@ impl Module {
         Ok(())
     }
 
-    /// Every *required* `StringId` held in a section — entry-point names,
+    /// Every *required* `StringId` held in a section — entry point names,
     /// node/field symbol names, type names, type member names, and regex pattern
     /// names — must address a real string-table entry, so the view accessors that
     /// resolve them (and `find_by_name`, the materializer's record-field keys,
@@ -927,7 +927,7 @@ impl Module {
     ///    on a recorded instruction start.
     ///
     /// Returns the instruction-start bitmap so [`Self::validate_entry_points`] can
-    /// hold entry-point targets to the same rule: an entry point pointing into the
+    /// hold entry point targets to the same rule: an entry point pointing into the
     /// interior of a multi-word instruction would otherwise begin decoding
     /// mid-instruction.
     ///

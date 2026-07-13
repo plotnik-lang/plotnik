@@ -51,7 +51,7 @@ matches(document) -> Result<Boolean, LimitExceeded>
 ```
 
 `parse` runs the matcher, then decodes the output-event view of its committed
-match journal into the generated result type. `matches` runs the same matcher with data events
+match journal into the generated result type. `matches` runs the same matcher with output events
 suppressed; it does not allocate a match journal and cannot fail a decode-depth
 limit.
 
@@ -76,7 +76,7 @@ The document must provide these semantic operations:
 | `root_position()`     | A fresh matcher position rooted at the tree root.             |
 | `node(position)`      | The binding-native node at a position.                        |
 | `source_bytes()`      | The exact source, encoded as canonical UTF-8 bytes.           |
-| `byte_span(node)`     | Half-open `[start, end)` offsets into the UTF-8 source bytes. |
+| `byte_range(node)`    | Half-open `[start, end)` offsets into the UTF-8 source bytes. |
 | `text_bytes(node)`    | The canonical source-byte slice for this node.                |
 | `text(node)`          | Unicode text decoded from `text_bytes(node)`.                 |
 | `source_node_count()` | Root descendant count used to resolve automatic limits.       |
@@ -133,7 +133,8 @@ The adapter normalizes binding quirks before the matcher sees them:
 - field ids and kind ids use the same numeric namespace verified at module
   initialization.
 
-The following node class is normative:
+The following Plotnik navigation class is normative; it groups nodes by skip
+behavior and does not claim they are semantically insignificant:
 
 ```text
 trivia(node) = !node.named || node.extra
@@ -141,7 +142,7 @@ trivia(node) = !node.named || node.extra
 
 An explicit match always gets a chance before the skip policy is applied. In
 particular, an explicitly requested comment can match even though comments are
-usually extras and therefore trivia.
+usually extras and therefore fall in this navigation class.
 
 ### 3.1 Navigation
 
@@ -314,8 +315,8 @@ before their closing `RecordSet`. The order of sibling `RecordSet` entries insid
 record is not stable and must not be used as declaration order.
 
 `SuppressBegin` and `SuppressEnd` change the suppression depth but are not
-journal entries. While suppression is nonzero, ordinary data events,
-including scalar opens and closes, are skipped. `ScalarMark` bypasses data
+journal entries. While suppression is nonzero, ordinary output events,
+including scalar opens and closes, are skipped. `ScalarMark` bypasses output-event
 suppression so an enclosing scalar still sees nodes matched inside a suppressed
 definition. A mark is a no-op when no scalar frame is open. Suppression still
 nests during `matches`, whose initial depth is nonzero, so `matches` allocates
@@ -334,7 +335,7 @@ provenance; it never derives truthiness from marks.
 For a scalar whose raw value is one node, `NodeStr` and `NodeBool` are the
 equivalent one-entry fast path; the node also carries result provenance.
 Production lowering uses `BoolValue(true)` for presence booleans because their
-source range is not observable there; `NodeBool` and balanced boolean frames
+document range is not observable there; `NodeBool` and balanced boolean frames
 are emitted only when inspection requests that provenance.
 
 ### 6.1 Result decoder
@@ -450,7 +451,7 @@ GrammarIdentity {
   path passed to `--grammar`.
 
 The identity appears in generated header comments and constants. It is
-diagnostic provenance, not something most tree-sitter bindings can verify from
+diagnostic provenance, not something most Tree-sitter bindings can verify from
 a live language object.
 
 Enforcement is a subset check over the ids the generated matcher actually uses:

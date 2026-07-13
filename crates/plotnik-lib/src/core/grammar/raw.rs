@@ -12,7 +12,7 @@ pub struct RawGrammar {
     pub name: String,
     /// Production rules, preserving definition order.
     pub rules: IndexMap<String, RawRule>,
-    /// Extra/trivia nodes (comments, whitespace).
+    /// Rules admitted as Tree-sitter extras, such as comments or whitespace.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extras: Vec<RawRule>,
     /// Precedence orderings.

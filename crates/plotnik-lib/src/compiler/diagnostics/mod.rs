@@ -27,7 +27,7 @@ pub enum Error {
     QueryAnalyzeError(Diagnostics),
 
     /// Emission configuration is outside-boundary input and has no honest
-    /// query-source span.
+    /// query span.
     #[error("invalid emission configuration: {0}")]
     EmitConfig(#[from] crate::compiler::emit::EmitConfigError),
 

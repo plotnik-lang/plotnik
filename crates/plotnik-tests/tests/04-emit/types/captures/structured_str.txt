@@ -14,7 +14,7 @@ warning: capture type `str` replaces structured data with source text
 5 |   } @chunk :: str
   |            ^^^^^^
   |
-help: fields, cases, text, or boolean values produced inside the capture will not be returned
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 ------------------- TYPESCRIPT -------------------
 export interface Q {
   chunk: string;

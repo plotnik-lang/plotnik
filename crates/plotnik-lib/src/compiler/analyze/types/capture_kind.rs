@@ -145,14 +145,14 @@ impl TypeAnalysis {
             return mode.recover("admitted reference must resolve to a definition", false);
         };
 
-        // After inference the definition's registered output type is authoritative;
+        // After inference the definition's registered result type is authoritative;
         // this is the path emission always takes.
         if mode.is_admitted() {
-            let Some(output_type) = self.expect_def_output(def_id).value() else {
+            let Some(result_type) = self.expect_def_output(def_id).value() else {
                 return false;
             };
             return matches!(
-                self.expect_type_shape(output_type),
+                self.expect_type_shape(result_type),
                 TypeShape::Record(_)
                     | TypeShape::Variant(_)
                     | TypeShape::List { .. }
@@ -160,9 +160,9 @@ impl TypeAnalysis {
             );
         }
 
-        if let Some(output_type) = self.def_output(def_id).and_then(|output| output.value()) {
+        if let Some(result_type) = self.def_output(def_id).and_then(|output| output.value()) {
             return matches!(
-                self.type_shape(output_type),
+                self.type_shape(result_type),
                 Some(
                     TypeShape::Record(_)
                         | TypeShape::Variant(_)

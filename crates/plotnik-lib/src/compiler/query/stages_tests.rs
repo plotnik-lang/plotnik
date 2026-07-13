@@ -181,13 +181,13 @@ fn analysis_rejects_byte_oriented_regex() {
 }
 
 #[test]
-fn compile_rejects_value_less_definition() {
+fn compile_rejects_definition_with_positional_only_body() {
     let bound = Query::expect("Q = .").bind(grammar());
     let compiled = bound.compile().expect("compilation answers");
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no entry points"), "{rendered}");
+    assert!(rendered.contains("no selectable entry point"), "{rendered}");
 }
 
 #[test]
@@ -203,7 +203,7 @@ fn compile_accepts_valid_query() {
 }
 
 #[test]
-fn compile_flags_dropped_value_less_def_among_valid() {
+fn compile_flags_positional_only_definition_among_valid_definitions() {
     let bound = Query::expect(indoc!(
         "
         Bad = .
@@ -215,7 +215,7 @@ fn compile_flags_dropped_value_less_def_among_valid() {
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no entry points"), "{rendered}");
+    assert!(rendered.contains("no selectable entry point"), "{rendered}");
 }
 
 #[test]
@@ -252,7 +252,7 @@ fn multifile_bind_field_error_in_referenced_body_spans_two_files() {
     let res = bound.dump_diagnostics();
 
     insta::assert_snapshot!(res, @"
-    error: field `name` is not valid on this node kind
+    error: grammar field `name` is not valid on this node kind
      --> a.ptk:1:7
       |
     1 | Foo = name: (identifier)
@@ -263,7 +263,7 @@ fn multifile_bind_field_error_in_referenced_body_spans_two_files() {
     1 | Bar = (call_expression (Foo))
       |        --------------- on `call_expression`
       |
-    help: valid fields for `call_expression`: `arguments`, `function`, `optional_chain`
+    help: valid grammar fields for `call_expression`: `arguments`, `function`, `optional_chain`
     ");
 }
 
@@ -489,7 +489,7 @@ fn multifile_field_with_ref_to_seq_error() {
     };
 
     insta::assert_snapshot!(res, @"
-    error: field `name` cannot match a sequence
+    error: grammar field `name` cannot match a sequence
      --> main.ptk:1:17
       |
     1 | Q = (call name: (X))
@@ -500,6 +500,6 @@ fn multifile_field_with_ref_to_seq_error() {
     1 | X = {(a) (b)}
       |     --------- defined here
       |
-    help: a field holds a single child node; match one pattern, or move the sequence outside the field
+    help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint
     ");
 }

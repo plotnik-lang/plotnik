@@ -9,7 +9,7 @@
 //! Offsets in any payload are byte offsets into the exact text the caller
 //! passed in; the web side converts to UTF-16 at its edge (`byte-offsets.ts`).
 
-use plotnik_lib::bytecode::{EntryPoint, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
+use plotnik_lib::bytecode::{EntryPoint, Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
     Colors, MatchJournal, RunStats, RuntimeError, extract_result_provenance, materialize_verified,
 };
@@ -128,13 +128,13 @@ fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
         SpanKind::Ref => ("reference", None),
         SpanKind::Pattern => ("pattern", None),
         SpanKind::Capture => ("capture", None),
-        SpanKind::Field => ("field", None),
-        SpanKind::NegField => ("negated_field", None),
+        SpanKind::GrammarField => ("grammar_field", None),
+        SpanKind::NegatedGrammarField => ("negated_grammar_field", None),
         SpanKind::Predicate => ("predicate", None),
         SpanKind::Quantifier => ("quantifier", None),
         SpanKind::Sequence => ("sequence", None),
-        SpanKind::UnlabeledAlternation => ("alternation", Some("unlabeled")),
-        SpanKind::LabeledAlternation => ("alternation", Some("labeled")),
+        SpanKind::Alternation(Labeling::Unlabeled) => ("alternation", Some("unlabeled")),
+        SpanKind::Alternation(Labeling::Labeled) => ("alternation", Some("labeled")),
         SpanKind::Alternative => ("alternative", None),
         SpanKind::CaptureType => ("capture_type", None),
     }

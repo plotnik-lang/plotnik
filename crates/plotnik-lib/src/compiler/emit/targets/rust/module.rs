@@ -652,14 +652,14 @@ impl<'a> Generator<'a> {
         let unit = |out: &mut String, variant: &str| {
             let _ = writeln!(
                 out,
-                "{indent}eng.emit_data(|_| rt::JournalEvent::{variant});"
+                "{indent}eng.emit_output_event(|_| rt::JournalEvent::{variant});"
             );
         };
         match effect.kind {
             EffectKind::Node => {
                 let _ = writeln!(
                     out,
-                    "{indent}eng.emit_data(|c| rt::JournalEvent::Node(c.node()));"
+                    "{indent}eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));"
                 );
             }
             EffectKind::ListOpen => unit(out, "ListOpen"),
@@ -677,7 +677,7 @@ impl<'a> Generator<'a> {
                 };
                 let _ = writeln!(
                     out,
-                    "{indent}eng.emit_data(|_| rt::JournalEvent::{variant}({})); // {}",
+                    "{indent}eng.emit_output_event(|_| rt::JournalEvent::{variant}({})); // {}",
                     effect.payload, effect.display
                 );
             }
@@ -1071,7 +1071,7 @@ pub(super) fn depth_expr(limit: Limit, max_decoder_frame_bytes: u64) -> String {
 }
 
 const HEADER: &str = r#"
-// Generated Plotnik query module: typed output types, `parse`/`matches` entry
+// Generated Plotnik query module: typed result types, `parse`/`matches` entry
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
@@ -1224,7 +1224,7 @@ pub(super) fn @LIMITED_JOURNAL_FN@<'t>(
 "#;
 
 const LIMITED_MATCHES_ENTRY_FN: &str = r#"
-/// Whether `@DEF@` accepts, under [`LIMITS`], with data effects suppressed.
+/// Whether `@DEF@` accepts under [`LIMITS`] without recording output events.
 pub(super) fn @MATCHES_FN@(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
     Ok(run::<@FUEL_METERED@, @MEMORY_METERED@, false>(tree, source, @ENTRY@, @SAFE_LIMITS@)?.is_some())
 }
@@ -1253,20 +1253,20 @@ enum Unwound {
 /// independently: each folds away when its resource is unbounded, so a fully
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
 /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-/// `RECORD_OUTPUT` controls whether data events are journaled; `matches`
+/// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
 /// disables it to avoid output allocation and decode-depth failures. (No
 /// let-chains: generated code targets the embedding crate's edition.)
-fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT: bool>(
+fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT_EVENTS: bool>(
     tree: &'t rt::Tree,
     source: &str,
     entry: u16,
     limits: rt::ResolvedRuntimeLimits,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
     verify_language(tree);
-    let mut eng = if RECORD_OUTPUT {
+    let mut eng = if RECORD_OUTPUT_EVENTS {
         rt::Engine::new(tree.walk())
     } else {
-        rt::Engine::new_data_suppressed(tree.walk())
+        rt::Engine::new_match_only(tree.walk())
     };
     let mut fuel_used: u64 = 0;
     let mut ip = entry;

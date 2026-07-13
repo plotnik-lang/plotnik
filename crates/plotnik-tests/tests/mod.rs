@@ -630,7 +630,7 @@ impl Lang {
                 ts: arborium_dart::language().into(),
             }),
             Some(other) => Err(format!(
-                "input language `{other}` is not wired into the fixture suite yet (have: javascript, typescript, dart)"
+                "source language `{other}` is not wired into the fixture suite yet (have: javascript, typescript, dart)"
             )),
         }
     }

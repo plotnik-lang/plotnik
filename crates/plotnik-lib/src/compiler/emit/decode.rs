@@ -2,7 +2,7 @@
 //!
 //! Match-journal events name record fields and variant cases with absolute layout
 //! slots. This plan resolves every nominal twin to the complete set of slots
-//! it may produce and turns output types into a small value-decoding algebra.
+//! it may produce and turns result types into a small value-decoding algebra.
 //! Backends choose identifiers, error syntax, recursion representation, and
 //! construction syntax without walking analysis types or rebuilding tables.
 
@@ -110,7 +110,7 @@ pub(crate) enum DecodeValue {
     Node,
     Text,
     Bool,
-    Nullable(Box<DecodeValue>),
+    Option(Box<DecodeValue>),
     List(Box<DecodeValue>),
     Nested {
         item: Symbol,
@@ -199,7 +199,7 @@ impl DecodePlanBuilder<'_, '_> {
             TypeShape::Node => DecodeValue::Node,
             TypeShape::Text => DecodeValue::Text,
             TypeShape::Bool => DecodeValue::Bool,
-            TypeShape::Option(inner) => DecodeValue::Nullable(Box::new(self.value(*inner))),
+            TypeShape::Option(inner) => DecodeValue::Option(Box::new(self.value(*inner))),
             TypeShape::List { element, .. } => DecodeValue::List(Box::new(self.value(*element))),
             TypeShape::Record(_) | TypeShape::Variant(_) => DecodeValue::Nested {
                 item: self

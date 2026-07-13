@@ -1,6 +1,6 @@
 //! CLI presentation for VM runtime errors.
 //!
-//! `RuntimeError` is a plain library enum with no `.ptk` source span, so it is
+//! `RuntimeError` is a plain library enum with no `.ptk` query span, so it is
 //! deliberately *not* routed through the diagnostics engine (which requires a
 //! span and a `SourceMap` already dropped before execution). Instead the limit
 //! errors get a four-line "what / halted / why / how" message with a stable

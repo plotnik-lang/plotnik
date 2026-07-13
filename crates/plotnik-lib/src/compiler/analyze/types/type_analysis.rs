@@ -184,7 +184,7 @@ impl TypeAnalysis {
     /// A `Ref` resolves through its target: a reference to a match-only definition
     /// leaves no pending value at runtime (the capture takes the matched node),
     /// so it must not classify as structured. Mid-inference a same-SCC target
-    /// has no output yet; assume structured — the admitted classification that
+    /// has no inferred output flow yet; assume structured — the admitted classification that
     /// lowering reads always resolves.
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
@@ -271,7 +271,7 @@ impl TypeAnalysis {
         self.resolve_underlying_type_id(target)
     }
 
-    /// Iterate over all definition output types as `(DefId, TypeId)` in `DefId`
+    /// Iterate over all definition result types as `(DefId, TypeId)` in `DefId`
     /// order, which corresponds to SCC processing order (leaves first).
     pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
         self.def_output.iter().map(|(&id, &output)| (id, output))
@@ -337,7 +337,7 @@ impl TypeAnalysis {
 
         for output in self.def_output.values() {
             if let DefinitionOutput::Value(type_id) = output {
-                self.assert_type_id_registered(*type_id, "def output type id out of range");
+                self.assert_type_id_registered(*type_id, "definition result type id out of range");
             }
         }
 

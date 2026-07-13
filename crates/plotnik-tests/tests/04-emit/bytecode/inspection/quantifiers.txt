@@ -189,7 +189,7 @@ P22 capture    284..290  source_id=0  T10.M5
 P23 quantifier 282..283  source_id=0
 P24 pattern    228..282  source_id=0
 P25 capture    273..278  source_id=0  T08.M4
-P26 field      254..258  source_id=0
+P26 grammar_field 254..258  source_id=0
 P27 pattern    260..272  source_id=0
 
 [instructions]

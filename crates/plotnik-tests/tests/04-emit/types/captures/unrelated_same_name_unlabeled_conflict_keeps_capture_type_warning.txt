@@ -18,7 +18,7 @@ warning: capture type `str` replaces structured data with source text
 6 |       } @x :: str
   |            ^^^^^^
   |
-help: fields, cases, text, or boolean values produced inside the capture will not be returned
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 
 error: capture `@x` has incompatible types across alternatives
   --> query.ptk:8:18

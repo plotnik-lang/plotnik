@@ -168,7 +168,7 @@ fn forged_invalid_entry_point_name_is_rejected() {
         reseal(&mut bytes);
 
         let err = Module::load_compiler_output(&bytes)
-            .expect_err("forged entry-point name must be rejected");
+            .expect_err("forged entry point name must be rejected");
         assert!(
             matches!(err, ModuleError::InvalidStringId(_)),
             "forged name {forged}: expected InvalidStringId, got {err:?}"
@@ -979,7 +979,7 @@ fn forged_corrupt_regex_dfa_is_rejected() {
 
 #[test]
 fn forged_entry_point_into_instruction_interior_is_rejected() {
-    // Issue #457: an entry-point `target` that lands inside a multi-word
+    // Issue #457: an entry point `target` that lands inside a multi-word
     // instruction (not on a recorded instruction start) makes the VM begin
     // decoding mid-instruction. `target < word_count` is not enough — the load-time
     // check holds entry points to the same instruction-start rule as successors.
@@ -1025,7 +1025,7 @@ fn forged_record_set_to_array_push_is_rejected() {
 #[test]
 fn forged_scalar_capture_record_set_to_array_push_is_rejected() {
     // The minimal case: a scalar record whose only effect is a `RecordSet` into
-    // the entry-point wrapper's root record. Forged to `ArrayPush`, the body now
+    // the entry point wrapper's root record. Forged to `ArrayPush`, the body now
     // demands a List top while the wrapper hands it a Record — caught when the entry point
     // wrapper is checked as a root.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
@@ -1276,7 +1276,7 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
 
 #[test]
 fn forged_record_wrapper_without_root_frame_is_rejected() {
-    // A record-producing entry-point wrapper opens a root `RecordOpen` before calling the
+    // A record-producing entry point wrapper opens a root `RecordOpen` before calling the
     // body, so the body always has a Record to apply `RecordSet` to. Neutralize
     // `RecordOpen` and its matching `RecordClose` (turn both into no-op `Absent`s)
     // and lie that the result type is scalar: the entry's `RecordSet` would then hit
@@ -1562,7 +1562,7 @@ fn forged_nonzero_entry_point_pad_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged entry-point pad must be rejected");
+        Module::load_compiler_output(&bytes).expect_err("forged entry point pad must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidEntryPoint(_)),
         "expected InvalidEntryPoint, got {err:?}"

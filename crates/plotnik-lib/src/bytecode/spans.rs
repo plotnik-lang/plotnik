@@ -4,21 +4,25 @@ use crate::bytecode::SPAN_ENTRY_SIZE;
 
 /// Classifies the query construct covered by an inspection span.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-#[repr(u8)]
 pub enum SpanKind {
-    Def = 0,
-    Ref = 1,
-    Pattern = 2,
-    Capture = 3,
-    Field = 4,
-    NegField = 5,
-    Predicate = 6,
-    Quantifier = 7,
-    Sequence = 8,
-    UnlabeledAlternation = 9,
-    LabeledAlternation = 10,
-    Alternative = 11,
-    CaptureType = 12,
+    Def,
+    Ref,
+    Pattern,
+    Capture,
+    GrammarField,
+    NegatedGrammarField,
+    Predicate,
+    Quantifier,
+    Sequence,
+    Alternation(Labeling),
+    Alternative,
+    CaptureType,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Labeling {
+    Unlabeled,
+    Labeled,
 }
 
 impl SpanKind {
@@ -28,18 +32,36 @@ impl SpanKind {
             1 => Self::Ref,
             2 => Self::Pattern,
             3 => Self::Capture,
-            4 => Self::Field,
-            5 => Self::NegField,
+            4 => Self::GrammarField,
+            5 => Self::NegatedGrammarField,
             6 => Self::Predicate,
             7 => Self::Quantifier,
             8 => Self::Sequence,
-            9 => Self::UnlabeledAlternation,
-            10 => Self::LabeledAlternation,
+            9 => Self::Alternation(Labeling::Unlabeled),
+            10 => Self::Alternation(Labeling::Labeled),
             11 => Self::Alternative,
             12 => Self::CaptureType,
             _ => return None,
         };
         Some(kind)
+    }
+
+    fn to_u8(self) -> u8 {
+        match self {
+            Self::Def => 0,
+            Self::Ref => 1,
+            Self::Pattern => 2,
+            Self::Capture => 3,
+            Self::GrammarField => 4,
+            Self::NegatedGrammarField => 5,
+            Self::Predicate => 6,
+            Self::Quantifier => 7,
+            Self::Sequence => 8,
+            Self::Alternation(Labeling::Unlabeled) => 9,
+            Self::Alternation(Labeling::Labeled) => 10,
+            Self::Alternative => 11,
+            Self::CaptureType => 12,
+        }
     }
 
     pub fn name(self) -> &'static str {
@@ -48,13 +70,13 @@ impl SpanKind {
             Self::Ref => "ref",
             Self::Pattern => "pattern",
             Self::Capture => "capture",
-            Self::Field => "field",
-            Self::NegField => "neg_field",
+            Self::GrammarField => "grammar_field",
+            Self::NegatedGrammarField => "negated_grammar_field",
             Self::Predicate => "predicate",
             Self::Quantifier => "quantifier",
             Self::Sequence => "sequence",
-            Self::UnlabeledAlternation => "unlabeled_alternation",
-            Self::LabeledAlternation => "labeled_alternation",
+            Self::Alternation(Labeling::Unlabeled) => "unlabeled_alternation",
+            Self::Alternation(Labeling::Labeled) => "labeled_alternation",
             Self::Alternative => "alternative",
             Self::CaptureType => "capture_type",
         }
@@ -99,7 +121,7 @@ impl SpanEntry {
     pub(crate) fn to_bytes(self) -> [u8; Self::SIZE] {
         let mut bytes = [0u8; Self::SIZE];
         bytes[0..2].copy_from_slice(&self.source_id.to_le_bytes());
-        bytes[2] = self.kind as u8;
+        bytes[2] = self.kind.to_u8();
         bytes[3] = 0;
         bytes[4..8].copy_from_slice(&self.start.to_le_bytes());
         bytes[8..12].copy_from_slice(&self.end.to_le_bytes());

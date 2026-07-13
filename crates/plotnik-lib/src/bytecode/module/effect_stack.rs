@@ -25,7 +25,7 @@
 //! materializer's pending-value register is full. Tracking span *ids* (not just
 //! a depth) proves every `SpanEnd` closes the span the matching bracket opened,
 //! so inspection extraction can assert pairing instead of re-validating. The
-//! walk starts from each entry-point wrapper and follows `Match` successors,
+//! walk starts from each entry point wrapper and follows `Match` successors,
 //! descending through `Call` and resuming at its return address — exactly the
 //! edge set that orders effects at runtime.
 //!
@@ -34,7 +34,7 @@
 //! The panic-freedom property is per *path*: every graph path must execute to a
 //! well-shaped effect sequence. Distinct paths may legally reach the same instruction
 //! with different abstract states — the dedup pass hash-conses structurally
-//! identical branch tails, so e.g. two alternatives share one `VariantClose`
+//! identical alternative tails, so e.g. two alternatives share one `VariantClose`
 //! instruction, reached once under `Variant(A)` and once under `Variant(B)`. Each arrival
 //! is individually sound (dedup is a bisimulation quotient: it preserves the
 //! op-labeled path set exactly), so the walk keeps a *set* of states per instruction
@@ -328,7 +328,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
         )?;
     }
 
-    // ...and every entry-point wrapper. A wrapper has no caller, so a residual
+    // ...and every entry point wrapper. A wrapper has no caller, so a residual
     // caller-top constraint means some effect would read below the frames the
     // wrapper itself opened and hit the materializer's result root frame.
     for entry_point in entry_points.iter() {
@@ -504,7 +504,7 @@ fn analyze(
             }
 
             if suppress > 0 {
-                // A suppressed callee is frozen: all its data effects are
+                // A suppressed callee is frozen: all its output effects are
                 // dropped, so it is a no-op on the builder stack.
                 call.push_returns(
                     &mut work,
@@ -718,7 +718,7 @@ fn apply_effect(
 ) -> Result<(), ModuleError> {
     use EffectKind::*;
 
-    // Suppression and span brackets act regardless of depth; data effects are
+    // Suppression and span brackets act regardless of depth; output effects are
     // dropped by the VM while suppressed and so must not touch the builder stack.
     if *state.suppress > 0 {
         match effect.kind {

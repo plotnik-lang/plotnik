@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use indexmap::IndexMap;
 
-use crate::bytecode::{Nav, SpanKind};
+use crate::bytecode::{Labeling as SpanLabeling, Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
@@ -372,7 +372,7 @@ impl<'a> NfaBuilder<'a> {
                 exit: match_exit,
                 nav,
                 capture: CaptureEffects::default(),
-                value: definition_value_root(body),
+                observe_value: definition_value_root(body),
             };
             return self.compile_nullable_pattern(body, pattern_ctx, skip_exit);
         }
@@ -382,7 +382,7 @@ impl<'a> NfaBuilder<'a> {
         };
 
         let ctx = if definition_value_root(body) {
-            PatternCtx::with_value(exit, nav)
+            PatternCtx::observing_value(exit, nav)
         } else {
             PatternCtx::with_nav(exit, nav)
         };
@@ -467,7 +467,7 @@ impl<'a> NfaBuilder<'a> {
                     exit,
                     nav,
                     capture,
-                    value: _,
+                    observe_value: _,
                 } = ctx;
                 self.compile_captured(c, nav, capture, CaptureExits::Single(exit))
             }
@@ -479,7 +479,7 @@ impl<'a> NfaBuilder<'a> {
 
     /// Wrap this pattern's capture channel in inspection span brackets.
     ///
-    /// Node and token patterns use `SpanStartAt` because their `pre` effects land
+    /// Node-matching patterns use `SpanStartAt` because their `pre` effects land
     /// on the consuming match instruction; epsilon-entered constructs use pure
     /// marker starts.
     pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
@@ -489,12 +489,10 @@ impl<'a> NfaBuilder<'a> {
             | Pattern::NodeWildcard(_) => (SpanKind::Pattern, true),
             Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
             Pattern::Alternation(alternation) => (
-                match alternation.labeling() {
-                    ast::Labeling::Labeled => SpanKind::LabeledAlternation,
-                    ast::Labeling::Unlabeled | ast::Labeling::Mixed => {
-                        SpanKind::UnlabeledAlternation
-                    }
-                },
+                SpanKind::Alternation(match alternation.labeling() {
+                    ast::Labeling::Labeled => SpanLabeling::Labeled,
+                    ast::Labeling::Unlabeled | ast::Labeling::Mixed => SpanLabeling::Unlabeled,
+                }),
                 false,
             ),
             Pattern::DefRef(_) => (SpanKind::Ref, false),
@@ -513,13 +511,13 @@ impl<'a> NfaBuilder<'a> {
             exit,
             nav,
             capture,
-            value,
+            observe_value,
         } = ctx;
         PatternCtx {
             exit,
             nav,
             capture: capture.nest_span(start, EffectIR::span_end(id.0)),
-            value,
+            observe_value,
         }
     }
 

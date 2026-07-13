@@ -6,6 +6,6 @@ error: `number` can't be the value of `name`
 1 | Q = (function_declaration name: (number))
   |                           ----   ^^^^^^
   |                           |
-  |                           field `name`
+  |                           grammar field `name`
   |
 help: `name` accepts: `identifier`

@@ -46,7 +46,7 @@ pub enum EffectKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EffectSuppression {
-    Data,
+    Output,
     Control,
     Bypass,
 }
@@ -107,7 +107,7 @@ impl EffectKind {
             Self::SpanStartAt | Self::SpanStart | Self::SpanEnd | Self::ScalarMark => {
                 EffectSuppression::Bypass
             }
-            _ => EffectSuppression::Data,
+            _ => EffectSuppression::Output,
         }
     }
 
