@@ -340,7 +340,7 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
 }
 
 #[test]
-fn satisfiability_step_budget_rejects_and_is_tunable() {
+fn satisfiability_work_budget_rejects_and_is_tunable() {
     // A wide child list drives satisfiability construction and the solve's quadratic fixed point.
     // Under a deliberately tiny budget it trips and the query is rejected as too complex; under
     // the default it compiles — so the knob fails closed yet stays out of the way.
@@ -355,13 +355,16 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
         source_map.add_file(SourcePath::new("q.ptk"), &src);
         let mut builder = QueryBuilder::new(source_map);
         if let Some(budget) = budget {
-            builder = builder.with_satisfiability_step_budget(budget);
+            builder = builder.with_satisfiability_work_budget(budget);
         }
         builder.analyze().unwrap().bind(grammar())
     };
 
     let tight = build(Some(100));
-    assert!(!tight.is_valid(), "a 100-step budget must reject this list");
+    assert!(
+        !tight.is_valid(),
+        "a 100-unit work budget must reject this list"
+    );
     assert!(
         tight
             .diagnostics()
@@ -384,7 +387,7 @@ fn satisfiability_budget_counts_automaton_construction() {
     let bound = QueryBuilder::new(SourceMap::from_inline(
         "Q = (program (expression_statement))",
     ))
-    .with_satisfiability_step_budget(1)
+    .with_satisfiability_work_budget(1)
     .analyze()
     .unwrap()
     .bind(grammar());
@@ -413,7 +416,7 @@ fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
     );
 
     let bound = QueryBuilder::new(source_map)
-        .with_satisfiability_step_budget(2)
+        .with_satisfiability_work_budget(2)
         .analyze()
         .unwrap()
         .bind(grammar());
@@ -453,7 +456,7 @@ fn exhausted_anchor_probe_budget_keeps_unsatisfiable_verdict() {
     );
 
     let bound = QueryBuilder::new(source_map)
-        .with_satisfiability_step_budget(20)
+        .with_satisfiability_work_budget(20)
         .analyze()
         .unwrap()
         .bind(grammar());

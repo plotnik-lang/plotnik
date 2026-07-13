@@ -427,9 +427,9 @@ pub(super) struct AnchorProbes<'a> {
 }
 
 impl<'a> AnchorProbes<'a> {
-    pub(super) fn new(primary: &SatisfiabilitySolver<'a>, step_budget: u64) -> Self {
+    pub(super) fn new(primary: &SatisfiabilitySolver<'a>, work_budget: u64) -> Self {
         Self {
-            solver: primary.relaxing_anchors(step_budget),
+            solver: primary.relaxing_anchors(work_budget),
         }
     }
 

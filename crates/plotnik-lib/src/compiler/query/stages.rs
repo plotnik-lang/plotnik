@@ -78,8 +78,8 @@ impl QueryBuilder {
     /// legitimately needs a wide child list the default rejects as too complex; the
     /// default protects against an adversarial one driving the quadratic solve for an
     /// unbounded stretch.
-    pub fn with_satisfiability_step_budget(mut self, budget: u64) -> Self {
-        self.limits = self.limits.with_satisfiability_step_budget(budget);
+    pub fn with_satisfiability_work_budget(mut self, budget: u64) -> Self {
+        self.limits = self.limits.with_satisfiability_work_budget(budget);
         self
     }
 

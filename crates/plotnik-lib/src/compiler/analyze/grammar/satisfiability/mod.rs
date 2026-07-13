@@ -29,7 +29,7 @@ mod engine;
 mod facts;
 mod state_set;
 
-pub use engine::DEFAULT_SATISFIABILITY_STEP_BUDGET;
+pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
 
 #[cfg(test)]
 mod state_set_tests;
@@ -74,7 +74,7 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
     };
 
     let mut solver = SatisfiabilitySolver::checking(ctx, input.limits);
-    let anchor_probes = diagnose::AnchorProbes::new(&solver, input.limits.step_budget);
+    let anchor_probes = diagnose::AnchorProbes::new(&solver, input.limits.work_budget);
     let mut reporter = Reporter {
         solver: &mut solver,
         diag,
