@@ -23,7 +23,7 @@ enum SuffixMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PatternSlot {
     /// `Name = <here>`. Anchors/negated fields parse, and the definition
-    /// then fails analysis with `NoEntrypoints`, which explains that a
+    /// then fails analysis with `NoEntryPoints`, which explains that a
     /// definition must produce a value — a better teaching moment than a
     /// parse error.
     DefBody,

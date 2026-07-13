@@ -2,7 +2,7 @@
 
 pub mod capture_kind;
 mod capture_type;
-mod entrypoints;
+mod entry_points;
 mod naming;
 mod raw_output;
 mod root_extent;
@@ -15,7 +15,7 @@ pub use capture_type::{
     BuiltInCaptureType, CaptureFact, CaptureTypePlan, CaptureTypePlanKind, FieldCompletion,
     FieldCompletions, OptionMode, RawCaptureFact, TerminalData,
 };
-pub use entrypoints::check_entrypoints;
+pub use entry_points::check_entry_points;
 pub use root_extent::RootExtent;
 pub use type_analysis::TypeAnalysis;
 pub use type_shape::TypeShape;

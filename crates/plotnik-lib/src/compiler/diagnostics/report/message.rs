@@ -126,7 +126,7 @@ pub enum DiagnosticKind {
     // earlier-stage error exists.
     TargetLimitExceeded,
     CompilerInvariantViolation,
-    NoEntrypoints,
+    NoEntryPoints,
     EmptyQuery,
 }
 
@@ -321,7 +321,7 @@ impl DiagnosticKind {
             Self::EntrypointNeverMatchesRoot => {
                 "wrap the pattern in the grammar's root node, e.g. `(program ...)`"
             }
-            Self::NoEntrypoints => {
+            Self::NoEntryPoints => {
                 "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
             }
             Self::EmptyQuery => "add a definition, e.g. `Q = (identifier) @id`",
@@ -456,7 +456,7 @@ impl DiagnosticKind {
             Self::MissingDefName => "definition must be named",
             Self::TargetLimitExceeded => "emission target limit exceeded",
             Self::CompilerInvariantViolation => "compiler invariant violation",
-            Self::NoEntrypoints => "query produces no entry points",
+            Self::NoEntryPoints => "query produces no entry points",
             Self::EmptyQuery => "query defines nothing",
         }
     }

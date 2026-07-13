@@ -19,7 +19,7 @@ use super::type_check::TypeAnalysis;
 /// from `TypeAnalysis::iter_def_output()`. The AST is the source of truth for the
 /// original definition list, including definitions that never reached the symbol
 /// table.
-pub fn check_entrypoints(
+pub fn check_entry_points(
     ast_map: &IndexMap<SourceId, Root>,
     interner: &Interner,
     type_analysis: &TypeAnalysis,
@@ -41,7 +41,7 @@ pub fn check_entrypoints(
                 .is_some_and(|sym| output_defs.contains(&sym));
             if !has_output {
                 diag.report(
-                    DiagnosticKind::NoEntrypoints,
+                    DiagnosticKind::NoEntryPoints,
                     Span::new(*source_id, name.text_range()),
                 )
                 .emit();
