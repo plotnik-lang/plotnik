@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPlotnikClient, type PlotnikClient } from "./client";
 import type {
-  AstResult,
   GeneratedCode,
   RunResult,
   SessionInfo,
+  TreeResult,
 } from "./protocol";
 
 /* The playground's orchestration layer — and the only module that talks to
@@ -13,7 +13,7 @@ import type {
    and never call the client themselves.
 
    Policy encoded here, in one place:
-   - one debounced latest-wins pipeline per engine call (compile / run / ast);
+   - one debounced latest-wins pipeline per engine call (compile / run / tree);
    - run re-fires only after a successful compile actually swapped the worker
      session (`compiled` object identity is the generation marker);
    - stale-while-error: a query that stops producing bytecode keeps the last
@@ -40,9 +40,9 @@ export interface CompileOutcome {
 }
 
 /** A dump paired with the exact source it describes (same pairing rule). */
-export interface AstSnapshot {
+export interface TreeSnapshot {
   source: string;
-  result: AstResult;
+  result: TreeResult;
 }
 
 export interface PlaygroundSession {
@@ -62,7 +62,7 @@ export interface PlaygroundSession {
   runResult: RunResult | null;
   /** `runResult` came from a query that no longer compiles to a module. */
   stale: boolean;
-  ast: AstSnapshot | null;
+  tree: TreeSnapshot | null;
 }
 
 const COMPILE_DEBOUNCE_MS = 250;
@@ -77,7 +77,7 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
   const [compiled, setCompiled] = useState<CompileOutcome | null>(null);
   const [generated, setGenerated] = useState<GeneratedCode | null>(null);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
-  const [ast, setAst] = useState<AstSnapshot | null>(null);
+  const [tree, setTree] = useState<TreeSnapshot | null>(null);
 
   useEffect(() => {
     const handle = createPlotnikClient();
@@ -151,8 +151,8 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     RUN_DEBOUNCE_MS,
     [source, lang],
     async (stillCurrent) => {
-      const result = await clientRef.current?.ast(source, lang, false);
-      if (result && stillCurrent()) setAst({ source, result });
+      const result = await clientRef.current?.tree(source, lang, false);
+      if (result && stillCurrent()) setTree({ source, result });
     },
   );
 
@@ -167,7 +167,7 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     entry: effectiveEntry,
     runResult,
     stale: runResult !== null && compiled !== null && !hasModule,
-    ast,
+    tree,
   };
 }
 

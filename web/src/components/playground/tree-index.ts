@@ -1,13 +1,13 @@
 import { byteToUtf16 } from "./byte-offsets";
 import type { DumpChunk, DumpNode } from "./protocol";
 
-/* Index over an AST dump for hover interactions: node ranges converted to
+/* Index over a source-tree dump for hover interactions: node ranges converted to
    UTF-16 (dump side and source side), plus enough structure to resolve
    "which node is under this dump offset" quickly.
 
    Pure text/offset logic only — everything that touches the DOM (pointer
-   hit-testing, rect measurement) lives in ast-dom.ts. In the playground's
-   join-table framing (docs/wip/playground-design.md §2) this is the AST
+   hit-testing, rect measurement) lives in tree-dom.ts. In the playground's
+   join-table framing (docs/wip/playground-design.md §2) this is the tree
    pane's table: dump range ↔ source range per node. */
 
 export interface Range16 {
@@ -15,7 +15,7 @@ export interface Range16 {
   to: number;
 }
 
-export interface AstIndexNode {
+export interface TreeIndexNode {
   /** Range in the source text (UTF-16), for the source editor spotlight. */
   src: Range16;
   /** Range in the dump text (UTF-16) used for hover targeting; includes
@@ -27,20 +27,20 @@ export interface AstIndexNode {
   parent: number;
 }
 
-export interface AstIndex {
+export interface TreeIndex {
   /** The dump text: all chunk texts concatenated. */
   text: string;
   /** UTF-16 start offset of each chunk in `text` (plus final sentinel). */
   chunkStarts: number[];
   /** Pre-order (sorted by `dump.from`); descendants nest inside ancestors. */
-  nodes: AstIndexNode[];
+  nodes: TreeIndexNode[];
 }
 
-export function buildAstIndex(
+export function buildTreeIndex(
   chunks: DumpChunk[],
   nodes: DumpNode[],
   source: string,
-): AstIndex {
+): TreeIndex {
   const chunkStarts: number[] = new Array(chunks.length + 1);
   const startToChunk = new Map<number, number>();
   let text = "";
@@ -53,7 +53,7 @@ export function buildAstIndex(
 
   const dumpB2u = byteToUtf16(text);
   const srcB2u = byteToUtf16(source);
-  const indexNodes: AstIndexNode[] = new Array(nodes.length);
+  const indexNodes: TreeIndexNode[] = new Array(nodes.length);
   // Pre-order + nesting: the parent is the nearest open ancestor on a stack.
   const open: number[] = [];
   for (let i = 0; i < nodes.length; i++) {
@@ -86,7 +86,7 @@ export function buildAstIndex(
 }
 
 /** Innermost node whose dump range contains `offset`, or null. */
-function containingNode(index: AstIndex, offset: number): number | null {
+function containingNode(index: TreeIndex, offset: number): number | null {
   const nodes = index.nodes;
   // Binary search: last node starting at or before `offset`. Because ranges
   // nest, walking `parent` links from there finds the innermost container.
@@ -121,11 +121,11 @@ export function lineFirstGlyph(text: string, offset: number): number {
  *
  * The hover area is deliberately larger than the highlight: hovering the
  * indentation left of a line targets the node whose text starts the line,
- * so the whole gutter side of the AST is live. Everywhere else the target
+ * so the whole gutter side of the tree is live. Everywhere else the target
  * is the innermost node containing the offset.
  */
 export function resolveDumpHover(
-  index: AstIndex,
+  index: TreeIndex,
   offset: number,
 ): number | null {
   const text = index.text;

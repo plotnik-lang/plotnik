@@ -1,7 +1,7 @@
 //! WebAssembly bindings for playground and editor integrations.
 //!
 //! A thin shim over `plotnik_lib`, in three modules:
-//! - `lib.rs` — the `#[wasm_bindgen]` surface (`Session`, `ast`, `tokenize`)
+//! - `lib.rs` — the `#[wasm_bindgen]` surface (`Session`, `tree`, `tokenize`)
 //!   and query execution
 //! - `langs` — the feature-gated language registry
 //! - `wire` — every JSON payload that crosses to JS, mirrored by the
@@ -146,13 +146,13 @@ impl Session {
 }
 
 /// Render `source`'s tree as a query-shaped dump plus the node table mapping
-/// the dump back to source ranges (`AstResult` in protocol.ts).
+/// the dump back to source ranges (`TreeResult` in protocol.ts).
 #[wasm_bindgen]
-pub fn ast(source: &str, lang: &str, raw: bool) -> JsValue {
+pub fn tree(source: &str, lang: &str, include_anonymous: bool) -> JsValue {
     let value = match langs::resolve(lang) {
         Ok(lang) => {
             let tree = lang.parse_source(source);
-            let dump = dump_tree(&tree, source, lang.grammar(), raw);
+            let dump = dump_tree(&tree, source, lang.grammar(), include_anonymous);
             json!({ "chunks": json_value!(dump.chunks), "nodes": json_value!(dump.nodes) })
         }
         Err(error) => error_json(error),

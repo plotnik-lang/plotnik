@@ -3,17 +3,17 @@ import { CircleAlertIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { dumpNodeAtPoint, measureDumpSpotlight } from "./ast-dom";
-import { buildAstIndex, type Range16 } from "./ast-index";
+import { dumpNodeAtPoint, measureDumpSpotlight } from "./tree-dom";
+import { buildTreeIndex, type Range16 } from "./tree-index";
 import type { DumpChunk, DumpNode } from "./protocol";
 import {
   attachSpotlight,
   HIDDEN_SPOTLIGHT,
   type SpotlightHandle,
 } from "./spotlight";
-import type { AstSnapshot } from "./use-session";
+import type { TreeSnapshot } from "./use-session";
 
-/* The AST pane. AstView picks the state (skeleton / parse error / dump);
+/* The source-tree pane. TreeView picks the state (skeleton / parse error / dump);
    DumpView renders the dump and owns the hover machinery, so the spotlight
    and index live exactly as long as there is a dump to point into.
 
@@ -31,15 +31,15 @@ const CHUNK_CLASS: Partial<Record<DumpChunk["kind"], string>> = {
   comment: "ptk-comment",
 };
 
-interface AstViewProps {
-  ast: AstSnapshot | null;
+interface TreeViewProps {
+  tree: TreeSnapshot | null;
   /** Source range of the hovered node (UTF-16, in the snapshot's source
       coordinates), or null; fires only on change. */
   onHover?: (src: Range16 | null) => void;
 }
 
-export function AstView({ ast, onHover }: AstViewProps) {
-  if (!ast) {
+export function TreeView({ tree, onHover }: TreeViewProps) {
+  if (!tree) {
     return (
       <div className="flex flex-col gap-2 p-4">
         <Skeleton className="h-4 w-2/5" />
@@ -48,13 +48,13 @@ export function AstView({ ast, onHover }: AstViewProps) {
     );
   }
 
-  if ("error" in ast.result) {
+  if ("error" in tree.result) {
     return (
       <div className="p-4">
         <Alert variant="destructive">
           <CircleAlertIcon />
           <AlertTitle>Parse failed</AlertTitle>
-          <AlertDescription>{ast.result.error}</AlertDescription>
+          <AlertDescription>{tree.result.error}</AlertDescription>
         </Alert>
       </div>
     );
@@ -62,9 +62,9 @@ export function AstView({ ast, onHover }: AstViewProps) {
 
   return (
     <DumpView
-      chunks={ast.result.chunks}
-      nodes={ast.result.nodes}
-      source={ast.source}
+      chunks={tree.result.chunks}
+      nodes={tree.result.nodes}
+      source={tree.source}
       onHover={onHover}
     />
   );
@@ -84,7 +84,7 @@ function DumpView({ chunks, nodes, source, onHover }: DumpViewProps) {
   const hoverRef = useRef<number | null>(null);
 
   const index = useMemo(
-    () => buildAstIndex(chunks, nodes, source),
+    () => buildTreeIndex(chunks, nodes, source),
     [chunks, nodes, source],
   );
   const indexRef = useRef(index);
@@ -145,7 +145,7 @@ function DumpView({ chunks, nodes, source, onHover }: DumpViewProps) {
         }}
         onPointerLeave={() => setHover(null)}
       >
-        {/* One span per chunk, in order — the ast-dom.ts contract. Vertical
+        {/* One span per chunk, in order — the tree-dom.ts contract. Vertical
             padding on the inline spans doesn't move any text (it never grows
             the line box) but it does extend their hit area into the
             half-leading gap between lines, so hover stays continuous when

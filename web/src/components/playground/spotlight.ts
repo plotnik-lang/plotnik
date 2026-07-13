@@ -1,7 +1,7 @@
 /* Generic "spotlight" highlight, deliberately pane-agnostic: it knows
    nothing about editors, dumps, or hover — callers translate their own
    geometry into rects/specs. Consumers today: cm-spotlight.ts (CodeMirror
-   editors) and ast-dom.ts + ast-view.tsx (the AST dump pane); any future
+   editors) and tree-dom.ts + tree-view.tsx (the source-tree pane); any future
    pane that joins the cross-view highlight fan-out
    (docs/wip/playground-design.md §3) should adapt itself to this module the
    same way rather than invent another overlay.

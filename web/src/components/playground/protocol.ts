@@ -105,9 +105,9 @@ export type RunResult =
     }
   | { error: string; execution_trace?: unknown };
 
-/** `ast()` output — crates/plotnik-lib/src/core/tree_dump.rs.
+/** `tree()` output — crates/plotnik-lib/src/core/tree_dump.rs.
     A pre-rendered dump of the source tree in Plotnik pattern syntax;
-    concatenating chunk `text` yields exactly the CLI's `plotnik ast` output. */
+    concatenating chunk `text` yields exactly the CLI's `plotnik tree` output. */
 export interface DumpChunk {
   kind: "text" | "punct" | "kind" | "field" | "string" | "comment";
   text: string;
@@ -122,7 +122,7 @@ export interface DumpNode {
   dump_end: number;
 }
 
-export type AstResult =
+export type TreeResult =
   { error: string } | { chunks: DumpChunk[]; nodes: DumpNode[] };
 
 /** Worker API exposed via comlink: the full wasm surface, nothing more.
@@ -150,7 +150,11 @@ export interface PlotnikApi {
     entry: string | undefined,
     maxRecords: number,
   ): Promise<RunResult>;
-  /** Dump `source`'s tree; `raw` includes anonymous nodes. */
-  ast(source: string, lang: string, raw: boolean): Promise<AstResult>;
+  /** Dump `source`'s tree, optionally including anonymous nodes. */
+  tree(
+    source: string,
+    lang: string,
+    includeAnonymous: boolean,
+  ): Promise<TreeResult>;
   tokenize(query: string): Promise<QueryToken[]>;
 }

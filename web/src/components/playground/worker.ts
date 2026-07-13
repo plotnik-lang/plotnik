@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
-import init, { Session, ast, tokenize } from "@/lib/plotnik-wasm/plotnik_wasm";
+import init, { Session, tokenize, tree } from "@/lib/plotnik-wasm/plotnik_wasm";
 import type {
   GeneratedCode,
   PlotnikApi,
@@ -63,9 +63,9 @@ const api: PlotnikApi = {
     return session.trace(source, entry ?? null, maxRecords);
   },
 
-  async ast(source: string, lang: string, raw: boolean) {
+  async tree(source: string, lang: string, includeAnonymous: boolean) {
     await wasmReady;
-    return ast(source, lang, raw);
+    return tree(source, lang, includeAnonymous);
   },
 
   async tokenize(query: string) {

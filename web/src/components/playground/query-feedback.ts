@@ -7,7 +7,7 @@ import type { QueryToken, WireDiagnostic } from "./protocol";
 /* Idents and whitespace keep the default ink; everything else gets a class
    styled in global.css next to the lezer `tok-*` palette. Field names are
    the exception: the lexer calls them plain idents, so they are recovered
-   below and get the calmer `tok-propertyName` ink, matching the AST pane. */
+   below and get the calmer `tok-propertyName` ink, matching the tree pane. */
 const TOKEN_CLASS: Partial<Record<QueryToken["kind"], string>> = {
   comment: "ptk-comment",
   string: "ptk-string",

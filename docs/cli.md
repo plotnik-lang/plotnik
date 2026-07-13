@@ -1,12 +1,12 @@
 # Plotnik CLI Guide
 
-> Query language for tree-sitter ASTs with type inference.
+> Query language for tree-sitter syntax trees with type inference.
 
 ## Quick Start
 
 ```sh
-# Explore a source file's tree-sitter AST
-plotnik ast app.ts
+# Explore a source file's syntax tree
+plotnik tree app.ts
 
 # Validate a query against a grammar
 plotnik check -q 'Func = (function_declaration) @fn' -l typescript
@@ -32,7 +32,7 @@ plotnik lang dump typescript
 | ------------- | ----- | ------------------------------- | ------------------------------------- |
 | `run`         | both  | Run query, output JSON          | Shebang or extension                  |
 | `check`       | query | Validate query                  | Optional (enables grammar validation) |
-| `ast`         | both  | Show AST of query and/or source | Shebang or extension                  |
+| `tree`        | both  | Show query and/or source trees  | Shebang or extension                  |
 | `infer`       | query | Generate type definitions       | Required                              |
 | `generate`    | query | Generate a compiled matcher     | Required unless `--grammar` is used   |
 | `dump`        | query | Show bytecode                   | Optional (enables grammar binding)    |
@@ -51,33 +51,38 @@ shebang line, query files become directly executable (see
 
 ---
 
-### ast
+### tree
 
-Show AST of query and/or source file. Use this to discover node kinds and structure.
+Show the query tree, the source syntax tree, or both. Query input supports AST
+and CST views; source input omits anonymous nodes unless requested.
 
 ```sh
-# Show tree-sitter AST of source file
-plotnik ast app.ts
+# Show source syntax tree
+plotnik tree app.ts
 
 # Show query AST
-plotnik ast query.ptk
+plotnik tree query.ptk
 
-# Show both query and source AST
-plotnik ast query.ptk app.ts
+# Show query CST, including trivia
+plotnik tree query.ptk --query-view cst
+
+# Show both query and source trees
+plotnik tree query.ptk app.ts
 
 # Include anonymous nodes (literals, punctuation)
-plotnik ast app.ts --raw
+plotnik tree app.ts --include-anonymous
 
-# Source tree as JSON (query AST output is skipped)
-plotnik ast app.ts --json
+# Source tree as JSON
+plotnik tree app.ts --json
 ```
 
 **Flags:**
 
-| Flag     | Purpose                                         |
-| -------- | ----------------------------------------------- |
-| `--raw`  | Include anonymous nodes (literals, punctuation) |
-| `--json` | Output source tree as JSON                      |
+| Flag                  | Purpose                                          |
+| --------------------- | ------------------------------------------------ |
+| `--query-view VIEW`   | Select query AST or CST                          |
+| `--include-anonymous` | Include anonymous source nodes and punctuation   |
+| `--json`              | Output `query_tree` and/or `source_tree` as JSON |
 
 ---
 
@@ -407,7 +412,7 @@ These commands take a single input. Use either:
 - **Positional**: `plotnik dump query.ptk`
 - **Flag**: `plotnik dump -q 'Q = ...'`
 
-### Query+Source Commands (ast, run, trace)
+### Query+Source Commands (tree, run, trace, inspect)
 
 These commands can take query, source, or both inputs. Use any combination:
 
@@ -445,7 +450,7 @@ entrypoint) via a shebang:
 Func = (function_declaration name: (identifier) @name)
 ```
 
-All commands (`run`, `check`, `infer`, `ast`, `trace`, `dump`) read the
+All commands (`run`, `check`, `infer`, `tree`, `trace`, `dump`) read the
 declaration; presentation flags in the shebang are ignored unless executing.
 An explicit `-l` must agree with the declaration, otherwise the command errors.
 
@@ -468,7 +473,7 @@ Use `-` as the file argument:
 echo 'Q = (identifier) @id' | plotnik dump -
 
 # Source from stdin
-cat app.ts | plotnik ast -
+cat app.ts | plotnik tree -
 
 # Run: query from stdin, source from file
 echo 'Q = (identifier) @id' | plotnik run - app.js
@@ -480,10 +485,10 @@ echo 'Q = (identifier) @id' | plotnik run - app.js
 
 ### Developing a Query
 
-1. **Explore the source AST** to understand node structure:
+1. **Explore the source syntax tree** to understand node structure:
 
    ```sh
-   plotnik ast example.ts
+   plotnik tree example.ts
    ```
 
 2. **Write a query and validate** against the grammar:
@@ -554,12 +559,12 @@ help: did you mean 'function_declaration'?
 
 Common errors:
 
-| Error                             | Cause                                | Fix                                      |
-| --------------------------------- | ------------------------------------ | ---------------------------------------- |
-| `unknown node kind`               | Typo in node kind                    | Check `plotnik ast file` for valid kinds |
-| `missing closing )`               | Unclosed tree pattern                | Match parentheses                        |
-| `expected expression`             | Invalid syntax                       | Check query syntax                       |
-| `strict dimensionality violation` | Quantified captures need row wrapper | Use `{...}* @rows` pattern               |
+| Error                             | Cause                                | Fix                                       |
+| --------------------------------- | ------------------------------------ | ----------------------------------------- |
+| `unknown node kind`               | Typo in node kind                    | Check `plotnik tree file` for valid kinds |
+| `missing closing )`               | Unclosed tree pattern                | Match parentheses                         |
+| `expected expression`             | Invalid syntax                       | Check query syntax                        |
+| `strict dimensionality violation` | Quantified captures need row wrapper | Use `{...}* @rows` pattern                |
 
 ---
 
@@ -577,8 +582,8 @@ Uniform across all commands:
 
 ## Tips
 
-1. **Start with `ast`** to explore unfamiliar codebases
-2. **Use `--raw`** to see all tokens including literals
+1. **Start with `tree`** to explore unfamiliar codebases
+2. **Use `--include-anonymous`** to see literal and punctuation nodes
 3. **Run `check`** before `infer` to catch grammar errors early
 4. **Use `dump`** to debug query parsing or bytecode
 5. **Use query files** for anything beyond one-liners

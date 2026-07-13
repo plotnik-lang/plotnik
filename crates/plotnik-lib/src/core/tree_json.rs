@@ -4,11 +4,12 @@ use serde_json::{Map, Value};
 
 /// Serialize a tree-sitter tree as editor-friendly JSON.
 ///
-/// Anonymous nodes are omitted unless `raw` is set, matching the CLI's text AST
-/// view. The walk is iterative so deeply nested source files cannot overflow the
-/// native stack while building diagnostics or playground payloads.
-pub fn tree_to_json(tree: &tree_sitter::Tree, _source: &str, raw: bool) -> Value {
-    let mut stack = vec![Frame::new(tree.root_node(), None, raw)];
+/// Anonymous nodes are omitted unless `include_anonymous` is set, matching the
+/// CLI's text tree view. The walk is iterative so deeply nested source files
+/// cannot overflow the native stack while building diagnostics or playground
+/// payloads.
+pub fn tree_to_json(tree: &tree_sitter::Tree, _source: &str, include_anonymous: bool) -> Value {
+    let mut stack = vec![Frame::new(tree.root_node(), None, include_anonymous)];
 
     loop {
         let next_child = {
@@ -23,7 +24,7 @@ pub fn tree_to_json(tree: &tree_sitter::Tree, _source: &str, raw: bool) -> Value
         };
 
         if let Some((node, field)) = next_child {
-            stack.push(Frame::new(node, field, raw));
+            stack.push(Frame::new(node, field, include_anonymous));
             continue;
         }
 
@@ -45,8 +46,8 @@ struct Frame<'t> {
 }
 
 impl<'t> Frame<'t> {
-    fn new(node: tree_sitter::Node<'t>, field: Option<&'t str>, raw: bool) -> Self {
-        let child_edges = collect_children(node, raw);
+    fn new(node: tree_sitter::Node<'t>, field: Option<&'t str>, include_anonymous: bool) -> Self {
+        let child_edges = collect_children(node, include_anonymous);
         let child_values = Vec::with_capacity(child_edges.len());
         Self {
             node,
@@ -79,7 +80,7 @@ impl<'t> Frame<'t> {
 
 fn collect_children<'t>(
     node: tree_sitter::Node<'t>,
-    raw: bool,
+    include_anonymous: bool,
 ) -> Vec<(tree_sitter::Node<'t>, Option<&'t str>)> {
     let mut cursor = node.walk();
     let mut result = Vec::new();
@@ -89,7 +90,7 @@ fn collect_children<'t>(
 
     loop {
         let child = cursor.node();
-        if raw || child.is_named() {
+        if include_anonymous || child.is_named() {
             result.push((child, cursor.field_name()));
         }
         if !cursor.goto_next_sibling() {

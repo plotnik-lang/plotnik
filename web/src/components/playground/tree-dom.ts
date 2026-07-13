@@ -1,4 +1,4 @@
-import { lineFirstGlyph, resolveDumpHover, type AstIndex } from "./ast-index";
+import { lineFirstGlyph, resolveDumpHover, type TreeIndex } from "./tree-index";
 import {
   lineSegments,
   spotlightPath,
@@ -6,10 +6,10 @@ import {
   type SpotlightSpec,
 } from "./spotlight";
 
-/* DOM-side geometry for the AST dump pane: pointer → dump offset → node
+/* DOM-side geometry for the source-tree pane: pointer → dump offset → node
    (hit-testing) and node → client rects → spotlight spec (measurement).
 
-   Rendering contract with ast-view.tsx: the dump renders inside a wrapper
+   Rendering contract with tree-view.tsx: the dump renders inside a wrapper
    (the spotlight's positioning ancestor) as a <pre> whose children are one
    <span data-ci={i}> per chunk, in chunk order, so `pre.children[i]` is
    chunk i and `index.chunkStarts` maps between chunk-local and global dump
@@ -40,7 +40,7 @@ function caretAtPoint(
 /** The caret nearest the pointer as a global dump offset, or null when it
     doesn't land inside one of `pre`'s chunk spans. */
 function caretDumpOffset(
-  index: AstIndex,
+  index: TreeIndex,
   pre: HTMLPreElement,
   x: number,
   y: number,
@@ -56,7 +56,7 @@ function caretDumpOffset(
 
 /* Dump offset → (text node, local offset); binary search over chunk starts,
    then straight into that chunk's span. */
-function positionAt(index: AstIndex, pre: HTMLPreElement, offset: number) {
+function positionAt(index: TreeIndex, pre: HTMLPreElement, offset: number) {
   const starts = index.chunkStarts;
   let lo = 0;
   let hi = starts.length - 2;
@@ -83,7 +83,7 @@ const LINE_HIT_SLACK = 4;
  * space right of a line and below the tree stays dead.
  */
 export function dumpNodeAtPoint(
-  index: AstIndex,
+  index: TreeIndex,
   pre: HTMLPreElement,
   x: number,
   y: number,
@@ -102,7 +102,7 @@ export function dumpNodeAtPoint(
 }
 
 function edgeNode(
-  index: AstIndex,
+  index: TreeIndex,
   pre: HTMLPreElement,
   x: number,
   y: number,
@@ -132,7 +132,7 @@ function edgeNode(
  * space (`wrap` is the spotlight's positioning ancestor around the <pre>).
  */
 export function measureDumpSpotlight(
-  index: AstIndex,
+  index: TreeIndex,
   pre: HTMLPreElement,
   wrap: HTMLElement,
   node: number,
