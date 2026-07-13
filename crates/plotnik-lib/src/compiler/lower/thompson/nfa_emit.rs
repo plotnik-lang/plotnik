@@ -115,7 +115,7 @@ impl NfaBuilder<'_> {
     /// fold `outer_capture.pre` onto their own `Struct`/`Arr` step. Captures that
     /// own no such step — `PendingValue` and suppressive — have nowhere to fold it,
     /// so they call this. Dropping it loses an enum variant's `Enum`-open (or an
-    /// union branch's null-injected defaults), and the path then closes a
+    /// an alternative's injected defaults), and the path then closes a
     /// scope it never opened.
     pub(super) fn wrap_entry_pre(&mut self, entry: Label, pre: Vec<EffectIR>) -> Label {
         if pre.is_empty() {
@@ -131,7 +131,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Null-inject captures on the skip path of an optional/star quantifier,
-    /// mirroring what alternations do for asymmetric branches.
+    /// mirroring what alternations do for asymmetric alternatives.
     /// Returns `exit` unchanged when no Set effects are present.
     pub(super) fn emit_null_for_skip_path(
         &mut self,

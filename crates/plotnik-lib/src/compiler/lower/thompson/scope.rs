@@ -66,7 +66,7 @@ impl CaptureExits {
 ///
 /// `Fail` prunes the path: no continuation is emitted, so a zero-width outcome
 /// backtracks like a plain match failure (the effect journal unwinds with it).
-/// Quantifier iterations and alternation branches compile nullable elements
+/// Quantifier iterations and alternation alternatives compile nullable elements
 /// this way — there, consuming nothing is a failed attempt, never an empty
 /// element or a zero-width win.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -181,7 +181,7 @@ impl NfaBuilder<'_> {
     /// closes on every continuation.
     ///
     /// `outer_capture.pre` runs in the enclosing scope before the struct opens
-    /// (e.g. an alternation branch's null-injected defaults, or an enum variant's
+    /// (e.g. an alternative's default-value effects, or a variant's
     /// `Enum`); dropping it would lose those and close a scope that never opened.
     /// `@cap` is resolved by the caller, against the enclosing scope.
     pub(super) fn compile_struct_capture(

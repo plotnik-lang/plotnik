@@ -5,7 +5,7 @@ use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{
-    CapturedPattern, EnumPattern, FieldPattern, Pattern, QuantifiedPattern,
+    AlternationPattern, CapturedPattern, FieldPattern, Pattern, QuantifiedPattern,
 };
 use crate::compiler::parse::cst::{SyntaxNode, SyntaxToken};
 
@@ -95,9 +95,9 @@ impl InferVisitor<'_, '_> {
                 "the referenced definition doesn't match exactly one node, so there is no single node to bind",
                 "capture nodes inside the definition, or drop this capture",
             ),
-            Pattern::Union(_) | Pattern::Enum(_) => (
+            Pattern::Alternation(_) => (
                 "this alternation doesn't match exactly one node, so there is no single node to bind",
-                "capture inside the branches, or drop this capture",
+                "capture inside the alternatives, or drop this capture",
             ),
             _ => (
                 "this group doesn't match exactly one node, so there is no single node to bind",
@@ -258,12 +258,16 @@ impl InferVisitor<'_, '_> {
 
     /// Warn about a labeled alternation whose value nothing consumes: the
     /// labels are inert and the alternation behaves as a plain union.
-    pub(super) fn report_unused_branch_labels(&mut self, e: &EnumPattern) {
-        self.report(DiagnosticKind::UnusedBranchLabels, e.text_range())
+    pub(super) fn report_unused_alternative_labels(&mut self, alternation: &AlternationPattern) {
+        self.report(DiagnosticKind::UnusedBranchLabels, alternation.text_range())
             .emit();
     }
 
-    pub(super) fn report_branch_unify_error(&mut self, alternation: &SyntaxNode, err: &UnifyError) {
+    pub(super) fn report_alternative_unify_error(
+        &mut self,
+        alternation: &SyntaxNode,
+        err: &UnifyError,
+    ) {
         match err {
             UnifyError::IncompatibleTypes { field } => {
                 let field_name = self.ctx.interner.resolve(*field).to_string();
@@ -301,7 +305,7 @@ impl InferVisitor<'_, '_> {
 /// `{...}` for sequences (and anything else).
 fn row_capture_brackets(quant: &QuantifiedPattern) -> &'static str {
     match quant.inner() {
-        Some(Pattern::Union(_) | Pattern::Enum(_)) => "[...]",
+        Some(Pattern::Alternation(_)) => "[...]",
         Some(Pattern::DefRef(_) | Pattern::NodePattern(_)) => "(...)",
         _ => "{...}",
     }
@@ -375,7 +379,7 @@ fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
                 }
                 inner = q.inner();
             }
-            Some(Pattern::SeqPattern(_) | Pattern::Union(_) | Pattern::Enum(_)) => return false,
+            Some(Pattern::SeqPattern(_) | Pattern::Alternation(_)) => return false,
             _ => return true,
         }
     }

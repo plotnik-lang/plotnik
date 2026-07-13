@@ -46,9 +46,9 @@ impl RawOutputGraph {
         for alternation in self.alternations.values() {
             for (&name, field) in &alternation.fields {
                 if !alternation
-                    .branches
+                    .alternatives
                     .iter()
-                    .any(|branch| branch.omissions.contains(&name))
+                    .any(|alternative| alternative.omissions.contains(&name))
                 {
                     continue;
                 }
@@ -375,9 +375,9 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             let mut field = self.normalize_sources(&output, name, raw_field);
             if let Some(alternation) = &alternation {
                 let omitted = alternation
-                    .branches
+                    .alternatives
                     .iter()
-                    .any(|branch| branch.omissions.contains(&name));
+                    .any(|alternative| alternative.omissions.contains(&name));
                 if omitted {
                     let (omitted, fallback) = field.omitted(self.session.types);
                     field = omitted;

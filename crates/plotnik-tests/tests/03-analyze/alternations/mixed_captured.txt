@@ -7,7 +7,7 @@ error: cannot mix enum and union branches
  --> query.ptk:3:3
   |
 2 |   A: (a)
-  |   - enum branch here
+  |   - labeled alternative here
 3 |   (b)
   |   ^^^
   |

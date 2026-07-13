@@ -60,11 +60,11 @@ pub(crate) fn tier(kind: SpanKind) -> u8 {
         SpanKind::Def => 0,
         SpanKind::Capture => 1,
         SpanKind::Pattern | SpanKind::Ref => 2,
-        SpanKind::Branch
+        SpanKind::Alternative
         | SpanKind::Quantifier
         | SpanKind::Sequence
-        | SpanKind::Union
-        | SpanKind::Enum => 3,
+        | SpanKind::UnlabeledAlternation
+        | SpanKind::LabeledAlternation => 3,
         SpanKind::Field | SpanKind::CaptureType => 4,
         SpanKind::NegField | SpanKind::Predicate => 5,
     }
@@ -335,20 +335,15 @@ fn collect_pattern(
                 collect_pattern(input, source, &value, visibility, out);
             }
         }
-        Pattern::Union(union) => {
-            push_pattern(source, SpanKind::Union, union.syntax(), out);
-            for branch in union.branches() {
-                push_branch(source, &branch, out);
-                if let Some(body) = branch.body() {
-                    collect_pattern(input, source, &body, visibility, out);
-                }
-            }
-        }
-        Pattern::Enum(enumeration) => {
-            push_pattern(source, SpanKind::Enum, enumeration.syntax(), out);
-            for branch in enumeration.branches() {
-                push_branch(source, &branch, out);
-                if let Some(body) = branch.body() {
+        Pattern::Alternation(alternation) => {
+            let kind = match alternation.labeling() {
+                ast::Labeling::Labeled => SpanKind::LabeledAlternation,
+                ast::Labeling::Unlabeled | ast::Labeling::Mixed => SpanKind::UnlabeledAlternation,
+            };
+            push_pattern(source, kind, alternation.syntax(), out);
+            for alternative in alternation.alternatives() {
+                push_alternative(source, &alternative, out);
+                if let Some(body) = alternative.body() {
                     collect_pattern(input, source, &body, visibility, out);
                 }
             }
@@ -366,12 +361,12 @@ fn push_pattern(source: SourceId, kind: SpanKind, node: &SyntaxNode, out: &mut V
     });
 }
 
-fn push_branch(source: SourceId, branch: &ast::Branch, out: &mut Vec<Candidate>) {
+fn push_alternative(source: SourceId, alternative: &ast::Alternative, out: &mut Vec<Candidate>) {
     out.push(Candidate {
-        node: branch.syntax().clone(),
+        node: alternative.syntax().clone(),
         source,
-        range: branch.text_range(),
-        kind: SpanKind::Branch,
+        range: alternative.text_range(),
+        kind: SpanKind::Alternative,
         binding: None,
     });
 }

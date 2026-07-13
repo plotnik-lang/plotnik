@@ -327,10 +327,7 @@ fn pattern_matches_field(
             Some(Goal::Concrete { kind, .. }) => field_value_admits(ctx, parent, field, kind),
             _ => false,
         },
-        Pattern::TokenPattern(_)
-        | Pattern::SeqPattern(_)
-        | Pattern::Union(_)
-        | Pattern::Enum(_) => false,
+        Pattern::TokenPattern(_) | Pattern::SeqPattern(_) | Pattern::Alternation(_) => false,
     }
 }
 
@@ -645,7 +642,7 @@ fn query_demand(ctx: AutomatonContext<'_>, pattern: &Located<Pattern>) -> Option
         Pattern::QuantifiedPattern(q) => q
             .inner()
             .and_then(|inner| query_demand(ctx, &pattern.wrap(inner))),
-        Pattern::SeqPattern(_) | Pattern::Union(_) | Pattern::Enum(_) => None,
+        Pattern::SeqPattern(_) | Pattern::Alternation(_) => None,
     }
 }
 

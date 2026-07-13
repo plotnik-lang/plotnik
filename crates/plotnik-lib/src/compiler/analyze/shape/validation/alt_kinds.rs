@@ -1,15 +1,10 @@
-//! Mixed enum/union alternation diagnostic.
-//!
-//! Runs over the raw syntax tree rather than the typed `Pattern` split: union
-//! and enum are distinct AST nodes, but "do some branches have labels and others
-//! not" is a purely syntactic question. Classifying here keeps the typed split
-//! mixed-blind while preserving a precise diagnostic for `[A: (x) (y)]`.
+//! Mixed-labeling alternation diagnostic.
 
 use super::ValidationInput;
-use crate::compiler::analyze::shape::invariants::ensure_both_branch_kinds;
+use crate::compiler::analyze::shape::invariants::ensure_both_labeling_kinds;
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast::{AltKind, Branch, classify_alt};
+use crate::compiler::parse::ast::{Alternative, Labeling, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
 
 pub fn validate_alt_kinds(input: ValidationInput) {
@@ -20,25 +15,34 @@ pub fn validate_alt_kinds(input: ValidationInput) {
     } = input;
 
     for node in ast.syntax().descendants() {
-        if node.kind() != SyntaxKind::Alternation || classify_alt(&node) != AltKind::Mixed {
+        if node.kind() != SyntaxKind::Alternation {
+            continue;
+        }
+        let Some(Pattern::Alternation(alternation)) = Pattern::cast(node) else {
+            continue;
+        };
+        if alternation.labeling() != Labeling::Mixed {
             continue;
         }
 
-        let branches: Vec<Branch> = node.children().filter_map(Branch::cast).collect();
-        let first_enum = branches.iter().find(|b| b.label().is_some());
-        let first_union = branches.iter().find(|b| b.label().is_none());
-        let (enum_branch, union_branch) = ensure_both_branch_kinds(first_enum, first_union);
+        let alternatives: Vec<Alternative> = alternation.alternatives().collect();
+        let first_labeled = alternatives.iter().find(|a| a.label().is_some());
+        let first_unlabeled = alternatives.iter().find(|a| a.label().is_none());
+        let (labeled, unlabeled) = ensure_both_labeling_kinds(first_labeled, first_unlabeled);
 
-        let enum_range = enum_branch
+        let labeled_range = labeled
             .label()
-            .expect("enum branch found via filter must have label")
+            .expect("labeled alternative found via filter must have label")
             .text_range();
 
         diag.report(
             DiagnosticKind::MixedAltBranches,
-            Span::new(source_id, union_branch.text_range()),
+            Span::new(source_id, unlabeled.text_range()),
         )
-        .related_to(Span::new(source_id, enum_range), "enum branch here")
+        .related_to(
+            Span::new(source_id, labeled_range),
+            "labeled alternative here",
+        )
         .emit();
     }
 }

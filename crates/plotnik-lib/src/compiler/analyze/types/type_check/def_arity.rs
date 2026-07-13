@@ -84,24 +84,15 @@ fn pattern_arity(
             }
             pattern_arity(&first, arities, deps, interner)
         }
-        Pattern::Union(u) => {
+        Pattern::Alternation(alternation) => {
             let mut combined = Arity::One;
-            for branch in u.branches() {
-                if let Some(body) = branch.body() {
+            for alternative in alternation.alternatives() {
+                if let Some(body) = alternative.body() {
                     combined = combined.combine(pattern_arity(&body, arities, deps, interner));
                 }
             }
-            for p in u.patterns() {
+            for p in alternation.patterns() {
                 combined = combined.combine(pattern_arity(&p, arities, deps, interner));
-            }
-            combined
-        }
-        Pattern::Enum(e) => {
-            let mut combined = Arity::One;
-            for branch in e.branches() {
-                if let Some(body) = branch.body() {
-                    combined = combined.combine(pattern_arity(&body, arities, deps, interner));
-                }
             }
             combined
         }

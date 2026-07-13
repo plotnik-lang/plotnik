@@ -5,10 +5,10 @@
 use super::ValidationInput;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{
-    Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
+    Visitor, walk_alternation_pattern, walk_node_pattern, walk_seq_pattern,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
-use crate::compiler::parse::ast::{NodePattern, SeqPattern, UnionPattern};
+use crate::compiler::parse::ast::{AlternationPattern, NodePattern, SeqPattern};
 use crate::compiler::parse::cst::SyntaxNode;
 
 pub fn validate_empty_constructs(input: ValidationInput) {
@@ -50,16 +50,16 @@ impl Visitor for EmptyConstructsValidator<'_> {
         walk_seq_pattern(self, seq);
     }
 
-    fn visit_union_pattern(&mut self, union: &Located<UnionPattern>) {
-        if is_construct_empty(union.node().syntax()) {
+    fn visit_alternation_pattern(&mut self, alternation: &Located<AlternationPattern>) {
+        if is_construct_empty(alternation.node().syntax()) {
             self.diag
                 .report(
                     DiagnosticKind::EmptyAlternation,
-                    union.span_of(union.node().text_range()),
+                    alternation.span_of(alternation.node().text_range()),
                 )
                 .emit();
         }
-        walk_union_pattern(self, union);
+        walk_alternation_pattern(self, alternation);
     }
 }
 

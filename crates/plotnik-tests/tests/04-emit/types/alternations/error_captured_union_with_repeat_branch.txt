@@ -14,4 +14,4 @@ error: this alternation doesn't match exactly one node, so there is no single no
 5 | |   ] @x
   | |___^
   |
-help: capture inside the branches, or drop this capture
+help: capture inside the alternatives, or drop this capture

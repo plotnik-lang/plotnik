@@ -18,12 +18,12 @@ Root
         Colon ":"
         Alternation
           BracketOpen "["
-          Branch
+          Alternative
             NamedNode
               ParenOpen "("
               Id "string"
               ParenClose ")"
-          Branch
+          Alternative
             NamedNode
               ParenOpen "("
               Id "number"
@@ -36,8 +36,8 @@ Root
   Def Q
     NamedNode call
       FieldPattern arguments:
-        Union
-          Branch
+        Alternation
+          Alternative
             NamedNode string
-          Branch
+          Alternative
             NamedNode number

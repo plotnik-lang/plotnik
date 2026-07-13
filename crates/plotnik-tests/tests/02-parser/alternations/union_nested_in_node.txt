@@ -15,12 +15,12 @@ Root
       Id "expr"
       Alternation
         BracketOpen "["
-        Branch
+        Alternative
           NamedNode
             ParenOpen "("
             Id "binary"
             ParenClose ")"
-        Branch
+        Alternative
           NamedNode
             ParenOpen "("
             Id "unary"
@@ -32,8 +32,8 @@ Root
 Root
   Def Q
     NamedNode expr
-      Union
-        Branch
+      Alternation
+        Alternative
           NamedNode binary
-        Branch
+        Alternative
           NamedNode unary

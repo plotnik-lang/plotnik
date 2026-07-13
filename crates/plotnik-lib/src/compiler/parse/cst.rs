@@ -205,7 +205,7 @@ pub enum SyntaxKind {
     Quantifier,
     Sequence,
     Alternation,
-    Branch,
+    Alternative,
     Wildcard,
     Anchor,
     NegatedField,

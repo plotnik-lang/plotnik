@@ -15,12 +15,12 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "number"
           ParenClose ")"
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "string"
@@ -31,12 +31,12 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
-      Branch
+      Alternative
         DefRef
           ParenOpen "("
           Id "Literal"
@@ -46,14 +46,14 @@ Root
 # query.ptk
 Root
   Def Literal
-    Union
-      Branch
+    Alternation
+      Alternative
         NamedNode number
-      Branch
+      Alternative
         NamedNode string
   Def Expr
-    Union
-      Branch
+    Alternation
+      Alternative
         NamedNode identifier
-      Branch
+      Alternative
         Ref Literal

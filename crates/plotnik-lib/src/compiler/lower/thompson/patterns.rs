@@ -617,7 +617,7 @@ impl NfaBuilder<'_> {
             return call_entry;
         }
 
-        // Wrap with pre-effects epsilon (e.g., Enum for enum alternations)
+        // Wrap with pre-effects epsilon (e.g., EnumOpen for labeled alternations).
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
@@ -1022,10 +1022,7 @@ impl NfaBuilder<'_> {
     fn field_value_needs_wrapper(value: &Pattern) -> bool {
         matches!(
             value,
-            Pattern::Union(_)
-                | Pattern::Enum(_)
-                | Pattern::SeqPattern(_)
-                | Pattern::QuantifiedPattern(_)
+            Pattern::Alternation(_) | Pattern::SeqPattern(_) | Pattern::QuantifiedPattern(_)
         )
     }
 
@@ -1201,7 +1198,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Single-exit lowering for a `PendingValue` capture: the inner leaves the value
-    /// pending (enum alternation or a named node forwarding a structured child).
+    /// pending (labeled alternation or a named node forwarding a structured child).
     fn compile_setafter_capture(&mut self, req: CaptureRequest, exit: Label) -> Label {
         let CaptureRequest {
             inner,

@@ -15,9 +15,9 @@ pub enum SpanKind {
     Predicate = 6,
     Quantifier = 7,
     Sequence = 8,
-    Union = 9,
-    Enum = 10,
-    Branch = 11,
+    UnlabeledAlternation = 9,
+    LabeledAlternation = 10,
+    Alternative = 11,
     CaptureType = 12,
 }
 
@@ -33,9 +33,9 @@ impl SpanKind {
             6 => Self::Predicate,
             7 => Self::Quantifier,
             8 => Self::Sequence,
-            9 => Self::Union,
-            10 => Self::Enum,
-            11 => Self::Branch,
+            9 => Self::UnlabeledAlternation,
+            10 => Self::LabeledAlternation,
+            11 => Self::Alternative,
             12 => Self::CaptureType,
             _ => return None,
         };
@@ -53,9 +53,9 @@ impl SpanKind {
             Self::Predicate => "predicate",
             Self::Quantifier => "quantifier",
             Self::Sequence => "sequence",
-            Self::Union => "union",
-            Self::Enum => "enum",
-            Self::Branch => "branch",
+            Self::UnlabeledAlternation => "unlabeled_alternation",
+            Self::LabeledAlternation => "labeled_alternation",
+            Self::Alternative => "alternative",
             Self::CaptureType => "capture_type",
         }
     }

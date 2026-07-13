@@ -86,7 +86,7 @@ fn many_trees_exhaust_exec_fuel() {
 }
 
 #[test]
-fn many_branches_exhaust_exec_fuel() {
+fn many_alternatives_exhaust_exec_fuel() {
     let count = 500;
     let mut input = String::new();
     input.push('[');

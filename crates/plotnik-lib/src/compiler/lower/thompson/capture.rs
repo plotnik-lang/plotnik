@@ -23,9 +23,9 @@ use super::scope::Struct;
 /// - `pre` effects go on the first item (entry)
 /// - `post` effects go on the last item (exit)
 ///
-/// For enum alternations `[A: body]`:
-/// - `pre` contains `Enum(variant)` for branch entry
-/// - `post` contains `EndEnum` for branch exit
+/// For labeled alternations `[A: body]`:
+/// - `pre` contains `EnumOpen(variant)` for alternative entry
+/// - `post` contains `EnumClose` for alternative exit
 #[derive(Clone, Default)]
 pub struct CaptureEffects {
     /// Effects to place before the compiled subgraph's own effects.
@@ -80,7 +80,7 @@ impl CaptureEffects {
 
     /// Add pre-match value effects (run after all scopes open).
     ///
-    /// Use for: Null+Set injection in union alternations
+    /// Use for default-value injection in unlabeled alternations.
     ///
     /// Given `pre=[Scope_Open]`, adding value effects:
     /// - Result: `pre=[Scope_Open, Value1, Value2]`

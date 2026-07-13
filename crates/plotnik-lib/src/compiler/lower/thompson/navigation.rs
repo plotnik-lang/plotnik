@@ -29,7 +29,7 @@ pub fn pattern_owns_iteration(pattern: &Pattern) -> bool {
 /// sibling search (`SkipPolicy::Any`).
 ///
 /// For an item that matches a single candidate (a node, ref, field, or
-/// alternation branch), only `Down`/`Next`/`Stay` skip past named siblings, so
+/// alternation alternative), only `Down`/`Next`/`Stay` skip past named siblings, so
 /// they have multiple candidate positions and need the resumable
 /// `emit_position_search` wrapper to retry a later sibling when a following
 /// pattern fails. Bounded navs (anchored, exact) skip only trivia, so they have

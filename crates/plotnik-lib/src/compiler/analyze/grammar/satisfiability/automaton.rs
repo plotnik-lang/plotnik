@@ -16,9 +16,7 @@ use std::collections::HashMap;
 use rowan::TextRange;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::anchors::{
-    AnchorSemantics, GapClass, has_direct_alternation_branch_nav,
-};
+use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass, has_direct_alternative_nav};
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::parse::ast::{
@@ -532,7 +530,7 @@ impl<'a, 'b> Builder<'a, 'b> {
                 None => from,
             },
             Pattern::QuantifiedPattern(q) => self.emit_quantifier(q, descent, from),
-            Pattern::Union(_) | Pattern::Enum(_) => self.emit_alternation(pattern, descent, from),
+            Pattern::Alternation(_) => self.emit_alternation(pattern, descent, from),
             // A sequence is several siblings, never a single field value (the grammar
             // forbids `field: {…}`), so the field does not carry into its items.
             Pattern::SeqPattern(seq) => {
@@ -728,7 +726,7 @@ fn checked_anonymous_node(ctx: AutomatonContext<'_>, text: &str) -> NodeKindId {
 /// branches at once and so takes the most permissive gap. Strict (`Nothing`) is
 /// never widened — it is the user's adjacency demand.
 fn satisfiability_gap(gap: GapClass, pattern: &Pattern) -> GapClass {
-    if gap == GapClass::ExtrasOnly && has_direct_alternation_branch_nav(pattern) {
+    if gap == GapClass::ExtrasOnly && has_direct_alternative_nav(pattern) {
         GapClass::AnonymousAndExtras
     } else {
         gap

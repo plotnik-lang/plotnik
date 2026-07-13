@@ -56,9 +56,9 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Branch labels are PascalCase (they become enum variants).
+    /// Alternative labels are PascalCase (they become variant cases).
     /// Lowercase labels take a separate parse path; this only checks separators.
-    pub(crate) fn validate_branch_label(&mut self, ident: Ident<'_>) {
+    pub(crate) fn validate_alternative_label(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if name.contains(['_', '-', '.']) {
             let suggested = to_pascal_case(name);

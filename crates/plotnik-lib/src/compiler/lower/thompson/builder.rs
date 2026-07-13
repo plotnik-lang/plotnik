@@ -424,13 +424,12 @@ impl<'a> NfaBuilder<'a> {
             Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
             Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
-            Pattern::Union(u) => self.compile_union(u, ctx),
-            Pattern::Enum(e) => {
-                // Inference decides tagging by consumption: a consumed enum
-                // flows `Value(enum)`; an unconsumed one degraded to a union
+            Pattern::Alternation(alternation) => {
+                // Inference decides tagging by consumption: a consumed labeled
+                // alternation flows `Value(enum)`; an unconsumed one degrades
                 // (fields or void) and compiles without variant scopes. A
                 // suppressed region discards the value, so even a consumed
-                // enum compiles structurally there.
+                // labeled alternation compiles structurally there.
                 let flow = &self
                     .ctx
                     .analysis
@@ -441,9 +440,9 @@ impl<'a> NfaBuilder<'a> {
                     && matches!(flow, PatternFlow::Value(_))
                     && !self.is_suppressed()
                 {
-                    self.compile_enum(e, ctx)
+                    self.compile_labeled_alternation(alternation, ctx)
                 } else {
-                    self.compile_degraded_enum(e, ctx)
+                    self.compile_unlabeled_alternation(alternation, ctx)
                 }
             }
             Pattern::CapturedPattern(c) => {
@@ -470,8 +469,15 @@ impl<'a> NfaBuilder<'a> {
         let (kind, start_at) = match pattern {
             Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),
             Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
-            Pattern::Union(_) => (SpanKind::Union, false),
-            Pattern::Enum(_) => (SpanKind::Enum, false),
+            Pattern::Alternation(alternation) => (
+                match alternation.labeling() {
+                    ast::Labeling::Labeled => SpanKind::LabeledAlternation,
+                    ast::Labeling::Unlabeled | ast::Labeling::Mixed => {
+                        SpanKind::UnlabeledAlternation
+                    }
+                },
+                false,
+            ),
             Pattern::DefRef(_) => (SpanKind::Ref, false),
             _ => return ctx,
         };

@@ -10,14 +10,14 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         Id "Single"
         Colon ":"
         NamedNode
           ParenOpen "("
           Id "statement"
           ParenClose ")"
-      Branch
+      Alternative
         Id "Multiple"
         Colon ":"
         Quantifier
@@ -31,9 +31,9 @@ Root
 # query.ptk
 Root
   Def Q
-    Enum
-      Branch Single:
+    Alternation
+      Alternative Single:
         NamedNode statement
-      Branch Multiple:
+      Alternative Multiple:
         QuantifiedPattern +
           NamedNode statement

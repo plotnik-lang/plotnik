@@ -198,7 +198,7 @@ impl NfaBuilder<'_> {
     /// first iteration; everything from the first unmatched close in `post`
     /// (closes of scopes this quantifier did not open) runs once after the
     /// last. Only the remaining `post` prefix — this level's own value effects —
-    /// stays on each iteration. Without this split, an enum branch like
+    /// stays on each iteration. Without this split, a labeled alternative like
     /// `[A: (x)+ ...]` would re-open its variant scope on every loop pass and
     /// close it over the previous pass's pending value.
     fn bracket_quantifier(
@@ -494,23 +494,14 @@ impl NfaBuilder<'_> {
         // An alternation with a nullable branch: the lifted zero-width
         // alternative exits to `skip_exit` (or is pruned) instead of
         // dead-ending inside the candidate search.
-        if let Pattern::Union(u) = pattern {
+        if let Pattern::Alternation(alternation) = pattern {
             let pattern_ctx = PatternCtx {
                 exit: match_exit,
                 nav: nav_override,
                 capture,
                 value: value_context,
             };
-            return self.compile_union_with_exits(u, pattern_ctx, skip_exit);
-        }
-        if let Pattern::Enum(e) = pattern {
-            let ctx = PatternCtx {
-                exit: match_exit,
-                nav: nav_override,
-                capture,
-                value: value_context,
-            };
-            // Mirrors dispatch_pattern: only a consumed enum outside
+            // Mirrors dispatch_pattern: only a consumed labeled alternation outside
             // suppression tags its variants.
             let flow = &self
                 .ctx
@@ -518,13 +509,13 @@ impl NfaBuilder<'_> {
                 .type_analysis
                 .expect_pattern_result(pattern)
                 .flow;
-            return if ctx.consumes_value()
+            return if pattern_ctx.consumes_value()
                 && matches!(flow, PatternFlow::Value(_))
                 && !self.is_suppressed()
             {
-                self.compile_enum_with_exits(e, ctx, skip_exit)
+                self.compile_labeled_alternation_with_exits(alternation, pattern_ctx, skip_exit)
             } else {
-                self.compile_degraded_enum_with_exits(e, ctx, skip_exit)
+                self.compile_unlabeled_alternation_with_exits(alternation, pattern_ctx, skip_exit)
             };
         }
 

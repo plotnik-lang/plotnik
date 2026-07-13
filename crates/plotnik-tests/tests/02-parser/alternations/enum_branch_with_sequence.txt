@@ -13,7 +13,7 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         Id "Pair"
         Colon ":"
         Sequence
@@ -27,7 +27,7 @@ Root
             Id "value"
             ParenClose ")"
           BraceClose "}"
-      Branch
+      Alternative
         Id "Single"
         Colon ":"
         NamedNode
@@ -39,10 +39,10 @@ Root
 # query.ptk
 Root
   Def Q
-    Enum
-      Branch Pair:
+    Alternation
+      Alternative Pair:
         Seq
           NamedNode key
           NamedNode value
-      Branch Single:
+      Alternative Single:
         NamedNode value

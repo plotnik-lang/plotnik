@@ -83,11 +83,11 @@ Q = 00 :: T2
 
 [spans]
 P00 def        0..75  src0  T1
-P01 enum       7..75  src0
-P02 branch     11..31  src0  T1.M0
+P01 labeled_alternation 7..75  src0
+P02 alternative 11..31  src0  T1.M0
 P03 quantifier 30..31  src0
 P04 pattern    18..30  src0
-P05 branch     34..73  src0  T1.M1
+P05 alternative 34..73  src0  T1.M1
 P06 pattern    40..73  src0
 P07 ref        66..72  src0  T1
 P08 def        77..129  src0  T2

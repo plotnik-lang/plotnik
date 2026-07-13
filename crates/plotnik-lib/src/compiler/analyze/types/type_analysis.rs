@@ -530,7 +530,7 @@ impl TypeAnalysisBuilder {
             .pattern_result
             .iter()
             .filter_map(|(pattern, shape)| {
-                if !matches!(pattern, Pattern::Union(_) | Pattern::Enum(_)) {
+                if !matches!(pattern, Pattern::Alternation(_)) {
                     return None;
                 }
                 let PatternFlow::Fields(type_id) = shape.flow else {

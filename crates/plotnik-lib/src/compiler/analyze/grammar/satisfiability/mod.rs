@@ -175,17 +175,17 @@ impl Reporter<'_, '_> {
                 )
                 .into()
             }
-            Pattern::Union(_) | Pattern::Enum(_) => {
-                // A branch failing is normally excused by its siblings; but when every
-                // branch is impossible the alternation is too, so promote them — each is
+            Pattern::Alternation(_) => {
+                // An alternative failing is normally excused by its siblings; but when every
+                // alternative is impossible the alternation is too, so promote them — each is
                 // then reported with the reason it cannot match.
-                let dead = participation.is_required() && self.all_branches_impossible(located);
-                let branch_participation = if dead {
+                let dead = participation.is_required() && self.all_alternatives_impossible(located);
+                let alternative_participation = if dead {
                     Participation::Required
                 } else {
-                    participation.inside_disjunction_branch()
+                    participation.inside_alternative()
                 };
-                self.walk_children(located, branch_participation)
+                self.walk_children(located, alternative_participation)
             }
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
@@ -241,8 +241,10 @@ impl Reporter<'_, '_> {
     }
 
     fn dead_alternation_child(&mut self, located: Located<Pattern>) -> Option<Located<Pattern>> {
-        if matches!(located.node(), Pattern::Union(_) | Pattern::Enum(_)) {
-            return self.all_branches_impossible(&located).then_some(located);
+        if matches!(located.node(), Pattern::Alternation(_)) {
+            return self
+                .all_alternatives_impossible(&located)
+                .then_some(located);
         }
         match located.node() {
             Pattern::CapturedPattern(cap) => cap
@@ -270,7 +272,7 @@ impl Reporter<'_, '_> {
                 Goal::from_node(self.solver.context(), node)
                     .is_some_and(|goal| goal.is_impossible(self.solver))
             }
-            Pattern::Union(_) | Pattern::Enum(_) => self.all_branches_impossible(located),
+            Pattern::Alternation(_) => self.all_alternatives_impossible(located),
             Pattern::CapturedPattern(cap) => cap
                 .inner()
                 .is_some_and(|inner| self.impossible(&located.wrap(inner))),
@@ -291,15 +293,15 @@ impl Reporter<'_, '_> {
         }
     }
 
-    fn all_branches_impossible(&mut self, located: &Located<Pattern>) -> bool {
-        let mut saw_branch = false;
-        for branch in located.node().children() {
-            saw_branch = true;
-            if !self.impossible(&located.wrap(branch)) {
+    fn all_alternatives_impossible(&mut self, located: &Located<Pattern>) -> bool {
+        let mut saw_alternative = false;
+        for alternative in located.node().children() {
+            saw_alternative = true;
+            if !self.impossible(&located.wrap(alternative)) {
                 return false;
             }
         }
-        saw_branch
+        saw_alternative
     }
 }
 
@@ -389,11 +391,11 @@ fn collect_goals(
             let inner_participation = participation.inside_quantifier_body(q);
             collect_goals(&located.wrap(inner), inner_participation, ctx, out);
         }
-        Pattern::Union(_) | Pattern::Enum(_) => {
-            for branch in located.node().children() {
+        Pattern::Alternation(_) => {
+            for alternative in located.node().children() {
                 collect_goals(
-                    &located.wrap(branch),
-                    participation.inside_disjunction_branch(),
+                    &located.wrap(alternative),
+                    participation.inside_alternative(),
                     ctx,
                     out,
                 );

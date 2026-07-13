@@ -133,7 +133,7 @@ impl NfaBuilder<'_> {
         // The skip path makes the follower the new "first" item, so it must re-derive
         // first-position navigation rather than the sibling `Next` the match path uses.
         // This is required whenever the first item navigates to a position (`Down*` into
-        // a child, `Stay*` at an alternation branch's search candidate) instead of
+        // a child, `Stay*` at an alternative's search candidate) instead of
         // advancing to a sibling — otherwise the skip path over-advances and never binds.
         let first_positions = is_down_nav(first_pattern_nav)
             || matches!(first_pattern_nav, Some(Nav::Stay | Nav::StayExact));
@@ -248,7 +248,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Compile sequence items where the first item is skippable and navigates to a
-    /// position (`Down*` into a child, or `Stay*` at an alternation branch's candidate).
+    /// position (`Down*` into a child, or `Stay*` at an alternative's candidate).
     ///
     /// When the first item (optional/star) is skipped, the next item becomes the "first"
     /// and must re-derive first-position navigation instead of the sibling `Next` the

@@ -134,13 +134,12 @@ pub struct AnchorSemantics<'a> {
 ///
 /// A soft anchor before such a pattern is decided by each branch, not by the
 /// alternation's whole-pattern anonymous classification.
-pub(crate) fn has_direct_alternation_branch_nav(pattern: &Pattern) -> bool {
+pub(crate) fn has_direct_alternative_nav(pattern: &Pattern) -> bool {
     match pattern {
-        Pattern::Union(_) | Pattern::Enum(_) => true,
-        Pattern::CapturedPattern(cap) => cap
-            .inner()
-            .as_ref()
-            .is_some_and(has_direct_alternation_branch_nav),
+        Pattern::Alternation(_) => true,
+        Pattern::CapturedPattern(cap) => {
+            cap.inner().as_ref().is_some_and(has_direct_alternative_nav)
+        }
         _ => false,
     }
 }
@@ -168,7 +167,7 @@ impl<'a> AnonymousClassifier<'a> {
             Pattern::CapturedPattern(cap) => self.classify_opt(cap.inner().as_ref(), visited),
             Pattern::QuantifiedPattern(q) => self.classify_opt(q.inner().as_ref(), visited),
             Pattern::FieldPattern(field) => self.classify_opt(field.value().as_ref(), visited),
-            Pattern::Union(_) | Pattern::Enum(_) => self.classify_any(pattern.children(), visited),
+            Pattern::Alternation(_) => self.classify_any(pattern.children(), visited),
             Pattern::SeqPattern(seq) => self.classify_any(seq.children(), visited),
             Pattern::DefRef(r) => self.classify_ref(r, visited),
         }
@@ -320,12 +319,11 @@ impl<'a> AnchorSemantics<'a> {
                         self.classifier.pattern_may_match_anonymous(Some(pattern));
                     // Alternation branches compile their own entry nav, so the branch body—not
                     // the whole alternation—decides whether soft anchors use extras-only nav.
-                    let current_is_anonymous_for_anchor =
-                        if has_direct_alternation_branch_nav(pattern) {
-                            false
-                        } else {
-                            current_is_anonymous
-                        };
+                    let current_is_anonymous_for_anchor = if has_direct_alternative_nav(pattern) {
+                        false
+                    } else {
+                        current_is_anonymous
+                    };
                     let nav = if let Some(is_exact) = pending_anchor_strict {
                         if is_first_pattern && is_inside_node {
                             Some(if is_exact {

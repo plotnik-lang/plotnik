@@ -108,11 +108,11 @@ Value = 00 :: T3
 
 [spans]
 P00 def        0..55  src0  T3
-P01 enum       8..55  src0
-P02 branch     12..32  src0  T3.M2
+P01 labeled_alternation 8..55  src0
+P02 alternative 12..32  src0  T3.M2
 P03 capture    29..32  src0  T1.M0
 P04 pattern    16..28  src0
-P05 branch     35..53  src0  T3.M3
+P05 alternative 35..53  src0  T3.M3
 P06 capture    49..53  src0  T2.M1
 P07 pattern    40..48  src0
 P08 def        57..292  src0  T5
@@ -128,10 +128,10 @@ P17 capture_type 190..197  src0  T4
 P18 field      165..169  src0
 P19 pattern    171..183  src0
 P20 field      206..211  src0
-P21 union      213..266  src0
-P22 branch     225..232  src0
+P21 unlabeled_alternation 213..266  src0
+P22 alternative 225..232  src0
 P23 ref        225..232  src0  T3
-P24 branch     243..256  src0
+P24 alternative 243..256  src0
 P25 capture    252..256  src0  T5.M6
 P26 pattern    243..251  src0
 

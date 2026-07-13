@@ -11,7 +11,7 @@ Root
     Capture
       Alternation
         BracketOpen "["
-        Branch
+        Alternative
           Id "Base"
           Colon ":"
           Capture
@@ -20,7 +20,7 @@ Root
               Id "identifier"
               ParenClose ")"
             CaptureToken "@name"
-        Branch
+        Alternative
           Id "Access"
           Colon ":"
           NamedNode
@@ -46,11 +46,11 @@ Root
 Root
   Def Q
     CapturedPattern @chain :: MemberChain
-      Enum
-        Branch Base:
+      Alternation
+        Alternative Base:
           CapturedPattern @name
             NamedNode identifier
-        Branch Access:
+        Alternative Access:
           NamedNode member_expression
             CapturedPattern @obj
               FieldPattern object:

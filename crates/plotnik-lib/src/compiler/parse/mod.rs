@@ -48,7 +48,7 @@ mod tokenize_tests;
 
 pub use cst::{SyntaxKind, SyntaxNode};
 
-pub use ast::{Anchor, Branch, Def, NegatedField, Pattern, Root};
+pub use ast::{Alternative, Anchor, Def, NegatedField, Pattern, Root};
 
 pub use parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 

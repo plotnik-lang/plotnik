@@ -53,8 +53,8 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
-    Branch, CapturedPattern, DefRef, EnumPattern, FieldPattern, NodePattern, Pattern,
-    QuantifiedPattern, SeqPattern, TokenPattern, UnionPattern, is_empty_group,
+    AlternationPattern, Alternative, CapturedPattern, DefRef, FieldPattern, Labeling, NodePattern,
+    Pattern, QuantifiedPattern, SeqPattern, TokenPattern, is_empty_group,
 };
 
 mod diagnostics;
@@ -297,7 +297,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
 
         let info = match pattern.node() {
-            Pattern::Enum(e) => self.infer_enum(&pattern.wrap(e.clone()), Consumption::Consumed),
+            Pattern::Alternation(alternation) if alternation.labeling() == Labeling::Labeled => {
+                self.infer_labeled_alternation(
+                    &pattern.wrap(alternation.clone()),
+                    Consumption::Consumed,
+                )
+            }
             Pattern::FieldPattern(f) => {
                 self.infer_field_pattern_in(&pattern.wrap(f.clone()), Consumption::Consumed)
             }
@@ -338,8 +343,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Pattern::TokenPattern(n) => self.infer_anonymous_node(n),
             Pattern::DefRef(r) => self.infer_ref(r),
             Pattern::SeqPattern(s) => self.infer_seq_pattern(&pattern.wrap(s.clone())),
-            Pattern::Union(u) => self.infer_union(&pattern.wrap(u.clone())),
-            Pattern::Enum(e) => self.infer_enum(&pattern.wrap(e.clone()), Consumption::Plain),
+            Pattern::Alternation(alternation) => match alternation.labeling() {
+                Labeling::Labeled => self.infer_labeled_alternation(
+                    &pattern.wrap(alternation.clone()),
+                    Consumption::Plain,
+                ),
+                Labeling::Unlabeled | Labeling::Mixed => {
+                    self.infer_unlabeled_alternation(&pattern.wrap(alternation.clone()))
+                }
+            },
             Pattern::CapturedPattern(c) => self.infer_captured_pattern(&pattern.wrap(c.clone())),
             Pattern::QuantifiedPattern(q) => {
                 self.infer_quantified_pattern_in(&pattern.wrap(q.clone()), QuantifiedContext::Bare)
@@ -481,32 +493,41 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    fn infer_enum(&mut self, e: &Located<EnumPattern>, consumption: Consumption) -> PatternShape {
+    fn infer_labeled_alternation(
+        &mut self,
+        alternation: &Located<AlternationPattern>,
+        consumption: Consumption,
+    ) -> PatternShape {
         match consumption {
-            Consumption::Consumed => self.infer_enum_consumed(e),
-            Consumption::Plain => self.infer_enum_degraded(e),
+            Consumption::Consumed => self.infer_labeled_alternation_consumed(alternation),
+            Consumption::Plain => self.infer_labeled_alternation_degraded(alternation),
         }
     }
 
-    fn infer_enum_consumed(&mut self, e: &Located<EnumPattern>) -> PatternShape {
+    fn infer_labeled_alternation_consumed(
+        &mut self,
+        alternation: &Located<AlternationPattern>,
+    ) -> PatternShape {
         let mut variants: BTreeMap<Symbol, TypeId> = BTreeMap::new();
         let mut combined_arity = Arity::One;
 
-        for branch in e.node().branches() {
-            let label = branch.label().expect("enum branch must have a label");
+        for alternative in alternation.node().alternatives() {
+            let label = alternative
+                .label()
+                .expect("labeled alternative must have a label");
             let label_sym = self.ctx.interner.intern(label.text());
 
             // A BTreeMap would silently collapse duplicate labels, leaving the enum
             // with fewer variants than the emitter expects. Reject them instead.
             if variants.contains_key(&label_sym) {
                 self.report_duplicate_enum_label(label.text_range(), label.text());
-                if let Some(body_info) = self.infer_enum_branch_body(e, &branch) {
+                if let Some(body_info) = self.infer_alternative_body(alternation, &alternative) {
                     combined_arity = combined_arity.combine(body_info.arity);
                 }
                 continue;
             }
 
-            let Some(body_info) = self.infer_enum_branch_body(e, &branch) else {
+            let Some(body_info) = self.infer_alternative_body(alternation, &alternative) else {
                 // Empty variant -> Void (no payload)
                 variants.insert(label_sym, TYPE_VOID);
                 continue;
@@ -523,30 +544,33 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// An alternation whose labels nothing consumes: warn, then infer it as the
     /// plain union it effectively is — branch captures bubble as optional
     /// fields, the labels are inert.
-    fn infer_enum_degraded(&mut self, e: &Located<EnumPattern>) -> PatternShape {
-        self.check_duplicate_labels(e);
-        self.report_unused_branch_labels(e.node());
+    fn infer_labeled_alternation_degraded(
+        &mut self,
+        alternation: &Located<AlternationPattern>,
+    ) -> PatternShape {
+        self.check_duplicate_labels(alternation);
+        self.report_unused_alternative_labels(alternation.node());
 
         let mut flows: Vec<PatternFlow> = Vec::new();
         let mut combined_arity = Arity::One;
 
-        for branch in e.node().branches() {
-            if let Some(body_info) = self.infer_enum_branch_body(e, &branch) {
+        for alternative in alternation.node().alternatives() {
+            if let Some(body_info) = self.infer_alternative_body(alternation, &alternative) {
                 combined_arity = combined_arity.combine(body_info.arity);
                 flows.push(body_info.flow);
             }
         }
 
-        let pattern = Pattern::Enum(e.node().clone());
+        let pattern = Pattern::Alternation(alternation.node().clone());
         let unified_flow = self.unify_alternation(pattern, flows);
 
         PatternShape::new(combined_arity, unified_flow)
     }
 
-    fn check_duplicate_labels(&mut self, e: &Located<EnumPattern>) {
+    fn check_duplicate_labels(&mut self, alternation: &Located<AlternationPattern>) {
         let mut seen: BTreeMap<Symbol, ()> = BTreeMap::new();
-        for branch in e.node().branches() {
-            let Some(label) = branch.label() else {
+        for alternative in alternation.node().alternatives() {
+            let Some(label) = alternative.label() else {
                 continue;
             };
             let label_sym = self.ctx.interner.intern(label.text());
@@ -562,33 +586,38 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .emit();
     }
 
-    fn infer_enum_branch_body(
+    fn infer_alternative_body(
         &mut self,
-        e: &Located<EnumPattern>,
-        branch: &Branch,
+        alternation: &Located<AlternationPattern>,
+        alternative: &Alternative,
     ) -> Option<PatternShape> {
-        branch.body().map(|body| self.infer_pattern(&e.wrap(body)))
+        alternative
+            .body()
+            .map(|body| self.infer_pattern(&alternation.wrap(body)))
     }
 
-    fn infer_union(&mut self, union: &Located<UnionPattern>) -> PatternShape {
+    fn infer_unlabeled_alternation(
+        &mut self,
+        alternation: &Located<AlternationPattern>,
+    ) -> PatternShape {
         let mut flows: Vec<PatternFlow> = Vec::new();
         let mut combined_arity = Arity::One;
 
-        for branch in union.node().branches() {
-            if let Some(body) = branch.body() {
-                let info = self.infer_pattern(&union.wrap(body));
+        for alternative in alternation.node().alternatives() {
+            if let Some(body) = alternative.body() {
+                let info = self.infer_pattern(&alternation.wrap(body));
                 combined_arity = combined_arity.combine(info.arity);
                 flows.push(info.flow);
             }
         }
 
-        for pattern in union.node().patterns() {
-            let info = self.infer_pattern(&union.wrap(pattern));
+        for pattern in alternation.node().patterns() {
+            let info = self.infer_pattern(&alternation.wrap(pattern));
             combined_arity = combined_arity.combine(info.arity);
             flows.push(info.flow);
         }
 
-        let pattern = Pattern::Union(union.node().clone());
+        let pattern = Pattern::Alternation(alternation.node().clone());
         let unified_flow = self.unify_alternation(pattern, flows);
 
         PatternShape::new(combined_arity, unified_flow)
@@ -601,7 +630,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 self.ctx
                     .type_ctx
                     .record_alternation_incompatibility(pattern.clone(), error.field());
-                self.report_branch_unify_error(pattern.syntax(), &error);
+                self.report_alternative_unify_error(pattern.syntax(), &error);
                 PatternFlow::Void
             }
         }
@@ -1167,7 +1196,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 TYPE_NODE
             }
             PatternFlow::Value(t) => {
-                if consumable_enum_root(inner.node()) {
+                if consumable_labeled_alternation_root(inner.node()) {
                     self.report_unnamed_quantified_element(quant, "a labeled alternation");
                 }
                 *t
@@ -1319,10 +1348,12 @@ enum Consumption {
 /// (`Expr = [Lit: … Neg: …]` produces the enum), reached through any field
 /// wrappers. Everything else — a bare reference in particular — is suppressed
 /// at the root like anywhere else.
-fn consumable_enum_root(pattern: &Pattern) -> bool {
+fn consumable_labeled_alternation_root(pattern: &Pattern) -> bool {
     match pattern {
-        Pattern::Enum(_) => true,
-        Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_enum_root(&v)),
+        Pattern::Alternation(alternation) => alternation.labeling() == Labeling::Labeled,
+        Pattern::FieldPattern(f) => f
+            .value()
+            .is_some_and(|v| consumable_labeled_alternation_root(&v)),
         _ => false,
     }
 }
@@ -1337,7 +1368,8 @@ fn consumable_enum_root(pattern: &Pattern) -> bool {
 /// would make the bytecode effect-stack verifier reject valid queries.
 pub(crate) fn consumable_value_root(pattern: &Pattern) -> bool {
     match pattern {
-        Pattern::Enum(_) | Pattern::QuantifiedPattern(_) => true,
+        Pattern::Alternation(alternation) => alternation.labeling() == Labeling::Labeled,
+        Pattern::QuantifiedPattern(_) => true,
         Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),
         _ => false,
     }
@@ -1512,11 +1544,13 @@ impl<'a, 'd> InferPass<'a, 'd> {
 pub(super) fn freeze_union_flow_plans(types: &mut TypeAnalysisBuilder) {
     for (pattern, type_id) in types.alternation_field_results() {
         let fields = types.in_progress().expect_struct_fields(type_id).clone();
-        let branch_fields = alternation_branch_fields(types, &pattern);
+        let alternative_fields = alternation_alternative_fields(types, &pattern);
         let fallbacks = fields
             .into_iter()
             .filter_map(|(name, info)| {
-                let omitted = branch_fields.iter().any(|fields| !fields.contains(&name));
+                let omitted = alternative_fields
+                    .iter()
+                    .any(|fields| !fields.contains(&name));
                 if !omitted {
                     return None;
                 }
@@ -1536,20 +1570,15 @@ pub(super) fn freeze_union_flow_plans(types: &mut TypeAnalysisBuilder) {
     }
 }
 
-fn alternation_branch_fields(
+fn alternation_alternative_fields(
     types: &TypeAnalysisBuilder,
     pattern: &Pattern,
 ) -> Vec<HashSet<Symbol>> {
     let bodies: Vec<Option<Pattern>> = match pattern {
-        Pattern::Union(union) => union
-            .branches()
-            .map(|branch| branch.body())
-            .chain(union.patterns().map(Some))
-            .collect(),
-        Pattern::Enum(enumeration) => enumeration
-            .branches()
-            .map(|branch| branch.body())
-            .chain(enumeration.patterns().map(Some))
+        Pattern::Alternation(alternation) => alternation
+            .alternatives()
+            .map(|alternative| alternative.body())
+            .chain(alternation.patterns().map(Some))
             .collect(),
         _ => unreachable!("union-flow plans are only built for alternations"),
     };

@@ -13,23 +13,23 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         Id "Literal"
         Colon ":"
         Alternation
           BracketOpen "["
-          Branch
+          Alternative
             NamedNode
               ParenOpen "("
               Id "number"
               ParenClose ")"
-          Branch
+          Alternative
             NamedNode
               ParenOpen "("
               Id "string"
               ParenClose ")"
           BracketClose "]"
-      Branch
+      Alternative
         Id "Ident"
         Colon ":"
         NamedNode
@@ -41,12 +41,12 @@ Root
 # query.ptk
 Root
   Def Q
-    Enum
-      Branch Literal:
-        Union
-          Branch
+    Alternation
+      Alternative Literal:
+        Alternation
+          Alternative
             NamedNode number
-          Branch
+          Alternative
             NamedNode string
-      Branch Ident:
+      Alternative Ident:
         NamedNode identifier

@@ -15,12 +15,12 @@ Root
       BraceOpen "{"
       Alternation
         BracketOpen "["
-        Branch
+        Alternative
           NamedNode
             ParenOpen "("
             Id "a"
             ParenClose ")"
-        Branch
+        Alternative
           NamedNode
             ParenOpen "("
             Id "b"
@@ -36,9 +36,9 @@ Root
 Root
   Def Q
     Seq
-      Union
-        Branch
+      Alternation
+        Alternative
           NamedNode a
-        Branch
+        Alternative
           NamedNode b
       NamedNode c

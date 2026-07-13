@@ -94,17 +94,15 @@ pub(crate) fn pattern_nullable(
         Pattern::SeqPattern(s) => s
             .children()
             .all(|item| pattern_nullable(&item, nullable, deps, interner)),
-        Pattern::Union(u) => {
-            u.branches()
-                .filter_map(|b| b.body())
+        Pattern::Alternation(alternation) => {
+            alternation
+                .alternatives()
+                .filter_map(|alternative| alternative.body())
                 .any(|body| pattern_nullable(&body, nullable, deps, interner))
-                || u.patterns()
+                || alternation
+                    .patterns()
                     .any(|p| pattern_nullable(&p, nullable, deps, interner))
         }
-        Pattern::Enum(e) => e
-            .branches()
-            .filter_map(|b| b.body())
-            .any(|body| pattern_nullable(&body, nullable, deps, interner)),
         Pattern::DefRef(r) => r
             .name()
             .and_then(|n| deps.def_id_for_name(interner, n.text()))

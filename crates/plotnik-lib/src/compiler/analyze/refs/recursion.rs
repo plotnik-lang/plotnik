@@ -303,7 +303,7 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
             let children: Vec<_> = node.children().collect();
             children.is_empty() || children.iter().all(|c| pattern_has_escape(c, scc_names))
         }
-        Pattern::Union(_) | Pattern::Enum(_) => pattern
+        Pattern::Alternation(_) => pattern
             .children()
             .any(|c| pattern_has_escape(&c, scc_names)),
         Pattern::SeqPattern(_) => pattern
@@ -327,9 +327,7 @@ fn pattern_consumes_input(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
         Pattern::DefRef(_) => false,
-        Pattern::Union(_) | Pattern::Enum(_) => {
-            pattern.children().all(|c| pattern_consumes_input(&c))
-        }
+        Pattern::Alternation(_) => pattern.children().all(|c| pattern_consumes_input(&c)),
         Pattern::SeqPattern(_) => pattern.children().any(|c| pattern_consumes_input(&c)),
         Pattern::QuantifiedPattern(q) => {
             !q.is_optional()

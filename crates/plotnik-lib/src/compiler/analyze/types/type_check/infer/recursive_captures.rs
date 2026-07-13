@@ -108,21 +108,14 @@ impl InferVisitor<'_, '_> {
                     recurse(self, &child);
                 }
             }
-            Pattern::Union(u) => {
-                for branch in u.branches() {
-                    if let Some(body) = branch.body() {
+            Pattern::Alternation(alternation) => {
+                for alternative in alternation.alternatives() {
+                    if let Some(body) = alternative.body() {
                         recurse(self, &body);
                     }
                 }
-                for p in u.patterns() {
+                for p in alternation.patterns() {
                     recurse(self, &p);
-                }
-            }
-            Pattern::Enum(e) => {
-                for branch in e.branches() {
-                    if let Some(body) = branch.body() {
-                        recurse(self, &body);
-                    }
                 }
             }
             Pattern::QuantifiedPattern(q) => {

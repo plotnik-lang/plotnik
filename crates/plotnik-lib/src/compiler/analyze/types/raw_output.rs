@@ -2,7 +2,7 @@
 //!
 //! The public type graph intentionally collapses provenance: a struct field says
 //! what type is returned, not which capture occurrences produced it or which
-//! alternation branches omitted it. Capture-type normalization needs the latter
+//! alternation alternatives omitted it. Capture-type normalization needs the latter
 //! facts. When a query contains a builtin capture type, this projection records
 //! them at the raw inference boundary; the focused normalizer then rewrites the
 //! public type graph from the exact producer and omission relationships.
@@ -156,14 +156,14 @@ struct RawAlternationField {
 }
 
 #[derive(Clone, Debug)]
-struct RawAlternationBranch {
+struct RawAlternationAlternative {
     omissions: BTreeSet<Symbol>,
 }
 
 #[derive(Clone, Debug)]
 struct RawAlternationOutput {
     fields: BTreeMap<Symbol, RawAlternationField>,
-    branches: Vec<RawAlternationBranch>,
+    alternatives: Vec<RawAlternationAlternative>,
     incompatible_field: Option<Symbol>,
 }
 
@@ -302,7 +302,7 @@ impl RawOutputGraphBuilder {
             });
         }
 
-        if matches!(occurrence, Pattern::Union(_) | Pattern::Enum(_)) {
+        if matches!(occurrence, Pattern::Alternation(_)) {
             self.record_alternation(occurrence);
         }
     }
@@ -420,7 +420,7 @@ impl RawOutputGraphBuilder {
         }
 
         let all_fields = fields.keys().copied().collect::<BTreeSet<_>>();
-        let branches = branch_flows
+        let alternatives = branch_flows
             .into_iter()
             .map(|flow| {
                 let present = flow
@@ -428,13 +428,13 @@ impl RawOutputGraphBuilder {
                     .map(|fields| fields.keys().copied().collect::<BTreeSet<_>>())
                     .unwrap_or_default();
                 let omissions = all_fields.difference(&present).copied().collect();
-                RawAlternationBranch { omissions }
+                RawAlternationAlternative { omissions }
             })
             .collect();
 
         let output = RawAlternationOutput {
             fields,
-            branches,
+            alternatives,
             incompatible_field: self.incompatibilities.get(&pattern).copied(),
         };
         self.alternations.insert(pattern, output);
@@ -459,19 +459,12 @@ impl RawOutputGraphBuilder {
 /// no-builtin inference result and cache.
 fn for_each_inference_child(pattern: &Pattern, mut visit: impl FnMut(Pattern)) {
     match pattern {
-        Pattern::Union(union) => {
-            for child in union
-                .branches()
-                .filter_map(|branch| branch.body())
-                .chain(union.patterns())
+        Pattern::Alternation(alternation) => {
+            for child in alternation
+                .alternatives()
+                .filter_map(|alternative| alternative.body())
+                .chain(alternation.patterns())
             {
-                visit(child);
-            }
-        }
-        // Enum inference only visits proper branch bodies. Malformed bare
-        // patterns are syntax-recovery artifacts and do not contribute output.
-        Pattern::Enum(enumeration) => {
-            for child in enumeration.branches().filter_map(|branch| branch.body()) {
                 visit(child);
             }
         }
@@ -485,12 +478,11 @@ fn for_each_inference_child(pattern: &Pattern, mut visit: impl FnMut(Pattern)) {
 
 fn alternation_bodies(pattern: &Pattern) -> Vec<Option<Pattern>> {
     match pattern {
-        Pattern::Union(union) => union
-            .branches()
-            .map(|branch| branch.body())
-            .chain(union.patterns().map(Some))
+        Pattern::Alternation(alternation) => alternation
+            .alternatives()
+            .map(|alternative| alternative.body())
+            .chain(alternation.patterns().map(Some))
             .collect(),
-        Pattern::Enum(enumeration) => enumeration.branches().map(|branch| branch.body()).collect(),
         _ => unreachable!("raw alternation output requires an alternation pattern"),
     }
 }

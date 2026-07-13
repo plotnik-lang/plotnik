@@ -315,22 +315,10 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                     )?;
                 }
             }
-            ast::Pattern::Union(u) => {
-                writeln!(self.w, "{}Union{}{}", prefix, arity, span)?;
-                for branch in u.branches() {
-                    self.format_branch(&branch, depth + 1)?;
-                }
-                for pattern in u.patterns() {
-                    self.format_pattern(&pattern, depth + 1)?;
-                }
-            }
-            ast::Pattern::Enum(e) => {
-                writeln!(self.w, "{}Enum{}{}", prefix, arity, span)?;
-                for branch in e.branches() {
-                    self.format_branch(&branch, depth + 1)?;
-                }
-                for pattern in e.patterns() {
-                    self.format_pattern(&pattern, depth + 1)?;
+            ast::Pattern::Alternation(a) => {
+                writeln!(self.w, "{}Alternation{}{}", prefix, arity, span)?;
+                for alternative in a.alternatives() {
+                    self.format_alternative(&alternative, depth + 1)?;
                 }
             }
             ast::Pattern::SeqPattern(s) => {
@@ -426,18 +414,22 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
         writeln!(self.w, "{}NegatedField{} -{}", prefix, span, name)
     }
 
-    fn format_branch(&mut self, branch: &ast::Branch, depth: usize) -> std::fmt::Result {
+    fn format_alternative(
+        &mut self,
+        alternative: &ast::Alternative,
+        depth: usize,
+    ) -> std::fmt::Result {
         let prefix = indent(depth);
-        let arity = self.printer.arity_glyph(branch.syntax());
-        let span = self.printer.span_str(branch.text_range());
-        let label = branch.label().map(|t| t.text().to_string());
+        let arity = self.printer.arity_glyph(alternative.syntax());
+        let span = self.printer.span_str(alternative.text_range());
+        let label = alternative.label().map(|t| t.text().to_string());
 
         match label {
-            Some(l) => writeln!(self.w, "{}Branch{}{} {}:", prefix, arity, span, l)?,
-            None => writeln!(self.w, "{}Branch{}{}", prefix, arity, span)?,
+            Some(l) => writeln!(self.w, "{}Alternative{}{} {}:", prefix, arity, span, l)?,
+            None => writeln!(self.w, "{}Alternative{}{}", prefix, arity, span)?,
         }
 
-        let Some(body) = branch.body() else {
+        let Some(body) = alternative.body() else {
             return Ok(());
         };
         self.format_pattern(&body, depth + 1)

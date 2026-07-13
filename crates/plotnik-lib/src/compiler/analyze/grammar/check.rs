@@ -102,14 +102,14 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 let located_field = located.wrap(f.clone());
                 self.validate_field_pattern(&located_field, ctx.as_ref(), participation, walk);
             }
-            Pattern::Union(_) | Pattern::Enum(_) => {
-                // A branch is disjunctive — none is guaranteed to match, so defer its contents.
+            Pattern::Alternation(_) => {
+                // An alternative is disjunctive — none is guaranteed to match, so defer its contents.
                 for body in located.node().children() {
                     let body_located = located.wrap(body);
                     self.check_pattern_grammar(
                         &body_located,
                         ctx,
-                        participation.inside_disjunction_branch(),
+                        participation.inside_alternative(),
                         walk,
                     );
                 }
@@ -189,29 +189,17 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 };
                 self.pattern_can_match_root(&located.wrap(inner), grammar_root, seen_refs)
             }
-            Pattern::Union(union) => {
-                let mut saw_branch = false;
-                for branch in union.branches() {
-                    saw_branch = true;
-                    if branch.body().is_none_or(|body| {
+            Pattern::Alternation(alternation) => {
+                let mut saw_alternative = false;
+                for alternative in alternation.alternatives() {
+                    saw_alternative = true;
+                    if alternative.body().is_none_or(|body| {
                         self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs)
                     }) {
                         return true;
                     }
                 }
-                !saw_branch
-            }
-            Pattern::Enum(en) => {
-                let mut saw_branch = false;
-                for branch in en.branches() {
-                    saw_branch = true;
-                    if branch.body().is_none_or(|body| {
-                        self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs)
-                    }) {
-                        return true;
-                    }
-                }
-                !saw_branch
+                !saw_alternative
             }
             Pattern::DefRef(def_ref) => {
                 let Some(name) = def_ref.name() else {
@@ -437,8 +425,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             // Anonymous children are untracked (grammar children arrays never list anonymous
             // tokens). Alternations, quantifiers, and references are not checked here.
             Pattern::TokenPattern(_)
-            | Pattern::Union(_)
-            | Pattern::Enum(_)
+            | Pattern::Alternation(_)
             | Pattern::QuantifiedPattern(_)
             | Pattern::DefRef(_)
             | Pattern::FieldPattern(_) => {}
@@ -503,8 +490,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             }
             // Alternations, quantifiers, and references are not checked here; a field value
             // can't be a sequence (rejected earlier as `FieldSequenceValue`).
-            Pattern::Union(_)
-            | Pattern::Enum(_)
+            Pattern::Alternation(_)
             | Pattern::QuantifiedPattern(_)
             | Pattern::DefRef(_)
             | Pattern::SeqPattern(_)

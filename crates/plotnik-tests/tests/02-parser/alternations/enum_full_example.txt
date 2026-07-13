@@ -15,7 +15,7 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         Id "Ident"
         Colon ":"
         Capture
@@ -27,7 +27,7 @@ Root
           CaptureType
             DoubleColon "::"
             Id "Foo"
-      Branch
+      Alternative
         Id "Num"
         Colon ":"
         Capture
@@ -39,7 +39,7 @@ Root
           CaptureType
             DoubleColon "::"
             Id "Foo"
-      Branch
+      Alternative
         Id "Str"
         Colon ":"
         Capture
@@ -51,7 +51,7 @@ Root
           CaptureType
             DoubleColon "::"
             Id "Foo"
-      Branch
+      Alternative
         Id "Binary"
         Colon ":"
         NamedNode
@@ -81,17 +81,17 @@ Root
 # query.ptk
 Root
   Def Expression
-    Enum
-      Branch Ident:
+    Alternation
+      Alternative Ident:
         CapturedPattern @name :: Foo
           NamedNode identifier
-      Branch Num:
+      Alternative Num:
         CapturedPattern @value :: Foo
           NamedNode number
-      Branch Str:
+      Alternative Str:
         CapturedPattern @value :: Foo
           NamedNode string
-      Branch Binary:
+      Alternative Binary:
         NamedNode binary_expression
           CapturedPattern @left
             FieldPattern left:

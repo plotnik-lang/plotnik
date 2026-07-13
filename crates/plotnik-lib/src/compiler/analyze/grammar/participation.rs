@@ -17,7 +17,7 @@ impl Participation {
         matches!(self, Self::Required)
     }
 
-    pub(super) fn inside_disjunction_branch(self) -> Self {
+    pub(super) fn inside_alternative(self) -> Self {
         Self::Deferred
     }
 

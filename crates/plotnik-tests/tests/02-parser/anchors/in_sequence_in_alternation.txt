@@ -14,7 +14,7 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         Sequence
           BraceOpen "{"
           NamedNode
@@ -28,7 +28,7 @@ Root
             Id "b"
             ParenClose ")"
           BraceClose "}"
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "c"
@@ -38,11 +38,11 @@ Root
 # query.ptk
 Root
   Def Q
-    Union
-      Branch
+    Alternation
+      Alternative
         Seq
           NamedNode a
           .
           NamedNode b
-      Branch
+      Alternative
         NamedNode c

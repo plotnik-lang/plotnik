@@ -102,7 +102,7 @@ impl TypeAnalysis {
             PatternFlow::Fields(_) => {
                 // A captured alternation is a consumed position, so an enum
                 // flows `Value` (handled below); only a union flows `Fields`.
-                if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
+                if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Alternation(_)) {
                     CaptureKind::Struct
                 } else {
                     CaptureKind::Node

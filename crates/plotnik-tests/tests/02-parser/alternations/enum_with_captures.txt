@@ -11,7 +11,7 @@ Root
     Capture
       Alternation
         BracketOpen "["
-        Branch
+        Alternative
           Id "Assign"
           Colon ":"
           NamedNode
@@ -27,7 +27,7 @@ Root
                   ParenClose ")"
               CaptureToken "@left"
             ParenClose ")"
-        Branch
+        Alternative
           Id "Call"
           Colon ":"
           NamedNode
@@ -50,13 +50,13 @@ Root
 Root
   Def Q
     CapturedPattern @stmt
-      Enum
-        Branch Assign:
+      Alternation
+        Alternative Assign:
           NamedNode assignment_expression
             CapturedPattern @left
               FieldPattern left:
                 NamedNode identifier
-        Branch Call:
+        Alternative Call:
           NamedNode call_expression
             CapturedPattern @func
               FieldPattern function:

@@ -11,12 +11,12 @@ Root
     Capture
       Alternation
         BracketOpen "["
-        Branch
+        Alternative
           NamedNode
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
-        Branch
+        Alternative
           NamedNode
             ParenOpen "("
             Id "string"
@@ -28,8 +28,8 @@ Root
 Root
   Def Q
     CapturedPattern @value
-      Union
-        Branch
+      Alternation
+        Alternative
           NamedNode identifier
-        Branch
+        Alternative
           NamedNode string

@@ -10,12 +10,12 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         Str
           DoubleQuote "\""
           StringContent "true"
           DoubleQuote "\""
-      Branch
+      Alternative
         Str
           DoubleQuote "\""
           StringContent "false"
@@ -25,8 +25,8 @@ Root
 # query.ptk
 Root
   Def Q
-    Union
-      Branch
+    Alternation
+      Alternative
         AnonymousNode "true"
-      Branch
+      Alternative
         AnonymousNode "false"

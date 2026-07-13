@@ -10,12 +10,12 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
-      Branch
+      Alternative
         Capture
           Quantifier
             NamedNode
@@ -29,10 +29,10 @@ Root
 # query.ptk
 Root
   Def Q
-    Union
-      Branch
+    Alternation
+      Alternative
         NamedNode identifier
-      Branch
+      Alternative
         CapturedPattern @strings
           QuantifiedPattern *
             NamedNode string

@@ -9,7 +9,7 @@ error: cannot mix enum and union branches
 2 |   (a)
   |   ^^^
 3 |   B: (b)
-  |   - enum branch here
+  |   - labeled alternative here
   |
 help: use all labels for an enum, or none for a merged struct
 -------------------- SYMBOLS ---------------------

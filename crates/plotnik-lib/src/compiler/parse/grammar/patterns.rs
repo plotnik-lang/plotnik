@@ -28,7 +28,7 @@ pub(crate) enum PatternSlot {
     /// parse error.
     DefBody,
     /// `[Label: <here> ...]`.
-    BranchBody,
+    AlternativeBody,
     /// `field: <here>`.
     FieldValue,
 }
@@ -40,8 +40,10 @@ impl PatternSlot {
 
         match self {
             Self::DefBody => None,
-            Self::BranchBody if is_anchor => Some(DiagnosticKind::AnchorInAlternation),
-            Self::BranchBody if is_negated_field => Some(DiagnosticKind::NegatedFieldInAlternation),
+            Self::AlternativeBody if is_anchor => Some(DiagnosticKind::AnchorInAlternation),
+            Self::AlternativeBody if is_negated_field => {
+                Some(DiagnosticKind::NegatedFieldInAlternation)
+            }
             Self::FieldValue if is_anchor => Some(DiagnosticKind::AnchorAsFieldValue),
             Self::FieldValue if is_negated_field => Some(DiagnosticKind::NegatedFieldAsFieldValue),
             _ => None,
@@ -86,7 +88,7 @@ impl Parser<'_, '_> {
         false
     }
 
-    /// Parse a pattern required after a prefix like `=`, `field:`, or a branch label.
+    /// Parse a pattern required after a prefix like `=`, `field:`, or an alternative label.
     ///
     /// On a non-pattern token this reports `ExpectedExpression` at the current position,
     /// except a misplaced tree-sitter predicate (`#eq?`), which gets its dedicated diagnostic
@@ -95,9 +97,9 @@ impl Parser<'_, '_> {
         self.parse_required_pattern_inner(SuffixMode::Apply, PatternSlot::DefBody)
     }
 
-    /// Like [`Self::parse_required_pattern`], for an alternation branch body.
-    pub(crate) fn parse_branch_body(&mut self) {
-        self.parse_required_pattern_inner(SuffixMode::Apply, PatternSlot::BranchBody)
+    /// Like [`Self::parse_required_pattern`], for an alternative body.
+    pub(crate) fn parse_alternative_body(&mut self) {
+        self.parse_required_pattern_inner(SuffixMode::Apply, PatternSlot::AlternativeBody)
     }
 
     /// Like [`Self::parse_required_pattern`], but without applying a quantifier/capture suffix —
@@ -162,7 +164,7 @@ impl Parser<'_, '_> {
     /// - `field: (x)*` parses as `(field: (x))*` — repeat the field (e.g., decorators)
     /// - `field: (x) @cap` parses as `(field: (x)) @cap` — capture the field pattern
     ///
-    /// For captures on structured values (enums/structs), the compilation handles this
+    /// For captures on structured values (variants/records), compilation handles this
     /// by looking through FieldPattern to determine the actual value type. See
     /// `build_capture_effects` in compile/capture.rs.
     pub(crate) fn parse_pattern_no_suffix(&mut self) {

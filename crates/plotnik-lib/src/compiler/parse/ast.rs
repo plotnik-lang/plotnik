@@ -65,24 +65,15 @@ macro_rules! define_pattern {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum Pattern {
             $($variant($variant),)+
-            /// Union alternation `[a b]`.
-            Union(UnionPattern),
-            /// Enum alternation `[A: a B: b]`.
-            Enum(EnumPattern),
+            /// Alternation `[a b]` or `[A: a B: b]`.
+            Alternation(AlternationPattern),
         }
 
         impl Pattern {
             pub fn cast(node: SyntaxNode) -> Option<Self> {
                 let kind = node.kind();
-                // `UnionPattern` and `EnumPattern` both wrap `SyntaxKind::Alternation`;
-                // branch labels decide which. This is the one syntactic boundary
-                // where the two concepts still meet — a mixed alternation recovers
-                // as a union (its `MixedAltBranches` diagnostic is raised separately).
                 if kind == SyntaxKind::Alternation {
-                    return Some(match classify_alt(&node) {
-                        AltKind::Enum => Pattern::Enum(EnumPattern(node)),
-                        AltKind::Union | AltKind::Mixed => Pattern::Union(UnionPattern(node)),
-                    });
+                    return Some(Pattern::Alternation(AlternationPattern(node)));
                 }
                 $(if $variant::can_cast(kind) { return Some(Pattern::$variant($variant(node))); })+
                 None
@@ -91,16 +82,14 @@ macro_rules! define_pattern {
             pub fn syntax(&self) -> &SyntaxNode {
                 match self {
                     $(Pattern::$variant(n) => n.syntax(),)+
-                    Pattern::Union(n) => n.syntax(),
-                    Pattern::Enum(n) => n.syntax(),
+                    Pattern::Alternation(n) => n.syntax(),
                 }
             }
 
             pub fn text_range(&self) -> TextRange {
                 match self {
                     $(Pattern::$variant(n) => n.text_range(),)+
-                    Pattern::Union(n) => n.text_range(),
-                    Pattern::Enum(n) => n.text_range(),
+                    Pattern::Alternation(n) => n.text_range(),
                 }
             }
         }
@@ -119,17 +108,11 @@ impl Pattern {
             Pattern::CapturedPattern(c) => PatternChildren::Optional(c.inner().into_iter()),
             Pattern::QuantifiedPattern(q) => PatternChildren::Optional(q.inner().into_iter()),
             Pattern::FieldPattern(f) => PatternChildren::Optional(f.value().into_iter()),
-            Pattern::Union(u) => PatternChildren::BranchBodies(
-                u.syntax()
+            Pattern::Alternation(a) => PatternChildren::AlternativeBodies(
+                a.syntax()
                     .children()
-                    .filter_map(Branch::cast as fn(SyntaxNode) -> Option<Branch>)
-                    .filter_map(branch_body as fn(Branch) -> Option<Pattern>),
-            ),
-            Pattern::Enum(e) => PatternChildren::BranchBodies(
-                e.syntax()
-                    .children()
-                    .filter_map(Branch::cast as fn(SyntaxNode) -> Option<Branch>)
-                    .filter_map(branch_body as fn(Branch) -> Option<Pattern>),
+                    .filter_map(Alternative::cast as fn(SyntaxNode) -> Option<Alternative>)
+                    .filter_map(alternative_body as fn(Alternative) -> Option<Pattern>),
             ),
             Pattern::DefRef(_) | Pattern::TokenPattern(_) => {
                 PatternChildren::Empty(std::iter::empty())
@@ -140,14 +123,17 @@ impl Pattern {
 
 type DirectPatternChildren =
     std::iter::FilterMap<rowan::SyntaxNodeChildren<QueryLang>, fn(SyntaxNode) -> Option<Pattern>>;
-type BranchChildren =
-    std::iter::FilterMap<rowan::SyntaxNodeChildren<QueryLang>, fn(SyntaxNode) -> Option<Branch>>;
-type BranchBodyChildren = std::iter::FilterMap<BranchChildren, fn(Branch) -> Option<Pattern>>;
+type AlternativeChildren = std::iter::FilterMap<
+    rowan::SyntaxNodeChildren<QueryLang>,
+    fn(SyntaxNode) -> Option<Alternative>,
+>;
+type AlternativeBodyChildren =
+    std::iter::FilterMap<AlternativeChildren, fn(Alternative) -> Option<Pattern>>;
 
 enum PatternChildren {
     Direct(DirectPatternChildren),
     Optional(std::option::IntoIter<Pattern>),
-    BranchBodies(BranchBodyChildren),
+    AlternativeBodies(AlternativeBodyChildren),
     Empty(std::iter::Empty<Pattern>),
 }
 
@@ -158,39 +144,26 @@ impl Iterator for PatternChildren {
         match self {
             Self::Direct(children) => children.next(),
             Self::Optional(child) => child.next(),
-            Self::BranchBodies(children) => children.next(),
+            Self::AlternativeBodies(children) => children.next(),
             Self::Empty(children) => children.next(),
         }
     }
 }
 
-fn branch_body(branch: Branch) -> Option<Pattern> {
-    branch.body()
+fn alternative_body(alternative: Alternative) -> Option<Pattern> {
+    alternative.body()
 }
 
 ast_node!(Root, Root);
 ast_node!(Def, Def);
 ast_node!(NodePattern, NamedNode);
 ast_node!(DefRef, DefRef);
-// `UnionPattern` and `EnumPattern` both refine `SyntaxKind::Alternation`, told apart
-// only by their branch labels. A kind-only `cast`/`can_cast` (as `ast_node!`
-// generates) could not distinguish them — it would wrap an enum alternation as
-// a union and vice versa — so they are defined by hand without one.
-// Classification happens exactly once, in `Pattern::cast` (via `classify_alt`),
-// which is their sole constructor.
-
-/// Union alternation `[a b]`. A refinement of `SyntaxKind::Alternation`,
-/// constructed only by `Pattern::cast` when no branch carries a label (mixed
-/// alternations recover here too; their `MixedAltBranches` diagnostic is raised
-/// separately).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct UnionPattern(SyntaxNode);
-
-/// Enum alternation `[A: a B: b]`. A refinement of `SyntaxKind::Alternation`,
-/// constructed only by `Pattern::cast` when every branch carries a label.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EnumPattern(SyntaxNode);
-ast_node!(Branch, Branch);
+ast_node!(
+    /// Alternation `[a b]` or `[A: a B: b]`.
+    AlternationPattern,
+    Alternation
+);
+ast_node!(Alternative, Alternative);
 ast_node!(SeqPattern, Sequence);
 ast_node!(CapturedPattern, Capture);
 ast_node!(CaptureTypeSyntax, CaptureType);
@@ -251,40 +224,36 @@ impl TokenPattern {
     }
 }
 
-/// Syntactic classification of an alternation `[...]` by its branch labels.
-///
-/// This is the *only* place union and enum are still one concept. `Pattern::cast`
-/// uses it to fork into `UnionPattern`/`EnumPattern` (collapsing `Mixed` to a
-/// union for recovery); the `MixedAltBranches` diagnostic uses it to flag the
-/// invalid case. Nothing downstream of `Pattern::cast` ever sees an `AltKind`.
+/// Whether an alternation's alternatives are consistently labeled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AltKind {
-    /// All branches have labels: `[A: expr1 B: expr2]`
-    Enum,
-    /// No branches have labels: `[expr1 expr2]`
-    Union,
-    /// Mixed enum and union branches (invalid)
+pub enum Labeling {
+    /// No alternatives have labels: `[expr1 expr2]`.
+    Unlabeled,
+    /// All alternatives have labels: `[A: expr1 B: expr2]`.
+    Labeled,
+    /// Only some alternatives have labels (invalid).
     Mixed,
 }
 
-/// Classify an alternation node by scanning its branches for labels — the shared
-/// boundary used by `Pattern::cast` and the mixed-branch diagnostic.
-pub fn classify_alt(node: &SyntaxNode) -> AltKind {
-    let mut is_enum = false;
-    let mut is_union = false;
+fn classify_labeling(node: &SyntaxNode) -> Labeling {
+    let mut has_labeled = false;
+    let mut has_unlabeled = false;
 
-    for child in node.children().filter(|c| c.kind() == SyntaxKind::Branch) {
+    for child in node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::Alternative)
+    {
         if find_token(&child, |k| k == SyntaxKind::Id).is_some() {
-            is_enum = true;
+            has_labeled = true;
         } else {
-            is_union = true;
+            has_unlabeled = true;
         }
     }
 
-    match (is_enum, is_union) {
-        (true, true) => AltKind::Mixed,
-        (true, false) => AltKind::Enum,
-        _ => AltKind::Union,
+    match (has_labeled, has_unlabeled) {
+        (true, true) => Labeling::Mixed,
+        (true, false) => Labeling::Labeled,
+        _ => Labeling::Unlabeled,
     }
 }
 
@@ -524,35 +493,22 @@ impl DefRef {
     }
 }
 
-macro_rules! alternation_accessors {
-    ($($ty:ident),+ $(,)?) => {
-        $(
-            impl $ty {
-                pub fn syntax(&self) -> &SyntaxNode {
-                    &self.0
-                }
+impl AlternationPattern {
+    pub fn alternatives(&self) -> impl Iterator<Item = Alternative> + '_ {
+        self.0.children().filter_map(Alternative::cast)
+    }
 
-                pub fn text_range(&self) -> TextRange {
-                    self.0.text_range()
-                }
+    pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
+        self.alternatives()
+            .filter_map(|alternative| alternative.body())
+    }
 
-                pub fn branches(&self) -> impl Iterator<Item = Branch> + '_ {
-                    self.0.children().filter_map(Branch::cast)
-                }
-
-                /// Bare (non-`Branch`-wrapped) patterns — only present on a malformed tree;
-                /// a well-formed alternation wraps every branch in `SyntaxKind::Branch`.
-                pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
-                    self.0.children().filter_map(Pattern::cast)
-                }
-            }
-        )+
-    };
+    pub fn labeling(&self) -> Labeling {
+        classify_labeling(&self.0)
+    }
 }
 
-alternation_accessors!(UnionPattern, EnumPattern);
-
-impl Branch {
+impl Alternative {
     pub fn label(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| k == SyntaxKind::Id)
     }
@@ -683,8 +639,7 @@ impl NegatedField {
 pub fn is_empty_group(inner: &Pattern) -> bool {
     match inner {
         Pattern::SeqPattern(seq) => seq.children().next().is_none(),
-        Pattern::Union(u) => u.branches().next().is_none(),
-        Pattern::Enum(e) => e.branches().next().is_none(),
+        Pattern::Alternation(a) => a.alternatives().next().is_none(),
         Pattern::QuantifiedPattern(q) => q.inner().is_some_and(|i| is_empty_group(&i)),
         _ => false,
     }

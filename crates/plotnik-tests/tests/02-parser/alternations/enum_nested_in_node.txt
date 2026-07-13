@@ -26,14 +26,14 @@ Root
       Id "expr"
       Alternation
         BracketOpen "["
-        Branch
+        Alternative
           Id "Binary"
           Colon ":"
           NamedNode
             ParenOpen "("
             Id "binary_expression"
             ParenClose ")"
-        Branch
+        Alternative
           Id "Unary"
           Colon ":"
           NamedNode
@@ -47,8 +47,8 @@ Root
 Root
   Def Q
     NamedNode expr
-      Enum
-        Branch Binary:
+      Alternation
+        Alternative Binary:
           NamedNode binary_expression
-        Branch Unary:
+        Alternative Unary:
           NamedNode unary_expression

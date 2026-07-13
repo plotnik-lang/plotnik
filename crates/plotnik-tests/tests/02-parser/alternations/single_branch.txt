@@ -7,7 +7,7 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "identifier"
@@ -17,6 +17,6 @@ Root
 # query.ptk
 Root
   Def Q
-    Union
-      Branch
+    Alternation
+      Alternative
         NamedNode identifier

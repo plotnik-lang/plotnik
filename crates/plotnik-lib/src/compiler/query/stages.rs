@@ -266,8 +266,10 @@ impl Query {
             return def.body().and_then(|b| analysis.type_analysis.arity(&b));
         }
 
-        if let Some(branch) = ast::Branch::cast(node.clone()) {
-            return branch.body().and_then(|b| analysis.type_analysis.arity(&b));
+        if let Some(alternative) = ast::Alternative::cast(node.clone()) {
+            return alternative
+                .body()
+                .and_then(|body| analysis.type_analysis.arity(&body));
         }
 
         None

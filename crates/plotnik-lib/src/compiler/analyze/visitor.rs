@@ -20,8 +20,8 @@
 
 use crate::compiler::analyze::Located;
 use crate::compiler::parse::ast::{
-    CapturedPattern, Def, DefRef, EnumPattern, FieldPattern, NodePattern, Pattern,
-    QuantifiedPattern, Root, SeqPattern, TokenPattern, UnionPattern,
+    AlternationPattern, CapturedPattern, Def, DefRef, FieldPattern, NodePattern, Pattern,
+    QuantifiedPattern, Root, SeqPattern, TokenPattern,
 };
 
 pub trait Visitor: Sized {
@@ -45,12 +45,8 @@ pub trait Visitor: Sized {
 
     fn visit_def_ref(&mut self, _ref: &Located<DefRef>) {}
 
-    fn visit_union_pattern(&mut self, union: &Located<UnionPattern>) {
-        walk_union_pattern(self, union);
-    }
-
-    fn visit_enum_pattern(&mut self, e: &Located<EnumPattern>) {
-        walk_enum_pattern(self, e);
+    fn visit_alternation_pattern(&mut self, alternation: &Located<AlternationPattern>) {
+        walk_alternation_pattern(self, alternation);
     }
 
     fn visit_seq_pattern(&mut self, seq: &Located<SeqPattern>) {
@@ -87,8 +83,9 @@ pub fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Located<Pattern>) {
         Pattern::NodePattern(n) => visitor.visit_node_pattern(&pattern.wrap(n.clone())),
         Pattern::TokenPattern(n) => visitor.visit_token_pattern(&pattern.wrap(n.clone())),
         Pattern::DefRef(r) => visitor.visit_def_ref(&pattern.wrap(r.clone())),
-        Pattern::Union(u) => visitor.visit_union_pattern(&pattern.wrap(u.clone())),
-        Pattern::Enum(e) => visitor.visit_enum_pattern(&pattern.wrap(e.clone())),
+        Pattern::Alternation(alternation) => {
+            visitor.visit_alternation_pattern(&pattern.wrap(alternation.clone()))
+        }
         Pattern::SeqPattern(s) => visitor.visit_seq_pattern(&pattern.wrap(s.clone())),
         Pattern::CapturedPattern(c) => visitor.visit_captured_pattern(&pattern.wrap(c.clone())),
         Pattern::QuantifiedPattern(q) => visitor.visit_quantified_pattern(&pattern.wrap(q.clone())),
@@ -102,24 +99,14 @@ pub fn walk_node_pattern<V: Visitor>(visitor: &mut V, node: &Located<NodePattern
     }
 }
 
-macro_rules! alternation_walker {
-    ($fn_name:ident, $ty:ty) => {
-        pub fn $fn_name<V: Visitor>(visitor: &mut V, alt: &Located<$ty>) {
-            for branch in alt.node().branches() {
-                if let Some(body) = branch.body() {
-                    visitor.visit_pattern(&alt.wrap(body));
-                }
-            }
-
-            for pattern in alt.node().patterns() {
-                visitor.visit_pattern(&alt.wrap(pattern));
-            }
-        }
-    };
+pub fn walk_alternation_pattern<V: Visitor>(
+    visitor: &mut V,
+    alternation: &Located<AlternationPattern>,
+) {
+    for pattern in alternation.node().patterns() {
+        visitor.visit_pattern(&alternation.wrap(pattern));
+    }
 }
-
-alternation_walker!(walk_union_pattern, UnionPattern);
-alternation_walker!(walk_enum_pattern, EnumPattern);
 
 pub fn walk_seq_pattern<V: Visitor>(visitor: &mut V, seq: &Located<SeqPattern>) {
     for child in seq.node().children() {

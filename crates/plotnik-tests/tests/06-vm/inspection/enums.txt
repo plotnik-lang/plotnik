@@ -216,11 +216,11 @@ Q    = 02 :: T4
 
 [spans]
 P00 def        0..54  src0  T3
-P01 enum       7..54  src0
-P02 branch     11..31  src0  T3.M2
+P01 labeled_alternation 7..54  src0
+P02 alternative 11..31  src0  T3.M2
 P03 capture    28..31  src0  T1.M0
 P04 pattern    15..27  src0
-P05 branch     34..52  src0  T3.M3
+P05 alternative 34..52  src0  T3.M3
 P06 capture    48..52  src0  T2.M1
 P07 pattern    39..47  src0
 P08 def        56..108  src0  T4
