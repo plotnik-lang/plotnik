@@ -324,7 +324,7 @@ pub fn inspect_command() -> Command {
             r#"EXAMPLES:
   plotnik inspect query.ptk app.js --json
   plotnik inspect -q 'Q = ...' -s 'let x' -l js --json
-  plotnik inspect query.ptk app.js --json -v  # include recording"#,
+  plotnik inspect query.ptk app.js --json -v  # include execution trace"#,
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
@@ -335,7 +335,7 @@ pub fn inspect_command() -> Command {
         .arg(entry_arg())
         .next_help_heading("Inspect options")
         .arg(json_arg().help("Output the full inspect bundle as JSON"))
-        .arg(verbose_arg().help("Include VM recording in the JSON bundle"))
+        .arg(verbose_arg().help("Include the VM execution trace in the JSON bundle"))
         .next_help_heading("Limit options")
         .arg(fuel_arg())
         .arg(max_memory_arg())

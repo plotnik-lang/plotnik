@@ -184,7 +184,7 @@ The mutable engine state consists of:
 - the current suppression depth;
 - the number of open, logged scalar frames.
 
-An instruction pointer, step counter, and resolved limit policy may live in the
+An instruction pointer, matcher-dispatch counter, and resolved limit policy may live in the
 generated driver's representation instead of the runtime object.
 
 Every checkpoint snapshots all state that affects future matching:
@@ -275,7 +275,7 @@ source. Predicate execution does not byte-walk and TypeScript does not use
 Rust is the representation exception, not a semantic exception: generated
 Rust and bytecode use `rt::StaticDfa` compiled by regex-automata from the same
 normalized HIR. Regex execution is not charged to Plotnik's state-dispatch
-step counter. Engine class and worst-case running time are target properties
+matcher-dispatch counter. Engine class and worst-case running time are target properties
 (Rust remains linear; some dynamic hosts backtrack), not conformance
 properties; the observable boolean result is shared.
 

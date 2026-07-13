@@ -37,7 +37,7 @@ pub struct NfaBuilder<'a> {
     pub(super) def_entries: IndexMap<DefVariant, Label>,
     compiled_def_variants: HashSet<DefVariant>,
     active_def_variants: HashSet<DefVariant>,
-    /// Stack of active struct scopes for capture lookup.
+    /// Stack of active record scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<RecordScope>,
     /// Non-zero while compiling under a discard (`@_`). The whole

@@ -18,10 +18,10 @@ pub enum RuntimeError {
     NoMatch,
 }
 
-/// Non-error outcomes that unwind a step back to the main execution loop.
+/// Non-error outcomes that unwind a dispatch back to the main execution loop.
 ///
 /// These are propagated through the same `Err` channel as `RuntimeError` (so
-/// `?` can short-circuit a step), but they are not failures: the main loop
+/// `?` can short-circuit a dispatch), but they are not failures: the main loop
 /// either continues (`Backtracked`) or completes the run (`Accept`).
 #[derive(Debug)]
 pub(crate) enum ControlFlow {
@@ -31,7 +31,7 @@ pub(crate) enum ControlFlow {
     Backtracked,
 }
 
-/// The `Err` channel of a VM step: either a control-flow signal or a real error.
+/// The `Err` channel of a VM dispatch: either a control-flow signal or a real error.
 #[derive(Debug)]
 pub(crate) enum Signal {
     Flow(ControlFlow),

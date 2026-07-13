@@ -79,8 +79,8 @@ pub(crate) enum MappingPolicy {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum VmMode {
-    Recording,
-    Traced { inspection: InspectionPolicy },
+    StructuredTrace,
+    TextTrace { inspection: InspectionPolicy },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -124,7 +124,7 @@ impl FixtureKind {
             }),
             "03" => Ok(Self::Analyze),
             "04" if name.contains("bytecode") => Ok(Self::Bytecode {
-                inspection: if name.contains("inspection") || name.contains("recording") {
+                inspection: if name.contains("inspection") || name.contains("execution_trace") {
                     InspectionPolicy::Include
                 } else {
                     InspectionPolicy::Omit
@@ -146,10 +146,10 @@ impl FixtureKind {
             }),
             "04" if name.contains_path(&["rust", "module"]) => Ok(Self::Matcher { lints }),
             "06" => Ok(Self::Vm {
-                mode: if name.contains("recording") {
-                    VmMode::Recording
+                mode: if name.contains("execution_trace") {
+                    VmMode::StructuredTrace
                 } else {
-                    VmMode::Traced {
+                    VmMode::TextTrace {
                         inspection: if name.contains("inspection") {
                             InspectionPolicy::Include
                         } else {
@@ -209,7 +209,7 @@ impl FixtureKind {
                 SectionKind::Diagnostics,
                 SectionKind::Output,
                 SectionKind::Inspection,
-                SectionKind::Recording,
+                SectionKind::ExecutionTrace,
                 SectionKind::Bytecode,
                 SectionKind::Trace,
             ],
@@ -247,7 +247,7 @@ pub(crate) enum SectionKind {
     Matcher,
     Output,
     Inspection,
-    Recording,
+    ExecutionTrace,
     Trace,
 }
 
@@ -266,7 +266,7 @@ impl SectionKind {
             Self::Matcher => "matcher",
             Self::Output => "output",
             Self::Inspection => "inspection",
-            Self::Recording => "recording",
+            Self::ExecutionTrace => "execution_trace",
             Self::Trace => "trace",
         }
     }
@@ -292,7 +292,7 @@ const ALL_SECTION_KINDS: &[SectionKind] = &[
     SectionKind::Matcher,
     SectionKind::Output,
     SectionKind::Inspection,
-    SectionKind::Recording,
+    SectionKind::ExecutionTrace,
     SectionKind::Trace,
 ];
 

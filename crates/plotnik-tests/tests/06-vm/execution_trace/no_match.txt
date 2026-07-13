@@ -9,17 +9,17 @@ export interface Q {
 }
 --------------------- OUTPUT ---------------------
 <no match>
-------------------- RECORDING --------------------
+---------------- EXECUTION_TRACE -----------------
 {
   "v": 1,
-  "steps": [
+  "records": [
     {
       "ip": 0,
       "event": {
         "kind": "enter_entry_point",
         "target": 0
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 0
     },
@@ -28,7 +28,7 @@ export interface Q {
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 0
     },
@@ -38,7 +38,7 @@ export interface Q {
         "kind": "journal_event",
         "event": "RecordOpen"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -47,7 +47,7 @@ export interface Q {
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -57,7 +57,7 @@ export interface Q {
         "kind": "call",
         "target": 18
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -66,7 +66,7 @@ export interface Q {
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -75,7 +75,7 @@ export interface Q {
       "event": {
         "kind": "nav"
       },
-      "span": null,
+      "query_span_id": null,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -88,7 +88,7 @@ export interface Q {
       "event": {
         "kind": "match_ok"
       },
-      "span": null,
+      "query_span_id": null,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -102,7 +102,7 @@ export interface Q {
         "kind": "journal_event",
         "event": "SpanStart#0"
       },
-      "span": 0,
+      "query_span_id": 0,
       "node": null,
       "journal_len": 2
     },
@@ -112,7 +112,7 @@ export interface Q {
         "kind": "journal_event",
         "event": "SpanStartAt#1"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -125,7 +125,7 @@ export interface Q {
       "event": {
         "kind": "instruction"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -134,7 +134,7 @@ export interface Q {
       "event": {
         "kind": "nav"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -147,7 +147,7 @@ export interface Q {
       "event": {
         "kind": "match_ok"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -160,7 +160,7 @@ export interface Q {
       "event": {
         "kind": "checkpoint_new"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -170,7 +170,7 @@ export interface Q {
         "kind": "journal_event",
         "event": "SpanStartAt#2"
       },
-      "span": 2,
+      "query_span_id": 2,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -183,7 +183,7 @@ export interface Q {
       "event": {
         "kind": "instruction"
       },
-      "span": 2,
+      "query_span_id": 2,
       "node": null,
       "journal_len": 4
     },
@@ -192,7 +192,7 @@ export interface Q {
       "event": {
         "kind": "nav"
       },
-      "span": 2,
+      "query_span_id": 2,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -205,7 +205,7 @@ export interface Q {
       "event": {
         "kind": "match_fail"
       },
-      "span": 2,
+      "query_span_id": 2,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -217,9 +217,9 @@ export interface Q {
       "ip": 8,
       "event": {
         "kind": "backtrack",
-        "to_step": 13
+        "to_record": 13
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     }

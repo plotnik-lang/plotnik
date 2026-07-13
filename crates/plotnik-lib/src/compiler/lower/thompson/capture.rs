@@ -213,13 +213,13 @@ impl NfaBuilder<'_> {
 
         // Add `RecordSet` if we have a capture name.
         // Always look up in the current scope - bubble captures don't create new scopes,
-        // so all fields (including nested bubble captures) reference the same root struct.
+        // so all fields (including nested bubble captures) reference the same root record.
         if let Some(name_token) = cap.name() {
             let capture_name = &name_token.text()[1..];
             // Suppressed regions never reach here (their captures are inert), so
-            // the enclosing scope is a struct at every real capture site — except
+            // the enclosing scope is a record at every real capture site — except
             // a variant-rooted definition body, whose scope carries no fields. Once
-            // a struct scope exists, a missing member is our bug.
+            // a record scope exists, a missing member is our bug.
             if let Some(RecordScope(type_id)) = self.scope_stack.last().copied()
                 && self
                     .ctx
@@ -267,7 +267,7 @@ impl NfaBuilder<'_> {
     /// Whether a quantifier element needs a `Node` effect to produce its value.
     ///
     /// A ref returning a structured type leaves its value pending via Call/Return;
-    /// a struct- or variant-shaped element leaves it pending via RecordClose/VariantClose.
+    /// a record- or variant-shaped element leaves it pending via RecordClose/VariantClose.
     /// Everything else (a plain node match) needs an explicit `Node`.
     pub(super) fn element_needs_node(&self, element: &Pattern) -> bool {
         if self.is_ref_returning_structured(element) {

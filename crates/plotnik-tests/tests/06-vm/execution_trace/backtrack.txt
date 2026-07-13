@@ -31,17 +31,17 @@ export type QExpr =
     }
   }
 }
-------------------- RECORDING --------------------
+---------------- EXECUTION_TRACE -----------------
 {
   "v": 1,
-  "steps": [
+  "records": [
     {
       "ip": 0,
       "event": {
         "kind": "enter_entry_point",
         "target": 0
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 0
     },
@@ -50,7 +50,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 0
     },
@@ -60,7 +60,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "RecordOpen"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -69,7 +69,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -79,7 +79,7 @@ export type QExpr =
         "kind": "call",
         "target": 37
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -88,7 +88,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 1
     },
@@ -97,7 +97,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": null,
+      "query_span_id": null,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -110,7 +110,7 @@ export type QExpr =
       "event": {
         "kind": "match_ok"
       },
-      "span": null,
+      "query_span_id": null,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -124,7 +124,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStart#0"
       },
-      "span": 0,
+      "query_span_id": 0,
       "node": null,
       "journal_len": 2
     },
@@ -134,7 +134,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStartAt#1"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -147,7 +147,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -156,7 +156,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -169,7 +169,7 @@ export type QExpr =
       "event": {
         "kind": "match_ok"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -182,7 +182,7 @@ export type QExpr =
       "event": {
         "kind": "checkpoint_new"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -191,7 +191,7 @@ export type QExpr =
       "event": {
         "kind": "checkpoint_new"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -200,7 +200,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -209,7 +209,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -222,7 +222,7 @@ export type QExpr =
       "event": {
         "kind": "match_ok"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -236,7 +236,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStart#3"
       },
-      "span": 3,
+      "query_span_id": 3,
       "node": null,
       "journal_len": 4
     },
@@ -246,7 +246,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStart#4"
       },
-      "span": 4,
+      "query_span_id": 4,
       "node": null,
       "journal_len": 5
     },
@@ -256,7 +256,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "VariantOpen \"Bad\""
       },
-      "span": 4,
+      "query_span_id": 4,
       "node": null,
       "journal_len": 6
     },
@@ -266,7 +266,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStartAt#5"
       },
-      "span": 5,
+      "query_span_id": 5,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -279,7 +279,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": 5,
+      "query_span_id": 5,
       "node": null,
       "journal_len": 7
     },
@@ -288,7 +288,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": 5,
+      "query_span_id": 5,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -301,7 +301,7 @@ export type QExpr =
       "event": {
         "kind": "predicate_fail"
       },
-      "span": 5,
+      "query_span_id": 5,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -313,9 +313,9 @@ export type QExpr =
       "ip": 8,
       "event": {
         "kind": "backtrack",
-        "to_step": 14
+        "to_record": 14
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -324,7 +324,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 3
     },
@@ -333,7 +333,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -346,7 +346,7 @@ export type QExpr =
       "event": {
         "kind": "match_ok"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -360,7 +360,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStart#3"
       },
-      "span": 3,
+      "query_span_id": 3,
       "node": null,
       "journal_len": 4
     },
@@ -370,7 +370,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStart#8"
       },
-      "span": 8,
+      "query_span_id": 8,
       "node": null,
       "journal_len": 5
     },
@@ -380,7 +380,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "VariantOpen \"Good\""
       },
-      "span": 8,
+      "query_span_id": 8,
       "node": null,
       "journal_len": 6
     },
@@ -390,7 +390,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStartAt#9"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -403,7 +403,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": null,
       "journal_len": 7
     },
@@ -412,7 +412,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -425,7 +425,7 @@ export type QExpr =
       "event": {
         "kind": "match_ok"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -438,7 +438,7 @@ export type QExpr =
       "event": {
         "kind": "checkpoint_new"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": null,
       "journal_len": 7
     },
@@ -448,7 +448,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStartAt#11"
       },
-      "span": 11,
+      "query_span_id": 11,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -462,7 +462,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStart#10"
       },
-      "span": 10,
+      "query_span_id": 10,
       "node": null,
       "journal_len": 9
     },
@@ -472,7 +472,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "Node"
       },
-      "span": 10,
+      "query_span_id": 10,
       "node": {
         "kind_id": 1,
         "start": 0,
@@ -486,7 +486,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "RecordSet \"good\""
       },
-      "span": 10,
+      "query_span_id": 10,
       "node": null,
       "journal_len": 11
     },
@@ -496,7 +496,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#10"
       },
-      "span": 10,
+      "query_span_id": 10,
       "node": null,
       "journal_len": 12
     },
@@ -506,7 +506,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#11"
       },
-      "span": 11,
+      "query_span_id": 11,
       "node": null,
       "journal_len": 13
     },
@@ -515,7 +515,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": null,
       "journal_len": 13
     },
@@ -524,7 +524,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -537,7 +537,7 @@ export type QExpr =
       "event": {
         "kind": "match_ok"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": {
         "kind_id": 182,
         "start": 0,
@@ -551,7 +551,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#9"
       },
-      "span": 9,
+      "query_span_id": 9,
       "node": null,
       "journal_len": 14
     },
@@ -561,7 +561,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "VariantClose"
       },
-      "span": 8,
+      "query_span_id": 8,
       "node": null,
       "journal_len": 15
     },
@@ -571,7 +571,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#8"
       },
-      "span": 8,
+      "query_span_id": 8,
       "node": null,
       "journal_len": 16
     },
@@ -581,7 +581,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#3"
       },
-      "span": 3,
+      "query_span_id": 3,
       "node": null,
       "journal_len": 17
     },
@@ -590,7 +590,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 17
     },
@@ -599,7 +599,7 @@ export type QExpr =
       "event": {
         "kind": "nav"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -612,7 +612,7 @@ export type QExpr =
       "event": {
         "kind": "match_ok"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": {
         "kind_id": 166,
         "start": 0,
@@ -626,7 +626,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanStart#2"
       },
-      "span": 2,
+      "query_span_id": 2,
       "node": null,
       "journal_len": 18
     },
@@ -636,7 +636,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "RecordSet \"expr\""
       },
-      "span": 2,
+      "query_span_id": 2,
       "node": null,
       "journal_len": 19
     },
@@ -646,7 +646,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#2"
       },
-      "span": 2,
+      "query_span_id": 2,
       "node": null,
       "journal_len": 20
     },
@@ -656,7 +656,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#1"
       },
-      "span": 1,
+      "query_span_id": 1,
       "node": null,
       "journal_len": 21
     },
@@ -666,7 +666,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "SpanEnd#0"
       },
-      "span": 0,
+      "query_span_id": 0,
       "node": null,
       "journal_len": 22
     },
@@ -675,7 +675,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 22
     },
@@ -684,7 +684,7 @@ export type QExpr =
       "event": {
         "kind": "return"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 22
     },
@@ -693,7 +693,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 22
     },
@@ -703,7 +703,7 @@ export type QExpr =
         "kind": "journal_event",
         "event": "RecordClose"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 23
     },
@@ -712,7 +712,7 @@ export type QExpr =
       "event": {
         "kind": "instruction"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 23
     },
@@ -721,7 +721,7 @@ export type QExpr =
       "event": {
         "kind": "return"
       },
-      "span": null,
+      "query_span_id": null,
       "node": null,
       "journal_len": 23
     }

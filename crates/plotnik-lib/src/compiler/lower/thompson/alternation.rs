@@ -236,7 +236,7 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// An untagged alternation merges each alternative's fields into one struct.
+    /// An unlabeled alternation merges each alternative's fields into one record.
     pub(super) fn compile_unlabeled_alternation(
         &mut self,
         alternation: &ast::AlternationPattern,
@@ -264,7 +264,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Lower an alternation without variant tagging. `alternation` is the pattern whose inferred result carries
-    /// the merged output struct.
+    /// the merged output record.
     ///
     /// A nullable alternative compiles pruned ([`SkipExit::Fail`]) so its body only
     /// matches by consuming; its empty outcome is lifted to one shared
@@ -290,7 +290,7 @@ impl NfaBuilder<'_> {
         }
 
         // In a suppressed region there is no output shape to keep stable (and a
-        // consumed labeled alternation routed here still flows `Value(variant)`, not a struct).
+        // value-producing labeled alternation routed here still flows `Value(variant)`, not a record).
         let alternation_type_id = if self.is_suppressed() {
             None
         } else {
@@ -413,7 +413,7 @@ impl NfaBuilder<'_> {
             // Lower the alternative's own empty outcome instead of guessing a
             // value from its final field types. The distinction is semantic:
             // an absent field takes its declared completion, while a field that is
-            // present through a zero-node value can produce a struct, `""`, or
+            // present through an empty match can produce a record, `""`, or
             // `true`. Reusing the ordinary skippable lowering also preserves
             // capture and alternative spans around that exact outcome.
             if alternative_nullable && let SkipExit::To(skip) = skip_exit {

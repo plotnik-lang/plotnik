@@ -1,4 +1,4 @@
-//! Structured VM run recording for debugger-oriented trace output.
+//! Structured VM execution trace for debugger-oriented output.
 
 use serde::Serialize;
 use tree_sitter::Node;
@@ -10,24 +10,24 @@ use super::trace::Tracer;
 use plotnik_rt::JournalEvent;
 
 #[derive(Debug, Serialize)]
-pub struct Recording {
+pub struct ExecutionTrace {
     pub v: u32,
-    pub steps: Vec<StepRecord>,
+    pub records: Vec<TraceRecord>,
     pub truncated: bool,
 }
 
 #[derive(Debug, Serialize)]
-pub struct StepRecord {
+pub struct TraceRecord {
     pub ip: u16,
-    pub event: StepEvent,
-    pub span: Option<u16>,
+    pub event: TraceEvent,
+    pub query_span_id: Option<u16>,
     pub node: Option<TraceNode>,
     pub journal_len: u32,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum StepEvent {
+pub enum TraceEvent {
     Instruction,
     Nav,
     NavFail,
@@ -43,7 +43,7 @@ pub enum StepEvent {
     Call { target: u16 },
     Return,
     CheckpointNew,
-    Backtrack { to_step: u32 },
+    Backtrack { to_record: u32 },
     EnterEntryPoint { target: u16 },
 }
 
@@ -60,9 +60,9 @@ struct Shadow {
     record_idx: u32,
 }
 
-pub struct RecordingTracer {
+pub struct TraceRecorder {
     render: ModuleRenderContext,
-    steps: Vec<StepRecord>,
+    records: Vec<TraceRecord>,
     span_stack: Vec<u16>,
     shadow: Vec<Shadow>,
     max_records: usize,
@@ -72,11 +72,11 @@ pub struct RecordingTracer {
     records_seen: u32,
 }
 
-impl RecordingTracer {
+impl TraceRecorder {
     pub fn new(module: &Module, max_records: usize) -> Self {
         Self {
             render: ModuleRenderContext::new(module),
-            steps: Vec::new(),
+            records: Vec::new(),
             span_stack: Vec::new(),
             shadow: Vec::new(),
             max_records,
@@ -87,30 +87,30 @@ impl RecordingTracer {
         }
     }
 
-    pub fn finish(self) -> Recording {
-        Recording {
+    pub fn finish(self) -> ExecutionTrace {
+        ExecutionTrace {
             v: 1,
-            steps: self.steps,
+            records: self.records,
             truncated: self.truncated,
         }
     }
 
-    fn add_record(&mut self, event: StepEvent, node: Option<TraceNode>) -> u32 {
+    fn add_record(&mut self, event: TraceEvent, node: Option<TraceNode>) -> u32 {
         self.add_record_at(self.current_ip, event, node)
     }
 
-    fn add_record_at(&mut self, ip: CodeAddr, event: StepEvent, node: Option<TraceNode>) -> u32 {
+    fn add_record_at(&mut self, ip: CodeAddr, event: TraceEvent, node: Option<TraceNode>) -> u32 {
         let record_idx = self.records_seen;
         self.records_seen = self
             .records_seen
             .checked_add(1)
-            .expect("recording step count fits in u32");
+            .expect("execution-trace record count fits in u32");
 
-        if self.steps.len() < self.max_records {
-            self.steps.push(StepRecord {
+        if self.records.len() < self.max_records {
+            self.records.push(TraceRecord {
                 ip: ip.get(),
                 event,
-                span: self.span_stack.last().copied(),
+                query_span_id: self.span_stack.last().copied(),
                 node,
                 journal_len: self.journal_len,
             });
@@ -125,7 +125,7 @@ impl RecordingTracer {
     /// formatting effect strings would be wasted allocation — `add_record`
     /// drops the event anyway.
     fn keeps_records(&self) -> bool {
-        self.steps.len() < self.max_records
+        self.records.len() < self.max_records
     }
 
     fn bump_journal_len(&mut self) {
@@ -219,42 +219,42 @@ impl RecordingTracer {
     }
 }
 
-impl Tracer for RecordingTracer {
+impl Tracer for TraceRecorder {
     fn trace_instruction(&mut self, ip: CodeAddr, _instr: &Instruction<'_>) {
         self.current_ip = ip;
-        self.add_record(StepEvent::Instruction, None);
+        self.add_record(TraceEvent::Instruction, None);
     }
 
     fn trace_nav(&mut self, _nav: Nav, node: Node<'_>) {
-        self.add_record(StepEvent::Nav, Some(trace_node(node)));
+        self.add_record(TraceEvent::Nav, Some(trace_node(node)));
     }
 
     fn trace_nav_failure(&mut self, _nav: Nav) {
-        self.add_record(StepEvent::NavFail, None);
+        self.add_record(TraceEvent::NavFail, None);
     }
 
     fn trace_match_success(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::MatchOk, Some(trace_node(node)));
+        self.add_record(TraceEvent::MatchOk, Some(trace_node(node)));
     }
 
     fn trace_match_failure(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::MatchFail, Some(trace_node(node)));
+        self.add_record(TraceEvent::MatchFail, Some(trace_node(node)));
     }
 
     fn trace_field_success(&mut self, _field_id: NodeFieldId) {
-        self.add_record(StepEvent::FieldOk, None);
+        self.add_record(TraceEvent::FieldOk, None);
     }
 
     fn trace_field_failure(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::FieldFail, Some(trace_node(node)));
+        self.add_record(TraceEvent::FieldFail, Some(trace_node(node)));
     }
 
     fn trace_predicate_failure(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::PredicateFail, Some(trace_node(node)));
+        self.add_record(TraceEvent::PredicateFail, Some(trace_node(node)));
     }
 
     fn trace_neg_field_failure(&mut self, node: Node<'_>, _field: NodeFieldId) {
-        self.add_record(StepEvent::NegFieldFail, Some(trace_node(node)));
+        self.add_record(TraceEvent::NegFieldFail, Some(trace_node(node)));
     }
 
     fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
@@ -269,18 +269,18 @@ impl Tracer for RecordingTracer {
         match event {
             JournalEvent::SpanStart { id, .. } => {
                 self.span_stack.push(*id);
-                self.add_record(StepEvent::JournalEvent { event: event_name }, node);
+                self.add_record(TraceEvent::JournalEvent { event: event_name }, node);
             }
             JournalEvent::SpanEnd(id) => {
-                self.add_record(StepEvent::JournalEvent { event: event_name }, node);
+                self.add_record(TraceEvent::JournalEvent { event: event_name }, node);
                 let popped = self
                     .span_stack
                     .pop()
-                    .expect("SpanEnd requires an open recording span");
-                assert_eq!(popped, *id, "recording span stack must be balanced");
+                    .expect("SpanEnd requires an open query span");
+                assert_eq!(popped, *id, "execution-trace query spans must be balanced");
             }
             _ => {
-                self.add_record(StepEvent::JournalEvent { event: event_name }, node);
+                self.add_record(TraceEvent::JournalEvent { event: event_name }, node);
             }
         }
     }
@@ -291,7 +291,7 @@ impl Tracer for RecordingTracer {
         } else {
             String::new()
         };
-        self.add_record(StepEvent::SuppressedEffect { effect }, None);
+        self.add_record(TraceEvent::SuppressedEffect { effect }, None);
     }
 
     fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool) {
@@ -301,16 +301,16 @@ impl Tracer for RecordingTracer {
             String::new()
         };
         let event = if suppressed {
-            StepEvent::SuppressedEffect { effect }
+            TraceEvent::SuppressedEffect { effect }
         } else {
-            StepEvent::Effect { effect }
+            TraceEvent::Effect { effect }
         };
         self.add_record(event, None);
     }
 
     fn trace_call(&mut self, target_ip: CodeAddr) {
         self.add_record(
-            StepEvent::Call {
+            TraceEvent::Call {
                 target: target_ip.get(),
             },
             None,
@@ -318,11 +318,11 @@ impl Tracer for RecordingTracer {
     }
 
     fn trace_return(&mut self, _outcome: plotnik_rt::ReturnOutcome) {
-        self.add_record(StepEvent::Return, None);
+        self.add_record(TraceEvent::Return, None);
     }
 
     fn trace_checkpoint_created(&mut self, ip: CodeAddr) {
-        let record_idx = self.add_record_at(ip, StepEvent::CheckpointNew, None);
+        let record_idx = self.add_record_at(ip, TraceEvent::CheckpointNew, None);
         self.shadow.push(Shadow {
             span_depth: self.span_stack.len(),
             journal_len: self.journal_len,
@@ -340,8 +340,8 @@ impl Tracer for RecordingTracer {
         // restore; mirror that so `journal_len` keeps indexing the real journal.
         self.journal_len = shadow.journal_len;
         self.add_record(
-            StepEvent::Backtrack {
-                to_step: shadow.record_idx,
+            TraceEvent::Backtrack {
+                to_record: shadow.record_idx,
             },
             None,
         );
@@ -350,7 +350,7 @@ impl Tracer for RecordingTracer {
     fn trace_enter_entry_point(&mut self, target_ip: CodeAddr) {
         self.current_ip = target_ip;
         self.add_record(
-            StepEvent::EnterEntryPoint {
+            TraceEvent::EnterEntryPoint {
                 target: target_ip.get(),
             },
             None,

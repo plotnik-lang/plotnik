@@ -242,14 +242,14 @@ A quantified named node collects the same way: `(pair (key) @k)? @p` gives
 
 There is no uncaptured fallback (the item-boundary rule): a bare
 `{(mod) @mod (dec) @dec}?` would scatter correlated nulls into the enclosing
-scope as independently-optional fields — a type that permits states the match
+scope as independently option-typed fields — a type that permits states the match
 can never produce. For a single optional node with no wrapper, put the capture
 on the quantifier: `(decorator)? @dec` → `dec: Node | null`. To match
 structurally and drop the captures, discard them: `{...}? @_`.
 
 ### Null, Not Absent
 
-Every declared field is **always present** in the output. An optional field
+Every declared field is **always present** in the output. A field with option type
 renders as `T | null` and materializes as `null` when it doesn't match — never
 as a missing key. Missing **lists** are the empty array `[]`, never `null`.
 The output shape is stable; consumers never guard for `undefined`.
@@ -574,7 +574,7 @@ On a plain node capture, `:: Name` declares a named alias:
   payloads never get standalone declarations.
 - Match-only queries render as `export type Q = undefined;` — the query matches
   or not, and carries no data.
-- Optional fields are `T | null` (always present), non-empty lists are
+- Fields with option type are `T | null` (always present); non-empty lists are
   `[T, ...T[]]`.
 
 ```typescript

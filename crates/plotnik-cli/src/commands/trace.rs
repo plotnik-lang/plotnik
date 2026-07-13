@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use plotnik_lib::{
-    Colors, PrintTracer, RecordingTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity,
+    Colors, PrintTracer, RuntimeError, RuntimeLimitSpec, TraceRecorder, VM, Verbosity,
     materialize_verified,
 };
 
@@ -47,13 +47,13 @@ pub fn run(args: TraceArgs) -> CliResult {
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
 
     if args.json {
-        let mut tracer = RecordingTracer::new(&module, DEFAULT_MAX_RECORDS);
+        let mut tracer = TraceRecorder::new(&module, DEFAULT_MAX_RECORDS);
         let (result, stats) = vm.execute_with_stats(&module, &entry_point, &mut tracer);
-        let recording = tracer.finish();
+        let execution_trace = tracer.finish();
         println!(
             "{}",
             serde_json::json!({
-                "execution_trace": recording,
+                "execution_trace": execution_trace,
                 "run_stats": stats,
             })
         );

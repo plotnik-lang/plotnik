@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use plotnik_lib::bytecode::{Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
-    BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RecordingTracer,
-    RuntimeError, RuntimeLimitSpec, TypeScriptCodegenConfig, VM, extract_result_provenance,
+    BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RuntimeError,
+    RuntimeLimitSpec, TraceRecorder, TypeScriptCodegenConfig, VM, extract_result_provenance,
     materialize_verified, tokenize,
 };
 use serde_json::{Map, Value, json};
@@ -193,15 +193,15 @@ fn run_module(
 ) -> RunPayload {
     let vm = VM::builder(source_code, tree).limits(limits).build();
     if trace {
-        let mut tracer = RecordingTracer::new(module, DEFAULT_MAX_RECORDS);
+        let mut tracer = TraceRecorder::new(module, DEFAULT_MAX_RECORDS);
         let (result, stats) = vm.execute_with_stats(module, entry_point, &mut tracer);
-        let recording = tracer.finish();
+        let execution_trace = tracer.finish();
         return run_payload_from_result(
             module,
             entry_point,
             source_code,
             (result, stats),
-            Some(json_value!(recording)),
+            Some(json_value!(execution_trace)),
         );
     }
 

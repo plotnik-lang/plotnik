@@ -27,7 +27,7 @@ pub fn parse_section_header(line: &str) -> Option<String> {
                 | "trace"
                 | "output"
                 | "inspection"
-                | "recording"
+                | "execution_trace"
                 | "diagnostics"
         );
     known.then_some(name)

@@ -64,7 +64,7 @@ use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, PrintTracer, QueryBuilder,
-    RecordingTracer, RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TypeScriptBinding,
+    RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TraceRecorder, TypeScriptBinding,
     TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
 use plotnik_tests::fixture::parse_section_header;
@@ -383,8 +383,8 @@ fn render_compile(
         }
         FixtureKind::Vm { mode, .. } => {
             let inspection = match mode {
-                VmMode::Recording => InspectionPolicy::Include,
-                VmMode::Traced { inspection } => inspection,
+                VmMode::StructuredTrace => InspectionPolicy::Include,
+                VmMode::TextTrace { inspection } => inspection,
             };
             let emission = emit_bytecode(&compiled, inspection);
             let module = emission
@@ -417,11 +417,17 @@ fn render_compile(
                 ));
             }
             match run {
-                VmArtifacts::Recording { output, recording } => {
+                VmArtifacts::StructuredTrace {
+                    output,
+                    execution_trace,
+                } => {
                     out.push(GeneratedSection::new(SectionKind::Output, output));
-                    out.push(GeneratedSection::new(SectionKind::Recording, recording));
+                    out.push(GeneratedSection::new(
+                        SectionKind::ExecutionTrace,
+                        execution_trace,
+                    ));
                 }
-                VmArtifacts::Traced {
+                VmArtifacts::TextTrace {
                     output,
                     trace,
                     inspection,
@@ -506,11 +512,11 @@ struct VmScenario<'a> {
 }
 
 enum VmArtifacts {
-    Recording {
+    StructuredTrace {
         output: String,
-        recording: String,
+        execution_trace: String,
     },
-    Traced {
+    TextTrace {
         output: String,
         trace: String,
         inspection: Option<String>,
@@ -526,13 +532,13 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
 
     let vm = VM::builder(scenario.source, &tree).build();
 
-    if matches!(scenario.mode, VmMode::Recording) {
-        let mut tracer = RecordingTracer::new(scenario.module, 65_536);
+    if matches!(scenario.mode, VmMode::StructuredTrace) {
+        let mut tracer = TraceRecorder::new(scenario.module, 65_536);
         let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
-        let recording = tracer.finish();
-        let mut recording_json =
-            serde_json::to_string_pretty(&recording).expect("recording serialization cannot fail");
-        recording_json.push('\n');
+        let execution_trace = tracer.finish();
+        let mut execution_trace_json = serde_json::to_string_pretty(&execution_trace)
+            .expect("execution-trace serialization cannot fail");
+        execution_trace_json.push('\n');
 
         let output = match result {
             Ok(effects) => {
@@ -548,21 +554,21 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 value.format(true, Colors::new(false))
             }
             Err(RuntimeError::NoMatch) => "<no match>".to_string(),
-            // A no-match is a real outcome worth pinning; step/memory exhaustion is
+            // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
             // not — fail the trial rather than accept a resource limit as golden output.
             Err(err) => {
                 return Err(format!("VM run failed for `{}`: {err}", scenario.entry));
             }
         };
 
-        return Ok(VmArtifacts::Recording {
+        return Ok(VmArtifacts::StructuredTrace {
             output,
-            recording: recording_json,
+            execution_trace: execution_trace_json,
         });
     }
 
-    let VmMode::Traced { inspection } = scenario.mode else {
-        unreachable!("recording mode returns above")
+    let VmMode::TextTrace { inspection } = scenario.mode else {
+        unreachable!("structured trace mode returns above")
     };
     let mut tracer = PrintTracer::builder(scenario.source, scenario.module)
         .verbosity(Verbosity::Default)
@@ -597,7 +603,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         // not — fail the trial rather than accept a resource limit as golden output.
         Err(err) => return Err(format!("VM run failed for `{}`: {err}", scenario.entry)),
     };
-    Ok(VmArtifacts::Traced {
+    Ok(VmArtifacts::TextTrace {
         output,
         trace,
         inspection,

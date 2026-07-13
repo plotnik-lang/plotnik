@@ -4,8 +4,8 @@
 //! producing a match journal that can be materialized into output values.
 
 mod error;
+mod execution_trace;
 mod materializer;
-mod recording;
 mod result_provenance;
 mod trace;
 mod value;
@@ -18,8 +18,8 @@ mod vm;
 pub use plotnik_rt::{JournalEvent, Limit, MatchJournal, ResolvedRuntimeLimits, RuntimeLimitSpec};
 
 pub use error::RuntimeError;
+pub use execution_trace::{ExecutionTrace, TraceEvent, TraceNode, TraceRecord, TraceRecorder};
 pub use materializer::{ValueMaterializer, materialize_verified};
-pub use recording::{Recording, RecordingTracer, StepEvent, StepRecord, TraceNode};
 pub use result_provenance::{
     ProvenanceBinding, ResultProvenance, ResultProvenanceEntry, extract_result_provenance,
 };

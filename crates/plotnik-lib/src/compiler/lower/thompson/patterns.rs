@@ -1159,7 +1159,7 @@ impl NfaBuilder<'_> {
 
             // Record scope: RecordOpen → inner → RecordClose+capture → exit(s) (also empty `{}`).
             // Without the wrapper `RecordSet` lands on the raw inner node and both the
-            // struct scope and the inner Sets are lost (#470).
+            // record scope and the inner `RecordSet`s are lost (#470).
             CaptureKind::Record => self.compile_record_capture(req, exits),
 
             // Node/Ref/PendingValue own no capture-site scope (their wrapper, if any, is

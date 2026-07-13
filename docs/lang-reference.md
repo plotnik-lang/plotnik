@@ -290,7 +290,7 @@ Quantifiers determine whether a field is singular, optional, or a list:
 | `(x)* @a` | `a: T[]`         | zero or more (node list) |
 | `(x)+ @a` | `a: [T, ...T[]]` | one or more (node list)  |
 
-Every declared field is **always present** in the output: an optional field is
+Every declared field is **always present** in the output: a field with option type is
 `T | null` and materializes as `null` when it doesn't match (never an absent
 key), and a missing list is `[]` (never `null`). The output shape is stable.
 
@@ -402,7 +402,7 @@ Rules:
 | Pattern                 | Output                                  |
 | ----------------------- | --------------------------------------- |
 | `@name`                 | Field in current scope                  |
-| `(x)? @a`               | Optional field                          |
+| `(x)? @a`               | Field with option type                  |
 | `(x)* @a`               | Node list (no internal captures)        |
 | `{...}* @items`         | Record list (with internal captures)    |
 | `{...} @x` / `[...] @x` | Nested object (new scope)               |

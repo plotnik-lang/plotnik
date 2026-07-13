@@ -30,7 +30,7 @@ use langs::Lang;
 use plotnik_lib::bytecode::{EntryPoint, Module};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
-    RecordingTracer, RuntimeLimitSpec, RustCodegenConfig, TypeScriptCodegenConfig, VM, dump_tree,
+    RuntimeLimitSpec, RustCodegenConfig, TraceRecorder, TypeScriptCodegenConfig, VM, dump_tree,
     tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
@@ -137,10 +137,10 @@ impl Session {
         to_js(&value)
     }
 
-    /// Run with a bounded execution recording.
+    /// Run with a bounded execution trace.
     pub fn trace(&self, source: &str, entry: Option<String>, max_records: u32) -> JsValue {
         let max_records = usize::try_from(max_records).expect("u32 fits usize");
-        let value = self.execute(source, entry.as_deref(), TraceMode::Recording(max_records));
+        let value = self.execute(source, entry.as_deref(), TraceMode::Structured(max_records));
         to_js(&value)
     }
 }
@@ -187,16 +187,16 @@ impl Session {
                 let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
                 result_json(module, &entry_point, source, result, None)
             }
-            TraceMode::Recording(max_records) => {
-                let mut tracer = RecordingTracer::new(module, max_records);
+            TraceMode::Structured(max_records) => {
+                let mut tracer = TraceRecorder::new(module, max_records);
                 let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
-                let recording = tracer.finish();
+                let execution_trace = tracer.finish();
                 result_json(
                     module,
                     &entry_point,
                     source,
                     result,
-                    Some(json_value!(recording)),
+                    Some(json_value!(execution_trace)),
                 )
             }
         }
@@ -205,7 +205,7 @@ impl Session {
 
 enum TraceMode {
     None,
-    Recording(usize),
+    Structured(usize),
 }
 
 fn resolve_entry_point(
