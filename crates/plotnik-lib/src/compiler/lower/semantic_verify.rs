@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
 use crate::compiler::analyze::output::{CaptureMemberKind, CaptureScopeKind, OutputSchema};
-use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeShape};
+use crate::compiler::analyze::types::type_shape::CasePayload;
 use crate::compiler::lower::ir::{
     CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, MemberRef, NfaGraph,
     ReturnEntry, ReturnOutcome, SemanticNfa,
@@ -801,11 +801,7 @@ impl<'a> Program<'a> {
                 "VariantOpen does not reference a variant case",
             ));
         };
-        Ok(payload == TYPE_NO_VALUE
-            || matches!(
-                self.schema.types.expect_type_shape(payload),
-                TypeShape::NoValue
-            ))
+        Ok(payload == CasePayload::None)
     }
 
     fn validate_record_set_member(

@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
-use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NODE, TypeShape};
+use crate::compiler::analyze::types::type_shape::{
+    DefinitionOutput, RecordField, TYPE_NODE, TypeShape,
+};
 use crate::compiler::ids::DefId;
 use crate::core::Interner;
 
@@ -32,7 +34,7 @@ fn option_interning_preserves_an_option_declaration_reference() {
     let mut ctx = TypeAnalysisBuilder::new();
     let definition = DefId::from_raw(0);
     let option = ctx.intern_option(TYPE_NODE);
-    ctx.record_def_output(definition, option);
+    ctx.record_def_output(definition, DefinitionOutput::Value(option));
     ctx.record_def_root_extent(definition, RootExtent::SingleNode);
     let reference = ctx.intern_type(TypeShape::Ref(definition));
 
@@ -66,8 +68,8 @@ fn distinct_record_declarations_are_nominal() {
     let right = DefId::from_raw(1);
     let left_body = ctx.intern_record(BTreeMap::from([(field, RecordField::new(TYPE_NODE))]));
     let right_body = ctx.intern_record(BTreeMap::from([(field, RecordField::new(TYPE_NODE))]));
-    ctx.record_def_output(left, left_body);
-    ctx.record_def_output(right, right_body);
+    ctx.record_def_output(left, DefinitionOutput::Value(left_body));
+    ctx.record_def_output(right, DefinitionOutput::Value(right_body));
     let left_ref = ctx.intern_type(TypeShape::Ref(left));
     let right_ref = ctx.intern_type(TypeShape::Ref(right));
 
@@ -79,8 +81,8 @@ fn transparent_definition_aliases_compare_by_body() {
     let mut ctx = TypeAnalysisBuilder::new();
     let left = DefId::from_raw(0);
     let right = DefId::from_raw(1);
-    ctx.record_def_output(left, TYPE_NODE);
-    ctx.record_def_output(right, TYPE_NODE);
+    ctx.record_def_output(left, DefinitionOutput::Value(TYPE_NODE));
+    ctx.record_def_output(right, DefinitionOutput::Value(TYPE_NODE));
     let left_ref = ctx.intern_type(TypeShape::Ref(left));
     let right_ref = ctx.intern_type(TypeShape::Ref(right));
 

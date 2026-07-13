@@ -56,7 +56,7 @@ T0 = <NoValue>
 Q = 00 :: T0
 
 [spans]
-P00 def        0..150  src0  T0
+P00 def        0..150  src0
 P01 pattern    4..150  src0
 P02 pattern    15..148  src0
 P03 unlabeled_alternation 41..144  src0

@@ -36,8 +36,8 @@ use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, PatternFlow, PatternShape, QuantifierKind, RecordField, TYPE_NO_VALUE, TYPE_NODE,
-    TypeId, TypeShape,
+    CasePayload, DefinitionOutput, ListMinimum, PatternFlow, PatternShape, QuantifierKind,
+    RecordField, TYPE_NODE, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{
     BuiltInCaptureType, CaptureFact, FieldCompletion, FieldCompletions, RawCaptureFact, RootExtent,
@@ -245,10 +245,10 @@ fn suggested_builtin_capture_type(name: &str) -> Option<&'static str> {
 /// reference contributes no payload, so the case carries the tag alone.
 /// `[Fn: (FnDef)]` tags which alternative matched; `[Fn: (FnDef) @fn]` also
 /// carries the data.
-fn case_payload_type(flow: &PatternFlow) -> TypeId {
+fn case_payload(flow: &PatternFlow) -> CasePayload {
     match flow {
-        PatternFlow::NoValue | PatternFlow::Value(_) => TYPE_NO_VALUE,
-        PatternFlow::Fields(t) => *t,
+        PatternFlow::NoValue | PatternFlow::Value(_) => CasePayload::None,
+        PatternFlow::Fields(type_id) => CasePayload::Record(*type_id),
     }
 }
 
@@ -452,7 +452,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // sites are re-checked once the SCC completes.
             let resolved_output = self.ctx.type_ctx.in_progress().def_output(def_id);
             let flow = match resolved_output {
-                Some(output) if output == TYPE_NO_VALUE => PatternFlow::NoValue,
+                Some(DefinitionOutput::MatchOnly) => PatternFlow::NoValue,
                 _ => {
                     let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
                     PatternFlow::Value(ref_type)
@@ -465,11 +465,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             self.ctx.type_ctx.in_progress().def_output(def_id).expect(
                 "non-recursive reference target is inferred before the referrer (SCC order)",
             );
-        let flow = if output == TYPE_NO_VALUE {
-            PatternFlow::NoValue
-        } else {
-            let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
-            PatternFlow::Value(ref_type)
+        let flow = match output {
+            DefinitionOutput::MatchOnly => PatternFlow::NoValue,
+            DefinitionOutput::Value(_) => {
+                let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
+                PatternFlow::Value(ref_type)
+            }
         };
         PatternShape::new(root_extent, flow)
     }
@@ -540,7 +541,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         &mut self,
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
-        let mut cases: BTreeMap<Symbol, TypeId> = BTreeMap::new();
+        let mut cases: BTreeMap<Symbol, CasePayload> = BTreeMap::new();
         let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
@@ -561,12 +562,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
             let Some(body_info) = self.infer_alternative_body(alternation, &alternative) else {
                 // Tag-only case has no payload.
-                cases.insert(label_sym, TYPE_NO_VALUE);
+                cases.insert(label_sym, CasePayload::None);
                 continue;
             };
 
             combined_extent = combined_extent.combine(body_info.root_extent);
-            cases.insert(label_sym, case_payload_type(&body_info.flow));
+            cases.insert(label_sym, case_payload(&body_info.flow));
         }
 
         let variant_type = self.ctx.type_ctx.intern_type(TypeShape::Variant(cases));
@@ -1230,12 +1231,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Mid-SCC targets have no registered output yet; the recursion checks
         // own those cycles.
         let view = self.ctx.type_ctx.in_progress();
-        let wrapper_output = view.def_output(def_id).is_some_and(|output| {
-            matches!(
-                view.type_shape(output),
-                Some(TypeShape::Option(_) | TypeShape::List { .. })
-            )
-        });
+        let wrapper_output = view
+            .def_output(def_id)
+            .and_then(DefinitionOutput::value)
+            .is_some_and(|output| {
+                matches!(
+                    view.type_shape(output),
+                    Some(TypeShape::Option(_) | TypeShape::List { .. })
+                )
+            });
         if wrapper_output {
             self.report_nullable_repeat(quant, &element);
         }
@@ -1577,22 +1581,22 @@ impl<'a, 'd> InferPass<'a, 'd> {
             visitor.infer_pattern_value(&located_body)
         });
 
-        let type_id = match &info.flow {
-            PatternFlow::NoValue => TYPE_NO_VALUE,
-            PatternFlow::Fields(t) => *t,
+        let output = match &info.flow {
+            PatternFlow::NoValue => DefinitionOutput::MatchOnly,
+            PatternFlow::Fields(type_id) => DefinitionOutput::Value(*type_id),
             // A root value is the definition's result only when a labeled
             // alternation or quantifier supplies it directly. A bare reference
             // is structural: no capture, no output — the definition still
             // matches, like a capture-less regex.
             PatternFlow::Value(t) => {
                 if definition_value_root(&body) {
-                    *t
+                    DefinitionOutput::Value(*t)
                 } else {
-                    TYPE_NO_VALUE
+                    DefinitionOutput::MatchOnly
                 }
             }
         };
-        self.ctx.record_def_output(def_id, type_id);
+        self.ctx.record_def_output(def_id, output);
         let value_role = if definition_value_root(&body) {
             RawDefinitionValueRole::Value
         } else {

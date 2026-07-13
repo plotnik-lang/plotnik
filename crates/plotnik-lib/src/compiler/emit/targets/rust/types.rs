@@ -13,7 +13,7 @@
 
 use crate::compiler::analyze::output::OutputSchema;
 pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItemKind as ItemKind};
-use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NO_VALUE, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{CasePayload, RecordField, TypeId, TypeShape};
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 use crate::compiler::ids::DefId;
@@ -95,21 +95,22 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     fn render_struct(&mut self, item: &Item) -> String {
+        let item_ty = item.value_type();
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Record(fields) = types.expect_type_shape(item.ty) else {
+        let TypeShape::Record(fields) = types.expect_type_shape(item_ty) else {
             unreachable!("struct item must have a record shape");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
-        let lt = self.lifetime_args(item.ty);
+        let lt = self.lifetime_args(item_ty);
 
         let mut out = Sink::<()>::new();
         out.line(DERIVES);
         out.line(&format!("pub struct {ident}{lt} {{"));
         out.indented(|out| {
             for (info, field_ident) in fields.values().zip(&field_idents) {
-                let field_ty = self.field_type(TypeContext::item(item.ty), info);
+                let field_ty = self.field_type(TypeContext::item(item_ty), info);
                 out.line(&format!("pub {field_ident}: {field_ty},"));
             }
         });
@@ -118,21 +119,22 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     fn render_enum(&mut self, item: &Item) -> String {
+        let item_ty = item.value_type();
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Variant(variants) = types.expect_type_shape(item.ty) else {
+        let TypeShape::Variant(variants) = types.expect_type_shape(item_ty) else {
             unreachable!("Rust enum item must have a variant shape");
         };
         let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
-        let lt = self.lifetime_args(item.ty);
+        let lt = self.lifetime_args(item_ty);
 
         let mut out = Sink::<()>::new();
         out.line(DERIVES);
         out.line(&format!("pub enum {ident}{lt} {{"));
         out.indented(|out| {
             for ((_, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
-                let payload = self.render_variant_payload(item.ty, payload);
+                let payload = self.render_variant_payload(item_ty, payload);
                 out.line(&format!("{variant_ident}{payload},"));
             }
         });
@@ -140,10 +142,10 @@ impl<'m, 'a> Emitter<'m, 'a> {
         out.plain().to_string()
     }
 
-    fn render_variant_payload(&mut self, item_ty: TypeId, payload: TypeId) -> String {
-        if payload == TYPE_NO_VALUE {
+    fn render_variant_payload(&mut self, item_ty: TypeId, payload: CasePayload) -> String {
+        let Some(payload) = payload.type_id() else {
             return String::new();
-        }
+        };
 
         let types = self.schema.types;
         let interner = self.schema.interner;
@@ -165,9 +167,10 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     fn render_alias(&mut self, item: &Item) -> String {
+        let item_ty = item.value_type();
         let ident = self.item_ident(item.name).to_string();
-        let lt = self.lifetime_args(item.ty);
-        let body = self.alias_body(TypeContext::item(item.ty), item.ty);
+        let lt = self.lifetime_args(item_ty);
+        let body = self.alias_body(TypeContext::item(item_ty), item_ty);
         format!("pub type {ident}{lt} = {body};")
     }
 
@@ -197,7 +200,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 )
             }
             TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::Record(_) | TypeShape::Variant(_) | TypeShape::NoValue => {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 unreachable!("alias items cover non-composite outputs only")
             }
         }
@@ -238,9 +241,6 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 )
             }
             TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::NoValue => {
-                unreachable!("no-value flow cannot appear in a value position")
-            }
         }
     }
 
@@ -260,10 +260,9 @@ impl<'m, 'a> Emitter<'m, 'a> {
     /// declaration. A match-only target contributes no value, so the capture holds
     /// the matched node itself.
     fn ref_type(&mut self, context: TypeContext, def_id: DefId, ref_ty: TypeId) -> String {
-        let target = self.schema.types.expect_def_output(def_id);
-        if target == TYPE_NO_VALUE {
+        let Some(target) = self.schema.types.expect_def_output(def_id).value() else {
             return self.node_type();
-        }
+        };
 
         let name = self.schema.deps.def_name_sym(def_id);
         let base = self.named_type(name, target);

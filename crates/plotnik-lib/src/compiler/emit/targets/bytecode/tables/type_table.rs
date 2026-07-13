@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::types::TypeAnalysis;
+use crate::compiler::analyze::types::type_shape::DefinitionOutput;
 use crate::compiler::ids::TypeId;
 
 use super::error::EmitError;
@@ -25,6 +26,7 @@ pub struct TypeTableBuilder {
     type_members: Vec<TypeMember>,
     /// Type names for named types (4 bytes each).
     type_names: Vec<TypeNameEntry>,
+    no_value: Option<WireTypeId>,
 }
 
 impl TypeTableBuilder {
@@ -34,6 +36,7 @@ impl TypeTableBuilder {
             type_defs: Vec::new(),
             type_members: Vec::new(),
             type_names: Vec::new(),
+            no_value: None,
         }
     }
 
@@ -48,6 +51,30 @@ impl TypeTableBuilder {
         self.mapping.insert(query_id, bc_id);
         self.type_defs.push(def);
         Ok(bc_id)
+    }
+
+    pub fn push_no_value(&mut self) -> Result<WireTypeId, EmitError> {
+        if self.type_defs.len() >= EmitError::MAX_TYPES {
+            return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
+        }
+        let wire_id = WireTypeId::from(self.type_defs.len() as u16);
+        self.type_defs
+            .push(TypeDef::builtin(crate::bytecode::TypeKind::NoValue));
+        self.no_value = Some(wire_id);
+        Ok(wire_id)
+    }
+
+    pub fn resolve_output(
+        &self,
+        output: DefinitionOutput,
+        type_ctx: &TypeAnalysis,
+    ) -> Result<WireTypeId, EmitError> {
+        match output {
+            DefinitionOutput::MatchOnly => Ok(self
+                .no_value
+                .expect("match-only output requires a bytecode no-value type")),
+            DefinitionOutput::Value(type_id) => self.resolve_type(type_id, type_ctx),
+        }
     }
 
     /// Overwrite a previously reserved slot with its final definition.

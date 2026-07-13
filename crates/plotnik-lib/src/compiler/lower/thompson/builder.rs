@@ -162,12 +162,14 @@ impl<'a> NfaBuilder<'a> {
         self.instructions.push(ReturnIR::new(return_label).into());
 
         let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let output_shape = self.ctx.analysis.type_analysis.expect_type_shape(output);
-        let wraps_record = matches!(output_shape, TypeShape::Record(_));
+        let output_shape = output
+            .value()
+            .map(|type_id| self.ctx.analysis.type_analysis.expect_type_shape(type_id));
+        let wraps_record = matches!(output_shape, Some(TypeShape::Record(_)));
 
         let after_body = if wraps_record {
             self.emit_record_close(return_label)
-        } else if matches!(output_shape, TypeShape::Node) {
+        } else if matches!(output_shape, Some(TypeShape::Node)) {
             self.emit_effects_epsilon(
                 return_label,
                 vec![EffectIR::node()],
@@ -290,12 +292,17 @@ impl<'a> NfaBuilder<'a> {
         // We still use with_scope for member index lookup during compilation.
         // The inline-stack entry keeps a nullable self-reference inside this
         // body (`A = (x (A) (y))?`) from inlining itself endlessly.
-        let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let type_id = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_def_output(def_id)
+            .value();
         let (body_exits, def_span) = self.bracket_def_body_exits(body, exits);
 
         self.inline_stack.push(def_id);
         let mode = variant.mode().clone();
-        let body_entry = self.with_scope(type_id, |this| {
+        let body_entry = self.compile_with_optional_scope(type_id, |this| {
             this.compile_def_body(body, &mode, body_exits, body_nav)
         });
         self.inline_stack.pop();

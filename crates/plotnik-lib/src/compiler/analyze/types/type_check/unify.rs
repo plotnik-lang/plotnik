@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, PatternFlow, RecordField, TYPE_NO_VALUE, TypeId, TypeShape,
+    ListMinimum, PatternFlow, RecordField, TypeId, TypeShape,
 };
 use crate::core::Symbol;
 
@@ -161,20 +161,13 @@ fn merge_fields(
 /// Records and variant types mint a fresh id per occurrence (nominal typing), so two
 /// alternatives capturing structurally identical anonymous composites carry
 /// different ids for the same shape — compare structurally, keeping the first
-/// alternative's id. `NoValue` is the identity element (compatible with any type).
+/// alternative's id.
 fn unify_type_ids(
     ctx: &mut TypeAnalysisBuilder,
     a: TypeId,
     b: TypeId,
     field: Symbol,
 ) -> Result<TypeId, UnifyError> {
-    if a == TYPE_NO_VALUE {
-        return Ok(b);
-    }
-    if b == TYPE_NO_VALUE {
-        return Ok(a);
-    }
-
     if ctx.types_structurally_equal(a, b) {
         return Ok(a);
     }

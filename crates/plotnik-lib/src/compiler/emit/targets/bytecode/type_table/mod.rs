@@ -8,7 +8,7 @@ use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeN
 use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TypeShape,
+    DefinitionOutput, ListMinimum, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeShape,
 };
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
@@ -44,7 +44,7 @@ fn build(
     let type_layout = schema.type_layout();
     let ordered_types = type_layout.custom_types();
 
-    emit_builtins(types, type_layout.builtins())?;
+    emit_builtins(types, type_layout)?;
     reserve_slots(types, ordered_types)?;
 
     let mut ctx = TypeEmitCtx {
@@ -63,10 +63,15 @@ fn build(
     Ok(())
 }
 
-fn emit_builtins(types: &mut TypeTableBuilder, builtins: &[TypeId]) -> Result<(), EmitError> {
-    for &builtin in builtins {
+fn emit_builtins(
+    types: &mut TypeTableBuilder,
+    layout: &crate::compiler::analyze::output::OutputTypeLayout,
+) -> Result<(), EmitError> {
+    if layout.has_no_value() {
+        types.push_no_value()?;
+    }
+    for &builtin in layout.builtins() {
         let kind = match builtin {
-            TYPE_NO_VALUE => TypeKind::NoValue,
             TYPE_NODE => TypeKind::Node,
             TYPE_TEXT => TypeKind::Text,
             TYPE_BOOL => TypeKind::Bool,
@@ -127,7 +132,7 @@ fn emit_type_at_slot(
     let slot_index = usize::from(u16::from(wire_type));
     let type_shape = ctx.type_analysis.expect_type_shape(type_id);
     match type_shape {
-        TypeShape::NoValue | TypeShape::Node | TypeShape::Text | TypeShape::Bool => {
+        TypeShape::Node | TypeShape::Text | TypeShape::Bool => {
             unreachable!("builtins should be handled separately")
         }
 
@@ -190,9 +195,12 @@ fn emit_type_at_slot(
         TypeShape::Variant(cases) => {
             // Resolve case types (this may create types at later indices).
             let mut resolved_cases = Vec::with_capacity(cases.len());
-            for (case_sym, case_type_id) in cases {
+            for (case_sym, payload) in cases {
                 let case_name = ctx.strings.intern(*case_sym, ctx.interner)?;
-                let case_type = types.resolve_type(*case_type_id, ctx.type_analysis)?;
+                let case_type = match payload.type_id() {
+                    Some(type_id) => types.resolve_type(type_id, ctx.type_analysis)?,
+                    None => types.resolve_output(DefinitionOutput::MatchOnly, ctx.type_analysis)?,
+                };
                 resolved_cases.push((case_name, case_type));
             }
 
@@ -221,12 +229,11 @@ fn emit_type_at_slot(
             // captures all suppressed) leaves no pending value at runtime: the
             // capture takes the matched node, so the alias targets Node.
             let target = ctx.type_analysis.expect_def_output(*def_id);
-            let alias = if target == TYPE_NO_VALUE {
-                types
+            let alias = match target.value() {
+                None => types
                     .lookup(TYPE_NODE)
-                    .expect("Node is mapped before a Ref alias that targets it is emitted")
-            } else {
-                types.resolve_type(target, ctx.type_analysis)?
+                    .expect("Node is mapped before a Ref alias that targets it is emitted"),
+                Some(type_id) => types.resolve_type(type_id, ctx.type_analysis)?,
             };
             types.fill_slot(slot_index, TypeDef::alias(alias));
             Ok(())

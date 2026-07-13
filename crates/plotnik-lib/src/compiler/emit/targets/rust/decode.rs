@@ -85,7 +85,11 @@ struct InherentParseSignature {
 impl InherentParseSignature {
     fn for_item(model: &TypeModel<'_>, item: &DecodeItem) -> Self {
         let ident = model.item_ident(item.name).to_string();
-        let usage = model.lifetime_usage(item.ty);
+        let usage = item
+            .output
+            .value()
+            .map(|type_id| model.lifetime_usage(type_id))
+            .unwrap_or_default();
         let (impl_generics, type_generics) = match (usage.tree, usage.source) {
             (false, false) => ("", ""),
             (true, false) => ("<'t>", "<'t>"),
@@ -323,7 +327,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let ident = self.model.item_ident(item.name).to_string();
         let fn_generics = "<'t, 's>";
         let decoder_generics = "<'_, 't, 's>";
-        let return_type = format!("{ident}{}", lifetime_args(self.model, item.ty));
+        let return_type = format!("{ident}{}", lifetime_args(self.model, item.value_type()));
         let decoder_fn = self.decoder_fn(item.name);
         let fallible = item.fallible;
         let depth_param = if fallible {
@@ -351,7 +355,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         out.push('\n');
         self.decoder_open(out, item);
         out.push_str("    decoder.expect_record_open();\n");
-        let scope = Scope::struct_body(item.ty, &ident);
+        let scope = Scope::struct_body(item.value_type(), &ident);
         self.field_scope(out, &scope, plan);
         out.push_str("    decoder.expect_record_close();\n");
         self.construct(out, &scope, plan, item.fallible);
@@ -384,7 +388,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
                 continue;
             };
 
-            let scope = Scope::variant_payload(item.ty, &ident, variant_ident);
+            let scope = Scope::variant_payload(item.value_type(), &ident, variant_ident);
             self.field_scope(out, &scope, payload);
             out.push_str("            decoder.expect_variant_close();\n");
             self.construct(out, &scope, payload, item.fallible);
@@ -401,7 +405,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     fn alias_decoder(&self, out: &mut String, item: &DecodeItem, value: &DecodeValue) {
         out.push('\n');
         self.decoder_open(out, item);
-        let expr = self.value_expr(value, DecodeContext::item(item.ty, 1));
+        let expr = self.value_expr(value, DecodeContext::item(item.value_type(), 1));
         if item.fallible {
             let _ = writeln!(out, "    Ok({expr})");
         } else {

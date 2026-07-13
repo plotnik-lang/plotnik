@@ -148,7 +148,9 @@ impl TypeAnalysis {
         // After inference the definition's registered output type is authoritative;
         // this is the path emission always takes.
         if mode.is_admitted() {
-            let output_type = self.expect_def_output(def_id);
+            let Some(output_type) = self.expect_def_output(def_id).value() else {
+                return false;
+            };
             return matches!(
                 self.expect_type_shape(output_type),
                 TypeShape::Record(_)
@@ -158,7 +160,7 @@ impl TypeAnalysis {
             );
         }
 
-        if let Some(output_type) = self.def_output(def_id) {
+        if let Some(output_type) = self.def_output(def_id).and_then(|output| output.value()) {
             return matches!(
                 self.type_shape(output_type),
                 Some(

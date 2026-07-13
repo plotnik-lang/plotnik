@@ -21,7 +21,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 
 pub(super) struct TypeFacts {
     lifetimes: HashMap<TypeId, LifetimeUsage>,
@@ -78,8 +78,7 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
     let mut out = Vec::new();
     let mut stack: Vec<TypeId> = types
         .iter_def_output()
-        .filter(|&(_, ty)| ty != TYPE_NO_VALUE)
-        .map(|(_, ty)| ty)
+        .filter_map(|(_, output)| output.value())
         .collect();
 
     while let Some(ty) = stack.pop() {
@@ -89,8 +88,7 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
         out.push(ty);
         stack.extend(types.expect_type_shape(ty).child_type_ids());
         if let TypeShape::Ref(def_id) = types.expect_type_shape(ty) {
-            let target = types.expect_def_output(*def_id);
-            if target != TYPE_NO_VALUE {
+            if let Some(target) = types.expect_def_output(*def_id).value() {
                 stack.push(target);
             }
         }
@@ -117,17 +115,13 @@ fn lifetime_fixpoint(types: &TypeAnalysis, reachable: &[TypeId]) -> HashMap<Type
                     tree: false,
                     source: true,
                 },
-                TypeShape::Ref(def_id) => {
-                    let target = types.expect_def_output(*def_id);
-                    if target == TYPE_NO_VALUE {
-                        LifetimeUsage {
-                            tree: true,
-                            source: false,
-                        }
-                    } else {
-                        facts[&target]
-                    }
-                }
+                TypeShape::Ref(def_id) => match types.expect_def_output(*def_id).value() {
+                    None => LifetimeUsage {
+                        tree: true,
+                        source: false,
+                    },
+                    Some(target) => facts[&target],
+                },
                 _ => LifetimeUsage::default(),
             };
             for child in types.expect_type_shape(ty).child_type_ids() {
@@ -151,10 +145,10 @@ fn ref_target_closures(
     reachable
         .iter()
         .filter_map(|&ty| match types.expect_type_shape(ty) {
-            TypeShape::Ref(def_id) => {
-                let target = types.expect_def_output(*def_id);
-                (target != TYPE_NO_VALUE).then(|| (ty, by_value_closure(types, target)))
-            }
+            TypeShape::Ref(def_id) => types
+                .expect_def_output(*def_id)
+                .value()
+                .map(|target| (ty, by_value_closure(types, target))),
             _ => None,
         })
         .collect()
@@ -174,8 +168,7 @@ fn by_value_closure(types: &TypeAnalysis, from: TypeId) -> HashSet<TypeId> {
             // An array stores its elements on the heap: not a by-value edge.
             TypeShape::List { .. } => {}
             TypeShape::Ref(def_id) => {
-                let target = types.expect_def_output(*def_id);
-                if target != TYPE_NO_VALUE {
+                if let Some(target) = types.expect_def_output(*def_id).value() {
                     stack.push(target);
                 }
             }

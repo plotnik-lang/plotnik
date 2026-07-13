@@ -15,7 +15,7 @@ use super::RootExtent;
 use crate::bytecode::type_system::PrimitiveType;
 pub use crate::compiler::parse::ast::QuantifierKind;
 
-pub const TYPE_NO_VALUE: TypeId = TypeId(PrimitiveType::NoValue.index() as u32);
+pub(crate) const RESERVED_NO_VALUE_TYPE_ID: TypeId = TypeId(PrimitiveType::NoValue.index() as u32);
 pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
 pub const TYPE_TEXT: TypeId = TypeId(PrimitiveType::Text.index() as u32);
 pub const TYPE_BOOL: TypeId = TypeId(PrimitiveType::Bool.index() as u32);
@@ -26,6 +26,36 @@ pub enum ListMinimum {
     One,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum DefinitionOutput {
+    MatchOnly,
+    Value(TypeId),
+}
+
+impl DefinitionOutput {
+    pub fn value(self) -> Option<TypeId> {
+        match self {
+            Self::MatchOnly => None,
+            Self::Value(type_id) => Some(type_id),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum CasePayload {
+    None,
+    Record(TypeId),
+}
+
+impl CasePayload {
+    pub fn type_id(self) -> Option<TypeId> {
+        match self {
+            Self::None => None,
+            Self::Record(type_id) => Some(type_id),
+        }
+    }
+}
+
 /// The shape of an inferred type, determining its structure.
 ///
 /// This represents the inference-time type representation which carries
@@ -33,8 +63,6 @@ pub enum ListMinimum {
 /// `type_system::TypeKind`, the bytecode discriminant.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeShape {
-    /// Sentinel for successful matching that produces no value.
-    NoValue,
     /// A tree-sitter node.
     Node,
     /// Borrowed source text.
@@ -46,7 +74,7 @@ pub enum TypeShape {
     /// Record with named fields.
     Record(BTreeMap<Symbol, RecordField>),
     /// Variant type from a labeled alternation.
-    Variant(BTreeMap<Symbol, TypeId>),
+    Variant(BTreeMap<Symbol, CasePayload>),
     /// Ordered list with its semantic minimum length.
     List {
         element: TypeId,
@@ -62,8 +90,10 @@ type RecordFieldTypeIds<'a> = std::iter::Map<
     std::collections::btree_map::Values<'a, Symbol, RecordField>,
     fn(&RecordField) -> TypeId,
 >;
-type CasePayloadTypeIds<'a> =
-    std::iter::Copied<std::collections::btree_map::Values<'a, Symbol, TypeId>>;
+type CasePayloadTypeIds<'a> = std::iter::FilterMap<
+    std::iter::Copied<std::collections::btree_map::Values<'a, Symbol, CasePayload>>,
+    fn(CasePayload) -> Option<TypeId>,
+>;
 
 pub struct TypeShapeChildIds<'a>(TypeShapeChildIdsInner<'a>);
 
@@ -95,16 +125,18 @@ impl TypeShape {
                     .values()
                     .map(field_type_id as fn(&RecordField) -> TypeId),
             ),
-            Self::Variant(cases) => TypeShapeChildIdsInner::Cases(cases.values().copied()),
+            Self::Variant(cases) => TypeShapeChildIdsInner::Cases(
+                cases
+                    .values()
+                    .copied()
+                    .filter_map(CasePayload::type_id as fn(CasePayload) -> Option<TypeId>),
+            ),
             Self::List { element, .. } | Self::Option(element) => {
                 TypeShapeChildIdsInner::One(Some(*element).into_iter())
             }
-            Self::NoValue
-            | Self::Node
-            | Self::Text
-            | Self::Bool
-            | Self::Custom(_)
-            | Self::Ref(_) => TypeShapeChildIdsInner::Empty(std::iter::empty()),
+            Self::Node | Self::Text | Self::Bool | Self::Custom(_) | Self::Ref(_) => {
+                TypeShapeChildIdsInner::Empty(std::iter::empty())
+            }
         };
         TypeShapeChildIds(inner)
     }

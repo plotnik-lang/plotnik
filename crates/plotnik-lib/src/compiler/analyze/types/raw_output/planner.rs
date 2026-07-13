@@ -104,7 +104,6 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::Ref(target) => {
                 self.str_plan(self.raw.definition(*target), zero_node_terminal, visiting)
             }
-            TypeShape::NoValue => Err("a capture type requires an ordinary captured value"),
             TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
                 unreachable!("a capture type cannot feed another capture type")
             }
@@ -158,7 +157,6 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) => Err(
                 "capture type `bool` requires a value that may be absent; this capture is always present",
             ),
-            TypeShape::NoValue => Err("a capture type requires an ordinary captured value"),
             TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
                 unreachable!("a capture type cannot feed another capture type")
             }
@@ -182,7 +180,6 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 TYPE_BOOL,
                 terminal_data(self.raw.shape(type_id)),
             )),
-            TypeShape::NoValue => Err("a capture type requires an ordinary captured value"),
             TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
                 unreachable!("a capture type cannot feed another capture type")
             }

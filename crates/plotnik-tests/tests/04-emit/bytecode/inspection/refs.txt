@@ -81,7 +81,7 @@ Name     = 00 :: T2
 P00 def        0..25  src0  T2
 P01 capture    20..25  src0  T2.M0
 P02 pattern    7..19  src0
-P03 def        26..72  src0  T0
+P03 def        26..72  src0
 P04 pattern    33..72  src0
 P05 pattern    42..71  src0
 P06 ref        64..70  src0  T2

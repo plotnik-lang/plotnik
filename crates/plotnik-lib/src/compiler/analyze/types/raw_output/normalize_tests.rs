@@ -15,16 +15,16 @@ fn invalid_containment_propagates_through_recursive_cycle() {
     let invalid = TypeId(6);
     let definition = DefId::from_raw(0);
     let types = vec![
-        TypeShape::NoValue,
-        TypeShape::Node,
-        TypeShape::Text,
-        TypeShape::Bool,
-        TypeShape::Record(BTreeMap::from([
+        None,
+        Some(TypeShape::Node),
+        Some(TypeShape::Text),
+        Some(TypeShape::Bool),
+        Some(TypeShape::Record(BTreeMap::from([
             (cycle, RecordField::new(reference)),
             (bad, RecordField::new(invalid)),
-        ])),
-        TypeShape::Ref(definition),
-        TypeShape::Custom(interner.intern("Invalid")),
+        ]))),
+        Some(TypeShape::Ref(definition)),
+        Some(TypeShape::Custom(interner.intern("Invalid"))),
     ];
     let definitions = BTreeMap::from([(definition, recursive)]);
 

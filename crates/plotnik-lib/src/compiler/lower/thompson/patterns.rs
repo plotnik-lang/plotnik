@@ -549,16 +549,11 @@ impl NfaBuilder<'_> {
         let target = self.ensure_def_variant(variant);
         let callee = CalleeEntry(target);
 
-        let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let def_output_shape = self
-            .ctx
-            .analysis
-            .type_analysis
-            .expect_type_shape(def_output_id);
+        let def_output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
         let lowering = if compile_time_suppressed {
             RefLowering::PlainCall
         } else {
-            self.ref_call_lowering(def_output_shape, is_captured)
+            self.ref_call_lowering(def_output, is_captured)
         };
 
         let nav = nav_override.unwrap_or(Nav::Stay);
@@ -626,9 +621,18 @@ impl NfaBuilder<'_> {
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
-    fn ref_call_lowering(&self, def_output_shape: &TypeShape, is_captured: bool) -> RefLowering {
+    fn ref_call_lowering(
+        &self,
+        def_output: crate::compiler::analyze::types::type_shape::DefinitionOutput,
+        is_captured: bool,
+    ) -> RefLowering {
         if is_captured {
-            if matches!(def_output_shape, TypeShape::Record(_)) {
+            if def_output.value().is_some_and(|type_id| {
+                matches!(
+                    self.ctx.analysis.type_analysis.expect_type_shape(type_id),
+                    TypeShape::Record(_)
+                )
+            }) {
                 return RefLowering::ScopedCapture;
             }
 
@@ -639,7 +643,12 @@ impl NfaBuilder<'_> {
         // output is discarded (inference gives it no-value flow). Match-only
         // and node-valued definitions emit no output events in their bodies, so there is
         // nothing to bracket.
-        if matches!(def_output_shape, TypeShape::NoValue | TypeShape::Node) {
+        if def_output.value().is_none_or(|type_id| {
+            matches!(
+                self.ctx.analysis.type_analysis.expect_type_shape(type_id),
+                TypeShape::Node
+            )
+        }) {
             return RefLowering::PlainCall;
         }
 
@@ -754,13 +763,19 @@ impl NfaBuilder<'_> {
             .body(name)
             .expect("analyzed definition has a body");
 
-        let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let def_output_shape = self
+        let def_output_id = self
             .ctx
             .analysis
             .type_analysis
-            .expect_type_shape(def_output_id);
-        let inline_scoped_capture = is_captured && matches!(def_output_shape, TypeShape::Record(_));
+            .expect_def_output(def_id)
+            .value();
+        let inline_scoped_capture = is_captured
+            && def_output_id.is_some_and(|type_id| {
+                matches!(
+                    self.ctx.analysis.type_analysis.expect_type_shape(type_id),
+                    TypeShape::Record(_)
+                )
+            });
         let CaptureEffects { pre, post } = capture;
 
         self.inline_stack.push(def_id);
@@ -785,7 +800,7 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
                 SkipExit::Fail => SkipExit::Fail,
             };
-            let body_entry = self.with_scope(def_output_id, |this| {
+            let body_entry = self.compile_with_optional_scope(def_output_id, |this| {
                 let pattern_ctx = PatternCtx {
                     exit: body_match_exit,
                     nav: nav_override,
@@ -811,7 +826,7 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
                 SkipExit::Fail => SkipExit::Fail,
             };
-            let body_entry = self.with_scope(def_output_id, |this| {
+            let body_entry = self.compile_with_optional_scope(def_output_id, |this| {
                 let pattern_ctx = PatternCtx {
                     exit: body_match_exit,
                     nav: nav_override,
@@ -939,8 +954,7 @@ impl NfaBuilder<'_> {
 
     fn guarded_ref_output(&self, def_id: DefId) -> GuardedRefOutput {
         let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let shape = self.ctx.analysis.type_analysis.expect_type_shape(output);
-        match self.ref_call_lowering(shape, false) {
+        match self.ref_call_lowering(output, false) {
             RefLowering::PlainCall => GuardedRefOutput::Plain,
             RefLowering::SuppressedCall if self.marks_source() => {
                 GuardedRefOutput::CompileTimeSuppressed

@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NO_VALUE, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{CasePayload, RecordField, TypeId, TypeShape};
 use crate::compiler::emit::plan::{DecodeItem, ResultDecodePlan};
 use crate::compiler::emit::targets::rust::{TypeContext, TypeModel};
 use crate::core::Symbol;
@@ -52,16 +52,16 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
     }
 
     fn decoder_frame_bytes(&self, item: &DecodeItem) -> u64 {
+        let item_ty = item.value_type();
         let guard_bytes = if item.fallible { WORD_BYTES } else { 0 };
-        let local_bytes = match self.types.expect_type_shape(item.ty) {
-            TypeShape::Record(fields) => self.field_scope_frame_bytes(item.ty, fields),
+        let local_bytes = match self.types.expect_type_shape(item_ty) {
+            TypeShape::Record(fields) => self.field_scope_frame_bytes(item_ty, fields),
             TypeShape::Variant(cases) => cases
                 .values()
-                .map(|&payload| self.variant_payload_frame_bytes(item.ty, payload))
+                .map(|&payload| self.variant_payload_frame_bytes(item_ty, payload))
                 .max()
                 .unwrap_or(0),
-            TypeShape::NoValue => 0,
-            _ => self.value_temp_bytes(item.ty, TypeContext::item(item.ty)),
+            _ => self.value_temp_bytes(item_ty, TypeContext::item(item_ty)),
         };
 
         DECODER_FRAME_BASE_BYTES
@@ -69,10 +69,10 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
             .saturating_add(local_bytes)
     }
 
-    fn variant_payload_frame_bytes(&self, owner: TypeId, payload: TypeId) -> u64 {
-        if payload == TYPE_NO_VALUE {
+    fn variant_payload_frame_bytes(&self, owner: TypeId, payload: CasePayload) -> u64 {
+        let Some(payload) = payload.type_id() else {
             return 0;
-        }
+        };
         let TypeShape::Record(fields) = self.types.expect_type_shape(payload) else {
             unreachable!("variant case has no payload or an anonymous record payload");
         };
@@ -130,7 +130,6 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
         }
 
         match self.types.expect_type_shape(ty) {
-            TypeShape::NoValue => 0,
             TypeShape::Node | TypeShape::Custom(_) => NODE_VALUE_BYTES,
             TypeShape::Text => 2 * WORD_BYTES,
             TypeShape::Bool => 1,
@@ -151,6 +150,9 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
                 let widest = cases
                     .values()
                     .map(|&payload| {
+                        let Some(payload) = payload.type_id() else {
+                            return 0;
+                        };
                         let mut variant_seen = seen.clone();
                         self.type_value_bytes(payload, context, &mut variant_seen)
                     })
@@ -159,10 +161,9 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
                 WORD_BYTES.saturating_add(widest)
             }
             TypeShape::Ref(def_id) => {
-                let target = self.types.expect_def_output(*def_id);
-                if target == TYPE_NO_VALUE {
+                let Some(target) = self.types.expect_def_output(*def_id).value() else {
                     return NODE_VALUE_BYTES;
-                }
+                };
                 if self.model.is_boxed_ref(context, ty) {
                     return WORD_BYTES;
                 }

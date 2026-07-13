@@ -14,7 +14,7 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
+    CasePayload, DefinitionOutput, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
@@ -40,7 +40,7 @@ pub(crate) enum OutputItemKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct OutputItem {
     pub(crate) name: Symbol,
-    pub(crate) ty: TypeId,
+    pub(crate) output: DefinitionOutput,
     pub(crate) kind: OutputItemKind,
 }
 
@@ -51,13 +51,17 @@ impl OutputItem {
             TypeShape::Variant(_) => OutputItemKind::Variant,
             _ => OutputItemKind::Alias,
         };
-        Self { name, ty, kind }
+        Self {
+            name,
+            output: DefinitionOutput::Value(ty),
+            kind,
+        }
     }
 
     fn match_only_definition(name: Symbol) -> Self {
         Self {
             name,
-            ty: TYPE_NO_VALUE,
+            output: DefinitionOutput::MatchOnly,
             kind: OutputItemKind::MatchOnlyDef,
         }
     }
@@ -68,6 +72,12 @@ impl OutputItem {
 
     pub(crate) fn is_record(self) -> bool {
         self.kind == OutputItemKind::Record
+    }
+
+    pub(crate) fn value_type(self) -> TypeId {
+        self.output
+            .value()
+            .expect("value-bearing output item must have a value type")
     }
 }
 
@@ -80,7 +90,7 @@ pub(crate) enum CaptureScopeKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureMemberKind {
     Field(RecordField),
-    Case(TypeId),
+    Case(CasePayload),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,18 +137,19 @@ pub(crate) struct CaptureLayout {
 }
 
 /// Stable analysis-type to emitted-type numbering shared by every output
-/// backend. Built-ins lead in canonical order; custom wire types retain the
-/// compiler's historical post-order.
+/// backend. Built-ins lead in canonical order, followed by value types in
+/// dependency order.
 #[derive(Clone, Debug)]
 pub(crate) struct OutputTypeLayout {
+    no_value: bool,
     builtins: Vec<TypeId>,
     custom_types: Vec<TypeId>,
     output_ids: HashMap<TypeId, u32>,
 }
 
 impl OutputTypeLayout {
-    fn build(used_builtins: &HashSet<TypeId>, custom_types: Vec<TypeId>) -> Self {
-        let builtins = [TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
+    fn build(no_value: bool, used_builtins: &HashSet<TypeId>, custom_types: Vec<TypeId>) -> Self {
+        let builtins = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
             .into_iter()
             .filter(|builtin| used_builtins.contains(builtin))
             .collect::<Vec<_>>();
@@ -150,11 +161,13 @@ impl OutputTypeLayout {
             .map(|(index, &type_id)| {
                 (
                     type_id,
-                    u32::try_from(index).expect("output type count fits the wire type space"),
+                    u32::try_from(index + usize::from(no_value))
+                        .expect("output type count fits the wire type space"),
                 )
             })
             .collect();
         Self {
+            no_value,
             builtins,
             custom_types,
             output_ids,
@@ -163,6 +176,18 @@ impl OutputTypeLayout {
 
     pub(crate) fn builtins(&self) -> &[TypeId] {
         &self.builtins
+    }
+
+    pub(crate) fn has_no_value(&self) -> bool {
+        self.no_value
+    }
+
+    pub(crate) fn no_value_output_id(&self) -> u32 {
+        assert!(
+            self.no_value,
+            "output layout must include the no-value wire type"
+        );
+        0
     }
 
     pub(crate) fn custom_types(&self) -> &[TypeId] {
@@ -298,10 +323,9 @@ impl<'a> OutputSchema<'a> {
             .map(|(&body, &name)| TypeDeclaration { name, body })
             .collect::<Vec<_>>();
         for def_id in reachable_defs.iter() {
-            let body = types.expect_def_output(def_id);
-            if body == TYPE_NO_VALUE {
+            let Some(body) = types.expect_def_output(def_id).value() else {
                 continue;
-            }
+            };
             type_declarations.push(TypeDeclaration {
                 name: deps.def_name_sym(def_id),
                 body,
@@ -326,6 +350,7 @@ impl<'a> OutputSchema<'a> {
     pub(crate) fn type_layout(&self) -> &OutputTypeLayout {
         self.type_layout.get_or_init(|| {
             OutputTypeLayout::build(
+                self.collected_types.no_value,
                 &self.collected_types.builtins,
                 self.collected_types.custom.clone(),
             )
@@ -391,11 +416,12 @@ impl<'a> ItemCollector<'a> {
     fn collect(mut self) -> Vec<OutputItem> {
         for (def_id, output) in self.types.iter_entry_point_outputs() {
             let name = self.deps.def_name_sym(def_id);
-            if output == TYPE_NO_VALUE {
-                self.items.push(OutputItem::match_only_definition(name));
-                continue;
+            match output {
+                DefinitionOutput::MatchOnly => {
+                    self.items.push(OutputItem::match_only_definition(name));
+                }
+                DefinitionOutput::Value(type_id) => self.add_item(name, type_id),
             }
-            self.add_item(name, output);
         }
         self.items
     }
@@ -422,10 +448,10 @@ impl<'a> ItemCollector<'a> {
                 }
             }
             TypeShape::Variant(cases) => {
-                for &payload in cases.values() {
-                    if payload == TYPE_NO_VALUE {
+                for payload in cases.values() {
+                    let Some(payload) = payload.type_id() else {
                         continue;
-                    }
+                    };
                     let TypeShape::Record(fields) = self.types.expect_type_shape(payload) else {
                         unreachable!("variant case has no payload or an anonymous record payload");
                     };
@@ -438,11 +464,7 @@ impl<'a> ItemCollector<'a> {
                 self.collect_position(*element)
             }
             TypeShape::Ref(def_id) => self.collect_reference(*def_id),
-            TypeShape::NoValue
-            | TypeShape::Node
-            | TypeShape::Text
-            | TypeShape::Bool
-            | TypeShape::Custom(_) => {}
+            TypeShape::Node | TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {}
         }
     }
 
@@ -465,20 +487,18 @@ impl<'a> ItemCollector<'a> {
             }
             TypeShape::Ref(def_id) => self.collect_reference(*def_id),
             TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
-            TypeShape::NoValue => unreachable!("no-value flow cannot appear in a value position"),
         }
     }
 
     fn collect_reference(&mut self, def_id: DefId) {
-        let output = self.types.expect_def_output(def_id);
-        if output == TYPE_NO_VALUE {
+        let Some(output) = self.types.expect_def_output(def_id).value() else {
             return;
-        }
+        };
         self.add_item(self.deps.def_name_sym(def_id), output);
     }
 }
 
-/// Custom types in the exact post-order the wire table historically used.
+/// Value types in dependency order for wire-table emission.
 #[cfg(test)]
 pub(super) fn collect_ordered_types(types: &TypeAnalysis) -> Vec<TypeId> {
     CollectedTypes::collect(types, types.iter_def_output().map(|(def_id, _)| def_id)).custom
@@ -488,13 +508,18 @@ pub(super) fn collect_ordered_types(types: &TypeAnalysis) -> Vec<TypeId> {
 struct CollectedTypes {
     custom: Vec<TypeId>,
     builtins: HashSet<TypeId>,
+    no_value: bool,
 }
 
 impl CollectedTypes {
     fn collect(types: &TypeAnalysis, definitions: impl IntoIterator<Item = DefId>) -> Self {
         let mut collector = TypeCollector::new();
+        let mut no_value = false;
         for def_id in definitions {
-            let type_id = types.expect_def_output(def_id);
+            let Some(type_id) = types.expect_def_output(def_id).value() else {
+                no_value = true;
+                continue;
+            };
             collector.collect(type_id, types);
             if !matches!(types.expect_type_shape(type_id), TypeShape::Ref(_)) {
                 continue;
@@ -506,6 +531,7 @@ impl CollectedTypes {
         Self {
             custom: collector.out,
             builtins: collector.builtins,
+            no_value: no_value || collector.no_value,
         }
     }
 }
@@ -514,6 +540,7 @@ struct TypeCollector {
     out: Vec<TypeId>,
     seen: HashSet<TypeId>,
     builtins: HashSet<TypeId>,
+    no_value: bool,
 }
 
 impl TypeCollector {
@@ -522,6 +549,7 @@ impl TypeCollector {
             out: Vec::new(),
             seen: HashSet::new(),
             builtins: HashSet::new(),
+            no_value: false,
         }
     }
 
@@ -534,12 +562,16 @@ impl TypeCollector {
             return;
         }
         let shape = types.expect_type_shape(type_id);
+        if let TypeShape::Variant(cases) = shape
+            && cases.values().any(|payload| payload.type_id().is_none())
+        {
+            self.no_value = true;
+        }
         if let TypeShape::Ref(def_id) = shape {
-            let target = types.expect_def_output(*def_id);
-            if target == TYPE_NO_VALUE {
+            let Some(target) = types.expect_def_output(*def_id).value() else {
                 self.builtins.insert(TYPE_NODE);
                 return;
-            }
+            };
             self.collect(target, types);
             return;
         }

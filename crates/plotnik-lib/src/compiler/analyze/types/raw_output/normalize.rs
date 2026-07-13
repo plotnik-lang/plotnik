@@ -183,7 +183,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
 
 #[derive(Clone)]
 pub(super) struct RawTypeSnapshot {
-    types: Vec<TypeShape>,
+    types: Vec<Option<TypeShape>>,
     definitions: BTreeMap<DefId, TypeId>,
     invalid_containment: HashSet<TypeId>,
 }
@@ -193,11 +193,14 @@ impl RawTypeSnapshot {
         types: &crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
         graph: &RawOutputGraph,
     ) -> Self {
-        let type_shapes = types.analysis.types.clone();
+        let type_shapes = types.type_shapes_snapshot();
         let definitions = graph
             .definitions
             .iter()
-            .map(|(&def_id, &output)| (def_id, output.type_id(graph)))
+            .map(|(&def_id, &output)| {
+                let body = output.output(graph).value().unwrap_or(TYPE_NODE);
+                (def_id, body)
+            })
             .collect();
         let invalid_containment =
             compute_invalid_containment(&type_shapes, &definitions, &types.invalid_types);
@@ -211,6 +214,7 @@ impl RawTypeSnapshot {
     pub(super) fn shape(&self, type_id: TypeId) -> &TypeShape {
         self.types
             .get(type_id.0 as usize)
+            .and_then(Option::as_ref)
             .expect("raw capture type must be registered")
     }
 
@@ -227,7 +231,7 @@ impl RawTypeSnapshot {
 }
 
 fn compute_invalid_containment(
-    types: &[TypeShape],
+    types: &[Option<TypeShape>],
     definitions: &BTreeMap<DefId, TypeId>,
     invalid: &HashSet<TypeId>,
 ) -> HashSet<TypeId> {
@@ -236,6 +240,9 @@ fn compute_invalid_containment(
     // containing type is visited once, after any invalid descendant reaches it.
     let mut containers = vec![Vec::new(); types.len()];
     for (index, shape) in types.iter().enumerate() {
+        let Some(shape) = shape else {
+            continue;
+        };
         let container = TypeId(index as u32);
         if let TypeShape::Ref(def_id) = shape {
             let child = *definitions
@@ -398,17 +405,9 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             .iter()
             .map(|(&name, field)| (name, field.info))
             .collect();
-        let shape = self
-            .session
+        self.session
             .types
-            .analysis
-            .types
-            .get_mut(raw_fields.type_id.0 as usize)
-            .expect("raw fields flow type must be registered");
-        let TypeShape::Record(current) = shape else {
-            unreachable!("raw fields flow must reference a record")
-        };
-        *current = fields;
+            .replace_record_fields(raw_fields.type_id, fields);
 
         if alternation.is_some() {
             self.session.types.analysis.field_completions.insert(

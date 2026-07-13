@@ -16,8 +16,8 @@ use crate::compiler::analyze::types::capture_type::{
 };
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_TEXT,
-    TypeId, TypeShape,
+    DefinitionOutput, ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NODE,
+    TYPE_TEXT, TypeId, TypeShape,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
@@ -171,14 +171,14 @@ struct RawDefinitionOutput {
 }
 
 impl RawDefinitionOutput {
-    fn type_id(self, graph: &RawOutputGraph) -> TypeId {
+    fn output(self, graph: &RawOutputGraph) -> DefinitionOutput {
         match &graph.flow(self.body).flow {
-            RawPatternFlow::NoValue => TYPE_NO_VALUE,
-            RawPatternFlow::Fields(fields) => fields.type_id,
+            RawPatternFlow::NoValue => DefinitionOutput::MatchOnly,
+            RawPatternFlow::Fields(fields) => DefinitionOutput::Value(fields.type_id),
             RawPatternFlow::Value(type_id) if self.value_role == RawDefinitionValueRole::Value => {
-                *type_id
+                DefinitionOutput::Value(*type_id)
             }
-            RawPatternFlow::Value(_) => TYPE_NO_VALUE,
+            RawPatternFlow::Value(_) => DefinitionOutput::MatchOnly,
         }
     }
 }

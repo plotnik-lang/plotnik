@@ -108,9 +108,12 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
             source,
             range: def.text_range(),
             kind: SpanKind::Def,
-            binding: Some(SpanBindingIR::Type(
-                input.analysis.type_analysis.expect_def_output(def_id),
-            )),
+            binding: input
+                .analysis
+                .type_analysis
+                .expect_def_output(def_id)
+                .value()
+                .map(SpanBindingIR::Type),
         });
         collect_pattern(
             input,
@@ -228,9 +231,12 @@ fn collect_pattern(
                 source,
                 range: reference.text_range(),
                 kind: SpanKind::Ref,
-                binding: visibility.bind(SpanBindingIR::Type(
-                    input.analysis.type_analysis.expect_def_output(target),
-                )),
+                binding: input
+                    .analysis
+                    .type_analysis
+                    .expect_def_output(target)
+                    .value()
+                    .and_then(|type_id| visibility.bind(SpanBindingIR::Type(type_id))),
             });
         }
         Pattern::SeqPattern(seq) => {

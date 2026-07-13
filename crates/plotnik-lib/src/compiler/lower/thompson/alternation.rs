@@ -2,10 +2,8 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
-use crate::compiler::analyze::types::type_shape::PatternFlow;
-use crate::compiler::analyze::types::type_shape::RecordField;
+use crate::compiler::analyze::types::type_shape::{CasePayload, PatternFlow, RecordField};
 use crate::compiler::analyze::types::{FieldCompletion, FieldCompletions};
-use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
 };
@@ -529,7 +527,7 @@ impl NfaBuilder<'_> {
         else {
             panic!("an analyzed labeled alternation must produce a variant type");
         };
-        let case_info: BTreeMap<Symbol, (u16, TypeId)> = cases
+        let case_info: BTreeMap<Symbol, (u16, CasePayload)> = cases
             .iter()
             .enumerate()
             .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
@@ -554,7 +552,7 @@ impl NfaBuilder<'_> {
             let label = alternative
                 .label()
                 .expect("labeled alternative must have label");
-            let (case_idx, payload_type_id) = self
+            let (case_idx, payload) = self
                 .ctx
                 .analysis
                 .interner
@@ -578,7 +576,7 @@ impl NfaBuilder<'_> {
             let alternative_end = alternative_span.map(|id| EffectIR::span_end(id.0));
 
             let alternative_nullable = self.pattern_is_nullable(&body);
-            let body_entry = self.with_scope(payload_type_id, |this| {
+            let body_entry = self.compile_with_optional_scope(payload.type_id(), |this| {
                 if alternative_nullable {
                     let mut close_effects = vec![EffectIR::end_variant()];
                     if let Some(end) = alternative_end.clone() {
@@ -645,7 +643,7 @@ impl NfaBuilder<'_> {
                     vec![],
                     CaptureEffects::new_post(alternative_capture.post),
                 );
-                let empty_entry = self.with_scope(payload_type_id, |this| {
+                let empty_entry = self.compile_with_optional_scope(payload.type_id(), |this| {
                     let pattern_ctx = PatternCtx {
                         exit: empty_exit,
                         nav: alternative_nav,

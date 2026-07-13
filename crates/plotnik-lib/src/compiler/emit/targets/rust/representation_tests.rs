@@ -4,7 +4,7 @@ use super::representation::TypeFacts;
 use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, RecordField, TYPE_NO_VALUE, TYPE_NODE, TypeId, TypeShape,
+    CasePayload, DefinitionOutput, ListMinimum, RecordField, TYPE_NODE, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::Interner;
@@ -18,7 +18,7 @@ struct Fixture {
 }
 
 fn record_def(builder: &mut TypeAnalysisBuilder, def_id: DefId, type_id: TypeId) {
-    builder.record_def_output(def_id, type_id);
+    builder.record_def_output(def_id, DefinitionOutput::Value(type_id));
     builder.record_def_root_extent(def_id, RootExtent::SingleNode);
 }
 
@@ -41,8 +41,8 @@ fn recursive_def(wrap: impl FnOnce(&mut TypeAnalysisBuilder, TypeId) -> TypeId) 
         RecordField::new(payload_ty),
     )]));
     let variants = BTreeMap::from([
-        (interner.intern("Leaf"), TYPE_NO_VALUE),
-        (interner.intern("Rec"), payload),
+        (interner.intern("Leaf"), CasePayload::None),
+        (interner.intern("Rec"), CasePayload::Record(payload)),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     record_def(&mut builder, def, enum_ty);
@@ -89,8 +89,8 @@ fn shared_ref_node_boxes_only_inside_the_cycle() {
         RecordField::new(ref_ty),
     )]));
     let variants = BTreeMap::from([
-        (interner.intern("Leaf"), TYPE_NO_VALUE),
-        (interner.intern("Rec"), payload),
+        (interner.intern("Leaf"), CasePayload::None),
+        (interner.intern("Rec"), CasePayload::Record(payload)),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     record_def(&mut builder, expr_def, enum_ty);
@@ -208,8 +208,8 @@ fn node_free_enum_needs_no_lifetime() {
     let def = DefId::from_raw(0);
 
     let variants = BTreeMap::from([
-        (interner.intern("On"), TYPE_NO_VALUE),
-        (interner.intern("Off"), TYPE_NO_VALUE),
+        (interner.intern("On"), CasePayload::None),
+        (interner.intern("Off"), CasePayload::None),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     let holder = builder.intern_record(BTreeMap::from([(

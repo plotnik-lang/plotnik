@@ -17,8 +17,8 @@ use crate::compiler::analyze::types::raw_output::{
     RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TypeId,
-    TypeShape,
+    DefinitionOutput, PatternFlow, PatternShape, RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL,
+    TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
 use crate::compiler::diagnostics::report::Diagnostics;
@@ -43,15 +43,12 @@ pub struct CustomCaptureTypeOccurrence {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct TypeAnalysis {
-    pub(super) types: Vec<TypeShape>,
+    types: Vec<TypeEntry>,
 
-    /// Each definition's output type, keyed by `DefId`. `BTreeMap` so iteration
+    /// Each definition's output, keyed by `DefId`. `BTreeMap` so iteration
     /// is in `DefId` order — the SCC/emission order entry points rely on. Total
-    /// over every scheduled definition: a captureless structural body maps to
-    /// `TYPE_NO_VALUE`, so a lookup for any admitted `DefId` hits. `finish` admits
-    /// the map only after checking its type ids and every `Ref` target are
-    /// consistent.
-    pub(super) def_output: BTreeMap<DefId, TypeId>,
+    /// over every scheduled definition, including match-only definitions.
+    pub(super) def_output: BTreeMap<DefId, DefinitionOutput>,
 
     /// Each definition's static top-level extent. `SingleNode` definitions are
     /// selectable as entry points; all others remain reusable fragments.
@@ -73,9 +70,18 @@ pub struct TypeAnalysis {
     named_types: BTreeMap<TypeId, Symbol>,
 }
 
+#[derive(Clone, Debug)]
+enum TypeEntry {
+    ReservedNoValue,
+    Shape(TypeShape),
+}
+
 impl TypeAnalysis {
     pub fn type_shape(&self, id: TypeId) -> Option<&TypeShape> {
-        self.types.get(id.0 as usize)
+        match self.types.get(id.0 as usize)? {
+            TypeEntry::ReservedNoValue => None,
+            TypeEntry::Shape(shape) => Some(shape),
+        }
     }
 
     pub fn expect_type_shape(&self, id: TypeId) -> &TypeShape {
@@ -89,7 +95,8 @@ impl TypeAnalysis {
             match self.type_shape(type_id) {
                 Some(TypeShape::Option(_)) => return true,
                 Some(TypeShape::Ref(def_id)) => {
-                    let Some(target) = self.def_output(*def_id) else {
+                    let Some(target) = self.def_output(*def_id).and_then(DefinitionOutput::value)
+                    else {
                         return false;
                     };
                     type_id = target;
@@ -135,6 +142,7 @@ impl TypeAnalysis {
             Some(TypeShape::Variant(_) | TypeShape::Record(_)) => true,
             Some(TypeShape::Ref(def_id)) => self
                 .def_output(*def_id)
+                .and_then(DefinitionOutput::value)
                 .is_none_or(|t| self.is_structured_output(t)),
             Some(shape @ (TypeShape::List { .. } | TypeShape::Option(_))) => shape
                 .child_type_ids()
@@ -176,13 +184,13 @@ impl TypeAnalysis {
             .map(|info| info.root_extent)
     }
 
-    pub fn def_output(&self, def_id: DefId) -> Option<TypeId> {
+    pub fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
         self.def_output.get(&def_id).copied()
     }
 
-    pub fn expect_def_output(&self, def_id: DefId) -> TypeId {
+    pub fn expect_def_output(&self, def_id: DefId) -> DefinitionOutput {
         self.def_output(def_id)
-            .expect("admitted definition must have an inferred output type")
+            .expect("admitted definition must have an inferred output")
     }
 
     pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
@@ -209,21 +217,20 @@ impl TypeAnalysis {
         let Some(TypeShape::Ref(def_id)) = self.type_shape(type_id) else {
             return type_id;
         };
-        let target = self.expect_def_output(*def_id);
-        if target == TYPE_NO_VALUE {
+        let Some(target) = self.expect_def_output(*def_id).value() else {
             return TYPE_NODE;
-        }
+        };
         self.resolve_underlying_type_id(target)
     }
 
     /// Iterate over all definition output types as `(DefId, TypeId)` in `DefId`
     /// order, which corresponds to SCC processing order (leaves first).
-    pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
-        self.def_output.iter().map(|(&id, &type_id)| (id, type_id))
+    pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
+        self.def_output.iter().map(|(&id, &output)| (id, output))
     }
 
     /// Iterate over selectable definition outputs in definition order.
-    pub fn iter_entry_point_outputs(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
+    pub fn iter_entry_point_outputs(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
         self.iter_def_output()
             .filter(|&(def_id, _)| self.is_selectable_definition(def_id))
     }
@@ -241,8 +248,11 @@ impl TypeAnalysis {
     /// loudly — the same discipline `DependencyAnalysis::new` follows.
     fn assert_well_formed(&self) {
         assert!(
-            matches!(self.type_shape(TYPE_NO_VALUE), Some(TypeShape::NoValue)),
-            "TYPE_NO_VALUE must be interned at its canonical id",
+            matches!(
+                self.types.get(RESERVED_NO_VALUE_TYPE_ID.0 as usize),
+                Some(TypeEntry::ReservedNoValue)
+            ),
+            "the bytecode no-value slot must remain reserved",
         );
         assert!(
             matches!(self.type_shape(TYPE_NODE), Some(TypeShape::Node)),
@@ -257,7 +267,10 @@ impl TypeAnalysis {
             "TYPE_BOOL must be interned at its canonical id",
         );
 
-        for shape in &self.types {
+        for entry in &self.types {
+            let TypeEntry::Shape(shape) = entry else {
+                continue;
+            };
             for child_id in shape.child_type_ids() {
                 self.assert_type_id_registered(child_id, "child type id out of range");
             }
@@ -274,8 +287,10 @@ impl TypeAnalysis {
             }
         }
 
-        for &type_id in self.def_output.values() {
-            self.assert_type_id_registered(type_id, "def output type id out of range");
+        for output in self.def_output.values() {
+            if let DefinitionOutput::Value(type_id) = output {
+                self.assert_type_id_registered(*type_id, "def output type id out of range");
+            }
         }
 
         assert_eq!(
@@ -417,7 +432,7 @@ impl TypeAnalysisView<'_> {
         self.analysis.pattern_result(pattern)
     }
 
-    pub(crate) fn def_output(&self, def_id: DefId) -> Option<TypeId> {
+    pub(crate) fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
         self.analysis.def_output(def_id)
     }
 }
@@ -447,9 +462,9 @@ impl TypeAnalysisBuilder {
             invalid_types: HashSet::new(),
         };
 
-        // Pre-register builtin types at their expected IDs.
-        let no_value_id = builder.intern_type(TypeShape::NoValue);
-        debug_assert_eq!(no_value_id, TYPE_NO_VALUE);
+        // Preserve bytecode primitive numbering without treating no-value flow as a type.
+        builder.analysis.types.push(TypeEntry::ReservedNoValue);
+        debug_assert_eq!(builder.analysis.types.len(), TYPE_NODE.0 as usize);
 
         let node_id = builder.intern_type(TypeShape::Node);
         debug_assert_eq!(node_id, TYPE_NODE);
@@ -500,7 +515,7 @@ impl TypeAnalysisBuilder {
 
         if matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)) {
             let id = TypeId(self.analysis.types.len() as u32);
-            self.analysis.types.push(shape);
+            self.analysis.types.push(TypeEntry::Shape(shape));
             return id;
         }
 
@@ -509,9 +524,20 @@ impl TypeAnalysisBuilder {
         }
 
         let id = TypeId(self.analysis.types.len() as u32);
-        self.analysis.types.push(shape.clone());
+        self.analysis.types.push(TypeEntry::Shape(shape.clone()));
         self.intern_index.insert(shape, id);
         id
+    }
+
+    pub(super) fn type_shapes_snapshot(&self) -> Vec<Option<TypeShape>> {
+        self.analysis
+            .types
+            .iter()
+            .map(|entry| match entry {
+                TypeEntry::ReservedNoValue => None,
+                TypeEntry::Shape(shape) => Some(shape.clone()),
+            })
+            .collect()
     }
 
     fn type_is_option(&self, type_id: TypeId) -> bool {
@@ -528,6 +554,19 @@ impl TypeAnalysisBuilder {
 
     pub fn intern_single_field_record(&mut self, name: Symbol, info: RecordField) -> TypeId {
         self.intern_type(TypeShape::Record(BTreeMap::from([(name, info)])))
+    }
+
+    pub(super) fn replace_record_fields(
+        &mut self,
+        type_id: TypeId,
+        fields: BTreeMap<Symbol, RecordField>,
+    ) {
+        let Some(TypeEntry::Shape(TypeShape::Record(current))) =
+            self.analysis.types.get_mut(type_id.0 as usize)
+        else {
+            unreachable!("record field replacement requires a registered record")
+        };
+        *current = fields;
     }
 
     pub fn intern_custom(&mut self, name: Symbol) -> TypeId {
@@ -617,8 +656,8 @@ impl TypeAnalysisBuilder {
             .collect()
     }
 
-    pub fn record_def_output(&mut self, def_id: DefId, type_id: TypeId) {
-        self.analysis.def_output.insert(def_id, type_id);
+    pub fn record_def_output(&mut self, def_id: DefId, output: DefinitionOutput) {
+        self.analysis.def_output.insert(def_id, output);
     }
 
     pub(crate) fn record_raw_definition(
@@ -689,7 +728,12 @@ impl TypeAnalysisBuilder {
             (TypeShape::Variant(va), TypeShape::Variant(vb)) => {
                 va.len() == vb.len()
                     && va.iter().zip(vb.iter()).all(|((ka, pa), (kb, pb))| {
-                        ka == kb && self.types_structurally_equal(*pa, *pb)
+                        ka == kb
+                            && match (pa.type_id(), pb.type_id()) {
+                                (None, None) => true,
+                                (Some(a), Some(b)) => self.types_structurally_equal(a, b),
+                                _ => false,
+                            }
                     })
             }
             (
@@ -715,7 +759,11 @@ impl TypeAnalysisBuilder {
             if !seen.insert(*def_id) {
                 return type_id;
             }
-            let Some(body) = self.analysis.def_output(*def_id) else {
+            let Some(body) = self
+                .analysis
+                .def_output(*def_id)
+                .and_then(DefinitionOutput::value)
+            else {
                 return type_id;
             };
             match self.analysis.type_shape(body) {

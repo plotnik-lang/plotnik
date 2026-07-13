@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, PatternShape, TYPE_NO_VALUE, TypeShape,
+    DefinitionOutput, PatternFlow, PatternShape, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
@@ -167,11 +167,12 @@ impl InferVisitor<'_, '_> {
             .type_ctx
             .def_root_extent(def_id)
             .expect("definition root extents are precomputed before inference");
-        let flow = if output == TYPE_NO_VALUE {
-            PatternFlow::NoValue
-        } else {
-            let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
-            PatternFlow::Value(ref_type)
+        let flow = match output {
+            DefinitionOutput::MatchOnly => PatternFlow::NoValue,
+            DefinitionOutput::Value(_) => {
+                let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
+                PatternFlow::Value(ref_type)
+            }
         };
         Some(PatternShape::new(root_extent, flow))
     }

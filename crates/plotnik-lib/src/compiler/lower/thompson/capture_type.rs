@@ -486,10 +486,12 @@ impl CaptureTypeLowerer<'_, '_> {
         let nav = self.nav;
 
         self.compiler.inline_stack.push(def_id);
-        let entry = self.compiler.with_scope(output, |this| {
-            this.capture_type(&plan, nav, body_exits)
-                .lower(body, ValueDestination::Pending)
-        });
+        let entry = self
+            .compiler
+            .compile_with_optional_scope(output.value(), |this| {
+                this.capture_type(&plan, nav, body_exits)
+                    .lower(body, ValueDestination::Pending)
+            });
         self.compiler.inline_stack.pop();
         self.compiler.wrap_def_body_entry(entry, def_span)
     }

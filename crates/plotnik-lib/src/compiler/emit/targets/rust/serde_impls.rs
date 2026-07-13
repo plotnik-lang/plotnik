@@ -14,7 +14,7 @@
 
 use std::fmt::Write as _;
 
-use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 
 use super::type_model::TypeContext;
@@ -39,7 +39,7 @@ impl Emitter<'_, '_> {
     pub(super) fn serde_impl(&mut self, item: &Item) -> String {
         let rt = self.config.rt_crate.clone();
         let ident = self.item_ident(item.name).to_string();
-        let usage = self.lifetime_usage(item.ty);
+        let usage = self.lifetime_usage(item.value_type());
         let args = match (usage.tree, usage.source) {
             (false, false) => "",
             (true, false) | (false, true) => "<'_>",
@@ -78,7 +78,7 @@ impl Emitter<'_, '_> {
         let types = self.schema.types;
         let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
-        let TypeShape::Record(fields) = types.expect_type_shape(item.ty) else {
+        let TypeShape::Record(fields) = types.expect_type_shape(item.value_type()) else {
             unreachable!("struct item must have a record shape");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
@@ -105,7 +105,7 @@ impl Emitter<'_, '_> {
     fn enum_body(&mut self, item: &Item, ident: &str) -> SerdeBody {
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Variant(variants) = types.expect_type_shape(item.ty) else {
+        let TypeShape::Variant(variants) = types.expect_type_shape(item.value_type()) else {
             unreachable!("Rust enum item must have a variant shape");
         };
         let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
@@ -114,7 +114,7 @@ impl Emitter<'_, '_> {
         let mut uses_source = false;
         for ((&label_sym, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
             let label = interner.resolve(label_sym);
-            let arm = if payload != TYPE_NO_VALUE {
+            let arm = if let Some(payload) = payload.type_id() {
                 uses_source = true;
                 self.payload_arm(item, payload, variant_ident, label)
             } else {
@@ -166,7 +166,7 @@ impl Emitter<'_, '_> {
         {
             // The helper borrows the enum's actual field, so its type must be
             // spelled with the declaration's own cut context.
-            let field_ty = self.field_type(TypeContext::item(item.ty), info);
+            let field_ty = self.field_type(TypeContext::item(item.value_type()), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);

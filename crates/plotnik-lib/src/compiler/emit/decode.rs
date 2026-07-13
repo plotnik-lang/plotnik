@@ -10,7 +10,9 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::compiler::analyze::output::{CaptureLayout, OutputItem, OutputItemKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NO_VALUE, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{
+    DefinitionOutput, RecordField, TypeId, TypeShape,
+};
 use crate::core::Symbol;
 
 #[derive(Clone, Debug)]
@@ -54,7 +56,7 @@ impl ResultDecodePlan {
 #[derive(Clone, Debug)]
 pub(crate) struct DecodeItem {
     pub(crate) name: Symbol,
-    pub(crate) ty: TypeId,
+    pub(crate) output: DefinitionOutput,
     pub(crate) kind: DecodeItemKind,
     /// This decoder is a recursive definition's dynamic depth boundary.
     pub(crate) enters_depth: bool,
@@ -65,6 +67,12 @@ pub(crate) struct DecodeItem {
 impl DecodeItem {
     pub(crate) fn has_decoder(&self) -> bool {
         !matches!(self.kind, DecodeItemKind::MatchOnlyDefinition)
+    }
+
+    pub(crate) fn value_type(&self) -> TypeId {
+        self.output
+            .value()
+            .expect("value decoder must have a value type")
     }
 }
 
@@ -121,19 +129,21 @@ impl DecodePlanBuilder<'_, '_> {
     fn item(&self, item: OutputItem) -> DecodeItem {
         let kind = match item.kind {
             OutputItemKind::Record => {
-                let TypeShape::Record(fields) = self.schema.types.expect_type_shape(item.ty) else {
+                let TypeShape::Record(fields) =
+                    self.schema.types.expect_type_shape(item.value_type())
+                else {
                     unreachable!("record output item has a record shape");
                 };
                 let twins = collect_twins(self.schema.types, self.schema.layout(), item);
                 DecodeItemKind::Record(self.scope(fields.iter(), &twins))
             }
             OutputItemKind::Variant => DecodeItemKind::Variant(self.variant_cases(item)),
-            OutputItemKind::Alias => DecodeItemKind::Alias(self.value(item.ty)),
+            OutputItemKind::Alias => DecodeItemKind::Alias(self.value(item.value_type())),
             OutputItemKind::MatchOnlyDef => DecodeItemKind::MatchOnlyDefinition,
         };
         DecodeItem {
             name: item.name,
-            ty: item.ty,
+            output: item.output,
             kind,
             enters_depth: self.item_enters_depth(item.name),
             fallible: self.item_is_fallible(item),
@@ -141,7 +151,8 @@ impl DecodePlanBuilder<'_, '_> {
     }
 
     fn variant_cases(&self, item: OutputItem) -> Vec<DecodeCase> {
-        let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(item.ty) else {
+        let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(item.value_type())
+        else {
             unreachable!("variant output item has a variant shape");
         };
         let twins = collect_twins(self.schema.types, self.schema.layout(), item);
@@ -149,16 +160,14 @@ impl DecodePlanBuilder<'_, '_> {
             .iter()
             .enumerate()
             .map(|(index, (&name, &payload))| {
-                let payload = if payload == TYPE_NO_VALUE {
-                    None
-                } else {
+                let payload = payload.type_id().map(|payload| {
                     let TypeShape::Record(fields) = self.schema.types.expect_type_shape(payload)
                     else {
                         unreachable!("variant case has no payload or an anonymous record payload");
                     };
                     let payloads = payload_twins(self.schema.types, &twins, index);
-                    Some(self.scope(fields.iter(), &payloads))
-                };
+                    self.scope(fields.iter(), &payloads)
+                });
                 DecodeCase {
                     name,
                     indices: member_indices(self.schema.layout(), &twins, index),
@@ -200,17 +209,19 @@ impl DecodePlanBuilder<'_, '_> {
                 source_type: ty,
             },
             TypeShape::Ref(definition) => {
-                let target = self.schema.types.expect_def_output(*definition);
-                if target == TYPE_NO_VALUE {
+                if self
+                    .schema
+                    .types
+                    .expect_def_output(*definition)
+                    .value()
+                    .is_none()
+                {
                     return DecodeValue::Node;
                 }
                 DecodeValue::Nested {
                     item: self.schema.deps.def_name_sym(*definition),
                     source_type: ty,
                 }
-            }
-            TypeShape::NoValue => {
-                unreachable!("no-value flow cannot appear in a value position")
             }
         }
     }
@@ -224,7 +235,9 @@ impl DecodePlanBuilder<'_, '_> {
 
     fn item_is_fallible(&self, item: OutputItem) -> bool {
         self.item_enters_depth(item.name)
-            || self.type_reaches_recursive_ref(item.ty, &mut HashSet::new())
+            || item.output.value().is_some_and(|type_id| {
+                self.type_reaches_recursive_ref(type_id, &mut HashSet::new())
+            })
     }
 
     fn type_reaches_recursive_ref(&self, ty: TypeId, seen: &mut HashSet<TypeId>) -> bool {
@@ -238,10 +251,9 @@ impl DecodePlanBuilder<'_, '_> {
         }
         match self.schema.types.expect_type_shape(ty) {
             TypeShape::Ref(definition) => {
-                let target = self.schema.types.expect_def_output(*definition);
-                if target == TYPE_NO_VALUE {
+                let Some(target) = self.schema.types.expect_def_output(*definition).value() else {
                     return false;
-                }
+                };
                 self.schema.deps.is_recursive_def(*definition)
                     || self.type_reaches_recursive_ref(target, seen)
             }
@@ -272,7 +284,7 @@ fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: OutputItem)
         }
         twins.insert(ty);
     }
-    twins.insert(item.ty);
+    twins.insert(item.value_type());
     twins.into_iter().collect()
 }
 
@@ -284,10 +296,12 @@ fn payload_twins(types: &TypeAnalysis, twins: &[TypeId], index: usize) -> Vec<Ty
             let TypeShape::Variant(cases) = types.expect_type_shape(ty) else {
                 unreachable!("variant twins share the variant shape");
             };
-            *cases
+            cases
                 .values()
                 .nth(index)
                 .expect("twins share the case list")
+                .type_id()
+                .expect("payload twins belong to a payload-bearing case")
         })
         .collect()
 }

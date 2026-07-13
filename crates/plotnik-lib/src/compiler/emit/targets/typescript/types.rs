@@ -3,7 +3,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::output::{OutputItem, OutputItemKind, OutputSchema};
-use crate::compiler::analyze::types::type_shape::{ListMinimum, TYPE_NO_VALUE, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{
+    CasePayload, DefinitionOutput, ListMinimum, TypeId, TypeShape,
+};
 use crate::compiler::emit::sink::{Sink, Style};
 use crate::core::Symbol;
 
@@ -71,7 +73,8 @@ impl<'a> SchemaEmitter<'a> {
         let items = self.schema.entry_point_items().to_vec();
         self.needs_node_type = items
             .iter()
-            .any(|item| self.type_uses_node(item.ty, &mut HashSet::new()));
+            .filter_map(|item| item.output.value())
+            .any(|type_id| self.type_uses_node(type_id, &mut HashSet::new()));
         if self.config.emit_node_interface && self.needs_node_type {
             self.emit_node_interface();
         }
@@ -108,10 +111,12 @@ impl<'a> SchemaEmitter<'a> {
         }
         match self.schema.types.expect_type_shape(ty) {
             TypeShape::Node | TypeShape::Custom(_) => true,
-            TypeShape::Ref(definition) => {
-                let target = self.schema.types.expect_def_output(*definition);
-                target == TYPE_NO_VALUE || self.type_uses_node(target, seen)
-            }
+            TypeShape::Ref(definition) => self
+                .schema
+                .types
+                .expect_def_output(*definition)
+                .value()
+                .is_none_or(|target| self.type_uses_node(target, seen)),
             shape => shape
                 .child_type_ids()
                 .any(|child| self.type_uses_node(child, seen)),
@@ -124,21 +129,28 @@ impl<'a> SchemaEmitter<'a> {
             return;
         }
         match item.kind {
-            OutputItemKind::Record => self.emit_interface(&name, item.ty),
-            OutputItemKind::Variant => self.emit_variant(&name, item.ty),
-            OutputItemKind::Alias | OutputItemKind::MatchOnlyDef => {
-                let body = self.render_shape(item.ty);
-                self.emit_type_decl(&name, item.ty, body);
+            OutputItemKind::Record => self.emit_interface(&name, item.value_type()),
+            OutputItemKind::Variant => self.emit_variant(&name, item.value_type()),
+            OutputItemKind::Alias => {
+                let body = self.render_shape(item.value_type());
+                self.emit_type_decl(&name, item.output, body);
+            }
+            OutputItemKind::MatchOnlyDef => {
+                let body = match self.config.match_only_type {
+                    MatchOnlyType::Undefined => text("undefined"),
+                    MatchOnlyType::Null => text("null"),
+                };
+                self.emit_type_decl(&name, item.output, body);
             }
         }
     }
 
-    fn emit_type_decl(&mut self, name: &str, ty: TypeId, body: Sink<SemanticTag>) {
+    fn emit_type_decl(&mut self, name: &str, output: DefinitionOutput, body: Sink<SemanticTag>) {
         emit_export(&mut self.sink, self.config.export);
         self.sink.styled(Style::Dim, "type");
         self.sink.push(" ");
         self.sink.set_style(Style::Blue);
-        self.push_mapped(name, ty, None);
+        self.push_mapped_output(name, output);
         self.sink.reset_style();
         self.sink.push(" ");
         self.sink.styled(Style::Dim, "=");
@@ -254,18 +266,19 @@ impl<'a> SchemaEmitter<'a> {
 
     fn render_shape(&self, ty: TypeId) -> Sink<SemanticTag> {
         match self.schema.types.expect_type_shape(ty) {
-            TypeShape::NoValue => match self.config.match_only_type {
-                MatchOnlyType::Undefined => text("undefined"),
-                MatchOnlyType::Null => text("null"),
-            },
             TypeShape::Node | TypeShape::Custom(_) => text("Node"),
             TypeShape::Text => self.render_builtin("string", ty),
             TypeShape::Bool => self.render_builtin("boolean", ty),
             TypeShape::Option(inner) => self.render_nullable(*inner),
             TypeShape::List { element, minimum } => self.render_array(*element, *minimum),
             TypeShape::Ref(definition) => {
-                let target = self.schema.types.expect_def_output(*definition);
-                if target == TYPE_NO_VALUE {
+                if self
+                    .schema
+                    .types
+                    .expect_def_output(*definition)
+                    .value()
+                    .is_none()
+                {
                     return text("Node");
                 }
                 let name = self.schema.deps.def_name_sym(*definition);
@@ -368,7 +381,7 @@ impl<'a> SchemaEmitter<'a> {
     fn render_variant(
         &self,
         name: &str,
-        payload: TypeId,
+        payload: CasePayload,
         tag: Option<SemanticTag>,
         payload_tags: bool,
     ) -> Sink<SemanticTag> {
@@ -386,11 +399,11 @@ impl<'a> SchemaEmitter<'a> {
         }
         out.push("\"");
         out.reset_style();
-        if payload == TYPE_NO_VALUE {
+        let Some(payload) = payload.type_id() else {
             out.push(" ");
             out.styled(Style::Dim, "}");
             return out;
-        }
+        };
         out.set_style(Style::Dim);
         out.push("; $data");
         out.set_style(Style::Dim);
@@ -434,6 +447,24 @@ impl<'a> SchemaEmitter<'a> {
             member,
         };
         self.sink.tagged(tag, |sink| sink.push(value));
+    }
+
+    fn push_mapped_output(&mut self, value: &str, output: DefinitionOutput) {
+        if !self.map_enabled {
+            self.sink.push(value);
+            return;
+        }
+        let type_id = match output {
+            DefinitionOutput::MatchOnly => self.schema.type_layout().no_value_output_id(),
+            DefinitionOutput::Value(type_id) => self.wire_id(type_id),
+        };
+        self.sink.tagged(
+            SemanticTag {
+                type_id,
+                member: None,
+            },
+            |sink| sink.push(value),
+        );
     }
 
     fn render_builtin(&self, value: &str, ty: TypeId) -> Sink<SemanticTag> {

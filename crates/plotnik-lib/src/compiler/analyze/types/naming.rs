@@ -25,7 +25,7 @@ use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
-use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
@@ -118,7 +118,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 .expect("every definition is inferred before naming");
 
             let span = definition_name_span(symbol_table, self.interner, name_sym);
-            let type_id = (output != TYPE_NO_VALUE).then_some(output);
+            let type_id = output.value();
 
             self.claim(name_sym, type_id, span);
         }
@@ -132,9 +132,9 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 .in_progress()
                 .def_output(def_id)
                 .expect("every definition is inferred before naming");
-            if output == TYPE_NO_VALUE {
+            let Some(output) = output.value() else {
                 continue;
-            }
+            };
             let name = self.interner.resolve(deps.def_name_sym(def_id)).to_owned();
             self.walk_named(output, &name);
         }
@@ -162,8 +162,11 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 // case's data); composites inside their fields are named
                 // through the variant type name + the verbatim label.
                 for (label_sym, payload) in &cases {
+                    let Some(payload) = payload.type_id() else {
+                        continue;
+                    };
                     let Some(TypeShape::Record(payload_fields)) =
-                        self.ctx.in_progress().type_shape(*payload).cloned()
+                        self.ctx.in_progress().type_shape(payload).cloned()
                     else {
                         continue;
                     };
@@ -261,8 +264,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     self.warn_redundant_capture_type(capture_type.span, &detail);
                 }
             }
-            TypeShape::NoValue
-            | TypeShape::Node
+            TypeShape::Node
             | TypeShape::Text
             | TypeShape::Bool
             | TypeShape::List { .. }
