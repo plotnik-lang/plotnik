@@ -90,7 +90,7 @@ impl ReturnOutcomes {
     fn insert(&mut self, outcome: plotnik_rt::ReturnOutcome) {
         self.0 |= match outcome {
             plotnik_rt::ReturnOutcome::Matched => Self::MATCHED.0,
-            plotnik_rt::ReturnOutcome::Zero => 2,
+            plotnik_rt::ReturnOutcome::Empty => 2,
         };
     }
 }
@@ -136,8 +136,8 @@ impl DepthRoute {
             (Self::Caller, plotnik_rt::ReturnOutcome::Matched) => Some(0),
             (Self::RoutedMatchOnly(depth), plotnik_rt::ReturnOutcome::Matched)
             | (Self::RoutedSplit(depth), plotnik_rt::ReturnOutcome::Matched) => Some(depth),
-            (Self::RoutedSplit(_), plotnik_rt::ReturnOutcome::Zero) => Some(0),
-            (Self::Caller | Self::RoutedMatchOnly(_), plotnik_rt::ReturnOutcome::Zero) => None,
+            (Self::RoutedSplit(_), plotnik_rt::ReturnOutcome::Empty) => Some(0),
+            (Self::Caller | Self::RoutedMatchOnly(_), plotnik_rt::ReturnOutcome::Empty) => None,
         }
     }
 
@@ -640,7 +640,7 @@ impl Module {
 
     /// Calls and callees must agree on the return outcomes carried by their
     /// frames. This keeps malformed bytecode from selecting a continuation an
-    /// ordinary frame does not own, or from encoding a split call whose zero
+    /// ordinary frame does not own, or from encoding a split call whose empty
     /// route can never be taken.
     fn validate_return_routes(&self) -> Result<(), ModuleError> {
         let mut cache = HashMap::new();
@@ -727,7 +727,7 @@ impl Module {
                     work.push(CodeAddr::from(u16::from(call.next)));
                 }
                 Instruction::SplitCall(call) => {
-                    work.push(CodeAddr::from(u16::from(call.returns.zero)));
+                    work.push(CodeAddr::from(u16::from(call.returns.empty)));
                     work.push(CodeAddr::from(u16::from(call.returns.matched)));
                 }
                 Instruction::Return(return_) => contract.insert(return_),
@@ -789,7 +789,7 @@ impl Module {
                         CodeAddr::from(u16::from(c.returns.matched)),
                         net + c.entry_nav.depth_delta(),
                     ));
-                    work.push((CodeAddr::from(u16::from(c.returns.zero)), net));
+                    work.push((CodeAddr::from(u16::from(c.returns.empty)), net));
                 }
             }
         }
@@ -1025,14 +1025,14 @@ impl Module {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
                     let matched = read_operand_u16(storage, instr_off + 2)?;
-                    let zero = read_operand_u16(storage, instr_off + 4)?;
+                    let empty = read_operand_u16(storage, instr_off + 4)?;
                     let target = read_operand_u16(storage, instr_off + 6)?;
-                    if matched == 0 || zero == 0 || target == 0 {
+                    if matched == 0 || empty == 0 || target == 0 {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
                     targets.extend([
                         CodeAddr::from(matched),
-                        CodeAddr::from(zero),
+                        CodeAddr::from(empty),
                         CodeAddr::from(target),
                     ]);
                 }

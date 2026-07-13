@@ -279,7 +279,7 @@ impl<'a> AnchorSemantics<'a> {
     /// `None` when the item list has no leading anchor. Descends into a sole-child
     /// sequence like [`check_trailing_anchor`](Self::check_trailing_anchor), and
     /// reads the nav off [`compute_nav_modes`](Self::compute_nav_modes) so the
-    /// zero-width arm of the anchor cannot drift from the arm that matches.
+    /// empty-match arm of the anchor cannot drift from the arm that matches.
     pub fn check_leading_anchor(&self, items: &[SeqItem]) -> Option<Nav> {
         if items.len() == 1
             && let Some(SeqItem::Pattern(Pattern::SeqPattern(seq))) = items.first()

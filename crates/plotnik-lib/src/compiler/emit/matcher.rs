@@ -142,7 +142,7 @@ impl OrdinaryCallPlan {
 pub(crate) struct SplitCallPlan {
     pub(crate) target: StateId,
     pub(crate) matched: StateId,
-    pub(crate) zero: StateId,
+    pub(crate) empty: StateId,
 }
 
 #[derive(Clone, Debug)]
@@ -455,7 +455,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             CallProtocol::Split { returns, .. } => CallPlan::Split(SplitCallPlan {
                 target,
                 matched,
-                zero: resolve_state(self.ids, returns[1]),
+                empty: resolve_state(self.ids, returns[1]),
             }),
             CallProtocol::Routed { .. } => CallPlan::Routed(RoutedCallPlan {
                 target,

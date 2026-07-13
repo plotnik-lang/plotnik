@@ -49,7 +49,7 @@ fn resolve_instruction(
             let encoded = match return_.mode {
                 crate::bytecode::ReturnMode::CallerMatched => Return::matched(),
                 crate::bytecode::ReturnMode::RoutedMatched => Return::routed_matched(),
-                crate::bytecode::ReturnMode::RoutedZero => Return::routed_zero(),
+                crate::bytecode::ReturnMode::RoutedEmpty => Return::routed_empty(),
             };
             Ok(encoded.to_bytes().to_vec())
         }
@@ -119,7 +119,7 @@ fn resolve_call(c: &CallIR, map: &BTreeMap<Label, CodeAddr>) -> [u8; 8] {
             entry_nav,
             SplitCallReturns {
                 matched: successor_addr(returns[0]),
-                zero: successor_addr(returns[1]),
+                empty: successor_addr(returns[1]),
             },
             target,
         )

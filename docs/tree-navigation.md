@@ -118,9 +118,9 @@ in-instruction search or the NFA loop, never both.
 | `UpSkipExtras(n)` | Each node left must be its parent's last non-extra child  |
 | `UpExact(n)`      | Each node left must be its parent's last child            |
 
-**Childless variants** (zero-width anchors):
+**Childless variants** (empty-match anchors):
 
-When a node's whole child list matches zero-width, the cursor never descends,
+When a node's whole child list matches empty, the cursor never descends,
 so no `Down*` entry carries a leading anchor's first-child check and no `Up*`
 ascent carries a trailing anchor's lastness check. `Childless*` asserts the
 degenerate form of either: the node has no children the anchor's skip policy
@@ -359,8 +359,8 @@ A `Call` navigates to its first candidate the same way a `Match` does. When the 
 
 This is the same forward-search-with-backtracking that in-pattern anchors and quantifiers use; the resume state lives on the checkpoint so there is exactly one notion of "advance to the next sibling and try again," shared by `Call` retry and pattern search alike.
 
-### Zero-width returns
+### Empty-match returns
 
 A `Call`'s return address carries the navigation the follower needs _after the callee consumed its candidate_ — there is no return path that says "nothing was consumed, stay put." So references to _nullable_ definitions (bodies that can match zero nodes, e.g. `A = (x)?`) are not compiled as calls at all: the body is inlined at the reference site, where the ordinary skip-path machinery (checkpoint cursor restore, split follower navigation) applies exactly as if the body were written inline.
 
-The one exception is a nullable reference back into a definition currently being compiled (`A = (x (A) (y))?`). It becomes a real call guarded by a zero-width bypass branch that is tried first. The call targets a consuming-only body, so the bypass covers the empty case and every actual call path consumes input.
+The one exception is a nullable reference back into a definition currently being compiled (`A = (x (A) (y))?`). It becomes a real call guarded by an empty-match bypass tried first. The call targets a consuming-only body, so the bypass covers the empty case and every actual call path consumes input.

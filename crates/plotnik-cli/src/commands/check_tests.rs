@@ -19,7 +19,7 @@ fn check_js(query: &str) -> CliResult {
 }
 
 #[test]
-fn accepts_enum_zero_width_branch_in_quantifier() {
+fn accepts_labeled_empty_alternative_in_quantifier() {
     // A skippable enum arm in a quantifier (`[A: (comment)? @c]*`) used to emit
     // an unbracketed skip path rejected by bytecode validation;
     // enum bracket dominance makes both arm paths close the enum, so it compiles.

@@ -796,9 +796,12 @@ impl<'a> Generator<'a> {
         let state = &self.state(state_plan.id).const_name;
         let target = &self.state(plan.target).const_name;
         let matched = &self.state(plan.matched).const_name;
-        let zero = &self.state(plan.zero).const_name;
+        let empty = &self.state(plan.empty).const_name;
         let _ = writeln!(out, "        {state} => {{");
-        let _ = writeln!(out, "            eng.enter_split_frame({matched}, {zero});");
+        let _ = writeln!(
+            out,
+            "            eng.enter_split_frame({matched}, {empty});"
+        );
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
     }
@@ -1046,7 +1049,7 @@ fn policy_expr(policy: SkipPolicy) -> String {
 fn return_outcome_expr(outcome: plotnik_rt::ReturnOutcome) -> &'static str {
     match outcome {
         plotnik_rt::ReturnOutcome::Matched => "rt::ReturnOutcome::Matched",
-        plotnik_rt::ReturnOutcome::Zero => "rt::ReturnOutcome::Zero",
+        plotnik_rt::ReturnOutcome::Empty => "rt::ReturnOutcome::Empty",
     }
 }
 
@@ -1380,7 +1383,7 @@ eng.push_checkpoint(rt::Checkpoint::call_retry(
 const RETURN_ARM: &str = r#"
 @STATE@ => {
     if eng.frames_empty() {
-        assert_eq!(@OUTCOME@, rt::ReturnOutcome::Matched, "entry point returned zero-width");
+        assert_eq!(@OUTCOME@, rt::ReturnOutcome::Matched, "entry point returned empty");
         Flow::Accept
     } else {
         Flow::Jump(eng.exit_frame(@OUTCOME@))

@@ -245,10 +245,10 @@ impl<'t> Engine<'t> {
         self.enter_frame_with(crate::FrameReturns::single(return_addr));
     }
 
-    /// Enter a nullable callee whose matched and zero-width outcomes resume at
+    /// Enter a nullable callee whose node-consuming and empty outcomes resume at
     /// different continuations.
-    pub fn enter_split_frame(&mut self, matched: u16, zero: u16) {
-        self.enter_frame_with(crate::FrameReturns::split(matched, zero));
+    pub fn enter_split_frame(&mut self, matched: u16, empty: u16) {
+        self.enter_frame_with(crate::FrameReturns::split(matched, empty));
     }
 
     fn enter_frame_with(&mut self, returns: crate::FrameReturns) {

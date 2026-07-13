@@ -75,7 +75,7 @@ Instruction forms:
 | Call        | `addr nav field: (@target) target : ret` |
 | RoutedCall  | `addr (@target) target : ret`            |
 | SplitCall   | `addr (@target) target : matched / zero` |
-| Return      | `addr ▶` or `addr ▶ zero`                |
+| Return      | `addr ▶` or `addr ▶ empty`               |
 | Padding     | `addr ...`                               |
 
 An empty navigation column means `Stay`. `-ε-` means `Nav::Epsilon`, a distinct

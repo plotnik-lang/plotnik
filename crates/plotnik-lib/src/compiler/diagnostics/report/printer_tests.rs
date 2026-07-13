@@ -150,7 +150,7 @@ fn printer_with_custom_path() {
 }
 
 #[test]
-fn printer_zero_width_span() {
+fn printer_empty_range() {
     let mut map = SourceMap::new();
     let id = map.add_inline("hello");
 
@@ -160,12 +160,12 @@ fn printer_zero_width_span() {
             DiagnosticKind::ExpectedExpression,
             Span::new(id, TextRange::empty(0.into())),
         )
-        .detail("zero width error")
+        .detail("empty range error")
         .emit();
 
     let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @r#"
-    error: expected an expression: zero width error
+    error: expected an expression: empty range error
       |
     1 | hello
       | ^
@@ -175,7 +175,7 @@ fn printer_zero_width_span() {
 }
 
 #[test]
-fn printer_related_zero_width() {
+fn printer_related_empty_range() {
     let mut map = SourceMap::new();
     let id = map.add_inline("hello world!");
 
@@ -188,7 +188,7 @@ fn printer_related_zero_width() {
         .detail("primary")
         .related_to(
             Span::new(id, TextRange::empty(6.into())),
-            "zero width related",
+            "empty range related",
         )
         .emit();
 
@@ -197,7 +197,7 @@ fn printer_related_zero_width() {
     error: missing closing `)`: primary
       |
     1 | hello world!
-      | ^^^^^ - zero width related
+      | ^^^^^ - empty range related
       |
     help: add `)` to close the node
     ");

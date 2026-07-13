@@ -82,7 +82,7 @@ pub enum DiagnosticKind {
     CaptureWithoutSingleNode,
     MatchOnlyReferenceCapture,
     UnnamedQuantifiedElement,
-    ZeroWidthRepeat,
+    NullableRepeat,
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
     IncompatibleRecordShapes,
@@ -310,7 +310,7 @@ impl DiagnosticKind {
                 "`(ERROR)` matches any error node as a leaf; use `(MISSING \"x\")` to match a missing token"
             }
             Self::MissingTakesNoChildren => {
-                "a missing node is a zero-width token inserted by error recovery; write `(MISSING)`, `(MISSING kind)`, or `(MISSING \";\")`"
+                "a missing node is a zero-byte node inserted by error recovery; write `(MISSING)`, `(MISSING kind)`, or `(MISSING \";\")`"
             }
             Self::MissingKindNotToken => {
                 "use a token kind like `(MISSING identifier)`, a quoted literal like `(MISSING \";\")`, or bare `(MISSING)`"
@@ -408,7 +408,7 @@ impl DiagnosticKind {
             Self::UnnamedQuantifiedElement => {
                 "quantifier at definition root leaves its element type unnamed"
             }
-            Self::ZeroWidthRepeat => "cannot repeat a nullable pattern",
+            Self::NullableRepeat => "cannot repeat a nullable pattern",
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleRecordShapes => "incompatible record shapes",
@@ -479,7 +479,7 @@ impl DiagnosticKind {
             Self::CaptureWithoutSingleNode => "{}".to_string(),
             Self::MatchOnlyReferenceCapture => "{}".to_string(),
             Self::UnnamedQuantifiedElement => "{}".to_string(),
-            Self::ZeroWidthRepeat => "{}".to_string(),
+            Self::NullableRepeat => "{}".to_string(),
             Self::TypeNameConflict => {
                 "type name `{}` is already used for a different type".to_string()
             }

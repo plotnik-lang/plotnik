@@ -29,7 +29,7 @@ Body:
 B (split, routed Next):
   06  -ε-                                   13, 08, 27
   07                                        ▶
-  08                                        ▶ zero
+  08                                        ▶ empty
   09  -ε-  [SuppressEnd]                    07
   10   !   (Body)                           04 : 09
   11  -ε-  [SuppressBegin]                  10
@@ -90,7 +90,7 @@ Q:
   02                                        ▶
   03                                        ▶
   04                                        ▶
-  05                                        ▶ zero
+  05                                        ▶ empty
   06  -ε-  [SuppressEnd]                    04
   08   !   (@25)                            25 : 06
   09  -ε-  [SuppressBegin]                  08

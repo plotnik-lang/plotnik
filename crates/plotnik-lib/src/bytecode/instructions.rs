@@ -479,7 +479,7 @@ impl<'a> Match<'a> {
         )
     }
 
-    /// Whether the matched node must be a tree-sitter MISSING node (a zero-width
+    /// Whether the matched node must be a tree-sitter MISSING node (a zero-byte
     /// node the parser inserts during error recovery). Only extended Matches can
     /// carry it — the `Match8` fast path has no counts word.
     #[inline]
@@ -870,7 +870,7 @@ pub struct SplitCall {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SplitCallReturns {
     pub matched: SuccessorAddr,
-    pub zero: SuccessorAddr,
+    pub empty: SuccessorAddr,
 }
 
 impl SplitCall {
@@ -902,7 +902,7 @@ impl SplitCall {
             entry_nav: Nav::from_byte(bytes[1]),
             returns: SplitCallReturns {
                 matched: successor_addr(2),
-                zero: successor_addr(4),
+                empty: successor_addr(4),
             },
             target: successor_addr(6),
         }
@@ -913,7 +913,7 @@ impl SplitCall {
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::SplitCall);
         bytes[1] = self.entry_nav.to_byte();
         bytes[2..4].copy_from_slice(&u16::from(self.returns.matched).to_le_bytes());
-        bytes[4..6].copy_from_slice(&u16::from(self.returns.zero).to_le_bytes());
+        bytes[4..6].copy_from_slice(&u16::from(self.returns.empty).to_le_bytes());
         bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
         bytes
     }
@@ -927,12 +927,12 @@ pub enum ReturnEntry {
 }
 
 /// Complete return protocol. Invalid combinations such as a caller-owned
-/// zero-width return are unrepresentable after decoding.
+/// empty return are unrepresentable after decoding.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ReturnMode {
     CallerMatched,
     RoutedMatched,
-    RoutedZero,
+    RoutedEmpty,
 }
 
 impl ReturnMode {
@@ -947,8 +947,8 @@ impl ReturnMode {
             (Some(plotnik_rt::ReturnOutcome::Matched), Some(ReturnEntry::Routed)) => {
                 Some(Self::RoutedMatched)
             }
-            (Some(plotnik_rt::ReturnOutcome::Zero), Some(ReturnEntry::Routed)) => {
-                Some(Self::RoutedZero)
+            (Some(plotnik_rt::ReturnOutcome::Empty), Some(ReturnEntry::Routed)) => {
+                Some(Self::RoutedEmpty)
             }
             _ => None,
         }
@@ -957,14 +957,14 @@ impl ReturnMode {
     pub fn outcome(self) -> plotnik_rt::ReturnOutcome {
         match self {
             Self::CallerMatched | Self::RoutedMatched => plotnik_rt::ReturnOutcome::Matched,
-            Self::RoutedZero => plotnik_rt::ReturnOutcome::Zero,
+            Self::RoutedEmpty => plotnik_rt::ReturnOutcome::Empty,
         }
     }
 
     pub fn entry(self) -> ReturnEntry {
         match self {
             Self::CallerMatched => ReturnEntry::Caller,
-            Self::RoutedMatched | Self::RoutedZero => ReturnEntry::Routed,
+            Self::RoutedMatched | Self::RoutedEmpty => ReturnEntry::Routed,
         }
     }
 }
@@ -1013,10 +1013,10 @@ impl Return {
         }
     }
 
-    pub fn routed_zero() -> Self {
+    pub fn routed_empty() -> Self {
         Self {
             segment: 0,
-            mode: ReturnMode::RoutedZero,
+            mode: ReturnMode::RoutedEmpty,
         }
     }
 

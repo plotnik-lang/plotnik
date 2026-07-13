@@ -61,7 +61,7 @@ Q:
   12  └•─  (debugger_statement) [SuppressEnd]  29
   14  ─‣─  (debugger_statement) [SuppressEnd]  29
   16                                        ▶
-  17                                        ▶ zero
+  17                                        ▶ empty
   18  └•─  (debugger_statement) [SuppressEnd]  23
   20  ─‣─  (debugger_statement) [SuppressEnd]  23
   22       (@26)                            26 : 20 / 18
@@ -104,7 +104,7 @@ Q:
        ○   {
        ○   debugger_statement
   26  ❮❮❮ 
-  17   ◀   (@26)                            zero
+  17   ◀   (@26)                            empty
 
 @26:
   18       (debugger_statement) [SuppressEnd]  23

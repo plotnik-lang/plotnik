@@ -156,7 +156,7 @@ impl NfaBuilder<'_> {
     /// Per-alternative "named" flags plus the soft-skip follower twin. An alternative
     /// is "named" (eligible for the twin) when it cannot
     /// match an anonymous node and does not own its own iteration. A quantified
-    /// alternative's zero-match path leaves no named node on the anchor's left, so the
+    /// alternative's empty path leaves no named node on the anchor's left, so the
     /// soft-skip upgrade is unsound there. The anonymity test covers the whole alternative,
     /// matching `nav_for_alternative`'s before-anchor classification. The twin is a
     /// `NextSkip` clone of a conservative (`NextSkipExtras`) soft follower, worth
@@ -195,19 +195,19 @@ impl NfaBuilder<'_> {
     /// wrapper around the fanned-in alternatives; otherwise each alternative performed
     /// its own exact navigation.
     ///
-    /// `zero_width` holds the lifted zero-width continuations of nullable
+    /// `empty` holds the lifted empty-match continuations of nullable
     /// alternatives (see [`compile_unlabeled_alternatives`](Self::compile_unlabeled_alternatives)).
-    /// They sit outside the position search — a zero-width outcome needs no
+    /// They sit outside the position search — an empty outcome needs no
     /// candidate node — and after it: consuming matches, at any candidate and
-    /// in any alternative, are preferred over a zero-width one.
+    /// in any alternative, are preferred over an empty one.
     fn assemble_alternatives(
         &mut self,
         successors: Vec<Label>,
-        zero_width: Vec<Label>,
+        empty: Vec<Label>,
         search_nav: Option<Nav>,
         exit: Label,
     ) -> Label {
-        if successors.is_empty() && zero_width.is_empty() {
+        if successors.is_empty() && empty.is_empty() {
             return exit;
         }
 
@@ -227,7 +227,7 @@ impl NfaBuilder<'_> {
             })
         };
 
-        let mut alternatives: Vec<Label> = real_entry.into_iter().chain(zero_width).collect();
+        let mut alternatives: Vec<Label> = real_entry.into_iter().chain(empty).collect();
         if alternatives.len() == 1 {
             return alternatives.remove(0);
         }
@@ -246,7 +246,7 @@ impl NfaBuilder<'_> {
         self.compile_unlabeled_alternation_with_exits(alternation, ctx, skip_exit)
     }
 
-    /// [`compile_unlabeled_alternation`](Self::compile_unlabeled_alternation) with a distinct zero-width
+    /// [`compile_unlabeled_alternation`](Self::compile_unlabeled_alternation) with a distinct empty
     /// continuation (a skippable sequence item, or a pruned iteration element).
     pub(super) fn compile_unlabeled_alternation_with_exits(
         &mut self,
@@ -267,10 +267,10 @@ impl NfaBuilder<'_> {
     /// the merged output struct.
     ///
     /// A nullable alternative compiles pruned ([`SkipExit::Fail`]) so its body only
-    /// matches by consuming; its zero-width outcome is lifted to one shared
+    /// matches by consuming; its empty outcome is lifted to one shared
     /// alternative after the candidate search — a pure-effect epsilon that
     /// defaults every merged field and exits to `skip_exit` with the cursor
-    /// untouched. That gives the zero-width path a life outside the search
+    /// untouched. That gives the empty path a life outside the search
     /// (it needs no candidate node) and an honest cursor for any follower.
     fn compile_unlabeled_alternatives(
         &mut self,
@@ -315,7 +315,7 @@ impl NfaBuilder<'_> {
         let alternative_routing = self.alternative_routing(alternatives, exit);
 
         let mut successors = Vec::new();
-        let mut zero_width = Vec::new();
+        let mut empty = Vec::new();
         for (alternative_idx, alternative) in alternatives.iter().enumerate() {
             let Some(body) = alternative.body() else {
                 continue;
@@ -410,7 +410,7 @@ impl NfaBuilder<'_> {
             };
             successors.push(alternative_entry);
 
-            // Lower the alternative's own zero-width outcome instead of guessing a
+            // Lower the alternative's own empty outcome instead of guessing a
             // value from its final field types. The distinction is semantic:
             // an absent field takes its declared completion, while a field that is
             // present through a zero-node value can produce a struct, `""`, or
@@ -425,23 +425,23 @@ impl NfaBuilder<'_> {
                 } else {
                     capture.clone().with_pre_values(completion_effects)
                 };
-                let zero_exit = self.emit_effects_epsilon(
+                let empty_exit = self.emit_effects_epsilon(
                     skip,
                     vec![],
                     CaptureEffects::new_post(alternative_capture.post),
                 );
                 let pattern_ctx = PatternCtx {
-                    exit: zero_exit,
+                    exit: empty_exit,
                     nav: alternative_nav,
                     capture: CaptureEffects::default(),
                     value: false,
                 };
-                let zero_entry = self.compile_zero_width_outcome(&body, pattern_ctx);
-                zero_width.push(self.wrap_entry_pre(zero_entry, alternative_capture.pre));
+                let empty_entry = self.compile_empty_outcome(&body, pattern_ctx);
+                empty.push(self.wrap_entry_pre(empty_entry, alternative_capture.pre));
             }
         }
 
-        self.assemble_alternatives(successors, zero_width, search_nav, exit)
+        self.assemble_alternatives(successors, empty, search_nav, exit)
     }
 
     /// Effects that complete every merged field absent from `provided`, resolved
@@ -489,8 +489,8 @@ impl NfaBuilder<'_> {
         self.compile_labeled_alternation_with_exits(alternation, ctx, skip_exit)
     }
 
-    /// [`compile_labeled_alternation`](Self::compile_labeled_alternation) with a distinct zero-width
-    /// continuation. A nullable alternative compiles pruned; its zero-width outcome
+    /// [`compile_labeled_alternation`](Self::compile_labeled_alternation) with a distinct empty
+    /// continuation. A nullable alternative compiles pruned; its empty outcome
     /// is lifted past the candidate search — the
     /// variant tags with every payload field at its default (see
     /// [`compile_unlabeled_alternatives`](Self::compile_unlabeled_alternatives)).
@@ -540,7 +540,7 @@ impl NfaBuilder<'_> {
         let alternative_routing = self.alternative_routing(&alternatives, exit);
 
         let mut successors = Vec::new();
-        let mut zero_width = Vec::new();
+        let mut empty = Vec::new();
         for (alternative_idx, alternative) in alternatives.iter().enumerate() {
             let Some(body) = alternative.body() else {
                 continue;
@@ -640,24 +640,24 @@ impl NfaBuilder<'_> {
                             .clone()
                             .nest_scope(e_effect, EffectIR::end_variant())
                     };
-                let zero_exit = self.emit_effects_epsilon(
+                let empty_exit = self.emit_effects_epsilon(
                     skip,
                     vec![],
                     CaptureEffects::new_post(alternative_capture.post),
                 );
-                let zero_entry = self.with_scope(payload_type_id, |this| {
+                let empty_entry = self.with_scope(payload_type_id, |this| {
                     let pattern_ctx = PatternCtx {
-                        exit: zero_exit,
+                        exit: empty_exit,
                         nav: alternative_nav,
                         capture: CaptureEffects::default(),
                         value: true,
                     };
-                    this.compile_zero_width_outcome(&body, pattern_ctx)
+                    this.compile_empty_outcome(&body, pattern_ctx)
                 });
-                zero_width.push(self.wrap_entry_pre(zero_entry, alternative_capture.pre));
+                empty.push(self.wrap_entry_pre(empty_entry, alternative_capture.pre));
             }
         }
 
-        self.assemble_alternatives(successors, zero_width, search_nav, exit)
+        self.assemble_alternatives(successors, empty, search_nav, exit)
     }
 }

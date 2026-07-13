@@ -68,7 +68,7 @@ pub(crate) struct DecodedCall {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct DecodedSplitCall {
     pub(crate) matched: SuccessorAddr,
-    pub(crate) zero: SuccessorAddr,
+    pub(crate) empty: SuccessorAddr,
     pub(crate) target: SuccessorAddr,
 }
 
@@ -182,7 +182,7 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                     .words
                     .push(DecodedInstr::SplitCall(DecodedSplitCall {
                         matched: c.returns.matched,
-                        zero: c.returns.zero,
+                        empty: c.returns.empty,
                         target: c.target,
                     }));
                 word_addr += 1;

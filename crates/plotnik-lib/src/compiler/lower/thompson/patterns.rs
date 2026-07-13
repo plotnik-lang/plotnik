@@ -183,7 +183,7 @@ impl NfaBuilder<'_> {
         let final_exit = self.emit_trailing_effects_exit(exit, exit_effects);
 
         // The skip exit bypasses Up when the whole child list matches
-        // zero-width: nothing was consumed, so the cursor never descended and
+        // Empty match: nothing was consumed, so the cursor never descended and
         // there is no child to ascend from. Anchors lose their carrier on that
         // path — a trailing anchor's "nothing may follow the last match" and a
         // leading anchor's "the first match comes first" both degrade to "this
@@ -207,7 +207,7 @@ impl NfaBuilder<'_> {
         } else {
             final_exit
         };
-        // A body of anchors alone consumes no child, so it is the zero-width
+        // A body of anchors alone consumes no child, so it is the empty-match
         // path and nothing else: the childless assertion is the whole
         // constraint. Compiling the descend/ascend pair around an empty
         // match would emit a bare ascent (`verify` rightly rejects it).
@@ -262,7 +262,7 @@ impl NfaBuilder<'_> {
 }
 
 /// Whether any item — descending through sequence groups — is a pattern that
-/// consumes a child. A body failing this is anchors alone: one zero-width
+/// consumes a child. A body failing this is anchors alone: one empty-match
 /// match with no descent into the child list.
 fn items_have_patterns(items: &[ast::SeqItem]) -> bool {
     items.iter().any(|item| match item {
@@ -275,7 +275,7 @@ fn items_have_patterns(items: &[ast::SeqItem]) -> bool {
     })
 }
 
-/// The zero-width counterpart of an anchor's constrained nav: a trailing
+/// The empty-match counterpart of an anchor's constrained nav: a trailing
 /// anchor's `Up*` lastness mode or a leading anchor's `Down*` entry mode.
 fn childless_nav(anchor_nav: Nav) -> Nav {
     match anchor_nav {
@@ -400,7 +400,7 @@ impl NfaBuilder<'_> {
 
     /// Whether this pattern is a reference (possibly captured) to a nullable
     /// definition — one whose body can match zero nodes. Such references are
-    /// skippable items: their bodies inline at the call site so the zero-width
+    /// skippable items: their bodies inline at the call site so the empty
     /// path exits like an inline `?` (see [`compile_ref_inline`](Self::compile_ref_inline)).
     pub(super) fn is_nullable_ref_item(&self, pattern: &Pattern) -> bool {
         let inner = match pattern {
@@ -479,7 +479,7 @@ impl NfaBuilder<'_> {
     /// Compile a reference with capture effects.
     ///
     /// A reference to a nullable definition (body can match zero nodes) inlines
-    /// the body at the call site: a real call's zero-width return would resume
+    /// the body at the call site: a real call's empty return would resume
     /// at a return address whose navigation assumes the candidate was consumed,
     /// stepping over an unmatched node. Inlining lets the ordinary skip-path
     /// machinery (checkpoint cursor restore, split exits) apply unchanged, so a
@@ -667,7 +667,7 @@ impl NfaBuilder<'_> {
     ///   `SuppressBegin`/`SuppressEnd` brackets needed)
     ///
     /// The body routes through [`compile_nullable_pattern`](Self::compile_nullable_pattern),
-    /// so its zero-width path exits to `skip_exit` with the checkpoint-restored
+    /// so its empty path exits to `skip_exit` with the checkpoint-restored
     /// cursor — exactly the inline `?` semantics. Single-exit callers pass the
     /// same label for both exits; the paths still differ in cursor state.
     pub(super) fn compile_ref_inline(
@@ -766,7 +766,7 @@ impl NfaBuilder<'_> {
         self.inline_stack.push(def_id);
         let entry = if inline_scoped_capture {
             // A record scope isolates the definition's internal captures before the
-            // `RecordSet`; both continuations close it (a zero-width body still
+            // `RecordSet`; both continuations close it (an empty body still
             // produced its row of skip-path values, e.g. `{x: null}`).
             let end = ScopeCloseEffects {
                 leading: &[],
@@ -901,7 +901,7 @@ impl NfaBuilder<'_> {
         let suppresses_output = output == GuardedRefOutput::RuntimeSuppressed;
 
         let matched_return = self.guarded_ref_return(match_exit, post.clone(), suppresses_output);
-        let zero_return = self.guarded_ref_return(zero_exit, post, suppresses_output);
+        let empty_return = self.guarded_ref_return(zero_exit, post, suppresses_output);
         let mode = output.specialize(DefBodyMode::ordinary());
         let mode = self.propagate_source_mode(mode);
         let target = self.ensure_def_variant(DefVariant::routed_split(def_id, mode, entry_nav));
@@ -909,7 +909,7 @@ impl NfaBuilder<'_> {
             entry_nav,
             SplitReturnAddrs {
                 matched: ReturnAddr(matched_return),
-                zero: ReturnAddr(zero_return),
+                empty: ReturnAddr(empty_return),
             },
             CalleeEntry(target),
         );

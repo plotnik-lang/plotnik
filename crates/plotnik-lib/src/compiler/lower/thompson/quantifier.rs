@@ -351,31 +351,27 @@ impl NfaBuilder<'_> {
         )
     }
 
-    /// Compile only the admitted zero-node outcomes of a nullable pattern.
+    /// Compile only the admitted empty outcomes of a nullable pattern.
     ///
     /// Ordinary skippable lowering already owns the exact value, scope, span,
-    /// and recursive-reference semantics for every zero-node outcome. Compile
+    /// and recursive-reference semantics for every empty outcome. Compile
     /// that graph with both continuations joined, then project it onto control
     /// paths that never perform a node match. This retains both kinds of
-    /// zero-node result — an absent optional and a present structured value —
+    /// empty result — an absent optional and a present structured value —
     /// without letting a lifted alternation fallback re-run its consuming body
     /// against the parent cursor.
-    pub(super) fn compile_zero_width_outcome(
-        &mut self,
-        pattern: &Pattern,
-        ctx: PatternCtx,
-    ) -> Label {
+    pub(super) fn compile_empty_outcome(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
         let exit = ctx.exit;
         let first_new_instruction = self.instructions.len();
         let entry = self.compile_nullable_pattern(pattern, ctx, SkipExit::To(exit));
-        self.project_zero_width_paths(first_new_instruction, entry, exit)
+        self.project_empty_paths(first_new_instruction, entry, exit)
     }
 
     /// Keep the newly emitted subgraph's paths that reach `exit` using only
     /// epsilon control flow or a childless anchor assertion. `Stay*` still
     /// counts as a node match: accepting it here is the bug that turns a
     /// wildcard optional's absent value into its parent node.
-    fn project_zero_width_paths(
+    fn project_empty_paths(
         &mut self,
         first_new_instruction: usize,
         entry: Label,
@@ -387,7 +383,7 @@ impl NfaBuilder<'_> {
         loop {
             let before = reaches_exit.len();
             for instruction in &emitted {
-                if !zero_width_control(instruction) {
+                if !empty_path_control(instruction) {
                     continue;
                 }
                 if instruction
@@ -405,7 +401,7 @@ impl NfaBuilder<'_> {
 
         assert!(
             reaches_exit.contains(&entry),
-            "a nullable pattern must expose an admitted zero-width path"
+            "a nullable pattern must expose an admitted empty path"
         );
 
         for instruction in &mut emitted {
@@ -440,9 +436,9 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Compile a nullable pattern with independent consuming and zero-width
+    /// Compile a nullable pattern with independent node-consuming and empty
     /// continuations. The consuming continuation travels as a complete pattern
-    /// context; the sibling argument is only the zero-width route.
+    /// context; the sibling argument is only the empty route.
     pub(super) fn compile_nullable_pattern(
         &mut self,
         pattern: &Pattern,
@@ -475,8 +471,8 @@ impl NfaBuilder<'_> {
         }
 
         // A reference to a nullable definition skips like an inline `?`: its
-        // body is inlined so the zero-width path takes `skip_exit` with the
-        // checkpoint-restored cursor (a call's zero-width return cannot — the
+        // body is inlined so the empty path takes `skip_exit` with the
+        // checkpoint-restored cursor (a call's empty return cannot — the
         // return address carries the consumed-candidate navigation).
         if let Pattern::DefRef(r) = pattern {
             let def_id = self.resolve_ref_def_id(r);
@@ -491,7 +487,7 @@ impl NfaBuilder<'_> {
             }
         }
 
-        // An alternation with a nullable branch: the lifted zero-width
+        // An alternation with a nullable alternative: the lifted empty
         // alternative exits to `skip_exit` (or is pruned) instead of
         // dead-ending inside the candidate search.
         if let Pattern::Alternation(alternation) = pattern {
@@ -691,7 +687,7 @@ impl NfaBuilder<'_> {
                 },
                 Greediness::from(kind),
             ),
-            // Pruned: the row must match — a zero-width outcome backtracks.
+            // Pruned: the element must match — an empty outcome backtracks.
             None => iterate,
         };
         self.wrap_entry_pre(entry, brackets.entry_pre)
@@ -699,7 +695,7 @@ impl NfaBuilder<'_> {
 
     /// Compile a list capture (`(x)* @cap`) — `ListOpen → quantifier (with ArrayPush)
     /// → ListClose+capture → exit(s)`. With `Single` exits the loop falls straight
-    /// through; with `Split` exits a zero-match takes `skip_exit` and a loop-exit
+    /// through; with `Split` exits an empty match takes `skip_exit` and a loop-exit
     /// takes `match_exit`, each closing the list. `capture_effects` is built once
     /// by the caller; the matched element's `Node` is pushed only when the
     /// element is not already a structured value
@@ -920,7 +916,7 @@ impl NfaBuilder<'_> {
             }
 
             QuantifierKind::ZeroOrMore => match exits {
-                // Pruned zero-match: the star must consume, so it compiles
+                // Pruned empty match: the star must consume, so it compiles
                 // exactly like a plus — total failure backtracks to the caller.
                 CaptureExits::Split {
                     match_exit,
@@ -963,7 +959,7 @@ impl NfaBuilder<'_> {
                         greediness,
                     );
 
-                    // zero-match backtracks to the entry epsilon's checkpoint, restoring
+                    // An empty match backtracks to the entry epsilon's checkpoint, restoring
                     // the pre-nav cursor and taking skip_exit.
                     self.emit_branch_epsilon(
                         BranchTargets {
@@ -1114,7 +1110,7 @@ impl NfaBuilder<'_> {
         let iterate = if let Pattern::DefRef(r) = &element {
             let def_id = self.resolve_ref_def_id(r);
             if self.nullable_defs.contains(&def_id) {
-                // A zero-width element match and a skip of the `?` both leave
+                // An empty element match and a skip of the `?` both leave
                 // a null pending; funneling the inline skip into the match
                 // continuation keeps the two paths one value.
                 self.emit_iteration(first_nav, match_target, |this, target| {
@@ -1163,14 +1159,14 @@ impl NfaBuilder<'_> {
                 },
                 Greediness::from(kind),
             ),
-            // Pruned: the value must match — a zero-width outcome backtracks.
+            // Pruned: the value must match — an empty outcome backtracks.
             None => iterate,
         };
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
     /// Compile one quantifier-iteration element. A nullable element compiles
-    /// with its zero-width path pruned ([`SkipExit::Fail`]): an iteration that
+    /// with its empty path pruned ([`SkipExit::Fail`]): an iteration that
     /// consumes nothing is a failed attempt — the search advances or the loop
     /// exits — never a spurious empty element.
     pub(super) fn compile_iteration_element(&mut self, inner: &Pattern, ctx: PatternCtx) -> Label {
@@ -1222,7 +1218,7 @@ impl NfaBuilder<'_> {
     }
 }
 
-fn zero_width_control(instruction: &InstructionIR) -> bool {
+fn empty_path_control(instruction: &InstructionIR) -> bool {
     let InstructionIR::Match(matched) = instruction else {
         return false;
     };

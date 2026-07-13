@@ -561,10 +561,10 @@ impl CaptureTypeLowerer<'_, '_> {
         let matched_return = self
             .compiler
             .emit_effects_if_nonempty(match_exit, destination.clone().into_effects());
-        let zero_return = self
+        let empty_return = self
             .compiler
             .emit_effects_if_nonempty(zero_exit, destination.into_effects());
-        self.split_guarded_reference(def_id, entry_nav, matched_return, zero_return)
+        self.split_guarded_reference(def_id, entry_nav, matched_return, empty_return)
     }
 
     fn split_guarded_reference(
@@ -572,7 +572,7 @@ impl CaptureTypeLowerer<'_, '_> {
         def_id: DefId,
         entry_nav: Nav,
         matched_return: Label,
-        zero_return: Label,
+        empty_return: Label,
     ) -> Label {
         let mode = DefBodyMode::ordinary().with_capture_type(self.plan.clone());
         let mode = self.compiler.propagate_source_mode(mode);
@@ -583,7 +583,7 @@ impl CaptureTypeLowerer<'_, '_> {
             entry_nav,
             SplitReturnAddrs {
                 matched: ReturnAddr(matched_return),
-                zero: ReturnAddr(zero_return),
+                empty: ReturnAddr(empty_return),
             },
             CalleeEntry(target),
         )

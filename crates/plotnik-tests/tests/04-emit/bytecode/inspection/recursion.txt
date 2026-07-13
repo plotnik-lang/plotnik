@@ -29,7 +29,7 @@ Q:
 Expr (split, routed Down):
   26  -ε-                                   52, 41
   27                                        ▶
-  28                                        ▶ zero
+  28                                        ▶ empty
   30   !   (identifier) [VariantClose]      27
   32  ──!  _                                30, 32
   33   !   _ [VariantOpen(Empty)]           30, 32
@@ -112,7 +112,7 @@ Q:
   18  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
   24  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  74
   27                                        ▶
-  28                                        ▶ zero
+  28                                        ▶ empty
   29   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  27
   32  ──!  _                                29, 32
   34   !   _ [SpanStart#3]                  29, 32

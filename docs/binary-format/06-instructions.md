@@ -171,7 +171,7 @@ counts (u16)
 - `succ`: number of successors, max 31.
 - `predicate`: one bit; when set, two payload slots hold the predicate.
 - `missing`: one bit; when set, the node must be a tree-sitter MISSING node (a
-  zero-width node inserted by error recovery) — the `(MISSING …)` constraint.
+  zero-byte node inserted by error recovery) — the `(MISSING …)` constraint.
   Independent of `predicate`; it forces at least the `Match16` form since the
   `Match8` fast path has no counts word.
 - `reserved`: must be zero.
@@ -225,7 +225,7 @@ struct SplitCall {
     type_id: u8,
     entry_nav: u8,
     matched: u16, // SuccessorAddr: matched return address
-    zero: u16,    // SuccessorAddr: zero-width return address
+    empty: u16,   // SuccessorAddr: empty-match return address
     target: u16,  // SuccessorAddr: callee entry
 }
 ```
@@ -234,8 +234,8 @@ struct SplitCall {
 navigation routed into its specialized callee so the loader can verify cursor
 depth without reconstructing compiler provenance. Candidate-search checkpoints
 therefore remain inside the nullable body's authored alternative order. A matched
-`Return` resumes at `matched` at the routed navigation depth; a zero-width
-`Return` resumes at `zero` at the caller's original depth.
+`Return` resumes at `matched` at the routed navigation depth; an empty
+`Return` resumes at `empty` at the caller's original depth.
 
 ## RoutedCall
 
@@ -262,7 +262,7 @@ split-return body.
 #[repr(C)]
 struct Return {
     type_id: u8,
-    outcome: u8, // 0 = matched, 1 = zero-width
+    outcome: u8, // 0 = matched, 1 = empty
     entry: u8,   // 0 = caller-owned, 1 = routed
     _reserved: [u8; 5],
 }

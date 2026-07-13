@@ -83,7 +83,7 @@ impl InferVisitor<'_, '_> {
     /// Report a capture whose no-value inner doesn't match exactly one node —
     /// whether several or possibly none, there is no single node to bind.
     /// Without this, the capture would silently bind an arbitrary node (or one
-    /// per repeat), or dangle on a zero-width match.
+    /// per repeat), or dangle on an empty match.
     pub(super) fn report_capture_without_single_node(
         &mut self,
         inner: &Pattern,
@@ -146,11 +146,11 @@ impl InferVisitor<'_, '_> {
     }
 
     /// Report a repeat whose element is a reference that can match zero nodes.
-    pub(super) fn report_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
+    pub(super) fn report_nullable_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
         let op = self.quantifier_operator(quant);
         let related = self.referenced_definition_range(inner);
         let mut builder = self
-            .report(DiagnosticKind::ZeroWidthRepeat, quant.text_range())
+            .report(DiagnosticKind::NullableRepeat, quant.text_range())
             .detail(format!(
                 "the referenced definition can match zero nodes, but a `{op}` repeat must consume input on every iteration — its empty case could never occur here"
             ))

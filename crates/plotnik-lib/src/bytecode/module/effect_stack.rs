@@ -654,7 +654,7 @@ impl CallRoute {
                 target: CodeAddr::from(u16::from(call.target)),
                 returns: CallReturnAddrs::Split([
                     CodeAddr::from(u16::from(call.returns.matched)),
-                    CodeAddr::from(u16::from(call.returns.zero)),
+                    CodeAddr::from(u16::from(call.returns.empty)),
                 ]),
             }),
             Instruction::Match(_) | Instruction::Return(_) => None,
@@ -664,8 +664,8 @@ impl CallRoute {
     fn push_returns(self, work: &mut Vec<(CodeAddr, AbsState)>, state: AbsState) {
         match self.returns {
             CallReturnAddrs::Single([return_]) => work.push((return_, state)),
-            CallReturnAddrs::Split([matched, zero]) => {
-                work.push((zero, state.clone()));
+            CallReturnAddrs::Split([matched, empty]) => {
+                work.push((empty, state.clone()));
                 work.push((matched, state));
             }
         }

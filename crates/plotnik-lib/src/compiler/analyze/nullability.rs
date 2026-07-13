@@ -2,9 +2,9 @@
 //!
 //! A definition is *nullable* when its body can match zero nodes (`A = (x)?`,
 //! `A = {(a)? (b)?}`, an alias to such a definition, …). A call to a nullable
-//! definition may return zero-width, but the caller's return address carries a
+//! definition may return empty, but the caller's return address carries a
 //! fixed sibling navigation that assumes the candidate was consumed — the
-//! zero-width return would step over an unmatched node. So `compile_ref`
+//! empty return would step over an unmatched node. So `compile_ref`
 //! inlines nullable bodies at the call site instead, where the ordinary
 //! split-exit machinery gives the skip path its own continuation
 //! (see `compile_ref_inline` in the lowering).
@@ -58,7 +58,7 @@ pub(crate) fn compute_nullable_defs(
 
 /// Whether a pattern can match zero nodes, given the set of nullable
 /// definitions (for `DefRef` leaves). Shared by the fixpoint above and by
-/// lowering, which prunes zero-width paths in quantifier iterations and
+/// lowering, which prunes empty paths in quantifier iterations and
 /// alternation branches.
 pub(crate) fn pattern_nullable(
     pattern: &Pattern,
@@ -80,7 +80,7 @@ pub(crate) fn pattern_nullable(
             };
             match q.quantifier_kind() {
                 Some(QuantifierKind::Optional | QuantifierKind::ZeroOrMore) => true,
-                // A `+` always consumes: lowering prunes the zero-width path
+                // A `+` always consumes: lowering prunes the empty path
                 // of a nullable element inside quantifier iterations, so even
                 // `+` over a nullable inner cannot match zero nodes.
                 Some(QuantifierKind::OneOrMore) => false,
@@ -90,7 +90,7 @@ pub(crate) fn pattern_nullable(
         Pattern::CapturedPattern(c) => c
             .inner()
             .is_some_and(|inner| pattern_nullable(&inner, nullable, deps, interner)),
-        // A sequence matches zero-width only when every item does. An empty
+        // A sequence matches empty only when every item does. An empty
         // sequence compiles to a pass-through, so `all` on nothing is right.
         Pattern::SeqPattern(s) => s
             .children()

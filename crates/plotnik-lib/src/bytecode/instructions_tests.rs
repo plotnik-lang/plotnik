@@ -109,7 +109,7 @@ fn return_roundtrip() {
     for r in [
         Return::matched(),
         Return::routed_matched(),
-        Return::routed_zero(),
+        Return::routed_empty(),
     ] {
         let bytes = r.to_bytes();
         let decoded = Return::from_bytes(bytes);
@@ -123,7 +123,7 @@ fn split_call_roundtrip() {
         Nav::Next,
         SplitCallReturns {
             matched: SuccessorAddr::try_from(100).expect("successor address must be non-zero"),
-            zero: SuccessorAddr::try_from(200).expect("successor address must be non-zero"),
+            empty: SuccessorAddr::try_from(200).expect("successor address must be non-zero"),
         },
         SuccessorAddr::try_from(500).expect("successor address must be non-zero"),
     );

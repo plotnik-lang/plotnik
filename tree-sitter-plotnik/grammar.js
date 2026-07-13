@@ -139,7 +139,7 @@ module.exports = grammar({
     error_node: (_) => seq("(", "ERROR", ")"),
 
     // `(MISSING)`, `(MISSING kind)`, or `(MISSING ";")`. A missing node is
-    // a zero-width token inserted by error recovery, so the reference
+    // a zero-byte node inserted by error recovery, so the reference
     // parser rejects children — only the optional kind argument is legal.
     missing_node: ($) =>
       seq(

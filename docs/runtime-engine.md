@@ -68,11 +68,11 @@ are statically verified to return at the same cursor depth they entered.
 
 ### Split call
 
-A nullable recursive call carries matched and zero-width continuations. The
+A nullable recursive call carries node-consuming and empty continuations. The
 call itself does not navigate or create a retry checkpoint; its specialized
 callee owns the call-site navigation. This preserves the body's exact alternative
-order even when consuming and zero-width outcomes are interleaved. Matched
-returns keep the routed navigation depth; zero-width returns restore the
+order even when node-consuming and empty outcomes are interleaved. Node-consuming
+returns keep the routed navigation depth; empty returns restore the
 caller's original depth.
 
 A routed matched-only call uses the same callee-owned navigation rule but has
@@ -81,7 +81,7 @@ prove the nonzero matched return depth without a flag or sentinel.
 
 ### Return
 
-`Return` reports matched or zero-width, pops a frame, and jumps to the
+`Return` reports node-consuming or empty, pops a frame, and jumps to the
 corresponding return address. The bytecode also records whether the returning
 body owns entry navigation; the loader consumes that contract and the hot
 runtime drops it. Returning with an empty frame stack accepts the entry point

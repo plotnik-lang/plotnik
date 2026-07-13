@@ -396,7 +396,7 @@ impl<'q> Parser<'q, '_> {
             }
             _ => {}
         }
-        // A missing node is a zero-width token, so children could never
+        // A missing node is a zero-byte node, so children could never
         // match anything; only the optional kind argument above is legal.
         if !self.at(SyntaxKind::ParenClose) && !self.eof() {
             self.parse_forbidden_children(DiagnosticKind::MissingTakesNoChildren);
@@ -578,7 +578,7 @@ impl<'q> Parser<'q, '_> {
                 continue;
             }
             // Anchors and negated fields cannot form alternatives — an alternative must
-            // be a pattern, and these are zero-width assertions. Parse them
+            // be a pattern, and these constraints occupy no sibling position. Parse them
             // anyway (with their suffix rejection) and report on the spot.
             if matches!(self.current(), SyntaxKind::Dot | SyntaxKind::DotBang) {
                 self.parse_rejected_positional(DiagnosticKind::AnchorInAlternation);

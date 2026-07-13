@@ -631,12 +631,12 @@ mod debug_impl {
     /// consumed a candidate. This is only a compiler IR check: once the VM's
     /// `Node` effect reads the cursor directly, malformed bytecode can still
     /// produce wrong values, but it cannot reach undefined state.
-    fn check_no_node_on_zero_width_paths(nfa: &NfaGraph) -> Result<(), String> {
+    fn check_no_node_on_empty_paths(nfa: &NfaGraph) -> Result<(), String> {
         let instr_map: HashMap<Label, &InstructionIR> =
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
 
         for (root, entry) in entries(nfa) {
-            check_zero_width_root(root, entry, &instr_map)?;
+            check_empty_root(root, entry, &instr_map)?;
         }
         Ok(())
     }
@@ -661,7 +661,7 @@ mod debug_impl {
         Ok(())
     }
 
-    fn check_zero_width_root(
+    fn check_empty_root(
         root: WalkRoot,
         entry: Label,
         instr_map: &HashMap<Label, &InstructionIR>,
@@ -669,13 +669,13 @@ mod debug_impl {
         let mut memo: HashMap<Label, bool> = HashMap::new();
         let mut work = vec![(entry, true)];
 
-        while let Some((label, zero_width)) = work.pop() {
-            if let Some(&seen_zero_width) = memo.get(&label)
-                && (seen_zero_width || !zero_width)
+        while let Some((label, empty_path)) = work.pop() {
+            if let Some(&seen_empty_path) = memo.get(&label)
+                && (seen_empty_path || !empty_path)
             {
                 continue;
             }
-            memo.insert(label, zero_width);
+            memo.insert(label, empty_path);
 
             let instr = instr_map
                 .get(&label)
@@ -684,8 +684,8 @@ mod debug_impl {
 
             match instr {
                 InstructionIR::Match(m) => {
-                    let after_nav_zero_width = zero_width && m.nav == Nav::Epsilon;
-                    if after_nav_zero_width
+                    let after_nav_empty = empty_path && m.nav == Nav::Epsilon;
+                    if after_nav_empty
                         && m.effects.iter().any(|effect| effect.kind().reads_cursor())
                     {
                         return Err(format!(
@@ -695,13 +695,13 @@ mod debug_impl {
                     }
 
                     for &succ in &m.successors {
-                        work.push((succ, after_nav_zero_width));
+                        work.push((succ, after_nav_empty));
                     }
                 }
                 InstructionIR::Call(c) => {
                     work.push((c.matched_return(), false));
-                    if let Some(zero) = c.zero_return() {
-                        work.push((zero, zero_width));
+                    if let Some(empty) = c.empty_return() {
+                        work.push((empty, empty_path));
                     }
                 }
                 InstructionIR::Return(_) => {}
@@ -757,8 +757,8 @@ mod debug_impl {
                 }
                 InstructionIR::Call(c) => {
                     work.push((c.matched_return(), net + c.entry_nav().depth_delta()));
-                    if let Some(zero) = c.zero_return() {
-                        work.push((zero, net));
+                    if let Some(empty) = c.empty_return() {
+                        work.push((empty, net));
                     }
                 }
                 InstructionIR::Return(r) => {
@@ -797,9 +797,9 @@ mod debug_impl {
     }
 
     #[cfg(test)]
-    pub(super) fn assert_no_node_on_zero_width_paths(nfa: &NfaGraph, context: &str) {
-        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
-            panic!("[verify] {context} produced zero-width Node effect: {e}");
+    pub(super) fn assert_no_node_on_empty_paths(nfa: &NfaGraph, context: &str) {
+        if let Err(e) = check_no_node_on_empty_paths(nfa) {
+            panic!("[verify] {context} produced empty-match Node effect: {e}");
         }
     }
 
@@ -855,8 +855,8 @@ mod debug_impl {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }
         assert_depth_neutrality(nfa, &format!("pass `{name}`"));
-        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
-            panic!("[verify] pass `{name}` produced zero-width Node effect: {e}");
+        if let Err(e) = check_no_node_on_empty_paths(nfa) {
+            panic!("[verify] pass `{name}` produced empty-match Node effect: {e}");
         }
 
         let before_walk = GraphWalk::new(&before.instructions, &nfa.def_entries, ctx);
@@ -914,8 +914,8 @@ mod debug_impl {
             panic!("[verify] construction produced malformed IR: {e}");
         }
         assert_depth_neutrality(nfa, "construction");
-        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
-            panic!("[verify] construction produced zero-width Node effect: {e}");
+        if let Err(e) = check_no_node_on_empty_paths(nfa) {
+            panic!("[verify] construction produced empty-match Node effect: {e}");
         }
         let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
         for (key, entry) in entries(nfa) {

@@ -500,7 +500,7 @@ impl<'t> VM<'t> {
             tracer.trace_call(CodeAddr::from(u16::from(call.target)));
         }
         self.engine
-            .enter_split_frame(u16::from(call.matched), u16::from(call.zero));
+            .enter_split_frame(u16::from(call.matched), u16::from(call.empty));
         self.ip = CodeAddr::from(u16::from(call.target));
         Ok(())
     }
@@ -611,7 +611,7 @@ impl<'t> VM<'t> {
             assert_eq!(
                 outcome,
                 ReturnOutcome::Matched,
-                "entry point returned through a zero-width call continuation"
+                "entry point returned through an empty call continuation"
             );
             return Err(ControlFlow::Accept.into());
         }

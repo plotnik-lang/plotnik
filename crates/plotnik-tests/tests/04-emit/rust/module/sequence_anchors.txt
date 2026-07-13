@@ -285,7 +285,7 @@ mod matcher {
             //   01                                        ▶
             S01_Q => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -344,7 +344,7 @@ mod matcher {
             //   07                                        ▶
             S07_Q_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))

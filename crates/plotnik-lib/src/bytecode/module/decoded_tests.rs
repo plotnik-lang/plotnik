@@ -100,7 +100,7 @@ fn decoded_program_matches_byte_decoder() {
             }
             (Instruction::SplitCall(c), DecodedInstr::SplitCall(decoded)) => {
                 assert_eq!(decoded.matched, c.returns.matched);
-                assert_eq!(decoded.zero, c.returns.zero);
+                assert_eq!(decoded.empty, c.returns.empty);
                 assert_eq!(decoded.target, c.target);
                 addr = addr
                     .checked_add(1)

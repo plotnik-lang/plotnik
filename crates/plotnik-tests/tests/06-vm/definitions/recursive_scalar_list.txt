@@ -82,7 +82,7 @@ Q:
   23                                        ▶
   24  -ε-  [RecordSet(M0)]                  23
   26                                        ▶
-  27                                        ▶ zero
+  27                                        ▶ empty
   28  -ε-  [ListClose]                      26
   30  -ε-  [ListClose]                      27
   32  -ε-  [StrClose ArrayPush]             44, 28

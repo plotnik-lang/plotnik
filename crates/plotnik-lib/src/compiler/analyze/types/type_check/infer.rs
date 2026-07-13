@@ -1144,14 +1144,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     QuantifierKind::OneOrMore => ListMinimum::One,
                     QuantifierKind::Optional => unreachable!("repeat arm excludes optional"),
                 };
-                // A value-collecting repeat over a zero-width-capable element
+                // A value-collecting repeat over a nullable element
                 // could complete an iteration without advancing; reject before
                 // lowering has to give the loop an exit it cannot have.
                 if matches!(
                     context,
                     QuantifiedContext::Captured | QuantifiedContext::DefinitionValue
                 ) {
-                    self.reject_zero_width_repeat(quant.node(), &inner);
+                    self.reject_nullable_repeat(quant.node(), &inner);
                 }
                 if context == QuantifiedContext::DefinitionValue {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
@@ -1197,13 +1197,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// Reject `*`/`+` whose element is a reference to an optional- or
-    /// list-rooted definition that can match zero nodes: a zero-width
+    /// list-rooted definition that can match zero nodes: an empty
     /// iteration completes without consuming, so the loop collects a spurious
     /// null/empty element at every non-matching candidate. Scoped to
     /// wrapper-shaped outputs — the surface quantifier-rooted definitions
     /// introduce — so nullable record-valued definitions (a captured `?` at
     /// the root) keep their existing repeat behavior.
-    fn reject_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Located<Pattern>) {
+    fn reject_nullable_repeat(&mut self, quant: &QuantifiedPattern, inner: &Located<Pattern>) {
         let mut element = inner.node().clone();
         while let Pattern::FieldPattern(f) = &element {
             match f.value() {
@@ -1237,7 +1237,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             )
         });
         if wrapper_output {
-            self.report_zero_width_repeat(quant, &element);
+            self.report_nullable_repeat(quant, &element);
         }
     }
 

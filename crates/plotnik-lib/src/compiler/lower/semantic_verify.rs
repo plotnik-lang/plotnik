@@ -58,8 +58,8 @@ pub(crate) enum SemanticVerifyError {
     CaptureMember { state: Label, detail: String },
     #[error("cursor depth is imbalanced: {0}")]
     CursorDepth(String),
-    #[error("cursor-reading effect is reachable on a zero-width path at state {0:?}")]
-    ZeroWidthCursorRead(Label),
+    #[error("cursor-reading effect is reachable on an empty-match path at state {0:?}")]
+    EmptyPathCursorRead(Label),
     #[error("native regex DFA compilation failed for `{pattern}`: {error}")]
     Regex { pattern: String, error: String },
 }
@@ -79,7 +79,7 @@ pub(crate) fn verify(
     verify_regexes(graph)?;
     let program = Program::new(graph, schema)?;
     program.verify_cursor_depth()?;
-    program.verify_zero_width_cursor_reads()?;
+    program.verify_empty_path_cursor_reads()?;
     program.verify_effects()
 }
 
@@ -245,7 +245,7 @@ impl ReturnOutcomes {
     fn insert(&mut self, outcome: crate::compiler::lower::ir::ReturnOutcome) {
         self.0 |= match outcome {
             crate::compiler::lower::ir::ReturnOutcome::Matched => Self::MATCHED.0,
-            crate::compiler::lower::ir::ReturnOutcome::Zero => 2,
+            crate::compiler::lower::ir::ReturnOutcome::Empty => 2,
         };
     }
 }
@@ -879,8 +879,8 @@ impl<'a> Program<'a> {
                             call.matched_return(),
                             depth + call.entry_nav().depth_delta(),
                         ));
-                        if let Some(zero) = call.zero_return() {
-                            work.push((zero, depth));
+                        if let Some(empty) = call.empty_return() {
+                            work.push((empty, depth));
                         }
                     }
                     InstructionIR::Return(return_) => {
@@ -909,27 +909,27 @@ impl<'a> Program<'a> {
         Ok(())
     }
 
-    fn verify_zero_width_cursor_reads(&self) -> Result<(), SemanticVerifyError> {
+    fn verify_empty_path_cursor_reads(&self) -> Result<(), SemanticVerifyError> {
         for entry in self.entries() {
             let mut memo: HashMap<Label, bool> = HashMap::new();
             let mut work = vec![(entry, true)];
-            while let Some((label, zero_width)) = work.pop() {
-                if let Some(seen_zero_width) = memo.get(&label)
-                    && (*seen_zero_width || !zero_width)
+            while let Some((label, empty_path)) = work.pop() {
+                if let Some(seen_empty_path) = memo.get(&label)
+                    && (*seen_empty_path || !empty_path)
                 {
                     continue;
                 }
-                memo.insert(label, zero_width);
+                memo.insert(label, empty_path);
                 match self.instructions[&label] {
                     InstructionIR::Match(matched) => {
-                        let after = zero_width && matched.nav == plotnik_rt::Nav::Epsilon;
+                        let after = empty_path && matched.nav == plotnik_rt::Nav::Epsilon;
                         if after
                             && matched
                                 .effects
                                 .iter()
                                 .any(|effect| effect.kind().reads_cursor())
                         {
-                            return Err(SemanticVerifyError::ZeroWidthCursorRead(label));
+                            return Err(SemanticVerifyError::EmptyPathCursorRead(label));
                         }
                         for successor in &matched.successors {
                             work.push((*successor, after));
@@ -937,8 +937,8 @@ impl<'a> Program<'a> {
                     }
                     InstructionIR::Call(call) => {
                         work.push((call.matched_return(), false));
-                        if let Some(zero) = call.zero_return() {
-                            work.push((zero, zero_width));
+                        if let Some(empty) = call.empty_return() {
+                            work.push((empty, empty_path));
                         }
                     }
                     InstructionIR::Return(_) => {}

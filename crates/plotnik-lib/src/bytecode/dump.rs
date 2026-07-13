@@ -503,7 +503,7 @@ impl DumpFormatter<'_> {
             "{:0w$} : {:0w$} / {:0w$}",
             u16::from(call.target),
             u16::from(call.returns.matched),
-            u16::from(call.returns.zero),
+            u16::from(call.returns.empty),
             w = self.addr_width
         );
         builder.pad_successors(format!("{prefix}{content}"), &successors)
@@ -579,7 +579,7 @@ impl DumpFormatter<'_> {
         );
         let outcome = match return_.mode.outcome() {
             plotnik_rt::ReturnOutcome::Matched => "▶",
-            plotnik_rt::ReturnOutcome::Zero => "▶ zero",
+            plotnik_rt::ReturnOutcome::Empty => "▶ empty",
         };
         builder.pad_successors(prefix, outcome)
     }

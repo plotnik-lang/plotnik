@@ -264,12 +264,12 @@ impl<'a> NfaBuilder<'a> {
         };
         self.instructions.push(matched_return_instr.into());
         let exits = if variant.route().splits() {
-            let zero_return = self.fresh_label();
+            let empty_return = self.fresh_label();
             self.instructions
-                .push(ReturnIR::routed_zero(zero_return).into());
+                .push(ReturnIR::routed_empty(empty_return).into());
             CaptureExits::Split {
                 match_exit: matched_return,
-                skip_exit: SkipExit::To(zero_return),
+                skip_exit: SkipExit::To(empty_return),
             }
         } else if variant.route().requires_consumption() {
             CaptureExits::Split {

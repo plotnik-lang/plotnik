@@ -209,7 +209,7 @@ impl Parser<'_, '_> {
         if matches!(kind, SyntaxKind::Dot | SyntaxKind::DotBang) {
             // Anchors constrain position and produce no value: `*` or `@x` after
             // one is always a mistake, never a suffix to wrap.
-            self.reject_zero_width_suffixes(
+            self.reject_constraint_suffixes(
                 DiagnosticKind::QuantifiedAnchor,
                 DiagnosticKind::CapturedAnchor,
             );
@@ -218,7 +218,7 @@ impl Parser<'_, '_> {
             // would hide the `NegatedField` node from every consumer (they all
             // look at direct node children) and lower the constraint into
             // nothing.
-            self.reject_zero_width_suffixes(
+            self.reject_constraint_suffixes(
                 DiagnosticKind::QuantifiedNegatedField,
                 DiagnosticKind::CapturedNegatedField,
             );
@@ -230,7 +230,7 @@ impl Parser<'_, '_> {
         self.exit_recursion();
     }
 
-    fn reject_zero_width_suffixes(&mut self, quantified: DiagnosticKind, captured: DiagnosticKind) {
+    fn reject_constraint_suffixes(&mut self, quantified: DiagnosticKind, captured: DiagnosticKind) {
         loop {
             if self.at_ts(QUANTIFIERS) {
                 self.report_current_and_bump(quantified, |report| {

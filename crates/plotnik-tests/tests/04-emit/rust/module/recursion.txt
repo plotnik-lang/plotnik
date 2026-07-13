@@ -413,7 +413,7 @@ mod matcher {
             //   01                                        ▶
             S01_EXPR => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -463,7 +463,7 @@ mod matcher {
             //   10                                        ▶
             S10_Q => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -518,7 +518,7 @@ mod matcher {
             //   17                                        ▶
             S17_EXPR_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -532,7 +532,7 @@ mod matcher {
             //   19                                        ▶
             S19_Q_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))

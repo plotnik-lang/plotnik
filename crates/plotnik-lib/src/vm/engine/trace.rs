@@ -540,7 +540,7 @@ impl Tracer for PrintTracer<'_> {
                     "{:02} : {:02} / {:02}",
                     u16::from(c.target),
                     u16::from(c.returns.matched),
-                    u16::from(c.returns.zero)
+                    u16::from(c.returns.empty)
                 );
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
@@ -677,9 +677,9 @@ impl Tracer for PrintTracer<'_> {
         let successor = match (is_top_level, outcome) {
             (true, ReturnOutcome::Matched) => "◼",
             (false, ReturnOutcome::Matched) => "",
-            (false, ReturnOutcome::Zero) => "zero",
-            (true, ReturnOutcome::Zero) => {
-                unreachable!("entry point zero returns are rejected during module validation")
+            (false, ReturnOutcome::Empty) => "empty",
+            (true, ReturnOutcome::Empty) => {
+                unreachable!("entry point empty returns are rejected during module validation")
             }
         };
         self.add_instruction(ip, trace::RETURN, &content, successor);

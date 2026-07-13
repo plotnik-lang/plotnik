@@ -13,7 +13,7 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
 /// v7: Type kind and effect opcode discriminants renumbered contiguously.
 /// v8: single effects list per Match; per-entry-point wrappers.
-/// v9: `Childless*` navigation family (anchors over a zero-width child list).
+/// v9: `Childless*` navigation family (anchors over an empty-matching child list).
 /// v10: inspection spans — three span effect kinds and the `spans` section.
 /// v11: `Text`/`Bool` types and balanced scalar-provenance effects.
 pub const VERSION: u32 = 11;

@@ -202,21 +202,21 @@ impl DefRoute {
     pub(crate) fn return_depth(self, outcome: ReturnOutcome) -> Option<i32> {
         match (self, outcome) {
             (Self::Caller, ReturnOutcome::Matched) => Some(0),
-            (Self::Caller, ReturnOutcome::Zero) => None,
+            (Self::Caller, ReturnOutcome::Empty) => None,
             (Self::Routed { nav, .. }, ReturnOutcome::Matched) => Some(nav.depth_delta()),
             (
                 Self::Routed {
                     returns: RoutedReturns::Split,
                     ..
                 },
-                ReturnOutcome::Zero,
+                ReturnOutcome::Empty,
             ) => Some(0),
             (
                 Self::Routed {
                     returns: RoutedReturns::MatchOnly,
                     ..
                 },
-                ReturnOutcome::Zero,
+                ReturnOutcome::Empty,
             ) => None,
         }
     }
@@ -714,7 +714,7 @@ pub enum CallProtocol {
     },
     /// The callee owns entry navigation and has one matched continuation.
     Routed { entry_nav: Nav, next: Label },
-    /// The callee owns entry navigation and selects matched or zero-width.
+    /// The callee owns entry navigation and selects node-consuming or empty.
     Split { entry_nav: Nav, returns: [Label; 2] },
 }
 
@@ -749,7 +749,7 @@ impl CallIR {
         }
     }
 
-    /// Create a call whose nullable callee reports matched and zero-width
+    /// Create a call whose nullable callee reports node-consuming and empty
     /// outcomes separately. Navigation belongs to the routed callee variant.
     pub fn split(
         label: Label,
@@ -761,7 +761,7 @@ impl CallIR {
             label,
             protocol: CallProtocol::Split {
                 entry_nav,
-                returns: [returns.matched.0, returns.zero.0],
+                returns: [returns.matched.0, returns.empty.0],
             },
             target: callee.0,
         }
@@ -815,7 +815,7 @@ impl CallIR {
         self.return_labels()[0]
     }
 
-    pub fn zero_return(&self) -> Option<Label> {
+    pub fn empty_return(&self) -> Option<Label> {
         match self.protocol {
             CallProtocol::Split { returns, .. } => Some(returns[1]),
             CallProtocol::Ordinary { .. } | CallProtocol::Routed { .. } => None,
@@ -838,11 +838,11 @@ impl CallIR {
 /// The two semantic continuations of a nullable recursive call.
 ///
 /// Bundling the same-typed labels prevents callers from silently transposing
-/// the matched and zero-width routes.
+/// the node-consuming and empty routes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SplitReturnAddrs {
     pub matched: ReturnAddr,
-    pub zero: ReturnAddr,
+    pub empty: ReturnAddr,
 }
 
 impl From<CallIR> for InstructionIR {
@@ -879,10 +879,10 @@ impl ReturnIR {
         }
     }
 
-    pub fn routed_zero(label: Label) -> Self {
+    pub fn routed_empty(label: Label) -> Self {
         Self {
             label,
-            mode: ReturnMode::RoutedZero,
+            mode: ReturnMode::RoutedEmpty,
         }
     }
 

@@ -17,7 +17,7 @@ pub struct RecordScope(pub TypeId);
 ///
 /// Most captures have one continuation (`Single`). A capture wrapping an
 /// optional/star at a navigating first-child position needs two: the parent must
-/// restore the cursor and take a different path when the inner matches zero
+/// restore the cursor and take a different path when the inner matches empty
 /// times, so the match and skip paths exit separately (`Split`). A scope emitter
 /// closes its scope on *every* continuation, so the only difference between the
 /// two modes is how many close steps it emits. Threading this through one
@@ -28,7 +28,7 @@ pub(super) enum CaptureExits {
     /// One continuation for the matched path (a non-skippable capture, or the
     /// single-exit caller where match and skip coincide).
     Single(Label),
-    /// Distinct continuations for the matched path and the zero-match skip path.
+    /// Distinct continuations for the node-consuming path and the empty skip path.
     Split {
         match_exit: Label,
         skip_exit: SkipExit,
@@ -62,13 +62,13 @@ impl CaptureExits {
     }
 }
 
-/// Continuation for a zero-width (skip) outcome.
+/// Continuation for an empty (skip) outcome.
 ///
-/// `Fail` prunes the path: no continuation is emitted, so a zero-width outcome
+/// `Fail` prunes the path: no continuation is emitted, so an empty outcome
 /// backtracks like a plain match failure (the effect journal unwinds with it).
 /// Quantifier iterations and alternation alternatives compile nullable elements
 /// this way — there, consuming nothing is a failed attempt, never an empty
-/// element or a zero-width win.
+/// element or an empty win.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum SkipExit {
     To(Label),
@@ -76,7 +76,7 @@ pub(super) enum SkipExit {
 }
 
 /// The two distinct continuations a skippable pattern (`?`/`*`) routes to:
-/// the matched path and the zero-match skip path. Bundling them keeps the two
+/// the node-consuming path and the empty skip path. Bundling them keeps the two
 /// from being transposed at a call site.
 #[derive(Clone, Copy)]
 pub(super) struct SplitExits {
@@ -87,7 +87,7 @@ pub(super) struct SplitExits {
 /// The per-capture inputs shared by every capture lowering. The continuation is
 /// not among them: it is a sibling argument whose type encodes the capability —
 /// the scope-emitting helpers ([`NfaBuilder::compile_record_capture`] /
-/// [`NfaBuilder::compile_list_capture`]) take a [`CaptureExits`], so a zero-match
+/// [`NfaBuilder::compile_list_capture`]) take a [`CaptureExits`], so an empty
 /// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
 /// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
 /// unrepresentable for them rather than silently collapsed via `match_exit`.

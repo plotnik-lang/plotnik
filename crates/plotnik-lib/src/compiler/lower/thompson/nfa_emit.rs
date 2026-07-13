@@ -296,7 +296,7 @@ impl NfaBuilder<'_> {
     ///
     /// The body is always preferred over advancing: the iteration has no exit
     /// edge of its own, so a following pattern can never bind at a
-    /// failed-candidate cursor position (see #414). Greediness and zero-match
+    /// failed-candidate cursor position (see #414). Greediness and empty-match
     /// escape, where applicable, live on the caller's loop-boundary epsilons,
     /// not here.
     ///

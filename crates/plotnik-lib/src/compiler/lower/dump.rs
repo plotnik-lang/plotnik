@@ -417,7 +417,7 @@ impl NfaDumper<'_> {
         let prefix = self.prefix(return_.label, Symbol::EMPTY);
         let outcome = match return_.outcome() {
             crate::compiler::lower::ir::ReturnOutcome::Matched => "▶",
-            crate::compiler::lower::ir::ReturnOutcome::Zero => "▶ zero",
+            crate::compiler::lower::ir::ReturnOutcome::Empty => "▶ empty",
         };
         LineBuilder::new(self.label_width).pad_successors(prefix, outcome)
     }
