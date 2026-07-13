@@ -20,7 +20,7 @@ use super::scope::{CaptureExits, SkipExit};
 #[derive(Clone)]
 enum ValueDestination {
     Pending,
-    ArrayItem,
+    ListItem,
     Effects(Vec<EffectIR>),
 }
 
@@ -34,7 +34,7 @@ impl ValueDestination {
     fn into_effects(self) -> Vec<EffectIR> {
         match self {
             Self::Pending => vec![],
-            Self::ArrayItem => vec![EffectIR::push()],
+            Self::ListItem => vec![EffectIR::push()],
             Self::Effects(effects) => effects,
         }
     }
@@ -107,7 +107,7 @@ impl<'a> NfaBuilder<'a> {
 
     /// A transformed quantifier element still obeys the ordinary iteration
     /// contract: matching zero nodes is a failed attempt, never a present
-    /// optional value or an array item. Apply the conversion only to the
+    /// optional value or a list item. Apply the conversion only to the
     /// consuming continuation.
     fn capture_type_iteration_exits(&self, pattern: &Pattern, exit: Label) -> CaptureExits {
         if !self.pattern_is_nullable(pattern) {
@@ -173,11 +173,11 @@ impl CaptureTypeLowerer<'_, '_> {
         self.compiler.wrap_entry_pre(entry, pre)
     }
 
-    pub(super) fn array_item(mut self, inner: &Pattern) -> Label {
+    pub(super) fn list_item(mut self, inner: &Pattern) -> Label {
         self.exits = self
             .compiler
             .capture_type_iteration_exits(inner, self.exits.match_exit());
-        self.lower(inner, ValueDestination::ArrayItem)
+        self.lower(inner, ValueDestination::ListItem)
     }
 
     fn lower(&mut self, pattern: &Pattern, destination: ValueDestination) -> Label {
@@ -198,11 +198,11 @@ impl CaptureTypeLowerer<'_, '_> {
                 };
                 self.optional(quant, mode, *inner, destination)
             }
-            CaptureTypePlanKind::Array { element, .. } => {
+            CaptureTypePlanKind::List { element, .. } => {
                 let Pattern::QuantifiedPattern(quant) = pattern else {
                     return self.specialized_reference(pattern, destination);
                 };
-                self.array(quant, *element, destination)
+                self.list(quant, *element, destination)
             }
         }
     }
@@ -388,7 +388,7 @@ impl CaptureTypeLowerer<'_, '_> {
         }
     }
 
-    fn array(
+    fn list(
         &mut self,
         quant: &ast::QuantifiedPattern,
         element: CaptureTypePlan,
@@ -414,7 +414,7 @@ impl CaptureTypeLowerer<'_, '_> {
                 },
             },
         };
-        let iterations = self.compiler.compile_capture_type_array_iterations(
+        let iterations = self.compiler.compile_capture_type_list_iterations(
             quant,
             element,
             closed_exits,

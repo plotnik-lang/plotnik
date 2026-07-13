@@ -30,8 +30,8 @@ pub enum CaptureKind {
     /// consumed labeled alternation (lowered as `VariantOpen … VariantClose`). Emit
     /// the inner, then a trailing `Set`; the capture contributes no `Node` and no wrapper.
     PendingValue,
-    /// An array collected by `*` or `+` (`Arr … Push … EndArr`).
-    Array,
+    /// A list collected by `*` or `+` (`Arr … ArrayPush … EndArr`).
+    List,
 }
 
 /// Capture value-mechanism classification while analysis is in progress.
@@ -50,8 +50,8 @@ impl TypeAnalysis {
         if let Pattern::QuantifiedPattern(quant) = &pattern {
             let kind = mode.quantifier_kind(quant);
             return match kind {
-                // `*` / `+` collect into an array regardless of element shape.
-                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::Array,
+                // `*` / `+` collect into a list regardless of element shape.
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::List,
                 // `?` adds optionality to the inner's value mechanism — except a
                 // fields-flow inner, whose captures the `?` collects as one
                 // optional record (the `?` counterpart of `*`'s list). That holds
@@ -152,7 +152,7 @@ impl TypeAnalysis {
                 self.expect_type_shape(output_type),
                 TypeShape::Record(_)
                     | TypeShape::Variant(_)
-                    | TypeShape::Array { .. }
+                    | TypeShape::List { .. }
                     | TypeShape::Option(_)
             );
         }
@@ -163,7 +163,7 @@ impl TypeAnalysis {
                 Some(
                     TypeShape::Record(_)
                         | TypeShape::Variant(_)
-                        | TypeShape::Array { .. }
+                        | TypeShape::List { .. }
                         | TypeShape::Option(_)
                 )
             );

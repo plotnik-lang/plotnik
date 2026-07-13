@@ -477,7 +477,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
     /// Read one planned value. The returned expression's first line splices
     /// inline; continuation lines are indented for `level`. `depth` suffixes
-    /// array accumulators so nested arrays don't shadow. `cut` is the item
+    /// list accumulators so nested lists don't shadow. `cut` is the item
     /// declaration this position renders inside — the box-placement context,
     /// threaded exactly as the type renderer threads it so `Box::new` sits
     /// precisely where the declared type says `Box`.
@@ -487,7 +487,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             ReplayValuePlan::Text => "t.expect_str()".to_string(),
             ReplayValuePlan::Bool => "t.expect_bool()".to_string(),
             ReplayValuePlan::Nullable(inner) => self.nullable_expr(inner, context),
-            ReplayValuePlan::Array(element) => self.array_expr(element, context),
+            ReplayValuePlan::List(element) => self.list_expr(element, context),
             ReplayValuePlan::Read { item, source } => {
                 let call = self.reader_call(*item);
                 if self.model.is_boxed_ref(context.type_context, *source) {
@@ -514,10 +514,10 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         out
     }
 
-    fn array_expr(&self, element: &ReplayValuePlan, context: ReadContext) -> String {
+    fn list_expr(&self, element: &ReplayValuePlan, context: ReadContext) -> String {
         let p = indentation(context.level);
-        let items = format!("items{}", context.array_depth);
-        let elem = self.value_expr(element, context.array_element());
+        let items = format!("items{}", context.list_depth);
+        let elem = self.value_expr(element, context.list_element());
         let mut out = String::new();
         let _ = writeln!(out, "{{");
         let _ = writeln!(out, "{p}    t.expect_array_open();");
@@ -534,13 +534,13 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 }
 
 /// Where a value expression is emitted. `type_context` decides recursive
-/// `Box` placement, `level` is the emitted indentation, and `array_depth`
+/// `Box` placement, `level` is the emitted indentation, and `list_depth`
 /// keeps nested array accumulator names distinct.
 #[derive(Clone, Copy)]
 struct ReadContext {
     type_context: TypeContext,
     level: usize,
-    array_depth: usize,
+    list_depth: usize,
 }
 
 impl ReadContext {
@@ -548,7 +548,7 @@ impl ReadContext {
         Self {
             type_context: TypeContext::item(item_ty),
             level,
-            array_depth: 0,
+            list_depth: 0,
         }
     }
 
@@ -566,11 +566,11 @@ impl ReadContext {
         }
     }
 
-    fn array_element(self) -> Self {
+    fn list_element(self) -> Self {
         Self {
-            type_context: self.type_context.array_element(),
+            type_context: self.type_context.list_element(),
             level: self.level + 2,
-            array_depth: self.array_depth + 1,
+            list_depth: self.list_depth + 1,
         }
     }
 }

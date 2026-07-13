@@ -60,7 +60,7 @@ T0 = <Node>
 T1 = Record  M0:1  ; { id }
 T2 = Option(T1)  ; AX?
 T3 = Record  M1:1  ; { x }
-T4 = ArrayStar(T3)  ; A*
+T4 = ListZeroOrMore(T3)  ; A*
 T5 = Record  M2:1  ; { xs }
 
 [type_members]

@@ -112,8 +112,8 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
 
     fn value_temp_bytes(&self, ty: TypeId, context: TypeContext) -> u64 {
         match self.types.expect_type_shape(ty) {
-            TypeShape::Array { element, .. } => VEC_VALUE_BYTES.saturating_add(
-                self.type_value_bytes(*element, context.array_element(), &mut HashSet::new()),
+            TypeShape::List { element, .. } => VEC_VALUE_BYTES.saturating_add(
+                self.type_value_bytes(*element, context.list_element(), &mut HashSet::new()),
             ),
             _ => self.type_value_bytes(ty, context, &mut HashSet::new()),
         }
@@ -138,8 +138,8 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
                 let inner = self.type_value_bytes(*inner, context, seen);
                 self.option_value_bytes(inner)
             }
-            TypeShape::Array { element, .. } => VEC_VALUE_BYTES
-                .saturating_add(self.type_value_bytes(*element, context.array_element(), seen)),
+            TypeShape::List { element, .. } => VEC_VALUE_BYTES
+                .saturating_add(self.type_value_bytes(*element, context.list_element(), seen)),
             TypeShape::Record(fields) => fields
                 .values()
                 .map(|info| {

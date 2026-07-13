@@ -36,7 +36,7 @@ S4 "Q"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = ArrayPlus(T1)  ; <Node>+
+T2 = ListOneOrMore(T1)  ; <Node>+
 
 [type_members]
 

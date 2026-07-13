@@ -58,7 +58,7 @@ S10 "number"
 T0 = <Node>
 T1 = Option(T0)  ; <Node>?
 T2 = Record  M0:2  ; { a, b }
-T3 = ArrayStar(T2)  ; QItems*
+T3 = ListZeroOrMore(T2)  ; QItems*
 T4 = Record  M2:1  ; { items }
 
 [type_members]

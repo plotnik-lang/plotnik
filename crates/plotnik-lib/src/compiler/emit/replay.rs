@@ -103,7 +103,7 @@ pub(crate) enum ReplayValuePlan {
     Text,
     Bool,
     Nullable(Box<ReplayValuePlan>),
-    Array(Box<ReplayValuePlan>),
+    List(Box<ReplayValuePlan>),
     Read {
         item: Symbol,
         /// Analysis type at this read position. It preserves whether the
@@ -191,8 +191,8 @@ impl ReplayPlanBuilder<'_, '_> {
             TypeShape::Text => ReplayValuePlan::Text,
             TypeShape::Bool => ReplayValuePlan::Bool,
             TypeShape::Option(inner) => ReplayValuePlan::Nullable(Box::new(self.value(*inner))),
-            TypeShape::Array { element, .. } => {
-                ReplayValuePlan::Array(Box::new(self.value(*element)))
+            TypeShape::List { element, .. } => {
+                ReplayValuePlan::List(Box::new(self.value(*element)))
             }
             TypeShape::Record(_) | TypeShape::Variant(_) => ReplayValuePlan::Read {
                 item: self

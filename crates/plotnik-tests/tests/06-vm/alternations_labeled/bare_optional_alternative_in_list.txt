@@ -44,7 +44,7 @@ T0 = <Node>
 T1 = Option(T0)  ; <Node>?
 T2 = Record  M0:1  ; { c }
 T3 = Variant M1:1  ; A
-T4 = ArrayStar(T3)  ; QItems*
+T4 = ListZeroOrMore(T3)  ; QItems*
 T5 = Record  M2:1  ; { items }
 
 [type_members]

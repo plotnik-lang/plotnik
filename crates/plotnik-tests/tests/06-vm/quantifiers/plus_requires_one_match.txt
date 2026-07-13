@@ -19,7 +19,7 @@ S4 "lexical_declaration"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayPlus(T0)  ; <Node>+
+T1 = ListOneOrMore(T0)  ; <Node>+
 T2 = Record  M0:1  ; { decls }
 
 [type_members]

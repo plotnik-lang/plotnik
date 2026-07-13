@@ -41,7 +41,7 @@ S8 "number"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:2  ; { a, b }
-T2 = ArrayStar(T1)  ; QItems*
+T2 = ListZeroOrMore(T1)  ; QItems*
 T3 = Record  M2:1  ; { items }
 
 [type_members]

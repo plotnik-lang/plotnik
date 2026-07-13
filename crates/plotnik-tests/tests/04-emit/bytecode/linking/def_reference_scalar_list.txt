@@ -43,7 +43,7 @@ S5 "Func"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = ArrayPlus(T1)  ; <Node>+
+T2 = ListOneOrMore(T1)  ; <Node>+
 T3 = Record  M0:1  ; { funcs }
 
 [type_members]

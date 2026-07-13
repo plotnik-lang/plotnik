@@ -30,7 +30,7 @@ S8 "right"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayPlus(T0)  ; <Node>+
+T1 = ListOneOrMore(T0)  ; <Node>+
 T2 = Record  M0:1  ; { ids }
 
 [type_members]

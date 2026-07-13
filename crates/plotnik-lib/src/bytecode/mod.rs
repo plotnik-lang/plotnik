@@ -81,5 +81,3 @@ mod instructions_tests;
 mod node_kind_constraint_tests;
 #[cfg(test)]
 mod spans_tests;
-#[cfg(test)]
-mod type_meta_tests;

@@ -155,8 +155,12 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
             TypeDefKind::Wrapper { kind, inner } => {
                 let formatted = match kind {
                     TypeKind::Option => format!("Option(T{:0tw$})", u16::from(inner)),
-                    TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", u16::from(inner)),
-                    TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:0tw$})", u16::from(inner)),
+                    TypeKind::ListZeroOrMore => {
+                        format!("ListZeroOrMore(T{:0tw$})", u16::from(inner))
+                    }
+                    TypeKind::ListOneOrMore => {
+                        format!("ListOneOrMore(T{:0tw$})", u16::from(inner))
+                    }
                     TypeKind::Alias => format!("Alias(T{:0tw$})", u16::from(inner)),
                     _ => unreachable!(),
                 };
@@ -165,11 +169,11 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                         let inner_name = format_type_name(inner, module, ctx);
                         format!("{}  ; {}?{}", c.dim, inner_name, c.reset)
                     }
-                    TypeKind::ArrayZeroOrMore => {
+                    TypeKind::ListZeroOrMore => {
                         let inner_name = format_type_name(inner, module, ctx);
                         format!("{}  ; {}*{}", c.dim, inner_name, c.reset)
                     }
-                    TypeKind::ArrayOneOrMore => {
+                    TypeKind::ListOneOrMore => {
                         let inner_name = format_type_name(inner, module, ctx);
                         format!("{}  ; {}+{}", c.dim, inner_name, c.reset)
                     }

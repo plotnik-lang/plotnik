@@ -31,7 +31,7 @@ S4 "comment"
 
 [type_defs]
 T0 = <Text>
-T1 = ArrayStar(T0)  ; <Text>*
+T1 = ListZeroOrMore(T0)  ; <Text>*
 T2 = Record  M0:1  ; { comments }
 
 [type_members]

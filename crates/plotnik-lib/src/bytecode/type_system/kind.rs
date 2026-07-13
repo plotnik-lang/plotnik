@@ -13,10 +13,10 @@ pub enum TypeKind {
     Node = 1,
     /// `T?` - option type containing zero or one value.
     Option = 2,
-    /// `T*` - array of zero or more values.
-    ArrayZeroOrMore = 3,
-    /// `T+` - array of one or more values (non-empty).
-    ArrayOneOrMore = 4,
+    /// `T*` - list of zero or more values.
+    ListZeroOrMore = 3,
+    /// `T+` - list of one or more values.
+    ListOneOrMore = 4,
     /// Record with named fields.
     Record = 5,
     /// Variant type with named cases.
@@ -36,8 +36,8 @@ impl TypeKind {
             0 => Some(Self::Void),
             1 => Some(Self::Node),
             2 => Some(Self::Option),
-            3 => Some(Self::ArrayZeroOrMore),
-            4 => Some(Self::ArrayOneOrMore),
+            3 => Some(Self::ListZeroOrMore),
+            4 => Some(Self::ListOneOrMore),
             5 => Some(Self::Record),
             6 => Some(Self::Variant),
             7 => Some(Self::Alias),
@@ -52,24 +52,20 @@ impl TypeKind {
         matches!(self, Self::Void | Self::Node | Self::Text | Self::Bool)
     }
 
-    /// Whether this is a wrapper type (Option, ArrayZeroOrMore, ArrayOneOrMore).
+    /// Whether this is a wrapper type (`Option`, `ListZeroOrMore`, or
+    /// `ListOneOrMore`).
     ///
     /// Wrapper types contain a single inner type.
     /// Record and Variant types carry named members instead.
     pub fn is_wrapper(self) -> bool {
         matches!(
             self,
-            Self::Option | Self::ArrayZeroOrMore | Self::ArrayOneOrMore
+            Self::Option | Self::ListZeroOrMore | Self::ListOneOrMore
         )
     }
 
-    pub fn is_array(self) -> bool {
-        matches!(self, Self::ArrayZeroOrMore | Self::ArrayOneOrMore)
-    }
-
-    /// For array types, whether the array is non-empty.
-    pub fn is_non_empty_array(self) -> bool {
-        matches!(self, Self::ArrayOneOrMore)
+    pub fn is_list(self) -> bool {
+        matches!(self, Self::ListZeroOrMore | Self::ListOneOrMore)
     }
 
     pub fn is_alias(self) -> bool {

@@ -39,7 +39,7 @@ S8 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
+T1 = ListZeroOrMore(T0)  ; <Node>*
 T2 = Option(T0)  ; <Node>?
 T3 = Record  M0:3  ; { ids, e, d }
 

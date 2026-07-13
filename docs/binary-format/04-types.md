@@ -8,18 +8,18 @@ Type system metadata for code generation and runtime validation. Describes the s
 
 **TypeKind (u8)**: Discriminator for TypeDef.
 
-| Value | Kind              | Description                     |
-| ----- | ----------------- | ------------------------------- |
-| 0     | `Void`            | Unit type, captures nothing     |
-| 1     | `Node`            | AST node reference              |
-| 2     | `Option`          | Zero or one value               |
-| 3     | `ArrayZeroOrMore` | Zero or more (T\*)              |
-| 4     | `ArrayOneOrMore`  | One or more (T+)                |
-| 5     | `Record`          | Record with named fields        |
-| 6     | `Variant`         | Variant type with named cases   |
-| 7     | `Alias`           | Named reference to another type |
-| 8     | `Text`            | Borrowed source text            |
-| 9     | `Bool`            | Boolean value                   |
+| Value | Kind             | Description                     |
+| ----- | ---------------- | ------------------------------- |
+| 0     | `Void`           | Unit type, captures nothing     |
+| 1     | `Node`           | AST node reference              |
+| 2     | `Option`         | Zero or one value               |
+| 3     | `ListZeroOrMore` | Zero or more (T\*)              |
+| 4     | `ListOneOrMore`  | One or more (T+)                |
+| 5     | `Record`         | Record with named fields        |
+| 6     | `Variant`        | Variant type with named cases   |
+| 7     | `Alias`          | Named reference to another type |
+| 8     | `Text`           | Borrowed source text            |
+| 9     | `Bool`           | Boolean value                   |
 
 ### Node Semantics
 
@@ -60,18 +60,18 @@ struct TypeDef {
 
 **Field semantics by kind**:
 
-| Kind              | `data`        | `count`    |
-| :---------------- | :------------ | :--------- |
-| `Void`            | 0             | 0          |
-| `Node`            | 0             | 0          |
-| `Text`            | 0             | 0          |
-| `Bool`            | 0             | 0          |
-| `Option`          | Inner TypeId  | 0          |
-| `ArrayZeroOrMore` | Inner TypeId  | 0          |
-| `ArrayOneOrMore`  | Inner TypeId  | 0          |
-| `Alias`           | Target TypeId | 0          |
-| `Record`          | MemberIndex   | FieldCount |
-| `Variant`         | MemberIndex   | CaseCount  |
+| Kind             | `data`        | `count`    |
+| :--------------- | :------------ | :--------- |
+| `Void`           | 0             | 0          |
+| `Node`           | 0             | 0          |
+| `Text`           | 0             | 0          |
+| `Bool`           | 0             | 0          |
+| `Option`         | Inner TypeId  | 0          |
+| `ListZeroOrMore` | Inner TypeId  | 0          |
+| `ListOneOrMore`  | Inner TypeId  | 0          |
+| `Alias`          | Target TypeId | 0          |
+| `Record`         | MemberIndex   | FieldCount |
+| `Variant`        | MemberIndex   | CaseCount  |
 
 > **Limit**: `count` is u8, so composites are limited to 255 members.
 

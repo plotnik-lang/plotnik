@@ -51,7 +51,7 @@ T1 = Record  M0:1  ; { a }
 T2 = Record  M1:1  ; { b }
 T3 = Variant M2:2  ; A | B
 T4 = Record  M4:1  ; { item }
-T5 = ArrayStar(T4)  ; QItems*
+T5 = ListZeroOrMore(T4)  ; QItems*
 T6 = Record  M5:1  ; { items }
 
 [type_members]

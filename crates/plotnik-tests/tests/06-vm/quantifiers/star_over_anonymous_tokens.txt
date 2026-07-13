@@ -38,7 +38,7 @@ S6 ","
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
+T1 = ListZeroOrMore(T0)  ; <Node>*
 T2 = Record  M0:1  ; { commas }
 
 [type_members]

@@ -30,7 +30,7 @@ impl TypeContext {
         Self { cut: Some(item_ty) }
     }
 
-    pub(crate) fn array_element(self) -> Self {
+    pub(crate) fn list_element(self) -> Self {
         Self { cut: None }
     }
 }

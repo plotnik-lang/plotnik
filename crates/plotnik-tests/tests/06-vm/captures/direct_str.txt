@@ -35,7 +35,7 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Text>
-T1 = ArrayStar(T0)  ; <Text>*
+T1 = ListZeroOrMore(T0)  ; <Text>*
 T2 = Record  M0:2  ; { comments, name }
 
 [type_members]

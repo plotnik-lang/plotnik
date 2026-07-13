@@ -60,7 +60,7 @@ pub enum CaptureTypePlanKind {
         mode: OptionMode,
         inner: Box<CaptureTypePlan>,
     },
-    Array {
+    List {
         element: Box<CaptureTypePlan>,
     },
 }
@@ -96,10 +96,10 @@ impl CaptureTypePlan {
         }
     }
 
-    pub fn array(final_type: TypeId, element: CaptureTypePlan) -> Self {
+    pub fn list(final_type: TypeId, element: CaptureTypePlan) -> Self {
         Self {
             final_type,
-            kind: CaptureTypePlanKind::Array {
+            kind: CaptureTypePlanKind::List {
                 element: Box::new(element),
             },
         }
@@ -118,7 +118,7 @@ impl CaptureTypePlan {
             CaptureTypePlanKind::TextTerminal { data }
             | CaptureTypePlanKind::BoolTerminal { data } => data.suppresses_semantic_data(),
             CaptureTypePlanKind::Option { inner, .. } => inner.suppresses_semantic_data(),
-            CaptureTypePlanKind::Array { element } => element.suppresses_semantic_data(),
+            CaptureTypePlanKind::List { element } => element.suppresses_semantic_data(),
         }
     }
 }

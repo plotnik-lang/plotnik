@@ -434,7 +434,7 @@ impl<'a> ItemCollector<'a> {
                     }
                 }
             }
-            TypeShape::Array { element, .. } | TypeShape::Option(element) => {
+            TypeShape::List { element, .. } | TypeShape::Option(element) => {
                 self.collect_position(*element)
             }
             TypeShape::Ref(def_id) => self.collect_reference(*def_id),
@@ -456,7 +456,7 @@ impl<'a> ItemCollector<'a> {
                 self.add_item(name, ty);
             }
             TypeShape::Custom(name) => self.add_item(*name, ty),
-            TypeShape::Array { .. } | TypeShape::Option(_) => {
+            TypeShape::List { .. } | TypeShape::Option(_) => {
                 let Some(&name) = self.named_types.get(&ty) else {
                     self.walk(ty);
                     return;
@@ -555,7 +555,7 @@ impl TypeCollector {
             shape,
             TypeShape::Record(_)
                 | TypeShape::Variant(_)
-                | TypeShape::Array { .. }
+                | TypeShape::List { .. }
                 | TypeShape::Option(_)
                 | TypeShape::Custom(_)
         ) {

@@ -36,7 +36,8 @@ use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, PatternShape, QuantifierKind, RecordField, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    ListMinimum, PatternFlow, PatternShape, QuantifierKind, RecordField, TYPE_NODE, TYPE_VOID,
+    TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{
     BuiltInCaptureType, CaptureFact, FieldCompletion, FieldCompletions, RawCaptureFact, RootExtent,
@@ -753,7 +754,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // A void inner that doesn't match exactly one node has no single node
         // for the capture to bind. Recover as `Node` — the error is already
         // reported. Direct quantifiers are exempt: the captured-quantifier
-        // machinery defines their value (array, or optional node), and the
+        // machinery defines their value (list, or optional node), and the
         // exactly-one check runs on their element instead.
         if !matches!(inner.node(), Pattern::QuantifiedPattern(_))
             && !self.report_capture_on_void_ref(inner.node(), &inner_info)
@@ -837,7 +838,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// `:: TypeName` — name a structured capture or alias its semantic leaf.
-    /// Recurses into arrays and optionals so the name lands on the element.
+    /// Recurses into lists and options so the name lands on the element.
     /// Every occurrence is recorded for the naming pass to validate.
     fn apply_custom_capture_type(
         &mut self,
@@ -856,11 +857,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     });
                 type_id
             }
-            Some(TypeShape::Array { element, non_empty }) => {
+            Some(TypeShape::List { element, minimum }) => {
                 let element = self.apply_custom_capture_type(element, name, range);
                 self.ctx
                     .type_ctx
-                    .intern_type(TypeShape::Array { element, non_empty })
+                    .intern_type(TypeShape::List { element, minimum })
             }
             Some(TypeShape::Option(inner)) => {
                 let inner = self.apply_custom_capture_type(inner, name, range);
@@ -1138,6 +1139,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 }
             },
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
+                let minimum = match quantifier {
+                    QuantifierKind::ZeroOrMore => ListMinimum::Zero,
+                    QuantifierKind::OneOrMore => ListMinimum::One,
+                    QuantifierKind::Optional => unreachable!("repeat arm excludes optional"),
+                };
                 // A value-collecting repeat over a zero-width-capable element
                 // could complete an iteration without advancing; reject before
                 // lowering has to give the loop an exit it cannot have.
@@ -1149,13 +1155,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 }
                 if context == QuantifiedContext::DefinitionValue {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
-                    PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Array {
-                        element,
-                        non_empty: quantifier.is_non_empty(),
-                    }))
+                    PatternFlow::Value(
+                        self.ctx
+                            .type_ctx
+                            .intern_type(TypeShape::List { element, minimum }),
+                    )
                 } else {
-                    self.check_quantified_array_dimensionality(quant.node(), &inner_info, context);
-                    self.make_flow_array(inner_info.flow, quantifier.is_non_empty(), context)
+                    self.check_quantified_list_dimensionality(quant.node(), &inner_info, context);
+                    self.make_flow_list(inner_info.flow, minimum, context)
                 }
             }
         };
@@ -1165,7 +1172,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternShape::new(RootExtent::Other, flow)
     }
 
-    fn check_quantified_array_dimensionality(
+    fn check_quantified_list_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
@@ -1190,7 +1197,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// Reject `*`/`+` whose element is a reference to an optional- or
-    /// array-rooted definition that can match zero nodes: a zero-width
+    /// list-rooted definition that can match zero nodes: a zero-width
     /// iteration completes without consuming, so the loop collects a spurious
     /// null/empty element at every non-matching candidate. Scoped to
     /// wrapper-shaped outputs — the surface quantifier-rooted definitions
@@ -1226,7 +1233,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let wrapper_output = view.def_output(def_id).is_some_and(|output| {
             matches!(
                 view.type_shape(output),
-                Some(TypeShape::Option(_) | TypeShape::Array { .. })
+                Some(TypeShape::Option(_) | TypeShape::List { .. })
             )
         });
         if wrapper_output {
@@ -1291,14 +1298,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    fn make_flow_array(
+    fn make_flow_list(
         &mut self,
         flow: PatternFlow,
-        non_empty: bool,
+        minimum: ListMinimum,
         context: QuantifiedContext,
     ) -> PatternFlow {
-        let intern_array = |ctx: &mut TypeAnalysisBuilder, element: TypeId| {
-            PatternFlow::Value(ctx.intern_type(TypeShape::Array { element, non_empty }))
+        let intern_list = |ctx: &mut TypeAnalysisBuilder, element: TypeId| {
+            PatternFlow::Value(ctx.intern_type(TypeShape::List { element, minimum }))
         };
 
         match (context, flow) {
@@ -1308,20 +1315,20 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             (QuantifiedContext::Bare, PatternFlow::Void | PatternFlow::Value(_))
             | (QuantifiedContext::Discard, _) => PatternFlow::Void,
             // Bare with bubbling captures: `report_internal_capture_dimensionality`
-            // already errored. Produce the plausible array type anyway so
+            // already errored. Produce the plausible list type anyway so
             // downstream inference isn't poisoned by void.
             (QuantifiedContext::Bare, PatternFlow::Fields(record_type)) => {
-                intern_array(self.ctx.type_ctx, record_type)
+                intern_list(self.ctx.type_ctx, record_type)
             }
             // Captured repeats collect elements: matched nodes, pending values
             // (variant/reference results), or records of captured fields.
             (QuantifiedContext::Captured, PatternFlow::Void) => {
-                intern_array(self.ctx.type_ctx, TYPE_NODE)
+                intern_list(self.ctx.type_ctx, TYPE_NODE)
             }
             (
                 QuantifiedContext::Captured,
                 PatternFlow::Value(element) | PatternFlow::Fields(element),
-            ) => intern_array(self.ctx.type_ctx, element),
+            ) => intern_list(self.ctx.type_ctx, element),
             (QuantifiedContext::DefinitionValue, _) => {
                 unreachable!("quantifier-rooted definitions resolve their element type instead")
             }
@@ -1391,7 +1398,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
-        // Shared with `TypeAnalysis::capture_kind` and `compile`'s implicit-array gate so the
+        // Shared with `TypeAnalysis::capture_kind` and `compile`'s implicit-list gate so the
         // three never disagree on a quantifier's arity.
         quant
             .quantifier_kind()
@@ -1618,7 +1625,7 @@ pub(super) fn freeze_field_completions(types: &mut TypeAnalysisBuilder) {
                     FieldCompletion::AlwaysPresent
                 } else if matches!(
                     types.in_progress().type_shape(info.final_type),
-                    Some(TypeShape::Array { .. })
+                    Some(TypeShape::List { .. })
                 ) {
                     FieldCompletion::EmptyList
                 } else {

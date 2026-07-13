@@ -64,7 +64,7 @@ S10 "name"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:2  ; { decl, n }
-T2 = ArrayStar(T1)  ; QRows*
+T2 = ListZeroOrMore(T1)  ; QRows*
 T3 = Record  M2:1  ; { rows }
 
 [type_members]

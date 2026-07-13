@@ -50,7 +50,7 @@ R1 /^\p{Lu}$/
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { id }
-T2 = ArrayStar(T1)  ; QRows*
+T2 = ListZeroOrMore(T1)  ; QRows*
 T3 = Record  M1:1  ; { rows }
 
 [type_members]

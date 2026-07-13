@@ -20,6 +20,12 @@ pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
 pub const TYPE_TEXT: TypeId = TypeId(PrimitiveType::Text.index() as u32);
 pub const TYPE_BOOL: TypeId = TypeId(PrimitiveType::Bool.index() as u32);
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum ListMinimum {
+    Zero,
+    One,
+}
+
 /// The shape of an inferred type, determining its structure.
 ///
 /// This represents the inference-time type representation which carries
@@ -41,8 +47,11 @@ pub enum TypeShape {
     Record(BTreeMap<Symbol, RecordField>),
     /// Variant type from a labeled alternation.
     Variant(BTreeMap<Symbol, TypeId>),
-    /// Array type with element type.
-    Array { element: TypeId, non_empty: bool },
+    /// Ordered list with its semantic minimum length.
+    List {
+        element: TypeId,
+        minimum: ListMinimum,
+    },
     /// Option type containing zero or one value.
     Option(TypeId),
     /// Forward reference to a recursive type.
@@ -87,7 +96,7 @@ impl TypeShape {
                     .map(field_type_id as fn(&RecordField) -> TypeId),
             ),
             Self::Variant(cases) => TypeShapeChildIdsInner::Cases(cases.values().copied()),
-            Self::Array { element, .. } | Self::Option(element) => {
+            Self::List { element, .. } | Self::Option(element) => {
                 TypeShapeChildIdsInner::One(Some(*element).into_iter())
             }
             Self::Void | Self::Node | Self::Text | Self::Bool | Self::Custom(_) | Self::Ref(_) => {

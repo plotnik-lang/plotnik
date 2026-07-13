@@ -8,7 +8,7 @@ use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeN
 use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeShape,
+    ListMinimum, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeShape,
 };
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
@@ -148,12 +148,11 @@ fn emit_type_at_slot(
             Ok(())
         }
 
-        TypeShape::Array { element, non_empty } => {
+        TypeShape::List { element, minimum } => {
             let element_bc = types.resolve_type(*element, ctx.type_analysis)?;
-            let def = if *non_empty {
-                TypeDef::array_plus(element_bc)
-            } else {
-                TypeDef::array_star(element_bc)
+            let def = match minimum {
+                ListMinimum::Zero => TypeDef::list_zero_or_more(element_bc),
+                ListMinimum::One => TypeDef::list_one_or_more(element_bc),
             };
             types.fill_slot(slot_index, def);
             Ok(())

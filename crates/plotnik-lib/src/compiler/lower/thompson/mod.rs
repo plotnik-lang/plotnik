@@ -12,7 +12,7 @@
 //! - `patterns`: Leaf pattern compilation (named/anon nodes, refs, fields, captures)
 //! - `navigation`: Navigation mode computation for anchors and quantifiers
 //! - `quantifier`: Unified quantifier compilation (*, +, ?)
-//! - `scope`: Scope management for struct/array wrappers
+//! - `scope`: Scope management for record/list wrappers
 //! - `sequences`: Sequence and alternation compilation
 
 mod alternation;

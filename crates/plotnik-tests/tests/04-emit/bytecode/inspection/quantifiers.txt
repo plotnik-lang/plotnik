@@ -130,13 +130,13 @@ S14 "identifier"
 T00 = <Node>
 T01 = Option(T00)  ; <Node>?
 T02 = Record  M0:1  ; { stmt }
-T03 = ArrayStar(T00)  ; <Node>*
+T03 = ListZeroOrMore(T00)  ; <Node>*
 T04 = Record  M1:1  ; { stmts }
-T05 = ArrayPlus(T00)  ; <Node>+
+T05 = ListOneOrMore(T00)  ; <Node>+
 T06 = Record  M2:1  ; { stmts }
 T07 = Record  M3:1  ; { stmts }
 T08 = Record  M4:1  ; { name }
-T09 = ArrayStar(T08)  ; FuncsFuncs*
+T09 = ListZeroOrMore(T08)  ; FuncsFuncs*
 T10 = Record  M5:1  ; { funcs }
 
 [type_members]

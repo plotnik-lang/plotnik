@@ -10,7 +10,7 @@
 //! - a `Ref` occurrence is boxed iff it closes a by-value cycle through the
 //!   item declaration it is rendered in: its target reaches that *item* back
 //!   through edges that stay on the stack. `Vec` already heap-indirects, so
-//!   array elements are not by-value edges (and a ref under an array is
+//!   list elements are not by-value edges (and a ref under a list is
 //!   never boxed); `Option` stores inline, so it is one. Keying on the
 //!   enclosing item rather than the ref node keeps an off-cycle use of a
 //!   recursive type unboxed (`Q { expr: Expr }`) while every declaration a
@@ -172,7 +172,7 @@ fn by_value_closure(types: &TypeAnalysis, from: TypeId) -> HashSet<TypeId> {
         }
         match types.expect_type_shape(ty) {
             // An array stores its elements on the heap: not a by-value edge.
-            TypeShape::Array { .. } => {}
+            TypeShape::List { .. } => {}
             TypeShape::Ref(def_id) => {
                 let target = types.expect_def_output(*def_id);
                 if target != TYPE_VOID {

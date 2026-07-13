@@ -42,7 +42,7 @@ T0 = <Node>
 T1 = Record  M0:1  ; { expression }
 T2 = Record  M1:1  ; { debugger }
 T3 = Variant M2:2  ; Expression | Debugger
-T4 = ArrayPlus(T3)  ; QStatements+
+T4 = ListOneOrMore(T3)  ; QStatements+
 T5 = Record  M4:1  ; { statements }
 
 [type_members]

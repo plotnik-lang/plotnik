@@ -52,7 +52,7 @@ T0 = <Void>
 T1 = <Node>
 T2 = Record  M0:1  ; { name }
 T3 = Record  M1:1  ; { item }
-T4 = ArrayStar(T3)  ; CollectItems*
+T4 = ListZeroOrMore(T3)  ; CollectItems*
 T5 = Record  M2:1  ; { items }
 
 [type_members]

@@ -58,7 +58,7 @@ S9 "array"
 T0 = <Node>
 T1 = Record  M0:1  ; { name }
 T2 = Record  M1:1  ; { item }
-T3 = ArrayStar(T2)  ; OuterItems*
+T3 = ListZeroOrMore(T2)  ; OuterItems*
 T4 = Record  M2:1  ; { items }
 
 [type_members]

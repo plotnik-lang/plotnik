@@ -4,18 +4,11 @@ use super::{StringId, TypeId};
 
 pub use crate::bytecode::type_system::TypeKind;
 
-/// Convenience aliases for bytecode-specific naming (ArrayStar/ArrayPlus).
-impl TypeKind {
-    /// Alias for `ArrayZeroOrMore` (T*).
-    pub const ARRAY_STAR: Self = Self::ArrayZeroOrMore;
-    /// Alias for `ArrayOneOrMore` (T+).
-    pub const ARRAY_PLUS: Self = Self::ArrayOneOrMore;
-}
-
 /// Type definition entry (4 bytes).
 ///
 /// Semantics of `payload` and `count` depend on `kind`:
-/// - Wrappers (Option, ArrayStar, ArrayPlus): `payload` = inner TypeId, `count` = 0
+/// - Wrappers (`Option`, `ListZeroOrMore`, `ListOneOrMore`): `payload` = inner
+///   `TypeId`, `count` = 0
 /// - Record/Variant: `payload` = member index, `count` = member count
 /// - Alias: `payload` = target TypeId, `count` = 0
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,7 +30,7 @@ const _: () = assert!(std::mem::size_of::<TypeDef>() == TypeDef::SIZE);
 pub enum TypeDefKind {
     /// Primitive types: Void, Node, Text, Bool.
     Primitive(TypeKind),
-    /// Wrapper types: Option, ArrayZeroOrMore, ArrayOneOrMore, Alias.
+    /// Wrapper types: `Option`, list kinds, and `Alias`.
     Wrapper { kind: TypeKind, inner: TypeId },
     /// A fixed set of named fields.
     Record { member_start: u16, member_count: u8 },
@@ -67,7 +60,7 @@ impl TypeDef {
         }
     }
 
-    /// Create a wrapper type (Option, ArrayStar, ArrayPlus).
+    /// Create a wrapper type.
     pub fn wrapper(kind: TypeKind, inner: TypeId) -> Self {
         Self {
             payload: u16::from(inner),
@@ -95,14 +88,12 @@ impl TypeDef {
         Self::wrapper(TypeKind::Alias, target)
     }
 
-    /// Create an ArrayStar (T*) wrapper type.
-    pub fn array_star(element: TypeId) -> Self {
-        Self::wrapper(TypeKind::ARRAY_STAR, element)
+    pub fn list_zero_or_more(element: TypeId) -> Self {
+        Self::wrapper(TypeKind::ListZeroOrMore, element)
     }
 
-    /// Create an ArrayPlus (T+) wrapper type.
-    pub fn array_plus(element: TypeId) -> Self {
-        Self::wrapper(TypeKind::ARRAY_PLUS, element)
+    pub fn list_one_or_more(element: TypeId) -> Self {
+        Self::wrapper(TypeKind::ListOneOrMore, element)
     }
 
     pub fn for_record(member_start: u16, member_count: u8) -> Self {
@@ -156,8 +147,8 @@ impl TypeDef {
                 TypeDefKind::Primitive(kind)
             }
             TypeKind::Option
-            | TypeKind::ArrayZeroOrMore
-            | TypeKind::ArrayOneOrMore
+            | TypeKind::ListZeroOrMore
+            | TypeKind::ListOneOrMore
             | TypeKind::Alias => TypeDefKind::Wrapper {
                 kind,
                 inner: TypeId::from(self.payload),

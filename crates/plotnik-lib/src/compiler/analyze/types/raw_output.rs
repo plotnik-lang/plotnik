@@ -16,7 +16,8 @@ use crate::compiler::analyze::types::capture_type::{
 };
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_TEXT, TYPE_VOID, TypeId, TypeShape,
+    ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_TEXT, TYPE_VOID, TypeId,
+    TypeShape,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;

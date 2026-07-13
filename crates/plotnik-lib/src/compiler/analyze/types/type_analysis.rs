@@ -136,7 +136,7 @@ impl TypeAnalysis {
             Some(TypeShape::Ref(def_id)) => self
                 .def_output(*def_id)
                 .is_none_or(|t| self.is_structured_output(t)),
-            Some(shape @ (TypeShape::Array { .. } | TypeShape::Option(_))) => shape
+            Some(shape @ (TypeShape::List { .. } | TypeShape::Option(_))) => shape
                 .child_type_ids()
                 .any(|id| id != TYPE_NODE && self.is_structured_output(id)),
             _ => false,
@@ -693,15 +693,15 @@ impl TypeAnalysisBuilder {
                     })
             }
             (
-                TypeShape::Array {
+                TypeShape::List {
                     element: ea,
-                    non_empty: na,
+                    minimum: ma,
                 },
-                TypeShape::Array {
+                TypeShape::List {
                     element: eb,
-                    non_empty: nb,
+                    minimum: mb,
                 },
-            ) => na == nb && self.types_structurally_equal(*ea, *eb),
+            ) => ma == mb && self.types_structurally_equal(*ea, *eb),
             (TypeShape::Option(ia), TypeShape::Option(ib)) => {
                 self.types_structurally_equal(*ia, *ib)
             }

@@ -1,6 +1,6 @@
 //! Scope management for structured captures.
 //!
-//! Handles StructOpen/StructClose and Arr/EndArr wrapper emission for record and array captures.
+//! Handles StructOpen/StructClose and Arr/EndArr wrapper emission for record and list captures.
 
 use crate::bytecode::Nav;
 use crate::compiler::ids::TypeId;
@@ -87,7 +87,7 @@ pub(super) struct SplitExits {
 /// The per-capture inputs shared by every capture lowering. The continuation is
 /// not among them: it is a sibling argument whose type encodes the capability —
 /// the scope-emitting helpers ([`NfaBuilder::compile_record_capture`] /
-/// [`NfaBuilder::compile_array_capture`]) take a [`CaptureExits`], so a zero-match
+/// [`NfaBuilder::compile_list_capture`]) take a [`CaptureExits`], so a zero-match
 /// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
 /// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
 /// unrepresentable for them rather than silently collapsed via `match_exit`.
@@ -99,9 +99,9 @@ pub(super) struct CaptureRequest {
 }
 
 impl CaptureRequest {
-    /// A definition-root array produces a pending value rather than assigning
+    /// A definition-root list produces a pending value rather than assigning
     /// a named capture at this site.
-    pub(super) fn pending_array(
+    pub(super) fn pending_list(
         inner: Pattern,
         nav: Option<Nav>,
         outer_capture: CaptureEffects,
@@ -290,11 +290,11 @@ impl NfaBuilder<'_> {
         self.dispatch_pattern(&inner, pattern_ctx)
     }
 
-    /// Compile a pattern with StructOpen/StructClose wrapping for array iteration.
+    /// Compile a pattern with StructOpen/StructClose wrapping for list iteration.
     ///
     /// Used when inner is a scope-creating pattern (sequence/alternation) with
     /// internal captures. Each iteration produces: StructOpen → inner → StructClose Push
-    pub(super) fn compile_struct_for_array(
+    pub(super) fn compile_record_for_list(
         &mut self,
         inner: &Pattern,
         exit: Label,

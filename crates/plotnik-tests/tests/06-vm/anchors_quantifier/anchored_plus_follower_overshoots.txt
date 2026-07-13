@@ -36,7 +36,7 @@ S10 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Option(T0)  ; <Node>?
-T2 = ArrayPlus(T0)  ; <Node>+
+T2 = ListOneOrMore(T0)  ; <Node>+
 T3 = Record  M0:3  ; { a, b, c }
 
 [type_members]

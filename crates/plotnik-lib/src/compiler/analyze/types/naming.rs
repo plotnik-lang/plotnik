@@ -5,7 +5,7 @@
 //!
 //! - A definition's result type carries the definition's name.
 //! - A composite reached through field `f` of a type named `T` is `T` +
-//!   PascalCase(`f`), landing on array/optional *elements*. Variant-case
+//!   PascalCase(`f`), landing on list/option *elements*. Variant-case
 //!   payload records stay anonymous (rendered inline); composites inside a
 //!   payload fields are named variant type name + verbatim label + PascalCase(field).
 //! - A custom `:: TypeName` capture type overrides the generated name and
@@ -179,8 +179,8 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    /// Name the composite (if any) behind a field's type, unwrapping array and
-    /// optional wrappers so the name lands on the element.
+    /// Name the composite (if any) behind a field's type, unwrapping list and
+    /// option wrappers so the name lands on the element.
     fn visit_field_element(&mut self, field_type: TypeId, parent_name: &str, field: &str) {
         let element = self.unwrap_wrappers(field_type);
         let shape = self
@@ -265,7 +265,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             | TypeShape::Node
             | TypeShape::Text
             | TypeShape::Bool
-            | TypeShape::Array { .. }
+            | TypeShape::List { .. }
             | TypeShape::Option(_) => {}
         }
     }
@@ -307,7 +307,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         let mut current = type_id;
         loop {
             match self.ctx.in_progress().type_shape(current) {
-                Some(TypeShape::Array { element, .. }) => current = *element,
+                Some(TypeShape::List { element, .. }) => current = *element,
                 Some(TypeShape::Option(inner)) => current = *inner,
                 _ => return current,
             }

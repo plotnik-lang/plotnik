@@ -45,7 +45,7 @@ impl CaptureEffects {
 
     /// Add an inner scope (opens after existing scopes, closes before them).
     ///
-    /// Use for paired struct, variant, array, and suppression effects.
+    /// Use for paired record, variant, list, and suppression effects.
     ///
     /// Given existing `pre=[A_Open]`, `post=[A_Close]`, adding inner scope B:
     /// - Result: `pre=[A_Open, B_Open]`, `post=[B_Close, A_Close]`
@@ -91,7 +91,7 @@ impl CaptureEffects {
 
     /// Add post-match value effects (run before any scope closes).
     ///
-    /// Use for: Node+Set capture effects, Push for arrays
+    /// Use for: Node+Set capture effects, Push for lists
     ///
     /// Given `post=[Scope_Close]`, adding value effects:
     /// - Result: `post=[Value1, Value2, Scope_Close]`
@@ -203,7 +203,7 @@ impl NfaBuilder<'_> {
         let mut member_ref = None;
 
         // Only the `Node` mechanism captures the matched node directly. Every
-        // other mechanism (struct scope, pass-through ref/variant/forward, array)
+        // other mechanism (record scope, pass-through ref/variant/forward, list)
         // produces its value via StructClose/VariantClose/ArrayClose/Call, so the capture itself
         // emits no Node. A bare capture (`@x` with no inner) is a Node.
         let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
@@ -249,7 +249,7 @@ impl NfaBuilder<'_> {
 
     /// Check if a quantifier body needs Node effect before Push.
     ///
-    /// For scalar array elements (Node type), we need [Node, Push]
+    /// For scalar list elements (Node type), we need [Node, Push]
     /// to capture the matched node value.
     /// For structured elements, StructClose/VariantClose provides the value.
     /// For refs returning structured types, Call provides the value.
@@ -314,7 +314,7 @@ impl NfaBuilder<'_> {
     }
 }
 
-/// Check if inner needs struct wrapper for array iterations.
+/// Check if inner needs a record wrapper for list iterations.
 ///
 /// Returns true when the inner pattern produces a record type (bubbling fields).
 /// This includes:
@@ -336,7 +336,7 @@ pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
         .is_some_and(|shape| matches!(shape, TypeShape::Record(_)))
 }
 
-/// Get row type ID for array element scoping.
+/// Get the row type ID for list-element scoping.
 pub fn row_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
     type_ctx.expect_pattern_result(inner).flow.type_id()
 }

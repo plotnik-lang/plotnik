@@ -1101,7 +1101,7 @@ impl NfaBuilder<'_> {
     /// Capture effects land on the innermost match / scope-close instruction:
     /// - Node:   inner_pattern[Node, Set] → exit
     /// - Record: StructOpen → inner[…] → StructClose+capture → exit
-    /// - Array:  Arr → quantifier (with Push) → EndArr+capture → exit
+    /// - List: Arr → quantifier (with Push) → EndArr+capture → exit
     /// - Ref:    Call → Set epsilon → exit
     /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
     pub(super) fn compile_captured(
@@ -1149,8 +1149,8 @@ impl NfaBuilder<'_> {
         let req = CaptureRequest::for_capture(self, cap, nav_override, mechanism, outer_capture);
 
         match mechanism {
-            // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
-            CaptureKind::Array => self.compile_array_capture(req, exits),
+            // List: Arr → quantifier (with Push) → EndArr+capture → exit(s).
+            CaptureKind::List => self.compile_list_capture(req, exits),
 
             // Record scope: StructOpen → inner → StructClose+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
@@ -1188,7 +1188,7 @@ impl NfaBuilder<'_> {
                         CaptureKind::PendingValue => self.compile_setafter_capture(req, exit),
                         CaptureKind::Ref => self.compile_ref_capture(req, exit),
                         CaptureKind::Node => self.compile_node_capture(req, exit),
-                        CaptureKind::Array | CaptureKind::Record => {
+                        CaptureKind::List | CaptureKind::Record => {
                             unreachable!("scope mechanisms are handled above in compile_captured")
                         }
                     },

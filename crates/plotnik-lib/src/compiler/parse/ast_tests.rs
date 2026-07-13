@@ -11,13 +11,6 @@ fn category_subtype_shares_id_grammar_with_slash() {
 }
 
 #[test]
-fn is_non_empty() {
-    assert!(!QuantifierKind::Optional.is_non_empty());
-    assert!(!QuantifierKind::ZeroOrMore.is_non_empty());
-    assert!(QuantifierKind::OneOrMore.is_non_empty());
-}
-
-#[test]
 fn operator_tracks_arity_and_greediness() {
     let op = QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::Lazy);
 

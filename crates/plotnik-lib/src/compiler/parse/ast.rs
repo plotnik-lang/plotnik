@@ -299,12 +299,6 @@ pub enum QuantifierKind {
     OneOrMore,
 }
 
-impl QuantifierKind {
-    pub fn is_non_empty(self) -> bool {
-        matches!(self, Self::OneOrMore)
-    }
-}
-
 /// Syntactic quantifier greediness parsed from a quantifier token.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Greediness {

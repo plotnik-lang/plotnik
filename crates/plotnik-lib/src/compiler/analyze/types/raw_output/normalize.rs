@@ -284,7 +284,7 @@ pub(super) struct NormalizedField {
 
 impl NormalizedField {
     fn ordinary(info: RecordField, raw_types: &RawTypeSnapshot) -> Self {
-        let on_absence = if matches!(raw_types.shape(info.final_type), TypeShape::Array { .. }) {
+        let on_absence = if matches!(raw_types.shape(info.final_type), TypeShape::List { .. }) {
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {
             AbsencePolicy::MakeOption
@@ -302,7 +302,7 @@ impl NormalizedField {
                 FieldCompletion::Absent
             }
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList) => {
-                let TypeShape::Array { element, .. } = types
+                let TypeShape::List { element, .. } = types
                     .in_progress()
                     .type_shape(self.info.final_type)
                     .cloned()
@@ -310,11 +310,11 @@ impl NormalizedField {
                 else {
                     unreachable!("empty-list completion belongs to a list field")
                 };
-                let array = types.intern_type(TypeShape::Array {
+                let list = types.intern_type(TypeShape::List {
                     element,
-                    non_empty: false,
+                    minimum: ListMinimum::Zero,
                 });
-                self.info = RecordField::new(array);
+                self.info = RecordField::new(list);
                 FieldCompletion::EmptyList
             }
             AbsencePolicy::CompleteWith(
@@ -511,7 +511,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         field.info = RecordField::new(final_type);
         field.on_absence = if matches!(
             self.session.types.in_progress().type_shape(final_type),
-            Some(TypeShape::Array { .. })
+            Some(TypeShape::List { .. })
         ) {
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {
@@ -535,12 +535,12 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
                 let inner = self.adapt_final_type(raw_source, inner, normalized)?;
                 Some(self.session.types.intern_option(inner))
             }
-            TypeShape::Array { element, non_empty } => {
+            TypeShape::List { element, minimum } => {
                 let element = self.adapt_final_type(raw_source, element, normalized)?;
                 Some(
                     self.session
                         .types
-                        .intern_type(TypeShape::Array { element, non_empty }),
+                        .intern_type(TypeShape::List { element, minimum }),
                 )
             }
             _ => None,
@@ -628,19 +628,19 @@ fn unify_normalized_types(
             Ok(types.intern_option(inner))
         }
         (
-            TypeShape::Array {
+            TypeShape::List {
                 element: a,
-                non_empty: a_non_empty,
+                minimum: a_minimum,
             },
-            TypeShape::Array {
+            TypeShape::List {
                 element: b,
-                non_empty: b_non_empty,
+                minimum: b_minimum,
             },
         ) => {
             let element = unify_normalized_types(types, a, b)?;
-            Ok(types.intern_type(TypeShape::Array {
+            Ok(types.intern_type(TypeShape::List {
                 element,
-                non_empty: a_non_empty && b_non_empty,
+                minimum: std::cmp::min(a_minimum, b_minimum),
             }))
         }
         _ => Err(()),

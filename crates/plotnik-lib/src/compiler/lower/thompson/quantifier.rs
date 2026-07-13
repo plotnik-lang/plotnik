@@ -1,6 +1,6 @@
 //! Unified quantifier compilation (`?`, `*`, `+` and lazy variants).
 //!
-//! All quantifier paths — plain, array-context, and split-exit — share one
+//! All quantifier paths — plain, list-context, and split-exit — share one
 //! `compile_quantified` entry point so greediness and search-nav logic
 //! stay in one place.
 
@@ -91,7 +91,7 @@ impl IterationScope {
         Self::Standalone { capture }
     }
 
-    fn array_element(
+    fn list_element(
         inner: &Pattern,
         capture: CaptureEffects,
         type_ctx: &crate::compiler::analyze::types::TypeAnalysis,
@@ -117,7 +117,7 @@ impl IterationScope {
         }
     }
 
-    fn by_array_exit(&self) -> Self {
+    fn by_list_exit(&self) -> Self {
         match self {
             Self::Standalone { capture } => Self::Standalone {
                 capture: capture.clone(),
@@ -296,10 +296,10 @@ impl NfaBuilder<'_> {
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile a quantified pattern for array capture with element-level effects.
+    /// Compile a quantified pattern for list capture with element-level effects.
     ///
     /// The element_capture effects (typically [Push]) are placed on each iteration.
-    pub(super) fn compile_quantified_for_array(
+    pub(super) fn compile_quantified_for_list(
         &mut self,
         quant: &ast::QuantifiedPattern,
         exit: Label,
@@ -320,11 +320,11 @@ impl NfaBuilder<'_> {
             QuantifierForm::Quantified { inner, .. } => inner,
         };
         let scope =
-            IterationScope::array_element(&inner, element_capture, self.ctx.analysis.type_analysis);
+            IterationScope::list_element(&inner, element_capture, self.ctx.analysis.type_analysis);
         self.compile_quantified(quant, scope, QuantifierRoute::single(nav_override, exit))
     }
 
-    pub(super) fn compile_capture_type_array_iterations(
+    pub(super) fn compile_capture_type_list_iterations(
         &mut self,
         quant: &ast::QuantifiedPattern,
         element: CaptureTypePlan,
@@ -340,7 +340,7 @@ impl NfaBuilder<'_> {
                         nav_override,
                         CaptureExits::Single(exits.match_exit()),
                     )
-                    .array_item(&inner);
+                    .list_item(&inner);
             }
             QuantifierForm::Quantified { .. } => {}
         }
@@ -599,9 +599,9 @@ impl NfaBuilder<'_> {
 
     /// Compile a struct-mechanism capture whose inner is an optional quantifier
     /// (`{...}? @x`, `[...]? @x`) — the only quantifier that reaches the struct
-    /// mechanism, since `*`/`+` classify as `Array`.
+    /// mechanism, since `*`/`+` classify as `List`.
     ///
-    /// The row is optional as a whole. Mirroring how arrays scope each element
+    /// The row is optional as a whole. Mirroring how lists scope each element
     /// record, the `StructOpen → body → StructClose+Set` wrapper lives inside the
     /// iteration; the skip path emits a bare `Null` for the capture instead of
     /// a hollow `{ field: null }` struct, matching the declared
@@ -625,7 +625,7 @@ impl NfaBuilder<'_> {
         };
         assert!(
             matches!(kind.kind(), QuantifierKind::Optional),
-            "`*`/`+` captures classify as Array, never Record"
+            "`*`/`+` captures classify as List, never Record"
         );
 
         let (match_exit, skip_exit) = match exits {
@@ -697,14 +697,14 @@ impl NfaBuilder<'_> {
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile an array capture (`(x)* @cap`) — `Arr → quantifier (with Push)
+    /// Compile a list capture (`(x)* @cap`) — `Arr → quantifier (with Push)
     /// → EndArr+capture → exit(s)`. With `Single` exits the loop falls straight
     /// through; with `Split` exits a zero-match takes `skip_exit` and a loop-exit
-    /// takes `match_exit`, each closing the array. `capture_effects` is built once
+    /// takes `match_exit`, each closing the list. `capture_effects` is built once
     /// by the caller; the matched element's `Node` is pushed only when the
     /// element is not already a structured value
     /// ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
-    pub(super) fn compile_array_capture(
+    pub(super) fn compile_list_capture(
         &mut self,
         req: CaptureRequest,
         exits: CaptureExits,
@@ -740,7 +740,7 @@ impl NfaBuilder<'_> {
             CaptureExits::Single(exit) => {
                 let endarr = self.emit_endarr_step(end_effects, exit);
                 if let Pattern::QuantifiedPattern(quant) = &inner {
-                    self.compile_quantified_for_array(quant, endarr, nav, push_effects)
+                    self.compile_quantified_for_list(quant, endarr, nav, push_effects)
                 } else {
                     self.compile_pattern(&inner, endarr, nav)
                 }
@@ -754,7 +754,7 @@ impl NfaBuilder<'_> {
                     SkipExit::To(skip) => SkipExit::To(self.emit_endarr_step(end_effects, skip)),
                     SkipExit::Fail => SkipExit::Fail,
                 };
-                self.compile_star_for_array_with_exits(
+                self.compile_star_for_list_with_exits(
                     &inner,
                     SplitExits {
                         match_exit: match_endarr,
@@ -766,11 +766,11 @@ impl NfaBuilder<'_> {
             }
         };
 
-        // Emit the array-open step at entry with outer pre-effects such as VariantOpen.
+        // Emit the list-open step at entry with outer pre-effects such as VariantOpen.
         self.emit_arr_step(inner_entry, outer_capture.pre, quant_start)
     }
 
-    fn compile_star_for_array_with_exits(
+    fn compile_star_for_list_with_exits(
         &mut self,
         pattern: &Pattern,
         exits: SplitExits,
@@ -805,7 +805,7 @@ impl NfaBuilder<'_> {
             QuantifierForm::Quantified { inner, .. } => inner,
         };
 
-        let scope = IterationScope::array_element(&inner, capture, self.ctx.analysis.type_analysis);
+        let scope = IterationScope::list_element(&inner, capture, self.ctx.analysis.type_analysis);
         let route = QuantifierRoute::with_exits(
             nav_override,
             CaptureExits::Split {
@@ -943,7 +943,7 @@ impl NfaBuilder<'_> {
                     match_exit,
                     skip_exit: SkipExit::To(skip_exit),
                 } => {
-                    let split_scope = element_scope.by_array_exit();
+                    let split_scope = element_scope.by_list_exit();
                     let split_body = |this: &mut Self, target: ExitNav| -> Label {
                         this.compile_quantified_body(&inner, target, split_scope.clone())
                     };
@@ -1030,7 +1030,7 @@ impl NfaBuilder<'_> {
 
     /// Compile a quantifier that IS a definition's output: the collected
     /// value is left pending as the call's return value — a captured
-    /// quantifier with no consumer of its own. `*`/`+` collect an array
+    /// quantifier with no consumer of its own. `*`/`+` collect a list
     /// (`Arr → iterations with Push → EndArr`); `?` leaves the element's
     /// value pending on the match path and a bare `Null` on the skip path.
     fn compile_valued_quantifier(
@@ -1047,8 +1047,8 @@ impl NfaBuilder<'_> {
         match kind.kind() {
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
                 let pattern = Pattern::QuantifiedPattern(quant.clone());
-                let req = CaptureRequest::pending_array(pattern, nav_override, outer);
-                self.compile_array_capture(req, exits)
+                let req = CaptureRequest::pending_list(pattern, nav_override, outer);
+                self.compile_list_capture(req, exits)
             }
             QuantifierKind::Optional => {
                 self.compile_valued_optional(quant, exits, nav_override, outer)
@@ -1197,7 +1197,7 @@ impl NfaBuilder<'_> {
                 },
             ),
             IterationScope::StructScoped { row_type_id, .. } => {
-                self.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
+                self.compile_record_for_list(inner, exit, Some(nav), row_type_id)
             }
             IterationScope::RowScopedByIteration {
                 row_type_id,
@@ -1215,7 +1215,7 @@ impl NfaBuilder<'_> {
             }),
             IterationScope::CaptureType { plan, .. } => self
                 .capture_type(&plan, Some(nav), CaptureExits::Single(exit))
-                .array_item(inner),
+                .list_item(inner),
         }
     }
 }

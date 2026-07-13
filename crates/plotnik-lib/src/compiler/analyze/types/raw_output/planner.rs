@@ -44,7 +44,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             AbsencePolicy::CompleteWith(FieldCompletion::Absent)
         } else if matches!(
             self.types.in_progress().type_shape(plan.final_type()),
-            Some(TypeShape::Array { .. })
+            Some(TypeShape::List { .. })
         ) {
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {
@@ -93,13 +93,13 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                     true,
                 ))
             }
-            TypeShape::Array { element, non_empty } => {
+            TypeShape::List { element, minimum } => {
                 let (element, _) = self.str_plan(*element, false, visiting)?;
-                let array = self.types.intern_type(TypeShape::Array {
+                let list = self.types.intern_type(TypeShape::List {
                     element: element.final_type(),
-                    non_empty: *non_empty,
+                    minimum: *minimum,
                 });
-                Ok((CaptureTypePlan::array(array, element), false))
+                Ok((CaptureTypePlan::list(list, element), false))
             }
             TypeShape::Ref(target) => {
                 self.str_plan(self.raw.definition(*target), zero_node_terminal, visiting)
@@ -145,11 +145,11 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::Ref(target) => {
                 self.bool_required(self.raw.definition(*target), may_be_absent, visiting)
             }
-            TypeShape::Array { .. } if may_be_absent => Ok(CaptureTypePlan::bool_terminal(
+            TypeShape::List { .. } if may_be_absent => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
                 TerminalData::Semantic,
             )),
-            TypeShape::Array { .. } => Err(
+            TypeShape::List { .. } => Err(
                 "capture type `bool` cannot be applied to this list; capture an optional value inside the list, or inspect whether the list is empty after parsing",
             ),
             TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) if may_be_absent => Ok(
@@ -178,7 +178,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::Node
             | TypeShape::Record(_)
             | TypeShape::Variant(_)
-            | TypeShape::Array { .. } => Ok(CaptureTypePlan::bool_terminal(
+            | TypeShape::List { .. } => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
                 terminal_data(self.raw.shape(type_id)),
             )),

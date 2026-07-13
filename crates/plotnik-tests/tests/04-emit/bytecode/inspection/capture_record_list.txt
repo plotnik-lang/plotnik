@@ -41,7 +41,7 @@ S7 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { name }
-T2 = ArrayStar(T1)  ; QFuncs*
+T2 = ListZeroOrMore(T1)  ; QFuncs*
 T3 = Record  M1:1  ; { funcs }
 
 [type_members]

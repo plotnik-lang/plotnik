@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::output::{OutputItem, OutputItemKind, OutputSchema};
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{ListMinimum, TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::emit::sink::{Sink, Style};
 use crate::core::Symbol;
 
@@ -260,7 +260,7 @@ impl<'a> SchemaEmitter<'a> {
             TypeShape::Text => self.render_builtin("string", ty),
             TypeShape::Bool => self.render_builtin("boolean", ty),
             TypeShape::Option(inner) => self.render_nullable(*inner),
-            TypeShape::Array { element, non_empty } => self.render_array(*element, *non_empty),
+            TypeShape::List { element, minimum } => self.render_array(*element, *minimum),
             TypeShape::Ref(definition) => {
                 let target = self.schema.types.expect_def_output(*definition);
                 if target == TYPE_VOID {
@@ -295,8 +295,8 @@ impl<'a> SchemaEmitter<'a> {
         out
     }
 
-    fn render_array(&self, element: TypeId, non_empty: bool) -> Sink<SemanticTag> {
-        if !non_empty {
+    fn render_array(&self, element: TypeId, minimum: ListMinimum) -> Sink<SemanticTag> {
+        if minimum == ListMinimum::Zero {
             let mut out = self.render_ty(element);
             out.styled(Style::Dim, "[]");
             return out;

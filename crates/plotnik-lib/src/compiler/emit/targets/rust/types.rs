@@ -176,7 +176,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
     ///
     /// Throughout the rendering recursion, `cut` is the item declaration a
     /// by-value path from this position is still inside — the context
-    /// the shared type model keys on. Descending into an array element
+    /// the shared type model keys on. Descending into a list element
     /// clears it: `Vec` indirects, so no cycle below is by-value.
     fn alias_body(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.schema.types;
@@ -184,10 +184,10 @@ impl<'m, 'a> Emitter<'m, 'a> {
             TypeShape::Node | TypeShape::Custom(_) => self.node_type(),
             TypeShape::Text => "&'s str".to_string(),
             TypeShape::Bool => "bool".to_string(),
-            TypeShape::Array { element, .. } => {
+            TypeShape::List { element, .. } => {
                 format!(
                     "::std::vec::Vec<{}>",
-                    self.position_type(context.array_element(), *element)
+                    self.position_type(context.list_element(), *element)
                 )
             }
             TypeShape::Option(inner) => {
@@ -225,10 +225,10 @@ impl<'m, 'a> Emitter<'m, 'a> {
                     .expect("naming pass names every composite outside enum-variant payloads");
                 self.named_type(name, ty)
             }
-            TypeShape::Array { element, .. } => {
+            TypeShape::List { element, .. } => {
                 format!(
                     "::std::vec::Vec<{}>",
-                    self.position_type(context.array_element(), *element)
+                    self.position_type(context.list_element(), *element)
                 )
             }
             TypeShape::Option(inner) => {

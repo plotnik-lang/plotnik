@@ -73,7 +73,7 @@ S12 "value"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:2  ; { key, val }
-T2 = ArrayStar(T1)  ; Row*
+T2 = ListZeroOrMore(T1)  ; Row*
 T3 = Record  M2:1  ; { rows }
 
 [type_members]

@@ -1,13 +1,13 @@
 //! Unification logic for alternation branches.
 //!
-//! Handles merging PatternFlow from different branches of union alternations.
+//! Handles merging `PatternFlow` from different alternatives.
 //! Consumed labeled alternations don't unify — they produce variant types directly.
 
 use std::collections::BTreeMap;
 
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, RecordField, TYPE_VOID, TypeId, TypeShape,
+    ListMinimum, PatternFlow, RecordField, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::core::Symbol;
 
@@ -98,19 +98,19 @@ fn suppress_value(flow: PatternFlow) -> PatternFlow {
 /// Relax a field that is absent from some branch, keeping the output shape stable
 /// (every key present).
 ///
-/// A list stays present as a (possibly empty) array when the list itself is the
+/// A list stays present as a (possibly empty) list when the list itself is the
 /// field type: the absent branch emits `[]`, never null, so it relaxes to
 /// zero-or-more. Everything else becomes an option. In particular,
-/// `Option<Array<T>>` remains an option: `((x)+ @a)?` emits null when its `?` is
+/// `Option<List<T>>` remains an option: `((x)+ @a)?` emits null when its `?` is
 /// skipped, so forcing it to a non-null `[]` would make the declared type lie.
 fn relax_for_absence(ctx: &mut TypeAnalysisBuilder, info: RecordField) -> RecordField {
-    if let Some(TypeShape::Array { element, .. }) = ctx.in_progress().type_shape(info.final_type) {
+    if let Some(TypeShape::List { element, .. }) = ctx.in_progress().type_shape(info.final_type) {
         let element = *element;
-        let array = ctx.intern_type(TypeShape::Array {
+        let list = ctx.intern_type(TypeShape::List {
             element,
-            non_empty: false,
+            minimum: ListMinimum::Zero,
         });
-        return RecordField::new(array);
+        return RecordField::new(list);
     }
     RecordField::new(ctx.intern_option(info.final_type))
 }
@@ -206,23 +206,23 @@ fn unify_type_ids(
         _ => {}
     }
 
-    // Arrays that differ only in cardinality relax to zero-or-more: only one
+    // Lists that differ only in minimum length relax to zero-or-more: only one
     // branch matches, so the merged list is non-empty only when the `+` branch
     // did — `T[]+ ∪ T[]* = T[]*`.
     if let (
-        TypeShape::Array {
+        TypeShape::List {
             element: ea,
-            non_empty: na,
+            minimum: ma,
         },
-        TypeShape::Array {
+        TypeShape::List {
             element: eb,
-            non_empty: nb,
+            minimum: mb,
         },
     ) = (&a_shape, &b_shape)
-        && na != nb
+        && ma != mb
         && ctx.types_structurally_equal(*ea, *eb)
     {
-        return Ok(if *na { b } else { a });
+        return Ok(if *ma == ListMinimum::One { b } else { a });
     }
 
     Err(UnifyError::IncompatibleTypes { field })

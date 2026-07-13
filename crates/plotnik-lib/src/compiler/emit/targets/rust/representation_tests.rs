@@ -4,7 +4,7 @@ use super::representation::TypeFacts;
 use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 use crate::compiler::analyze::types::type_shape::{
-    RecordField, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    ListMinimum, RecordField, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::Interner;
@@ -118,9 +118,9 @@ fn cycle_through_an_array_boxes_nothing() {
     let b_def = DefId::from_raw(1);
 
     let ref_to_b = builder.intern_type(TypeShape::Ref(b_def));
-    let list_of_b = builder.intern_type(TypeShape::Array {
+    let list_of_b = builder.intern_type(TypeShape::List {
         element: ref_to_b,
-        non_empty: false,
+        minimum: ListMinimum::Zero,
     });
     let a_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("items"),
@@ -254,9 +254,9 @@ fn lifetime_crosses_mutual_recursion() {
 
     // `A` has no node of its own; it holds one only through `B`.
     let ref_to_b = builder.intern_type(TypeShape::Ref(b_def));
-    let list_of_b = builder.intern_type(TypeShape::Array {
+    let list_of_b = builder.intern_type(TypeShape::List {
         element: ref_to_b,
-        non_empty: false,
+        minimum: ListMinimum::Zero,
     });
     let a_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("items"),

@@ -42,7 +42,7 @@ S6 "debugger_statement"
 [type_defs]
 T0 = <Node>
 T1 = Option(T0)  ; <Node>?
-T2 = ArrayStar(T0)  ; <Node>*
+T2 = ListZeroOrMore(T0)  ; <Node>*
 T3 = Record  M0:2  ; { a, b }
 
 [type_members]

@@ -132,7 +132,7 @@ impl<'a> TypeVerifier<'a> {
                         self.verify(value, inner);
                     }
                 }
-                TypeKind::ArrayZeroOrMore => match value {
+                TypeKind::ListZeroOrMore => match value {
                     Value::Array(items) => {
                         for (i, item) in items.iter().enumerate() {
                             let prev_len = self.path.len();
@@ -144,16 +144,16 @@ impl<'a> TypeVerifier<'a> {
                     _ => {
                         self.errors.push(format_error(
                             &self.path,
-                            &format!("type: array, value: {}", value_kind_name(value)),
+                            &format!("type: list, value: {}", value_kind_name(value)),
                         ));
                     }
                 },
-                TypeKind::ArrayOneOrMore => match value {
+                TypeKind::ListOneOrMore => match value {
                     Value::Array(items) => {
                         if items.is_empty() {
                             self.errors.push(format_error(
                                 &self.path,
-                                "type: non-empty array, value: empty array",
+                                "type: list with minimum one item, value: empty list",
                             ));
                         }
                         for (i, item) in items.iter().enumerate() {
