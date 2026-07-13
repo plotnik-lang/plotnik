@@ -1,4 +1,4 @@
-//! Extract inspection joins from a winning match journal.
+//! Reconstruct result provenance from a winning match journal.
 
 use serde::Serialize;
 use tree_sitter::Node;
@@ -8,22 +8,23 @@ use crate::bytecode::{Module, SpanKind};
 use plotnik_rt::JournalEvent;
 
 #[derive(Debug, Serialize)]
-pub struct Inspection {
-    pub v: u32,
-    pub entries: Vec<InspectionEntry>,
+pub struct ResultProvenance {
+    pub version: u32,
+    pub entries: Vec<ResultProvenanceEntry>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct InspectionEntry {
-    pub span_id: u16,
+pub struct ResultProvenanceEntry {
+    pub query_span_id: u16,
     pub parent: Option<u32>,
-    pub hull: Option<(u32, u32)>,
-    pub bindings: Vec<Binding>,
-    pub effect_range: (u32, u32),
+    pub source_span: Option<(u32, u32)>,
+    pub bindings: Vec<ProvenanceBinding>,
+    #[serde(rename = "range")]
+    pub event_range: (u32, u32),
 }
 
 #[derive(Debug, Serialize)]
-pub struct Binding {
+pub struct ProvenanceBinding {
     /// JSON-pointer-style path of the bound value, relative to the builder
     /// frames open when the binding event fired. Not absolute: a container
     /// assigned after its close (`RecordSet`/`ArrayPush` following `ListClose` etc.)
@@ -31,7 +32,7 @@ pub struct Binding {
     /// entries active during construction — a consumer absolutizes by joining
     /// paths down the entry parent chain.
     pub path: String,
-    pub effect_idx: u32,
+    pub event_index: u32,
 }
 
 enum Frame {
@@ -49,38 +50,38 @@ enum Frame {
 
 struct ScalarProvenance {
     item_owner: Option<u32>,
-    hull: Option<(u32, u32)>,
+    source_span: Option<(u32, u32)>,
 }
 
 #[derive(Clone, Copy)]
 struct ValueProvenance {
     item_owner: Option<u32>,
-    hull: Option<(u32, u32)>,
+    source_span: Option<(u32, u32)>,
 }
 
 impl ValueProvenance {
     fn is_unowned_absence(self) -> bool {
-        self.item_owner.is_none() && self.hull.is_none()
+        self.item_owner.is_none() && self.source_span.is_none()
     }
 }
 
-pub fn extract_inspection(events: &[JournalEvent<'_>], module: &Module) -> Inspection {
-    let extractor = Inspector::new(module);
+pub fn extract_result_provenance(events: &[JournalEvent<'_>], module: &Module) -> ResultProvenance {
+    let extractor = ProvenanceExtractor::new(module);
     extractor.extract(events)
 }
 
-struct Inspector<'m> {
+struct ProvenanceExtractor<'m> {
     member_names: Box<[&'m str]>,
     span_kinds: Box<[SpanKind]>,
     span_members: Box<[u16]>,
-    entries: Vec<InspectionEntry>,
+    entries: Vec<ResultProvenanceEntry>,
     open: Vec<u32>,
     frames: Vec<Frame>,
     scalar_frames: Vec<ScalarProvenance>,
     pending: Option<ValueProvenance>,
 }
 
-impl<'m> Inspector<'m> {
+impl<'m> ProvenanceExtractor<'m> {
     fn new(module: &'m Module) -> Self {
         let types = module.types();
         let strings = module.strings();
@@ -99,43 +100,43 @@ impl<'m> Inspector<'m> {
         }
     }
 
-    fn extract(mut self, events: &[JournalEvent<'_>]) -> Inspection {
-        for (event_idx, event) in events.iter().enumerate() {
-            let event_idx = u32::try_from(event_idx).expect("journal event index fits in u32");
+    fn extract(mut self, events: &[JournalEvent<'_>]) -> ResultProvenance {
+        for (event_index, event) in events.iter().enumerate() {
+            let event_index = u32::try_from(event_index).expect("journal event index fits in u32");
             match event {
                 JournalEvent::SpanStart { id, node } => {
                     let parent = self.open.last().copied();
                     let idx = u32::try_from(self.entries.len())
-                        .expect("inspection entry count fits in u32");
-                    self.entries.push(InspectionEntry {
-                        span_id: *id,
+                        .expect("result provenance entry count fits in u32");
+                    self.entries.push(ResultProvenanceEntry {
+                        query_span_id: *id,
                         parent,
-                        hull: node.map(node_hull),
+                        source_span: node.map(node_span),
                         bindings: Vec::new(),
-                        effect_range: (event_idx, event_idx),
+                        event_range: (event_index, event_index),
                     });
                     self.open.push(idx);
                     self.record_scalar_item_owner(idx);
                 }
-                JournalEvent::SpanEnd(id) => self.close_span(*id, event_idx),
+                JournalEvent::SpanEnd(id) => self.close_span(*id, event_index),
                 JournalEvent::Node(node) => {
                     self.pending = Some(ValueProvenance {
                         item_owner: self.open.last().copied(),
-                        hull: Some(node_hull(*node)),
+                        source_span: Some(node_span(*node)),
                     });
                     if let Some(entry) = self.current_entry_mut() {
-                        union_hull(&mut entry.hull, Some(node_hull(*node)));
+                        union_span(&mut entry.source_span, Some(node_span(*node)));
                     }
                 }
                 JournalEvent::ListOpen => {
                     let provenance = self.open_value();
                     self.frames.push(Frame::List { len: 0, provenance });
                 }
-                JournalEvent::ArrayPush => self.bind_push(event_idx),
+                JournalEvent::ArrayPush => self.bind_push(event_index),
                 JournalEvent::ListClose => match self.frames.pop() {
                     Some(Frame::List { provenance, .. }) => self.pending = Some(provenance),
                     other => panic!(
-                        "ListClose expects List on inspection frame stack, found {:?}",
+                        "ListClose expects List on provenance frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
@@ -143,55 +144,55 @@ impl<'m> Inspector<'m> {
                     let provenance = self.open_value();
                     self.frames.push(Frame::Record { provenance });
                 }
-                JournalEvent::RecordSet(member) => self.bind_set(*member, event_idx),
+                JournalEvent::RecordSet(member) => self.bind_set(*member, event_index),
                 JournalEvent::RecordClose => match self.frames.pop() {
                     Some(Frame::Record { provenance }) => self.pending = Some(provenance),
                     other => panic!(
-                        "RecordClose expects Record on inspection frame stack, found {:?}",
+                        "RecordClose expects Record on provenance frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
-                JournalEvent::VariantOpen(member) => self.open_variant(*member, event_idx),
+                JournalEvent::VariantOpen(member) => self.open_variant(*member, event_index),
                 JournalEvent::VariantClose => match self.frames.pop() {
                     Some(Frame::Variant { provenance }) => self.pending = Some(provenance),
                     other => panic!(
-                        "VariantClose expects Variant on inspection frame stack, found {:?}",
+                        "VariantClose expects Variant on provenance frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
                 JournalEvent::Absent => {
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
-                        hull: None,
+                        source_span: None,
                     });
                 }
                 JournalEvent::NodeStr(node) | JournalEvent::NodeBool(node) => {
-                    let hull = Some(node_hull(*node));
+                    let source_span = Some(node_span(*node));
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
-                        hull,
+                        source_span,
                     });
                     if let Some(entry) = self.current_entry_mut() {
-                        union_hull(&mut entry.hull, hull);
+                        union_span(&mut entry.source_span, source_span);
                     }
                 }
                 JournalEvent::BoolValue(_) => {
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
-                        hull: None,
+                        source_span: None,
                     });
                 }
                 JournalEvent::ScalarOpen => self.scalar_frames.push(ScalarProvenance {
                     item_owner: None,
-                    hull: None,
+                    source_span: None,
                 }),
                 JournalEvent::ScalarMark(node) => {
-                    let hull = Some(node_hull(*node));
+                    let source_span = Some(node_span(*node));
                     for scalar in &mut self.scalar_frames {
-                        union_hull(&mut scalar.hull, hull);
+                        union_span(&mut scalar.source_span, source_span);
                     }
                     if let Some(entry) = self.current_entry_mut() {
-                        union_hull(&mut entry.hull, hull);
+                        union_span(&mut entry.source_span, source_span);
                     }
                 }
                 JournalEvent::StrClose | JournalEvent::BoolClose(_) => {
@@ -201,7 +202,7 @@ impl<'m> Inspector<'m> {
                         .expect("scalar event frames are balanced on the winning path");
                     self.pending = Some(ValueProvenance {
                         item_owner: scalar.item_owner,
-                        hull: scalar.hull,
+                        source_span: scalar.source_span,
                     });
                 }
             }
@@ -209,39 +210,41 @@ impl<'m> Inspector<'m> {
 
         assert!(
             self.open.is_empty(),
-            "inspection span stack must be empty after the match journal"
+            "provenance span stack must be empty after the match journal"
         );
-        Inspection {
-            v: 1,
+        ResultProvenance {
+            version: 1,
             entries: self.entries,
         }
     }
 
-    fn close_span(&mut self, id: u16, effect_idx: u32) {
+    fn close_span(&mut self, id: u16, event_index: u32) {
         let closed = self
             .open
             .pop()
             .expect("span brackets are balanced on the winning path");
-        let closed_idx = usize::try_from(closed).expect("inspection entry index fits usize");
-        let hull = {
+        let closed_idx = usize::try_from(closed).expect("provenance entry index fits usize");
+        let source_span = {
             let entry = self
                 .entries
                 .get_mut(closed_idx)
-                .expect("open span index addresses an inspection entry");
-            assert_eq!(entry.span_id, id, "span bracket ids must pair");
-            entry.effect_range.1 = effect_idx;
-            entry.hull
+                .expect("open span index addresses a provenance entry");
+            assert_eq!(entry.query_span_id, id, "span bracket ids must pair");
+            entry.event_range.1 = event_index
+                .checked_add(1)
+                .expect("journal event count fits in u32");
+            entry.source_span
         };
 
         if let Some(&parent) = self.open.last() {
-            let parent_idx = usize::try_from(parent).expect("inspection entry index fits usize");
-            union_hull(&mut self.entries[parent_idx].hull, hull);
+            let parent_idx = usize::try_from(parent).expect("provenance entry index fits usize");
+            union_span(&mut self.entries[parent_idx].source_span, source_span);
         }
     }
 
-    fn bind_push(&mut self, effect_idx: u32) {
+    fn bind_push(&mut self, event_index: u32) {
         let Some(Frame::List { len, .. }) = self.frames.last() else {
-            panic!("ArrayPush expects List on inspection frame stack");
+            panic!("ArrayPush expects List on provenance frame stack");
         };
         let index = *len;
         let mut path = path_for_frames(&self.frames[..self.frames.len() - 1]);
@@ -249,9 +252,9 @@ impl<'m> Inspector<'m> {
         let provenance = self.pending.take();
         if !provenance.is_some_and(ValueProvenance::is_unowned_absence) {
             if let Some(owner) = provenance.and_then(|value| value.item_owner) {
-                self.bind_entry(owner, path, effect_idx);
+                self.bind_entry(owner, path, event_index);
             } else {
-                self.bind_current(path, effect_idx);
+                self.bind_current(path, event_index);
             }
         }
 
@@ -263,63 +266,63 @@ impl<'m> Inspector<'m> {
             unreachable!("list frame was checked before binding ArrayPush");
         };
         if let Some(value) = provenance {
-            union_hull(&mut array.hull, value.hull);
+            union_span(&mut array.source_span, value.source_span);
         }
         *len += 1;
     }
 
-    fn bind_set(&mut self, member: u16, effect_idx: u32) {
+    fn bind_set(&mut self, member: u16, event_index: u32) {
         let mut path = path_for_frames(&self.frames);
         push_segment(&mut path, self.resolve_member_name(member));
         let provenance = self.pending.take();
         if let Some(value) = provenance {
-            self.record_child_hull(value.hull);
+            self.record_child_span(value.source_span);
         }
         if let Some(owner) = self.open_capture_for_member(member) {
-            self.bind_entry(owner, path, effect_idx);
+            self.bind_entry(owner, path, event_index);
             return;
         }
         if provenance.is_some_and(ValueProvenance::is_unowned_absence) {
             return;
         }
-        self.bind_current(path, effect_idx);
+        self.bind_current(path, event_index);
     }
 
-    fn open_variant(&mut self, _member: u16, effect_idx: u32) {
+    fn open_variant(&mut self, _member: u16, event_index: u32) {
         let mut path = path_for_frames(&self.frames);
         push_segment(&mut path, "$tag");
-        self.bind_current(path, effect_idx);
+        self.bind_current(path, event_index);
         let provenance = self.open_value();
         self.frames.push(Frame::Variant { provenance });
     }
 
-    fn bind_current(&mut self, path: String, effect_idx: u32) {
+    fn bind_current(&mut self, path: String, event_index: u32) {
         let Some(&entry) = self.open.last() else {
             return;
         };
-        self.bind_entry(entry, path, effect_idx);
+        self.bind_entry(entry, path, event_index);
     }
 
-    fn bind_entry(&mut self, entry: u32, path: String, effect_idx: u32) {
-        let entry = usize::try_from(entry).expect("inspection entry index fits usize");
+    fn bind_entry(&mut self, entry: u32, path: String, event_index: u32) {
+        let entry = usize::try_from(entry).expect("provenance entry index fits usize");
         let entry = self
             .entries
             .get_mut(entry)
-            .expect("open span index addresses an inspection entry");
-        entry.bindings.push(Binding { path, effect_idx });
+            .expect("open span index addresses a provenance entry");
+        entry.bindings.push(ProvenanceBinding { path, event_index });
     }
 
     fn open_capture_for_member(&self, member: u16) -> Option<u32> {
         self.open.iter().rev().copied().find(|&entry| {
-            let entry = usize::try_from(entry).expect("inspection entry index fits usize");
-            let span_id = self.entries[entry].span_id as usize;
+            let entry = usize::try_from(entry).expect("provenance entry index fits usize");
+            let span_id = self.entries[entry].query_span_id as usize;
             self.span_kinds[span_id] == SpanKind::Capture && self.span_members[span_id] == member
         })
     }
 
     fn record_scalar_item_owner(&mut self, entry: u32) {
-        let entry_idx = usize::try_from(entry).expect("inspection entry index fits usize");
-        let span_id = self.entries[entry_idx].span_id as usize;
+        let entry_idx = usize::try_from(entry).expect("provenance entry index fits usize");
+        let span_id = self.entries[entry_idx].query_span_id as usize;
         if self.span_kinds[span_id] == SpanKind::Capture {
             return;
         }
@@ -333,11 +336,11 @@ impl<'m> Inspector<'m> {
     fn open_value(&self) -> ValueProvenance {
         ValueProvenance {
             item_owner: None,
-            hull: None,
+            source_span: None,
         }
     }
 
-    fn record_child_hull(&mut self, hull: Option<(u32, u32)>) {
+    fn record_child_span(&mut self, source_span: Option<(u32, u32)>) {
         let Some(frame) = self.frames.last_mut() else {
             return;
         };
@@ -346,16 +349,16 @@ impl<'m> Inspector<'m> {
             | Frame::Record { provenance }
             | Frame::Variant { provenance } => provenance,
         };
-        union_hull(&mut provenance.hull, hull);
+        union_span(&mut provenance.source_span, source_span);
     }
 
-    fn current_entry_mut(&mut self) -> Option<&mut InspectionEntry> {
+    fn current_entry_mut(&mut self) -> Option<&mut ResultProvenanceEntry> {
         let idx = *self.open.last()?;
-        let idx = usize::try_from(idx).expect("inspection entry index fits usize");
+        let idx = usize::try_from(idx).expect("provenance entry index fits usize");
         Some(
             self.entries
                 .get_mut(idx)
-                .expect("open span index addresses an inspection entry"),
+                .expect("open span index addresses a provenance entry"),
         )
     }
 
@@ -364,15 +367,15 @@ impl<'m> Inspector<'m> {
     }
 }
 
-fn node_hull(node: Node<'_>) -> (u32, u32) {
+fn node_span(node: Node<'_>) -> (u32, u32) {
     (
         u32::try_from(node.start_byte()).expect("node start byte fits in u32"),
         u32::try_from(node.end_byte()).expect("node end byte fits in u32"),
     )
 }
 
-fn union_hull(target: &mut Option<(u32, u32)>, hull: Option<(u32, u32)>) {
-    let Some((start, end)) = hull else {
+fn union_span(target: &mut Option<(u32, u32)>, span: Option<(u32, u32)>) {
+    let Some((start, end)) = span else {
         return;
     };
     match target {

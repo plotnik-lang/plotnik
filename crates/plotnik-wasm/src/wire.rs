@@ -11,7 +11,7 @@
 
 use plotnik_lib::bytecode::{Entrypoint, Module, SPAN_NO_BINDING};
 use plotnik_lib::{
-    Colors, MatchJournal, RunStats, RuntimeError, extract_inspection, materialize_verified,
+    Colors, MatchJournal, RunStats, RuntimeError, extract_result_provenance, materialize_verified,
 };
 use serde_json::{Value as JsonValue, json};
 use wasm_bindgen::JsValue;
@@ -67,11 +67,11 @@ pub fn result_json(
             let colors = Colors::new(false);
             let value =
                 materialize_verified(source, module, entrypoint, journal.as_slice(), colors);
-            let inspection = (!module.spans().is_empty())
-                .then(|| extract_inspection(journal.as_slice(), module));
+            let result_provenance = (!module.spans().is_empty())
+                .then(|| extract_result_provenance(journal.as_slice(), module));
             json!({
                 "value": json_value!(value),
-                "inspection": json_value!(inspection),
+                "inspection": json_value!(result_provenance),
                 "stats": json_value!(stats),
             })
         }

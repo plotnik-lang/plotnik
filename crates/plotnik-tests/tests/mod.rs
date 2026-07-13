@@ -65,7 +65,7 @@ use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder,
     RecordingTracer, RuntimeError, RustCodegenConfig, SourceMap, SourcePath,
-    TypeScriptCodegenConfig, VM, Verbosity, extract_inspection, materialize_verified,
+    TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
 use plotnik_tests::fixture::parse_section_header;
 use support::formatter::Assessment;
@@ -574,9 +574,10 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let (output, inspection) = match result {
         Ok(effects) => {
             let inspection = (inspection == InspectionPolicy::Include).then(|| {
-                let inspection = extract_inspection(effects.as_slice(), scenario.module);
-                let mut rendered = serde_json::to_string_pretty(&inspection)
-                    .expect("inspection serialization cannot fail");
+                let result_provenance =
+                    extract_result_provenance(effects.as_slice(), scenario.module);
+                let mut rendered = serde_json::to_string_pretty(&result_provenance)
+                    .expect("result provenance serialization cannot fail");
                 rendered.push('\n');
                 rendered
             });

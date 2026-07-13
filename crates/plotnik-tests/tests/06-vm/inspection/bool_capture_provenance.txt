@@ -13,63 +13,63 @@ export interface Q {
 }
 ------------------- INSPECTION -------------------
 {
-  "v": 1,
+  "version": 1,
   "entries": [
     {
-      "span_id": 0,
+      "query_span_id": 0,
       "parent": null,
-      "hull": [
+      "source_span": [
         0,
         1
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         1,
+        11
+      ]
+    },
+    {
+      "query_span_id": 1,
+      "parent": 0,
+      "source_span": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "range": [
+        2,
         10
       ]
     },
     {
-      "span_id": 1,
-      "parent": 0,
-      "hull": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "effect_range": [
-        2,
-        9
-      ]
-    },
-    {
-      "span_id": 2,
+      "query_span_id": 2,
       "parent": 1,
-      "hull": [
+      "source_span": [
         0,
         1
       ],
       "bindings": [
         {
           "path": "/present",
-          "effect_idx": 6
+          "event_index": 6
         }
       ],
-      "effect_range": [
+      "range": [
         3,
-        8
+        9
       ]
     },
     {
-      "span_id": 5,
+      "query_span_id": 5,
       "parent": 2,
-      "hull": [
+      "source_span": [
         0,
         1
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         4,
-        7
+        8
       ]
     }
   ]

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use plotnik_lib::bytecode::{Module, SPAN_NO_BINDING};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RecordingTracer,
-    RuntimeError, RuntimeLimitSpec, TypeScriptCodegenConfig, VM, extract_inspection,
+    RuntimeError, RuntimeLimitSpec, TypeScriptCodegenConfig, VM, extract_result_provenance,
     materialize_verified, tokenize,
 };
 use serde_json::{Map, Value, json};
@@ -217,11 +217,11 @@ fn run_payload_from_result(
             let colors = Colors::new(false);
             let value =
                 materialize_verified(source_code, module, entrypoint, journal.as_slice(), colors);
-            let inspection = (!module.spans().is_empty())
-                .then(|| extract_inspection(journal.as_slice(), module));
+            let result_provenance = (!module.spans().is_empty())
+                .then(|| extract_result_provenance(journal.as_slice(), module));
             RunPayload {
                 value: json_value!(value),
-                inspection: json_value!(inspection),
+                inspection: json_value!(result_provenance),
                 stats: json_value!(stats),
                 trace: trace.unwrap_or(Value::Null),
                 error: None,

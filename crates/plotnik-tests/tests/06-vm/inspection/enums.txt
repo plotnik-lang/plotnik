@@ -31,148 +31,148 @@ export interface Q {
 }
 ------------------- INSPECTION -------------------
 {
-  "v": 1,
+  "version": 1,
   "entries": [
     {
-      "span_id": 8,
+      "query_span_id": 8,
       "parent": null,
-      "hull": [
+      "source_span": [
         0,
         2
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         1,
+        26
+      ]
+    },
+    {
+      "query_span_id": 9,
+      "parent": 0,
+      "source_span": [
+        0,
+        2
+      ],
+      "bindings": [],
+      "range": [
+        2,
         25
       ]
     },
     {
-      "span_id": 9,
-      "parent": 0,
-      "hull": [
+      "query_span_id": 10,
+      "parent": 1,
+      "source_span": [
         0,
         2
       ],
       "bindings": [],
-      "effect_range": [
-        2,
+      "range": [
+        3,
         24
       ]
     },
     {
-      "span_id": 10,
-      "parent": 1,
-      "hull": [
+      "query_span_id": 12,
+      "parent": 2,
+      "source_span": [
         0,
         2
       ],
       "bindings": [],
-      "effect_range": [
-        3,
+      "range": [
+        4,
         23
       ]
     },
     {
-      "span_id": 12,
-      "parent": 2,
-      "hull": [
+      "query_span_id": 0,
+      "parent": 3,
+      "source_span": [
         0,
         2
       ],
       "bindings": [],
-      "effect_range": [
-        4,
-        22
+      "range": [
+        5,
+        19
       ]
     },
     {
-      "span_id": 0,
-      "parent": 3,
-      "hull": [
+      "query_span_id": 1,
+      "parent": 4,
+      "source_span": [
         0,
         2
       ],
       "bindings": [],
-      "effect_range": [
-        5,
+      "range": [
+        6,
         18
       ]
     },
     {
-      "span_id": 1,
-      "parent": 4,
-      "hull": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "effect_range": [
-        6,
-        17
-      ]
-    },
-    {
-      "span_id": 5,
+      "query_span_id": 5,
       "parent": 5,
-      "hull": [
+      "source_span": [
         0,
         2
       ],
       "bindings": [
         {
           "path": "/$tag",
-          "effect_idx": 8
+          "event_index": 8
         }
       ],
-      "effect_range": [
+      "range": [
         7,
-        16
+        17
       ]
     },
     {
-      "span_id": 7,
+      "query_span_id": 7,
       "parent": 6,
-      "hull": [
+      "source_span": [
         0,
         2
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         9,
-        14
+        15
       ]
     },
     {
-      "span_id": 6,
+      "query_span_id": 6,
       "parent": 7,
-      "hull": [
+      "source_span": [
         0,
         2
       ],
       "bindings": [
         {
           "path": "/$data/num",
-          "effect_idx": 12
+          "event_index": 12
         }
       ],
-      "effect_range": [
+      "range": [
         10,
-        13
+        14
       ]
     },
     {
-      "span_id": 11,
+      "query_span_id": 11,
       "parent": 3,
-      "hull": null,
+      "source_span": null,
       "bindings": [
         {
           "path": "/expr",
-          "effect_idx": 20
+          "event_index": 20
         }
       ],
-      "effect_range": [
+      "range": [
         19,
-        21
+        22
       ]
     }
   ]

@@ -15,76 +15,76 @@ export interface Q {
 }
 ------------------- INSPECTION -------------------
 {
-  "v": 1,
+  "version": 1,
   "entries": [
     {
-      "span_id": 0,
+      "query_span_id": 0,
       "parent": null,
-      "hull": [
+      "source_span": [
         0,
         6
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         1,
+        13
+      ]
+    },
+    {
+      "query_span_id": 1,
+      "parent": 0,
+      "source_span": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "range": [
+        2,
         12
       ]
     },
     {
-      "span_id": 1,
-      "parent": 0,
-      "hull": [
+      "query_span_id": 2,
+      "parent": 1,
+      "source_span": [
         0,
         6
       ],
       "bindings": [],
-      "effect_range": [
-        2,
+      "range": [
+        3,
         11
       ]
     },
     {
-      "span_id": 2,
-      "parent": 1,
-      "hull": [
-        0,
-        6
-      ],
-      "bindings": [],
-      "effect_range": [
-        3,
-        10
-      ]
-    },
-    {
-      "span_id": 3,
+      "query_span_id": 3,
       "parent": 2,
-      "hull": [
+      "source_span": [
         0,
         5
       ],
       "bindings": [
         {
           "path": "/name",
-          "effect_idx": 7
+          "event_index": 7
         }
       ],
-      "effect_range": [
+      "range": [
         4,
-        9
+        10
       ]
     },
     {
-      "span_id": 5,
+      "query_span_id": 5,
       "parent": 3,
-      "hull": [
+      "source_span": [
         0,
         5
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         5,
-        8
+        9
       ]
     }
   ]

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use plotnik_lib::{
-    Colors, NoopTracer, RuntimeError, RuntimeLimitSpec, VM, extract_inspection,
+    Colors, NoopTracer, RuntimeError, RuntimeLimitSpec, VM, extract_result_provenance,
     materialize_verified,
 };
 
@@ -72,13 +72,13 @@ pub fn run(args: RunArgs) -> CliResult {
             effects.as_slice(),
             colors,
         );
-        let inspection =
-            (!module.spans().is_empty()).then(|| extract_inspection(effects.as_slice(), &module));
+        let result_provenance = (!module.spans().is_empty())
+            .then(|| extract_result_provenance(effects.as_slice(), &module));
         println!(
             "{}",
             serde_json::json!({
                 "value": value,
-                "inspection": inspection,
+                "inspection": result_provenance,
                 "stats": stats,
             })
         );

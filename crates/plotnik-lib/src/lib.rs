@@ -62,9 +62,9 @@ pub use crate::compiler::{
 
 #[cfg(feature = "vm")]
 pub use crate::vm::{
-    Binding, Inspection, InspectionEntry, JournalEvent, Limit, MatchJournal, NodeHandle,
-    NoopTracer, PrintTracer, PrintTracerBuilder, Recording, RecordingTracer, ResolvedRuntimeLimits,
-    RunStats, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord, TraceNode, Tracer, VM,
-    VMBuilder, Value, ValueMaterializer, Verbosity, debug_verify_type, extract_inspection,
-    materialize_verified,
+    JournalEvent, Limit, MatchJournal, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder,
+    ProvenanceBinding, Recording, RecordingTracer, ResolvedRuntimeLimits, ResultProvenance,
+    ResultProvenanceEntry, RunStats, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord,
+    TraceNode, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity, debug_verify_type,
+    extract_result_provenance, materialize_verified,
 };
