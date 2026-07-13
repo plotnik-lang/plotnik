@@ -363,7 +363,7 @@ impl DiagnosticKind {
             Self::NegatedFieldAsFieldValue => "a negated field cannot be a field value",
             Self::InvalidFieldEquals => "fields use `:`, not `=`",
             Self::InvalidSupertypeSyntax => "references cannot have supertypes",
-            Self::InvalidCaptureTypeSyntax => "capture modifiers use `::`, not `:`",
+            Self::InvalidCaptureTypeSyntax => "capture types use `::`, not `:`",
             Self::ErrorTakesNoArguments => "`(ERROR)` cannot have children",
             Self::MissingTakesNoChildren => {
                 "`(MISSING)` takes at most a node kind or a quoted token"

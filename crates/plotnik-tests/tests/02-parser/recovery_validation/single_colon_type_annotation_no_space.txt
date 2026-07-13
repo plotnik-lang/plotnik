@@ -1,6 +1,6 @@
 Q = (identifier) @name:Type
 ------------------ DIAGNOSTICS -------------------
-error: capture modifiers use `::`, not `:`
+error: capture types use `::`, not `:`
  --> query.ptk:1:23
   |
 1 | Q = (identifier) @name:Type
