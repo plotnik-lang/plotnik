@@ -55,6 +55,14 @@ Backtracking is an instruction-level line:
   08  ❮❮❮
 ```
 
+Scalar capture types use the same effect sub-lines. Their stable spellings are
+`ScalarOpen`, `ScalarMark`, `StrClose`, and `BoolClose(false)` /
+`BoolClose(true)`; direct values use `NodeStr`, `NodeBool`, and
+`BoolValue(false)` / `BoolValue(true)`. A scalar mark's node is available to structured trace and
+inspection output even though the concise text trace prints only the effect
+name. Backtracking truncates marks and restores scalar-frame depth with the
+rest of the checkpointed trace.
+
 ## Example
 
 Query:

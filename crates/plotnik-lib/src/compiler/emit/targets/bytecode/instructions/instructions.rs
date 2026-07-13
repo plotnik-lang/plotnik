@@ -3,12 +3,13 @@
 use std::collections::BTreeMap;
 
 use crate::bytecode::{
-    Call, Effect, MatchInstr, MatchPredicate, Return, STEP_SIZE, StepAddr, StepId,
+    Call, Effect, MatchInstr, MatchPredicate, Return, RoutedCall, STEP_SIZE, SplitCall,
+    SplitCallReturns, StepAddr, StepId,
 };
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{ConstantPool, EmitError};
 use crate::compiler::lower::ir::{
-    CallIR, EffectArg, EffectIR, InstructionIR, Label, MatchIR, MemberRef,
+    CallIR, CallProtocol, EffectArg, EffectIR, InstructionIR, Label, MatchIR, MemberRef,
 };
 
 pub fn emit_instructions(
@@ -44,7 +45,14 @@ fn resolve_instruction(
     match instr {
         InstructionIR::Match(m) => resolve_match(m, map, pool),
         InstructionIR::Call(c) => Ok(resolve_call(c, map).to_vec()),
-        InstructionIR::Return(_) => Ok(Return::new().to_bytes().to_vec()),
+        InstructionIR::Return(return_) => {
+            let encoded = match return_.mode {
+                crate::bytecode::ReturnMode::CallerMatched => Return::matched(),
+                crate::bytecode::ReturnMode::RoutedMatched => Return::routed_matched(),
+                crate::bytecode::ReturnMode::RoutedZero => Return::routed_zero(),
+            };
+            Ok(encoded.to_bytes().to_vec())
+        }
     }
 }
 
@@ -92,13 +100,28 @@ fn resolve_match(
 }
 
 fn resolve_call(c: &CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-    Call::new(
-        c.nav,
-        c.node_field,
-        StepId::try_from(c.next.resolve(map)).expect("step id must be non-zero"),
-        StepId::try_from(c.target.resolve(map)).expect("step id must be non-zero"),
-    )
-    .to_bytes()
+    let step =
+        |label: Label| StepId::try_from(label.resolve(map)).expect("step id must be non-zero");
+    let target = step(c.target);
+    match c.protocol {
+        CallProtocol::Ordinary {
+            nav,
+            node_field,
+            next,
+        } => Call::new(nav, node_field, step(next), target).to_bytes(),
+        CallProtocol::Routed { entry_nav, next } => {
+            RoutedCall::new(entry_nav, step(next), target).to_bytes()
+        }
+        CallProtocol::Split { entry_nav, returns } => SplitCall::new(
+            entry_nav,
+            SplitCallReturns {
+                matched: step(returns[0]),
+                zero: step(returns[1]),
+            },
+            target,
+        )
+        .to_bytes(),
+    }
 }
 
 fn resolve_effect(effect: &EffectIR, pool: ConstantPool<'_>) -> Effect {

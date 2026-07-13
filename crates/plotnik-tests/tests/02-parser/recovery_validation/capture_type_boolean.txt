@@ -1,0 +1,14 @@
+Q = (a) @x :: boolean
+------------------ DIAGNOSTICS -------------------
+error: unknown capture type `boolean`
+ --> query.ptk:1:15
+  |
+1 | Q = (a) @x :: boolean
+  |               ^^^^^^^
+  |
+help: use `:: bool`
+  |
+1 - Q = (a) @x :: boolean
+1 + Q = (a) @x :: bool
+  |
+help: write `:: str`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`

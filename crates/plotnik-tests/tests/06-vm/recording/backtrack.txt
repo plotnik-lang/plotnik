@@ -11,13 +11,13 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 x
 ------------------- TYPESCRIPT -------------------
-export type QExpr =
-  | { $tag: "Bad"; $data: { bad: Node } }
-  | { $tag: "Good"; $data: { good: Node } };
-
 export interface Q {
   expr: QExpr;
 }
+
+export type QExpr =
+  | { $tag: "Bad"; $data: { bad: Node } }
+  | { $tag: "Good"; $data: { good: Node } };
 --------------------- OUTPUT ---------------------
 {
   "expr": {

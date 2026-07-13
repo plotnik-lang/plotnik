@@ -1,0 +1,13 @@
+Q = [
+  (identifier) @seen :: bool
+  (number)
+]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  seen: boolean;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q {
+    pub seen: bool,
+}

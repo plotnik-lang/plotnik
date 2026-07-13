@@ -12,8 +12,10 @@ use super::InferVisitor;
 impl InferVisitor<'_, '_> {
     /// Add one field to a scope, reporting a diagnostic if the name is already
     /// bound. `range` locates the offending capture for the caret. This is the
-    /// single duplicate-capture gate: sequences call it per child, a named node
-    /// calls it for its own capture bubbling alongside the children.
+    /// duplicate-capture gate for merging independently inferred child flows.
+    /// A node's own bubbling capture validates its destination earlier, before
+    /// capture-type normalization, because that admission result gates whether
+    /// the capture type may run at all.
     pub(super) fn insert_scope_field(
         &mut self,
         target: &mut BTreeMap<Symbol, FieldInfo>,

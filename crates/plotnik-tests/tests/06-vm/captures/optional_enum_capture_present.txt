@@ -8,12 +8,12 @@ Q = (program
 --------------------- INPUT ----------------------
 x
 ------------------- TYPESCRIPT -------------------
-export type QE =
-  | { $tag: "A"; $data: { a: Node } };
-
 export interface Q {
   e: QE | null;
 }
+
+export type QE =
+  | { $tag: "A"; $data: { a: Node } };
 --------------------- OUTPUT ---------------------
 {
   "e": {

@@ -6,34 +6,17 @@ Q = {
 [entrypoints]
 
 [transitions]
-Q:
-  1                                         ▶
-  3  ─‣─  (number) [Node Set(b) StructClose Set(item)]  1
-  4   !   (identifier) [StructOpen Node Set(a)]  3
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "a"
-S2 "b"
-S3 "item"
-S4 "QItem"
-S5 "Q"
-S6 "identifier"
-S7 "number"
+S1 "identifier"
+S2 "number"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:2  ; { a, b }
-T2 = Struct  M2:1  ; { item }
 
 [type_members]
-M0: S1 → T0  ; a: <Node>
-M1: S2 → T0  ; b: <Node>
-M2: S3 → T1  ; item: QItem
 
 [type_names]
-N0: S4 → T1  ; QItem
-N1: S5 → T2  ; Q
 
 [entrypoints]
 

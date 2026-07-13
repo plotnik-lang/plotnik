@@ -13,15 +13,15 @@ Name     = 25
 
 [transitions]
 Name:
-  03                                        ▶
-  04   !   (identifier) [Node Set(name)]    03
+  01                                        ▶
+  02   !   (identifier) [Node Set(name)]    01
 
 Bare:
-  05                                        ▶
-  06   !   (program)                        08
-  08  └‣─  (expression_statement) [SuppressBegin]  11
-  09  ─‣┘² _ [SuppressEnd]                  05
-  11  └‣─  (Name)                           04 : 09
+  04                                        ▶
+  05   !   (program)                        07
+  07  └‣─  (expression_statement) [SuppressBegin]  10
+  08  ─‣┘² _ [SuppressEnd]                  04
+  10  └‣─  (Name)                           02 : 08
 
 Captured:
   13                                        ▶
@@ -29,17 +29,17 @@ Captured:
   16  └‣─  (expression_statement) [StructOpen]  20
   17  ─‣┘² _ [Set(item)]                    13
   19  -ε-  [StructClose]                    17
-  20  └‣─  (Name)                           04 : 19
+  20  └‣─  (Name)                           02 : 19
 
 Name (entrypoint):
   22                                        ▶
   23  -ε-  [StructClose]                    22
-  24       (Name)                           04 : 23
+  24       (Name)                           02 : 23
   25  -ε-  [StructOpen]                     24
 
 Bare (entrypoint):
   26                                        ▶
-  27       (Bare)                           06 : 26
+  27       (Bare)                           05 : 26
 
 Captured (entrypoint):
   28                                        ▶

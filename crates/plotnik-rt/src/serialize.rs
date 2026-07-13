@@ -63,6 +63,26 @@ impl SerializeWithSource for tree_sitter::Node<'_> {
     }
 }
 
+impl SerializeWithSource for &str {
+    fn serialize_with_source<S: Serializer>(
+        &self,
+        _source: &str,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        self.serialize(serializer)
+    }
+}
+
+impl SerializeWithSource for bool {
+    fn serialize_with_source<S: Serializer>(
+        &self,
+        _source: &str,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        self.serialize(serializer)
+    }
+}
+
 /// `None` serializes as a bare null — one flat null level, matching the VM,
 /// which never nests nulls even where the static type is `Option<Option<T>>`.
 impl<T: SerializeWithSource> SerializeWithSource for Option<T> {

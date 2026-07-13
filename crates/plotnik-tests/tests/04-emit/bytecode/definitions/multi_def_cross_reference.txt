@@ -16,34 +16,32 @@ Expression = 20
 Ident      = 18
 
 [transitions]
-Expression:
-  01  -ε-                                   06, 07
-
 Ident:
-  03                                        ▶
-  04   !   (identifier) [Node Set(name)]    03
+  01                                        ▶
+  02   !   (identifier) [Node Set(name)]    01
 
 Expression:
-  05                                        ▶
-  06   !   (number) [EnumOpen(Literal) Node Set(value) EnumClose]  05
-  07   !   (identifier) [EnumOpen(Variable) Node Set(name) EnumClose]  05
+  03  -ε-                                   05, 06
+  04                                        ▶
+  05   !   (number) [EnumOpen(Literal) Node Set(value) EnumClose]  04
+  06   !   (identifier) [EnumOpen(Variable) Node Set(name) EnumClose]  04
 
 Assignment:
   09                                        ▶
   10   !   (assignment_expression)          14
   11  ─‣┘  _ [Set(value)]                   09
-  13  ─‣─  right: (Expression)              01 : 11
+  13  ─‣─  right: (Expression)              03 : 11
   14  └‣─  left: (identifier) [Node Set(target)]  13
 
 Ident (entrypoint):
   15                                        ▶
   16  -ε-  [StructClose]                    15
-  17       (Ident)                          04 : 16
+  17       (Ident)                          02 : 16
   18  -ε-  [StructOpen]                     17
 
 Expression (entrypoint):
   19                                        ▶
-  20       (Expression)                     01 : 19
+  20       (Expression)                     03 : 19
 
 Assignment (entrypoint):
   21                                        ▶

@@ -7,17 +7,17 @@ Q = (program
   ] @item
 )
 ------------------- TYPESCRIPT -------------------
-export type QItem =
-  | { $tag: "Call" }
-  | { $tag: "Decl"; $data: { d: Node } };
+export interface Inner {
+  call: Node;
+}
 
 export interface Q {
   item: QItem;
 }
 
-export interface Inner {
-  call: Node;
-}
+export type QItem =
+  | { $tag: "Call" }
+  | { $tag: "Decl"; $data: { d: Node } };
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

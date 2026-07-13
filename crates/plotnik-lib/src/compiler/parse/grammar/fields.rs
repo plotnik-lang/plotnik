@@ -9,35 +9,35 @@ use super::utils::starts_uppercase;
 use super::validation::Ident;
 
 impl Parser<'_, '_> {
-    /// Type annotation: `::Type` (PascalCase)
-    pub(crate) fn parse_type_annotation(&mut self) {
-        self.start_node(SyntaxKind::TypeAnnotation);
-        self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");
+    /// Capture type: `::Type`, `::str`, or `::bool`.
+    pub(crate) fn parse_capture_type(&mut self) {
+        self.start_node(SyntaxKind::CaptureType);
+        self.expect(SyntaxKind::DoubleColon, "'::' for capture type");
 
         if self.at(SyntaxKind::Id) {
             let ident = self.bump_ident();
-            self.validate_type_name(ident);
+            self.validate_capture_type_name(ident);
             self.finish_node();
             return;
         }
 
-        if let Some(report) = self.report_current(DiagnosticKind::ExpectedTypeName) {
+        if let Some(report) = self.report_current(DiagnosticKind::ExpectedCaptureType) {
             report.emit();
         }
 
         self.finish_node();
     }
 
-    /// Handle single colon type annotation (common mistake: `@x : Type` instead of `@x :: Type`)
-    pub(crate) fn parse_type_annotation_single_colon(&mut self) {
+    /// Handle a single-colon capture type (`@x : Type` instead of `@x :: Type`).
+    pub(crate) fn parse_capture_type_single_colon(&mut self) {
         if !self.next_is(SyntaxKind::Id) {
             return;
         }
 
-        self.start_node(SyntaxKind::TypeAnnotation);
+        self.start_node(SyntaxKind::CaptureType);
 
         let span = self.current_span();
-        if let Some(report) = self.report_at(DiagnosticKind::InvalidTypeAnnotationSyntax, span) {
+        if let Some(report) = self.report_at(DiagnosticKind::InvalidCaptureTypeSyntax, span) {
             report.fix("use `::`", "::").emit();
         }
 
@@ -170,12 +170,12 @@ impl Parser<'_, '_> {
         let name = &source[usize::from(span.start()) + 1..usize::from(end)]; // strip @ prefix
         self.validate_capture_name(Ident::new(name, full_span));
 
-        // Type annotation only on regular captures
+        // Capture types are only valid on regular captures.
         if is_capture {
             if self.at(SyntaxKind::DoubleColon) {
-                self.parse_type_annotation();
+                self.parse_capture_type();
             } else if self.at(SyntaxKind::Colon) {
-                self.parse_type_annotation_single_colon();
+                self.parse_capture_type_single_colon();
             }
         }
 

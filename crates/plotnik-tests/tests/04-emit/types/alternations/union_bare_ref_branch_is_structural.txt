@@ -8,13 +8,13 @@ Q = [
   (number) @b
 ]
 ------------------- TYPESCRIPT -------------------
-export interface Q {
-  b: Node | null;
-}
-
 export type A =
   | { $tag: "X"; $data: { x: Node } }
   | { $tag: "Y"; $data: { y: Node } };
+
+export interface Q {
+  b: Node | null;
+}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

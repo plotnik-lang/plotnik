@@ -35,6 +35,6 @@ pub struct TypeId(pub u32);
 impl TypeId {
     #[inline]
     pub fn is_builtin(self) -> bool {
-        self.0 <= 1
+        self.0 < u32::from(crate::bytecode::type_system::TYPE_CUSTOM_START)
     }
 }

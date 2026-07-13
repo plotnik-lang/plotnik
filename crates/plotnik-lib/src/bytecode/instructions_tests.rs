@@ -8,8 +8,8 @@ use crate::core::{NodeFieldId, NodeKindId};
 
 use super::effects::{Effect, EffectKind};
 use super::instructions::{
-    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, align_to_section,
-    select_match_opcode,
+    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, RoutedCall, SplitCall,
+    SplitCallReturns, StepId, align_to_section, select_match_opcode,
 };
 use super::node_kind_constraint::NodeKindConstraint;
 use plotnik_rt::Nav;
@@ -25,12 +25,14 @@ fn from_u8_decodes_known_and_rejects_unknown() {
         (0x5, Opcode::Match64),
         (0x6, Opcode::Call),
         (0x7, Opcode::Return),
+        (0x8, Opcode::SplitCall),
+        (0x9, Opcode::RoutedCall),
     ];
 
     for (nibble, expected) in known {
         assert_eq!(Opcode::from_u8(nibble), Some(expected));
     }
-    for nibble in 0x8u8..=0xF {
+    for nibble in 0xAu8..=0xF {
         assert_eq!(Opcode::from_u8(nibble), None, "nibble {nibble:#x}");
     }
 }
@@ -45,6 +47,8 @@ fn opcode_sizes() {
     assert_eq!(Opcode::Match64.size(), 64);
     assert_eq!(Opcode::Call.size(), 8);
     assert_eq!(Opcode::Return.size(), 8);
+    assert_eq!(Opcode::SplitCall.size(), 8);
+    assert_eq!(Opcode::RoutedCall.size(), 8);
 }
 
 #[test]
@@ -102,11 +106,40 @@ fn call_roundtrip() {
 
 #[test]
 fn return_roundtrip() {
-    let r = Return::new();
+    for r in [
+        Return::matched(),
+        Return::routed_matched(),
+        Return::routed_zero(),
+    ] {
+        let bytes = r.to_bytes();
+        let decoded = Return::from_bytes(bytes);
+        assert_eq!(decoded, r);
+    }
+}
 
-    let bytes = r.to_bytes();
-    let decoded = Return::from_bytes(bytes);
-    assert_eq!(decoded, r);
+#[test]
+fn split_call_roundtrip() {
+    let call = SplitCall::new(
+        Nav::Next,
+        SplitCallReturns {
+            matched: StepId::try_from(100).expect("step id must be non-zero"),
+            zero: StepId::try_from(200).expect("step id must be non-zero"),
+        },
+        StepId::try_from(500).expect("step id must be non-zero"),
+    );
+
+    assert_eq!(SplitCall::from_bytes(call.to_bytes()), call);
+}
+
+#[test]
+fn routed_call_roundtrip() {
+    let call = RoutedCall::new(
+        Nav::Next,
+        StepId::try_from(100).expect("step id must be non-zero"),
+        StepId::try_from(500).expect("step id must be non-zero"),
+    );
+
+    assert_eq!(RoutedCall::from_bytes(call.to_bytes()), call);
 }
 
 #[test]

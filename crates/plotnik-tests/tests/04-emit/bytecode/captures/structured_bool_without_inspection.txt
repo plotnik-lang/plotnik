@@ -1,0 +1,70 @@
+Q = (program
+  [
+    {
+      (expression_statement) @item
+    } @seen :: bool
+    (comment)
+  ]
+)
+------------------ DIAGNOSTICS -------------------
+warning: capture type `bool` replaces the captured value with a boolean
+ --> query.ptk:5:13
+  |
+5 |     } @seen :: bool
+  |             ^^^^^^^
+  |
+help: the replaced fields, variants, or scalar payload will not be returned
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 14
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        10
+  03  ─‣┘  _                                01
+  05   !   (expression_statement) [BoolValue(1) Set(seen)]  03
+  06   !   (comment) [BoolValue(0) Set(seen)]  03
+  09  ──!  _                                05, 06, 09
+  10  └─!  _                                05, 06, 09
+
+Q (entrypoint):
+  11                                        ▶
+  12  -ε-  [StructClose]                    11
+  13       (Q)                              02 : 12
+  14  -ε-  [StructOpen]                     13
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "seen"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "comment"
+
+[type_defs]
+T0 = <Bool>
+T1 = Struct  M0:1  ; { seen }
+
+[type_members]
+M0: S1 → T0  ; seen: <Bool>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08   !   (expression_statement) [BoolValue(1) Set(M0)]  07
+  10   !   (comment) [BoolValue(0) Set(M0)]  07
+  12  ──!  _                                08, 10, 12
+  14  └─!  _                                08, 10, 12
+  16   !   (program)                        14

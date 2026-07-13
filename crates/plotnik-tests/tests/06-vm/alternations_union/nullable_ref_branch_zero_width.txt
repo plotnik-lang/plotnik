@@ -44,38 +44,32 @@ Q = 00 :: T2
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@32)                            32 : 03
+  02       (@21)                            21 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06                                        ▶
-  07  ─‣┘  _                                18
-  08  -ε-  [Null]                           06
-  10   !   (expression_statement) [Node]    06
-  12  ──!  _                                10, 12
-  14   !   _                                10, 12
-  16  -ε-                                   14, 08
-  18                                        ▶
-  19   !   (expression_statement)           07
-  20  ──!  _                                19, 20
-  22   !   _ [Null Set(M0)]                 19, 20
-  24   !   (debugger_statement) [Node Set(M0)]  07
-  26  -ε-  [Null Set(M0)]                   18
-  28  ──!  _                                22, 24, 28
-  30  └─!  _                                22, 24, 28
-  32   !   (program)                        30, 26
+  07   !   (expression_statement)           20
+  08  ──!  _                                07, 08
+  10   !   _ [Null Set(M0)]                 07, 08
+  12  -ε-  [Null Set(M0)]                   06
+  14   !   (debugger_statement) [Node Set(M0)]  20
+  16  ──!  _                                10, 14, 16
+  18  └─!  _                                10, 14, 16
+  20  ─‣┘  _                                06
+  21   !   (program)                        18, 12
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@32)                            32 : 03
-       ▶   (@32)
+  02       (@21)                            21 : 03
+       ▶   (@21)
 
-@32:
-  32       (program)                        30, 26
+@21:
+  21       (program)                        18, 12
        ●   program
-  30       _                                22, 24, 28
-  32  ❮❮❮ 
-  26  -ε-  [Null Set(M0)]                   18
-  18   ◀   (@32)                            
+  18       _                                10, 14, 16
+  21  ❮❮❮ 
+  12  -ε-  [Null Set(M0)]                   06
+  06   ◀   (@21)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -3,27 +3,16 @@ Q = (identifier)*
 [entrypoints]
 
 [transitions]
-Q:
-  01                                        ▶
-  02  -ε-  [ArrayClose]                     01
-  04   !   (identifier) [Node Push]         06, 02
-  06  ──!  _                                04, 06
-  07   !   _                                04, 06
-  12  -ε-  [ArrayOpen]                      07, 02
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "identifier"
+S1 "identifier"
 
 [type_defs]
-T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
 
 [type_members]
 
 [type_names]
-N0: S1 → T1  ; Q
 
 [entrypoints]
 

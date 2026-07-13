@@ -16,7 +16,7 @@ use crate::compiler::analyze::types::type_shape::{
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 
-use super::{InferPass, InferState, InferVisitor};
+use super::{InferPass, InferVisitor};
 
 impl InferPass<'_, '_> {
     pub(super) fn check_in_progress_reference_captures(&mut self) {
@@ -46,18 +46,9 @@ impl InferPass<'_, '_> {
                     .cloned()
                     .expect("symbol-table source entry must have a body");
 
-                let mut visitor = InferVisitor::new(
-                    InferState {
-                        type_ctx: &mut self.ctx,
-                        interner: self.analysis.interner,
-                        symbol_table: self.analysis.symbol_table,
-                        dependency_analysis: deps,
-                        nullable_defs: &self.nullable_defs,
-                        diag: &mut *self.analysis.diag,
-                    },
-                    deps.def_source_id(def_id),
-                );
-                visitor.recheck_capture_sites(&body, &registration_order, captor_order);
+                self.visit(deps.def_source_id(def_id), |visitor| {
+                    visitor.recheck_capture_sites(&body, &registration_order, captor_order);
+                });
             }
         }
     }

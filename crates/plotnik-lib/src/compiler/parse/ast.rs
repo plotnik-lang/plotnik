@@ -193,7 +193,7 @@ pub struct EnumPattern(SyntaxNode);
 ast_node!(Branch, Branch);
 ast_node!(SeqPattern, Sequence);
 ast_node!(CapturedPattern, Capture);
-ast_node!(TypeAnnotation, TypeAnnotation);
+ast_node!(CaptureTypeSyntax, CaptureType);
 ast_node!(QuantifiedPattern, Quantifier);
 ast_node!(FieldPattern, Field);
 ast_node!(NegatedField, NegatedField);
@@ -600,12 +600,12 @@ impl CapturedPattern {
         self.0.children().find_map(Pattern::cast)
     }
 
-    pub fn type_annotation(&self) -> Option<TypeAnnotation> {
-        self.0.children().find_map(TypeAnnotation::cast)
+    pub fn capture_type(&self) -> Option<CaptureTypeSyntax> {
+        self.0.children().find_map(CaptureTypeSyntax::cast)
     }
 }
 
-impl TypeAnnotation {
+impl CaptureTypeSyntax {
     pub fn name(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| k == SyntaxKind::Id)
     }

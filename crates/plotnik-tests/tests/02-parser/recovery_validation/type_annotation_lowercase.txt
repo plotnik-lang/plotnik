@@ -1,13 +1,9 @@
 Q = (a) @x :: foo
 ------------------ DIAGNOSTICS -------------------
-error: type names must be PascalCase
+error: unknown capture type `foo`
  --> query.ptk:1:15
   |
 1 | Q = (a) @x :: foo
   |               ^^^
   |
-help: use `::Foo`
-  |
-1 - Q = (a) @x :: foo
-1 + Q = (a) @x :: Foo
-  |
+help: write `:: str`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`

@@ -10,13 +10,13 @@ Q = (program
 --------------------- INPUT ----------------------
 let a; let b;
 ------------------- TYPESCRIPT -------------------
+export interface Q {
+  rows: QRows[];
+}
+
 export interface QRows {
   decl: Node;
   n: Node;
-}
-
-export interface Q {
-  rows: QRows[];
 }
 --------------------- OUTPUT ---------------------
 {

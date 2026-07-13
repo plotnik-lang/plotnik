@@ -1,0 +1,17 @@
+Q = (program
+  {
+    (comment) @x :: str
+  } @a :: Foo
+  {
+    (comment) @x
+  } @b :: Foo
+)
+------------------ DIAGNOSTICS -------------------
+error: type name `Foo` is already used for a different type
+ --> query.ptk:7:11
+  |
+4 |   } @a :: Foo
+  |           --- already used here
+...
+7 |   } @b :: Foo
+  |           ^^^

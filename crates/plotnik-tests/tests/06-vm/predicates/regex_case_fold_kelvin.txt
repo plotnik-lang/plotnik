@@ -6,12 +6,12 @@ Q = (program
 --------------------- INPUT ----------------------
 K; K; k; q;
 ------------------- TYPESCRIPT -------------------
-export interface QRows {
-  id: Node;
-}
-
 export interface Q {
   rows: QRows[];
+}
+
+export interface QRows {
+  id: Node;
 }
 --------------------- OUTPUT ---------------------
 {

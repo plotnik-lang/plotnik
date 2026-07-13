@@ -4,10 +4,3 @@ Q = {
 }
 ------------------- TYPESCRIPT -------------------
 ---------------------- RUST ----------------------
-use ::plotnik_rt::Node;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub a: Node<'t>,
-    pub b: Node<'t>,
-}

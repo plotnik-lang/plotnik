@@ -19,14 +19,14 @@ TrailingSkip = 28
 
 [transitions]
 LeadingSkip:
-  02                                        ▶
-  03   !   (program)                        10, 05
-  04  ─‣┘  _                                02
-  05  └‣─  (function_declaration) [Node Set(fn)]  04
-  06  ─‣─  (function_declaration) [Node Set(fn)]  04
-  07   !   (expression_statement)           06
-  09  ──!  _                                07, 09
-  10  └─!  _                                07, 09
+  01                                        ▶
+  02   !   (program)                        09, 04
+  03  ─‣┘  _                                01
+  04  └‣─  (function_declaration) [Node Set(fn)]  03
+  05  ─‣─  (function_declaration) [Node Set(fn)]  03
+  06   !   (expression_statement)           05
+  08  ──!  _                                06, 08
+  09  └─!  _                                06, 08
 
 TrailingSkip:
   12                                        ▶
@@ -39,7 +39,7 @@ TrailingSkip:
 LeadingSkip (entrypoint):
   21                                        ▶
   22  -ε-  [StructClose]                    21
-  23       (LeadingSkip)                    03 : 22
+  23       (LeadingSkip)                    02 : 22
   24  -ε-  [StructOpen]                     23
 
 TrailingSkip (entrypoint):

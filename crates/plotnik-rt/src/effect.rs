@@ -30,6 +30,20 @@ pub enum RuntimeEffect<'t> {
     EnumClose,
     /// Null placeholder (for optional/alternation).
     Null,
+    /// Begin one value-local scalar provenance frame.
+    ScalarOpen,
+    /// Contribute an explicit node-pattern match to every open scalar frame.
+    ScalarMark(Node<'t>),
+    /// Close a scalar frame and materialize its source text (or null when unmarked).
+    StrClose,
+    /// Close a scalar frame and materialize the supplied boolean.
+    BoolClose(bool),
+    /// Materialize the matched node's source text without a scalar frame.
+    NodeStr(Node<'t>),
+    /// Materialize presence for the matched node without a scalar frame.
+    NodeBool(Node<'t>),
+    /// Materialize a boolean with no source provenance.
+    BoolValue(bool),
     /// Open an inspection span. `node` is present only for cursor-snapshot starts.
     SpanStart { id: u16, node: Option<Node<'t>> },
     /// Close an inspection span.
@@ -95,7 +109,12 @@ impl Default for EffectLog<'_> {
 /// source, so the fallible `get` turns a violated expectation into a named
 /// panic instead of a raw slice abort.
 pub fn node_text<'s>(source: &'s str, node: &Node<'_>) -> &'s str {
+    source_text(source, node.start_byte()..node.end_byte())
+}
+
+/// Slice one validated scalar provenance range from the source.
+pub fn source_text(source: &str, range: std::ops::Range<usize>) -> &str {
     source
-        .get(node.start_byte()..node.end_byte())
+        .get(range)
         .expect("node span must lie within source on UTF-8 boundaries")
 }

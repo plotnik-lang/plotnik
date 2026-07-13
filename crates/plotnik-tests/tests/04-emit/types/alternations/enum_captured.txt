@@ -3,13 +3,13 @@ Q = [
   Num: (number) @n
 ] @result
 ------------------- TYPESCRIPT -------------------
-export type QResult =
-  | { $tag: "Str"; $data: { s: Node } }
-  | { $tag: "Num"; $data: { n: Node } };
-
 export interface Q {
   result: QResult;
 }
+
+export type QResult =
+  | { $tag: "Str"; $data: { s: Node } }
+  | { $tag: "Num"; $data: { n: Node } };
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

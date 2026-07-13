@@ -67,7 +67,7 @@ fn decoded_program_matches_byte_decoder() {
 
                 for interior in step + 1..step + m.step_count() {
                     assert!(
-                        matches!(module.decoded().step(interior), DecodedInstr::Return),
+                        matches!(module.decoded().step(interior), DecodedInstr::Return(_)),
                         "interior step {interior} should be a placeholder"
                     );
                 }
@@ -81,7 +81,19 @@ fn decoded_program_matches_byte_decoder() {
                 assert_eq!(decoded.target, u16::from(c.target));
                 step += 1;
             }
-            (Instruction::Return(_), DecodedInstr::Return) => {
+            (Instruction::RoutedCall(c), DecodedInstr::RoutedCall(decoded)) => {
+                assert_eq!(decoded.next, u16::from(c.next));
+                assert_eq!(decoded.target, u16::from(c.target));
+                step += 1;
+            }
+            (Instruction::SplitCall(c), DecodedInstr::SplitCall(decoded)) => {
+                assert_eq!(decoded.matched, u16::from(c.returns.matched));
+                assert_eq!(decoded.zero, u16::from(c.returns.zero));
+                assert_eq!(decoded.target, u16::from(c.target));
+                step += 1;
+            }
+            (Instruction::Return(return_), DecodedInstr::Return(outcome)) => {
+                assert_eq!(outcome, return_.mode.outcome());
                 step += 1;
             }
             (byte, decoded) => {

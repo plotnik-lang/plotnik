@@ -79,24 +79,29 @@ struct InherentParseSignature {
     impl_generics: &'static str,
     type_generics: &'static str,
     tree_ref: &'static str,
+    source_ref: &'static str,
 }
 
 impl InherentParseSignature {
     fn for_item(model: &TypeModel<'_>, item: &ReplayItem) -> Self {
         let ident = model.item_ident(item.name).to_string();
-        if model.needs_lifetime(item.ty) {
-            return Self {
-                ident,
-                impl_generics: "<'t>",
-                type_generics: "<'t>",
-                tree_ref: "&'t rt::Tree",
-            };
-        }
+        let usage = model.lifetime_usage(item.ty);
+        let (impl_generics, type_generics) = match (usage.tree, usage.source) {
+            (false, false) => ("", ""),
+            (true, false) => ("<'t>", "<'t>"),
+            (false, true) => ("<'s>", "<'s>"),
+            (true, true) => ("<'t, 's>", "<'t, 's>"),
+        };
         Self {
             ident,
-            impl_generics: "",
-            type_generics: "",
-            tree_ref: "&rt::Tree",
+            impl_generics,
+            type_generics,
+            tree_ref: if usage.tree {
+                "&'t rt::Tree"
+            } else {
+                "&rt::Tree"
+            },
+            source_ref: if usage.source { "&'s str" } else { "&str" },
         }
     }
 }
@@ -202,7 +207,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let _ = writeln!(out, "    /// backtracking state, and typed replay depth.");
         let _ = writeln!(out, "    pub fn parse(");
         let _ = writeln!(out, "        tree: {},", sig.tree_ref);
-        let _ = writeln!(out, "        source: &str,");
+        let _ = writeln!(out, "        source: {},", sig.source_ref);
         let _ = writeln!(
             out,
             "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
@@ -213,7 +218,10 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         );
         let _ = writeln!(out, "            return Ok(None);");
         let _ = writeln!(out, "        }};");
-        let _ = writeln!(out, "        let mut t = rt::TraceReader::new(&log);");
+        let _ = writeln!(
+            out,
+            "        let mut t = rt::TraceReader::new(&log, source);"
+        );
         if fallible_reader {
             let _ = writeln!(
                 out,
@@ -277,19 +285,14 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
     fn parse_trait_impl(&self, out: &mut String, item: &ReplayItem) {
         let sig = InherentParseSignature::for_item(self.model, item);
-        let impl_generics = if sig.impl_generics.is_empty() {
-            "<'t>"
-        } else {
-            sig.impl_generics
-        };
         let _ = writeln!(
             out,
-            "impl{impl_generics} rt::Parse<'t> for {}{} {{",
+            "impl<'t, 's> rt::Parse<'t, 's> for {}{} {{",
             sig.ident, sig.type_generics
         );
         let _ = writeln!(out, "    fn parse(");
         let _ = writeln!(out, "        tree: &'t rt::Tree,");
-        let _ = writeln!(out, "        source: &str,");
+        let _ = writeln!(out, "        source: &'s str,");
         let _ = writeln!(
             out,
             "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
@@ -315,11 +318,9 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
     fn reader_open(&self, out: &mut String, item: &ReplayItem) {
         let ident = self.model.item_ident(item.name).to_string();
-        let (fn_generics, reader_generics, return_type) = if self.model.needs_lifetime(item.ty) {
-            ("<'t>", "<'_, 't>", format!("{ident}<'t>"))
-        } else {
-            ("", "<'_, '_>", ident.clone())
-        };
+        let fn_generics = "<'t, 's>";
+        let reader_generics = "<'_, 't, 's>";
+        let return_type = format!("{ident}{}", lifetime_args(self.model, item.ty));
         let reader = self.reader_fn(item.name);
         let fallible = item.fallible;
         let depth_param = if fallible {
@@ -483,6 +484,8 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     fn value_expr(&self, plan: &ReplayValuePlan, context: ReadContext) -> String {
         match plan {
             ReplayValuePlan::Node => "t.expect_node()".to_string(),
+            ReplayValuePlan::Str => "t.expect_str()".to_string(),
+            ReplayValuePlan::Bool => "t.expect_bool()".to_string(),
             ReplayValuePlan::Nullable(inner) => self.nullable_expr(inner, context),
             ReplayValuePlan::Array(element) => self.array_expr(element, context),
             ReplayValuePlan::Read { item, source } => {
@@ -637,4 +640,14 @@ fn arm_pattern(indices: &[u16]) -> String {
         .map(u16::to_string)
         .collect::<Vec<_>>()
         .join(" | ")
+}
+
+fn lifetime_args(model: &TypeModel<'_>, ty: TypeId) -> &'static str {
+    let usage = model.lifetime_usage(ty);
+    match (usage.tree, usage.source) {
+        (false, false) => "",
+        (true, false) => "<'t>",
+        (false, true) => "<'s>",
+        (true, true) => "<'t, 's>",
+    }
 }

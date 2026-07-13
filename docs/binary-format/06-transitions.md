@@ -26,19 +26,21 @@ type_id (u8)
 ```
 
 - `segment`: reserved, must be `0`.
-- `node_kind`: used only by `Match`; must be `0` for `Call` and `Return`.
+- `node_kind`: used only by `Match`; must be `0` for calls and `Return`.
 - `opcode`: instruction kind.
 
-| Opcode | Name    | Size     | Description                          |
-| :----- | :------ | :------- | :----------------------------------- |
-| 0x0    | Match8  | 8 bytes  | Fast-path match                      |
-| 0x1    | Match16 | 16 bytes | Extended match with inline payload   |
-| 0x2    | Match24 | 24 bytes | Extended match with inline payload   |
-| 0x3    | Match32 | 32 bytes | Extended match with inline payload   |
-| 0x4    | Match48 | 48 bytes | Extended match with inline payload   |
-| 0x5    | Match64 | 64 bytes | Extended match with inline payload   |
-| 0x6    | Call    | 8 bytes  | Definition call                      |
-| 0x7    | Return  | 8 bytes  | Return from definition or entrypoint |
+| Opcode | Name       | Size     | Description                                    |
+| :----- | :--------- | :------- | :--------------------------------------------- |
+| 0x0    | Match8     | 8 bytes  | Fast-path match                                |
+| 0x1    | Match16    | 16 bytes | Extended match with inline payload             |
+| 0x2    | Match24    | 24 bytes | Extended match with inline payload             |
+| 0x3    | Match32    | 32 bytes | Extended match with inline payload             |
+| 0x4    | Match48    | 48 bytes | Extended match with inline payload             |
+| 0x5    | Match64    | 64 bytes | Extended match with inline payload             |
+| 0x6    | Call       | 8 bytes  | Definition call                                |
+| 0x7    | Return     | 8 bytes  | Return from definition or entrypoint           |
+| 0x8    | SplitCall  | 8 bytes  | Nullable call with two continuations           |
+| 0x9    | RoutedCall | 8 bytes  | Matched-only call with callee-owned navigation |
 
 ## Navigation
 
@@ -100,10 +102,27 @@ EffectOp (u16)
 | 12     | `SpanStartAt`   | Span index    |
 | 13     | `SpanStart`     | Span index    |
 | 14     | `SpanEnd`       | Span index    |
+| 15     | `ScalarOpen`    | -             |
+| 16     | `ScalarMark`    | -             |
+| 17     | `StrClose`      | -             |
+| 18     | `BoolClose`     | Boolean 0/1   |
+| 19     | `NodeStr`       | -             |
+| 20     | `NodeBool`      | -             |
+| 21     | `BoolValue`     | Boolean 0/1   |
 
 Match effects execute only after navigation and all match checks succeed, in
 the list order encoded on that instruction. Span payloads index the Spans
 section and must be `< spans_count`.
+
+`ScalarOpen` and either close form one balanced scalar value frame.
+`ScalarMark` snapshots the current explicit pattern match into every open
+scalar frame; it is cursor-reading like `Node` and `SpanStartAt`. Scalar open
+and close effects are motion barriers and must not be moved across a consuming
+match. `NodeStr` and `NodeBool` are direct scalar values for one matched node;
+they avoid a scalar frame when no source hull needs to be accumulated.
+`BoolValue` is the equivalent no-provenance path, used notably for an absent
+optional boolean. `BoolClose` and `BoolValue` accept only `0` or `1`. Every effect shown with `-`,
+including all other scalar effects, requires a zero payload.
 
 ## Match8
 
@@ -197,18 +216,62 @@ struct Call {
 `Call` applies its navigation and optional field constraint before entering the
 callee.
 
+## SplitCall
+
+```rust
+#[repr(C)]
+struct SplitCall {
+    type_id: u8,
+    entry_nav: u8,
+    matched: u16, // matched return address
+    zero: u16,    // zero-width return address
+    target: u16,  // callee entry
+}
+```
+
+`SplitCall` performs no navigation or field check. `entry_nav` records the
+navigation routed into its specialized callee so the loader can verify cursor
+depth without reconstructing compiler provenance. Candidate-search checkpoints
+therefore remain inside the nullable body's authored branch order. A matched
+`Return` resumes at `matched` at the routed navigation depth; a zero-width
+`Return` resumes at `zero` at the caller's original depth.
+
+## RoutedCall
+
+```rust
+#[repr(C)]
+struct RoutedCall {
+    type_id: u8,
+    entry_nav: u8,
+    reserved: u16,
+    next: u16,
+    target: u16,
+}
+```
+
+`RoutedCall` is the matched-only counterpart to `SplitCall`. Its specialized
+callee owns `entry_nav`, so the instruction performs no navigation itself;
+the encoded value exists so validation can prove the matched return depth.
+`reserved` must be zero. A routed call cannot target an ordinary or
+split-return body.
+
 ## Return
 
 ```rust
 #[repr(C)]
 struct Return {
     type_id: u8,
-    _reserved: [u8; 7],
+    outcome: u8, // 0 = matched, 1 = zero-width
+    entry: u8,   // 0 = caller-owned, 1 = routed
+    _reserved: [u8; 5],
 }
 ```
 
-Reserved bytes must be zero. Return pops a frame; if no frame exists, the VM
-accepts the entrypoint.
+Reserved bytes must be zero. `entry` lets the loader prove that ordinary calls
+target caller-navigated bodies while routed and split calls target bodies that
+own entry navigation; it is not needed by the VM after validation. Return pops
+a frame and selects the continuation for its outcome. If no frame exists, only
+a matched, caller-owned return may accept the entrypoint.
 
 ## Validation
 
@@ -219,8 +282,12 @@ The loader verifies:
 - every target and successor lands on an instruction boundary;
 - effect, predicate, member, type, node-kind, and field operands are in range;
 - span effect operands address a real span entry;
+- `Set`/`EnumOpen` payloads address a real member, `BoolClose`/`BoolValue` are `0..=1`, and
+  every unit effect has a zero payload;
 - calls and returns uphold cursor-depth neutrality;
+- ordinary calls target matched-only bodies, split calls target bodies with
+  both outcomes, and entrypoint wrappers return matched only;
 - the committed effect stream cannot underflow the materializer stack or
-  suppression depth;
+  suppression depth, and all array/struct/enum/scalar frames are balanced;
 - the committed effect stream cannot underflow or mis-nest the inspection span
   stack.

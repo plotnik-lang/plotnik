@@ -7,12 +7,12 @@ Q = (program
   (debugger_statement) @name
 )
 ------------------- TYPESCRIPT -------------------
+export type A =
+  | { $tag: "X"; $data: { s: Node } };
+
 export interface Q {
   name: Node;
 }
-
-export type A =
-  | { $tag: "X"; $data: { s: Node } };
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

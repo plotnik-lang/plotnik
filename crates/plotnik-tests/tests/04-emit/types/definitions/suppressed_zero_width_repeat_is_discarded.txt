@@ -10,9 +10,5 @@ Q = (program
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ---------------------- RUST ----------------------
-use ::plotnik_rt::Node;
-
-pub type MaybeId<'t> = ::core::option::Option<Node<'t>>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q;

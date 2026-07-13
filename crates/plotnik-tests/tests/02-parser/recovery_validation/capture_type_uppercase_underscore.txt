@@ -1,0 +1,13 @@
+Q = (identifier) @value :: Bad_Name
+------------------ DIAGNOSTICS -------------------
+error: capture type names cannot contain punctuation or custom-name separators
+ --> query.ptk:1:28
+  |
+1 | Q = (identifier) @value :: Bad_Name
+  |                            ^^^^^^^^
+  |
+help: use `::BadName`
+  |
+1 - Q = (identifier) @value :: Bad_Name
+1 + Q = (identifier) @value :: BadName
+  |

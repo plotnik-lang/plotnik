@@ -18,6 +18,14 @@ pub enum UnifyError {
     IncompatibleTypes { field: Symbol },
 }
 
+impl UnifyError {
+    pub fn field(&self) -> Symbol {
+        match self {
+            Self::IncompatibleTypes { field } => *field,
+        }
+    }
+}
+
 pub fn unify_flows(
     ctx: &mut TypeAnalysisBuilder,
     flows: impl IntoIterator<Item = PatternFlow>,
@@ -27,7 +35,7 @@ pub fn unify_flows(
         return Ok(PatternFlow::Void);
     };
 
-    iter.try_fold(first, |acc, flow| unify_flow(ctx, acc, flow))
+    iter.try_fold(first, |acc, flow| unify_flow_in(ctx, acc, flow))
 }
 
 /// Unify two PatternFlows from alternation branches.
@@ -38,7 +46,16 @@ pub fn unify_flows(
 /// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
 /// - Value is an uncaptured pending value (a bare reference); it is suppressed
 ///   like any uncaptured match, so it unifies as Void.
+#[cfg(test)]
 pub fn unify_flow(
+    ctx: &mut TypeAnalysisBuilder,
+    a: PatternFlow,
+    b: PatternFlow,
+) -> Result<PatternFlow, UnifyError> {
+    unify_flow_in(ctx, a, b)
+}
+
+fn unify_flow_in(
     ctx: &mut TypeAnalysisBuilder,
     a: PatternFlow,
     b: PatternFlow,
@@ -150,7 +167,7 @@ fn merge_fields(
 /// different ids for the same shape — compare structurally, keeping the first
 /// branch's id. `Void` is the identity element (compatible with any type).
 fn unify_type_ids(
-    ctx: &TypeAnalysisBuilder,
+    ctx: &mut TypeAnalysisBuilder,
     a: TypeId,
     b: TypeId,
     field: Symbol,
@@ -166,25 +183,34 @@ fn unify_type_ids(
         return Ok(a);
     }
 
+    let a_shape = ctx
+        .in_progress()
+        .type_shape(a)
+        .cloned()
+        .expect("unified field type is registered");
+    let b_shape = ctx
+        .in_progress()
+        .type_shape(b)
+        .cloned()
+        .expect("unified field type is registered");
+
     // Arrays that differ only in cardinality relax to zero-or-more: only one
     // branch matches, so the merged list is non-empty only when the `+` branch
     // did — `T[]+ ∪ T[]* = T[]*`.
     if let (
-        Some(&TypeShape::Array {
+        TypeShape::Array {
             element: ea,
             non_empty: na,
-        }),
-        Some(&TypeShape::Array {
+        },
+        TypeShape::Array {
             element: eb,
             non_empty: nb,
-        }),
-    ) = (
-        ctx.in_progress().type_shape(a),
-        ctx.in_progress().type_shape(b),
-    ) && na != nb
-        && ctx.types_structurally_equal(ea, eb)
+        },
+    ) = (&a_shape, &b_shape)
+        && na != nb
+        && ctx.types_structurally_equal(*ea, *eb)
     {
-        return Ok(if na { b } else { a });
+        return Ok(if *na { b } else { a });
     }
 
     Err(UnifyError::IncompatibleTypes { field })

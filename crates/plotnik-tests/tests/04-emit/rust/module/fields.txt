@@ -15,7 +15,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 1;
+pub const REQUIRED_RUNTIME_ABI: u32 = 2;
 
 use ::plotnik_rt::Node;
 
@@ -36,7 +36,7 @@ impl<'t> Q<'t> {
         let Some(log) = matcher::q_safe(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log);
+        let mut t = rt::TraceReader::new(&log, source);
         let value = read_q(&mut t);
         t.finish();
         Ok(Some(value))
@@ -57,17 +57,17 @@ impl<'t> rt::Matches for Q<'t> {
     }
 }
 
-impl<'t> rt::Parse<'t> for Q<'t> {
+impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
     fn parse(
         tree: &'t rt::Tree,
-        source: &str,
+        source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         Q::parse(tree, source)
     }
 }
 
 /// Replay one committed `Q` value.
-fn read_q<'t>(t: &mut rt::TraceReader<'_, 't>) -> Q<'t> {
+fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
     t.expect_struct_open();
     let mut v0 = None; // name
     while !t.at_struct_close() {
@@ -292,9 +292,10 @@ mod matcher {
             //   01                                        ▶
             S01_Q => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   02   !   (program)                        04
@@ -368,9 +369,10 @@ mod matcher {
             //   09                                        ▶
             S09_Q_EP => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   10  -ε-  [StructClose]                    09

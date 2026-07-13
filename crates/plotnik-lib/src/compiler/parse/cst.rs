@@ -30,7 +30,7 @@ pub enum SyntaxKind {
     #[token("}")]
     BraceClose,
 
-    /// `::` for type annotations. Longest match wins over `Colon`.
+    /// `::` for capture types. Longest match wins over `Colon`.
     #[token("::")]
     DoubleColon,
 
@@ -201,7 +201,7 @@ pub enum SyntaxKind {
     Str,
     Field,
     Capture,
-    TypeAnnotation,
+    CaptureType,
     Quantifier,
     Sequence,
     Alternation,

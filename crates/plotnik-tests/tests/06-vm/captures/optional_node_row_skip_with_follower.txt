@@ -7,13 +7,13 @@ Q = (program
 --------------------- INPUT ----------------------
 debugger;
 ------------------- TYPESCRIPT -------------------
-export interface QX {
-  id: Node;
-}
-
 export interface Q {
   d: Node;
   x: QX | null;
+}
+
+export interface QX {
+  id: Node;
 }
 --------------------- OUTPUT ---------------------
 {

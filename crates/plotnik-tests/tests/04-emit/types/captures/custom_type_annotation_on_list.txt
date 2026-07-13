@@ -1,11 +1,3 @@
 Q = (identifier)* @names :: Ident
 ------------------- TYPESCRIPT -------------------
 ---------------------- RUST ----------------------
-use ::plotnik_rt::Node;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub names: ::std::vec::Vec<Ident<'t>>,
-}
-
-pub type Ident<'t> = Node<'t>;

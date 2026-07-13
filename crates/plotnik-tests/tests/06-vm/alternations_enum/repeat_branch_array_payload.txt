@@ -7,13 +7,13 @@ Q = (program
 --------------------- INPUT ----------------------
 a; b;
 ------------------- TYPESCRIPT -------------------
-export type QX =
-  | { $tag: "A"; $data: { stmts: Node[] } }
-  | { $tag: "B" };
-
 export interface Q {
   x: QX;
 }
+
+export type QX =
+  | { $tag: "A"; $data: { stmts: Node[] } }
+  | { $tag: "B" };
 --------------------- OUTPUT ---------------------
 {
   "x": {

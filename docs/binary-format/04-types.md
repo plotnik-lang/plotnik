@@ -18,6 +18,8 @@ Type system metadata for code generation and runtime validation. Describes the s
 | 5     | `Struct`          | Record with named fields        |
 | 6     | `Enum`            | Discriminated union             |
 | 7     | `Alias`           | Named reference to another type |
+| 8     | `Str`             | Borrowed source text            |
+| 9     | `Bool`            | Boolean value                   |
 
 ### Node Semantics
 
@@ -28,6 +30,14 @@ The `Node` type represents a platform-dependent handle to a tree-sitter AST node
 | Rust       | `tree_sitter::Node<'tree>` (lifetime-bound reference)      |
 | TypeScript | Binding-provided object with `startPosition`, `text`, etc. |
 | JSON       | Unique node identifier (e.g., `"node:42"`)                 |
+
+### Scalar Semantics
+
+`Str` is the UTF-8 source slice selected by a direct node-scalar effect or a
+balanced scalar-provenance frame; it renders as `string` in TypeScript and
+`&'s str` in Rust. `Bool` is an explicit boolean carried by a scalar effect;
+the runtime does not infer list or text truthiness. Neither primitive contains
+member metadata.
 
 ## Sections
 
@@ -54,6 +64,8 @@ struct TypeDef {
 | :---------------- | :------------ | :----------- |
 | `Void`            | 0             | 0            |
 | `Node`            | 0             | 0            |
+| `Str`             | 0             | 0            |
+| `Bool`            | 0             | 0            |
 | `Optional`        | Inner TypeId  | 0            |
 | `ArrayZeroOrMore` | Inner TypeId  | 0            |
 | `ArrayOneOrMore`  | Inner TypeId  | 0            |
@@ -99,12 +111,13 @@ Sorted lexicographically by name (resolved via String Table) for binary search.
 **Usage**:
 
 - Named definitions (`List = [...]`) get an entry
-- Custom type annotations (`@x :: Identifier`) create an Alias TypeDef with an entry
+- Custom capture types (`@x :: Identifier`) create an Alias TypeDef with an entry
 - Anonymous types have no entry
 
 ## Examples
 
-> **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes them first in order (Void, Node), then composite types.
+> **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes
+> them first in order (`Void`, `Node`, `Str`, `Bool`), then custom output types.
 
 ### Simple Struct
 
@@ -150,7 +163,7 @@ M3: S4 → T2  ; Cons: T2
 N0: S5 → T3  ; List
 ```
 
-### Custom Type Annotation
+### Custom Capture Type
 
 Query: `Q = (identifier) @name :: Identifier`
 
@@ -176,7 +189,7 @@ Loaders must verify:
   member's `ty` is a valid TypeId (`< type_defs_count`).
 - Wrapper/`Alias`: `data` (inner/target TypeId) is `< type_defs_count`, and the
   reserved `count` is `0`.
-- `Void`/`Node`: the reserved `data` and `count` are both `0`.
+- `Void`/`Node`/`Str`/`Bool`: the reserved `data` and `count` are both `0`.
 
 The bounds checks prevent out-of-bounds reads from malformed binaries; the
 reserved-zero checks reject smuggled state where the format pins a field to zero.
@@ -193,5 +206,5 @@ code generator is a pure renderer:
    - Named → emit a declaration under that name, verbatim; anonymous (enum
      variant payloads, foreign bytecode) → render inline at use sites
 4. The same name may appear on several TypeIds only for structurally identical
-   types (nominal twins from repeated annotations) — one declaration serves
+   types (nominal twins from repeated custom capture types) — one declaration serves
    them all. Never invent names.

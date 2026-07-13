@@ -12,11 +12,11 @@ Q = (program
 --------------------- INPUT ----------------------
 [1, 2, "x"]
 ------------------- TYPESCRIPT -------------------
+export type Comma = undefined;
+
 export interface Q {
   s: Node;
 }
-
-export type Comma = undefined;
 --------------------- OUTPUT ---------------------
 {
   "s": {

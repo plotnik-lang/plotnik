@@ -39,10 +39,11 @@ impl Emitter<'_, '_> {
     pub(super) fn serde_impl(&mut self, item: &Item) -> String {
         let rt = self.config.rt_crate.clone();
         let ident = self.item_ident(item.name).to_string();
-        let args = if self.lifetime_args(item.ty).is_empty() {
-            ""
-        } else {
-            "<'_>"
+        let usage = self.lifetime_usage(item.ty);
+        let args = match (usage.tree, usage.source) {
+            (false, false) => "",
+            (true, false) | (false, true) => "<'_>",
+            (true, true) => "<'_, '_>",
         };
 
         let body = match item.kind {
@@ -115,7 +116,7 @@ impl Emitter<'_, '_> {
             let label = interner.resolve(label_sym);
             let arm = if payload != TYPE_VOID {
                 uses_source = true;
-                self.payload_arm(item.ty, payload, ident, variant_ident, label)
+                self.payload_arm(item, payload, variant_ident, label)
             } else {
                 unit_arm(ident, variant_ident, label)
             };
@@ -130,26 +131,30 @@ impl Emitter<'_, '_> {
 
     fn payload_arm(
         &mut self,
-        item_ty: TypeId,
+        item: &Item,
         payload: TypeId,
-        ident: &str,
         variant_ident: &str,
         label: &str,
     ) -> String {
         let types = self.schema.types;
         let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
+        let ident = self.item_ident(item.name).to_string();
         let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
             unreachable!("enum variant payload is void or an anonymous struct");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
-        let (decl_generics, impl_generics) = if fields
+        let usage = fields
             .values()
-            .any(|info| self.needs_lifetime(info.type_id))
-        {
-            ("<'a, 't>", "<'_, '_>")
-        } else {
-            ("<'a>", "<'_>")
+            .fold((false, false), |(tree, source), info| {
+                let field = self.lifetime_usage(info.type_id);
+                (tree || field.tree, source || field.source)
+            });
+        let (decl_generics, impl_generics) = match usage {
+            (false, false) => ("<'a>", "<'_>"),
+            (true, false) => ("<'a, 't>", "<'_, '_>"),
+            (false, true) => ("<'a, 's>", "<'_, '_>"),
+            (true, true) => ("<'a, 't, 's>", "<'_, '_, '_>"),
         };
 
         let mut data_fields = String::new();
@@ -161,7 +166,7 @@ impl Emitter<'_, '_> {
         {
             // The helper borrows the enum's actual field, so its type must be
             // spelled with the declaration's own cut context.
-            let field_ty = self.field_type(TypeContext::item(item_ty), info);
+            let field_ty = self.field_type(TypeContext::item(item.ty), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);

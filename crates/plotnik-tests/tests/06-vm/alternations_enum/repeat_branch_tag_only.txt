@@ -7,13 +7,13 @@ Q = (program
 --------------------- INPUT ----------------------
 a; b; c;
 ------------------- TYPESCRIPT -------------------
-export type QX =
-  | { $tag: "A" }
-  | { $tag: "B" };
-
 export interface Q {
   x: QX;
 }
+
+export type QX =
+  | { $tag: "A" }
+  | { $tag: "B" };
 --------------------- OUTPUT ---------------------
 {
   "x": {

@@ -10,7 +10,8 @@ use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{
-    CalleeEntry, EffectIR, InstructionIR, Label, LabelOrigin, NfaGraph, ReturnAddr, ReturnIR,
+    CalleeEntry, DefBodyMode, DefOutputMode, DefVariant, EffectIR, InstructionIR, Label,
+    LabelOrigin, NfaGraph, ReturnAddr, ReturnIR,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
 use crate::compiler::lower::verify::verify_fresh_build;
@@ -19,7 +20,7 @@ use crate::compiler::parse::cst::SyntaxNode;
 
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
-use super::scope::{CaptureExits, SkipExit, SplitExits, Struct};
+use super::scope::{CaptureExits, SkipExit, Struct};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
 use crate::compiler::analyze::types::type_check::consumable_value_root;
 
@@ -33,8 +34,9 @@ pub struct NfaBuilder<'a> {
     current_origin: Option<LabelOrigin>,
     /// Origin per allocated label id (index = `Label.0`), moved into the graph.
     label_origins: Vec<Option<LabelOrigin>>,
-    pub(super) def_entries: IndexMap<DefId, Label>,
-    pub(super) def_entries_consuming: IndexMap<DefId, Label>,
+    pub(super) def_entries: IndexMap<DefVariant, Label>,
+    compiled_def_variants: HashSet<DefVariant>,
+    active_def_variants: HashSet<DefVariant>,
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<Struct>,
@@ -44,6 +46,8 @@ pub struct NfaBuilder<'a> {
     /// output — shared code emits unconditionally — and the call site brackets
     /// them with SuppressBegin/SuppressEnd (`RefLowering::SuppressedCall`).
     pub(super) suppress_depth: u32,
+    /// Non-zero while explicit node-pattern matches contribute scalar provenance.
+    source_mark_depth: u32,
     /// Definitions whose body can match zero nodes; references to them are
     /// inlined at the call site (see `nullability`).
     pub(super) nullable_defs: HashSet<DefId>,
@@ -65,9 +69,11 @@ impl<'a> NfaBuilder<'a> {
             current_origin: None,
             label_origins: Vec::new(),
             def_entries: IndexMap::new(),
-            def_entries_consuming: IndexMap::new(),
+            compiled_def_variants: HashSet::new(),
+            active_def_variants: HashSet::new(),
             scope_stack: Vec::new(),
             suppress_depth: 0,
+            source_mark_depth: 0,
             nullable_defs: compute_nullable_defs(
                 ctx.analysis.interner,
                 ctx.symbol_table,
@@ -87,6 +93,21 @@ impl<'a> NfaBuilder<'a> {
         let result = f(self);
         self.suppress_depth -= 1;
         result
+    }
+
+    pub(super) fn with_source_marking<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.source_mark_depth += 1;
+        let result = f(self);
+        self.source_mark_depth -= 1;
+        result
+    }
+
+    pub(super) fn marks_source(&self) -> bool {
+        self.source_mark_depth > 0
+    }
+
+    pub(super) fn records_inspection(&self) -> bool {
+        self.ctx.inspection
     }
 
     /// The pre-assigned span id for a construct, or `None` when inspection is off
@@ -109,15 +130,8 @@ impl<'a> NfaBuilder<'a> {
         let mut compiler = NfaBuilder::new(ctx);
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
-        for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
-            compiler.current_origin = Some(LabelOrigin::Def(def_id));
-            let label = compiler.fresh_label();
-            compiler.def_entries.insert(def_id, label);
-        }
-
-        for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
-            compiler.current_origin = Some(LabelOrigin::Def(def_id));
-            compiler.compile_def(def_id);
+        for (def_id, _) in ctx.analysis.type_analysis.iter_entrypoint_output() {
+            compiler.ensure_def_variant(DefVariant::ordinary(def_id));
         }
 
         let mut entrypoint_wrappers = IndexMap::new();
@@ -137,7 +151,6 @@ impl<'a> NfaBuilder<'a> {
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
-            def_entries_consuming: compiler.def_entries_consuming,
             entrypoint_wrappers,
             spans: compiler.spans,
             label_origins: compiler.label_origins,
@@ -167,7 +180,7 @@ impl<'a> NfaBuilder<'a> {
             Nav::Stay,
             None,
             ReturnAddr(after_body),
-            CalleeEntry(self.def_entries[&def_id]),
+            CalleeEntry(self.def_entries[&DefVariant::ordinary(def_id)]),
         );
 
         if wraps_struct {
@@ -185,7 +198,54 @@ impl<'a> NfaBuilder<'a> {
         l
     }
 
-    fn compile_def(&mut self, def_id: DefId) {
+    /// Return the entry for one semantic definition-body variant, compiling it
+    /// once when first requested. The entry is registered before the body so a
+    /// recursive component can call back into an active variant safely.
+    pub(super) fn ensure_def_variant(&mut self, variant: DefVariant) -> Label {
+        let entry = self.reserve_def_variant(&variant);
+        if self.compiled_def_variants.contains(&variant)
+            || !self.active_def_variants.insert(variant.clone())
+        {
+            return entry;
+        }
+
+        let previous_origin = self.current_origin.replace(Self::variant_origin(&variant));
+        self.compile_def_variant_body(&variant, entry);
+        self.current_origin = previous_origin;
+
+        let removed = self.active_def_variants.remove(&variant);
+        assert!(removed, "compiled definition variant was active");
+        self.compiled_def_variants.insert(variant);
+        entry
+    }
+
+    fn reserve_def_variant(&mut self, variant: &DefVariant) -> Label {
+        if let Some(&entry) = self.def_entries.get(variant) {
+            return entry;
+        }
+
+        let previous_origin = self.current_origin.replace(Self::variant_origin(variant));
+        let entry = self.fresh_label();
+        self.current_origin = previous_origin;
+        self.def_entries.insert(variant.clone(), entry);
+        entry
+    }
+
+    fn variant_origin(variant: &DefVariant) -> LabelOrigin {
+        if variant.is_ordinary() {
+            return LabelOrigin::Def(variant.def_id());
+        }
+
+        LabelOrigin::DefVariant {
+            def_id: variant.def_id(),
+            output: variant.mode().output().origin(),
+            source: variant.mode().source(),
+            route: variant.route(),
+        }
+    }
+
+    fn compile_def_variant_body(&mut self, variant: &DefVariant, entry_label: Label) {
+        let def_id = variant.def_id();
         let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
         let name = self.ctx.analysis.interner.resolve(name_sym);
 
@@ -195,17 +255,35 @@ impl<'a> NfaBuilder<'a> {
             .body(name)
             .expect("analyzed definition has a body");
 
-        let entry_label = self.def_entries[&def_id];
+        let matched_return = self.fresh_label();
+        let matched_return_instr = match variant.route() {
+            crate::compiler::lower::ir::DefRoute::Caller => ReturnIR::matched(matched_return),
+            crate::compiler::lower::ir::DefRoute::Routed { .. } => {
+                ReturnIR::routed_matched(matched_return)
+            }
+        };
+        self.instructions.push(matched_return_instr.into());
+        let exits = if variant.route().splits() {
+            let zero_return = self.fresh_label();
+            self.instructions
+                .push(ReturnIR::routed_zero(zero_return).into());
+            CaptureExits::Split {
+                match_exit: matched_return,
+                skip_exit: SkipExit::To(zero_return),
+            }
+        } else if variant.route().requires_consumption() {
+            CaptureExits::Split {
+                match_exit: matched_return,
+                skip_exit: SkipExit::Fail,
+            }
+        } else {
+            CaptureExits::Single(matched_return)
+        };
 
-        // Return when stack is empty means Accept; when non-empty, pops frame to caller.
-        let return_label = self.fresh_label();
-        self.instructions.push(ReturnIR::new(return_label).into());
-
-        // Definition bodies use StayExact navigation: match at current position only.
-        // The caller (alternation, sequence, quantifier, or VM top-level) owns the search.
-        // This ensures named definition calls don't advance past positions that other
-        // alternation branches should try.
-        let body_nav = Some(Nav::StayExact);
+        // Ordinary variants are exact because their caller owns navigation.
+        // Routed recursive variants own the original call-site navigation so
+        // their authored nullable branch order stays above candidate retries.
+        let body_nav = Some(variant.route().body_nav());
 
         // Definitions are compiled in normalized form: body -> Return
         // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
@@ -213,16 +291,12 @@ impl<'a> NfaBuilder<'a> {
         // The inline-stack entry keeps a nullable self-reference inside this
         // body (`A = (x (A) (y))?`) from inlining itself endlessly.
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let (body_exit, def_span) = self.bracket_def_body_exit(body, return_label);
+        let (body_exits, def_span) = self.bracket_def_body_exits(body, exits);
 
         self.inline_stack.push(def_id);
+        let mode = variant.mode().clone();
         let body_entry = self.with_scope(type_id, |this| {
-            let ctx = if consumable_value_root(body) {
-                PatternCtx::with_value(body_exit, body_nav)
-            } else {
-                PatternCtx::with_nav(body_exit, body_nav)
-            };
-            this.dispatch_pattern(body, ctx)
+            this.compile_def_body(body, &mode, body_exits, body_nav)
         });
         self.inline_stack.pop();
 
@@ -233,58 +307,99 @@ impl<'a> NfaBuilder<'a> {
         }
     }
 
-    pub(super) fn compile_consuming_def(&mut self, def_id: DefId) -> Label {
-        if let Some(&entry) = self.def_entries_consuming.get(&def_id) {
-            return entry;
+    fn compile_def_body(
+        &mut self,
+        body: &Pattern,
+        mode: &DefBodyMode,
+        exits: CaptureExits,
+        nav: Option<Nav>,
+    ) -> Label {
+        if mode.marks_source() {
+            return self
+                .with_source_marking(|this| this.compile_def_output(body, mode, exits, nav));
+        }
+        self.compile_def_output(body, mode, exits, nav)
+    }
+
+    fn compile_def_output(
+        &mut self,
+        body: &Pattern,
+        mode: &DefBodyMode,
+        exits: CaptureExits,
+        nav: Option<Nav>,
+    ) -> Label {
+        if let DefOutputMode::CaptureType(plan) = mode.output() {
+            return self.capture_type(plan, nav, exits).definition(body);
         }
 
-        // Compiled on demand from inside the host definition's window; swap the
-        // origin for the consuming body's duration and restore it on the way out.
-        let prev_origin = self
-            .current_origin
-            .replace(LabelOrigin::ConsumingDef(def_id));
-
-        let entry_label = self.fresh_label();
-        self.def_entries_consuming.insert(def_id, entry_label);
-
-        let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
-        let name = self.ctx.analysis.interner.resolve(name_sym);
-        let body = self
-            .ctx
-            .symbol_table
-            .body(name)
-            .expect("analyzed definition has a body");
-
-        let return_label = self.fresh_label();
-        self.instructions.push(ReturnIR::new(return_label).into());
-
-        let body_nav = Some(Nav::StayExact);
-        let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let (body_match_exit, def_span) = self.bracket_def_body_exit(body, return_label);
-
-        self.inline_stack.push(def_id);
-        let body_entry = self.with_scope(type_id, |this| {
-            this.compile_skippable_with_exits(
-                body,
-                SplitExits {
-                    match_exit: body_match_exit,
-                    skip_exit: SkipExit::Fail,
-                },
-                body_nav,
-                CaptureEffects::default(),
-                consumable_value_root(body),
-            )
-        });
-        self.inline_stack.pop();
-
-        let body_entry = self.wrap_def_body_entry(body_entry, def_span);
-
-        if body_entry != entry_label {
-            self.emit_epsilon(entry_label, vec![body_entry]);
+        if mode.suppresses_output() {
+            return self
+                .with_suppression(|this| this.compile_structural_def_body(body, exits, nav));
         }
 
-        self.current_origin = prev_origin;
-        entry_label
+        self.compile_structural_def_body(body, exits, nav)
+    }
+
+    fn compile_structural_def_body(
+        &mut self,
+        body: &Pattern,
+        exits: CaptureExits,
+        nav: Option<Nav>,
+    ) -> Label {
+        if let CaptureExits::Split {
+            match_exit,
+            skip_exit,
+        } = exits
+        {
+            let pattern_ctx = PatternCtx {
+                exit: match_exit,
+                nav,
+                capture: CaptureEffects::default(),
+                value: consumable_value_root(body),
+            };
+            return self.compile_nullable_pattern(body, pattern_ctx, skip_exit);
+        }
+
+        let CaptureExits::Single(exit) = exits else {
+            unreachable!("split definition exits returned above")
+        };
+
+        let ctx = if consumable_value_root(body) {
+            PatternCtx::with_value(exit, nav)
+        } else {
+            PatternCtx::with_nav(exit, nav)
+        };
+        self.dispatch_pattern(body, ctx)
+    }
+
+    fn bracket_def_body_exits(
+        &mut self,
+        body: &Pattern,
+        exits: CaptureExits,
+    ) -> (CaptureExits, Option<SpanId>) {
+        match exits {
+            CaptureExits::Single(exit) => {
+                let (exit, span) = self.bracket_def_body_exit(body, exit);
+                (CaptureExits::Single(exit), span)
+            }
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => {
+                let (match_exit, span) = self.bracket_def_body_exit(body, match_exit);
+                let skip_exit = match skip_exit {
+                    SkipExit::To(exit) => SkipExit::To(self.bracket_def_body_exit(body, exit).0),
+                    SkipExit::Fail => SkipExit::Fail,
+                };
+                (
+                    CaptureExits::Split {
+                        match_exit,
+                        skip_exit,
+                    },
+                    span,
+                )
+            }
+        }
     }
 
     pub(super) fn compile_pattern(
@@ -338,9 +453,9 @@ impl<'a> NfaBuilder<'a> {
                     capture,
                     value: _,
                 } = ctx;
-                self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))
+                self.compile_captured(c, nav, capture, CaptureExits::Single(exit))
             }
-            Pattern::QuantifiedPattern(q) => self.compile_quantified(q, ctx),
+            Pattern::QuantifiedPattern(q) => self.compile_quantified_pattern(q, ctx),
             Pattern::FieldPattern(f) => self.compile_field(f, ctx),
             Pattern::DefRef(r) => self.compile_ref(r, ctx, None),
         }

@@ -27,7 +27,7 @@ use crate::bytecode::{
 };
 use crate::core::{Colors, NodeFieldId};
 
-use plotnik_rt::RuntimeEffect;
+use plotnik_rt::{ReturnOutcome, RuntimeEffect};
 
 /// Verbosity level for trace output.
 ///
@@ -95,7 +95,7 @@ pub trait Tracer {
     fn trace_call(&mut self, target_ip: u16);
 
     /// Called when returning from a definition.
-    fn trace_return(&mut self);
+    fn trace_return(&mut self, outcome: ReturnOutcome);
 
     /// Called when a checkpoint is created.
     fn trace_checkpoint_created(&mut self, ip: u16);
@@ -154,7 +154,7 @@ impl Tracer for NoopTracer {
     fn trace_call(&mut self, _target_ip: u16) {}
 
     #[inline(always)]
-    fn trace_return(&mut self) {}
+    fn trace_return(&mut self, _outcome: ReturnOutcome) {}
 
     #[inline(always)]
     fn trace_checkpoint_created(&mut self, _ip: u16) {}
@@ -173,7 +173,7 @@ pub struct PrintTracer<'s> {
     pub(crate) builder: LineBuilder,
     pub(crate) render: ModuleRenderContext,
     /// Parallel stack of checkpoint creation IPs (for backtrack display).
-    pub(crate) checkpoint_creation_ips: Vec<u16>,
+    pub(crate) checkpoints: Vec<TraceCheckpoint>,
     pub(crate) call_stack: Vec<String>,
     pub(crate) deferred_return_ip: Option<u16>,
     pub(crate) step_width: usize,
@@ -221,7 +221,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             lines: Vec::new(),
             builder: LineBuilder::new(step_width),
             render: ModuleRenderContext::new(self.module),
-            checkpoint_creation_ips: Vec::new(),
+            checkpoints: Vec::new(),
             call_stack: Vec::new(),
             deferred_return_ip: None,
             step_width,
@@ -245,6 +245,13 @@ enum TraceEffect {
     SpanStartAt(u16),
     SpanStart(u16),
     SpanEnd(u16),
+    ScalarOpen,
+    ScalarMark,
+    StrClose,
+    BoolClose(bool),
+    NodeStr,
+    NodeBool,
+    BoolValue(bool),
 }
 
 impl TraceEffect {
@@ -268,6 +275,13 @@ impl TraceEffect {
                 }
             }
             RuntimeEffect::SpanEnd(id) => Self::SpanEnd(*id),
+            RuntimeEffect::ScalarOpen => Self::ScalarOpen,
+            RuntimeEffect::ScalarMark(_) => Self::ScalarMark,
+            RuntimeEffect::StrClose => Self::StrClose,
+            RuntimeEffect::BoolClose(value) => Self::BoolClose(*value),
+            RuntimeEffect::NodeStr(_) => Self::NodeStr,
+            RuntimeEffect::NodeBool(_) => Self::NodeBool,
+            RuntimeEffect::BoolValue(value) => Self::BoolValue(*value),
         }
     }
 
@@ -286,6 +300,13 @@ impl TraceEffect {
             EffectKind::SpanStartAt => Self::SpanStartAt(payload as u16),
             EffectKind::SpanStart => Self::SpanStart(payload as u16),
             EffectKind::SpanEnd => Self::SpanEnd(payload as u16),
+            EffectKind::ScalarOpen => Self::ScalarOpen,
+            EffectKind::ScalarMark => Self::ScalarMark,
+            EffectKind::StrClose => Self::StrClose,
+            EffectKind::BoolClose => Self::BoolClose(payload != 0),
+            EffectKind::NodeStr => Self::NodeStr,
+            EffectKind::NodeBool => Self::NodeBool,
+            EffectKind::BoolValue => Self::BoolValue(payload != 0),
             EffectKind::SuppressBegin | EffectKind::SuppressEnd => unreachable!(),
         }
     }
@@ -368,6 +389,13 @@ impl<'s> PrintTracer<'s> {
             TraceEffect::SpanStartAt(id) => format!("SpanStartAt#{id}"),
             TraceEffect::SpanStart(id) => format!("SpanStart#{id}"),
             TraceEffect::SpanEnd(id) => format!("SpanEnd#{id}"),
+            TraceEffect::ScalarOpen => "ScalarOpen".to_string(),
+            TraceEffect::ScalarMark => "ScalarMark".to_string(),
+            TraceEffect::StrClose => "StrClose".to_string(),
+            TraceEffect::BoolClose(value) => format!("BoolClose({value})"),
+            TraceEffect::NodeStr => "NodeStr".to_string(),
+            TraceEffect::NodeBool => "NodeBool".to_string(),
+            TraceEffect::BoolValue(value) => format!("BoolValue({value})"),
         }
     }
 
@@ -496,6 +524,23 @@ impl Tracer for PrintTracer<'_> {
                 let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
+            Instruction::RoutedCall(c) => {
+                let name = self.def_ref_name(u16::from(c.target));
+                let content = self.format_def_ref(&name);
+                let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
+                self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
+            }
+            Instruction::SplitCall(c) => {
+                let name = self.def_ref_name(u16::from(c.target));
+                let content = self.format_def_ref(&name);
+                let successors = format!(
+                    "{:02} : {:02} / {:02}",
+                    u16::from(c.target),
+                    u16::from(c.returns.matched),
+                    u16::from(c.returns.zero)
+                );
+                self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
+            }
             Instruction::Return(_) => {
                 self.deferred_return_ip = Some(ip);
             }
@@ -614,7 +659,7 @@ impl Tracer for PrintTracer<'_> {
         self.call_stack.push(name);
     }
 
-    fn trace_return(&mut self) {
+    fn trace_return(&mut self, outcome: ReturnOutcome) {
         let ip = self
             .deferred_return_ip
             .take()
@@ -626,7 +671,14 @@ impl Tracer for PrintTracer<'_> {
         let content = self.format_def_ref(&name);
         // Show ◼ when returning from top-level (stack now empty)
         let is_top_level = self.call_stack.is_empty();
-        let successor = if is_top_level { "◼" } else { "" };
+        let successor = match (is_top_level, outcome) {
+            (true, ReturnOutcome::Matched) => "◼",
+            (false, ReturnOutcome::Matched) => "",
+            (false, ReturnOutcome::Zero) => "zero",
+            (true, ReturnOutcome::Zero) => {
+                unreachable!("entrypoint zero returns are rejected during module validation")
+            }
+        };
         self.add_instruction(ip, trace::RETURN, &content, successor);
         if let Some(caller) = self.call_stack.last().cloned() {
             self.push_def_header(&caller);
@@ -634,23 +686,25 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_checkpoint_created(&mut self, ip: u16) {
-        self.checkpoint_creation_ips.push(ip);
+        self.checkpoints.push(TraceCheckpoint {
+            ip,
+            call_stack: self.call_stack.clone(),
+        });
     }
 
     fn trace_backtrack(&mut self, depth: u32) {
-        let created_at = self
-            .checkpoint_creation_ips
+        let checkpoint = self
+            .checkpoints
             .pop()
             .expect("backtrack without checkpoint");
-        // The VM restores its frame arena to the checkpoint's depth in one bulk
-        // move, emitting no per-frame return. Mirror it by dropping the call-stack
-        // frames pushed since, so later headers and returns resolve against the
-        // definition actually being resumed. Slot 0 is the entrypoint header, so a
-        // depth-`d` restore keeps `d + 1` frames.
-        self.call_stack.truncate(depth as usize + 1);
+        // Backtracking can restore a frame that already returned. Retain the
+        // checkpoint's actual call path rather than only its depth, which can
+        // shrink a trace stack but cannot reconstruct a popped callee name.
+        self.call_stack = checkpoint.call_stack;
+        debug_assert_eq!(self.call_stack.len(), depth as usize + 1);
         let line = format!(
             "  {:0sw$} {}",
-            created_at,
+            checkpoint.ip,
             trace::BACKTRACK.format(),
             sw = self.step_width
         );
@@ -662,6 +716,12 @@ impl Tracer for PrintTracer<'_> {
         self.push_def_header(&name);
         self.call_stack.push(name);
     }
+}
+
+#[derive(Clone)]
+pub(crate) struct TraceCheckpoint {
+    ip: u16,
+    call_stack: Vec<String>,
 }
 
 fn format_match_successors(m: &Match<'_>) -> String {

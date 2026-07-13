@@ -23,16 +23,16 @@ Q    = 23
 
 [transitions]
 Leaf:
-  03                                        ▶
-  04   !   (identifier) [Node Set(id)]      03
+  01                                        ▶
+  02   !   (identifier) [Node Set(id)]      01
 
 Q:
-  05                                        ▶
-  06   !   (program)                        08
-  08  └‣─  (expression_statement) [StructOpen]  12
-  09  ─‣┘² _ [Set(leaf)]                    05
-  11  -ε-  [StructClose]                    09
-  12  └‣─  (Leaf)                           04 : 11
+  04                                        ▶
+  05   !   (program)                        07
+  07  └‣─  (expression_statement) [StructOpen]  11
+  08  ─‣┘² _ [Set(leaf)]                    04
+  10  -ε-  [StructClose]                    08
+  11  └‣─  (Leaf)                           02 : 10
 
 Bad:
   14                                        ▶
@@ -41,13 +41,13 @@ Bad:
 Leaf (entrypoint):
   16                                        ▶
   17  -ε-  [StructClose]                    16
-  18       (Leaf)                           04 : 17
+  18       (Leaf)                           02 : 17
   19  -ε-  [StructOpen]                     18
 
 Q (entrypoint):
   20                                        ▶
   21  -ε-  [StructClose]                    20
-  22       (Q)                              06 : 21
+  22       (Q)                              05 : 21
   23  -ε-  [StructOpen]                     22
 
 Bad (entrypoint):

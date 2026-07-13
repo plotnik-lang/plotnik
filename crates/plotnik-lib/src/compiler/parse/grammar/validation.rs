@@ -79,14 +79,26 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Type names must be PascalCase identifiers; never `.`, `-`, or lowercase.
-    pub(crate) fn validate_type_name(&mut self, ident: Ident<'_>) {
+    /// Custom capture types are PascalCase. Lowercase identifiers are complete
+    /// syntax here so analysis can recognize built-ins and diagnose unknown ones.
+    pub(crate) fn validate_capture_type_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
-        if name.contains(['.', '-']) || !starts_uppercase(name) {
+        let malformed = name.contains(['.', '-']) || starts_uppercase(name) && name.contains('_');
+        if !malformed {
+            return;
+        }
+
+        let report = self.report_at(DiagnosticKind::CaptureTypeNameInvalid, ident.span());
+        if starts_uppercase(name) {
             let suggested = to_pascal_case(name);
-            if let Some(report) = self.report_at(DiagnosticKind::TypeNameInvalid, ident.span()) {
+            if let Some(report) = report {
                 report.fix(format!("use `::{suggested}`"), suggested).emit();
             }
+            return;
+        }
+
+        if let Some(report) = report {
+            report.emit();
         }
     }
 }

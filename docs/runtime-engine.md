@@ -13,7 +13,7 @@ struct VM<'t> {
     frames: FrameArena,
     checkpoints: CheckpointStack,
     effects: EffectLog<'t>,
-    suppress_depth: u64,
+    effect_depths: u64, // suppression u32 | scalar u32
 }
 
 struct Frame {
@@ -66,10 +66,26 @@ used for branches, value/default effects, and wrapper cleanup.
 the encoded return address, and jumps to the callee target. Definition bodies
 are statically verified to return at the same cursor depth they entered.
 
+### Split call
+
+A nullable recursive call carries matched and zero-width continuations. The
+call itself does not navigate or create a retry checkpoint; its specialized
+callee owns the call-site navigation. This preserves the body's exact branch
+order even when consuming and zero-width outcomes are interleaved. Matched
+returns keep the routed navigation depth; zero-width returns restore the
+caller's original depth.
+
+A routed matched-only call uses the same callee-owned navigation rule but has
+one continuation. Keeping it distinct from an ordinary call lets validation
+prove the nonzero matched return depth without a flag or sentinel.
+
 ### Return
 
-`Return` pops a frame and jumps to its return address. Returning with an empty
-frame stack accepts the entrypoint.
+`Return` reports matched or zero-width, pops a frame, and jumps to the
+corresponding return address. The bytecode also records whether the returning
+body owns entry navigation; the loader consumes that contract and the hot
+runtime drops it. Returning with an empty frame stack accepts the entrypoint
+only for a matched, caller-owned body.
 
 ## Navigation
 
@@ -100,14 +116,14 @@ struct Checkpoint {
     effect_watermark: usize,
     frame_index: Option<u32>,
     recursion_depth: u32,
-    suppress_depth: u64,
+    effect_depths: u64, // suppression u32 | scalar u32
     ip: StepId,
 }
 ```
 
 Backtracking restores cursor position, truncates the effect log, restores the
-frame arena pointer, restores suppression depth, and then resumes per the
-checkpoint's kind: a branch checkpoint resumes at its recorded instruction; a
+frame arena pointer, restores suppression and open-scalar depth, and then
+resumes per the checkpoint's kind: a branch checkpoint resumes at its recorded instruction; a
 call-retry checkpoint advances to the next candidate satisfying the Call's
 skip policy and field constraint, then re-enters the callee; a match-retry
 checkpoint advances past the accepted-but-failed candidate and re-runs the
@@ -121,9 +137,11 @@ the current call stack.
 
 ## Effects
 
-Effects are logged only on paths that have not backtracked. Suppression
-(`@_`) increments a depth counter; data effects are skipped while the counter is
-non-zero.
+Effects are logged only on paths that have not backtracked. Suppression (`@_`)
+increments a depth counter; ordinary data effects are skipped while the counter
+is non-zero. Scalar marks bypass suppression so an enclosing `:: str` or
+`:: bool` value can retain provenance across a suppressed nested value. Scalar
+open and close effects obey suppression, so `matches` records no scalar trace.
 
 ```rust
 pub enum RuntimeEffect<'t> {
@@ -137,18 +155,47 @@ pub enum RuntimeEffect<'t> {
     EnumOpen(u16),
     EnumClose,
     Null,
+    ScalarOpen,
+    ScalarMark(tree_sitter::Node<'t>),
+    StrClose,
+    BoolClose(bool),
+    NodeStr(tree_sitter::Node<'t>),
+    NodeBool(tree_sitter::Node<'t>),
+    BoolValue(bool),
+    SpanStart { id: u16, node: Option<tree_sitter::Node<'t>> },
+    SpanEnd(u16),
 }
 ```
 
-| Effect                 | Action                             |
-| ---------------------- | ---------------------------------- |
-| Node                   | Produce the current cursor node    |
-| Null                   | Produce a null value               |
-| ArrayOpen/ArrayClose   | Build an array value               |
-| Push                   | Append the pending value to array  |
-| StructOpen/StructClose | Build a struct value               |
-| Set(idx)               | Assign pending value to member idx |
-| EnumOpen/EnumClose     | Build an enum variant              |
+| Effect                 | Action                                                   |
+| ---------------------- | -------------------------------------------------------- |
+| Node                   | Produce the current cursor node                          |
+| Null                   | Produce a null value                                     |
+| ArrayOpen/ArrayClose   | Build an array value                                     |
+| Push                   | Append the pending value to array                        |
+| StructOpen/StructClose | Build a struct value                                     |
+| Set(idx)               | Assign pending value to member idx                       |
+| EnumOpen/EnumClose     | Build an enum variant                                    |
+| ScalarOpen             | Begin one value-local source-provenance frame            |
+| ScalarMark             | Add the current explicit node match to every open scalar |
+| StrClose               | Close a scalar and produce its source slice or `null`    |
+| BoolClose(value)       | Close a scalar and produce the encoded boolean           |
+| NodeStr                | Produce one matched node's source text directly          |
+| NodeBool               | Produce `true` for one matched node directly             |
+| BoolValue(value)       | Produce a boolean without source provenance              |
+| SpanStart/SpanEnd      | Bracket query-inspection provenance                      |
+
+`ScalarMark` stores the matched node, not a byte sentinel. Each open scalar
+frame unions its marks into an optional byte-range hull. No marks means no
+matched node; a real zero-byte node contributes `Some(n..n)`. Consequently
+`StrClose` distinguishes an absent value (`null`) from a zero-byte node (`""`).
+`BoolClose` takes its value only from its encoded boolean; marks provide
+inspection provenance and never implement truthiness.
+Direct node scalars use `NodeStr` or `NodeBool` instead of allocating a scalar
+frame; framed effects remain the general source-hull representation.
+Non-inspection lowering has no consumer for boolean source provenance, so it
+emits `BoolValue(true)` for a present value instead of `NodeBool` or a balanced
+boolean frame. Inspection lowering retains the provenance-carrying forms.
 
 ## Entrypoint Wrappers
 
@@ -158,8 +205,8 @@ entrypoint value:
 
 - Struct result: `StructOpen`, call body, `StructClose`, return.
 - Node result: call body, `Node`, return.
-- Optional/array/enum result: call body, return; the body already produces the
-  pending value.
+- Optional/array/enum/scalar result: call body, return; the body already
+  produces the pending value.
 - Void result: call body, return; materialization falls back to `null`.
 
 ## Materialization
@@ -170,6 +217,12 @@ Consumers (`Set`, `Push`) take that pending value and attach it to the current
 builder frame. Open effects push builder frames; close effects pop them and
 produce the completed value.
 
+Scalar frames are part of the same balanced frame algebra as arrays, structs,
+and enums. `ScalarOpen` pushes a frame, `ScalarMark` expands its hull, and
+exactly one of `StrClose` or `BoolClose` closes it. Source text is sliced once
+from the validated source and remains borrowed; booleans are stored directly.
+The bytecode loader rejects mis-nested scalar effects before execution.
+
 Void output is represented by an empty stream and materializes as `null`.
 Tag-only enum variants emit no payload effects, so the rendered value has
 `$tag` without `$data`.
@@ -178,8 +231,8 @@ Materialized values borrow captured node text from the source and member/tag
 names from the bytecode string table. Rendering is unchanged; the borrows
 only avoid repeated string allocation and UTF-8 validation.
 
-Construction-time validation proves the stream discipline before the VM runs, so these
-materializer assertions are inside-zone invariants.
+Construction-time validation proves the stream discipline before the VM runs,
+so these materializer assertions are inside-zone invariants.
 
 ## Execution Limits
 

@@ -779,7 +779,7 @@ fn dropped_tier_names(tiers: &[u8]) -> String {
             1 => "capture",
             2 => "pattern/reference",
             3 => "structure",
-            4 => "field/annotation",
+            4 => "field/capture type",
             _ => "reserved",
         })
         .collect();

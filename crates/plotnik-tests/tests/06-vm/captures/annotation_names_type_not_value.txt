@@ -6,11 +6,11 @@ Q = (program
 --------------------- INPUT ----------------------
 foo;
 ------------------- TYPESCRIPT -------------------
-export type Ident = Node;
-
 export interface Q {
   id: Ident;
 }
+
+export type Ident = Node;
 --------------------- OUTPUT ---------------------
 {
   "id": {

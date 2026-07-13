@@ -59,67 +59,61 @@ Q = 00 :: T2
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@40)                            40 : 03
+  02       (@29)                            29 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06                                        ▶
-  07  ─‣┘³ _                                18
-  08  -ε-  [Null]                           06
-  10   !   (identifier) [Node]              06
-  12  ──!  _                                10, 12
-  14   !   _                                10, 12
-  16  -ε-                                   14, 08
-  18                                        ▶
-  19  └‣─  (number) [Null Set(M0) Node Set(M1)]  07
-  22  ─‣─  (number) [Set(M0) Node Set(M1)]  07
-  24  -ε-  [Null]                           22
-  26   !   (identifier) [Node]              22
-  28  ──!  _                                26, 28
-  30   !   _                                26, 28
-  32  ──!  _                                30, 24, 32
-  34  └─!  _                                30, 24, 32
-  36  └‣─  (array)                          34, 19
-  38  └‣─  (expression_statement)           36
-  39  ...
-  40   !   (program)                        38
+  07  ─‣┘³ _                                06
+  08  └‣─  (number) [Null Set(M0) Node Set(M1)]  07
+  11  ─‣─  (number) [Set(M0) Node Set(M1)]  07
+  13  -ε-  [Null]                           11
+  15  ...
+  16   !   (identifier) [Node]              11
+  18  ──!  _                                16, 18
+  20   !   _                                16, 18
+  22  ──!  _                                20, 13, 22
+  24  └─!  _                                20, 13, 22
+  26  └‣─  (array)                          24, 08
+  28  └‣─  (expression_statement)           26
+  29   !   (program)                        28
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@40)                            40 : 03
-       ▶   (@40)
+  02       (@29)                            29 : 03
+       ▶   (@29)
 
-@40:
-  40       (program)                        38
+@29:
+  29       (program)                        28
        ●   program
-  38       (expression_statement)           36
+  28       (expression_statement)           26
        ●   expression_statement
-  36       (array)                          34, 19
+  26       (array)                          24, 08
        ●   array
-  34       _                                30, 24, 32
+  24       _                                20, 13, 22
        ●   [
-  30       _                                26, 28
+  20       _                                16, 18
        ●   [
-  26       (identifier) [Node]              22
+  16       (identifier) [Node]              11
        ○   [
-  30  ❮❮❮ 
-  28       _                                26, 28
+  20  ❮❮❮ 
+  18       _                                16, 18
        ●   number
-  26       (identifier) [Node]              22
+  16       (identifier) [Node]              11
        ○   number
-  28  ❮❮❮ 
-  28       _                                26, 28
+  18  ❮❮❮ 
+  18       _                                16, 18
        ●   ]
-  26       (identifier) [Node]              22
+  16       (identifier) [Node]              11
        ○   ]
-  28  ❮❮❮ 
-  28       _                                26, 28
-  34  ❮❮❮ 
-  24  -ε-  [Null]                           22
-  22       (number) [Set(M0) Node Set(M1)]  07
+  18  ❮❮❮ 
+  18       _                                16, 18
+  24  ❮❮❮ 
+  13  -ε-  [Null]                           11
+  11       (number) [Set(M0) Node Set(M1)]  07
        ●   number
-  07       _                                18
+  07       _                                06
        ●   program
-  18   ◀   (@40)                            
+  06   ◀   (@29)                            
 
 Q:
   03  -ε-  [StructClose]                    05

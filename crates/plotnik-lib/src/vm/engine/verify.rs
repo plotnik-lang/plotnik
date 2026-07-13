@@ -104,17 +104,28 @@ impl<'a> TypeVerifier<'a> {
                         ));
                     }
                 }
+                TypeKind::Str => {
+                    if !matches!(value, Value::Str(_)) {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: Str, value: {}", value_kind_name(value)),
+                        ));
+                    }
+                }
+                TypeKind::Bool => {
+                    if !matches!(value, Value::Bool(_)) {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: Bool, value: {}", value_kind_name(value)),
+                        ));
+                    }
+                }
                 _ => unreachable!(),
             },
 
             TypeDefKind::Wrapper { kind, inner } => match kind {
                 TypeKind::Alias => {
-                    if !matches!(value, Value::Node(_)) {
-                        self.errors.push(format_error(
-                            &self.path,
-                            &format!("type: Node (alias), value: {}", value_kind_name(value)),
-                        ));
-                    }
+                    self.verify(value, inner);
                 }
                 TypeKind::Optional => {
                     if !matches!(value, Value::Null) {
@@ -266,6 +277,8 @@ fn value_kind_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Node(_) => "Node",
+        Value::Str(_) => "Str",
+        Value::Bool(_) => "Bool",
         Value::Array(_) => "array",
         Value::Struct(_) => "struct",
         Value::Enum { .. } => "enum",

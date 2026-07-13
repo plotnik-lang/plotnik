@@ -1,0 +1,158 @@
+Q = (program
+  (expression_statement
+    (identifier) @name :: str
+  )
+)
+--------------------- INPUT ----------------------
+value;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  name: string;
+}
+--------------------- OUTPUT ---------------------
+{
+  "name": "value"
+}
+------------------- INSPECTION -------------------
+{
+  "v": 1,
+  "entries": [
+    {
+      "span_id": 0,
+      "parent": null,
+      "hull": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "effect_range": [
+        1,
+        12
+      ]
+    },
+    {
+      "span_id": 1,
+      "parent": 0,
+      "hull": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "effect_range": [
+        2,
+        11
+      ]
+    },
+    {
+      "span_id": 2,
+      "parent": 1,
+      "hull": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "effect_range": [
+        3,
+        10
+      ]
+    },
+    {
+      "span_id": 3,
+      "parent": 2,
+      "hull": [
+        0,
+        5
+      ],
+      "bindings": [
+        {
+          "path": "/name",
+          "effect_idx": 7
+        }
+      ],
+      "effect_range": [
+        4,
+        9
+      ]
+    },
+    {
+      "span_id": 5,
+      "parent": 3,
+      "hull": [
+        0,
+        5
+      ],
+      "bindings": [],
+      "effect_range": [
+        5,
+        8
+      ]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "identifier"
+
+[type_defs]
+T0 = <Str>
+T1 = Struct  M0:1  ; { name }
+
+[type_members]
+M0: S1 → T0  ; name: <Str>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[spans]
+P0 def        0..72  src0  T1
+P1 pattern    4..72  src0
+P2 pattern    15..70  src0
+P3 capture    54..59  src0  T1.M0
+P4 capture_type 60..66  src0  T0
+P5 pattern    41..53  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@18)                            18 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08  └‣─  (identifier) [SpanStart#3 SpanStartAt#5 NodeStr Set(M0) SpanEnd#5 SpanEnd#3]  11
+  11  ─‣┘  _                                12
+  12  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  14                                        ▶
+  15  ...
+  16  └‣─  (expression_statement) [SpanStartAt#2]  08
+  18   !   (program) [SpanStart#0 SpanStartAt#1]  16
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@18)                            18 : 03
+       ▶   (@18)
+
+@18:
+  18       (program) [SpanStart#0 SpanStartAt#1]  16
+       ●   program
+  16       (expression_statement) [SpanStartAt#2]  08
+       ●   expression_statement
+  08       (identifier) [SpanStart#3 SpanStartAt#5 NodeStr Set(M0) SpanEnd#5 SpanEnd#3]  11
+       ●   identifier
+  11       _                                12
+       ●   expression_statement
+  12       _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+       ●   program
+  14   ◀   (@18)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

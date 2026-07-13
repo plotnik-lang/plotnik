@@ -17,7 +17,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 1;
+pub const REQUIRED_RUNTIME_ABI: u32 = 2;
 
 use ::plotnik_rt::Node;
 
@@ -44,7 +44,7 @@ impl<'t> Expr<'t> {
         let Some(log) = matcher::expr_safe(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log);
+        let mut t = rt::TraceReader::new(&log, source);
         let depth = rt::ReplayDepth::new(matcher::MAX_REPLAY_DEPTH);
         let value = read_expr(&mut t, &depth)?;
         t.finish();
@@ -66,10 +66,10 @@ impl<'t> rt::Matches for Expr<'t> {
     }
 }
 
-impl<'t> rt::Parse<'t> for Expr<'t> {
+impl<'t, 's> rt::Parse<'t, 's> for Expr<'t> {
     fn parse(
         tree: &'t rt::Tree,
-        source: &str,
+        source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         Expr::parse(tree, source)
     }
@@ -87,7 +87,7 @@ impl<'t> Q<'t> {
         let Some(log) = matcher::q_safe(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log);
+        let mut t = rt::TraceReader::new(&log, source);
         let depth = rt::ReplayDepth::new(matcher::MAX_REPLAY_DEPTH);
         let value = read_q(&mut t, &depth)?;
         t.finish();
@@ -109,17 +109,17 @@ impl<'t> rt::Matches for Q<'t> {
     }
 }
 
-impl<'t> rt::Parse<'t> for Q<'t> {
+impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
     fn parse(
         tree: &'t rt::Tree,
-        source: &str,
+        source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         Q::parse(tree, source)
     }
 }
 
 /// Replay one committed `Expr` value.
-fn read_expr<'t>(t: &mut rt::TraceReader<'_, 't>, depth: &rt::ReplayDepth) -> ::core::result::Result<Expr<'t>, rt::LimitExceeded> {
+fn read_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>, depth: &rt::ReplayDepth) -> ::core::result::Result<Expr<'t>, rt::LimitExceeded> {
     let _depth = depth.enter()?;
     match t.expect_enum_open() {
         // Paren
@@ -159,7 +159,7 @@ fn read_expr<'t>(t: &mut rt::TraceReader<'_, 't>, depth: &rt::ReplayDepth) -> ::
 }
 
 /// Replay one committed `Q` value.
-fn read_q<'t>(t: &mut rt::TraceReader<'_, 't>, depth: &rt::ReplayDepth) -> ::core::result::Result<Q<'t>, rt::LimitExceeded> {
+fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>, depth: &rt::ReplayDepth) -> ::core::result::Result<Q<'t>, rt::LimitExceeded> {
     t.expect_struct_open();
     let mut v0 = None; // expr
     while !t.at_struct_close() {
@@ -266,11 +266,11 @@ mod matcher {
     // Dense runtime state ids, in NFA label order.
     // Expr:
     const S00_EXPR: u16 = 0;
-    const S02_EXPR: u16 = 1;
-    const S03_EXPR: u16 = 2;
-    const S05_EXPR: u16 = 3;
-    const S07_EXPR: u16 = 4;
-    const S08_EXPR: u16 = 5;
+    const S01_EXPR: u16 = 1;
+    const S02_EXPR: u16 = 2;
+    const S04_EXPR: u16 = 3;
+    const S06_EXPR: u16 = 4;
+    const S07_EXPR: u16 = 5;
     // Q:
     const S10_Q: u16 = 6;
     const S11_Q: u16 = 7;
@@ -405,66 +405,68 @@ mod matcher {
 
     fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   00  -ε-                                   03, 08
+            //   00  -ε-                                   02, 07
             S00_EXPR => {
-                eng.push_branches(&[S08_EXPR]);
-                Flow::Jump(S03_EXPR)
+                eng.push_branches(&[S07_EXPR]);
+                Flow::Jump(S02_EXPR)
             }
-            //   02                                        ▶
-            S02_EXPR => {
+            //   01                                        ▶
+            S01_EXPR => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   03   !   (parenthesized_expression) [EnumOpen(Paren)]  07
-            S03_EXPR => 'state: {
-                if !cand_s03_expr(eng) {
+            //   02   !   (parenthesized_expression) [EnumOpen(Paren)]  06
+            S02_EXPR => 'state: {
+                if !cand_s02_expr(eng) {
                     break 'state Flow::Backtrack;
                 }
                 eng.emit_data(|_| rt::RuntimeEffect::EnumOpen(2)); // EnumOpen(Paren)
-                Flow::Jump(S07_EXPR)
+                Flow::Jump(S06_EXPR)
             }
-            //   05  ─‣┘  _ [Set(inner) EnumClose]         02
-            S05_EXPR => 'state: {
+            //   04  ─‣┘  _ [Set(inner) EnumClose]         01
+            S04_EXPR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
                 }
                 eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(inner)
                 eng.emit_data(|_| rt::RuntimeEffect::EnumClose);
-                Flow::Jump(S02_EXPR)
+                Flow::Jump(S01_EXPR)
             }
-            //   07  └‣─  (Expr)                           00 : 05
-            S07_EXPR => 'state: {
+            //   06  └‣─  (Expr)                           00 : 04
+            S06_EXPR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
                 }
                 eng.push_checkpoint(rt::Checkpoint::call_retry(
                     eng.checkpoint_state(),
-                    S07_EXPR,
-                    rt::CallResume { target: S00_EXPR, next: S05_EXPR, field: None, policy: rt::SkipPolicy::Any },
+                    S06_EXPR,
+                    rt::CallResume { target: S00_EXPR, next: S04_EXPR, field: None, policy: rt::SkipPolicy::Any },
                 ));
-                eng.enter_frame(S05_EXPR);
+                eng.enter_frame(S04_EXPR);
                 Flow::Jump(S00_EXPR)
             }
-            //   08   !   (identifier) [EnumOpen(Id) Node Set(id) EnumClose]  02
-            S08_EXPR => 'state: {
-                if !cand_s08_expr(eng) {
+            //   07   !   (identifier) [EnumOpen(Id) Node Set(id) EnumClose]  01
+            S07_EXPR => 'state: {
+                if !cand_s07_expr(eng) {
                     break 'state Flow::Backtrack;
                 }
                 eng.emit_data(|_| rt::RuntimeEffect::EnumOpen(3)); // EnumOpen(Id)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
                 eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(id)
                 eng.emit_data(|_| rt::RuntimeEffect::EnumClose);
-                Flow::Jump(S02_EXPR)
+                Flow::Jump(S01_EXPR)
             }
             //   10                                        ▶
             S10_Q => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   11   !   (program)                        13
@@ -516,9 +518,10 @@ mod matcher {
             //   17                                        ▶
             S17_EXPR_EP => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   18       (Expr)                           00 : 17
@@ -529,9 +532,10 @@ mod matcher {
             //   19                                        ▶
             S19_Q_EP => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   20  -ε-  [StructClose]                    19
@@ -553,9 +557,9 @@ mod matcher {
         }
     }
 
-    /// `S03_EXPR` candidate: `(parenthesized_expression)`.
+    /// `S02_EXPR` candidate: `(parenthesized_expression)`.
     #[inline]
-    fn cand_s03_expr(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s02_expr(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (parenthesized_expression)
         if node.kind_id() != 178 || !node.is_named() {
@@ -564,9 +568,9 @@ mod matcher {
         true
     }
 
-    /// `S08_EXPR` candidate: `(identifier)`.
+    /// `S07_EXPR` candidate: `(identifier)`.
     #[inline]
-    fn cand_s08_expr(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s07_expr(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (identifier)
         if node.kind_id() != 1 || !node.is_named() {

@@ -10,13 +10,6 @@ Q = {
 [entrypoints]
 
 [transitions]
-Q:
-  0  -ε-                                    4, 5
-  1                                         ▶
-  2  ─◦─  (identifier)                      1
-  3  ─•─  (identifier)                      1
-  4   !   (number)                          3
-  5   !   "+"                               2
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -25,7 +18,6 @@ S2 "+"
 S3 "identifier"
 
 [type_defs]
-T0 = <Void>
 
 [type_members]
 

@@ -21,6 +21,11 @@ fn record_def(builder: &mut TypeAnalysisBuilder, def_id: DefId, type_id: TypeId)
     builder.record_def_arity(def_id, Arity::One);
 }
 
+fn borrows_any(facts: &TypeFacts, ty: TypeId) -> bool {
+    let usage = facts.lifetime_usage(ty);
+    usage.tree || usage.source
+}
+
 /// One definition whose output is an enum with a `Ref` back to itself, the
 /// ref sitting behind the given wrapper chain.
 fn recursive_def(wrap: impl FnOnce(&mut TypeAnalysisBuilder, TypeId) -> TypeId) -> Fixture {
@@ -215,8 +220,28 @@ fn node_free_enum_needs_no_lifetime() {
 
     let facts = TypeFacts::compute(&types);
 
-    assert!(!facts.needs_lifetime(enum_ty));
-    assert!(!facts.needs_lifetime(holder));
+    assert!(!borrows_any(&facts, enum_ty));
+    assert!(!borrows_any(&facts, holder));
+}
+
+#[test]
+fn custom_node_alias_carries_tree_lifetime_into_its_owner() {
+    let mut interner = Interner::new();
+    let mut builder = TypeAnalysisBuilder::new();
+    let def = DefId::from_raw(0);
+
+    let custom = builder.intern_type(TypeShape::Custom(interner.intern("Identifier")));
+    let holder = builder.intern_struct(BTreeMap::from([(
+        interner.intern("name"),
+        FieldInfo::required(custom),
+    )]));
+    record_def(&mut builder, def, holder);
+    let types = builder.finish();
+
+    let facts = TypeFacts::compute(&types);
+
+    assert!(facts.lifetime_usage(custom).tree);
+    assert!(facts.lifetime_usage(holder).tree);
 }
 
 #[test]
@@ -248,6 +273,6 @@ fn lifetime_crosses_mutual_recursion() {
 
     let facts = TypeFacts::compute(&types);
 
-    assert!(facts.needs_lifetime(a_struct));
-    assert!(facts.needs_lifetime(b_struct));
+    assert!(borrows_any(&facts, a_struct));
+    assert!(borrows_any(&facts, b_struct));
 }

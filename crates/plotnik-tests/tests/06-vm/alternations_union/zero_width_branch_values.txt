@@ -1,0 +1,19 @@
+Q = (program
+  [
+    {
+      (comment)? @comment
+    } @value :: bool
+    (identifier)? @value :: bool
+  ]
+)
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: capture `@value` has incompatible types across branches
+ --> query.ptk:5:7
+  |
+5 |     } @value :: bool
+  |       ^^^^^^
+6 |     (identifier)? @value :: bool
+  |                   ------ and a different type here
+  |
+help: make every branch produce the same type, or label the branches for an enum

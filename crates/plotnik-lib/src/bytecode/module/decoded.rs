@@ -18,7 +18,9 @@ use super::Instruction;
 pub(crate) enum DecodedInstr {
     Match(DecodedMatch),
     Call(DecodedCall),
-    Return,
+    RoutedCall(DecodedRoutedCall),
+    SplitCall(DecodedSplitCall),
+    Return(plotnik_rt::ReturnOutcome),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -57,6 +59,19 @@ pub(crate) struct DecodedPredicate {
 pub(crate) struct DecodedCall {
     pub(crate) nav: Nav,
     pub(crate) node_field: Option<NodeFieldId>,
+    pub(crate) next: u16,
+    pub(crate) target: u16,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DecodedSplitCall {
+    pub(crate) matched: u16,
+    pub(crate) zero: u16,
+    pub(crate) target: u16,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DecodedRoutedCall {
     pub(crate) next: u16,
     pub(crate) target: u16,
 }
@@ -136,7 +151,9 @@ pub(crate) fn build(transitions: &[u8]) -> DecodedProgram {
                 }));
                 // Interior slots of a multi-step Match are never addressed.
                 for _ in 1..opcode.step_count() {
-                    program.steps.push(DecodedInstr::Return);
+                    program
+                        .steps
+                        .push(DecodedInstr::Return(plotnik_rt::ReturnOutcome::Matched));
                 }
                 step += opcode.step_count() as usize;
             }
@@ -149,8 +166,29 @@ pub(crate) fn build(transitions: &[u8]) -> DecodedProgram {
                 }));
                 step += 1;
             }
-            Instruction::Return(_) => {
-                program.steps.push(DecodedInstr::Return);
+            Instruction::RoutedCall(c) => {
+                program
+                    .steps
+                    .push(DecodedInstr::RoutedCall(DecodedRoutedCall {
+                        next: u16::from(c.next),
+                        target: u16::from(c.target),
+                    }));
+                step += 1;
+            }
+            Instruction::SplitCall(c) => {
+                program
+                    .steps
+                    .push(DecodedInstr::SplitCall(DecodedSplitCall {
+                        matched: u16::from(c.returns.matched),
+                        zero: u16::from(c.returns.zero),
+                        target: u16::from(c.target),
+                    }));
+                step += 1;
+            }
+            Instruction::Return(return_) => {
+                program
+                    .steps
+                    .push(DecodedInstr::Return(return_.mode.outcome()));
                 step += 1;
             }
         }

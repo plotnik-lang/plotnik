@@ -1,0 +1,33 @@
+Q = (program
+  (lexical_declaration
+    (variable_declarator
+      name: (identifier) @name :: str
+    )
+  )
+  [
+    A: (comment)? @doc :: str
+    B: (expression_statement)
+  ]
+)
+------------------ DIAGNOSTICS -------------------
+warning: branch labels have no effect without capture
+  --> query.ptk:7:3
+   |
+ 7 | /   [
+ 8 | |     A: (comment)? @doc :: str
+ 9 | |     B: (expression_statement)
+10 | |   ]
+   | |___^
+   |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  doc: string | null;
+  name: string;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub name: &'s str,
+    pub doc: ::core::option::Option<&'s str>,
+}

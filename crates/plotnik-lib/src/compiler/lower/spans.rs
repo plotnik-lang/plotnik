@@ -5,6 +5,8 @@ use std::collections::{HashMap, HashSet};
 use rowan::TextRange;
 
 use crate::bytecode::{MAX_SPANS, SpanKind};
+use crate::compiler::analyze::types::BuiltInCaptureType;
+use crate::compiler::analyze::types::type_shape::{TYPE_BOOL, TYPE_STR};
 use crate::compiler::diagnostics::SourceId;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::LowerInput;
@@ -63,7 +65,7 @@ pub(crate) fn tier(kind: SpanKind) -> u8 {
         | SpanKind::Sequence
         | SpanKind::Union
         | SpanKind::Enum => 3,
-        SpanKind::Field | SpanKind::Annotation => 4,
+        SpanKind::Field | SpanKind::CaptureType => 4,
         SpanKind::NegField | SpanKind::Predicate => 5,
     }
 }
@@ -75,17 +77,27 @@ pub(crate) struct SpanAssignment {
 }
 
 pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
+    let reachable_defs = input.analysis.dependency_analysis.reachable_from(
+        input
+            .analysis
+            .type_analysis
+            .iter_entrypoint_output()
+            .map(|(def_id, _)| def_id),
+    );
     let mut candidates = Vec::new();
     for name in input.symbol_table.names() {
-        let (source, body) = input
-            .symbol_table
-            .definition(name)
-            .expect("symbol-table name must have a definition");
         let def_id = input
             .analysis
             .dependency_analysis
             .def_id_for_name(input.analysis.interner, name)
             .expect("definition name must have a DefId");
+        if !reachable_defs.contains(def_id) {
+            continue;
+        }
+        let (source, body) = input
+            .symbol_table
+            .definition(name)
+            .expect("symbol-table name must have a definition");
         let def = body
             .syntax()
             .parent()
@@ -100,7 +112,13 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
                 input.analysis.type_analysis.expect_def_output(def_id),
             )),
         });
-        collect_pattern(input, source, body, &mut candidates);
+        collect_pattern(
+            input,
+            source,
+            body,
+            OutputBindingVisibility::Visible,
+            &mut candidates,
+        );
     }
 
     let mut counts = [0usize; 6];
@@ -160,17 +178,37 @@ struct Candidate {
     binding: Option<SpanBindingIR>,
 }
 
+#[derive(Clone, Copy)]
+enum OutputBindingVisibility {
+    Visible,
+    Suppressed,
+}
+
+impl OutputBindingVisibility {
+    fn bind(self, binding: SpanBindingIR) -> Option<SpanBindingIR> {
+        match self {
+            Self::Visible => Some(binding),
+            Self::Suppressed => None,
+        }
+    }
+
+    fn suppress(self) -> Self {
+        Self::Suppressed
+    }
+}
+
 fn collect_pattern(
     input: &LowerInput<'_>,
     source: SourceId,
     pattern: &Pattern,
+    visibility: OutputBindingVisibility,
     out: &mut Vec<Candidate>,
 ) {
     match pattern {
         Pattern::NodePattern(node) => {
             push_pattern(source, SpanKind::Pattern, node.syntax(), out);
             for child in node.children() {
-                collect_pattern(input, source, &child, out);
+                collect_pattern(input, source, &child, visibility, out);
             }
         }
         Pattern::TokenPattern(token) => {
@@ -190,7 +228,7 @@ fn collect_pattern(
                 source,
                 range: reference.text_range(),
                 kind: SpanKind::Ref,
-                binding: Some(SpanBindingIR::Type(
+                binding: visibility.bind(SpanBindingIR::Type(
                     input.analysis.type_analysis.expect_def_output(target),
                 )),
             });
@@ -201,7 +239,7 @@ fn collect_pattern(
                 let Some(child) = item.as_pattern() else {
                     continue;
                 };
-                collect_pattern(input, source, child, out);
+                collect_pattern(input, source, child, visibility, out);
             }
         }
         Pattern::CapturedPattern(capture) => {
@@ -216,26 +254,58 @@ fn collect_pattern(
                 });
             }
 
-            if let Some(annotation) = capture.type_annotation() {
-                let binding = annotation.name().and_then(|name| {
-                    input
-                        .analysis
-                        .type_analysis
-                        .iter_type_names()
-                        .find(|(_, sym)| input.analysis.interner.resolve(*sym) == name.text())
-                        .map(|(type_id, _)| SpanBindingIR::Type(type_id))
-                });
+            if let Some(capture_type) = capture.capture_type() {
+                let capture_pattern = Pattern::CapturedPattern(capture.clone());
+                let fact = input
+                    .analysis
+                    .type_analysis
+                    .expect_capture_fact(&capture_pattern);
+                let binding = fact
+                    .built_in_plan()
+                    .map(|(capture_type, _)| {
+                        let primitive = match capture_type {
+                            BuiltInCaptureType::Str => TYPE_STR,
+                            BuiltInCaptureType::Bool => TYPE_BOOL,
+                        };
+                        SpanBindingIR::Type(primitive)
+                    })
+                    .or_else(|| {
+                        capture_type.name().and_then(|name| {
+                            input
+                                .analysis
+                                .type_analysis
+                                .iter_type_names()
+                                .find(|(_, sym)| {
+                                    input.analysis.interner.resolve(*sym) == name.text()
+                                })
+                                .map(|(type_id, _)| SpanBindingIR::Type(type_id))
+                        })
+                    })
+                    .and_then(|binding| visibility.bind(binding));
                 out.push(Candidate {
-                    node: annotation.syntax().clone(),
+                    node: capture_type.syntax().clone(),
                     source,
-                    range: annotation.text_range(),
-                    kind: SpanKind::Annotation,
+                    range: capture_type.text_range(),
+                    kind: SpanKind::CaptureType,
                     binding,
                 });
             }
 
             if let Some(inner) = capture.inner() {
-                collect_pattern(input, source, &inner, out);
+                let capture_pattern = Pattern::CapturedPattern(capture.clone());
+                let suppresses_output = capture.is_suppressive()
+                    || input
+                        .analysis
+                        .type_analysis
+                        .expect_capture_fact(&capture_pattern)
+                        .built_in_plan()
+                        .is_some_and(|(_, plan)| plan.suppresses_semantic_data());
+                let inner_visibility = if suppresses_output {
+                    visibility.suppress()
+                } else {
+                    visibility
+                };
+                collect_pattern(input, source, &inner, inner_visibility, out);
             }
         }
         Pattern::QuantifiedPattern(quantifier) => {
@@ -249,7 +319,7 @@ fn collect_pattern(
                 });
             }
             if let Some(inner) = quantifier.inner() {
-                collect_pattern(input, source, &inner, out);
+                collect_pattern(input, source, &inner, visibility, out);
             }
         }
         Pattern::FieldPattern(field) => {
@@ -262,7 +332,7 @@ fn collect_pattern(
                 binding: None,
             });
             if let Some(value) = field.value() {
-                collect_pattern(input, source, &value, out);
+                collect_pattern(input, source, &value, visibility, out);
             }
         }
         Pattern::Union(union) => {
@@ -270,7 +340,7 @@ fn collect_pattern(
             for branch in union.branches() {
                 push_branch(source, &branch, out);
                 if let Some(body) = branch.body() {
-                    collect_pattern(input, source, &body, out);
+                    collect_pattern(input, source, &body, visibility, out);
                 }
             }
         }
@@ -279,7 +349,7 @@ fn collect_pattern(
             for branch in enumeration.branches() {
                 push_branch(source, &branch, out);
                 if let Some(body) = branch.body() {
-                    collect_pattern(input, source, &body, out);
+                    collect_pattern(input, source, &body, visibility, out);
                 }
             }
         }

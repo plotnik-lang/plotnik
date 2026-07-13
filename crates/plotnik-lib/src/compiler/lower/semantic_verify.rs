@@ -9,11 +9,12 @@ use std::cell::Cell;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::bytecode::EffectKind;
+use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
 use crate::compiler::analyze::output::{CaptureMemberKind, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeShape};
 use crate::compiler::lower::ir::{
-    EffectArg, EffectIR, InstructionIR, Label, MemberRef, NfaGraph, SemanticNfa,
+    CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, MemberRef, NfaGraph,
+    ReturnEntry, ReturnOutcome, SemanticNfa,
 };
 
 const STATE_BUDGET: usize = 1 << 18;
@@ -142,7 +143,6 @@ mod tests {
         SemanticNfa::new(NfaGraph {
             instructions,
             def_entries: IndexMap::new(),
-            def_entries_consuming: IndexMap::new(),
             entrypoint_wrappers: IndexMap::new(),
             spans: None,
             label_origins: vec![None; count],
@@ -155,6 +155,7 @@ enum FrameKind {
     Array,
     Struct,
     Enum { is_void: bool, got_data: bool },
+    Scalar,
 }
 
 impl FrameKind {
@@ -163,6 +164,7 @@ impl FrameKind {
             Self::Array => KS_ARRAY,
             Self::Struct => KS_STRUCT,
             Self::Enum { .. } => KS_ENUM,
+            Self::Scalar => KS_SCALAR,
         }
     }
 }
@@ -191,7 +193,8 @@ impl PendingState {
 const KS_ARRAY: u8 = 0b001;
 const KS_STRUCT: u8 = 0b010;
 const KS_ENUM: u8 = 0b100;
-const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM;
+const KS_SCALAR: u8 = 0b1000;
+const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM | KS_SCALAR;
 const KS_SET: u8 = KS_STRUCT | KS_ENUM;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -227,6 +230,50 @@ impl DefSummary {
 }
 
 type DefSummaries = HashMap<Label, DefSummary>;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct ReturnOutcomes(u8);
+
+impl ReturnOutcomes {
+    const NONE: Self = Self(0);
+    const MATCHED: Self = Self(1);
+    const BOTH: Self = Self(3);
+
+    fn insert(&mut self, outcome: crate::compiler::lower::ir::ReturnOutcome) {
+        self.0 |= match outcome {
+            crate::compiler::lower::ir::ReturnOutcome::Matched => Self::MATCHED.0,
+            crate::compiler::lower::ir::ReturnOutcome::Zero => 2,
+        };
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct ReturnContract {
+    outcomes: ReturnOutcomes,
+    entry: Option<ReturnEntry>,
+    mixed_entries: bool,
+}
+
+impl ReturnContract {
+    const NONE: Self = Self {
+        outcomes: ReturnOutcomes::NONE,
+        entry: None,
+        mixed_entries: false,
+    };
+
+    fn insert(&mut self, return_: &crate::compiler::lower::ir::ReturnIR) {
+        self.outcomes.insert(return_.outcome());
+        match self.entry {
+            None => self.entry = Some(return_.entry()),
+            Some(entry) if entry != return_.entry() => self.mixed_entries = true,
+            Some(_) => {}
+        }
+    }
+
+    fn is(self, outcomes: ReturnOutcomes, entry: ReturnEntry) -> bool {
+        self.outcomes == outcomes && self.entry == Some(entry) && !self.mixed_entries
+    }
+}
 
 struct Program<'a> {
     graph: &'a NfaGraph,
@@ -266,11 +313,73 @@ impl<'a> Program<'a> {
                 )));
             }
         }
-        Ok(Self {
+        let program = Self {
             graph,
             schema,
             instructions,
-        })
+        };
+        program.verify_return_routes()?;
+        Ok(program)
+    }
+
+    fn verify_return_routes(&self) -> Result<(), SemanticVerifyError> {
+        let mut cache = HashMap::new();
+        for &entry in self.graph.entrypoint_wrappers().values() {
+            if !self
+                .return_contract(entry, &mut cache)
+                .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
+            {
+                return Err(SemanticVerifyError::Malformed(format!(
+                    "entrypoint {entry:?} has the wrong return contract"
+                )));
+            }
+        }
+        for instruction in self.graph.instructions() {
+            let InstructionIR::Call(call) = instruction else {
+                continue;
+            };
+            let expected = match call.protocol {
+                CallProtocol::Ordinary { .. } => (ReturnOutcomes::MATCHED, ReturnEntry::Caller),
+                CallProtocol::Routed { .. } => (ReturnOutcomes::MATCHED, ReturnEntry::Routed),
+                CallProtocol::Split { .. } => (ReturnOutcomes::BOTH, ReturnEntry::Routed),
+            };
+            if !self
+                .return_contract(call.target, &mut cache)
+                .is(expected.0, expected.1)
+            {
+                return Err(SemanticVerifyError::Malformed(format!(
+                    "call {:?} and callee {:?} disagree on return outcomes",
+                    call.label, call.target
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn return_contract(
+        &self,
+        entry: Label,
+        cache: &mut HashMap<Label, ReturnContract>,
+    ) -> ReturnContract {
+        if let Some(&contract) = cache.get(&entry) {
+            return contract;
+        }
+
+        let mut contract = ReturnContract::NONE;
+        let mut seen = HashSet::new();
+        let mut work = vec![entry];
+        while let Some(label) = work.pop() {
+            if !seen.insert(label) {
+                continue;
+            }
+            match self.instructions[&label] {
+                InstructionIR::Match(matched) => work.extend(&matched.successors),
+                InstructionIR::Call(call) => work.extend(call.return_labels()),
+                InstructionIR::Return(return_) => contract.insert(return_),
+            }
+        }
+        cache.insert(entry, contract);
+        contract
     }
 
     fn verify_effects(&self) -> Result<(), SemanticVerifyError> {
@@ -297,7 +406,12 @@ impl<'a> Program<'a> {
         while let Some(entry) = queue.pop_front() {
             queued.remove(&entry);
 
-            let analysis = self.analyze_body(&summaries, entry, called.contains(&entry), false)?;
+            let analysis = self.analyze_body(
+                &summaries,
+                entry,
+                BodyRole::from_called(called.contains(&entry)),
+                VerifyPhase::Summarize,
+            )?;
             for target in analysis.discovered {
                 if known.insert(target) {
                     definitions.push(target);
@@ -333,10 +447,20 @@ impl<'a> Program<'a> {
         }
 
         for &entry in &definitions {
-            self.analyze_body(&summaries, entry, called.contains(&entry), true)?;
+            self.analyze_body(
+                &summaries,
+                entry,
+                BodyRole::from_called(called.contains(&entry)),
+                VerifyPhase::Final,
+            )?;
         }
         for entry in wrappers {
-            let wrapper = self.analyze_body(&summaries, entry, called.contains(&entry), true)?;
+            let wrapper = self.analyze_body(
+                &summaries,
+                entry,
+                BodyRole::from_called(called.contains(&entry)),
+                VerifyPhase::Final,
+            )?;
             if wrapper.entry_tos != KS_ANY {
                 return Err(SemanticVerifyError::EffectStack(entry));
             }
@@ -348,8 +472,8 @@ impl<'a> Program<'a> {
         &self,
         summaries: &DefSummaries,
         entry: Label,
-        is_called: bool,
-        final_check: bool,
+        role: BodyRole,
+        phase: VerifyPhase,
     ) -> Result<BodyAnalysis, SemanticVerifyError> {
         #[cfg(test)]
         record_body_analysis();
@@ -377,7 +501,8 @@ impl<'a> Program<'a> {
                         match effect.kind() {
                             EffectKind::ArrayOpen
                             | EffectKind::StructOpen
-                            | EffectKind::EnumOpen => frame_openers += 1,
+                            | EffectKind::EnumOpen
+                            | EffectKind::ScalarOpen => frame_openers += 1,
                             EffectKind::SuppressBegin => suppression_openers += 1,
                             EffectKind::SpanStartAt | EffectKind::SpanStart => span_openers += 1,
                             _ => {}
@@ -399,6 +524,10 @@ impl<'a> Program<'a> {
             if states_spent > STATE_BUDGET {
                 return Err(SemanticVerifyError::StateBudget(label));
             }
+            if matches!(instruction, InstructionIR::Return(_)) {
+                state.record_exit(&mut returns_pending, label)?;
+                continue;
+            }
             let AbsState {
                 mut stack,
                 mut suppress,
@@ -406,14 +535,7 @@ impl<'a> Program<'a> {
                 mut pending,
             } = state;
             match instruction {
-                InstructionIR::Return(_) => record_exit(
-                    &stack,
-                    suppress,
-                    &span_stack,
-                    pending,
-                    &mut returns_pending,
-                    label,
-                )?,
+                InstructionIR::Return(_) => unreachable!("returns exit before state mutation"),
                 InstructionIR::Match(matched) => {
                     for effect in &matched.effects {
                         self.apply_effect(
@@ -430,7 +552,7 @@ impl<'a> Program<'a> {
                         )?;
                     }
                     if matched.successors.is_empty() {
-                        if is_called || !stack.is_empty() || suppress != 0 {
+                        if role == BodyRole::Called || !stack.is_empty() || suppress != 0 {
                             return Err(SemanticVerifyError::EffectStack(label));
                         }
                         if !span_stack.is_empty() {
@@ -455,15 +577,13 @@ impl<'a> Program<'a> {
                         discovered.push(call.target);
                     }
                     if suppress > 0 {
-                        work.push((
-                            call.next,
-                            AbsState {
-                                stack,
-                                suppress,
-                                span_stack,
-                                pending,
-                            },
-                        ));
+                        let state = AbsState {
+                            stack,
+                            suppress,
+                            span_stack,
+                            pending,
+                        };
+                        push_call_returns(&mut work, call, state);
                         continue;
                     }
                     if pending == PendingState::Full {
@@ -474,7 +594,10 @@ impl<'a> Program<'a> {
                         .copied()
                         .unwrap_or_else(DefSummary::unknown);
                     match stack.last() {
-                        Some(kind) if final_check && kind.bit() & summary.entry_tos == 0 => {
+                        Some(kind)
+                            if phase == VerifyPhase::Final
+                                && kind.bit() & summary.entry_tos == 0 =>
+                        {
                             return Err(SemanticVerifyError::EffectStack(label));
                         }
                         None => {
@@ -496,25 +619,27 @@ impl<'a> Program<'a> {
                         if let Some(FrameKind::Enum { got_data, .. }) = written.last_mut() {
                             *got_data = true;
                         }
-                        work.push((
-                            call.next,
+                        push_call_returns(
+                            &mut work,
+                            call,
                             AbsState {
                                 stack: written,
                                 suppress,
                                 span_stack: span_stack.clone(),
                                 pending: post_pending,
                             },
-                        ));
+                        );
                     }
-                    work.push((
-                        call.next,
+                    push_call_returns(
+                        &mut work,
+                        call,
                         AbsState {
                             stack,
                             suppress,
                             span_stack,
                             pending: post_pending,
                         },
-                    ));
+                    );
                 }
             }
         }
@@ -541,13 +666,18 @@ impl<'a> Program<'a> {
                 SuppressEnd => *state.suppress -= 1,
                 SpanStartAt | SpanStart => state.span_stack.push(literal(effect, label)?),
                 SpanEnd => close_span(state.span_stack, literal(effect, label)?, label)?,
+                ScalarMark => {}
                 _ => {}
             }
             return Ok(());
         }
 
+        if effect.kind().frame_action().is_some() {
+            return self.apply_frame_action(effect, state, label);
+        }
+
         match effect.kind() {
-            Node | Null => {
+            Node | Null | NodeStr | NodeBool | BoolValue => {
                 if *state.pending == PendingState::Full {
                     return Err(SemanticVerifyError::EffectStack(label));
                 }
@@ -557,21 +687,7 @@ impl<'a> Program<'a> {
             SuppressEnd => return Err(SemanticVerifyError::EffectStack(label)),
             SpanStartAt | SpanStart => state.span_stack.push(literal(effect, label)?),
             SpanEnd => close_span(state.span_stack, literal(effect, label)?, label)?,
-            ArrayOpen => open_frame(state.stack, state.pending, FrameKind::Array, label)?,
-            StructOpen => open_frame(state.stack, state.pending, FrameKind::Struct, label)?,
-            EnumOpen => {
-                let member = member(effect, label)?;
-                let is_void = self.enum_member_is_void(member, label)?;
-                open_frame(
-                    state.stack,
-                    state.pending,
-                    FrameKind::Enum {
-                        is_void,
-                        got_data: false,
-                    },
-                    label,
-                )?;
-            }
+            ScalarMark => {}
             Push => {
                 require_pending(state.pending, label)?;
                 match state.stack.last() {
@@ -587,7 +703,7 @@ impl<'a> Program<'a> {
                 match state.stack.last_mut() {
                     Some(FrameKind::Struct) => {}
                     Some(FrameKind::Enum { got_data, .. }) => *got_data = true,
-                    Some(FrameKind::Array) => {
+                    Some(FrameKind::Array | FrameKind::Scalar) => {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
                     None => {
@@ -597,11 +713,38 @@ impl<'a> Program<'a> {
                 }
                 *state.pending = PendingState::Empty;
             }
-            ArrayClose => close_simple_frame(state.stack, state.pending, FrameKind::Array, label)?,
-            StructClose => {
-                close_simple_frame(state.stack, state.pending, FrameKind::Struct, label)?
+            ArrayOpen | ArrayClose | StructOpen | StructClose | EnumOpen | EnumClose
+            | ScalarOpen | StrClose | BoolClose => {
+                unreachable!("frame effects return before data dispatch")
             }
-            EnumClose => match state.stack.pop() {
+        }
+        Ok(())
+    }
+
+    fn apply_frame_action(
+        &self,
+        effect: &EffectIR,
+        state: EffectState<'_>,
+        label: Label,
+    ) -> Result<(), SemanticVerifyError> {
+        let action = effect
+            .kind()
+            .frame_action()
+            .expect("frame action effects are dispatched here");
+        match action {
+            FrameAction::Open(kind) => {
+                let frame = match kind {
+                    ValueFrameKind::Array => FrameKind::Array,
+                    ValueFrameKind::Struct => FrameKind::Struct,
+                    ValueFrameKind::Enum => FrameKind::Enum {
+                        is_void: self.enum_member_is_void(member(effect, label)?, label)?,
+                        got_data: false,
+                    },
+                    ValueFrameKind::Scalar => FrameKind::Scalar,
+                };
+                open_frame(state.stack, state.pending, frame, label)?;
+            }
+            FrameAction::Close(ValueFrameKind::Enum) => match state.stack.pop() {
                 Some(FrameKind::Enum { is_void, got_data }) => {
                     let data_pending = match *state.pending {
                         PendingState::Full => true,
@@ -615,6 +758,15 @@ impl<'a> Program<'a> {
                 }
                 _ => return Err(SemanticVerifyError::EffectStack(label)),
             },
+            FrameAction::Close(kind) => {
+                let expected = match kind {
+                    ValueFrameKind::Array => FrameKind::Array,
+                    ValueFrameKind::Struct => FrameKind::Struct,
+                    ValueFrameKind::Scalar => FrameKind::Scalar,
+                    ValueFrameKind::Enum => unreachable!("enum close handled above"),
+                };
+                close_simple_frame(state.stack, state.pending, expected, label)?;
+            }
         }
         Ok(())
     }
@@ -682,7 +834,7 @@ impl<'a> Program<'a> {
     }
 
     fn verify_cursor_depth(&self) -> Result<(), SemanticVerifyError> {
-        for entry in self.entries() {
+        for (entry, route) in self.depth_entries() {
             let mut memo = HashMap::new();
             let mut work = vec![(entry, 0i32)];
             while let Some((label, depth)) = work.pop() {
@@ -697,9 +849,12 @@ impl<'a> Program<'a> {
                 match self.instructions[&label] {
                     InstructionIR::Match(matched) => {
                         let next_depth = depth + matched.nav.depth_delta();
-                        if matched.successors.is_empty() && next_depth != 0 {
+                        let expected_exit = route
+                            .return_depth(ReturnOutcome::Matched)
+                            .expect("every body has a matched route");
+                        if matched.successors.is_empty() && next_depth != expected_exit {
                             return Err(SemanticVerifyError::CursorDepth(format!(
-                                "accepting state {label:?} exits at depth {next_depth}"
+                                "accepting state {label:?} exits at depth {next_depth}, expected {expected_exit}"
                             )));
                         }
                         for successor in &matched.successors {
@@ -707,14 +862,34 @@ impl<'a> Program<'a> {
                         }
                     }
                     InstructionIR::Call(call) => {
-                        work.push((call.next, depth + call.nav.depth_delta()));
+                        work.push((
+                            call.matched_return(),
+                            depth + call.entry_nav().depth_delta(),
+                        ));
+                        if let Some(zero) = call.zero_return() {
+                            work.push((zero, depth));
+                        }
                     }
-                    InstructionIR::Return(_) if depth != 0 => {
-                        return Err(SemanticVerifyError::CursorDepth(format!(
-                            "return state {label:?} exits at depth {depth}"
-                        )));
+                    InstructionIR::Return(return_) => {
+                        if return_.entry() != route.return_entry() {
+                            return Err(SemanticVerifyError::CursorDepth(format!(
+                                "return state {label:?} has {:?} entry, expected {:?}",
+                                return_.entry(),
+                                route.return_entry()
+                            )));
+                        }
+                        let Some(expected_exit) = route.return_depth(return_.outcome()) else {
+                            return Err(SemanticVerifyError::CursorDepth(format!(
+                                "return state {label:?} has unsupported {:?} outcome",
+                                return_.outcome()
+                            )));
+                        };
+                        if depth != expected_exit {
+                            return Err(SemanticVerifyError::CursorDepth(format!(
+                                "return state {label:?} exits at depth {depth}, expected {expected_exit}"
+                            )));
+                        }
                     }
-                    InstructionIR::Return(_) => {}
                 }
             }
         }
@@ -736,9 +911,10 @@ impl<'a> Program<'a> {
                     InstructionIR::Match(matched) => {
                         let after = zero_width && matched.nav == plotnik_rt::Nav::Epsilon;
                         if after
-                            && matched.effects.iter().any(|effect| {
-                                matches!(effect.kind(), EffectKind::Node | EffectKind::SpanStartAt)
-                            })
+                            && matched
+                                .effects
+                                .iter()
+                                .any(|effect| effect.kind().reads_cursor())
                         {
                             return Err(SemanticVerifyError::ZeroWidthCursorRead(label));
                         }
@@ -746,7 +922,12 @@ impl<'a> Program<'a> {
                             work.push((*successor, after));
                         }
                     }
-                    InstructionIR::Call(call) => work.push((call.next, false)),
+                    InstructionIR::Call(call) => {
+                        work.push((call.matched_return(), false));
+                        if let Some(zero) = call.zero_return() {
+                            work.push((zero, zero_width));
+                        }
+                    }
                     InstructionIR::Return(_) => {}
                 }
             }
@@ -759,9 +940,60 @@ impl<'a> Program<'a> {
             .entrypoint_wrappers
             .values()
             .chain(self.graph.def_entries.values())
-            .chain(self.graph.def_entries_consuming.values())
             .copied()
     }
+
+    fn depth_entries(&self) -> Vec<(Label, DefRoute)> {
+        let wrappers = self
+            .graph
+            .entrypoint_wrappers
+            .values()
+            .copied()
+            .map(|entry| (entry, DefRoute::Caller));
+        let definitions = self
+            .graph
+            .def_entries
+            .iter()
+            .map(|(variant, &entry)| (entry, variant.route()));
+        wrappers.chain(definitions).collect()
+    }
+}
+
+fn push_call_returns(
+    work: &mut Vec<(Label, AbsState)>,
+    call: &crate::compiler::lower::ir::CallIR,
+    state: AbsState,
+) {
+    match call.protocol {
+        CallProtocol::Ordinary { next, .. } | CallProtocol::Routed { next, .. } => {
+            work.push((next, state));
+        }
+        CallProtocol::Split { returns, .. } => {
+            work.push((returns[1], state.clone()));
+            work.push((returns[0], state));
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BodyRole {
+    Root,
+    Called,
+}
+
+impl BodyRole {
+    fn from_called(called: bool) -> Self {
+        if called {
+            return Self::Called;
+        }
+        Self::Root
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum VerifyPhase {
+    Summarize,
+    Final,
 }
 
 struct BodyAnalysis {
@@ -787,6 +1019,28 @@ impl AbsState {
             span_stack: Vec::new(),
             pending: PendingState::Empty,
         }
+    }
+
+    fn record_exit(
+        &self,
+        returns_pending: &mut Option<bool>,
+        label: Label,
+    ) -> Result<(), SemanticVerifyError> {
+        if !self.stack.is_empty() || self.suppress != 0 {
+            return Err(SemanticVerifyError::EffectStack(label));
+        }
+        if !self.span_stack.is_empty() {
+            return Err(SemanticVerifyError::SpanStack(label));
+        }
+        if let Some(pending) = self.pending.known() {
+            if let Some(seen) = *returns_pending
+                && seen != pending
+            {
+                return Err(SemanticVerifyError::EffectStack(label));
+            }
+            *returns_pending = Some(pending);
+        }
+        Ok(())
     }
 }
 
@@ -875,31 +1129,6 @@ fn close_simple_frame(
 fn close_span(stack: &mut Vec<usize>, id: usize, label: Label) -> Result<(), SemanticVerifyError> {
     if stack.pop() != Some(id) {
         return Err(SemanticVerifyError::SpanStack(label));
-    }
-    Ok(())
-}
-
-fn record_exit(
-    stack: &[FrameKind],
-    suppress: usize,
-    spans: &[usize],
-    pending: PendingState,
-    returns_pending: &mut Option<bool>,
-    label: Label,
-) -> Result<(), SemanticVerifyError> {
-    if !stack.is_empty() || suppress != 0 {
-        return Err(SemanticVerifyError::EffectStack(label));
-    }
-    if !spans.is_empty() {
-        return Err(SemanticVerifyError::SpanStack(label));
-    }
-    if let Some(pending) = pending.known() {
-        if let Some(seen) = *returns_pending
-            && seen != pending
-        {
-            return Err(SemanticVerifyError::EffectStack(label));
-        }
-        *returns_pending = Some(pending);
     }
     Ok(())
 }

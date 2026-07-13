@@ -1,0 +1,108 @@
+Q = (program
+  [
+    {
+      (comment)? @comment
+    } @left
+    {
+      (identifier)? @identifier
+    } @right
+  ]
+)
+--------------------- INPUT ----------------------
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  left: QLeft | null;
+  right: QRight | null;
+}
+
+export interface QLeft {
+  comment: Node | null;
+}
+
+export interface QRight {
+  identifier: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "right": null,
+  "left": {
+    "comment": null
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "comment"
+S2 "identifier"
+S3 "left"
+S4 "right"
+S5 "QLeft"
+S6 "QRight"
+S7 "Q"
+S8 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { comment }
+T2 = Struct  M1:1  ; { identifier }
+T3 = Struct  M2:2  ; { left, right }
+T4 = Optional(T0)  ; <Node>?
+T5 = Optional(T1)  ; QLeft?
+T6 = Optional(T2)  ; QRight?
+
+[type_members]
+M0: S1 → T4  ; comment: T4
+M1: S2 → T4  ; identifier: T4
+M2: S3 → T5  ; left: T5
+M3: S4 → T6  ; right: T6
+
+[type_names]
+N0: S5 → T1  ; QLeft
+N1: S6 → T2  ; QRight
+N2: S7 → T3  ; Q
+
+[entrypoints]
+Q = 00 :: T3
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@40)                            40 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08   !   (comment) [Node Set(M0) StructClose Set(M2)]  07
+  11  ──!  _                                08, 11
+  13   !   _ [StructOpen]                   08, 11
+  15  ...
+  16  -ε-  [Null Set(M3)]                   13
+  18  -ε-  [Null Set(M3) StructOpen Null Set(M0) StructClose Set(M2)]  06
+  21   !   (identifier) [Node Set(M1) StructClose Set(M3)]  07
+  24  ──!  _                                21, 24
+  26   !   _ [StructOpen]                   21, 24
+  28  -ε-  [Null Set(M2)]                   26
+  30  ...
+  31  ...
+  32  -ε-  [Null Set(M2) StructOpen Null Set(M1) StructClose Set(M3)]  06
+  35  ──!  _                                16, 28, 35
+  37  └─!  _                                16, 28, 35
+  39  ...
+  40   !   (program)                        37, 18, 32
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@40)                            40 : 03
+       ▶   (@40)
+
+@40:
+  40       (program)                        37, 18, 32
+       ●   program
+  37       _                                16, 28, 35
+  40  ❮❮❮ 
+  18  -ε-  [Null Set(M3) StructOpen Null Set(M0) StructClose Set(M2)]  06
+  06   ◀   (@40)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

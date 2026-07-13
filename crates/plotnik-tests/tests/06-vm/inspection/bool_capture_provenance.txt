@@ -1,0 +1,143 @@
+Q = (program
+  (expression_statement)? @present :: bool
+)
+--------------------- INPUT ----------------------
+x
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  present: boolean;
+}
+--------------------- OUTPUT ---------------------
+{
+  "present": true
+}
+------------------- INSPECTION -------------------
+{
+  "v": 1,
+  "entries": [
+    {
+      "span_id": 0,
+      "parent": null,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "effect_range": [
+        1,
+        10
+      ]
+    },
+    {
+      "span_id": 1,
+      "parent": 0,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "effect_range": [
+        2,
+        9
+      ]
+    },
+    {
+      "span_id": 2,
+      "parent": 1,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [
+        {
+          "path": "/present",
+          "effect_idx": 6
+        }
+      ],
+      "effect_range": [
+        3,
+        8
+      ]
+    },
+    {
+      "span_id": 5,
+      "parent": 2,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "effect_range": [
+        4,
+        7
+      ]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "present"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+
+[type_defs]
+T0 = <Bool>
+T1 = Struct  M0:1  ; { present }
+
+[type_members]
+M0: S1 → T0  ; present: <Bool>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[spans]
+P0 def        0..57  src0  T1
+P1 pattern    4..57  src0
+P2 capture    39..47  src0  T1.M0
+P3 capture_type 48..55  src0  T0
+P4 quantifier 37..38  src0
+P5 pattern    15..37  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@24)                            24 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08   !   (expression_statement) [SpanStartAt#5 NodeBool Set(M0) SpanEnd#5 SpanEnd#2]  11
+  11  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          13
+  13                                        ▶
+  14  ──!  _                                08, 14
+  16  └─!  _                                08, 14
+  18  -ε-  [BoolValue(0) Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
+  21  -ε-  [SpanStart#2]                    16, 18
+  23  ...
+  24   !   (program) [SpanStart#0 SpanStartAt#1]  21
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@24)                            24 : 03
+       ▶   (@24)
+
+@24:
+  24       (program) [SpanStart#0 SpanStartAt#1]  21
+       ●   program
+  21  -ε-  [SpanStart#2]                    16, 18
+  16       _                                08, 14
+       ●   expression_statement
+  08       (expression_statement) [SpanStartAt#5 NodeBool Set(M0) SpanEnd#5 SpanEnd#2]  11
+       ●   expression_statement
+  11       _ [SpanEnd#1 SpanEnd#0]          13
+       ●   program
+  13   ◀   (@24)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

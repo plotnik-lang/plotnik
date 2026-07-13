@@ -18,7 +18,7 @@ pub enum SpanKind {
     Union = 9,
     Enum = 10,
     Branch = 11,
-    Annotation = 12,
+    CaptureType = 12,
 }
 
 impl SpanKind {
@@ -36,7 +36,7 @@ impl SpanKind {
             9 => Self::Union,
             10 => Self::Enum,
             11 => Self::Branch,
-            12 => Self::Annotation,
+            12 => Self::CaptureType,
             _ => return None,
         };
         Some(kind)
@@ -56,7 +56,7 @@ impl SpanKind {
             Self::Union => "union",
             Self::Enum => "enum",
             Self::Branch => "branch",
-            Self::Annotation => "annotation",
+            Self::CaptureType => "capture_type",
         }
     }
 }

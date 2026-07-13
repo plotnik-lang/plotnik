@@ -17,7 +17,7 @@
 //! tree-sitter's C runtime.
 
 /// ABI implemented by this runtime build and required by generated modules.
-pub const RUNTIME_ABI: u32 = 1;
+pub const RUNTIME_ABI: u32 = 2;
 
 mod dfa;
 mod frame;
@@ -47,6 +47,11 @@ mod checkpoint_tests;
 #[cfg(test)]
 mod dfa_tests;
 #[cfg(test)]
+#[cfg(feature = "tree-sitter")]
+mod effect_tests;
+#[cfg(test)]
+mod frame_tests;
+#[cfg(test)]
 mod limits_tests;
 #[cfg(test)]
 mod nav_tests;
@@ -55,7 +60,7 @@ mod nav_tests;
 mod trace_tests;
 
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
-pub use frame::{Frame, FrameArena};
+pub use frame::{Frame, FrameArena, FrameReturns, ReturnOutcome};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
     Limit, LimitError, LimitExceeded, REPLAY_DEPTH_AUTO, ReplayDepth, ResolvedRuntimeLimits,
@@ -65,11 +70,13 @@ pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
 
 #[cfg(feature = "tree-sitter")]
-pub use checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState, Resume};
+pub use checkpoint::{
+    CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume,
+};
 #[cfg(feature = "tree-sitter")]
 pub use cursor::CursorWrapper;
 #[cfg(feature = "tree-sitter")]
-pub use effect::{EffectLog, RuntimeEffect, node_text};
+pub use effect::{EffectLog, RuntimeEffect, node_text, source_text};
 #[cfg(feature = "tree-sitter")]
 pub use engine::Engine;
 #[cfg(feature = "serde")]

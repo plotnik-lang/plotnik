@@ -18,7 +18,7 @@ const TOKEN_CLASS: Partial<Record<TokenSpan["kind"], string>> = {
 };
 
 /* An ident is a field name when a bare `:` follows (variant tags are
-   PascalCase and `::` annotations follow captures, so lowercase + single
+   PascalCase names and `::` capture types follow captures, so lowercase + single
    colon is exact), or when it is glued to a leading `-` (negated field). */
 function isFieldName(
   tokens: TokenSpan[],

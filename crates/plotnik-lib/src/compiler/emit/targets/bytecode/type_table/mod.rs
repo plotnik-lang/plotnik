@@ -3,13 +3,13 @@
 //! string table. The table storage and its read accessors live in
 //! `emit::tables`; this module owns the walk.
 
-use std::collections::HashSet;
-
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
+use crate::compiler::analyze::types::type_shape::{
+    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeShape,
+};
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
 };
@@ -29,20 +29,22 @@ pub fn build_type_table(
 
 /// Build the type table, remapping query TypeIds to bytecode ids.
 ///
-/// Only types reachable from an entrypoint result are emitted. Dead
-/// intermediate types produced during inference — a union alternation's
-/// per-branch merge structs, for instance — are pruned. Used builtins are
-/// emitted first, then custom types in definition order, depth-first.
+/// Types reachable from callable definition outputs are emitted. This keeps
+/// demanded fragment capture scopes available to matcher bodies without
+/// shipping unused fragments. Dead inference intermediates — a union
+/// alternation's per-branch merge structs, for instance — are also pruned.
+/// Used builtins lead, then custom types follow in definition order,
+/// depth-first.
 fn build(
     types: &mut TypeTableBuilder,
     schema: &OutputSchema<'_>,
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
     let type_analysis = schema.types;
-    let ordered_types = schema.ordered_types();
-    let usage = scan_builtin_usage(type_analysis, ordered_types);
+    let type_layout = schema.type_layout();
+    let ordered_types = type_layout.custom_types();
 
-    emit_builtins(types, &usage)?;
+    emit_builtins(types, type_layout.builtins())?;
     reserve_slots(types, ordered_types)?;
 
     let mut ctx = TypeEmitCtx {
@@ -50,43 +52,27 @@ fn build(
         interner: schema.interner,
         strings,
     };
-    fill_slots(types, ordered_types, &usage, schema.layout(), &mut ctx)?;
+    fill_slots(types, ordered_types, schema.layout(), &mut ctx)?;
     assert_eq!(
         usize::from(types.members_len()),
         schema.layout().member_count(),
         "wire type members consume every shared capture slot"
     );
-    emit_type_names(types, &mut ctx)?;
+    emit_type_names(types, schema, &mut ctx)?;
 
     Ok(())
 }
 
-fn scan_builtin_usage(type_ctx: &TypeAnalysis, ordered_types: &[TypeId]) -> BuiltinUsage {
-    let mut usage = BuiltinUsage::new();
-    for &type_id in ordered_types {
-        usage.collect(type_id, type_ctx);
-    }
-
-    for (_def_id, type_id) in type_ctx.iter_def_output() {
-        if type_id == TYPE_VOID {
-            usage.uses_void = true;
-        } else if type_id == TYPE_NODE {
-            usage.uses_node = true;
-        }
-    }
-
-    usage
-}
-
-fn emit_builtins(types: &mut TypeTableBuilder, usage: &BuiltinUsage) -> Result<(), EmitError> {
-    let builtin_types = [
-        (TYPE_VOID, TypeKind::Void, usage.uses_void),
-        (TYPE_NODE, TypeKind::Node, usage.uses_node),
-    ];
-    for &(builtin_id, kind, used) in &builtin_types {
-        if used {
-            types.push_mapped(builtin_id, TypeDef::builtin(kind))?;
-        }
+fn emit_builtins(types: &mut TypeTableBuilder, builtins: &[TypeId]) -> Result<(), EmitError> {
+    for &builtin in builtins {
+        let kind = match builtin {
+            TYPE_VOID => TypeKind::Void,
+            TYPE_NODE => TypeKind::Node,
+            TYPE_STR => TypeKind::Str,
+            TYPE_BOOL => TypeKind::Bool,
+            _ => unreachable!("output type layout exposes only primitive built-ins"),
+        };
+        types.push_mapped(builtin, TypeDef::builtin(kind))?;
     }
     Ok(())
 }
@@ -101,26 +87,29 @@ fn reserve_slots(types: &mut TypeTableBuilder, ordered_types: &[TypeId]) -> Resu
 fn fill_slots(
     types: &mut TypeTableBuilder,
     ordered_types: &[TypeId],
-    usage: &BuiltinUsage,
     layout: &CaptureLayout,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    let builtin_count = usage.builtin_count();
-    for (i, &type_id) in ordered_types.iter().enumerate() {
-        let slot_index = builtin_count + i;
-        let type_shape = ctx.type_analysis.expect_type_shape(type_id);
-        emit_type_at_slot(types, slot_index, type_id, type_shape, layout, ctx)?;
+    for &type_id in ordered_types {
+        emit_type_at_slot(types, type_id, layout, ctx)?;
     }
     Ok(())
 }
 
-fn emit_type_names(types: &mut TypeTableBuilder, ctx: &mut TypeEmitCtx) -> Result<(), EmitError> {
+fn emit_type_names(
+    types: &mut TypeTableBuilder,
+    schema: &OutputSchema<'_>,
+    ctx: &mut TypeEmitCtx,
+) -> Result<(), EmitError> {
     // The naming pass is the single source of names: definition results,
-    // path-generated composites, and `:: TypeName` annotations, in `TypeId`
-    // (deterministic) order. Every named type is reachable from a definition
-    // result, so it survives dead-type elimination; a miss here is a compiler
-    // bug, not anything a query can trigger.
-    for (type_id, name_sym) in ctx.type_analysis.iter_type_names() {
+    // path-generated composites, and custom `:: TypeName` capture types, in `TypeId`
+    // (deterministic) order. Naming covers the whole analyzed query; output
+    // layout deliberately keeps only names whose types survive callable-root
+    // reachability.
+    for (type_id, name_sym) in schema.iter_type_names() {
+        if !schema.type_layout().contains(type_id) {
+            continue;
+        }
         let bc_type_id = types.lookup(type_id).expect("named type must be mapped");
         let name = ctx.strings.intern(name_sym, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id))?;
@@ -131,30 +120,28 @@ fn emit_type_names(types: &mut TypeTableBuilder, ctx: &mut TypeEmitCtx) -> Resul
 
 fn emit_type_at_slot(
     types: &mut TypeTableBuilder,
-    slot_index: usize,
     type_id: TypeId,
-    type_shape: &TypeShape,
     layout: &CaptureLayout,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
+    let wire_type = types
+        .lookup(type_id)
+        .expect("reserved output type has a wire slot");
+    let slot_index = usize::from(u16::from(wire_type));
+    let type_shape = ctx.type_analysis.expect_type_shape(type_id);
     match type_shape {
-        TypeShape::Void | TypeShape::Node => {
+        TypeShape::Void | TypeShape::Node | TypeShape::Str | TypeShape::Bool => {
             unreachable!("builtins should be handled separately")
         }
 
         TypeShape::Custom(_) => {
-            // Custom type annotation: @x :: Identifier → type Identifier = Node.
+            // A custom capture type is a nominal alias for Node.
             // The name entry comes from the naming pass via `emit_type_names`;
             // here only the alias shape is emitted.
-            //
-            // Custom types alias Node - look up Node's actual bytecode ID.
-            // Reaching a Custom type means it was in `ordered_types`, so
-            // `BuiltinUsage::collect` marked Node used (`Custom(_) => usage.node =
-            // true`) and `emit_builtins` mapped it before custom slots are filled.
-            let node_bc_id = types
+            let node = types
                 .lookup(TYPE_NODE)
-                .expect("Node must be mapped before a Custom alias that targets it is emitted");
-            types.fill_slot(slot_index, TypeDef::alias(node_bc_id));
+                .expect("Node is mapped before aliases are emitted");
+            types.fill_slot(slot_index, TypeDef::alias(node));
             Ok(())
         }
 
@@ -275,52 +262,4 @@ struct TypeEmitCtx<'a> {
     type_analysis: &'a TypeAnalysis,
     interner: &'a Interner,
     strings: &'a mut StringTableBuilder,
-}
-
-struct BuiltinUsage {
-    uses_void: bool,
-    uses_node: bool,
-    seen: HashSet<TypeId>,
-}
-
-impl BuiltinUsage {
-    fn new() -> Self {
-        Self {
-            uses_void: false,
-            uses_node: false,
-            seen: HashSet::new(),
-        }
-    }
-
-    fn builtin_count(&self) -> usize {
-        self.uses_void as usize + self.uses_node as usize
-    }
-
-    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeAnalysis) {
-        if !self.seen.insert(type_id) {
-            return;
-        }
-
-        let type_shape = type_ctx.expect_type_shape(type_id);
-
-        match type_shape {
-            TypeShape::Void => self.uses_void = true,
-            TypeShape::Node => self.uses_node = true,
-            TypeShape::Custom(_) => self.uses_node = true, // Custom types alias Node
-            TypeShape::Ref(def_id) => {
-                let target_id = type_ctx.expect_def_output(*def_id);
-                if target_id == TYPE_VOID {
-                    // The Ref emits as an alias of Node (see `emit_type_at_slot`).
-                    self.uses_node = true;
-                } else {
-                    self.collect(target_id, type_ctx);
-                }
-            }
-            _ => {
-                for child_id in type_shape.child_type_ids() {
-                    self.collect(child_id, type_ctx);
-                }
-            }
-        }
-    }
 }

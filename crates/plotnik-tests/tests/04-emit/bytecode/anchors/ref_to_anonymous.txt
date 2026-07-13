@@ -12,21 +12,21 @@ Test  = 17
 
 [transitions]
 Comma:
-  02                                        ▶
-  03   !   ","                              02
+  01                                        ▶
+  02   !   ","                              01
 
 Test:
   04                                        ▶
   05   !   (array)                          11
   06  ─‣┘  _                                04
   07  ─◦─  (string) [Node Set(next)]        06
-  08   !   (Comma)                          03 : 07
+  08   !   (Comma)                          02 : 07
   10  ──!  _                                08, 10
   11  └─!  _                                08, 10
 
 Comma (entrypoint):
   12                                        ▶
-  13       (Comma)                          03 : 12
+  13       (Comma)                          02 : 12
 
 Test (entrypoint):
   14                                        ▶

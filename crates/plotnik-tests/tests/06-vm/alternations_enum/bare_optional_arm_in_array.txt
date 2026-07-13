@@ -7,12 +7,12 @@ Q = (program
 // c
 x;
 ------------------- TYPESCRIPT -------------------
-export type QItems =
-  | { $tag: "A"; $data: { c: Node | null } };
-
 export interface Q {
   items: QItems[];
 }
+
+export type QItems =
+  | { $tag: "A"; $data: { c: Node | null } };
 --------------------- OUTPUT ---------------------
 {
   "items": [

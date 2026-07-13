@@ -12,13 +12,14 @@
 
 use tree_sitter::Node;
 
-use crate::{EffectLog, RuntimeEffect};
+use crate::{EffectLog, RuntimeEffect, node_text, source_text};
 
 /// `set_index` sentinel: no `Set` closes a value starting at this position.
 const NO_SET: u32 = u32::MAX;
 
-pub struct TraceReader<'a, 't> {
+pub struct TraceReader<'a, 't, 's> {
     entries: &'a [RuntimeEffect<'t>],
+    source: &'s str,
     pos: usize,
     /// For each position, where the `Set` that closes a field value starting
     /// there sits — [`Self::peek_set`]'s answer, precomputed. One backward
@@ -28,11 +29,12 @@ pub struct TraceReader<'a, 't> {
     set_index: Vec<u32>,
 }
 
-impl<'a, 't> TraceReader<'a, 't> {
-    pub fn new(log: &'a EffectLog<'t>) -> Self {
+impl<'a, 't, 's> TraceReader<'a, 't, 's> {
+    pub fn new(log: &'a EffectLog<'t>, source: &'s str) -> Self {
         let entries = log.as_slice();
         Self {
             entries,
+            source,
             pos: 0,
             set_index: build_set_index(entries),
         }
@@ -93,7 +95,41 @@ impl<'a, 't> TraceReader<'a, 't> {
             self.pos += 1;
             return true;
         }
-        false
+        self.take_unmarked_str()
+    }
+
+    fn take_unmarked_str(&mut self) -> bool {
+        if !matches!(self.peek(), Some(RuntimeEffect::ScalarOpen)) {
+            return false;
+        }
+
+        let mut depth = 0_u32;
+        let mut marked = false;
+        for index in self.pos..self.entries.len() {
+            match &self.entries[index] {
+                RuntimeEffect::ScalarOpen => depth += 1,
+                RuntimeEffect::ScalarMark(_) => marked = true,
+                RuntimeEffect::StrClose => {
+                    depth -= 1;
+                    if depth != 0 {
+                        continue;
+                    }
+                    if marked {
+                        return false;
+                    }
+                    self.pos = index + 1;
+                    return true;
+                }
+                RuntimeEffect::BoolClose(_) => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+        }
+        unreachable!("validated trace balances every scalar frame")
     }
 
     pub fn at_array_close(&self) -> bool {
@@ -112,6 +148,66 @@ impl<'a, 't> TraceReader<'a, 't> {
         match self.next() {
             RuntimeEffect::Node(node) => *node,
             other => self.mismatch("Node", other),
+        }
+    }
+
+    pub fn expect_str(&mut self) -> &'s str {
+        if let Some(RuntimeEffect::NodeStr(node)) = self.peek() {
+            let value = node_text(self.source, node);
+            self.pos += 1;
+            return value;
+        }
+        let (range, close) = self.read_scalar();
+        if !matches!(close, RuntimeEffect::StrClose) {
+            self.mismatch("StrClose", close);
+        }
+        let range = range.expect("a non-null Str reader requires at least one scalar mark");
+        source_text(self.source, range)
+    }
+
+    pub fn expect_bool(&mut self) -> bool {
+        if matches!(self.peek(), Some(RuntimeEffect::NodeBool(_))) {
+            self.pos += 1;
+            return true;
+        }
+        if let Some(RuntimeEffect::BoolValue(value)) = self.peek() {
+            let value = *value;
+            self.pos += 1;
+            return value;
+        }
+        let (_, close) = self.read_scalar();
+        match close {
+            RuntimeEffect::BoolClose(value) => *value,
+            other => self.mismatch("BoolClose", other),
+        }
+    }
+
+    fn read_scalar(&mut self) -> (Option<std::ops::Range<usize>>, &'a RuntimeEffect<'t>) {
+        match self.next() {
+            RuntimeEffect::ScalarOpen => {}
+            other => self.mismatch("ScalarOpen", other),
+        }
+        let mut depth = 1_u32;
+        let mut range: Option<std::ops::Range<usize>> = None;
+        loop {
+            let entry = self.next();
+            match entry {
+                RuntimeEffect::ScalarOpen => depth += 1,
+                RuntimeEffect::ScalarMark(node) => {
+                    let mark = node.start_byte()..node.end_byte();
+                    range = Some(match range {
+                        Some(current) => current.start.min(mark.start)..current.end.max(mark.end),
+                        None => mark,
+                    });
+                }
+                RuntimeEffect::StrClose | RuntimeEffect::BoolClose(_) => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return (range, entry);
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -205,11 +301,18 @@ fn build_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
                 cur = i as u32;
                 index[i] = cur;
             }
-            RuntimeEffect::ArrayClose | RuntimeEffect::StructClose | RuntimeEffect::EnumClose => {
+            RuntimeEffect::ArrayClose
+            | RuntimeEffect::StructClose
+            | RuntimeEffect::EnumClose
+            | RuntimeEffect::StrClose
+            | RuntimeEffect::BoolClose(_) => {
                 outer.push(cur);
                 cur = NO_SET;
             }
-            RuntimeEffect::ArrayOpen | RuntimeEffect::StructOpen | RuntimeEffect::EnumOpen(_) => {
+            RuntimeEffect::ArrayOpen
+            | RuntimeEffect::StructOpen
+            | RuntimeEffect::EnumOpen(_)
+            | RuntimeEffect::ScalarOpen => {
                 cur = outer
                     .pop()
                     .expect("open/close balance proven by the effect-stack validation");

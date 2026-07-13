@@ -1,0 +1,7 @@
+Q = (identifier) @value :: bool
+------------------ DIAGNOSTICS -------------------
+error: capture type `bool` requires a value that may be absent; this capture is always present
+ --> query.ptk:1:25
+  |
+1 | Q = (identifier) @value :: bool
+  |                         ^^^^^^^

@@ -4,7 +4,7 @@ Q = (program
   (Foo) @val :: Renamed
 )
 ------------------ DIAGNOSTICS -------------------
-warning: this type annotation cannot rename a type that already has a name; omit it
+warning: this capture type cannot rename a type that already has a name; omit it
  --> query.ptk:4:17
   |
 4 |   (Foo) @val :: Renamed

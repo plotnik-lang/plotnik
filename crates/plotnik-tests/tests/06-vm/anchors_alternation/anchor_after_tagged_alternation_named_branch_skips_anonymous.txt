@@ -13,13 +13,13 @@ Q = (program
 --------------------- INPUT ----------------------
 5 * x
 ------------------- TYPESCRIPT -------------------
-export type QT =
-  | { $tag: "A" }
-  | { $tag: "B" };
-
 export interface Q {
   t: QT;
 }
+
+export type QT =
+  | { $tag: "A" }
+  | { $tag: "B" };
 --------------------- OUTPUT ---------------------
 {
   "t": {

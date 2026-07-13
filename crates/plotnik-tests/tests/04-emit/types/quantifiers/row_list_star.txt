@@ -4,15 +4,3 @@ Q = {
 }* @rows
 ------------------- TYPESCRIPT -------------------
 ---------------------- RUST ----------------------
-use ::plotnik_rt::Node;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub rows: ::std::vec::Vec<QRows<'t>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct QRows<'t> {
-    pub k: Node<'t>,
-    pub v: Node<'t>,
-}
