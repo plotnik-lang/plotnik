@@ -368,18 +368,19 @@ internal error, not be returned as invalid user input.
 
 ## 7. Limits
 
-Safe runs resolve independent step and memory policies. Each policy is
+Safe runs resolve independent fuel and memory policies. Each policy is
 `Auto`, an explicit nonnegative ceiling, or `Unbounded`.
 
 | Resource | Automatic ceiling                | What is metered                                                 |
 | -------- | -------------------------------- | --------------------------------------------------------------- |
-| Steps    | `1_000_000 + 1_024 * node_count` | Generated state dispatches.                                     |
+| Fuel     | `1_000_000 + 1_024 * node_count` | Matcher dispatches; one fuel unit each today.                   |
 | Memory   | `64 MiB + 256 * node_count`      | Live frames, checkpoints, capture effects, and saved positions. |
 
 Arithmetic saturates at the target's supported maximum. A runtime may sample
 memory rather than calculate it on every dispatch; the reference implementation
-samples every 1,024 steps. The error reports both ceiling and observed usage
-because geometric container growth can overshoot a sampled ceiling.
+samples every 1,024 matcher dispatches. The error reports both ceiling and
+observed usage because geometric container growth can overshoot a sampled
+ceiling.
 
 Generated typed decoding has a third limit, depth, because recursive decoders use
 the platform's native stack. Its automatic ceiling is target-specific and may
@@ -389,7 +390,7 @@ the VM materializer do not have a decode-depth limit.
 The portable error categories are:
 
 ```text
-LimitExceeded::Steps(limit)
+LimitExceeded::OutOfFuel(limit)
 LimitExceeded::Memory { used, limit }
 LimitExceeded::DecodeDepth(limit)
 ```

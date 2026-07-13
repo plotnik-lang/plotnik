@@ -9,7 +9,7 @@ and backtracking.
 ```sh
 plotnik trace query.ptk source.js
 plotnik trace -q 'Q = (program)' -s 'x;' -l javascript -v
-plotnik trace query.ptk source.js --max-steps 10000
+plotnik trace query.ptk source.js --fuel 10000
 ```
 
 ## Verbosity

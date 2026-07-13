@@ -269,22 +269,22 @@ plotnik run -q 'Q = (identifier) @id' -s 'let x = 1' -l javascript
 # Start from a specific definition
 plotnik run query.ptk app.js --entry FunctionDef
 
-# Lift the work limit for a known-heavy query
-plotnik run query.ptk app.js --max-steps unbounded
+# Lift the fuel limit for a known-heavy query
+plotnik run query.ptk app.js --fuel unbounded
 ```
 
 **Flags:**
 
-| Flag           | Purpose                                 |
-| -------------- | --------------------------------------- |
-| `-q, --query`  | Inline query text                       |
-| `-s, --source` | Inline source text                      |
-| `-l, --lang`   | Language (inferred from file ext)       |
-| `--compact`    | Output compact JSON                     |
-| `--entry NAME` | Select a specific selectable definition |
-| `--max-steps`  | Work limit (see Execution Limits)       |
-| `--max-memory` | Memory limit (see Execution Limits)     |
-| `--limits`     | Limit preset (`auto`/`unbounded`)       |
+| Flag           | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `-q, --query`  | Inline query text                          |
+| `-s, --source` | Inline source text                         |
+| `-l, --lang`   | Language (inferred from file ext)          |
+| `--compact`    | Output compact JSON                        |
+| `--entry NAME` | Select a specific selectable definition    |
+| `--fuel`       | Matcher work budget (see Execution Limits) |
+| `--max-memory` | Memory limit (see Execution Limits)        |
+| `--limits`     | Limit preset (`auto`/`unbounded`)          |
 
 ---
 
@@ -312,15 +312,15 @@ plotnik trace query.ptk app.js -vv  # very verbose
 
 **Flags:**
 
-| Flag           | Purpose                                 |
-| -------------- | --------------------------------------- |
-| `-v`           | Verbose output                          |
-| `-vv`          | Very verbose output                     |
-| `--no-result`  | Skip materialization                    |
-| `--max-steps`  | Work limit (see Execution Limits)       |
-| `--max-memory` | Memory limit (see Execution Limits)     |
-| `--limits`     | Limit preset (`auto`/`unbounded`)       |
-| `--entry`      | Select a specific selectable definition |
+| Flag           | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `-v`           | Verbose output                             |
+| `-vv`          | Very verbose output                        |
+| `--no-result`  | Skip materialization                       |
+| `--fuel`       | Matcher work budget (see Execution Limits) |
+| `--max-memory` | Memory limit (see Execution Limits)        |
+| `--limits`     | Limit preset (`auto`/`unbounded`)          |
+| `--entry`      | Select a specific selectable definition    |
 
 ---
 
@@ -343,14 +343,14 @@ plotnik inspect query.ptk app.js --json -v
 
 **Flags:**
 
-| Flag           | Purpose                                 |
-| -------------- | --------------------------------------- |
-| `--json`       | Output the full inspect bundle as JSON  |
-| `-v`           | Include VM recording in the JSON bundle |
-| `--entry NAME` | Select a specific selectable definition |
-| `--max-steps`  | Work limit (see Execution Limits)       |
-| `--max-memory` | Memory limit (see Execution Limits)     |
-| `--limits`     | Limit preset (`auto`/`unbounded`)       |
+| Flag           | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `--json`       | Output the full inspect bundle as JSON     |
+| `-v`           | Include VM recording in the JSON bundle    |
+| `--entry NAME` | Select a specific selectable definition    |
+| `--fuel`       | Matcher work budget (see Execution Limits) |
+| `--max-memory` | Memory limit (see Execution Limits)        |
+| `--limits`     | Limit preset (`auto`/`unbounded`)          |
 
 Exit codes follow `run`: `0` match, `1` no match or invalid query (the bundle is
 still printed, with diagnostics), `2` couldn't answer.
@@ -364,35 +364,34 @@ sized from the input so they stay invisible to legitimate queries:
 
 | Flag           | Accepts                              | Default |
 | -------------- | ------------------------------------ | ------- |
-| `--max-steps`  | a step count, `auto`, `unbounded`    | `auto`  |
+| `--fuel`       | a fuel amount, `auto`, `unbounded`   | `auto`  |
 | `--max-memory` | a binary size, `auto`, `unbounded`   | `auto`  |
 | `--limits`     | `auto` or `unbounded` runtime preset | `auto`  |
 
-- **Steps** bound total work (instruction dispatches) — the guard against
-  catastrophic backtracking.
+- **Fuel** bounds matcher work — the guard against catastrophic backtracking.
+  One matcher dispatch currently consumes one fuel unit.
 - **Memory** bounds the VM's live execution state (frame, checkpoint, and effect
-  arenas), summed and sampled once per step against a fixed ceiling. The arenas
-  grow on demand rather than pre-allocating, so a generous default is free on
-  small inputs. It meters execution, not the separate output-rendering pass (see
-  below).
+  arenas), sampled every 1,024 matcher dispatches against a fixed ceiling. The
+  arenas grow on demand rather than pre-allocating, so a generous default is
+  free on small inputs. It meters execution, not the separate output-rendering
+  pass (see below).
 - `auto` scales each ceiling with the source's node count; `unbounded` opts out.
 
 **Sizes** use binary units only: a bare integer is bytes; `KiB`/`MiB`/`GiB`
 scale by 1024. SI units (`MB`, `GB`) are rejected as ambiguous — use `MiB`/`GiB`.
 
 **Precedence** is order-independent: `--limits` sets the baseline for both
-runtime resources, and an explicit `--max-*` overrides that one. So
-`--limits unbounded --max-steps 5` means "unbounded runtime limits except
-steps = 5".
+runtime resources, and an explicit resource flag overrides that resource. So
+`--limits unbounded --fuel 5` means "unbounded runtime limits except fuel = 5".
 
 ```sh
-plotnik run q.ptk app.js --max-steps 5000000      # explicit work ceiling
+plotnik run q.ptk app.js --fuel 5000000           # explicit work ceiling
 plotnik run q.ptk app.js --max-memory 256MiB      # explicit memory ceiling
 plotnik run q.ptk app.js --limits unbounded       # opt out of both
 ```
 
 A run that exceeds a limit stops cleanly with exit code `2` and a message
-carrying a stable code (`E-limit-steps` / `E-limit-memory`); with `--json` the
+carrying a stable code (`E-out-of-fuel` / `E-limit-memory`); with `--json` the
 message is a one-line JSON object instead.
 
 There is no recursion/depth limit: backtracking and output rendering are

@@ -241,12 +241,11 @@ A run is bounded by two resources, each a `Limit` (`Auto`, `Of(n)`, or
 
 | Resource | `Auto` default              | Bounds                                               |
 | -------- | --------------------------- | ---------------------------------------------------- |
-| Steps    | `1M + 1024 * node_count`    | total work (instruction dispatches)                  |
+| Fuel     | `1M + 1024 * node_count`    | matcher work (one unit per dispatch today)           |
 | Memory   | `64 MiB + 256 * node_count` | live runtime heap (frame, checkpoint, effect arenas) |
 
 Both `Auto` ceilings scale linearly with the source's node count. Exhaustion
-returns `RuntimeError` (`StepLimitExceeded` or `MemoryLimitExceeded`), never a
-panic.
+returns `RuntimeError` (`OutOfFuel` or `MemoryLimitExceeded`), never a panic.
 
 There is no separate recursion limit _for the VM_. Backtracking is iterative
 and call depth costs heap memory only, which the memory ceiling bounds; the
