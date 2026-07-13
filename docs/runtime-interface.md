@@ -52,7 +52,7 @@ matches(document) -> Result<Boolean, LimitExceeded>
 
 `parse` runs the matcher, then decodes its committed match journal into the
 generated output type. `matches` runs the same matcher with data effects
-suppressed; it does not allocate an output trace and cannot fail a replay-depth
+suppressed; it does not allocate a match journal and cannot fail a decode-depth
 limit.
 
 A document binds together five things that must not drift independently:
@@ -337,7 +337,7 @@ Production lowering uses `BoolValue(true)` for presence booleans because their
 source range is not observable there; `NodeBool` and balanced boolean frames
 are emitted only when inspection requests that provenance.
 
-### 6.1 Replay reader
+### 6.1 Result decoder
 
 Typed decoders consume the committed match journal linearly. A runtime decoder provides:
 
@@ -348,21 +348,21 @@ Typed decoders consume the committed match journal linearly. A runtime decoder p
 - `expect_array_push` and close lookahead for repeated values;
 - `peek_record_set`, which returns the first `RecordSet` after the balanced value beginning
   at the current position;
-- `finish`, which asserts that the whole trace was consumed.
+- `finish`, which asserts that the whole journal was consumed.
 
 `peek_record_set` is required because a field's value precedes its member index and
-different members may require different typed readers. Implementations should
+different members may require different typed decoders. Implementations should
 precompute matching `RecordSet` positions in one backward pass so decoding remains
 linear on deeply nested output. Its balanced-value scan treats `ScalarOpen`
 through either scalar close as one value, including nested scalar frames.
 
-The reader receives the exact source used to parse the tree. A string leaf
+The decoder receives the exact source used to parse the tree. A string leaf
 returns a source slice and therefore carries the source lifetime; a node leaf
 carries the independent tree lifetime. Rust expresses the generic contract as
 `Parse<'t, 's>`, and generated types include only the lifetimes reachable from
 their output (`Q<'t>`, `Q<'s>`, `Q<'t, 's>`, or `Q`).
 
-The compiler validates balanced trace shapes. A mismatch during replay is an
+The compiler validates balanced journal shapes. A mismatch during decoding is an
 inside-zone generated-code/runtime defect and should assert or throw as an
 internal error, not be returned as invalid user input.
 
@@ -381,17 +381,17 @@ memory rather than calculate it on every dispatch; the reference implementation
 samples every 1,024 steps. The error reports both ceiling and observed usage
 because geometric container growth can overshoot a sampled ceiling.
 
-Generated typed replay has a third limit, depth, because recursive readers use
+Generated typed decoding has a third limit, depth, because recursive decoders use
 the platform's native stack. Its automatic ceiling is target-specific and may
 use a conservative generated frame-size estimate. The iterative matcher and
-the VM materializer do not have a replay-depth limit.
+the VM materializer do not have a decode-depth limit.
 
 The portable error categories are:
 
 ```text
 LimitExceeded::Steps(limit)
 LimitExceeded::Memory { used, limit }
-LimitExceeded::Depth(limit)
+LimitExceeded::DecodeDepth(limit)
 ```
 
 Limit exhaustion is an ordinary safe-entrypoint result. Exhausted checkpoints
@@ -483,12 +483,12 @@ with the VM oracle on:
 - match/no-match and portable limit category;
 - the committed match journal, including layout indices, captured-node byte
   spans, scalar marks, and scalar close values;
-- the debug value after typed replay;
+- the debug value after typed decoding;
 - grammar-skew and runtime-ABI failures.
 
 The corpus must cover every navigation and resume mode, field and missing-node
 checks, all predicate operators, suppression, recursive calls, ordered branch
-priority, trace truncation after backtracking, nested replay shapes, automatic
+priority, journal truncation after backtracking, nested decode shapes, automatic
 and explicit limits, scalar item boundaries and zero-byte ranges, and non-ASCII
 source before captured nodes. Regex cases
 exercise every dialect printer's semantic traps and are the tripwire for

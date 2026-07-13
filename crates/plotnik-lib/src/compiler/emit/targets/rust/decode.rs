@@ -1,26 +1,26 @@
-//! Typed replay emission: per-type readers and the `parse`/`matches` surface.
+//! Typed result-decoder emission and the `parse`/`matches` surface.
 //!
-//! The committed trace is a tiny wire format whose schema *is* the query's
-//! output type, so the replay is a generated deserializer (serde-derive
-//! mental model), not an interpreter: one reader fn per named type, shared
+//! The committed match journal is a tiny event format whose schema *is* the
+//! query's output type, so decoding is generated deserialization (serde-derive
+//! mental model), not interpretation: one decoder fn per named type, shared
 //! across every position that holds it, matching only the entries the type
 //! admits. It runs once, on the winning path; failed branches never reach it.
 //!
-//! Two stream facts shape the readers (see the VM materializer, the reference
+//! Two journal facts shape the decoders (see the VM materializer, the reference
 //! consumer):
 //!
 //! - **Values are value-first.** A field's entries arrive *before* the
 //!   `RecordSet` that names the field, and `RecordSet` order inside one record varies
 //!   between instances of the same type. Record scopes therefore peek ahead
-//!   to the balancing `RecordSet` (`TraceReader::peek_record_set`) to pick the field's
-//!   typed reader, then consume linearly.
+//!   to the balancing `RecordSet` (`ResultDecoder::peek_record_set`) to pick the
+//!   field's typed decoder, then consume linearly.
 //! - **`RecordSet`/`VariantOpen` payloads are absolute member-table indices**, baked
 //!   from the same emit tables the matcher folded into its states. Nominal
 //!   twins (one name, several structurally-identical analysis types) own
 //!   distinct member runs, so an arm matches the union of its twins' indices.
 //!
 //! Naming is never re-derived: item and field spellings come from the
-//! typegen emitter's own model, so a keyword-renamed field reads exactly as
+//! typegen emitter's own model, so a keyword-renamed field decodes exactly as
 //! it was declared.
 
 use std::collections::{HashMap, HashSet};
@@ -30,7 +30,7 @@ use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::type_shape::TypeId;
 use crate::compiler::emit::plan::{
-    ReplayCasePlan, ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan,
+    DecodeCase, DecodeItem, DecodeItemKind, DecodeScope, DecodeValue, ResultDecodePlan,
 };
 use crate::compiler::emit::sink::indentation;
 use crate::compiler::emit::targets::rust::ident::{rust_scope_idents, snake_ident};
@@ -38,39 +38,39 @@ use crate::compiler::emit::targets::rust::{TypeContext, TypeModel};
 use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
 
+use super::decoder_frame::DecoderFrameEstimator;
 use super::entry_names::{accepts_entry_fn_name, safe_entry_fn_name};
-use super::reader_frame::ReaderFrameEstimator;
 
-pub(super) struct ReaderGen<'m, 'a> {
+pub(super) struct DecoderGen<'m, 'a> {
     model: &'m TypeModel<'a>,
     deps: &'a DependencyAnalysis,
     interner: &'a Interner,
-    replay: &'a ReplayPlan,
-    tables: ReaderTables,
+    decode: &'a ResultDecodePlan,
+    tables: DecoderTables,
 }
 
-struct ReaderTables {
-    /// Item name → reader fn ident, uniqued in item order (nominally distinct
+struct DecoderTables {
+    /// Item name → decoder fn ident, uniqued in item order (nominally distinct
     /// names can share a snake form, e.g. `HTTPServer` / `HttpServer`).
-    reader_fns: HashMap<Symbol, String>,
+    decoder_fns: HashMap<Symbol, String>,
 }
 
-impl ReaderTables {
-    fn collect(replay: &ReplayPlan, interner: &Interner) -> Self {
-        let mut reader_fns = HashMap::new();
+impl DecoderTables {
+    fn collect(decode: &ResultDecodePlan, interner: &Interner) -> Self {
+        let mut decoder_fns = HashMap::new();
         let mut taken = HashSet::new();
-        for item in replay.items() {
-            if !item.has_reader() {
+        for item in decode.items() {
+            if !item.has_decoder() {
                 continue;
             }
-            let mut name = format!("read_{}", snake_ident(interner.resolve(item.name)));
+            let mut name = format!("decode_{}", snake_ident(interner.resolve(item.name)));
             while !taken.insert(name.clone()) {
                 name.push('_');
             }
-            reader_fns.insert(item.name, name);
+            decoder_fns.insert(item.name, name);
         }
 
-        Self { reader_fns }
+        Self { decoder_fns }
     }
 }
 
@@ -83,7 +83,7 @@ struct InherentParseSignature {
 }
 
 impl InherentParseSignature {
-    fn for_item(model: &TypeModel<'_>, item: &ReplayItem) -> Self {
+    fn for_item(model: &TypeModel<'_>, item: &DecodeItem) -> Self {
         let ident = model.item_ident(item.name).to_string();
         let usage = model.lifetime_usage(item.ty);
         let (impl_generics, type_generics) = match (usage.tree, usage.source) {
@@ -106,46 +106,46 @@ impl InherentParseSignature {
     }
 }
 
-impl<'m, 'a> ReaderGen<'m, 'a> {
+impl<'m, 'a> DecoderGen<'m, 'a> {
     pub(super) fn new(
         schema: &'a OutputSchema<'a>,
         model: &'m TypeModel<'a>,
-        replay: &'a ReplayPlan,
+        decode: &'a ResultDecodePlan,
     ) -> Self {
-        let tables = ReaderTables::collect(replay, schema.interner());
+        let tables = DecoderTables::collect(decode, schema.interner());
 
         Self {
             model,
             deps: schema.dependency_analysis(),
             interner: schema.interner(),
-            replay,
+            decode,
             tables,
         }
     }
 
-    fn reader_fn(&self, name: Symbol) -> &str {
+    fn decoder_fn(&self, name: Symbol) -> &str {
         self.tables
-            .reader_fns
+            .decoder_fns
             .get(&name)
-            .expect("every non-void item has a reader")
+            .expect("every value item has a decoder")
     }
 
-    fn item_named(&self, name: Symbol) -> &ReplayItem {
-        self.replay.item(name)
+    fn item_named(&self, name: Symbol) -> &DecodeItem {
+        self.decode.item(name)
     }
 
-    fn reader_call(&self, name: Symbol) -> String {
-        let reader = self.reader_fn(name);
+    fn decoder_call(&self, name: Symbol) -> String {
+        let decoder = self.decoder_fn(name);
         let item = self.item_named(name);
         if item.fallible {
-            format!("{reader}(t, depth)?")
+            format!("{decoder}(decoder, depth)?")
         } else {
-            format!("{reader}(t)")
+            format!("{decoder}(decoder)")
         }
     }
 
-    pub(super) fn max_reader_frame_bytes(&self) -> u64 {
-        ReaderFrameEstimator::new(self.model, self.replay).max_bytes()
+    pub(super) fn max_decoder_frame_bytes(&self) -> u64 {
+        DecoderFrameEstimator::new(self.model, self.decode).max_bytes()
     }
 
     /// The `parse`/`matches` surface, one block per entrypoint definition.
@@ -156,15 +156,15 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             let name = self.deps.def_name_sym(def_id);
             let def = self.interner.resolve(name).to_string();
             out.push('\n');
-            let item = self.replay.item(name);
+            let item = self.decode.item(name);
             match item.kind {
-                ReplayItemKind::Record(_) | ReplayItemKind::Variant(_) => {
+                DecodeItemKind::Record(_) | DecodeItemKind::Variant(_) => {
                     self.parse_impl(&mut out, &def, item);
                 }
-                ReplayItemKind::Alias(_) => {
+                DecodeItemKind::Alias(_) => {
                     unreachable!("selectable definitions are nominal or match-only")
                 }
-                ReplayItemKind::VoidDefinition => self.matches_impl(&mut out, &def, item),
+                DecodeItemKind::VoidDefinition => self.matches_impl(&mut out, &def, item),
             }
         }
         out
@@ -172,7 +172,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
     /// `matches` for a void definition: it can only answer matched-or-not, and
     /// the public API is always metered.
-    fn matches_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
+    fn matches_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
         let ident = self.model.item_ident(item.name);
         let _ = writeln!(out, "impl {ident} {{");
         self.inherent_matches_method(out, def);
@@ -182,11 +182,11 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     }
 
     /// Inherent `parse`/`matches` on a nominal (struct/enum) output type.
-    fn parse_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
+    fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
         let sig = InherentParseSignature::for_item(self.model, item);
-        let reader = self.reader_fn(item.name);
+        let decoder_fn = self.decoder_fn(item.name);
         let safe = safe_entry_fn_name(def);
-        let fallible_reader = item.fallible;
+        let fallible_decoder = item.fallible;
         let _ = writeln!(
             out,
             "impl{} {}{} {{",
@@ -194,7 +194,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         );
         let _ = writeln!(
             out,
-            "    /// Match `{def}` against `tree` and replay the committed trace into"
+            "    /// Match `{def}` against `tree` and decode the committed journal into"
         );
         let _ = writeln!(
             out,
@@ -204,7 +204,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             out,
             "    /// The module's compiled-in limits bound total work, live"
         );
-        let _ = writeln!(out, "    /// backtracking state, and typed replay depth.");
+        let _ = writeln!(out, "    /// backtracking state, and typed decode depth.");
         let _ = writeln!(out, "    pub fn parse(");
         let _ = writeln!(out, "        tree: {},", sig.tree_ref);
         let _ = writeln!(out, "        source: {},", sig.source_ref);
@@ -220,18 +220,21 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let _ = writeln!(out, "        }};");
         let _ = writeln!(
             out,
-            "        let mut t = rt::TraceReader::new(&journal, source);"
+            "        let mut decoder = rt::ResultDecoder::new(&journal, source);"
         );
-        if fallible_reader {
+        if fallible_decoder {
             let _ = writeln!(
                 out,
-                "        let depth = rt::ReplayDepth::new(matcher::MAX_REPLAY_DEPTH);"
+                "        let depth = rt::DecodeDepth::new(matcher::MAX_DECODE_DEPTH);"
             );
-            let _ = writeln!(out, "        let value = {reader}(&mut t, &depth)?;");
+            let _ = writeln!(
+                out,
+                "        let value = {decoder_fn}(&mut decoder, &depth)?;"
+            );
         } else {
-            let _ = writeln!(out, "        let value = {reader}(&mut t);");
+            let _ = writeln!(out, "        let value = {decoder_fn}(&mut decoder);");
         }
-        let _ = writeln!(out, "        t.finish();");
+        let _ = writeln!(out, "        decoder.finish();");
         let _ = writeln!(out, "        Ok(Some(value))");
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out);
@@ -260,9 +263,9 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let _ = writeln!(out, "    }}");
     }
 
-    fn matches_trait_impl(&self, out: &mut String, item: &ReplayItem) {
+    fn matches_trait_impl(&self, out: &mut String, item: &DecodeItem) {
         let ident = self.model.item_ident(item.name).to_string();
-        let (impl_generics, type_generics) = if matches!(item.kind, ReplayItemKind::VoidDefinition)
+        let (impl_generics, type_generics) = if matches!(item.kind, DecodeItemKind::VoidDefinition)
         {
             ("", "")
         } else {
@@ -283,7 +286,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let _ = writeln!(out, "}}");
     }
 
-    fn parse_trait_impl(&self, out: &mut String, item: &ReplayItem) {
+    fn parse_trait_impl(&self, out: &mut String, item: &DecodeItem) {
         let sig = InherentParseSignature::for_item(self.model, item);
         let _ = writeln!(
             out,
@@ -302,29 +305,29 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let _ = writeln!(out, "}}");
     }
 
-    /// Every reader fn, in item order.
-    pub(super) fn readers(&self) -> String {
+    /// Every decoder fn, in item order.
+    pub(super) fn decoders(&self) -> String {
         let mut out = String::new();
-        for item in self.replay.items() {
+        for item in self.decode.items() {
             match &item.kind {
-                ReplayItemKind::Record(scope) => self.struct_reader(&mut out, item, scope),
-                ReplayItemKind::Variant(cases) => self.enum_reader(&mut out, item, cases),
-                ReplayItemKind::Alias(value) => self.alias_reader(&mut out, item, value),
-                ReplayItemKind::VoidDefinition => {}
+                DecodeItemKind::Record(scope) => self.record_decoder(&mut out, item, scope),
+                DecodeItemKind::Variant(cases) => self.variant_decoder(&mut out, item, cases),
+                DecodeItemKind::Alias(value) => self.alias_decoder(&mut out, item, value),
+                DecodeItemKind::VoidDefinition => {}
             }
         }
         out
     }
 
-    fn reader_open(&self, out: &mut String, item: &ReplayItem) {
+    fn decoder_open(&self, out: &mut String, item: &DecodeItem) {
         let ident = self.model.item_ident(item.name).to_string();
         let fn_generics = "<'t, 's>";
-        let reader_generics = "<'_, 't, 's>";
+        let decoder_generics = "<'_, 't, 's>";
         let return_type = format!("{ident}{}", lifetime_args(self.model, item.ty));
-        let reader = self.reader_fn(item.name);
+        let decoder_fn = self.decoder_fn(item.name);
         let fallible = item.fallible;
         let depth_param = if fallible {
-            ", depth: &rt::ReplayDepth"
+            ", depth: &rt::DecodeDepth"
         } else {
             ""
         };
@@ -333,29 +336,29 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         } else {
             return_type
         };
-        let _ = writeln!(out, "/// Replay one committed `{ident}` value.");
+        let _ = writeln!(out, "/// Decode one committed `{ident}` value.");
         let _ = writeln!(
             out,
-            "fn {reader}{fn_generics}(t: &mut rt::TraceReader{reader_generics}{depth_param}) -> {return_type} {{"
+            "fn {decoder_fn}{fn_generics}(decoder: &mut rt::ResultDecoder{decoder_generics}{depth_param}) -> {return_type} {{"
         );
         if item.enters_depth {
             out.push_str("    let _depth = depth.enter()?;\n");
         }
     }
 
-    fn struct_reader(&self, out: &mut String, item: &ReplayItem, plan: &ReplayScopePlan) {
+    fn record_decoder(&self, out: &mut String, item: &DecodeItem, plan: &DecodeScope) {
         let ident = self.model.item_ident(item.name).to_string();
         out.push('\n');
-        self.reader_open(out, item);
-        out.push_str("    t.expect_record_open();\n");
+        self.decoder_open(out, item);
+        out.push_str("    decoder.expect_record_open();\n");
         let scope = Scope::struct_body(item.ty, &ident);
         self.field_scope(out, &scope, plan);
-        out.push_str("    t.expect_record_close();\n");
+        out.push_str("    decoder.expect_record_close();\n");
         self.construct(out, &scope, plan, item.fallible);
         out.push_str("}\n");
     }
 
-    fn enum_reader(&self, out: &mut String, item: &ReplayItem, cases: &[ReplayCasePlan]) {
+    fn variant_decoder(&self, out: &mut String, item: &DecodeItem, cases: &[DecodeCase]) {
         let ident = self.model.item_ident(item.name).to_string();
         let variant_idents = rust_scope_idents(
             cases
@@ -363,15 +366,15 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
                 .map(|variant| self.interner.resolve(variant.name)),
         );
         out.push('\n');
-        self.reader_open(out, item);
-        out.push_str("    match t.expect_variant_open() {\n");
+        self.decoder_open(out, item);
+        out.push_str("    match decoder.expect_variant_open() {\n");
         for (case, variant_ident) in cases.iter().zip(&variant_idents) {
             let indices = arm_pattern(&case.indices);
             let label = self.interner.resolve(case.name);
             let _ = writeln!(out, "        // {label}");
             let _ = writeln!(out, "        {indices} => {{");
             let Some(payload) = &case.payload else {
-                let _ = writeln!(out, "            t.expect_variant_close();");
+                let _ = writeln!(out, "            decoder.expect_variant_close();");
                 if item.fallible {
                     let _ = writeln!(out, "            Ok({ident}::{variant_ident})");
                 } else {
@@ -383,22 +386,22 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
             let scope = Scope::variant_payload(item.ty, &ident, variant_ident);
             self.field_scope(out, &scope, payload);
-            out.push_str("            t.expect_variant_close();\n");
+            out.push_str("            decoder.expect_variant_close();\n");
             self.construct(out, &scope, payload, item.fallible);
             out.push_str("        }\n");
         }
         let _ = writeln!(
             out,
-            "        other => unreachable!(\"trace shape proven at emit: `{ident}` has no variant index {{other}}\"),"
+            "        other => unreachable!(\"journal shape proven at emit: `{ident}` has no variant index {{other}}\"),"
         );
         out.push_str("    }\n");
         out.push_str("}\n");
     }
 
-    fn alias_reader(&self, out: &mut String, item: &ReplayItem, value: &ReplayValuePlan) {
+    fn alias_decoder(&self, out: &mut String, item: &DecodeItem, value: &DecodeValue) {
         out.push('\n');
-        self.reader_open(out, item);
-        let expr = self.value_expr(value, ReadContext::item(item.ty, 1));
+        self.decoder_open(out, item);
+        let expr = self.value_expr(value, DecodeContext::item(item.ty, 1));
         if item.fallible {
             let _ = writeln!(out, "    Ok({expr})");
         } else {
@@ -412,7 +415,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     /// field value. Variant payloads reuse it with `VariantClose` as the terminator
     /// (payload `RecordSet`s attach directly to the variant frame — the materializer's
     /// contract).
-    fn field_scope(&self, out: &mut String, scope: &Scope<'_>, plan: &ReplayScopePlan) {
+    fn field_scope(&self, out: &mut String, scope: &Scope<'_>, plan: &DecodeScope) {
         let p = indentation(scope.level());
         for (index, field) in plan.fields.iter().enumerate() {
             let _ = writeln!(
@@ -421,8 +424,8 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
                 self.interner.resolve(field.name)
             );
         }
-        let _ = writeln!(out, "{p}while !t.{}() {{", scope.kind.probe());
-        let _ = writeln!(out, "{p}    match t.peek_record_set() {{");
+        let _ = writeln!(out, "{p}while !decoder.{}() {{", scope.kind.probe());
+        let _ = writeln!(out, "{p}    match decoder.peek_record_set() {{");
         for (index, field) in plan.fields.iter().enumerate() {
             let indices = arm_pattern(&field.indices);
             let expr = self.value_expr(&field.value, scope.field_context());
@@ -431,24 +434,18 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         }
         let _ = writeln!(
             out,
-            "{p}        other => unreachable!(\"trace shape proven at emit: `{}` has no member index {{other}}\"),",
+            "{p}        other => unreachable!(\"journal shape proven at emit: `{}` has no member index {{other}}\"),",
             scope.name
         );
         let _ = writeln!(out, "{p}    }}");
-        let _ = writeln!(out, "{p}    t.expect_record_set();");
+        let _ = writeln!(out, "{p}    decoder.expect_record_set();");
         let _ = writeln!(out, "{p}}}");
     }
 
     /// The construction expression closing a scope: every field was set
     /// exactly once (field completion guarantees a `RecordSet` per
     /// field on every accepting path), so the positional locals unwrap.
-    fn construct(
-        &self,
-        out: &mut String,
-        scope: &Scope<'_>,
-        plan: &ReplayScopePlan,
-        fallible: bool,
-    ) {
+    fn construct(&self, out: &mut String, scope: &Scope<'_>, plan: &DecodeScope, fallible: bool) {
         let p = indentation(scope.level());
         let head = scope.construction_head();
         let field_idents = rust_scope_idents(
@@ -475,22 +472,22 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         }
     }
 
-    /// Read one planned value. The returned expression's first line splices
+    /// Decode one planned value. The returned expression's first line splices
     /// inline; continuation lines are indented for `level`. `depth` suffixes
     /// list accumulators so nested lists don't shadow. `cut` is the item
     /// declaration this position renders inside — the box-placement context,
     /// threaded exactly as the type renderer threads it so `Box::new` sits
     /// precisely where the declared type says `Box`.
-    fn value_expr(&self, plan: &ReplayValuePlan, context: ReadContext) -> String {
+    fn value_expr(&self, plan: &DecodeValue, context: DecodeContext) -> String {
         match plan {
-            ReplayValuePlan::Node => "t.expect_node()".to_string(),
-            ReplayValuePlan::Text => "t.expect_str()".to_string(),
-            ReplayValuePlan::Bool => "t.expect_bool()".to_string(),
-            ReplayValuePlan::Nullable(inner) => self.nullable_expr(inner, context),
-            ReplayValuePlan::List(element) => self.list_expr(element, context),
-            ReplayValuePlan::Read { item, source } => {
-                let call = self.reader_call(*item);
-                if self.model.is_boxed_ref(context.type_context, *source) {
+            DecodeValue::Node => "decoder.expect_node()".to_string(),
+            DecodeValue::Text => "decoder.expect_str()".to_string(),
+            DecodeValue::Bool => "decoder.expect_bool()".to_string(),
+            DecodeValue::Nullable(inner) => self.nullable_expr(inner, context),
+            DecodeValue::List(element) => self.list_expr(element, context),
+            DecodeValue::Nested { item, source_type } => {
+                let call = self.decoder_call(*item);
+                if self.model.is_boxed_ref(context.type_context, *source_type) {
                     format!("::std::boxed::Box::new({call})")
                 } else {
                     call
@@ -502,11 +499,11 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     /// `Absent` is the whole absent value — one flat absence, however many
     /// `Option` layers the type carries; a present value wraps `Some` at
     /// every layer (the VM never nests nulls).
-    fn nullable_expr(&self, inner: &ReplayValuePlan, context: ReadContext) -> String {
+    fn nullable_expr(&self, inner: &DecodeValue, context: DecodeContext) -> String {
         let p = indentation(context.level);
         let inner_expr = self.value_expr(inner, context.in_some_branch());
         let mut out = String::new();
-        let _ = writeln!(out, "if t.take_absent() {{");
+        let _ = writeln!(out, "if decoder.take_absent() {{");
         let _ = writeln!(out, "{p}    None");
         let _ = writeln!(out, "{p}}} else {{");
         let _ = writeln!(out, "{p}    Some({inner_expr})");
@@ -514,19 +511,19 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         out
     }
 
-    fn list_expr(&self, element: &ReplayValuePlan, context: ReadContext) -> String {
+    fn list_expr(&self, element: &DecodeValue, context: DecodeContext) -> String {
         let p = indentation(context.level);
         let items = format!("items{}", context.list_depth);
         let elem = self.value_expr(element, context.list_element());
         let mut out = String::new();
         let _ = writeln!(out, "{{");
-        let _ = writeln!(out, "{p}    t.expect_list_open();");
+        let _ = writeln!(out, "{p}    decoder.expect_list_open();");
         let _ = writeln!(out, "{p}    let mut {items} = ::std::vec::Vec::new();");
-        let _ = writeln!(out, "{p}    while !t.at_list_close() {{");
+        let _ = writeln!(out, "{p}    while !decoder.at_list_close() {{");
         let _ = writeln!(out, "{p}        {items}.push({elem});");
-        let _ = writeln!(out, "{p}        t.expect_array_push();");
+        let _ = writeln!(out, "{p}        decoder.expect_array_push();");
         let _ = writeln!(out, "{p}    }}");
-        let _ = writeln!(out, "{p}    t.expect_list_close();");
+        let _ = writeln!(out, "{p}    decoder.expect_list_close();");
         let _ = writeln!(out, "{p}    {items}");
         let _ = write!(out, "{p}}}");
         out
@@ -535,15 +532,15 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
 /// Where a value expression is emitted. `type_context` decides recursive
 /// `Box` placement, `level` is the emitted indentation, and `list_depth`
-/// keeps nested array accumulator names distinct.
+/// keeps nested list accumulator names distinct.
 #[derive(Clone, Copy)]
-struct ReadContext {
+struct DecodeContext {
     type_context: TypeContext,
     level: usize,
     list_depth: usize,
 }
 
-impl ReadContext {
+impl DecodeContext {
     fn item(item_ty: TypeId, level: usize) -> Self {
         Self {
             type_context: TypeContext::item(item_ty),
@@ -578,7 +575,7 @@ impl ReadContext {
 /// One struct-like scope from field collection through value construction.
 /// The kind fixes the close probe, indentation, and construction head together.
 struct Scope<'a> {
-    context: ReadContext,
+    context: DecodeContext,
     kind: ScopeKind<'a>,
     name: &'a str,
 }
@@ -601,7 +598,7 @@ impl ScopeKind<'_> {
 impl<'a> Scope<'a> {
     fn struct_body(owner: TypeId, name: &'a str) -> Self {
         Self {
-            context: ReadContext::item(owner, 1),
+            context: DecodeContext::item(owner, 1),
             kind: ScopeKind::Struct,
             name,
         }
@@ -609,13 +606,13 @@ impl<'a> Scope<'a> {
 
     fn variant_payload(owner: TypeId, name: &'a str, variant_ident: &'a str) -> Self {
         Self {
-            context: ReadContext::item(owner, 3),
+            context: DecodeContext::item(owner, 3),
             kind: ScopeKind::VariantPayload { variant_ident },
             name,
         }
     }
 
-    fn field_context(&self) -> ReadContext {
+    fn field_context(&self) -> DecodeContext {
         self.context.field_value()
     }
 

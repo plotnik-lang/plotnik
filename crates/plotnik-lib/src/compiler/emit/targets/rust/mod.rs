@@ -1,12 +1,12 @@
 //! Rust source target.
 
 mod config;
+mod decode;
+mod decoder_frame;
 mod entry_names;
 mod ident;
 mod literal;
 mod module;
-mod reader_frame;
-mod replay;
 mod representation;
 mod serde_impls;
 mod template;

@@ -1,8 +1,8 @@
-//! Target-neutral typed replay plan.
+//! Target-neutral typed result-decoding plan.
 //!
-//! Capture traces name record fields and variant cases with absolute layout
+//! Match-journal events name record fields and variant cases with absolute layout
 //! slots. This plan resolves every nominal twin to the complete set of slots
-//! it may produce and turns output types into a small value-reading algebra.
+//! it may produce and turns output types into a small value-decoding algebra.
 //! Backends choose identifiers, error syntax, recursion representation, and
 //! construction syntax without walking analysis types or rebuilding tables.
 
@@ -14,14 +14,14 @@ use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId
 use crate::core::Symbol;
 
 #[derive(Clone, Debug)]
-pub(crate) struct ReplayPlan {
-    items: Vec<ReplayItem>,
+pub(crate) struct ResultDecodePlan {
+    items: Vec<DecodeItem>,
     items_by_name: HashMap<Symbol, usize>,
 }
 
-impl ReplayPlan {
+impl ResultDecodePlan {
     pub(super) fn build(schema: &OutputSchema<'_>) -> Self {
-        let builder = ReplayPlanBuilder { schema };
+        let builder = DecodePlanBuilder { schema };
         let items = schema
             .entrypoint_items()
             .iter()
@@ -38,100 +38,100 @@ impl ReplayPlan {
         }
     }
 
-    pub(crate) fn items(&self) -> &[ReplayItem] {
+    pub(crate) fn items(&self) -> &[DecodeItem] {
         &self.items
     }
 
-    pub(crate) fn item(&self, name: Symbol) -> &ReplayItem {
+    pub(crate) fn item(&self, name: Symbol) -> &DecodeItem {
         let index = self
             .items_by_name
             .get(&name)
-            .expect("every replay target declares an output item");
+            .expect("every decode target declares an output item");
         &self.items[*index]
     }
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ReplayItem {
+pub(crate) struct DecodeItem {
     pub(crate) name: Symbol,
     pub(crate) ty: TypeId,
-    pub(crate) kind: ReplayItemKind,
-    /// This reader is a recursive definition's dynamic depth boundary.
+    pub(crate) kind: DecodeItemKind,
+    /// This decoder is a recursive definition's dynamic depth boundary.
     pub(crate) enters_depth: bool,
-    /// This reader or one it calls can trip the replay-depth limit.
+    /// This decoder or one it calls can trip the decode-depth limit.
     pub(crate) fallible: bool,
 }
 
-impl ReplayItem {
-    pub(crate) fn has_reader(&self) -> bool {
-        !matches!(self.kind, ReplayItemKind::VoidDefinition)
+impl DecodeItem {
+    pub(crate) fn has_decoder(&self) -> bool {
+        !matches!(self.kind, DecodeItemKind::VoidDefinition)
     }
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum ReplayItemKind {
-    Record(ReplayScopePlan),
-    Variant(Vec<ReplayCasePlan>),
-    Alias(ReplayValuePlan),
+pub(crate) enum DecodeItemKind {
+    Record(DecodeScope),
+    Variant(Vec<DecodeCase>),
+    Alias(DecodeValue),
     VoidDefinition,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ReplayScopePlan {
-    pub(crate) fields: Vec<ReplayFieldPlan>,
+pub(crate) struct DecodeScope {
+    pub(crate) fields: Vec<DecodeField>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ReplayFieldPlan {
+pub(crate) struct DecodeField {
     pub(crate) name: Symbol,
     /// Every absolute `RecordSet` slot this field may use across nominal twins.
     pub(crate) indices: Vec<u16>,
-    pub(crate) value: ReplayValuePlan,
+    pub(crate) value: DecodeValue,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ReplayCasePlan {
+pub(crate) struct DecodeCase {
     pub(crate) name: Symbol,
     /// Every absolute `VariantOpen` slot this case may use across twins.
     pub(crate) indices: Vec<u16>,
-    pub(crate) payload: Option<ReplayScopePlan>,
+    pub(crate) payload: Option<DecodeScope>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum ReplayValuePlan {
+pub(crate) enum DecodeValue {
     Node,
     Text,
     Bool,
-    Nullable(Box<ReplayValuePlan>),
-    List(Box<ReplayValuePlan>),
-    Read {
+    Nullable(Box<DecodeValue>),
+    List(Box<DecodeValue>),
+    Nested {
         item: Symbol,
         /// Analysis type at this read position. It preserves whether the
         /// position is a direct nominal value or a definition-reference
         /// occurrence without prescribing a target's representation.
-        source: TypeId,
+        source_type: TypeId,
     },
 }
 
-struct ReplayPlanBuilder<'p, 'a> {
+struct DecodePlanBuilder<'p, 'a> {
     schema: &'p OutputSchema<'a>,
 }
 
-impl ReplayPlanBuilder<'_, '_> {
-    fn item(&self, item: OutputItem) -> ReplayItem {
+impl DecodePlanBuilder<'_, '_> {
+    fn item(&self, item: OutputItem) -> DecodeItem {
         let kind = match item.kind {
             OutputItemKind::Record => {
                 let TypeShape::Record(fields) = self.schema.types.expect_type_shape(item.ty) else {
                     unreachable!("record output item has a record shape");
                 };
                 let twins = collect_twins(self.schema.types, self.schema.layout(), item);
-                ReplayItemKind::Record(self.scope(fields.iter(), &twins))
+                DecodeItemKind::Record(self.scope(fields.iter(), &twins))
             }
-            OutputItemKind::Variant => ReplayItemKind::Variant(self.variant_cases(item)),
-            OutputItemKind::Alias => ReplayItemKind::Alias(self.value(item.ty)),
-            OutputItemKind::VoidDef => ReplayItemKind::VoidDefinition,
+            OutputItemKind::Variant => DecodeItemKind::Variant(self.variant_cases(item)),
+            OutputItemKind::Alias => DecodeItemKind::Alias(self.value(item.ty)),
+            OutputItemKind::VoidDef => DecodeItemKind::VoidDefinition,
         };
-        ReplayItem {
+        DecodeItem {
             name: item.name,
             ty: item.ty,
             kind,
@@ -140,7 +140,7 @@ impl ReplayPlanBuilder<'_, '_> {
         }
     }
 
-    fn variant_cases(&self, item: OutputItem) -> Vec<ReplayCasePlan> {
+    fn variant_cases(&self, item: OutputItem) -> Vec<DecodeCase> {
         let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(item.ty) else {
             unreachable!("variant output item has a variant shape");
         };
@@ -159,7 +159,7 @@ impl ReplayPlanBuilder<'_, '_> {
                     let payloads = payload_twins(self.schema.types, &twins, index);
                     Some(self.scope(fields.iter(), &payloads))
                 };
-                ReplayCasePlan {
+                DecodeCase {
                     name,
                     indices: member_indices(self.schema.layout(), &twins, index),
                     payload,
@@ -172,11 +172,11 @@ impl ReplayPlanBuilder<'_, '_> {
         &self,
         fields: impl Iterator<Item = (&'b Symbol, &'b RecordField)>,
         twins: &[TypeId],
-    ) -> ReplayScopePlan {
-        ReplayScopePlan {
+    ) -> DecodeScope {
+        DecodeScope {
             fields: fields
                 .enumerate()
-                .map(|(index, (&name, info))| ReplayFieldPlan {
+                .map(|(index, (&name, info))| DecodeField {
                     name,
                     indices: member_indices(self.schema.layout(), twins, index),
                     value: self.value(info.final_type),
@@ -185,30 +185,28 @@ impl ReplayPlanBuilder<'_, '_> {
         }
     }
 
-    fn value(&self, ty: TypeId) -> ReplayValuePlan {
+    fn value(&self, ty: TypeId) -> DecodeValue {
         match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Node | TypeShape::Custom(_) => ReplayValuePlan::Node,
-            TypeShape::Text => ReplayValuePlan::Text,
-            TypeShape::Bool => ReplayValuePlan::Bool,
-            TypeShape::Option(inner) => ReplayValuePlan::Nullable(Box::new(self.value(*inner))),
-            TypeShape::List { element, .. } => {
-                ReplayValuePlan::List(Box::new(self.value(*element)))
-            }
-            TypeShape::Record(_) | TypeShape::Variant(_) => ReplayValuePlan::Read {
+            TypeShape::Node | TypeShape::Custom(_) => DecodeValue::Node,
+            TypeShape::Text => DecodeValue::Text,
+            TypeShape::Bool => DecodeValue::Bool,
+            TypeShape::Option(inner) => DecodeValue::Nullable(Box::new(self.value(*inner))),
+            TypeShape::List { element, .. } => DecodeValue::List(Box::new(self.value(*element))),
+            TypeShape::Record(_) | TypeShape::Variant(_) => DecodeValue::Nested {
                 item: self
                     .schema
                     .type_name_of(ty)
                     .expect("naming pass names every non-payload composite"),
-                source: ty,
+                source_type: ty,
             },
             TypeShape::Ref(definition) => {
                 let target = self.schema.types.expect_def_output(*definition);
                 if target == TYPE_VOID {
-                    return ReplayValuePlan::Node;
+                    return DecodeValue::Node;
                 }
-                ReplayValuePlan::Read {
+                DecodeValue::Nested {
                     item: self.schema.deps.def_name_sym(*definition),
-                    source: ty,
+                    source_type: ty,
                 }
             }
             TypeShape::Void => unreachable!("void cannot appear in an output position"),

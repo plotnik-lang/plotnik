@@ -33,7 +33,7 @@ pub(crate) enum OutputItemKind {
     Variant,
     Alias,
     /// A selectable match-only definition has a nominal marker and a `matches` API,
-    /// but no replay value.
+    /// but no decoded value.
     VoidDef,
 }
 

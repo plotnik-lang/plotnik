@@ -1,4 +1,4 @@
-use crate::{JournalEvent, MatchJournal, TraceReader};
+use crate::{JournalEvent, MatchJournal, ResultDecoder};
 
 fn journal(entries: Vec<JournalEvent<'static>>) -> MatchJournal<'static> {
     let mut journal = MatchJournal::new();
@@ -16,32 +16,32 @@ fn peek_record_set_sees_through_a_scalar() {
         JournalEvent::RecordSet(7),
     ]);
 
-    let t = TraceReader::new(&journal, "");
+    let decoder = ResultDecoder::new(&journal, "");
 
-    assert_eq!(t.peek_record_set(), 7);
+    assert_eq!(decoder.peek_record_set(), 7);
 }
 
 #[test]
-fn bool_reader_consumes_one_balanced_scalar() {
+fn bool_decoder_consumes_one_balanced_scalar() {
     let journal = journal(vec![
         JournalEvent::ScalarOpen,
         JournalEvent::BoolClose(false),
     ]);
 
-    let mut t = TraceReader::new(&journal, "");
+    let mut decoder = ResultDecoder::new(&journal, "");
 
-    assert!(!t.expect_bool());
-    t.finish();
+    assert!(!decoder.expect_bool());
+    decoder.finish();
 }
 
 #[test]
 fn absent_string_is_consumed_as_an_option() {
     let journal = journal(vec![JournalEvent::ScalarOpen, JournalEvent::StrClose]);
 
-    let mut t = TraceReader::new(&journal, "");
+    let mut decoder = ResultDecoder::new(&journal, "");
 
-    assert!(t.take_absent());
-    t.finish();
+    assert!(decoder.take_absent());
+    decoder.finish();
 }
 
 #[test]
@@ -57,24 +57,24 @@ fn peek_record_set_skips_a_balanced_composite() {
         JournalEvent::RecordSet(9),
     ]);
 
-    let t = TraceReader::new(&journal, "");
+    let decoder = ResultDecoder::new(&journal, "");
 
-    assert_eq!(t.peek_record_set(), 9);
+    assert_eq!(decoder.peek_record_set(), 9);
 }
 
 #[test]
 fn peek_record_set_skips_an_empty_list() {
     // Two shape-identical empty-list prefixes are told apart only by the
-    // member index behind them — the reader's dispatch relies on this.
+    // member index behind them — the decoder's dispatch relies on this.
     let journal = journal(vec![
         JournalEvent::ListOpen,
         JournalEvent::ListClose,
         JournalEvent::RecordSet(3),
     ]);
 
-    let t = TraceReader::new(&journal, "");
+    let decoder = ResultDecoder::new(&journal, "");
 
-    assert_eq!(t.peek_record_set(), 3);
+    assert_eq!(decoder.peek_record_set(), 3);
 }
 
 #[test]
@@ -90,28 +90,28 @@ fn peek_record_set_answers_at_every_level_of_a_nested_value() {
         JournalEvent::RecordSet(9),
     ]);
 
-    let mut t = TraceReader::new(&journal, "");
+    let mut decoder = ResultDecoder::new(&journal, "");
 
-    assert_eq!(t.peek_record_set(), 9);
-    t.expect_record_open();
-    assert_eq!(t.peek_record_set(), 1);
-    assert!(t.take_absent());
-    assert_eq!(t.expect_record_set(), 1);
-    t.expect_record_close();
-    assert_eq!(t.expect_record_set(), 9);
-    t.finish();
+    assert_eq!(decoder.peek_record_set(), 9);
+    decoder.expect_record_open();
+    assert_eq!(decoder.peek_record_set(), 1);
+    assert!(decoder.take_absent());
+    assert_eq!(decoder.expect_record_set(), 1);
+    decoder.expect_record_close();
+    assert_eq!(decoder.expect_record_set(), 9);
+    decoder.finish();
 }
 
 #[test]
 fn take_absent_consumes_only_absence() {
     let journal = journal(vec![JournalEvent::Absent, JournalEvent::RecordSet(0)]);
 
-    let mut t = TraceReader::new(&journal, "");
+    let mut decoder = ResultDecoder::new(&journal, "");
 
-    assert!(t.take_absent());
-    assert!(!t.take_absent());
-    assert_eq!(t.expect_record_set(), 0);
-    t.finish();
+    assert!(decoder.take_absent());
+    assert!(!decoder.take_absent());
+    assert_eq!(decoder.expect_record_set(), 0);
+    decoder.finish();
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn take_absent_consumes_only_absence() {
 fn finish_rejects_leftovers() {
     let journal = journal(vec![JournalEvent::Absent]);
 
-    let t = TraceReader::new(&journal, "");
+    let decoder = ResultDecoder::new(&journal, "");
 
-    t.finish();
+    decoder.finish();
 }

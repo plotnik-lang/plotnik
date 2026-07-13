@@ -21,7 +21,7 @@
 //!   self-normalization renders differently.
 //!
 //! Duplicate entries within one successor list also collapse (keep first):
-//! successor attempts replay from the same origin state, so a repeated label
+//! successor attempts restart from the same origin state, so a repeated label
 //! is a provably identical retry. Merges create these (`→ [a, b]` where `b`
 //! merged into `a`), and removing them re-enables further merges.
 //!

@@ -1,13 +1,13 @@
 //! The typed decoder's cursor over a committed match journal.
 //!
 //! A generated matcher commits the same journal the VM commits; the generated
-//! per-type readers then decode that journal once, on the winning
-//! path, into the query's typed output. [`TraceReader`] is the cursor those
-//! readers share: it only knows the stream's vocabulary, while the readers
+//! per-type decoders then decode that journal once, on the winning
+//! path, into the query's typed output. [`ResultDecoder`] is the cursor those
+//! decoders share: it only knows the stream's vocabulary, while the decoders
 //! carry the schema (which entries are possible where — proven at emit by the
 //! same analysis the bytecode effect-stack validation checks).
 //!
-//! Every miss here is emitter/reader drift, not anything an input can cause,
+//! Every miss here is emitter/decoder drift, not anything an input can cause,
 //! so misses panic with the position and the offending entry.
 
 use tree_sitter::Node;
@@ -17,19 +17,19 @@ use crate::{JournalEvent, MatchJournal, node_text, source_text};
 /// `record_set_index` sentinel: no `RecordSet` closes a value starting here.
 const NO_RECORD_SET: u32 = u32::MAX;
 
-pub struct TraceReader<'a, 't, 's> {
+pub struct ResultDecoder<'a, 't, 's> {
     entries: &'a [JournalEvent<'t>],
     source: &'s str,
     pos: usize,
     /// For each position, where the `RecordSet` that closes a field value
     /// starting there sits — [`Self::peek_record_set`]'s answer, precomputed. One backward
-    /// pass at construction keeps replay linear; peeking on demand would
+    /// pass at construction keeps decoding linear; peeking on demand would
     /// rescan every nested composite once per enclosing scope, going
     /// quadratic on deep recursive values.
     record_set_index: Vec<u32>,
 }
 
-impl<'a, 't, 's> TraceReader<'a, 't, 's> {
+impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
     pub fn new(journal: &'a MatchJournal<'t>, source: &'s str) -> Self {
         let entries = journal.as_slice();
         Self {
@@ -41,11 +41,11 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
     }
 
     /// Assert the whole trace was consumed — the entrypoint's value is the
-    /// entire committed stream, so leftovers mean the reader lost sync.
+    /// entire committed stream, so leftovers mean the decoder lost sync.
     pub fn finish(self) {
         assert!(
             self.pos == self.entries.len(),
-            "trace reader: {} of {} entries left unread after the value",
+            "result decoder: {} of {} events left unread after the value",
             self.entries.len() - self.pos,
             self.entries.len(),
         );
@@ -55,7 +55,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         let entry = self
             .entries
             .get(self.pos)
-            .expect("trace reader: read past the end of the committed trace");
+            .expect("result decoder: read past the end of the committed journal");
         self.pos += 1;
         entry
     }
@@ -68,7 +68,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
     /// starting at the cursor. Record scopes need it because the stream is
     /// value-first: the entries of a field's value arrive *before* the
     /// `RecordSet` that names the field, and sibling fields of one record can differ in
-    /// type — so the reader peeks ahead to pick the right typed reader, then
+    /// type — so the decoder peeks ahead to pick the right nested decoder, then
     /// consumes the value linearly. The answer — the first `RecordSet` past the
     /// cursor's balanced composite values — comes from the precomputed
     /// [`Self::record_set_index`].
@@ -76,10 +76,10 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         let record_set_pos = *self
             .record_set_index
             .get(self.pos)
-            .expect("trace reader: peeked past the end of the committed trace");
+            .expect("result decoder: peeked past the end of the committed journal");
         assert!(
             record_set_pos != NO_RECORD_SET,
-            "trace reader: no RecordSet closes the field value at {}",
+            "result decoder: no RecordSet closes the field value at {}",
             self.pos
         );
         match &self.entries[record_set_pos as usize] {
@@ -163,7 +163,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         if !matches!(close, JournalEvent::StrClose) {
             self.mismatch("StrClose", close);
         }
-        let range = range.expect("a non-null text reader requires at least one scalar mark");
+        let range = range.expect("a non-null text decoder requires at least one scalar mark");
         source_text(self.source, range)
     }
 
@@ -271,7 +271,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
 
     fn mismatch(&self, expected: &str, found: &JournalEvent<'_>) -> ! {
         panic!(
-            "trace reader: expected {expected} at {}, found {found:?}",
+            "result decoder: expected {expected} at {}, found {found:?}",
             self.pos - 1,
         )
     }
@@ -280,7 +280,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
 /// For each position, the position of the first `RecordSet` past the balanced
 /// composite values starting there — the `RecordSet` that closes a field value
 /// beginning at that entry, or [`NO_RECORD_SET`] where none does (positions no
-/// reader ever peeks at: closes, and value starts whose `RecordSet` lives in an
+/// decoder ever peeks at: closes, and value starts whose `RecordSet` lives in an
 /// enclosing scope).
 ///
 /// One backward pass. `cur` is the answer for the level being scanned;

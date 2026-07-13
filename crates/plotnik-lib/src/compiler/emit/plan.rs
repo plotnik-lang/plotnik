@@ -8,20 +8,20 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::lower::ir::NfaGraph;
 
+pub(crate) use super::decode::{
+    DecodeCase, DecodeItem, DecodeItemKind, DecodeScope, DecodeValue, ResultDecodePlan,
+};
 pub(crate) use super::matcher::{
     CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, OrdinaryCallPlan,
     PredicatePlan, PredicateValuePlan, RegexId, RoutedCallPlan, SplitCallPlan, StateId,
     StateOrigin, StatePlan, StatePlanKind,
-};
-pub(crate) use super::replay::{
-    ReplayCasePlan, ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan,
 };
 
 /// Everything a generated module shares across target languages.
 pub(crate) struct CodegenPlan<'a> {
     output: OutputSchema<'a>,
     matcher: MatcherPlan,
-    replay: ReplayPlan,
+    decode: ResultDecodePlan,
 }
 
 impl<'a> CodegenPlan<'a> {
@@ -29,11 +29,11 @@ impl<'a> CodegenPlan<'a> {
         let output = OutputSchema::from_artifacts(artifacts)
             .expect("target-neutral compilation validated the output schema");
         let matcher = MatcherPlan::build(graph, artifacts, output.layout());
-        let replay = ReplayPlan::build(&output);
+        let decode = ResultDecodePlan::build(&output);
         Self {
             output,
             matcher,
-            replay,
+            decode,
         }
     }
 
@@ -45,7 +45,7 @@ impl<'a> CodegenPlan<'a> {
         &self.matcher
     }
 
-    pub(crate) fn replay(&self) -> &ReplayPlan {
-        &self.replay
+    pub(crate) fn decode(&self) -> &ResultDecodePlan {
+        &self.decode
     }
 }

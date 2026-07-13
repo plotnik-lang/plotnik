@@ -1,4 +1,4 @@
-//! Rust-specific representation decisions shared by declarations and replay.
+//! Rust-specific representation decisions shared by declarations and decoding.
 //!
 //! This model assigns Rust identifiers and computes lifetime/boxing facts once.
 //! Renderers borrow it; they never collect or rename the output schema again.

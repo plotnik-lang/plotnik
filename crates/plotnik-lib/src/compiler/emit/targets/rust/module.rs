@@ -2,7 +2,7 @@
 //!
 //! The output is one self-contained module: typed output structs/enums (the
 //! Rust type renderer's text, verbatim), the `parse`/`matches` surface and
-//! per-type trace readers (`reader.rs`), and the compiled matcher itself —
+//! per-type result decoders (`decode.rs`), and the compiled matcher itself —
 //! shielded inside a nested `mod matcher` so its machinery names (`Flow`,
 //! state consts) can never collide with a query's own type names.
 //!
@@ -32,9 +32,9 @@ use crate::compiler::emit::plan::{
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::Config;
 use crate::compiler::emit::targets::rust::TypeModel;
+use crate::compiler::emit::targets::rust::decode::DecoderGen;
 use crate::compiler::emit::targets::rust::ident::{shouty_ident, snake_ident};
 use crate::compiler::emit::targets::rust::literal::{decimal_byte_lines, rust_string};
-use crate::compiler::emit::targets::rust::replay::ReaderGen;
 use crate::compiler::emit::targets::rust::template::splice;
 use crate::compiler::regex::compile_native_dfa;
 use plotnik_rt::{Limit, Nav, SkipPolicy};
@@ -190,7 +190,7 @@ struct Generator<'a> {
 struct RustLimits {
     fuel: Limit,
     memory: Limit,
-    replay_depth: Limit,
+    decode_depth: Limit,
 }
 
 impl<'a> Generator<'a> {
@@ -198,7 +198,7 @@ impl<'a> Generator<'a> {
         let limits = RustLimits {
             fuel: config.limits.fuel_limit,
             memory: config.limits.memory,
-            replay_depth: config.depth,
+            decode_depth: config.decode_depth,
         };
         let rust = RustRepresentation::from_plan(plan.matcher());
         Self {
@@ -228,7 +228,7 @@ impl<'a> Generator<'a> {
     fn render(&self) -> String {
         let rust_config = &self.config.rust_types;
         let type_model = TypeModel::new(self.plan.output().clone());
-        let readers = ReaderGen::new(self.plan.output(), &type_model, self.plan.replay());
+        let decoders = DecoderGen::new(self.plan.output(), &type_model, self.plan.decode());
 
         let mut out = String::new();
         self.header(&mut out);
@@ -238,7 +238,7 @@ impl<'a> Generator<'a> {
             rust_config,
         ));
         out.push_str(
-            &readers.parse_api(
+            &decoders.parse_api(
                 self.plan
                     .matcher()
                     .entrypoints()
@@ -246,11 +246,11 @@ impl<'a> Generator<'a> {
                     .map(|entry| entry.definition),
             ),
         );
-        out.push_str(&readers.readers());
+        out.push_str(&decoders.decoders());
         self.entry_reexports(&mut out);
 
         let mut machinery = String::new();
-        self.mod_header(&mut machinery, readers.max_reader_frame_bytes());
+        self.mod_header(&mut machinery, decoders.max_decoder_frame_bytes());
         self.language_check(&mut machinery);
         self.field_consts(&mut machinery);
         self.regex_statics(&mut machinery);
@@ -306,7 +306,7 @@ impl<'a> Generator<'a> {
         let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
     }
 
-    fn mod_header(&self, out: &mut String, max_reader_frame_bytes: u64) {
+    fn mod_header(&self, out: &mut String, max_decoder_frame_bytes: u64) {
         let limits = self.limits;
         splice(
             out,
@@ -316,10 +316,10 @@ impl<'a> Generator<'a> {
                 ("RT", self.config.rt_crate_path()),
                 ("FUEL", &limit_expr(limits.fuel)),
                 ("MEMORY", &limit_expr(limits.memory)),
-                ("READER_FRAME", &max_reader_frame_bytes.to_string()),
+                ("DECODER_FRAME", &max_decoder_frame_bytes.to_string()),
                 (
                     "DEPTH",
-                    &depth_expr(limits.replay_depth, max_reader_frame_bytes),
+                    &depth_expr(limits.decode_depth, max_decoder_frame_bytes),
                 ),
             ],
         );
@@ -985,7 +985,7 @@ impl<'a> Generator<'a> {
     }
 
     /// Per-state match-retry: step past the accepted-but-failed candidate,
-    /// re-run the same state's candidate search, replay the finish. Only
+    /// re-run the same state's candidate search and re-emit the finish. Only
     /// sibling-search states can carry a match-retry checkpoint.
     fn match_retry_fn(&self, out: &mut String) {
         let retryable: Vec<(&StatePlan, &MatchPlan)> = self
@@ -1056,12 +1056,12 @@ pub(super) fn limit_expr(limit: Limit) -> String {
     format!("rt::Limit::{limit:?}")
 }
 
-/// The replay-depth policy as the generated `MAX_REPLAY_DEPTH` initializer.
+/// The decode-depth policy as the generated `MAX_DECODE_DEPTH` initializer.
 /// Resolved at generation time — the ceiling guards the native stack, which
 /// does not scale with the input, so there is nothing to resolve per run.
-pub(super) fn depth_expr(limit: Limit, max_reader_frame_bytes: u64) -> String {
+pub(super) fn depth_expr(limit: Limit, max_decoder_frame_bytes: u64) -> String {
     match limit {
-        Limit::Auto => format!("Some(rt::replay_depth_auto({max_reader_frame_bytes}))"),
+        Limit::Auto => format!("Some(rt::decode_depth_auto({max_decoder_frame_bytes}))"),
         Limit::Of(n) => format!("Some({n})"),
         Limit::Unbounded => "None".to_string(),
     }
@@ -1069,7 +1069,7 @@ pub(super) fn depth_expr(limit: Limit, max_reader_frame_bytes: u64) -> String {
 
 const HEADER: &str = r#"
 // Generated Plotnik query module: typed output types, `parse`/`matches` entry
-// points, per-type trace readers, and the compiled matcher (`mod matcher`).
+// points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
 // (docs/binary-format/08-dump-format.md).
@@ -1100,13 +1100,13 @@ const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
 /// sampled; must be a power of two minus one. Twin of the VM's constant.
 const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
-/// Conservative maximum native-stack bytes used by one typed replay reader
+/// Conservative maximum native-stack bytes used by one typed decoder
 /// frame before runtime padding.
-pub(super) const MAX_READER_FRAME_BYTES: u64 = @READER_FRAME@;
+pub(super) const MAX_DECODER_FRAME_BYTES: u64 = @DECODER_FRAME@;
 
-/// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
-/// matcher itself is iterative; only reader recursion enters this guard.
-pub(super) const MAX_REPLAY_DEPTH: Option<u64> = @DEPTH@;
+/// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
+/// matcher itself is iterative; only decoder recursion enters this guard.
+pub(super) const MAX_DECODE_DEPTH: Option<u64> = @DEPTH@;
 
 /// Resolve [`LIMITS`] against this input's node count, exactly like
 /// `VM::builder(...).build()` resolves the VM's.
@@ -1251,7 +1251,7 @@ enum Unwound {
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
 /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
 /// `TRACE` controls whether data events are journaled; `matches` disables it to
-/// avoid output allocation and replay-depth failures. (No let-chains: generated
+/// avoid output allocation and decode-depth failures. (No let-chains: generated
 /// code targets the embedding crate's edition.)
 fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
     tree: &'t rt::Tree,

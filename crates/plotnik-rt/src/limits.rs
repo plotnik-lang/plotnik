@@ -12,10 +12,10 @@
 //! needs no ceiling of its own: backtracking is iterative, so it is pure heap —
 //! the frame arena, already part of the memory sum — not a native-stack risk.
 //!
-//! Generated matchers meter one more resource the VM does not: **replay
-//! depth**. The VM materializes output iteratively, but generated typed replay
+//! Generated matchers meter one more resource the VM does not: **decode
+//! depth**. The VM materializes output iteratively, but generated typed decoding
 //! can recurse through user-visible recursive output types, so recursive
-//! readers enter a [`ReplayDepth`] guard before constructing each nested value.
+//! decoders enter a [`DecodeDepth`] guard before constructing each nested value.
 
 use std::cell::Cell;
 
@@ -35,13 +35,13 @@ pub enum LimitExceeded {
     /// geometrically it can overshoot `limit` by up to a doubling, so it is
     /// reported alongside the ceiling to make the limit tunable.
     Memory { used: u64, limit: u64 },
-    /// The committed value's nesting exceeded the replay-depth ceiling.
+    /// The committed value's nesting exceeded the decode-depth ceiling.
     /// Reported only by generated matchers (the VM renders output
-    /// iteratively and has no such ceiling): their typed replay recurses,
-    /// so the metered path refuses the match before replay could exhaust
+    /// iteratively and has no such ceiling): their typed decoder recurses,
+    /// so the metered path refuses the match before decoding could exhaust
     /// the native stack. Raise the module's `depth` policy — and run with a
     /// stack to match — if values this deep are expected.
-    Depth(u64),
+    DecodeDepth(u64),
 }
 
 impl std::fmt::Display for LimitExceeded {
@@ -56,8 +56,8 @@ impl std::fmt::Display for LimitExceeded {
                     "exceeded the memory limit of {limit} bytes (used {used} bytes)"
                 )
             }
-            LimitExceeded::Depth(max) => {
-                write!(f, "exceeded the replay depth limit of {max} nested values")
+            LimitExceeded::DecodeDepth(max) => {
+                write!(f, "exceeded the decode depth limit of {max} nested values")
             }
         }
     }
@@ -65,12 +65,12 @@ impl std::fmt::Display for LimitExceeded {
 
 impl std::error::Error for LimitExceeded {}
 
-pub struct ReplayDepth {
+pub struct DecodeDepth {
     max: Option<u64>,
     current: Cell<u64>,
 }
 
-impl ReplayDepth {
+impl DecodeDepth {
     pub fn new(max: Option<u64>) -> Self {
         Self {
             max,
@@ -78,28 +78,28 @@ impl ReplayDepth {
         }
     }
 
-    pub fn enter(&self) -> Result<ReplayDepthGuard<'_>, LimitExceeded> {
+    pub fn enter(&self) -> Result<DecodeDepthGuard<'_>, LimitExceeded> {
         let next = self.current.get() + 1;
         if let Some(max) = self.max
             && next > max
         {
-            return Err(LimitExceeded::Depth(max));
+            return Err(LimitExceeded::DecodeDepth(max));
         }
         self.current.set(next);
-        Ok(ReplayDepthGuard { depth: self })
+        Ok(DecodeDepthGuard { depth: self })
     }
 }
 
-pub struct ReplayDepthGuard<'a> {
-    depth: &'a ReplayDepth,
+pub struct DecodeDepthGuard<'a> {
+    depth: &'a DecodeDepth,
 }
 
-impl Drop for ReplayDepthGuard<'_> {
+impl Drop for DecodeDepthGuard<'_> {
     fn drop(&mut self) {
         let current = self.depth.current.get();
         self.depth
             .current
-            .set(current.checked_sub(1).expect("replay depth underflow"));
+            .set(current.checked_sub(1).expect("decode depth underflow"));
     }
 }
 
@@ -172,38 +172,29 @@ pub struct ResolvedRuntimeLimits {
 // backtracking for fuel, unbounded checkpoint growth for memory). The constants
 // are generous headroom over measured legitimate usage, not tight targets.
 
-/// Native stack budget reserved for generated typed replay.
+/// Native stack budget reserved for generated typed decoding.
 ///
 /// This is intentionally lower than a typical main-thread stack: callers can
 /// run generated matchers on worker threads, and Rust's default worker stack is
 /// commonly 2 MiB.
-const REPLAY_STACK_BUDGET_BYTES: u64 = 2 * 1024 * 1024;
+const DECODE_STACK_BUDGET_BYTES: u64 = 2 * 1024 * 1024;
 
-/// Per-call overhead that the source-level reader estimate cannot see:
+/// Per-call overhead that the source-level decoder estimate cannot see:
 /// return address, saved registers, argument passing, and compiler-chosen
 /// temporaries. The emitter supplies the locals it knows about; this padding
 /// keeps the formula conservative without requiring backend-specific stack maps.
-const REPLAY_FRAME_OVERHEAD_BYTES: u64 = 512;
+const DECODE_FRAME_OVERHEAD_BYTES: u64 = 512;
 
-/// Reader-local bytes that reproduce the previous flat `REPLAY_DEPTH_AUTO`
-/// value under the new frame-scaled formula. Kept only for compatibility with
-/// older generated code that still names the constant directly.
-const REPLAY_DEPTH_AUTO_FRAME_BYTES: u64 = 1536;
-
-/// Compute the default replay-depth ceiling for a generated matcher module.
+/// Compute the default decode-depth ceiling for a generated matcher module.
 ///
-/// The emitter passes its conservative maximum reader-frame estimate. The
+/// The emitter passes its conservative maximum decoder-frame estimate. The
 /// ceiling then scales down for wide readers and up for narrow readers while
 /// staying tied to the native-stack budget this limit protects.
-pub const fn replay_depth_auto(reader_frame_bytes: u64) -> u64 {
-    let frame_bytes = reader_frame_bytes.saturating_add(REPLAY_FRAME_OVERHEAD_BYTES);
-    let depth = REPLAY_STACK_BUDGET_BYTES / frame_bytes;
+pub const fn decode_depth_auto(decoder_frame_bytes: u64) -> u64 {
+    let frame_bytes = decoder_frame_bytes.saturating_add(DECODE_FRAME_OVERHEAD_BYTES);
+    let depth = DECODE_STACK_BUDGET_BYTES / frame_bytes;
     if depth == 0 { 1 } else { depth }
 }
-
-/// Compatibility default for older generated code and callers. New generated
-/// modules call [`replay_depth_auto`] with a module-specific reader estimate.
-pub const REPLAY_DEPTH_AUTO: u64 = replay_depth_auto(REPLAY_DEPTH_AUTO_FRAME_BYTES);
 
 const FUEL_BASE: u64 = 1_000_000;
 const FUEL_PER_NODE: u64 = 1_024;

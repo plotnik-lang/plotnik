@@ -46,7 +46,7 @@ mod grammar_source_tests;
 ///   `depth = <n> | auto` — the limit policy compiled into the safe entry
 ///   points (default `auto`). `fuel` bounds matcher work,
 ///   `memory` bounds live backtracking state, `depth` bounds the committed
-///   value's nesting (the typed replay recurses once per nested value, so
+///   value's nesting (typed decoding recurses once per nested value, so
 ///   this is its native-stack guard).
 ///
 /// The expansion is item-position only (it defines types); invoke it at

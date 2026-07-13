@@ -31,7 +31,7 @@
 //!
 //! ## Why state *sets* (collecting semantics)
 //!
-//! The panic-freedom property is per *path*: every graph path must replay to a
+//! The panic-freedom property is per *path*: every graph path must execute to a
 //! well-shaped effect sequence. Distinct paths may legally reach the same step
 //! with different abstract states — the dedup pass hash-conses structurally
 //! identical branch tails, so e.g. two alternatives share one `VariantClose`

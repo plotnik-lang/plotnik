@@ -13,11 +13,11 @@ pub struct Config {
     /// trusted, the input is not, and the query's author is the one who knows
     /// the budget it deserves.
     pub(crate) limits: RuntimeLimitSpec,
-    /// The replay-depth policy for safe `parse`. Not part of
+    /// The decode-depth policy for safe `parse`. Not part of
     /// [`RuntimeLimitSpec`] — that spec is shared with the VM, whose output
-    /// rendering is iterative; replay depth is a generated-executor resource
-    /// (its typed replay recurses once per nested value).
-    pub(crate) depth: Limit,
+    /// rendering is iterative; decode depth is a generated-executor resource
+    /// (its typed decoder recurses once per nested value).
+    pub(crate) decode_depth: Limit,
     /// Diagnostic provenance for the exact grammar used during linking.
     /// Proc-macro output leaves this absent because Cargo already couples its
     /// parser and generated module; product `generate` paths always set it.
@@ -32,7 +32,7 @@ impl Default for Config {
                 fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
-            depth: Limit::Auto,
+            decode_depth: Limit::Auto,
             grammar_identity: None,
         }
     }
@@ -60,10 +60,10 @@ impl Config {
         self
     }
 
-    /// Override the compiled-in replay-depth policy for safe `parse` (see the
+    /// Override the compiled-in decode-depth policy for safe `parse` (see the
     /// field's doc for why it lives outside the shared spec).
-    pub fn depth(mut self, depth: Limit) -> Self {
-        self.depth = depth;
+    pub fn decode_depth(mut self, depth: Limit) -> Self {
+        self.decode_depth = depth;
         self
     }
 

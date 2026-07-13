@@ -34,12 +34,12 @@ mod cursor;
 mod engine;
 #[cfg(feature = "tree-sitter")]
 mod journal;
+#[cfg(feature = "tree-sitter")]
+mod result_decoder;
 #[cfg(feature = "serde")]
 mod serialize;
 #[cfg(feature = "tree-sitter")]
 mod surface;
-#[cfg(feature = "tree-sitter")]
-mod trace;
 
 #[cfg(test)]
 #[cfg(feature = "tree-sitter")]
@@ -57,14 +57,13 @@ mod limits_tests;
 mod nav_tests;
 #[cfg(test)]
 #[cfg(feature = "tree-sitter")]
-mod trace_tests;
+mod result_decoder_tests;
 
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{Frame, FrameArena, FrameReturns, ReturnOutcome};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
-    Limit, LimitExceeded, REPLAY_DEPTH_AUTO, ReplayDepth, ResolvedRuntimeLimits, RuntimeLimitSpec,
-    replay_depth_auto,
+    DecodeDepth, Limit, LimitExceeded, ResolvedRuntimeLimits, RuntimeLimitSpec, decode_depth_auto,
 };
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
@@ -79,12 +78,12 @@ pub use cursor::CursorWrapper;
 pub use engine::Engine;
 #[cfg(feature = "tree-sitter")]
 pub use journal::{JournalEvent, MatchJournal, node_text, source_text};
+#[cfg(feature = "tree-sitter")]
+pub use result_decoder::ResultDecoder;
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
 #[cfg(feature = "tree-sitter")]
 pub use surface::{Matches, Parse, matches, parse};
-#[cfg(feature = "tree-sitter")]
-pub use trace::TraceReader;
 
 /// The node handle generated query outputs are built from (plus the parse
 /// tree it borrows from). Re-exported so generated code and user code can

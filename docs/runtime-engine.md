@@ -252,12 +252,12 @@ There is no separate recursion limit _for the VM_. Backtracking is iterative
 and call depth costs heap memory only, which the memory ceiling bounds; the
 materializer renders output iteratively too.
 
-Generated Rust matchers meter one more resource: **replay depth**, the
-recursive typed reader's native-stack use. `Auto` is not input-scaled; the
-emitter estimates the module's widest reader frame and the runtime resolves a
+Generated Rust matchers meter one more resource: **decode depth**, the
+recursive typed decoder's native-stack use. `Auto` is not input-scaled; the
+emitter estimates the module's widest decoder frame and the runtime resolves a
 ceiling from that estimate. Safe `parse` refuses recursive output nesting past
-the bound (`LimitExceeded::Depth`) while `matches` suppresses output and never
-runs typed replay. The VM does not track or enforce replay depth: its
+the bound (`LimitExceeded::DecodeDepth`) while `matches` suppresses output and
+never decodes a result. The VM does not track or enforce decode depth: its
 backtracking and materialization paths are iterative.
 
 ## Trivia Handling

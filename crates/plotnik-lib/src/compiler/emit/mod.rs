@@ -1,9 +1,9 @@
 //! Target-neutral emission planning and target implementations.
 
 mod ansi;
+mod decode;
 mod matcher;
 mod plan;
-mod replay;
 pub(crate) mod sink;
 mod target;
 pub(crate) mod targets;

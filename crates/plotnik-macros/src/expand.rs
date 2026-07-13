@@ -107,7 +107,7 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
         .runtime_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
         .serde(cfg!(feature = "serde"))
         .limits(runtime_limits(&args.limits))
-        .depth(replay_depth(&args.limits));
+        .decode_depth(decode_depth(&args.limits));
     let emission = compiled
         .emit(config)
         .map_err(|error| ExpandError::new(query_span, error.to_string()))?;
@@ -229,7 +229,7 @@ fn runtime_limits(args: &LimitArgs) -> RuntimeLimitSpec {
     }
 }
 
-fn replay_depth(args: &LimitArgs) -> Limit {
+fn decode_depth(args: &LimitArgs) -> Limit {
     limit(&args.depth)
 }
 

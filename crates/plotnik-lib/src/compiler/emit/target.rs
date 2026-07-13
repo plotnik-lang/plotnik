@@ -136,7 +136,7 @@ pub struct RustCodegenConfig {
     runtime_crate: Cow<'static, str>,
     serde: bool,
     limits: RuntimeLimitSpec,
-    depth: Limit,
+    decode_depth: Limit,
     provenance: CodegenProvenance,
 }
 
@@ -149,7 +149,7 @@ impl Default for RustCodegenConfig {
                 fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
-            depth: Limit::Auto,
+            decode_depth: Limit::Auto,
             provenance: CodegenProvenance::Omit,
         }
     }
@@ -175,8 +175,8 @@ impl RustCodegenConfig {
         self
     }
 
-    pub fn depth(mut self, depth: Limit) -> Self {
-        self.depth = depth;
+    pub fn decode_depth(mut self, depth: Limit) -> Self {
+        self.decode_depth = depth;
         self
     }
 
@@ -207,7 +207,7 @@ impl RustCodegenConfig {
             .rt_crate(self.runtime_crate.clone())
             .serde(self.serde)
             .limits(self.limits)
-            .depth(self.depth)
+            .decode_depth(self.decode_depth)
     }
 
     pub(crate) fn provenance_mode(&self) -> CodegenProvenance {

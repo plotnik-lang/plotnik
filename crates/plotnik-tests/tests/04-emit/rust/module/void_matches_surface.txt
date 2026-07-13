@@ -1,7 +1,7 @@
 Probe = (program)
 -------------------- MATCHER ---------------------
 // Generated Plotnik query module: typed output types, `parse`/`matches` entry
-// points, per-type trace readers, and the compiled matcher (`mod matcher`).
+// points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
 // (docs/binary-format/08-dump-format.md).
@@ -54,13 +54,13 @@ mod matcher {
     /// sampled; must be a power of two minus one. Twin of the VM's constant.
     const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
-    /// Conservative maximum native-stack bytes used by one typed replay reader
+    /// Conservative maximum native-stack bytes used by one typed decoder
     /// frame before runtime padding.
-    pub(super) const MAX_READER_FRAME_BYTES: u64 = 128;
+    pub(super) const MAX_DECODER_FRAME_BYTES: u64 = 128;
 
-    /// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
-    /// matcher itself is iterative; only reader recursion enters this guard.
-    pub(super) const MAX_REPLAY_DEPTH: Option<u64> = Some(rt::replay_depth_auto(128));
+    /// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
+    /// matcher itself is iterative; only decoder recursion enters this guard.
+    pub(super) const MAX_DECODE_DEPTH: Option<u64> = Some(rt::decode_depth_auto(128));
 
     /// Resolve [`LIMITS`] against this input's node count, exactly like
     /// `VM::builder(...).build()` resolves the VM's.
@@ -163,7 +163,7 @@ mod matcher {
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
     /// `TRACE` controls whether data events are journaled; `matches` disables it to
-    /// avoid output allocation and replay-depth failures. (No let-chains: generated
+    /// avoid output allocation and decode-depth failures. (No let-chains: generated
     /// code targets the embedding crate's edition.)
     fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
         tree: &'t rt::Tree,

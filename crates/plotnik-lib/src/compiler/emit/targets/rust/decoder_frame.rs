@@ -1,14 +1,14 @@
-//! Conservative native-stack estimate for generated typed replay readers.
+//! Conservative native-stack estimate for generated typed result decoders.
 //!
 //! Rust does not expose final stack maps during source generation. This model
-//! counts the locals emitted for each replay shape; `plotnik-rt` adds runtime
+//! counts the locals emitted for each decode shape; `plotnik-rt` adds runtime
 //! padding when it converts the largest frame into an automatic depth limit.
 
 use std::collections::{BTreeMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId, TypeShape};
-use crate::compiler::emit::plan::{ReplayItem, ReplayPlan};
+use crate::compiler::emit::plan::{DecodeItem, ResultDecodePlan};
 use crate::compiler::emit::targets::rust::{TypeContext, TypeModel};
 use crate::core::Symbol;
 
@@ -16,42 +16,42 @@ const WORD_BYTES: u64 = 8;
 const NODE_VALUE_BYTES: u64 = 48;
 const VEC_VALUE_BYTES: u64 = 24;
 const OPTION_TAG_BYTES: u64 = 8;
-const READER_FRAME_BASE_BYTES: u64 = 128;
+const DECODER_FRAME_BASE_BYTES: u64 = 128;
 
 // Compiler-only builds deliberately omit tree-sitter. Workspace/VM builds
 // enable the runtime node type and turn representation drift into an error.
 #[cfg(feature = "vm")]
 const _: () = assert!(
     NODE_VALUE_BYTES >= std::mem::size_of::<plotnik_rt::Node<'static>>() as u64,
-    "reader-frame Node estimate must cover plotnik-rt::Node"
+    "decoder-frame Node estimate must cover plotnik-rt::Node"
 );
 
-pub(super) struct ReaderFrameEstimator<'m, 'a> {
+pub(super) struct DecoderFrameEstimator<'m, 'a> {
     model: &'m TypeModel<'a>,
     types: &'a TypeAnalysis,
-    replay: &'a ReplayPlan,
+    decode: &'a ResultDecodePlan,
 }
 
-impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
-    pub(super) fn new(model: &'m TypeModel<'a>, replay: &'a ReplayPlan) -> Self {
+impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
+    pub(super) fn new(model: &'m TypeModel<'a>, decode: &'a ResultDecodePlan) -> Self {
         Self {
             model,
             types: model.schema().types,
-            replay,
+            decode,
         }
     }
 
     pub(super) fn max_bytes(&self) -> u64 {
-        self.replay
+        self.decode
             .items()
             .iter()
-            .filter(|item| item.has_reader())
-            .map(|item| self.reader_frame_bytes(item))
+            .filter(|item| item.has_decoder())
+            .map(|item| self.decoder_frame_bytes(item))
             .max()
-            .unwrap_or(READER_FRAME_BASE_BYTES)
+            .unwrap_or(DECODER_FRAME_BASE_BYTES)
     }
 
-    fn reader_frame_bytes(&self, item: &ReplayItem) -> u64 {
+    fn decoder_frame_bytes(&self, item: &DecodeItem) -> u64 {
         let guard_bytes = if item.fallible { WORD_BYTES } else { 0 };
         let local_bytes = match self.types.expect_type_shape(item.ty) {
             TypeShape::Record(fields) => self.field_scope_frame_bytes(item.ty, fields),
@@ -64,7 +64,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
             _ => self.value_temp_bytes(item.ty, TypeContext::item(item.ty)),
         };
 
-        READER_FRAME_BASE_BYTES
+        DECODER_FRAME_BASE_BYTES
             .saturating_add(guard_bytes)
             .saturating_add(local_bytes)
     }

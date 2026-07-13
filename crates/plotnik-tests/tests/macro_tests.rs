@@ -62,7 +62,7 @@ mod limited {
     }
 }
 
-// Recursive output nests `Expr` values through native reader calls, so a depth
+// Recursive output nests `Expr` values through native decoder calls, so a depth
 // policy of 1 must trip `parse`; `matches` suppresses output and never replays.
 mod depth_limited {
     plotnik::query! {
@@ -238,9 +238,9 @@ fn compiled_in_depth_limit_trips_parse_only() {
 
     assert!(matches!(
         depth_limited::Q::parse(&tree, source),
-        Err(LimitExceeded::Depth(1))
+        Err(LimitExceeded::DecodeDepth(1))
     ));
-    assert!(depth_limited::Q::matches(&tree, source).expect("matches ignores replay depth"));
+    assert!(depth_limited::Q::matches(&tree, source).expect("matches ignores decode depth"));
 }
 
 #[test]

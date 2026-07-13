@@ -100,7 +100,7 @@ impl LimitKey {
     }
 
     /// Whether `unbounded` is a legal value. A recursive native value has no
-    /// safe unbounded replay depth (`drop` alone overflows), so `depth` refuses
+    /// safe unbounded decode depth (`drop` alone overflows), so `depth` refuses
     /// it — reflected in the value-error wording.
     fn allows_unbounded(self) -> bool {
         !matches!(self, Self::Depth)
