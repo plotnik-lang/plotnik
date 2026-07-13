@@ -202,7 +202,7 @@ When a group breaks:
    fields, and comments occupy lines of their own.
 3. The closing delimiter goes on its own line, at the indent of the line that
    opened the group, with the whole suffix chain attached:
-   `)`, `)* @funcs`, `]? @kind :: Kind`, `}+ @rows`.
+   `)`, `)* @funcs`, `]? @kind :: Kind`, `}+ @records`.
 4. An item that is itself a group repeats the procedure at its indent. A
    broken field value keeps `field: ` and the opener on the field's line:
 
@@ -251,7 +251,7 @@ Suffixes attach in fixed grammar order — quantifier, capture, capture type —
 and never migrate to their own line:
 
 ```
-}* @rows :: Row
+}* @entries :: Entry
 )+? @items
 ] @stmt :: Stmt
 ```

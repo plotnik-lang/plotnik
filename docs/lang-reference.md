@@ -251,7 +251,7 @@ item.**
 → { methods: { method: Node, name: Node }[] }
 ```
 
-This preserves row identity: each iteration produces one record instead of
+This preserves record identity: each iteration produces one record instead of
 parallel lists that lose the association between fields.
 
 Because references are opaque, repeating one is dimensionally simple — the definition's type is the element:
@@ -674,9 +674,9 @@ with an optional alternative — only its node-consuming matches become elements
 
 ```
 A = (expression_statement (identifier) @id)? @x
-Q = (program (A)* @xs)    ; xs collects one row per real match;
+Q = (program (A)* @xs)    ; xs collects one record per real match;
                           ; non-matching statements are skipped, not
-                          ; collected as { x: null } rows
+                          ; collected as { x: null } records
 ```
 
 `(A)+` likewise requires at least one real match; an empty outcome never

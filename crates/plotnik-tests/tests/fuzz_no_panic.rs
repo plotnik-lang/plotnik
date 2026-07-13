@@ -30,7 +30,7 @@ use plotnik_lib::{
 mod support;
 
 /// Queries known to compile, spanning the shapes whose runtime paths matter:
-/// a root match, a leaf match, an alternation, a scalar quantifier, a row
+/// a root match, a leaf match, an alternation, a node-list quantifier, a record-list
 /// quantifier, a self-recursive definition, and a recursive discard
 /// (the `@_` SuppressBegin/skip/SuppressEnd path).
 const TEMPLATES: &[&str] = &[
@@ -38,7 +38,7 @@ const TEMPLATES: &[&str] = &[
     "Q = (identifier) @id",
     "Q = [(identifier) @a (number) @b]",
     "Q = (program (_)* @items)",
-    "Q = (program (expression_statement (_) @stmt)* @rows)",
+    "Q = (program (expression_statement (_) @stmt)* @records)",
     indoc!(
         "
         Rec = [Leaf: (statement_block) Deep: (unary_expression (Rec))]

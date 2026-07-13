@@ -62,7 +62,7 @@ enum ValueAccumulator<'s> {
     },
     /// Marker into the scalar-only range stack. Keeping the marker here
     /// preserves heterogeneous frame nesting checks without making ScalarMark
-    /// scan arrays, structs, and enums.
+    /// scan lists, records, and variants.
     Scalar(usize),
 }
 
@@ -165,23 +165,23 @@ impl<'a> ValueMaterializer<'a> {
                     let val = pending
                         .take()
                         .expect("ArrayPush requires a produced value (verified at load)");
-                    let Some(ValueAccumulator::List(arr)) = stack.last_mut() else {
+                    let Some(ValueAccumulator::List(items)) = stack.last_mut() else {
                         panic!(
                             "event {event_idx}: ArrayPush expects List on stack, found {:?}",
                             stack.last().map(|b| b.kind())
                         );
                     };
-                    arr.push(val);
+                    items.push(val);
                 }
                 JournalEvent::ListClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::List(arr)) = top else {
+                    let Some(ValueAccumulator::List(items)) = top else {
                         panic!(
                             "event {event_idx}: ListClose expects List on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    pending = Some(Value::Array(arr));
+                    pending = Some(Value::List(items));
                 }
                 JournalEvent::RecordOpen => {
                     stack.push(ValueAccumulator::Record(vec![]));

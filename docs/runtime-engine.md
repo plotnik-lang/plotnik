@@ -172,7 +172,7 @@ pub enum JournalEvent<'t> {
 | Node                   | Produce the current cursor node                          |
 | Absent                 | Produce an absent value                                  |
 | ListOpen/ListClose     | Build a list value                                       |
-| ArrayPush              | Append the pending value to the list's backing array     |
+| ArrayPush              | Append the pending value to the backing list             |
 | RecordOpen/RecordClose | Build a record value                                     |
 | RecordSet(idx)         | Assign the pending value to a record member              |
 | VariantOpen/Close      | Build a variant value                                    |

@@ -64,7 +64,7 @@ pub enum Value<'s> {
     Node(NodeHandle<'s>),
     Text(&'s str),
     Bool(bool),
-    Array(Vec<Value<'s>>),
+    List(Vec<Value<'s>>),
     /// Record with ordered fields.
     Record(Vec<(&'s str, Value<'s>)>),
     /// Variant case. `data` is `None` when the case has no payload.
@@ -92,7 +92,7 @@ impl Drop for Value<'_> {
 /// Move `value`'s direct child values onto `worklist`, leaving `value` childless.
 fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
     match value {
-        Value::Array(items) => worklist.append(items),
+        Value::List(items) => worklist.append(items),
         Value::Record(fields) => worklist.extend(fields.drain(..).map(|(_, v)| v)),
         Value::Variant { data, .. } => {
             if let Some(boxed) = data.take() {
@@ -117,9 +117,9 @@ impl Serialize for Value<'_> {
             Value::Node(h) => h.serialize(serializer),
             Value::Text(value) => serializer.serialize_str(value),
             Value::Bool(value) => serializer.serialize_bool(*value),
-            Value::Array(arr) => {
-                let mut seq = serializer.serialize_seq(Some(arr.len()))?;
-                for item in arr {
+            Value::List(items) => {
+                let mut seq = serializer.serialize_seq(Some(items.len()))?;
+                for item in items {
                     seq.serialize_element(item)?;
                 }
                 seq.end()
@@ -320,19 +320,19 @@ fn emit_value<'a>(
             ctx.out.push_str(c.reset);
         }
         Value::Bool(value) => ctx.out.push_str(if *value { "true" } else { "false" }),
-        Value::Array(arr) => {
+        Value::List(items) => {
             ctx.out.push_str(c.dim);
             ctx.out.push('[');
             ctx.out.push_str(c.reset);
-            if arr.is_empty() {
+            if items.is_empty() {
                 ctx.out.push_str(c.dim);
                 ctx.out.push(']');
                 ctx.out.push_str(c.reset);
                 return;
             }
             let elem_indent = if ctx.pretty { indent + 2 } else { 0 };
-            let mut deferred = Vec::with_capacity(arr.len() * 3 + 3);
-            for (i, item) in arr.iter().enumerate() {
+            let mut deferred = Vec::with_capacity(items.len() * 3 + 3);
+            for (i, item) in items.iter().enumerate() {
                 if i > 0 {
                     deferred.push(Step::Str(c.dim));
                     deferred.push(Step::Str(","));

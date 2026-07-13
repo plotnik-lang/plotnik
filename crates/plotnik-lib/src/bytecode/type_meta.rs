@@ -128,7 +128,7 @@ impl TypeDef {
         (self.payload, self.count)
     }
 
-    /// Decode this type definition into a structured enum.
+    /// Decode this type definition into a variant.
     ///
     /// # Panics
     /// Panics if the kind byte is invalid (corrupted bytecode). Trusted side only;

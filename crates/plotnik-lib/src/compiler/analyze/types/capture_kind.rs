@@ -30,7 +30,7 @@ pub enum CaptureKind {
     /// consumed labeled alternation (lowered as `VariantOpen … VariantClose`). Emit
     /// the inner, then a trailing `RecordSet`; the capture contributes no `Node` and no wrapper.
     PendingValue,
-    /// A list collected by `*` or `+` (`Arr … ArrayPush … EndArr`).
+    /// A list collected by `*` or `+` (`ListOpen … ArrayPush … ListClose`).
     List,
 }
 
@@ -108,7 +108,7 @@ impl TypeAnalysis {
                     CaptureKind::Node
                 }
             }
-            // A structured scalar left pending by the inner itself — a consumed
+            // A structured value left pending by the inner itself — a consumed
             // variant type lowered through `VariantOpen`/`VariantClose`.
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue

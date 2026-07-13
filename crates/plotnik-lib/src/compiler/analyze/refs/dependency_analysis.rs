@@ -87,7 +87,7 @@ impl DefinitionDependencies {
             pending.extend_from_slice(
                 self.outgoing
                     .get(def_id.index())
-                    .expect("reachable definition must have a dependency row"),
+                    .expect("reachable definition must have a dependency list"),
             );
         }
 
@@ -177,7 +177,7 @@ impl DependencyAnalysis {
         assert_eq!(
             dependencies.outgoing.len(),
             defs.len(),
-            "every definition must have one dependency row",
+            "every definition must have one dependency list",
         );
 
         Self {

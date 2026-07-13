@@ -260,13 +260,13 @@ impl<'m> ProvenanceExtractor<'m> {
 
         let Some(Frame::List {
             len,
-            provenance: array,
+            provenance: list,
         }) = self.frames.last_mut()
         else {
             unreachable!("list frame was checked before binding ArrayPush");
         };
         if let Some(value) = provenance {
-            union_span(&mut array.source_span, value.source_span);
+            union_span(&mut list.source_span, value.source_span);
         }
         *len += 1;
     }

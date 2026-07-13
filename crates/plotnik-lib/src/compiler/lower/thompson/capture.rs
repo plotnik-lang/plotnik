@@ -249,7 +249,7 @@ impl NfaBuilder<'_> {
 
     /// Check if a quantifier body needs `Node` before `ArrayPush`.
     ///
-    /// For scalar list elements (`Node` type), we need `[Node, ArrayPush]`.
+    /// For node list elements, we need `[Node, ArrayPush]`.
     /// to capture the matched node value.
     /// For structured elements, RecordClose/VariantClose provides the value.
     /// For refs returning structured types, Call provides the value.
@@ -322,7 +322,7 @@ impl NfaBuilder<'_> {
 /// - Named nodes with bubble captures: `(node (child) @x)*`
 ///
 /// Variant types use VariantOpen/VariantClose instead (handled separately).
-pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
+pub fn needs_record_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
     let info = type_ctx.expect_pattern_result(inner);
 
     // Must be a bubble (fields flow to parent scope)
@@ -336,7 +336,7 @@ pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
         .is_some_and(|shape| matches!(shape, TypeShape::Record(_)))
 }
 
-/// Get the row type ID for list-element scoping.
-pub fn row_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
+/// Get the element type ID for list-element scoping.
+pub fn element_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
     type_ctx.expect_pattern_result(inner).flow.type_id()
 }

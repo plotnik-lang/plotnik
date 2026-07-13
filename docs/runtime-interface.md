@@ -293,7 +293,7 @@ Generated runtimes implement this vocabulary:
 | `Node`                 | Current binding-native node.                       |
 | `Absent`               | One absent option value.                           |
 | `ListOpen`             | Begin a list value.                                |
-| `ArrayPush`            | Append the pending value to its backing array.     |
+| `ArrayPush`            | Append the pending value to its backing list.      |
 | `ListClose`            | Close the list and make it pending.                |
 | `RecordOpen`           | Begin a record value.                              |
 | `RecordSet(member)`    | Assign the pending value to a record member index. |

@@ -96,19 +96,19 @@ body therefore becomes the definition's result container:
 ```
 Ids = (identifier)*          ; Ids = Node[]
 MaybeId = (identifier)?      ; MaybeId = Node | null
-Row = (pair key: (_) @k value: (_) @v)
-Rows = (Row)*                ; Rows = Row[]
-First = (Row)?               ; First = Row | null
+Pair = (pair key: (_) @k value: (_) @v)
+Pairs = (Pair)*              ; Pairs = Pair[]
+First = (Pair)?              ; First = Pair | null
 ```
 
 ```typescript
 export type Ids = Node[];
-export type Rows = Row[];
-export type First = Row | null;
+export type Pairs = Pair[];
+export type First = Pair | null;
 ```
 
-References stay opaque at call sites: `(Rows) @rows` → `rows: Rows`, bare
-`(Rows)` is structural, `(Rows)* @xss` → `xss: Rows[]`. An optional-rooted
+References stay opaque at call sites: `(Pairs) @pairs` → `pairs: Pairs`, bare
+`(Pairs)` is structural, `(Pairs)* @groups` → `groups: Pairs[]`. An optional-rooted
 definition under a call-site `?` nests: `(MaybeId)? @x` → `x: MaybeId | null`
 (both nulls print the same in JSON).
 
@@ -118,9 +118,9 @@ a nameable type: a plain node, or a reference. An anonymous element shape is
 rejected; name it in its own definition:
 
 ```
-Bad = {(key) @k (value) @v}*      ; ERROR: the element row has no type name
-Row = (pair key: (_) @k value: (_) @v)
-Good = (Row)*                     ; Good = Row[]
+Bad = {(key) @k (value) @v}*      ; ERROR: the element record has no type name
+Pair = (pair key: (_) @k value: (_) @v)
+Good = (Pair)*                    ; Good = Pair[]
 ```
 
 Two consequences:
@@ -176,8 +176,8 @@ matches exactly one node — the capture takes that node (`{(a)} @x` ≡
 Two rules keep repetition and captures honest:
 
 **1. A quantifier's internal captures must be collected by a capture on the
-quantifier.** All quantifiers, uniformly — `*`/`+` collect a list of rows, `?`
-collects one nullable row; `@_` discards:
+quantifier.** All quantifiers, uniformly — `*`/`+` collect a list of records, `?`
+collects one nullable record; `@_` discards:
 
 ```
 {(key) @k (value) @v}*            ; ERROR: captures repeat, nothing collects them
@@ -221,11 +221,11 @@ Item = (pair key: (_) @k value: (_) @v)
 
 ```
 (identifier)* @ids                ; node list:   ids: Node[]
-{(a) @a (b) @b}* @rows            ; record list: rows: { a: Node, b: Node }[]
+{(a) @a (b) @b}* @records         ; record list: records: { a: Node, b: Node }[]
 (Item)+ @items                    ; reference list: items: [Item, ...Item[]]
 ```
 
-### Optional Rows
+### Optional Records
 
 A captured optional group is one optional record — the `?` counterpart of a
 record list:
@@ -235,10 +235,10 @@ record list:
 → { attrs: { mod: Node, dec: Node } | null }
 ```
 
-The fields keep their true modality — if the row matched, both are present —
+The fields keep their true modality — if the record matched, both are present —
 and a skip yields `attrs: null`, never a hollow `{ mod: null, dec: null }`.
 A quantified named node collects the same way: `(pair (key) @k)? @p` gives
-`p: { k: Node } | null`, mirroring `(pair (key) @k)* @ps` rows.
+`p: { k: Node } | null`, mirroring the records in `(pair (key) @k)* @ps`.
 
 There is no uncaptured fallback (the item-boundary rule): a bare
 `{(mod) @mod (dec) @dec}?` would scatter correlated nulls into the enclosing

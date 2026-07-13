@@ -362,7 +362,7 @@ impl EffectIR {
         Self::literal(EffectKind::Absent, 0)
     }
 
-    /// Append the pending value to the open list's backing array.
+    /// Append the pending value to the open list.
     pub fn array_push() -> Self {
         Self::literal(EffectKind::ArrayPush, 0)
     }

@@ -197,7 +197,7 @@ Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
 
 ```
   01       (function)                           02
-  02  └‣─  (identifier) [Node Set(M0)]          03
+  02  └‣─  (identifier) [Node RecordSet(name)]  03
   03  ─‣┘                                       ◼
 ```
 

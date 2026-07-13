@@ -89,7 +89,7 @@ impl NfaBuilder<'_> {
     /// Emit an epsilon with combined effects.
     ///
     /// Note: this consumes only `outer.post`. Callers whose capture owns no
-    /// scope-opening step (`PendingValue`, suppressive) must route `outer.pre`
+    /// scope-opening step (`PendingValue`, suppressed region) must route `outer.pre`
     /// separately via [`wrap_entry_pre`](Self::wrap_entry_pre).
     pub(super) fn emit_effects_epsilon(
         &mut self,
@@ -113,7 +113,7 @@ impl NfaBuilder<'_> {
     ///
     /// Scope-opening captures (`compile_record_capture`, `compile_list_capture`)
     /// fold `outer_capture.pre` onto their own `RecordOpen`/`ListOpen` step. Captures that
-    /// own no such step — `PendingValue` and suppressive — have nowhere to fold it,
+    /// own no such step — `PendingValue` and suppressed regions — have nowhere to fold it,
     /// so they call this. Dropping it loses a case's `VariantOpen` (or an
     /// an alternative's injected defaults), and the path then closes a
     /// scope it never opened.

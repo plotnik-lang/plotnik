@@ -16,7 +16,7 @@ warning: capture type `bool` replaces the captured value with a boolean
 4 |   }? @present :: bool
   |               ^^^^^^^
   |
-help: the replaced fields, cases, or scalar payload will not be returned
+help: fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
 {
   "present": false

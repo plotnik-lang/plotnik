@@ -250,7 +250,7 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Post-effects (like `EndEnum`) must run after children complete, not right after
+    /// Post-effects (like `VariantClose`) must run after children complete, not right after
     /// matching the parent node. Returns `exit` unchanged when `post` is empty.
     fn emit_trailing_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
         if post.is_empty() {
@@ -767,7 +767,7 @@ impl NfaBuilder<'_> {
         let entry = if inline_scoped_capture {
             // A record scope isolates the definition's internal captures before the
             // `RecordSet`; both continuations close it (an empty body still
-            // produced its row of skip-path values, e.g. `{x: null}`).
+            // produced its record of skip-path values, e.g. `{x: null}`).
             let end = ScopeCloseEffects {
                 leading: &[],
                 capture: &post,
@@ -1108,7 +1108,7 @@ impl NfaBuilder<'_> {
     /// - Record: RecordOpen → inner[…] → RecordClose+capture → exit
     /// - List: ListOpen → quantifier (with ArrayPush) → ListClose+capture → exit
     /// - Ref:    Call → RecordSet epsilon → exit
-    /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
+    /// - Suppressed region: SuppressBegin → inner → SuppressEnd → outer_effects → exit
     pub(super) fn compile_captured(
         &mut self,
         cap: &ast::CapturedPattern,
@@ -1123,7 +1123,7 @@ impl NfaBuilder<'_> {
         // dropped its field, so emitting `RecordSet` would resolve against the wrong
         // scope (the panic behind #470).
         if cap.is_discard() || self.is_suppressed() {
-            return self.compile_suppressive(
+            return self.compile_suppressed_region(
                 inner_opt.as_ref(),
                 nav_override,
                 outer_capture,
@@ -1282,7 +1282,7 @@ impl NfaBuilder<'_> {
     ///
     /// `outer.pre`/`outer.post` (e.g. a case's `VariantOpen`/`VariantClose`)
     /// belong to the enclosing scope and run outside the suppressed region.
-    fn compile_suppressive(
+    fn compile_suppressed_region(
         &mut self,
         inner: Option<&Pattern>,
         nav_override: Option<Nav>,

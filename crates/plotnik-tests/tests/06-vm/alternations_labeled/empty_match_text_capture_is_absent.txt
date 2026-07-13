@@ -18,7 +18,7 @@ warning: capture type `str` replaces structured data with source text
 7 |   ] @value :: str
   |            ^^^^^^
   |
-help: the replaced fields, cases, or scalar payload will not be returned
+help: fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
 {
   "value": null

@@ -3,13 +3,13 @@
 //! Every iteration measures the user-visible query cost minus parsing: build a
 //! VM, execute the compiled module against a pre-parsed tree, and materialize
 //! the result. `parse` benches tree-sitter parsing of the same corpus for
-//! scale, and `scan_rows_execute` skips materialization to split VM time from
+//! scale, and `scan_items_execute` skips materialization to split VM time from
 //! output building.
 //!
 //! Scenarios, each isolating a different runtime path:
-//! - `scan_rows`: enum rows over every top-level statement — sibling
+//! - `scan_items`: variants over every top-level statement — sibling
 //!   navigation, alternation checkpoints, and match-journal recording in bulk.
-//! - `fn_params`: nested field constraints plus an inner list per row.
+//! - `fn_params`: nested field constraints plus an inner list per variant.
 //! - `deep_calls`: self-recursive definition descending nested call chains —
 //!   Call/Return frames and call-retry checkpoints.
 //! - `pred_eq` / `pred_regex`: string and regex predicates that mostly fail —
@@ -17,11 +17,11 @@
 //! - `backtrack_storm`: greedy any-star that never finds its tail, capped by
 //!   an explicit fuel budget — pure dispatch + backtracking, zero output.
 //!
-//! Run: `make bench` (or `make bench FILTER=scan_rows`).
+//! Run: `make bench` (or `make bench FILTER=scan_items`).
 //! Save/compare: `cargo bench -p plotnik-tests --bench vm -- --save-baseline
 //! <name>`, then `critcmp <a> <b>`.
 //! Profile: `samply record cargo bench -p plotnik-tests --bench vm --
-//! --profile-time 15 scan_rows` (bench profile keeps line tables).
+//! --profile-time 15 scan_items` (bench profile keeps line tables).
 
 use std::hint::black_box;
 use std::sync::LazyLock;
@@ -148,7 +148,7 @@ struct Scenario {
 
 const SCENARIOS: &[Scenario] = &[
     Scenario {
-        name: "scan_rows",
+        name: "scan_items",
         entry: "Items",
         query: indoc! {r#"
             Items = (program [
@@ -182,7 +182,7 @@ const SCENARIOS: &[Scenario] = &[
             Chains = (program [
               Hit: (lexical_declaration (variable_declarator value: (arrow_function body: (Nest) @chain)))
               Skip: (_)
-            ]* @rows)
+            ]* @items)
         "#},
     },
     Scenario {
@@ -192,7 +192,7 @@ const SCENARIOS: &[Scenario] = &[
             Strs = (program [
               Hit: (expression_statement (call_expression arguments: (arguments (string (string_fragment == "needle")) @s)))
               Other: (_)
-            ]* @rows)
+            ]* @items)
         "#},
     },
     Scenario {
@@ -202,7 +202,7 @@ const SCENARIOS: &[Scenario] = &[
             Strs = (program [
               Hit: (expression_statement (call_expression arguments: (arguments (string (string_fragment =~ /^ne+dle$/)) @s)))
               Other: (_)
-            ]* @rows)
+            ]* @items)
         "#},
     },
 ];
@@ -213,7 +213,7 @@ static MEDIUM_ONLY: [(&str, &LazyLock<String>); 1] = [("medium", &MEDIUM)];
 
 fn corpora_for(name: &str) -> &'static [(&'static str, &'static LazyLock<String>)] {
     match name {
-        "scan_rows" => &ALL_SIZES,
+        "scan_items" => &ALL_SIZES,
         _ => &MEDIUM_ONLY,
     }
 }
@@ -255,7 +255,7 @@ fn bench_scenarios(c: &mut Criterion) {
     }
 }
 
-/// The scan without materialization: subtracting this from `scan_rows/medium`
+/// The scan without materialization: subtracting this from `scan_items/medium`
 /// attributes time between the VM proper and output building.
 fn bench_scan_execute(c: &mut Criterion) {
     let s = &SCENARIOS[0];
@@ -265,7 +265,7 @@ fn bench_scan_execute(c: &mut Criterion) {
         .expect("bench entry point exists");
     let source: &str = &MEDIUM;
     let tree = parse_js(source);
-    let mut group = c.benchmark_group("scan_rows_execute");
+    let mut group = c.benchmark_group("scan_items_execute");
     group.throughput(Throughput::Bytes(source.len() as u64));
     group.bench_function("medium", |b| {
         b.iter(|| {

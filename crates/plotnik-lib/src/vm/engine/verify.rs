@@ -133,7 +133,7 @@ impl<'a> TypeVerifier<'a> {
                     }
                 }
                 TypeKind::ListZeroOrMore => match value {
-                    Value::Array(items) => {
+                    Value::List(items) => {
                         for (i, item) in items.iter().enumerate() {
                             let prev_len = self.path.len();
                             self.path.push_str(&format!("[{}]", i));
@@ -149,7 +149,7 @@ impl<'a> TypeVerifier<'a> {
                     }
                 },
                 TypeKind::ListOneOrMore => match value {
-                    Value::Array(items) => {
+                    Value::List(items) => {
                         if items.is_empty() {
                             self.errors.push(format_error(
                                 &self.path,
@@ -166,7 +166,7 @@ impl<'a> TypeVerifier<'a> {
                     _ => {
                         self.errors.push(format_error(
                             &self.path,
-                            &format!("type: array, value: {}", value_kind_name(value)),
+                            &format!("type: list, value: {}", value_kind_name(value)),
                         ));
                     }
                 },
@@ -280,7 +280,7 @@ fn value_kind_name(value: &Value) -> &'static str {
         Value::Node(_) => "Node",
         Value::Text(_) => "Text",
         Value::Bool(_) => "Bool",
-        Value::Array(_) => "array",
+        Value::List(_) => "list",
         Value::Record(_) => "record",
         Value::Variant { .. } => "variant",
     }

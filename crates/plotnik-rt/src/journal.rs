@@ -14,7 +14,7 @@ pub enum JournalEvent<'t> {
     Node(Node<'t>),
     /// Begin a list value.
     ListOpen,
-    /// Append the current value to the open list's backing array.
+    /// Append the current value to the open list.
     ArrayPush,
     /// End a list value.
     ListClose,

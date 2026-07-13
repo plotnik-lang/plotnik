@@ -175,8 +175,8 @@ impl NfaBuilder<'_> {
     /// Compile a record-scope capture: `RecordOpen → inner → RecordClose+capture → exit(s)`.
     ///
     /// A quantified inner (`{...}? @cap`) routes to
-    /// [`compile_optional_row_capture`](Self::compile_optional_row_capture): the
-    /// row is optional as a whole, so the record scope must not open on the skip
+    /// [`compile_optional_record_capture`](Self::compile_optional_record_capture): the
+    /// record is optional as a whole, so the record scope must not open on the skip
     /// path. For the remaining (non-quantified) inners the record opens once and
     /// closes on every continuation.
     ///
@@ -189,11 +189,11 @@ impl NfaBuilder<'_> {
         req: CaptureRequest,
         exits: CaptureExits,
     ) -> Label {
-        // `{...}? @x`: the row is optional as a whole. The record scope moves
+        // `{...}? @x`: the record is optional as a whole. The record scope moves
         // inside the quantifier iteration so a skip emits a bare `Absent` for the
-        // capture — never a hollow `{ field: null }` struct.
+        // capture — never a hollow `{ field: null }` record.
         if matches!(&req.inner, Pattern::QuantifiedPattern(_)) {
-            return self.compile_optional_row_capture(req, exits);
+            return self.compile_optional_record_capture(req, exits);
         }
 
         let CaptureRequest {
@@ -299,7 +299,7 @@ impl NfaBuilder<'_> {
         inner: &Pattern,
         exit: Label,
         nav_override: Option<Nav>,
-        row_type_id: Option<TypeId>,
+        element_type_id: Option<TypeId>,
     ) -> Label {
         let record_close_step = self.fresh_label();
         self.instructions.push(
@@ -309,8 +309,8 @@ impl NfaBuilder<'_> {
                 .into(),
         );
 
-        // `row_type_id` drives `RecordSet` effects inside the record scope.
-        let inner_entry = self.compile_with_optional_scope(row_type_id, |this| {
+        // `element_type_id` drives `RecordSet` effects inside the record scope.
+        let inner_entry = self.compile_with_optional_scope(element_type_id, |this| {
             this.compile_iteration_element(
                 inner,
                 PatternCtx::with_nav(record_close_step, nav_override),

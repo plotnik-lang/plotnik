@@ -15,7 +15,7 @@ use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOpera
 
 use super::NfaBuilder;
 use super::capture::{
-    CaptureEffects, PatternCtx, first_unmatched_close, needs_struct_wrapper, row_type_id,
+    CaptureEffects, PatternCtx, element_type_id, first_unmatched_close, needs_record_wrapper,
 };
 use super::navigation::resumable_search_nav;
 use super::nfa_emit::{ForkTargets, Greediness};
@@ -69,15 +69,15 @@ enum IterationScope {
     Standalone {
         capture: CaptureEffects,
     },
-    StructScoped {
-        row_type_id: Option<TypeId>,
+    RecordElement {
+        element_type_id: Option<TypeId>,
         capture: CaptureEffects,
     },
-    RowScopedByIteration {
-        row_type_id: Option<TypeId>,
+    ElementScopeByIteration {
+        element_type_id: Option<TypeId>,
         capture: CaptureEffects,
     },
-    RowScopedByArrayExit {
+    ElementScopeByListExit {
         capture: CaptureEffects,
     },
     CaptureType {
@@ -96,16 +96,16 @@ impl IterationScope {
         capture: CaptureEffects,
         type_ctx: &crate::compiler::analyze::types::TypeAnalysis,
     ) -> Self {
-        let row_type_id = row_type_id(inner, type_ctx);
-        if needs_struct_wrapper(inner, type_ctx) {
-            return Self::StructScoped {
-                row_type_id,
+        let element_type_id = element_type_id(inner, type_ctx);
+        if needs_record_wrapper(inner, type_ctx) {
+            return Self::RecordElement {
+                element_type_id,
                 capture,
             };
         }
 
-        Self::RowScopedByIteration {
-            row_type_id,
+        Self::ElementScopeByIteration {
+            element_type_id,
             capture,
         }
     }
@@ -122,17 +122,17 @@ impl IterationScope {
             Self::Standalone { capture } => Self::Standalone {
                 capture: capture.clone(),
             },
-            Self::StructScoped {
-                row_type_id,
+            Self::RecordElement {
+                element_type_id,
                 capture,
-            } => Self::StructScoped {
-                row_type_id: *row_type_id,
+            } => Self::RecordElement {
+                element_type_id: *element_type_id,
                 capture: capture.clone(),
             },
-            Self::RowScopedByIteration { capture, .. } => Self::RowScopedByArrayExit {
+            Self::ElementScopeByIteration { capture, .. } => Self::ElementScopeByListExit {
                 capture: capture.clone(),
             },
-            Self::RowScopedByArrayExit { capture } => Self::RowScopedByArrayExit {
+            Self::ElementScopeByListExit { capture } => Self::ElementScopeByListExit {
                 capture: capture.clone(),
             },
             Self::CaptureType { plan, capture } => Self::CaptureType {
@@ -145,9 +145,9 @@ impl IterationScope {
     fn capture(&self) -> &CaptureEffects {
         match self {
             Self::Standalone { capture }
-            | Self::StructScoped { capture, .. }
-            | Self::RowScopedByIteration { capture, .. }
-            | Self::RowScopedByArrayExit { capture }
+            | Self::RecordElement { capture, .. }
+            | Self::ElementScopeByIteration { capture, .. }
+            | Self::ElementScopeByListExit { capture }
             | Self::CaptureType { capture, .. } => capture,
         }
     }
@@ -593,16 +593,16 @@ impl NfaBuilder<'_> {
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile a struct-mechanism capture whose inner is an optional quantifier
-    /// (`{...}? @x`, `[...]? @x`) — the only quantifier that reaches the struct
+    /// Compile a record capture whose inner is an optional quantifier
+    /// (`{...}? @x`, `[...]? @x`) — the only quantifier that reaches the record
     /// mechanism, since `*`/`+` classify as `List`.
     ///
-    /// The row is optional as a whole. Mirroring how lists scope each element
+    /// The record is optional as a whole. Mirroring how lists scope each element
     /// record, the `RecordOpen → body → RecordClose+RecordSet` wrapper lives inside the
     /// iteration; the skip path emits a bare `Absent` for the capture instead of
-    /// a hollow `{ field: null }` struct, matching the declared
+    /// a hollow `{ field: null }` record, matching the declared
     /// `{ … } | null` type.
-    pub(super) fn compile_optional_row_capture(
+    pub(super) fn compile_optional_record_capture(
         &mut self,
         req: CaptureRequest,
         exits: CaptureExits,
@@ -614,10 +614,10 @@ impl NfaBuilder<'_> {
             outer_capture,
         } = req
         else {
-            unreachable!("optional-row lowering receives a quantified capture")
+            unreachable!("optional-record lowering receives a quantified capture")
         };
         let QuantifierForm::Quantified { inner, kind } = classify_quantifier(&quant) else {
-            unreachable!("admitted struct-mechanism quantifier has an operator and an inner");
+            unreachable!("admitted record capture has an operator and an inner");
         };
         assert!(
             matches!(kind.kind(), QuantifierKind::Optional),
@@ -633,7 +633,7 @@ impl NfaBuilder<'_> {
         };
         let brackets = self.bracket_quantifier(&quant, outer_capture, match_exit);
 
-        // Skip: the row is absent — null the capture; the enclosing scope's
+        // Skip: the record is absent — null the capture; the enclosing scope's
         // trailing effects still run, as they do on the match path.
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
@@ -649,8 +649,8 @@ impl NfaBuilder<'_> {
             SkipExit::Fail => None,
         };
 
-        // The row scope's type drives the inner captures' `RecordSet` member resolution.
-        let row_type_id = self
+        // The record's type drives the inner captures' `RecordSet` member resolution.
+        let record_type_id = self
             .ctx
             .analysis
             .type_analysis
@@ -669,7 +669,7 @@ impl NfaBuilder<'_> {
             |this, target| {
                 let ExitNav { exit, nav } = target;
                 let record_close = this.emit_record_close_step_with_effects(end_effects, exit);
-                let body = this.compile_with_optional_scope(row_type_id, |t| {
+                let body = this.compile_with_optional_scope(record_type_id, |t| {
                     t.compile_iteration_element(
                         &inner,
                         PatternCtx::with_nav(record_close, Some(nav)),
@@ -1185,7 +1185,7 @@ impl NfaBuilder<'_> {
         let ExitNav { exit, nav } = target;
         match element_scope {
             IterationScope::Standalone { capture }
-            | IterationScope::RowScopedByArrayExit { capture } => self.compile_iteration_element(
+            | IterationScope::ElementScopeByListExit { capture } => self.compile_iteration_element(
                 inner,
                 PatternCtx {
                     exit,
@@ -1194,13 +1194,13 @@ impl NfaBuilder<'_> {
                     value: false,
                 },
             ),
-            IterationScope::StructScoped { row_type_id, .. } => {
-                self.compile_record_for_list(inner, exit, Some(nav), row_type_id)
-            }
-            IterationScope::RowScopedByIteration {
-                row_type_id,
+            IterationScope::RecordElement {
+                element_type_id, ..
+            } => self.compile_record_for_list(inner, exit, Some(nav), element_type_id),
+            IterationScope::ElementScopeByIteration {
+                element_type_id,
                 capture,
-            } => self.compile_with_optional_scope(row_type_id, |this| {
+            } => self.compile_with_optional_scope(element_type_id, |this| {
                 this.compile_iteration_element(
                     inner,
                     PatternCtx {
