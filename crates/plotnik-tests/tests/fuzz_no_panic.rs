@@ -193,6 +193,12 @@ proptest! {
     }
 }
 
+#[test]
+#[ignore = "known formatter panic: parse-clean group has a closer"]
+fn formatting_nested_group_with_literal_closer_never_panics() {
+    let _ = format_query("((\"(\"");
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
