@@ -800,7 +800,7 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
                 SkipExit::Fail => SkipExit::Fail,
             };
-            let body_entry = self.compile_with_optional_scope(def_output_id, |this| {
+            let body_entry = self.with_scope_if_present(def_output_id, |this| {
                 let pattern_ctx = PatternCtx {
                     exit: body_match_exit,
                     nav: nav_override,
@@ -826,7 +826,7 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
                 SkipExit::Fail => SkipExit::Fail,
             };
-            let body_entry = self.compile_with_optional_scope(def_output_id, |this| {
+            let body_entry = self.with_scope_if_present(def_output_id, |this| {
                 let pattern_ctx = PatternCtx {
                     exit: body_match_exit,
                     nav: nav_override,
@@ -1177,7 +1177,7 @@ impl NfaBuilder<'_> {
 
             // Node/Ref/PendingValue own no capture-site scope (their wrapper, if any, is
             // part of the inner). With split exits all three fold the capture onto the
-            // body and recurse, letting the inner optional/star own the skip/match
+            // body and recurse, letting the inner `?`/`*` own the skip/match
             // split; that context always enters with empty `pre`, so the per-mechanism
             // single-exit handling (PendingValue's trailing `RecordSet`, Node's bubble) is
             // unnecessary there.

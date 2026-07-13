@@ -80,7 +80,7 @@ pub struct InferVisitor<'a, 'd> {
 /// Whether a quantifier contributes fields, materializes a captured value, is
 /// explicitly discarded, or supplies a definition's value. Captured `*`/`+`
 /// quantifiers establish a list element boundary; captured `?` establishes an
-/// optional value boundary. A bare quantifier is structural. Under `@_`, output
+/// option-value boundary. A bare quantifier is structural. Under `@_`, output
 /// is discarded, so no collection boundary is required. At a definition root,
 /// the quantifier's list or option is the definition value.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -755,7 +755,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // A no-value inner that doesn't match exactly one node has no single node
         // for the capture to bind. Recover as `Node` — the error is already
         // reported. Direct quantifiers are exempt: the captured-quantifier
-        // machinery defines their value (list, or optional node), and the
+        // machinery defines their value (list, or option-valued node), and the
         // exactly-one check runs on their element instead.
         if !matches!(inner.node(), Pattern::QuantifiedPattern(_))
             && !self.report_capture_on_match_only_ref(inner.node(), &inner_info)
@@ -1143,7 +1143,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 }
                 QuantifiedContext::Discard => PatternFlow::NoValue,
                 // The definition collects the skip as its own null: the output
-                // is the option type itself, not a field-optionality flag.
+                // is the option type itself, not a field-completion flag.
                 QuantifiedContext::DefinitionValue => {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
                     PatternFlow::Value(self.ctx.type_ctx.intern_option(element))
@@ -1207,8 +1207,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    /// Reject `*`/`+` whose element is a reference to an optional- or
-    /// list-rooted definition that can match zero nodes: an empty
+    /// Reject `*`/`+` whose element is a reference to an option- or
+    /// list-valued definition that can match zero nodes: an empty
     /// iteration completes without consuming, so the loop collects a spurious
     /// null/empty element at every non-matching candidate. Scoped to
     /// wrapper-shaped outputs — the surface quantifier-rooted definitions

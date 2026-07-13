@@ -345,7 +345,7 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                         prefix, extent, span, name
                     )?,
                 }
-                self.format_optional_pattern(c.inner(), depth + 1)?;
+                self.format_pattern_if_present(c.inner(), depth + 1)?;
             }
             ast::Pattern::QuantifiedPattern(q) => {
                 let op = q
@@ -357,18 +357,18 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                     "{}QuantifiedPattern{}{} {}",
                     prefix, extent, span, op
                 )?;
-                self.format_optional_pattern(q.inner(), depth + 1)?;
+                self.format_pattern_if_present(q.inner(), depth + 1)?;
             }
             ast::Pattern::FieldPattern(f) => {
                 let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
                 writeln!(self.w, "{}FieldPattern{}{} {}:", prefix, extent, span, name)?;
-                self.format_optional_pattern(f.value(), depth + 1)?;
+                self.format_pattern_if_present(f.value(), depth + 1)?;
             }
         }
         Ok(())
     }
 
-    fn format_optional_pattern(
+    fn format_pattern_if_present(
         &mut self,
         pattern: Option<ast::Pattern>,
         depth: usize,

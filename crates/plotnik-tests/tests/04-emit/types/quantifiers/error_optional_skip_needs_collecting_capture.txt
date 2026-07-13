@@ -14,5 +14,5 @@ error: captures `@decl`, `@dbg` skip together with `?` but nothing collects them
 5 | |   }?
   | |____^
   |
-help: add an optional capture so the group becomes one optional record: `{...}? @items`
+help: add an optional capture so the group becomes an option of one record: `{...}? @items`
 help: or discard the captures if only the structure matters: `{...}? @_`

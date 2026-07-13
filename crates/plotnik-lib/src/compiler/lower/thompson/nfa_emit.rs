@@ -130,7 +130,7 @@ impl NfaBuilder<'_> {
         pre_state
     }
 
-    /// Produce absent captures on the skip path of an optional/star quantifier,
+    /// Produce absent captures on the skip path of a `?`/`*` quantifier,
     /// mirroring what alternations do for asymmetric alternatives.
     /// Returns `exit` unchanged when no `RecordSet` effects are present.
     pub(super) fn emit_absence_for_skip_path(
@@ -167,7 +167,7 @@ impl NfaBuilder<'_> {
         self.emit_effects_if_nonempty(exit, absence_effects)
     }
 
-    /// Emit absence events for internal captures when skipping an optional/star pattern.
+    /// Emit absence events for internal captures when skipping a `?`/`*` pattern.
     ///
     /// Unlike `emit_absence_for_skip_path` which handles captures passed as effects,
     /// this function handles captures defined INSIDE the pattern (e.g., `{(x) @cap}?`).

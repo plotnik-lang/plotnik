@@ -52,9 +52,9 @@ impl TypeAnalysis {
             return match kind {
                 // `*` / `+` collect into a list regardless of element shape.
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::List,
-                // `?` adds optionality to the inner's value mechanism — except a
+                // `?` adds an option layer to the inner's value mechanism — except a
                 // fields-flow inner, whose captures the `?` collects as one
-                // optional record (the `?` counterpart of `*`'s list). That holds
+                // option of a record (the `?` counterpart of `*`'s list). That holds
                 // for a named node too, even though its bare capture is a
                 // `Node`: quantified, its fields have nowhere to bubble.
                 QuantifierKind::Optional => {

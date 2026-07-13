@@ -250,12 +250,12 @@ impl NfaBuilder<'_> {
     /// Compile sequence items where the first item is skippable and navigates to a
     /// position (`Down*` into a child, or `Stay*` at an alternative's candidate).
     ///
-    /// When the first item (optional/star) is skipped, the next item becomes the "first"
+    /// When the first item (`?`/`*`) is skipped, the next item becomes the "first"
     /// and must re-derive first-position navigation instead of the sibling `Next` the
     /// match path uses. This requires compiling the continuation twice.
     ///
     /// Sequence-level scope effects (`capture`: e.g. `VariantOpen`/`VariantClose` for a variant
-    /// variant) wrap the whole body on single dominating epsilons — open before the
+    /// value) wrap the whole body on single dominating epsilons — open before the
     /// skippable item, close after the continuation — so they execute exactly once on
     /// both the skip and match paths. Merging them onto items instead would drop the
     /// open on the skip path (skippable first item) and leave the path unbalanced.
@@ -301,7 +301,7 @@ impl NfaBuilder<'_> {
         // path (this allows skip to bypass the Up instruction in the parent node).
         //
         // The two paths must slice `items` differently so that any anchor between the
-        // optional first item and its follower survives into `compute_nav_modes`:
+        // first `?`/`*` item and its follower survives into `compute_nav_modes`:
         //
         // - Skip path (first item absent): the anchor degrades to a leading anchor
         //   relative to the parent. Slicing *after* the first pattern keeps the

@@ -121,8 +121,8 @@ scalar frame; it is cursor-reading like `Node` and `SpanStartAt`. Scalar open
 and close effects are motion barriers and must not be moved across a consuming
 match. `NodeStr` and `NodeBool` are direct scalar values for one matched node;
 they avoid a scalar frame when no document bounding range needs to be accumulated.
-`BoolValue` is the equivalent no-provenance path, used notably for an absent
-optional boolean. `BoolClose` and `BoolValue` accept only `0` or `1`. Every effect shown with `-`,
+`BoolValue` is the equivalent no-provenance path, used notably for a presence
+boolean's absent fallback. `BoolClose` and `BoolValue` accept only `0` or `1`. Every effect shown with `-`,
 including all other scalar effects, requires a zero payload.
 
 ## Match8

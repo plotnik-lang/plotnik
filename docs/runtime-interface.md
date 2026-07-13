@@ -46,7 +46,7 @@ ABI and the runtime's supported range.
 Every generated definition exposes two logical operations:
 
 ```text
-parse(document)   -> Result<Optional<Output>, LimitExceeded>
+parse(document)   -> Result<Option<Output>, LimitExceeded>
 matches(document) -> Result<Boolean, LimitExceeded>
 ```
 

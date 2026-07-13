@@ -237,7 +237,7 @@ impl InferVisitor<'_, '_> {
         let brackets = capture_brackets(quant);
         let hint = if op.starts_with('?') {
             format!(
-                "add an optional capture so the group becomes one optional record: `{}{} @{}`",
+                "add an optional capture so the group becomes an option of one record: `{}{} @{}`",
                 brackets, op, placeholder
             )
         } else {

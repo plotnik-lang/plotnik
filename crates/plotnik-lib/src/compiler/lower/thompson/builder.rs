@@ -312,7 +312,7 @@ impl<'a> NfaBuilder<'a> {
 
         self.inline_stack.push(def_id);
         let mode = specialization.mode().clone();
-        let body_entry = self.compile_with_optional_scope(type_id, |this| {
+        let body_entry = self.with_scope_if_present(type_id, |this| {
             this.compile_def_body(body, &mode, body_exits, body_nav)
         });
         self.inline_stack.pop();

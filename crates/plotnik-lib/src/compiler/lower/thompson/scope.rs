@@ -16,7 +16,7 @@ pub struct RecordScope(pub TypeId);
 /// Where a captured pattern's compiled scope continues.
 ///
 /// Most captures have one continuation (`Single`). A capture wrapping an
-/// optional/star at a navigating first-child position needs two: the parent must
+/// `?`/`*` at a navigating first-child position needs two: the parent must
 /// restore the cursor and take a different path when the inner matches empty
 /// times, so the match and skip paths exit separately (`Split`). A scope emitter
 /// closes its scope on *every* continuation, so the only difference between the
@@ -137,7 +137,7 @@ impl ScopeCloseEffects<'_> {
 
 impl NfaBuilder<'_> {
     /// Avoids the repeated `if let Some(type_id) = type_id { with_scope } else { f }` pattern.
-    pub(super) fn compile_with_optional_scope<T>(
+    pub(super) fn with_scope_if_present<T>(
         &mut self,
         type_id: Option<TypeId>,
         f: impl FnOnce(&mut Self) -> T,
@@ -175,8 +175,8 @@ impl NfaBuilder<'_> {
     /// Compile a record-scope capture: `RecordOpen → inner → RecordClose+capture → exit(s)`.
     ///
     /// A quantified inner (`{...}? @cap`) routes to
-    /// [`compile_optional_record_capture`](Self::compile_optional_record_capture): the
-    /// record is optional as a whole, so the record scope must not open on the skip
+    /// [`compile_option_record_capture`](Self::compile_option_record_capture): the
+    /// record value has option type, so the record scope must not open on the skip
     /// path. For the remaining (non-quantified) inners the record opens once and
     /// closes on every continuation.
     ///
@@ -189,11 +189,11 @@ impl NfaBuilder<'_> {
         req: CaptureRequest,
         exits: CaptureExits,
     ) -> Label {
-        // `{...}? @x`: the record is optional as a whole. The record scope moves
+        // `{...}? @x`: the record value has option type. The record scope moves
         // inside the quantifier iteration so a skip emits a bare `Absent` for the
         // capture — never a hollow `{ field: null }` record.
         if matches!(&req.inner, Pattern::QuantifiedPattern(_)) {
-            return self.compile_optional_record_capture(req, exits);
+            return self.compile_option_record_capture(req, exits);
         }
 
         let CaptureRequest {
@@ -220,7 +220,7 @@ impl NfaBuilder<'_> {
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
                 let record_close = self.emit_record_close_with_effects(end_effects, exit);
-                self.compile_with_optional_scope(scope_type_id, |this| {
+                self.with_scope_if_present(scope_type_id, |this| {
                     this.compile_pattern(&inner, record_close, nav)
                 })
             }
@@ -236,7 +236,7 @@ impl NfaBuilder<'_> {
                     }
                     SkipExit::Fail => SkipExit::Fail,
                 };
-                self.compile_with_optional_scope(scope_type_id, |this| {
+                self.with_scope_if_present(scope_type_id, |this| {
                     let pattern_ctx = PatternCtx {
                         exit: match_record_close,
                         nav,
@@ -310,7 +310,7 @@ impl NfaBuilder<'_> {
         );
 
         // `element_type_id` drives `RecordSet` effects inside the record scope.
-        let inner_entry = self.compile_with_optional_scope(element_type_id, |this| {
+        let inner_entry = self.with_scope_if_present(element_type_id, |this| {
             this.compile_iteration_element(inner, PatternCtx::with_nav(record_close, nav_override))
         });
 

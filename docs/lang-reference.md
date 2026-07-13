@@ -17,8 +17,8 @@ NFA-based cursor walk with backtracking.
 - **Starts at the root**: An entry point begins at the supplied syntax-tree root; node patterns remain open, so unmentioned descendants are unconstrained
 - **Backtracking**: Continuation failure restores a checkpoint and tries the remaining alternatives
 - **Source-order priority**: Alternatives are tried left-to-right, but later alternatives remain available when the continuation fails
-- **Empty matches are last resort**: a pattern that can match zero nodes (an
-  optional, a star, a group of optionals, a reference to such a definition)
+- **Empty matches are last resort**: a pattern that can match zero nodes (a
+  `?` or `*` quantifier, a group of nullable patterns, or a reference to such a definition)
   succeeds empty only after node-consuming outcomes are exhausted
 
 ### Trivia Handling
@@ -281,7 +281,7 @@ zero-based `row` and a zero-based, byte-based `column`.
 
 ### Cardinality: Quantifiers → Lists
 
-Quantifiers determine whether a field is singular, optional, or a list:
+Quantifiers determine whether a field is a single value, an option, or a list:
 
 | Pattern   | Output Type      | Meaning                  |
 | --------- | ---------------- | ------------------------ |
@@ -300,7 +300,7 @@ Node lists work when the quantified pattern has **no internal captures**. For pa
 | --------------- | ----------------- | -------------------- |
 | `{...}* @items` | `items: T[]`      | zero or more records |
 | `{...}+ @items` | `items: [T, ...]` | one or more records  |
-| `{...}? @item`  | `item: T \| null` | optional record      |
+| `{...}? @item`  | `item: T \| null` | option of a record   |
 
 The capture on the quantifier is required whenever the pattern has internal
 captures — for `?` just like `*`/`+` (use `@_` to match structurally and
@@ -331,12 +331,12 @@ The `@func` capture on the sequence creates a nested scope. All captures inside 
 
 `::` after a regular capture selects its capture type:
 
-| Syntax       | Effect                                                  |
-| ------------ | ------------------------------------------------------- |
-| `@x`         | Inferred (usually `Node`)                               |
-| `@x :: str`  | Source text for the captured value                      |
-| `@x :: bool` | Observable presence; an absent optional becomes `false` |
-| `@x :: Name` | Custom nominal name for the inferred type               |
+| Syntax       | Effect                                                |
+| ------------ | ----------------------------------------------------- |
+| `@x`         | Inferred (usually `Node`)                             |
+| `@x :: str`  | Source text for the captured value                    |
+| `@x :: bool` | Observable presence; an absent option becomes `false` |
+| `@x :: Name` | Custom nominal name for the inferred type             |
 
 `str` and `bool` are the complete lowercase built-in set. Any other lowercase
 name is an error. Custom names must be `PascalCase`; `Str` is a custom name,
@@ -345,13 +345,13 @@ diagnosed with fixes to `str` and `bool`.
 
 A built-in capture type is applied only after the ordinary capture has been
 validated, so it cannot legalize an invalid multi-node or valueless capture.
-`str` recursively preserves optional and list dimensions: `Node?` becomes
+`str` recursively preserves option and list dimensions: `Node?` becomes
 `string | null`, and `Node[]` becomes `string[]`. Every list item owns its
 own source range. A composite value becomes the source slice from its first
 matched node through its last; a valid zero-node value becomes `null`.
 
-`bool` means presence, not truthiness. A matched optional becomes `true` and
-its absent path becomes `false`; a required value is rejected unless the same
+`bool` means presence, not truthiness. A present option becomes `true` and its
+absent path becomes `false`; a required value is rejected unless the same
 field is omitted by an alternative. That alternative supplies `false`.
 
 Replacing composite data with `str` or `bool` emits a warning.
@@ -670,7 +670,7 @@ Plotnik also supports lazy forms: `*?`, `+?`, `??`
 
 A repeat iteration must consume a syntax-tree node. When the element can itself match
 zero nodes — a reference to a definition rooted at `?`, or an alternation
-with an optional alternative — only its node-consuming matches become elements:
+with a nullable alternative — only its node-consuming matches become elements:
 
 ```
 A = (expression_statement (identifier) @id)? @x
@@ -840,7 +840,7 @@ Type mismatch is an error:
 [(identifier) @x :: Foo (number) @x :: Bar]  // ERROR: @x has different types
 ```
 
-With a capture on the alternation itself, the type is non-optional because one
+With a capture on the alternation itself, the type is not an option because one
 alternative must match:
 
 ```
@@ -976,9 +976,9 @@ For exact syntax-tree adjacency:
 
 Here, no syntax-tree node may occur between the function name and the opening parenthesis because `.!` requests exact adjacency.
 
-### Anchors After Optional Items
+### Anchors After Nullable Items
 
-When the item before an anchor is optional (`?` or `*`), the anchor's meaning depends on whether that item matched:
+When the item before an anchor is nullable (`?` or `*`), the anchor's meaning depends on whether that item matched:
 
 ```
 (program {(lexical_declaration)? @a . (debugger_statement) @b})
@@ -1007,7 +1007,7 @@ When `@a` is skipped, `@b` must be both the first child (leading anchor) and the
 
 ### Anchors Over Empty Matches
 
-When every item in a child list is optional and none of them matches, there is no matched child for an anchor to bind to. A leading or trailing anchor then degrades to an assertion about the node itself: it has no children the anchor's skip policy would reject — none beyond trivia for `.`, none at all for `.!` (the policy is chosen the same way as between siblings). When both anchors are present, the stricter one applies.
+When every item in a child list is nullable and none of them matches, there is no matched child for an anchor to bind to. A leading or trailing anchor then degrades to an assertion about the node itself: it has no children the anchor's skip policy would reject — none beyond trivia for `.`, none at all for `.!` (the policy is chosen the same way as between siblings). When both anchors are present, the stricter one applies.
 
 ```
 (program {(debugger_statement)* @b .})

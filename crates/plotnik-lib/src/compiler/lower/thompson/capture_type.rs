@@ -107,7 +107,7 @@ impl<'a> NfaBuilder<'a> {
 
     /// A transformed quantifier element still obeys the ordinary iteration
     /// contract: matching zero nodes is a failed attempt, never a present
-    /// optional value or a list item. Apply the conversion only to the
+    /// option value or a list item. Apply the conversion only to the
     /// consuming continuation.
     fn capture_type_iteration_exits(&self, pattern: &Pattern, exit: Label) -> CaptureExits {
         if !self.pattern_is_nullable(pattern) {
@@ -196,7 +196,7 @@ impl CaptureTypeLowerer<'_, '_> {
                 let Pattern::QuantifiedPattern(quant) = pattern else {
                     return self.specialized_reference(pattern, destination);
                 };
-                self.optional(quant, mode, *inner, destination)
+                self.option(quant, mode, *inner, destination)
             }
             CaptureTypePlanKind::List { element, .. } => {
                 let Pattern::QuantifiedPattern(quant) = pattern else {
@@ -330,7 +330,7 @@ impl CaptureTypeLowerer<'_, '_> {
             .emit_effects_epsilon(exit, effects, CaptureEffects::default())
     }
 
-    fn optional(
+    fn option(
         &mut self,
         quant: &ast::QuantifiedPattern,
         mode: OptionMode,
@@ -338,7 +338,7 @@ impl CaptureTypeLowerer<'_, '_> {
         destination: ValueDestination,
     ) -> Label {
         let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
-            unreachable!("an optional capture-type plan has an optional quantifier")
+            unreachable!("an option capture-type plan wraps a `?` quantifier")
         };
         assert_eq!(kind.kind(), QuantifierKind::Optional);
 
@@ -486,12 +486,10 @@ impl CaptureTypeLowerer<'_, '_> {
         let nav = self.nav;
 
         self.compiler.inline_stack.push(def_id);
-        let entry = self
-            .compiler
-            .compile_with_optional_scope(output.value(), |this| {
-                this.capture_type(&plan, nav, body_exits)
-                    .lower(body, ValueDestination::Pending)
-            });
+        let entry = self.compiler.with_scope_if_present(output.value(), |this| {
+            this.capture_type(&plan, nav, body_exits)
+                .lower(body, ValueDestination::Pending)
+        });
         self.compiler.inline_stack.pop();
         self.compiler.wrap_def_body_entry(entry, def_span)
     }

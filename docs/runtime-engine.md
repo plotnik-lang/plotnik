@@ -130,7 +130,7 @@ checkpoint advances past the accepted-but-failed candidate and re-runs the
 same Match's candidate search from there, re-emitting effects and dispatching its successor
 exactly as the original acceptance did. Every retryable choice leaves a
 checkpoint — which sibling binds a pattern, which successor of a fork, whether
-an optional matches — so no search ever silently commits.
+a `?` quantifier matches — so no search ever silently commits.
 
 Frame pruning after `Return` keeps the arena bounded by active checkpoints plus
 the current call stack.
@@ -186,7 +186,7 @@ pub enum JournalEvent<'t> {
 | SpanStart/SpanEnd      | Bracket result-provenance scopes                         |
 
 `ScalarMark` stores the matched node, not a byte sentinel. Each open scalar
-frame expands an optional document bounding range to include its marks. No marks means no
+frame expands its document bounding range, when present, to include its marks. No marks means no
 matched node; a real zero-byte node contributes `Some(n..n)`. Consequently
 `StrClose` distinguishes an absent value (`null`) from a zero-byte node (`""`).
 `BoolClose` takes its value only from its encoded boolean; marks provide

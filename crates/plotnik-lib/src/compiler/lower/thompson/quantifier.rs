@@ -357,7 +357,7 @@ impl NfaBuilder<'_> {
     /// and recursive-reference semantics for every empty outcome. Compile
     /// that graph with both continuations joined, then project it onto control
     /// paths that never perform a node match. This retains both kinds of
-    /// empty result — an absent optional and a present structured value —
+    /// empty result — an absent option and a present structured value —
     /// without letting a lifted alternation fallback re-run its consuming body
     /// against the parent cursor.
     pub(super) fn compile_empty_outcome(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
@@ -370,7 +370,7 @@ impl NfaBuilder<'_> {
     /// Keep the newly emitted subgraph's paths that reach `exit` using only
     /// epsilon control flow or a childless anchor assertion. `Stay*` still
     /// counts as a node match: accepting it here is the bug that turns a
-    /// wildcard optional's absent value into its parent node.
+    /// wildcard under `?`'s absent value into its parent node.
     fn project_empty_paths(
         &mut self,
         first_new_instruction: usize,
@@ -451,7 +451,7 @@ impl NfaBuilder<'_> {
             capture,
             value: value_context,
         } = self.bracket_pattern_ctx(pattern, matched);
-        // A captured optional/star at this navigating position shares the single
+        // A captured `?`/`*` at this navigating position shares the single
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
         // split exits and all, so the two can never drift — the gap behind both
         // #470 and the `@_` discard panic. It emits the scope that matches the
@@ -593,16 +593,16 @@ impl NfaBuilder<'_> {
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile a record capture whose inner is an optional quantifier
+    /// Compile a record capture whose inner has a `?` quantifier
     /// (`{...}? @x`, `[...]? @x`) — the only quantifier that reaches the record
     /// mechanism, since `*`/`+` classify as `List`.
     ///
-    /// The record is optional as a whole. Mirroring how lists scope each element
+    /// The record value has option type. Mirroring how lists scope each element
     /// record, the `RecordOpen → body → RecordClose+RecordSet` wrapper lives inside the
     /// iteration; the skip path emits a bare `Absent` for the capture instead of
     /// a hollow `{ field: null }` record, matching the declared
     /// `{ … } | null` type.
-    pub(super) fn compile_optional_record_capture(
+    pub(super) fn compile_option_record_capture(
         &mut self,
         req: CaptureRequest,
         exits: CaptureExits,
@@ -614,7 +614,7 @@ impl NfaBuilder<'_> {
             outer_capture,
         } = req
         else {
-            unreachable!("optional-record lowering receives a quantified capture")
+            unreachable!("option-record lowering receives a quantified capture")
         };
         let QuantifierForm::Quantified { inner, kind } = classify_quantifier(&quant) else {
             unreachable!("admitted record capture has an operator and an inner");
@@ -669,7 +669,7 @@ impl NfaBuilder<'_> {
             |this, target| {
                 let ExitNav { exit, nav } = target;
                 let record_close = this.emit_record_close_with_effects(end_effects, exit);
-                let body = this.compile_with_optional_scope(record_type_id, |t| {
+                let body = this.with_scope_if_present(record_type_id, |t| {
                     t.compile_iteration_element(
                         &inner,
                         PatternCtx::with_nav(record_close, Some(nav)),
@@ -1067,7 +1067,7 @@ impl NfaBuilder<'_> {
         outer: CaptureEffects,
     ) -> Label {
         let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
-            unreachable!("a valued optional has an operator and an inner pattern")
+            unreachable!("a value-producing `?` quantifier has an operator and an inner pattern")
         };
         assert_eq!(kind.kind(), QuantifierKind::Optional);
         let (match_exit, skip_exit) = match exits {
@@ -1198,7 +1198,7 @@ impl NfaBuilder<'_> {
             IterationScope::ElementScopeByIteration {
                 element_type_id,
                 capture,
-            } => self.compile_with_optional_scope(element_type_id, |this| {
+            } => self.with_scope_if_present(element_type_id, |this| {
                 this.compile_iteration_element(
                     inner,
                     PatternCtx {

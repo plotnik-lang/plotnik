@@ -38,7 +38,7 @@ pub fn infer_types(
 
     // One syntax-only O(AST) pre-scan buys the common path zero provenance
     // allocation. Folding this flag into inference would still make every
-    // pattern result carry optional producer state; keep that cost confined to
+    // pattern result carry producer state even when absent; keep that cost confined to
     // queries that actually write a builtin capture type.
     let has_capture_types = symbol_table
         .names()

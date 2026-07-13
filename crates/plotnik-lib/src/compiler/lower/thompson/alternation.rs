@@ -576,7 +576,7 @@ impl NfaBuilder<'_> {
             let alternative_end = alternative_span.map(|id| EffectIR::span_end(id.0));
 
             let alternative_nullable = self.pattern_is_nullable(&body);
-            let body_entry = self.compile_with_optional_scope(payload.type_id(), |this| {
+            let body_entry = self.with_scope_if_present(payload.type_id(), |this| {
                 if alternative_nullable {
                     let mut close_effects = vec![EffectIR::end_variant()];
                     if let Some(end) = alternative_end.clone() {
@@ -643,7 +643,7 @@ impl NfaBuilder<'_> {
                     vec![],
                     CaptureEffects::new_post(alternative_capture.post),
                 );
-                let empty_entry = self.compile_with_optional_scope(payload.type_id(), |this| {
+                let empty_entry = self.with_scope_if_present(payload.type_id(), |this| {
                     let pattern_ctx = PatternCtx {
                         exit: empty_exit,
                         nav: alternative_nav,

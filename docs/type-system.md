@@ -61,7 +61,7 @@ A definition whose body produces no output is match-only:
 - A sequence root is match-only because no output syntax materializes it.
 - A labeled alternation used as a definition body produces a variant value;
   no-payload cases remain no-payload.
-- A `?`, `*`, or `+` root returns the optional/list container described below.
+- A `?`, `*`, or `+` root returns the option or list value described below.
 
 Captures define the result; there is no hybrid `{ $node, ... }` output.
 
@@ -108,7 +108,7 @@ export type First = Pair | null;
 ```
 
 References stay opaque at call sites: `(Pairs) @pairs` → `pairs: Pairs`, bare
-`(Pairs)` is structural, `(Pairs)* @groups` → `groups: Pairs[]`. An optional-rooted
+`(Pairs)` is structural, `(Pairs)* @groups` → `groups: Pairs[]`. A `?`-rooted
 definition under a call-site `?` nests: `(MaybeId)? @x` → `x: MaybeId | null`
 (both nulls print the same in JSON).
 
@@ -225,10 +225,10 @@ Item = (pair key: (_) @k value: (_) @v)
 (Item)+ @items                    ; reference list: items: [Item, ...Item[]]
 ```
 
-### Optional Records
+### Options of Records
 
-A captured optional group is one optional record — the `?` counterpart of a
-record list:
+A captured `?` group produces an option of one record — the `?` counterpart of
+a record list:
 
 ```
 {(modifier) @mod (decorator) @dec}? @attrs
@@ -243,7 +243,7 @@ A quantified named node collects the same way: `(pair (key) @k)? @p` gives
 There is no uncaptured fallback (the item-boundary rule): a bare
 `{(mod) @mod (dec) @dec}?` would scatter correlated nulls into the enclosing
 scope as independently option-typed fields — a type that permits states the match
-can never produce. For a single optional node with no wrapper, put the capture
+can never produce. For a single node under `?` with no wrapper, put the capture
 on the quantifier: `(decorator)? @dec` → `dec: Node | null`. To match
 structurally and drop the captures, discard them: `{...}? @_`.
 
@@ -453,7 +453,7 @@ absent  -> false
 present -> true
 ```
 
-An optional non-boolean value becomes `boolean`. Nested optionals collapse to
+An option-typed non-boolean value becomes `boolean`. Nested options collapse to
 one boolean. A required node, list, record, or variant is rejected because the
 result would always be `true`, unless an alternative omits that exact field. In
 that case the capture observes alternative presence and the omitted alternative
