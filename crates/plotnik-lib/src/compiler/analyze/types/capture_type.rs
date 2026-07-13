@@ -211,23 +211,36 @@ impl CaptureFact {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FieldFallback {
-    Null,
-    EmptyArray,
+pub enum FieldCompletion {
+    /// Every alternative produces the field, so lowering owes no value.
+    AlwaysPresent,
+    /// A non-producing alternative materializes semantic absence (`null` in JSON).
+    Absent,
+    /// A non-producing alternative materializes an empty list.
+    EmptyList,
+    /// A non-producing alternative materializes a false presence value.
     False,
 }
 
+/// Total completion behavior for the fields merged by one alternation.
 #[derive(Clone, Debug, Default)]
-pub struct UnionFlowPlan {
-    omissions: BTreeMap<Symbol, FieldFallback>,
+pub struct FieldCompletions {
+    by_field: BTreeMap<Symbol, FieldCompletion>,
 }
 
-impl UnionFlowPlan {
-    pub fn new(omissions: BTreeMap<Symbol, FieldFallback>) -> Self {
-        Self { omissions }
+impl FieldCompletions {
+    pub fn new(by_field: BTreeMap<Symbol, FieldCompletion>) -> Self {
+        Self { by_field }
     }
 
-    pub fn fallback(&self, field: Symbol) -> Option<FieldFallback> {
-        self.omissions.get(&field).copied()
+    pub fn completion(&self, field: Symbol) -> FieldCompletion {
+        self.by_field
+            .get(&field)
+            .copied()
+            .expect("every merged field must have an explicit completion")
+    }
+
+    pub(crate) fn fields(&self) -> impl Iterator<Item = Symbol> + '_ {
+        self.by_field.keys().copied()
     }
 }

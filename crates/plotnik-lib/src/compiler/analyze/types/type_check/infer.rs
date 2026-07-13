@@ -39,7 +39,7 @@ use crate::compiler::analyze::types::type_shape::{
     FieldInfo, PatternFlow, PatternShape, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{
-    BuiltInCaptureType, CaptureFact, FieldFallback, RawCaptureFact, RootExtent, UnionFlowPlan,
+    BuiltInCaptureType, CaptureFact, FieldCompletion, FieldCompletions, RawCaptureFact, RootExtent,
 };
 
 use crate::compiler::analyze::Located;
@@ -1583,32 +1583,32 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 }
 
-pub(super) fn freeze_union_flow_plans(types: &mut TypeAnalysisBuilder) {
+pub(super) fn freeze_field_completions(types: &mut TypeAnalysisBuilder) {
     for (pattern, type_id) in types.alternation_field_results() {
         let fields = types.in_progress().expect_struct_fields(type_id).clone();
         let alternative_fields = alternation_alternative_fields(types, &pattern);
-        let fallbacks = fields
+        let completions = fields
             .into_iter()
-            .filter_map(|(name, info)| {
+            .map(|(name, info)| {
                 let omitted = alternative_fields
                     .iter()
                     .any(|fields| !fields.contains(&name));
-                if !omitted {
-                    return None;
-                }
-                let fallback = if !info.optional
+                let completion = if !omitted {
+                    FieldCompletion::AlwaysPresent
+                } else if !info.optional
                     && matches!(
                         types.in_progress().type_shape(info.type_id),
                         Some(TypeShape::Array { .. })
-                    ) {
-                    FieldFallback::EmptyArray
+                    )
+                {
+                    FieldCompletion::EmptyList
                 } else {
-                    FieldFallback::Null
+                    FieldCompletion::Absent
                 };
-                Some((name, fallback))
+                (name, completion)
             })
             .collect();
-        types.record_union_flow(pattern, UnionFlowPlan::new(fallbacks));
+        types.record_field_completions(pattern, FieldCompletions::new(completions));
     }
 }
 
@@ -1622,7 +1622,7 @@ fn alternation_alternative_fields(
             .map(|alternative| alternative.body())
             .chain(alternation.patterns().map(Some))
             .collect(),
-        _ => unreachable!("union-flow plans are only built for alternations"),
+        _ => unreachable!("field completions are only built for alternations"),
     };
 
     bodies

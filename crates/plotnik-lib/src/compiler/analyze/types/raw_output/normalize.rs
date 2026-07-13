@@ -85,7 +85,7 @@ impl<'a, 'd> NormalizationSession<'a, 'd> {
 
     fn run(mut self) {
         let captures = CaptureNormalizer::new(&mut self).run();
-        self.types.analysis.union_flow.clear();
+        self.types.analysis.field_completions.clear();
         let flow_count = self.graph.flows.len();
         let mut flows = FlowNormalizer::new(&mut self, &captures);
         for index in 0..flow_count {
@@ -271,58 +271,61 @@ fn compute_invalid_containment(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum OmissionPolicy {
-    FieldOptional,
-    Value(FieldFallback),
+pub(super) enum AbsencePolicy {
+    MakeOption,
+    CompleteWith(FieldCompletion),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct NormalizedField {
     pub(super) info: FieldInfo,
-    pub(super) omission: OmissionPolicy,
+    pub(super) on_absence: AbsencePolicy,
 }
 
 impl NormalizedField {
     fn ordinary(info: FieldInfo, raw_types: &RawTypeSnapshot) -> Self {
-        let omission =
+        let on_absence =
             if !info.optional && matches!(raw_types.shape(info.type_id), TypeShape::Array { .. }) {
-                OmissionPolicy::Value(FieldFallback::EmptyArray)
+                AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
             } else {
-                OmissionPolicy::FieldOptional
+                AbsencePolicy::MakeOption
             };
-        Self { info, omission }
+        Self { info, on_absence }
     }
 
-    fn omitted(
+    fn complete_absence(
         mut self,
         types: &mut crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
-    ) -> (Self, FieldFallback) {
-        let fallback = match self.omission {
-            OmissionPolicy::FieldOptional => {
+    ) -> (Self, FieldCompletion) {
+        let completion = match self.on_absence {
+            AbsencePolicy::MakeOption => {
                 self.info = self.info.make_optional();
-                FieldFallback::Null
+                FieldCompletion::Absent
             }
-            OmissionPolicy::Value(FieldFallback::EmptyArray) => {
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList) => {
                 let TypeShape::Array { element, .. } = types
                     .in_progress()
                     .type_shape(self.info.type_id)
                     .cloned()
-                    .expect("empty-array omission requires a registered array")
+                    .expect("empty-list completion requires a registered list")
                 else {
-                    unreachable!("empty-array omission belongs to an array field")
+                    unreachable!("empty-list completion belongs to a list field")
                 };
                 let array = types.intern_type(TypeShape::Array {
                     element,
                     non_empty: false,
                 });
                 self.info = FieldInfo::required(array);
-                FieldFallback::EmptyArray
+                FieldCompletion::EmptyList
             }
-            OmissionPolicy::Value(fallback @ (FieldFallback::Null | FieldFallback::False)) => {
-                fallback
+            AbsencePolicy::CompleteWith(
+                completion @ (FieldCompletion::Absent | FieldCompletion::False),
+            ) => completion,
+            AbsencePolicy::CompleteWith(FieldCompletion::AlwaysPresent) => {
+                unreachable!("always-present fields have no absence policy")
             }
         };
-        (self, fallback)
+        (self, completion)
     }
 }
 
@@ -369,7 +372,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             .get(&output.occurrence)
             .cloned();
         let mut normalized = BTreeMap::new();
-        let mut fallbacks = BTreeMap::new();
+        let mut completions = BTreeMap::new();
 
         for (&name, raw_field) in &raw_fields.fields {
             let mut field = self.normalize_sources(&output, name, raw_field);
@@ -378,11 +381,14 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
                     .alternatives
                     .iter()
                     .any(|alternative| alternative.omissions.contains(&name));
-                if omitted {
-                    let (omitted, fallback) = field.omitted(self.session.types);
-                    field = omitted;
-                    fallbacks.insert(name, fallback);
-                }
+                let completion = if omitted {
+                    let (completed, completion) = field.complete_absence(self.session.types);
+                    field = completed;
+                    completion
+                } else {
+                    FieldCompletion::AlwaysPresent
+                };
+                completions.insert(name, completion);
             } else {
                 field = self.adapt_to_raw_output(raw_field, field);
             }
@@ -406,11 +412,10 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         *current = fields;
 
         if alternation.is_some() {
-            self.session
-                .types
-                .analysis
-                .union_flow
-                .insert(output.occurrence.clone(), UnionFlowPlan::new(fallbacks));
+            self.session.types.analysis.field_completions.insert(
+                output.occurrence.clone(),
+                FieldCompletions::new(completions),
+            );
         }
         self.normalized.insert(id, normalized);
         self.visiting.remove(&id);
@@ -488,7 +493,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         }
 
         if raw_source.type_id == raw_output.info.type_id {
-            if raw_output.info.optional && field.omission == OmissionPolicy::FieldOptional {
+            if raw_output.info.optional && field.on_absence == AbsencePolicy::MakeOption {
                 field.info = field.info.make_optional();
             }
             return field;
@@ -507,10 +512,10 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             non_empty: *non_empty,
         });
         field.info = FieldInfo::with_optional(array, raw_output.info.optional);
-        field.omission = if field.info.optional {
-            OmissionPolicy::FieldOptional
+        field.on_absence = if field.info.optional {
+            AbsencePolicy::MakeOption
         } else {
-            OmissionPolicy::Value(FieldFallback::EmptyArray)
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         };
         field
     }
@@ -543,24 +548,24 @@ fn unify_normalized_fields(
     b: NormalizedField,
 ) -> Result<NormalizedField, ()> {
     let type_id = unify_normalized_types(types, a.info.type_id, b.info.type_id)?;
-    let omission = match (a.omission, b.omission) {
+    let on_absence = match (a.on_absence, b.on_absence) {
         (
-            OmissionPolicy::Value(FieldFallback::False),
-            OmissionPolicy::Value(FieldFallback::False),
-        ) => OmissionPolicy::Value(FieldFallback::False),
-        (OmissionPolicy::Value(FieldFallback::Null), _)
-        | (_, OmissionPolicy::Value(FieldFallback::Null)) => {
-            OmissionPolicy::Value(FieldFallback::Null)
+            AbsencePolicy::CompleteWith(FieldCompletion::False),
+            AbsencePolicy::CompleteWith(FieldCompletion::False),
+        ) => AbsencePolicy::CompleteWith(FieldCompletion::False),
+        (AbsencePolicy::CompleteWith(FieldCompletion::Absent), _)
+        | (_, AbsencePolicy::CompleteWith(FieldCompletion::Absent)) => {
+            AbsencePolicy::CompleteWith(FieldCompletion::Absent)
         }
         (
-            OmissionPolicy::Value(FieldFallback::EmptyArray),
-            OmissionPolicy::Value(FieldFallback::EmptyArray),
-        ) => OmissionPolicy::Value(FieldFallback::EmptyArray),
-        _ => OmissionPolicy::FieldOptional,
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList),
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList),
+        ) => AbsencePolicy::CompleteWith(FieldCompletion::EmptyList),
+        _ => AbsencePolicy::MakeOption,
     };
     Ok(NormalizedField {
         info: FieldInfo::with_optional(type_id, a.info.optional || b.info.optional),
-        omission,
+        on_absence,
     })
 }
 

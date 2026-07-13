@@ -1,6 +1,6 @@
 //! Capture-type planning against the frozen raw type graph.
 
-use super::normalize::{NormalizedField, OmissionPolicy, RawTypeSnapshot};
+use super::normalize::{AbsencePolicy, NormalizedField, RawTypeSnapshot};
 use super::*;
 
 pub(super) struct PlannedCapture {
@@ -25,11 +25,11 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         &mut self,
         capture_type: BuiltInCaptureType,
         contract: RawCaptureContract,
-        observes_omission: bool,
+        may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
         match capture_type {
             BuiltInCaptureType::Str => self.plan_str(contract),
-            BuiltInCaptureType::Bool => self.plan_bool(contract.fact.field(), observes_omission),
+            BuiltInCaptureType::Bool => self.plan_bool(contract.fact.field(), may_be_absent),
         }
     }
 
@@ -47,20 +47,20 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             plan = CaptureTypePlan::optional(optional, OptionalCaptureTypeMode::Preserve, plan);
             absorbs_null = true;
         }
-        let omission = if absorbs_null {
-            OmissionPolicy::Value(FieldFallback::Null)
+        let on_absence = if absorbs_null {
+            AbsencePolicy::CompleteWith(FieldCompletion::Absent)
         } else if matches!(
             self.types.in_progress().type_shape(plan.final_type()),
             Some(TypeShape::Array { .. })
         ) {
-            OmissionPolicy::Value(FieldFallback::EmptyArray)
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {
-            OmissionPolicy::FieldOptional
+            AbsencePolicy::MakeOption
         };
         Ok(PlannedCapture {
             field: NormalizedField {
                 info: FieldInfo::required(plan.final_type()),
-                omission,
+                on_absence,
             },
             plan,
         })
@@ -125,19 +125,19 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
     fn plan_bool(
         &mut self,
         raw: FieldInfo,
-        observes_omission: bool,
+        may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
         let plan = if raw.optional {
             let inner = self.bool_present(raw.type_id, &mut HashSet::new())?;
             CaptureTypePlan::optional(TYPE_BOOL, OptionalCaptureTypeMode::Bool, inner)
         } else {
-            self.bool_required(raw.type_id, observes_omission, &mut HashSet::new())?
+            self.bool_required(raw.type_id, may_be_absent, &mut HashSet::new())?
         };
         Ok(PlannedCapture {
             plan,
             field: NormalizedField {
                 info: FieldInfo::required(TYPE_BOOL),
-                omission: OmissionPolicy::Value(FieldFallback::False),
+                on_absence: AbsencePolicy::CompleteWith(FieldCompletion::False),
             },
         })
     }
@@ -145,7 +145,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
     fn bool_required(
         &mut self,
         type_id: TypeId,
-        observes_omission: bool,
+        may_be_absent: bool,
         visiting: &mut HashSet<TypeId>,
     ) -> Result<CaptureTypePlan, &'static str> {
         if !visiting.insert(type_id) {
@@ -161,21 +161,18 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 ))
             }
             TypeShape::Ref(target) => {
-                self.bool_required(self.raw.definition(*target), observes_omission, visiting)
+                self.bool_required(self.raw.definition(*target), may_be_absent, visiting)
             }
-            TypeShape::Array { .. } if observes_omission => Ok(CaptureTypePlan::bool_terminal(
+            TypeShape::Array { .. } if may_be_absent => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
                 TerminalData::Semantic,
             )),
             TypeShape::Array { .. } => Err(
                 "capture type `bool` cannot be applied to this list; capture an optional value inside the list, or inspect whether the list is empty after parsing",
             ),
-            TypeShape::Node | TypeShape::Struct(_) | TypeShape::Variant(_) if observes_omission => {
-                Ok(CaptureTypePlan::bool_terminal(
-                    TYPE_BOOL,
-                    terminal_data(self.raw.shape(type_id)),
-                ))
-            }
+            TypeShape::Node | TypeShape::Struct(_) | TypeShape::Variant(_) if may_be_absent => Ok(
+                CaptureTypePlan::bool_terminal(TYPE_BOOL, terminal_data(self.raw.shape(type_id))),
+            ),
             TypeShape::Node | TypeShape::Struct(_) | TypeShape::Variant(_) => Err(
                 "capture type `bool` requires a value that may be absent; this capture is always present",
             ),

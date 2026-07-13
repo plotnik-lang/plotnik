@@ -20,7 +20,7 @@ use crate::compiler::analyze::types::type_shape::{
     FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId,
     TypeShape,
 };
-use crate::compiler::analyze::types::{CaptureFact, RootExtent, UnionFlowPlan};
+use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
@@ -63,8 +63,8 @@ pub struct TypeAnalysis {
     /// every admitted regular capture occurrence.
     pub(super) capture_facts: HashMap<Pattern, CaptureFact>,
 
-    /// Concrete missing-field behavior for each union-like alternation.
-    pub(super) union_flow: HashMap<Pattern, UnionFlowPlan>,
+    /// Final completion behavior for every merged field of each alternation.
+    pub(super) field_completions: HashMap<Pattern, FieldCompletions>,
 
     /// Every named type, assigned by the naming pass: definition results carry
     /// their definition's name, nested composites carry path-derived names
@@ -146,13 +146,13 @@ impl TypeAnalysis {
             .expect("admitted regular capture must have frozen capture facts")
     }
 
-    pub fn union_flow_plan(&self, pattern: &Pattern) -> Option<&UnionFlowPlan> {
-        self.union_flow.get(pattern)
+    pub fn field_completions(&self, pattern: &Pattern) -> Option<&FieldCompletions> {
+        self.field_completions.get(pattern)
     }
 
-    pub fn expect_union_flow_plan(&self, pattern: &Pattern) -> &UnionFlowPlan {
-        self.union_flow_plan(pattern)
-            .expect("admitted union flow must have an explicit fallback plan")
+    pub fn expect_field_completions(&self, pattern: &Pattern) -> &FieldCompletions {
+        self.field_completions(pattern)
+            .expect("every field-producing alternation must have explicit field completions")
     }
 
     pub fn root_extent(&self, pattern: &Pattern) -> Option<RootExtent> {
@@ -279,6 +279,46 @@ impl TypeAnalysis {
             self.assert_flow_well_formed(&info.flow);
         }
 
+        let field_alternations = self
+            .pattern_result
+            .iter()
+            .filter(|(pattern, shape)| {
+                matches!(pattern, Pattern::Alternation(_))
+                    && matches!(&shape.flow, PatternFlow::Fields(_))
+            })
+            .count();
+        assert_eq!(
+            self.field_completions.len(),
+            field_alternations,
+            "field-completion tables must cover exactly the field-producing alternations",
+        );
+        for (pattern, completions) in &self.field_completions {
+            assert!(
+                matches!(pattern, Pattern::Alternation(_)),
+                "field completions must belong to an alternation",
+            );
+            let PatternFlow::Fields(type_id) = &self
+                .pattern_result
+                .get(pattern)
+                .expect("field completions must belong to an admitted pattern")
+                .flow
+            else {
+                panic!("field completions must belong to a field-producing alternation")
+            };
+            let fields = self.expect_struct_fields(*type_id);
+            assert_eq!(
+                completions.fields().count(),
+                fields.len(),
+                "every merged field must have exactly one completion",
+            );
+            for field in completions.fields() {
+                assert!(
+                    fields.contains_key(&field),
+                    "field completions cannot name a field outside the merged record",
+                );
+            }
+        }
+
         for &type_id in self.type_names.keys() {
             self.assert_type_id_registered(type_id, "named type id out of range");
         }
@@ -376,7 +416,7 @@ impl TypeAnalysisBuilder {
                 def_root_extent: BTreeMap::new(),
                 pattern_result: HashMap::new(),
                 capture_facts: HashMap::new(),
-                union_flow: HashMap::new(),
+                field_completions: HashMap::new(),
                 type_names: BTreeMap::new(),
             },
             intern_index: HashMap::new(),
@@ -508,8 +548,8 @@ impl TypeAnalysisBuilder {
         self.analysis.capture_facts.insert(pattern, fact);
     }
 
-    pub fn record_union_flow(&mut self, pattern: Pattern, plan: UnionFlowPlan) {
-        self.analysis.union_flow.insert(pattern, plan);
+    pub fn record_field_completions(&mut self, pattern: Pattern, completions: FieldCompletions) {
+        self.analysis.field_completions.insert(pattern, completions);
     }
 
     pub(crate) fn record_invalid_type(&mut self, type_id: TypeId) {
@@ -523,8 +563,8 @@ impl TypeAnalysisBuilder {
         graph.record_alternation_incompatibility(pattern, field);
     }
 
-    /// Snapshot only the alternation outputs needed to freeze omission plans.
-    /// The snapshot breaks the immutable borrow before plans are inserted
+    /// Snapshot the alternation outputs that need field-completion tables.
+    /// The snapshot breaks the immutable borrow before tables are inserted
     /// without cloning every inferred pattern and shape in the query.
     pub(crate) fn alternation_field_results(&self) -> Vec<(Pattern, TypeId)> {
         self.analysis

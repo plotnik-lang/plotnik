@@ -59,7 +59,7 @@ pub fn infer_types(
 
     if !has_capture_types {
         TypeNamer::new(&mut types, interner, diag).assign(symbol_table, dependency_analysis);
-        infer::freeze_union_flow_plans(&mut types);
+        infer::freeze_field_completions(&mut types);
         return types.finish();
     }
 

@@ -4,7 +4,7 @@ use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::FieldInfo;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
-use crate::compiler::analyze::types::{FieldFallback, UnionFlowPlan};
+use crate::compiler::analyze::types::{FieldCompletion, FieldCompletions};
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
@@ -303,11 +303,11 @@ impl NfaBuilder<'_> {
         };
         let merged_fields =
             alternation_type_id.map(|id| self.ctx.analysis.type_analysis.expect_struct_fields(id));
-        let alternation_flow = alternation_type_id.map(|_| {
+        let field_completions = alternation_type_id.map(|_| {
             self.ctx
                 .analysis
                 .type_analysis
-                .expect_union_flow_plan(alternation)
+                .expect_field_completions(alternation)
         });
 
         let search_nav = resumable_search_nav(first_nav);
@@ -323,13 +323,13 @@ impl NfaBuilder<'_> {
 
             let alternative_exit = alternative_routing.alternative_exit(alternative_idx, exit);
 
-            // Inject a default for every merged field this alternative does not itself
+            // Complete every merged field this alternative does not itself
             // produce, so the output shape stays stable. "Produces" means a top-level
-            // (bubbling) field — a capture nested in a child scope (`{...} @row`)
+            // (bubbling) field — a capture nested in a child scope (`{...} @item`)
             // belongs to that scope, not here. The alternative's inferred bubble is the
             // single source of truth; a syntactic capture walk would miscount nested
-            // names and drop a needed default.
-            let null_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
+            // names and drop a needed completion.
+            let completion_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
                 // Only bubbling fields count as provided; a `Value` alternative (a
                 // bare reference, suppressed) contributes nothing here.
                 let provided: HashSet<Symbol> = match &self
@@ -349,8 +349,8 @@ impl NfaBuilder<'_> {
                         .collect(),
                     _ => HashSet::new(),
                 };
-                self.merged_field_default_effects(
-                    alternation_flow.expect("merged alternation has a flow plan"),
+                self.merged_field_completion_effects(
+                    field_completions.expect("merged alternation has field completions"),
                     fields,
                     &provided,
                 )
@@ -389,16 +389,16 @@ impl NfaBuilder<'_> {
                 };
                 let entry = self.compile_nullable_pattern(&body, pattern_ctx, SkipExit::Fail);
                 let mut pre = alternative_capture.pre;
-                pre.extend(null_effects.clone());
+                pre.extend(completion_effects.clone());
                 self.wrap_entry_pre(entry, pre)
             } else {
                 let alternative_capture = if let Some(id) = alternative_span {
                     capture
                         .clone()
                         .nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0))
-                        .with_pre_values(null_effects.clone())
+                        .with_pre_values(completion_effects.clone())
                 } else {
-                    capture.clone().with_pre_values(null_effects.clone())
+                    capture.clone().with_pre_values(completion_effects.clone())
                 };
                 let pattern_ctx = PatternCtx {
                     exit: alternative_exit,
@@ -412,7 +412,7 @@ impl NfaBuilder<'_> {
 
             // Lower the alternative's own zero-width outcome instead of guessing a
             // value from its final field types. The distinction is semantic:
-            // an omitted field takes its alternation fallback, while a field that is
+            // an absent field takes its declared completion, while a field that is
             // present through a zero-node value can produce a struct, `""`, or
             // `true`. Reusing the ordinary skippable lowering also preserves
             // capture and alternative spans around that exact outcome.
@@ -421,9 +421,9 @@ impl NfaBuilder<'_> {
                     capture
                         .clone()
                         .nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0))
-                        .with_pre_values(null_effects)
+                        .with_pre_values(completion_effects)
                 } else {
-                    capture.clone().with_pre_values(null_effects)
+                    capture.clone().with_pre_values(completion_effects)
                 };
                 let zero_exit = self.emit_effects_epsilon(
                     skip,
@@ -444,12 +444,11 @@ impl NfaBuilder<'_> {
         self.assemble_alternatives(successors, zero_width, search_nav, exit)
     }
 
-    /// `[Null, Set]` (or `[Arr, EndArr, Set]` for an omitted list) for every
-    /// merged field not in `provided`, resolved against the enclosing scope —
-    /// the output a path that skips those captures owes.
-    fn merged_field_default_effects(
+    /// Effects that complete every merged field absent from `provided`, resolved
+    /// against the enclosing scope.
+    fn merged_field_completion_effects(
         &self,
-        flow: &UnionFlowPlan,
+        completions: &FieldCompletions,
         fields: &BTreeMap<Symbol, FieldInfo>,
         provided: &HashSet<Symbol>,
     ) -> Vec<EffectIR> {
@@ -457,20 +456,21 @@ impl NfaBuilder<'_> {
             .iter()
             .filter(|(sym, _)| !provided.contains(*sym))
             .flat_map(|(sym, _)| {
-                let Some(fallback) = flow.fallback(*sym) else {
-                    return Vec::new();
-                };
+                let completion = completions.completion(*sym);
                 let name = self.ctx.analysis.interner.resolve(*sym);
                 let member_ref = self
                     .lookup_member_in_scope(name)
                     .expect("alternation field must resolve in enclosing scope");
                 let set = EffectIR::with_member(EffectKind::Set, member_ref);
-                match fallback {
-                    FieldFallback::Null => vec![EffectIR::null(), set],
-                    FieldFallback::EmptyArray => {
+                match completion {
+                    FieldCompletion::AlwaysPresent => {
+                        unreachable!("an always-present field cannot be absent from an alternative")
+                    }
+                    FieldCompletion::Absent => vec![EffectIR::null(), set],
+                    FieldCompletion::EmptyList => {
                         vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
                     }
-                    FieldFallback::False => {
+                    FieldCompletion::False => {
                         vec![EffectIR::bool_value(false), set]
                     }
                 }

@@ -2,6 +2,7 @@ use crate::compiler::test_utils::synthetic_grammar as grammar;
 use indoc::indoc;
 use std::fmt::Write as _;
 
+use crate::compiler::analyze::types::FieldCompletion;
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::{SourceMap, SourcePath};
 
@@ -76,6 +77,44 @@ impl Query {
         }
         query.dump_diagnostics()
     }
+}
+
+fn field_completion(src: &str, field: &str) -> FieldCompletion {
+    let query = Query::parse_and_validate(src);
+    let analysis = query.analysis().expect("valid query must have analysis");
+    let pattern = analysis
+        .symbol_table
+        .body("Q")
+        .expect("test query must define Q");
+    let field = analysis
+        .interner
+        .get(field)
+        .expect("test field must be interned");
+
+    analysis
+        .type_analysis
+        .expect_field_completions(pattern)
+        .completion(field)
+}
+
+#[test]
+fn analysis_records_every_field_completion() {
+    assert_eq!(
+        field_completion("Q = [(a) @value (b) @value]", "value"),
+        FieldCompletion::AlwaysPresent,
+    );
+    assert_eq!(
+        field_completion("Q = [(a) @value (b)]", "value"),
+        FieldCompletion::Absent,
+    );
+    assert_eq!(
+        field_completion("Q = [(a)* @items (b)]", "items"),
+        FieldCompletion::EmptyList,
+    );
+    assert_eq!(
+        field_completion("Q = [(a) @present :: bool (b)]", "present"),
+        FieldCompletion::False,
+    );
 }
 
 #[test]
