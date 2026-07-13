@@ -59,7 +59,7 @@ pub(crate) fn compute_nullable_defs(
 /// Whether a pattern can match zero nodes, given the set of nullable
 /// definitions (for `DefRef` leaves). Shared by the fixpoint above and by
 /// lowering, which prunes empty paths in quantifier iterations and
-/// alternation branches.
+/// alternation alternatives.
 pub(crate) fn pattern_nullable(
     pattern: &Pattern,
     nullable: &HashSet<DefId>,

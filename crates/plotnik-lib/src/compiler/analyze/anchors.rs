@@ -130,9 +130,9 @@ pub struct AnchorSemantics<'a> {
     classifier: AnonymousClassifier<'a>,
 }
 
-/// Whether this pattern's immediate branches compile branch-local entry navs.
+/// Whether this pattern's immediate alternatives compile alternative-local entry navs.
 ///
-/// A soft anchor before such a pattern is decided by each branch, not by the
+/// A soft anchor before such a pattern is decided by each alternative, not by the
 /// alternation's whole-pattern anonymous classification.
 pub(crate) fn has_direct_alternative_nav(pattern: &Pattern) -> bool {
     match pattern {
@@ -181,9 +181,9 @@ impl<'a> AnonymousClassifier<'a> {
         pattern.map_or((false, false), |p| self.classify(p, visited))
     }
 
-    /// OR over children: any branch that may match anonymous makes the whole pattern.
+    /// OR over children: any alternative that may match anonymous makes the whole pattern.
     /// A `true` short-circuits (and is always sound to cache); an all-`false` answer
-    /// inherits a cut from any branch, since a cut branch might have masked a `true`.
+    /// inherits a cut from any alternative, since a cut alternative might have masked a `true`.
     fn classify_any(
         &self,
         children: impl Iterator<Item = Pattern>,
@@ -317,7 +317,7 @@ impl<'a> AnchorSemantics<'a> {
                 SeqItem::Pattern(pattern) => {
                     let current_is_anonymous =
                         self.classifier.pattern_may_match_anonymous(Some(pattern));
-                    // Alternation branches compile their own entry nav, so the branch body—not
+                    // Alternation alternatives compile their own entry nav, so the alternative body—not
                     // the whole alternation—decides whether soft anchors use extras-only nav.
                     let current_is_anonymous_for_anchor = if has_direct_alternative_nav(pattern) {
                         false

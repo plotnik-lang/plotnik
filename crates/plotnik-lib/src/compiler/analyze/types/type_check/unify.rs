@@ -95,7 +95,7 @@ fn drop_pending_value(flow: PatternFlow) -> PatternFlow {
     }
 }
 
-/// Relax a field that is absent from some branch, keeping the output shape stable
+/// Relax a field that is absent from some alternative, keeping the output shape stable
 /// (every key present).
 ///
 /// A list stays present as a (possibly empty) list when the list itself is the

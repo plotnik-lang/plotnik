@@ -282,7 +282,7 @@ impl<'a> NfaBuilder<'a> {
 
         // Ordinary variants are exact because their caller owns navigation.
         // Routed recursive variants own the original call-site navigation so
-        // their authored nullable branch order stays above candidate retries.
+        // their authored nullable alternative order stays above candidate retries.
         let body_nav = Some(variant.route().body_nav());
 
         // Definitions are compiled in normalized form: body -> Return
@@ -416,7 +416,7 @@ impl<'a> NfaBuilder<'a> {
     /// Capture effects are propagated to the innermost match instruction:
     /// - Named/Anonymous nodes: effects go on the match
     /// - Sequences: effects go on last item
-    /// - Alternations: effects go on each branch
+    /// - Alternations: effects go on each alternative
     /// - Other wrappers: effects propagate through
     pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
         let ctx = self.bracket_pattern_ctx(pattern, ctx);

@@ -147,7 +147,7 @@ impl DefBodyMode {
 /// Navigation and return routing for one definition body.
 ///
 /// Ordinary calls navigate before entering an exact body. Recursive nullable
-/// calls route navigation into the body instead, so the body's authored branch
+/// calls route navigation into the body instead, so the body's authored alternative
 /// order remains above any candidate-search checkpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DefRoute {
@@ -569,7 +569,7 @@ pub struct MatchIR {
     pub neg_fields: Vec<NodeFieldId>,
     /// Predicate for node text filtering (None = no text check).
     pub predicate: Option<PredicateIR>,
-    /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
+    /// Successor labels (empty = accept, 1 = linear, 2+ = fork).
     pub successors: Vec<Label>,
 }
 

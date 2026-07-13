@@ -88,7 +88,7 @@ impl NfaBuilder<'_> {
         let entry = self.fresh_label();
         let node_kind = self.resolve_node_kind(node);
         // MISSING nodes take no children, so the flag only ever rides the empty-items
-        // (leaf) branch below; the with-items branch never sees a missing node.
+        // (leaf) path below; the with-items path never sees a missing node.
         let missing = node.is_missing();
         let nav = nav_override.unwrap_or(Nav::Stay);
 
@@ -430,7 +430,7 @@ impl NfaBuilder<'_> {
 
     /// A sequence item that may consume nothing: a skippable quantifier, a
     /// reference to a nullable definition, a group of such items, or an
-    /// alternation with a nullable branch.
+    /// alternation with a nullable alternative.
     pub(super) fn is_skippable_item(&self, pattern: &Pattern) -> bool {
         self.pattern_is_nullable(pattern)
     }
@@ -981,7 +981,7 @@ impl NfaBuilder<'_> {
 
         // Alternations, sequences, and quantified patterns emit an epsilon entry and
         // cannot carry a field constraint directly — the field must go on a wrapper
-        // that navigates first, then lets the epsilon branch under it.
+        // that navigates first, then lets the epsilon fork under it.
         if let Some(field_id) = node_field
             && Self::field_value_needs_wrapper(&value)
         {

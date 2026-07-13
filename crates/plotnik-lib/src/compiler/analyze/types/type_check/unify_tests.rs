@@ -7,7 +7,7 @@ use crate::core::Interner;
 
 #[test]
 fn unify_suppresses_uncaptured_value() {
-    // A pending value nothing captures (a bare reference branch) is suppressed,
+    // A pending value nothing captures (a bare reference alternative) is suppressed,
     // not an error: `[(Foo) (bar)]` is a plain structural alternation.
     let mut ctx = TypeAnalysisBuilder::new();
 
@@ -32,12 +32,12 @@ fn record_field_absence_is_an_idempotent_option() {
         PatternFlow::NoValue,
         PatternFlow::Fields(required),
     )
-    .expect("a missing record branch is compatible");
+    .expect("a missing record alternative is compatible");
     let merged = unify_flow(&mut ctx, absent, PatternFlow::Fields(required))
         .expect("an option field is compatible with its inner type");
 
     let PatternFlow::Fields(record) = merged else {
-        panic!("record branches produce fields")
+        panic!("record alternatives produce fields")
     };
     let final_type = ctx.in_progress().expect_record_fields(record)[&name].final_type;
     assert_eq!(

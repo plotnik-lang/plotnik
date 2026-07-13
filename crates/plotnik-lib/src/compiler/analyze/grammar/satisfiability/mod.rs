@@ -20,8 +20,8 @@
 //! grammar *can* match. A false rejection blocks legitimate work, so it is the single
 //! failure we must prevent — when a verdict is genuinely undecidable, accept. That is
 //! why the walk only reports at `Required` positions: a concrete-kind node not under an
-//! alternation branch or quantified body, where a failure cannot be excused by a
-//! sibling branch or zero repetitions.
+//! alternation alternative or quantified body, where a failure cannot be excused by a
+//! sibling alternative or zero repetitions.
 
 mod automaton;
 mod diagnose;
@@ -110,8 +110,8 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 }
 
 /// Walks definition bodies reporting impossible patterns: a concrete-kind node at a
-/// required position the grammar can never build, and — when *no* branch of a required
-/// alternation can match — each of those branches with its own reason. Holds the solver
+/// required position the grammar can never build, and — when *no* alternative of a required
+/// alternation can match — each of those alternatives with its own reason. Holds the solver
 /// and the diagnostic sink, so the recursion threads only the position and its
 /// participation.
 struct Reporter<'a, 'q> {
@@ -145,7 +145,7 @@ impl From<diagnose::ReportOutcome> for WalkOutcome {
 
 impl Reporter<'_, '_> {
     /// Report what is impossible under `located` at `participation`. The descent
-    /// crosses always-present wrappers, lowers into disjunctive branches and `?`/`*`
+    /// crosses always-present wrappers, lowers into parallel alternatives and `?`/`*`
     /// bodies as `Deferred`, and stops at each node pattern, whose interior the
     /// engine judges whole.
     /// Returns `Stop` when reporting already emitted a terminal diagnostic; callers
@@ -263,7 +263,7 @@ impl Reporter<'_, '_> {
     /// Whether `located` provably cannot match any grammar tree — the cautious counterpart
     /// to satisfiability, used to decide an alternation is dead. It answers `true` only when
     /// impossibility is certain, never on doubt. An alternation is impossible only when every
-    /// branch is; a sequence when any item is; a node when the solver says so; tokens,
+    /// alternative is; a sequence when any item is; a node when the solver says so; tokens,
     /// references, and optional bodies stay matchable.
     fn impossible(&mut self, located: &Located<Pattern>) -> bool {
         match located.node() {

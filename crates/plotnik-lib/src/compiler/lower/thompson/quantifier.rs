@@ -18,7 +18,7 @@ use super::capture::{
     CaptureEffects, PatternCtx, first_unmatched_close, needs_struct_wrapper, row_type_id,
 };
 use super::navigation::resumable_search_nav;
-use super::nfa_emit::{BranchTargets, Greediness};
+use super::nfa_emit::{ForkTargets, Greediness};
 use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
 use super::sequences::SeqItemsCtx;
 
@@ -680,8 +680,8 @@ impl NfaBuilder<'_> {
         );
 
         let entry = match skip_target {
-            Some(skip_target) => self.emit_branch_epsilon(
-                BranchTargets {
+            Some(skip_target) => self.emit_fork_epsilon(
+                ForkTargets {
                     prefer: iterate,
                     other: skip_target,
                 },
@@ -903,9 +903,9 @@ impl NfaBuilder<'_> {
                 let (first_iterate, repeat_iterate) =
                     self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-                self.emit_branch_epsilon_at(
+                self.emit_fork_epsilon_at(
                     loop_entry,
-                    BranchTargets {
+                    ForkTargets {
                         prefer: repeat_iterate,
                         other: match_exit,
                     },
@@ -926,9 +926,9 @@ impl NfaBuilder<'_> {
                     let (first_iterate, repeat_iterate) =
                         self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-                    self.emit_branch_epsilon_at(
+                    self.emit_fork_epsilon_at(
                         loop_entry,
-                        BranchTargets {
+                        ForkTargets {
                             prefer: repeat_iterate,
                             other: match_exit,
                         },
@@ -950,9 +950,9 @@ impl NfaBuilder<'_> {
                     let (first_iterate, repeat_iterate) =
                         self.emit_loop_iterations(first_nav_mode, loop_entry, split_body);
 
-                    self.emit_branch_epsilon_at(
+                    self.emit_fork_epsilon_at(
                         loop_entry,
-                        BranchTargets {
+                        ForkTargets {
                             prefer: repeat_iterate,
                             other: match_exit,
                         },
@@ -961,8 +961,8 @@ impl NfaBuilder<'_> {
 
                     // An empty match backtracks to the entry epsilon's checkpoint, restoring
                     // the pre-nav cursor and taking skip_exit.
-                    self.emit_branch_epsilon(
-                        BranchTargets {
+                    self.emit_fork_epsilon(
+                        ForkTargets {
                             prefer: first_iterate,
                             other: skip_exit,
                         },
@@ -974,16 +974,16 @@ impl NfaBuilder<'_> {
                     let (first_iterate, repeat_iterate) =
                         self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-                    self.emit_branch_epsilon_at(
+                    self.emit_fork_epsilon_at(
                         loop_entry,
-                        BranchTargets {
+                        ForkTargets {
                             prefer: repeat_iterate,
                             other: match_exit,
                         },
                         greediness,
                     );
-                    self.emit_branch_epsilon(
-                        BranchTargets {
+                    self.emit_fork_epsilon(
+                        ForkTargets {
                             prefer: first_iterate,
                             other: match_exit,
                         },
@@ -1015,8 +1015,8 @@ impl NfaBuilder<'_> {
                 // Any failure backtracks to the entry epsilon's checkpoint, restoring
                 // the pre-navigation cursor and taking `skip_with_absence`.
                 let iterate = self.emit_iteration(first_nav_mode, match_exit, compile_body);
-                self.emit_branch_epsilon(
-                    BranchTargets {
+                self.emit_fork_epsilon(
+                    ForkTargets {
                         prefer: iterate,
                         other: skip_with_absence,
                     },
@@ -1152,8 +1152,8 @@ impl NfaBuilder<'_> {
         };
 
         let entry = match skip_target {
-            Some(skip_target) => self.emit_branch_epsilon(
-                BranchTargets {
+            Some(skip_target) => self.emit_fork_epsilon(
+                ForkTargets {
                     prefer: iterate,
                     other: skip_target,
                 },

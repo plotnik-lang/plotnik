@@ -32,7 +32,7 @@ pub fn build_type_table(
 /// Types reachable from selectable definition outputs are emitted. This keeps
 /// demanded fragment capture scopes available to matcher bodies without
 /// shipping unused fragments. Dead inference intermediates — a union
-/// alternation's per-branch merge structs, for instance — are also pruned.
+/// alternation's per-alternative merged records, for instance — are also pruned.
 /// Used builtins lead, then custom types follow in definition order,
 /// depth-first.
 fn build(

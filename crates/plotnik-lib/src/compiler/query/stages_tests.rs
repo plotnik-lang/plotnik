@@ -316,7 +316,7 @@ fn deep_reference_chain_hits_recursion_limit() {
 fn deeply_referenced_alternation_compiles_in_linear_time() {
     // Each level is an alternation naming the previous definition twice, so the inlined
     // form doubles per level — 2^40 nodes. The anchor classifier (run during lowering)
-    // walks alternation branches, so without memoization it would never finish. Memoized,
+    // walks alternation alternatives, so without memoization it would never finish. Memoized,
     // each definition is classified once and the whole pipeline stays linear; this test
     // completing at all is the regression guard.
     let depth = 40;

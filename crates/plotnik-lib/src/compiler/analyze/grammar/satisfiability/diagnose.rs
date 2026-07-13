@@ -10,7 +10,7 @@
 //! (proven by re-solving with every gap widened), the anchors are to blame, and the
 //! message contrasts the positions they demand with what the grammar actually places
 //! first or last. Otherwise the children's kinds or order are the obstacle, and the
-//! message lists what a node of that kind does allow. Each branch produces its own
+//! message lists what a node of that kind does allow. Each alternative produces its own
 //! shape of message — a leading anchor reads differently from a trailing one, which
 //! reads differently from a wrong arrangement — so the variety mirrors the cause.
 

@@ -13,7 +13,7 @@ use crate::compiler::parse::ast::{self, Pattern, QuantifierKind};
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
-use super::nfa_emit::{BranchTargets, Greediness};
+use super::nfa_emit::{ForkTargets, Greediness};
 use super::quantifier::{QuantifierForm, classify_quantifier};
 use super::scope::{CaptureExits, SkipExit};
 
@@ -377,8 +377,8 @@ impl CaptureTypeLowerer<'_, '_> {
         };
 
         match skipped {
-            Some(skipped) => self.compiler.emit_branch_epsilon(
-                BranchTargets {
+            Some(skipped) => self.compiler.emit_fork_epsilon(
+                ForkTargets {
                     prefer: matched,
                     other: skipped,
                 },

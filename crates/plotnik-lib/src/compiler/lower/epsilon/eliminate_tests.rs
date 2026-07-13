@@ -71,8 +71,8 @@ fn see_through_with_effects() {
 }
 
 #[test]
-fn see_through_blocked_by_branch() {
-    // 0 (ε) → 1 (ε, branching) → [2, 3]
+fn see_through_blocked_by_fork() {
+    // 0 (ε) → 1 (ε fork) → [2, 3]
     let instructions = vec![
         make_epsilon(0, vec![1]),
         make_epsilon(1, vec![2, 3]),
@@ -81,14 +81,14 @@ fn see_through_blocked_by_branch() {
     ];
     let idx = build_label_to_index(&instructions);
 
-    // Can see through 0 to 1, but 1 is branching
+    // Can see through 0 to 1, but 1 is a fork
     let (target, effects) = InstrIndex::new(&instructions, &idx)
         .see_through(Label(0))
         .unwrap();
-    assert_eq!(target, Label(1)); // Stops at branching epsilon
+    assert_eq!(target, Label(1)); // Stops at epsilon fork
     assert!(effects.is_empty());
 
-    // Starting from branching epsilon returns itself
+    // Starting from an epsilon fork returns itself
     let (target, effects) = InstrIndex::new(&instructions, &idx)
         .see_through(Label(1))
         .unwrap();
@@ -226,9 +226,9 @@ fn laser_vision_epsilon_source_absorbs_chain() {
 }
 
 #[test]
-fn laser_vision_branching_epsilon_skips_pure_jump() {
-    // 0 (ε+RecordOpen, branching) → [1 (ε pure) → 3, 4]
-    // The pure jump is bypassed per-successor; effects stay on the branch point.
+fn laser_vision_epsilon_fork_skips_pure_jump() {
+    // 0 (ε+RecordOpen fork) → [1 (ε pure) → 3, 4]
+    // The pure jump is bypassed per successor; effects stay on the fork point.
     let instructions = vec![
         make_epsilon_with_start(0, vec![1, 4]),
         make_epsilon(1, vec![3]),
@@ -371,7 +371,7 @@ fn entry_point_resolution() {
 
 #[test]
 fn branching_epsilon_preserved_by_laser_vision() {
-    // 0 (match) → 1 (ε, branching) → [2, 3]
+    // 0 (match) → 1 (ε fork) → [2, 3]
     let instructions = vec![
         make_match(0, Nav::Down, vec![1]),
         make_epsilon(1, vec![2, 3]),
@@ -387,7 +387,7 @@ fn branching_epsilon_preserved_by_laser_vision() {
         label_origins: Vec::new(),
     };
 
-    // laser_vision alone can't see through branching epsilon
+    // laser_vision alone can't see through an epsilon fork
     laser_vision(&mut result);
 
     let m0 = match &result.instructions[0] {
@@ -398,8 +398,8 @@ fn branching_epsilon_preserved_by_laser_vision() {
 }
 
 #[test]
-fn expand_branching_epsilon() {
-    // 0 (match) → 1 (ε, branching) → [2, 3]
+fn expand_epsilon_fork() {
+    // 0 (match) → 1 (ε fork) → [2, 3]
     // After expansion: 0 → [2, 3]
     let instructions = vec![
         make_match(0, Nav::Down, vec![1]),
@@ -416,7 +416,7 @@ fn expand_branching_epsilon() {
         label_origins: Vec::new(),
     };
 
-    expand_branching_epsilons(&mut result);
+    expand_epsilon_forks(&mut result);
 
     // 0 now points directly to [2, 3]
     let m0 = match &result.instructions[0] {
@@ -427,8 +427,8 @@ fn expand_branching_epsilon() {
 }
 
 #[test]
-fn expand_branching_multiple_predecessors() {
-    // Both 0 and 4 point to branching epsilon 1
+fn expand_fork_with_multiple_predecessors() {
+    // Both 0 and 4 point to epsilon fork 1
     // 0 → 1 (ε) → [2, 3]
     // 4 → 1
     // After: 0 → [2, 3], 4 → [2, 3]
@@ -448,7 +448,7 @@ fn expand_branching_multiple_predecessors() {
         label_origins: Vec::new(),
     };
 
-    expand_branching_epsilons(&mut result);
+    expand_epsilon_forks(&mut result);
 
     let m0 = match &result.instructions[0] {
         InstructionIR::Match(m) => m,
@@ -464,7 +464,7 @@ fn expand_branching_multiple_predecessors() {
 }
 
 #[test]
-fn expand_branching_preserves_other_successors() {
+fn expand_fork_preserves_other_successors() {
     // 0 → [1 (ε), 4]
     // 1 → [2, 3]
     // After: 0 → [2, 3, 4]
@@ -484,7 +484,7 @@ fn expand_branching_preserves_other_successors() {
         label_origins: Vec::new(),
     };
 
-    expand_branching_epsilons(&mut result);
+    expand_epsilon_forks(&mut result);
 
     let m0 = match &result.instructions[0] {
         InstructionIR::Match(m) => m,
@@ -495,8 +495,8 @@ fn expand_branching_preserves_other_successors() {
 
 #[test]
 fn expand_blocked_by_effects() {
-    // 0 → 1 (ε+Obj, branching) → [2, 3]
-    // Effectful branching epsilon cannot be expanded
+    // 0 → 1 (ε+Obj fork) → [2, 3]
+    // An effectful epsilon fork cannot be expanded
     let instructions = vec![
         make_match(0, Nav::Down, vec![1]),
         make_epsilon_with_start(1, vec![2, 3]),
@@ -512,7 +512,7 @@ fn expand_blocked_by_effects() {
         label_origins: Vec::new(),
     };
 
-    let changed = expand_branching_epsilons(&mut result);
+    let changed = expand_epsilon_forks(&mut result);
     assert!(!changed);
 
     // 0 still points to 1

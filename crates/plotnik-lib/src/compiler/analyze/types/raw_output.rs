@@ -394,17 +394,17 @@ impl RawOutputGraphBuilder {
     }
 
     fn record_alternation(&mut self, pattern: Pattern) {
-        let branch_flows = alternation_bodies(&pattern)
+        let alternative_flows = alternation_bodies(&pattern)
             .into_iter()
             .map(|body| body.map(|body| self.flow_id(&body)))
             .collect::<Vec<_>>();
 
         let mut fields: BTreeMap<Symbol, RawAlternationField> = BTreeMap::new();
-        for &flow in branch_flows.iter().flatten() {
-            let Some(branch_fields) = self.flow(flow).flow.fields() else {
+        for &flow in alternative_flows.iter().flatten() {
+            let Some(alternative_fields) = self.flow(flow).flow.fields() else {
                 continue;
             };
-            for (&name, field) in branch_fields {
+            for (&name, field) in alternative_fields {
                 let output = fields.entry(name).or_insert_with(|| RawAlternationField {
                     producers: BTreeSet::new(),
                 });
@@ -415,7 +415,7 @@ impl RawOutputGraphBuilder {
         }
 
         let all_fields = fields.keys().copied().collect::<BTreeSet<_>>();
-        let alternatives = branch_flows
+        let alternatives = alternative_flows
             .into_iter()
             .map(|flow| {
                 let present = flow

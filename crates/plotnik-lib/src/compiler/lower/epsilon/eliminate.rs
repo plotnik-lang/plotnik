@@ -4,7 +4,7 @@
 //! Uses a three-phase iterative approach:
 //!
 //! 1. **Forward migration**: Effectful epsilons push effects to exclusive successors
-//! 2. **Expand branching**: Effectless branching epsilons expanded into predecessors
+//! 2. **Expand forks**: Effectless epsilon forks expanded into predecessors
 //! 3. **Laser vision**: Every instruction (epsilons included) looks through epsilon
 //!    chains, absorbing or bypassing
 //!
@@ -57,7 +57,7 @@ impl<'a> InstrIndex<'a> {
     /// See through single-successor epsilon chains.
     ///
     /// Returns `(target, accumulated_effects)` or `None` if blocked by:
-    /// - Branching epsilon (multiple successors)
+    /// - Epsilon fork (multiple successors)
     /// - Cycle
     fn see_through(&self, start: Label) -> Option<(Label, Vec<EffectIR>)> {
         let mut current = start;
@@ -78,7 +78,7 @@ impl<'a> InstrIndex<'a> {
             }
 
             if m.successors.len() != 1 {
-                return Some((current, effects)); // Branching epsilon: visible but can't see through
+                return Some((current, effects)); // Epsilon fork: visible but can't see through
             }
 
             if m.effects
@@ -231,8 +231,8 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
 /// Epsilons participate as sources too: a single-successor epsilon absorbs the
 /// whole downstream chain into itself (coalescing the effect chains that scope
 /// brackets around a `Call` produce, since `CallIR` can't carry effects), and a
-/// branching epsilon bypasses pure jumps per successor. Effects bubble *up*
-/// toward branch points this way, while forward migration pushes them *down*
+/// epsilon fork bypasses pure jumps per successor. Effects bubble *up*
+/// toward fork points this way, while forward migration pushes them *down*
 /// into non-epsilon instructions; both strictly shorten chains, so the
 /// fixpoint terminates.
 fn laser_vision(result: &mut NfaGraph) -> bool {
@@ -352,16 +352,16 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
     changed
 }
 
-/// Phase C: Expand branching epsilons.
+/// Phase C: Expand epsilon forks.
 ///
-/// Effectless branching epsilons are expanded by replacing the epsilon
+/// Effectless epsilon forks are expanded by replacing the epsilon
 /// reference in each predecessor with the epsilon's successors.
 ///
 /// Before:  a → [ε, x], ε → [d, e, f]
 /// After:   a → [d, e, f, x]
 ///
 /// The epsilon becomes unreachable and is eliminated during layout.
-fn expand_branching_epsilons(result: &mut NfaGraph) -> bool {
+fn expand_epsilon_forks(result: &mut NfaGraph) -> bool {
     let idx = build_label_to_index(&result.instructions);
     let preds = build_predecessor_map(&result.instructions);
     let mut changed = false;
@@ -395,7 +395,7 @@ fn expand_branching_epsilons(result: &mut NfaGraph) -> bool {
                         .splice(pos..pos + 1, eps_succs.iter().cloned());
                     changed = true;
                 }
-                // Call has a single `next` - can't expand branching into it
+                // Call has a single `next` - can't expand a fork into it
             }
         }
     }
@@ -410,7 +410,7 @@ fn expand_branching_epsilons(result: &mut NfaGraph) -> bool {
 pub fn eliminate_epsilons(result: &mut NfaGraph) {
     loop {
         let a = forward_migrate(&mut result.instructions);
-        let b = expand_branching_epsilons(result);
+        let b = expand_epsilon_forks(result);
         let c = laser_vision(result);
         if !a && !b && !c {
             break;

@@ -69,8 +69,8 @@ fn keeps_all_when_all_reachable() {
 }
 
 #[test]
-fn handles_branching() {
-    // A -> [B, C] (all reachable via branch)
+fn handles_fork() {
+    // A -> [B, C] (all reachable through the fork)
     let instructions = vec![
         MatchIR::terminal(Label(0))
             .nav(Nav::Down)

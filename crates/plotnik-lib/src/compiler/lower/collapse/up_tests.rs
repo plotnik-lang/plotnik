@@ -286,7 +286,7 @@ fn collapse_up_refuses_merge_exceeding_max() {
 }
 
 #[test]
-fn collapse_up_branching_no_merge() {
+fn collapse_up_fork_no_merge() {
     // Up(1) with multiple successors should NOT merge
     let mut result = NfaGraph {
         instructions: vec![

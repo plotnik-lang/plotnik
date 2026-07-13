@@ -5,7 +5,7 @@
 //! 1. An **order-sensitive semantic fingerprint** of the graph reachable from an
 //!    entry: the ordered list (DFS pre-order) of per-path hashes. For a
 //!    backtracking VM transition *order* is semantics, so the fingerprint is
-//!    sensitive to branch priority and to dropped/duplicated successors. Every
+//!    sensitive to successor priority and to dropped/duplicated successors. Every
 //!    optimization pass must preserve it — see [`run_verified`].
 //! 2. **Structural invariants** on the instruction list: no duplicate labels and
 //!    no dangling references (successors and `Call` targets/returns all resolve).
@@ -19,7 +19,7 @@
 //!   `collapse_up` — and epsilon elimination parking effects onto Up nodes — is a
 //!   no-op.
 //!
-//! Anything else a pass does to navigation, matching, effects, or branch order
+//! Anything else a pass does to navigation, matching, effects, or successor order
 //! changes the fingerprint and trips the check.
 //!
 //! Cost is bounded: traversal stops after [`MAX_PATHS`] completed paths (a
@@ -400,7 +400,7 @@ mod debug_impl {
 
         /// Iterative DFS over the graph reachable from `entry`, invoking `on_path` with
         /// each completed path (coalesced) in pre-order. An explicit stack (no
-        /// recursion, so deep IRs can't overflow) carries per-branch op prefixes and
+        /// recursion, so deep IRs can't overflow) carries per-successor op prefixes and
         /// visited snapshots. Returns whether traversal was truncated by a budget.
         fn walk(&self, entry: Label, max_paths: usize, mut on_path: impl FnMut(Path)) -> bool {
             let mut count = 0usize;

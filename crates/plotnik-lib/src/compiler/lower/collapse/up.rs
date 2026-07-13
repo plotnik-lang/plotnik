@@ -13,7 +13,7 @@
 //! - Same mode only (Up, UpSkipTrivia, UpSkipExtras, UpExact can't mix)
 //! - Effectless only (no effects or neg_fields)
 //! - Capped at `Nav::MAX_UP_LEVEL` per instruction (the 5-bit level field)
-//! - Single successor (can't merge branching instructions)
+//! - Single successor (can't merge fork instructions)
 
 use std::collections::{HashMap, HashSet};
 

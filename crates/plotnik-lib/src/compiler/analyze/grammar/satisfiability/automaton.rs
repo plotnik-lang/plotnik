@@ -5,7 +5,7 @@
 //! child a production emits must be consumed, either by a **pattern edge** (a query
 //! child it matches) or by a **gap edge** (a self-loop the anchor context lets it
 //! skip). Reaching an accept state means the production's children realize what `p`
-//! demands. Quantifiers become loops, alternations become parallel branches, and a
+//! demands. Quantifiers become loops, alternations become parallel alternatives, and a
 //! nested sequence inlines its items, so child arity remains exact.
 //!
 //! The construction reuses `AnchorSemantics` verbatim, so the gap classes the checker
@@ -597,13 +597,13 @@ impl<'a, 'b> Builder<'a, 'b> {
 
     fn emit_alternation(&mut self, alt: &Pattern, descent: Descent, from: State) -> State {
         let to = self.new_state(GapClass::Any);
-        let mut had_branch = false;
-        for branch in alt.children() {
-            had_branch = true;
-            let branch_exit = self.emit_pattern(&branch, descent, from);
-            self.states[branch_exit as usize].eps_edges.push(to);
+        let mut had_alternative = false;
+        for alternative in alt.children() {
+            had_alternative = true;
+            let alternative_exit = self.emit_pattern(&alternative, descent, from);
+            self.states[alternative_exit as usize].eps_edges.push(to);
         }
-        if !had_branch {
+        if !had_alternative {
             self.states[from as usize].eps_edges.push(to);
         }
         to
@@ -721,9 +721,9 @@ fn checked_anonymous_node(ctx: AutomatonContext<'_>, text: &str) -> NodeKindId {
 }
 
 /// Widen a narrow skip to the broad one for direct alternation positions. The VM
-/// computes per-branch navs there, so a named branch may skip an anonymous token
+/// computes per-alternative navs there, so a named alternative may skip an anonymous token
 /// the conservative whole-pattern nav would not; the checker reasons over all
-/// branches at once and so takes the most permissive gap. Exact is
+/// alternatives at once and so takes the most permissive gap. Exact is
 /// never widened — it is the user's exact-anchor constraint.
 fn satisfiability_gap(gap: GapClass, pattern: &Pattern) -> GapClass {
     if gap == GapClass::ExtrasOnly && has_direct_alternative_nav(pattern) {

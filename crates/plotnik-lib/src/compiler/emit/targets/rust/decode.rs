@@ -4,7 +4,7 @@
 //! query's output type, so decoding is generated deserialization (serde-derive
 //! mental model), not interpretation: one decoder fn per named type, shared
 //! across every position that holds it, matching only the entries the type
-//! admits. It runs once, on the winning path; failed branches never reach it.
+//! admits. It runs once, on the winning path; failed execution paths never reach it.
 //!
 //! Two journal facts shape the decoders (see the VM materializer, the reference
 //! consumer):

@@ -294,7 +294,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         let Some(ctx) = ctx else { return };
 
         if !self.grammar.has_field(ctx.id(), field_id) {
-            // A field absent from this kind can never match here, but a sibling branch or zero
+            // A field absent from this kind can never match here, but a sibling alternative or zero
             // repetitions can — so skip when deferred.
             if participation.is_required() {
                 self.emit_field_not_on_node(

@@ -4,7 +4,7 @@
 //! instructions into cascading epsilon chains:
 //! - effects > 15 → epsilon chain after match
 //! - neg_fields > 7 → epsilon chain for overflow checks
-//! - successors > 28 → cascading epsilon branches
+//! - successors > 28 → cascading epsilon forks
 
 use crate::bytecode::{MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS};
 use crate::core::NodeFieldId;
@@ -92,7 +92,7 @@ impl Emitter {
                 }
                 PostChain::Successors(succs) => {
                     // The cascade holds the *overflow* (lowest-priority) successors. It is an
-                    // additional branch, so append its entry after the kept successors rather
+                    // additional successor, so append its entry after the kept successors rather
                     // than replacing them — replacing silently drops the kept successors.
                     self.emit_successors_cascade(chain_entry, succs);
                     current_succs.push(chain_entry);

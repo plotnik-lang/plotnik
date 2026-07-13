@@ -13,7 +13,7 @@ use super::capture::CaptureEffects;
 /// so the two same-type `Label`s can't be transposed — a swap would silently
 /// flip greediness.
 #[derive(Clone, Copy)]
-pub(super) struct BranchTargets {
+pub(super) struct ForkTargets {
     pub prefer: Label,
     pub other: Label,
 }
@@ -35,8 +35,8 @@ impl From<QuantifierOperator> for Greediness {
 }
 
 impl Greediness {
-    fn successors(self, targets: BranchTargets) -> Vec<Label> {
-        let BranchTargets { prefer, other } = targets;
+    fn successors(self, targets: ForkTargets) -> Vec<Label> {
+        let ForkTargets { prefer, other } = targets;
         match self {
             Self::Greedy => vec![prefer, other],
             Self::Lazy => vec![other, prefer],
@@ -257,22 +257,22 @@ impl NfaBuilder<'_> {
         );
     }
 
-    /// Emit an epsilon branch preferring `targets.prefer` when greedy,
+    /// Emit an epsilon fork preferring `targets.prefer` when greedy,
     /// `targets.other` when lazy.
-    pub(super) fn emit_branch_epsilon(
+    pub(super) fn emit_fork_epsilon(
         &mut self,
-        targets: BranchTargets,
+        targets: ForkTargets,
         greediness: Greediness,
     ) -> Label {
         let entry = self.fresh_label();
-        self.emit_branch_epsilon_at(entry, targets, greediness);
+        self.emit_fork_epsilon_at(entry, targets, greediness);
         entry
     }
 
-    pub(super) fn emit_branch_epsilon_at(
+    pub(super) fn emit_fork_epsilon_at(
         &mut self,
         label: Label,
-        targets: BranchTargets,
+        targets: ForkTargets,
         greediness: Greediness,
     ) {
         self.emit_epsilon(label, greediness.successors(targets));
@@ -307,9 +307,9 @@ impl NfaBuilder<'_> {
         let retry = self.fresh_label();
         self.emit_wildcard_nav(retry, Nav::Next, try_label);
 
-        self.emit_branch_epsilon_at(
+        self.emit_fork_epsilon_at(
             try_label,
-            BranchTargets {
+            ForkTargets {
                 prefer: body,
                 other: retry,
             },
