@@ -347,7 +347,7 @@ fn entry_point_resolution() {
         def_entries: {
             let mut m = indexmap::IndexMap::new();
             m.insert(
-                crate::compiler::lower::ir::DefVariant::ordinary(
+                crate::compiler::lower::ir::DefSpecialization::ordinary(
                     crate::compiler::ids::DefId::from_raw(0),
                 ),
                 Label(0),
@@ -362,7 +362,7 @@ fn entry_point_resolution() {
     laser_vision(&mut result);
 
     assert_eq!(
-        result.def_entries[&crate::compiler::lower::ir::DefVariant::ordinary(
+        result.def_entries[&crate::compiler::lower::ir::DefSpecialization::ordinary(
             crate::compiler::ids::DefId::from_raw(0),
         )],
         Label(2)

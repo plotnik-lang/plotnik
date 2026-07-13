@@ -6,7 +6,7 @@ use crate::compiler::analyze::types::{
 };
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
-    CalleeEntry, DefBodyMode, DefVariant, EffectIR, Label, ReturnAddr, SplitReturnAddrs,
+    CalleeEntry, DefBodyMode, DefSpecialization, EffectIR, Label, ReturnAddr, SplitReturnAddrs,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind};
@@ -440,7 +440,7 @@ impl CaptureTypeLowerer<'_, '_> {
         let mode = self.compiler.propagate_source_mode(mode);
         let target = self
             .compiler
-            .ensure_def_variant(DefVariant::new(def_id, mode));
+            .ensure_def_specialization(DefSpecialization::new(def_id, mode));
         let exit = self
             .compiler
             .emit_effects_if_nonempty(self.exits.match_exit(), destination.into_effects());
@@ -549,7 +549,9 @@ impl CaptureTypeLowerer<'_, '_> {
             let mode = self.compiler.propagate_source_mode(mode);
             let target = self
                 .compiler
-                .ensure_def_variant(DefVariant::routed_match(def_id, mode, entry_nav));
+                .ensure_def_specialization(DefSpecialization::routed_match(
+                    def_id, mode, entry_nav,
+                ));
             let continuation = self
                 .compiler
                 .emit_effects_if_nonempty(match_exit, destination.into_effects());
@@ -580,7 +582,7 @@ impl CaptureTypeLowerer<'_, '_> {
         let mode = self.compiler.propagate_source_mode(mode);
         let target = self
             .compiler
-            .ensure_def_variant(DefVariant::routed_split(def_id, mode, entry_nav));
+            .ensure_def_specialization(DefSpecialization::routed_split(def_id, mode, entry_nav));
         self.compiler.emit_split_call(
             entry_nav,
             SplitReturnAddrs {

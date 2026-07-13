@@ -80,7 +80,7 @@ impl<'a> NfaDumper<'a> {
     pub(crate) fn def_name_of(&self, label: Label) -> &str {
         match self.origin_of(label) {
             LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id),
-            LabelOrigin::DefVariant { def_id, .. } => self.def_name(def_id),
+            LabelOrigin::DefSpecialization { def_id, .. } => self.def_name(def_id),
         }
     }
 
@@ -161,8 +161,8 @@ impl NfaDumper<'_> {
     fn origin_header(&self, origin: LabelOrigin) -> String {
         match origin {
             LabelOrigin::Def(id) => format!("{}:", self.def_name(id)),
-            origin @ LabelOrigin::DefVariant { .. } => {
-                format!("{}:", self.variant_name(origin))
+            origin @ LabelOrigin::DefSpecialization { .. } => {
+                format!("{}:", self.specialization_name(origin))
             }
             LabelOrigin::Wrapper(id) => format!("{} (entry point):", self.def_name(id)),
         }
@@ -173,15 +173,15 @@ impl NfaDumper<'_> {
         self.artifacts.interner.resolve(sym)
     }
 
-    fn variant_name(&self, origin: LabelOrigin) -> String {
-        let LabelOrigin::DefVariant {
+    fn specialization_name(&self, origin: LabelOrigin) -> String {
+        let LabelOrigin::DefSpecialization {
             def_id,
             output,
             source,
             route,
         } = origin
         else {
-            unreachable!("variant names require variant provenance")
+            unreachable!("specialization names require specialization provenance")
         };
         let mut modes = Vec::new();
         if let DefOutputOrigin::CaptureType(output) = output {
@@ -404,12 +404,12 @@ impl NfaDumper<'_> {
     }
 
     /// Callee display name, resolved through the target label's origin: calls
-    /// enter at a definition body (or its consuming variant), so the window that
+    /// enter at a definition body (or its consuming specialization), so the window that
     /// allocated the target label names the callee.
     fn callee_name(&self, target: Label) -> String {
         match self.origin_of(target) {
             LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id).to_string(),
-            origin @ LabelOrigin::DefVariant { .. } => self.variant_name(origin),
+            origin @ LabelOrigin::DefSpecialization { .. } => self.specialization_name(origin),
         }
     }
 

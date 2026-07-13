@@ -1,7 +1,9 @@
 use super::*;
 use crate::bytecode::Nav;
 use crate::compiler::ids::DefId;
-use crate::compiler::lower::ir::{CallIR, CalleeEntry, DefVariant, MatchIR, ReturnAddr, ReturnIR};
+use crate::compiler::lower::ir::{
+    CallIR, CalleeEntry, DefSpecialization, MatchIR, ReturnAddr, ReturnIR,
+};
 use indexmap::IndexMap;
 
 #[test]
@@ -20,7 +22,7 @@ fn removes_unreachable_instructions() {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
-            m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            m.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
         entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
@@ -55,7 +57,7 @@ fn keeps_all_when_all_reachable() {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
-            m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            m.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
         entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
@@ -84,7 +86,7 @@ fn handles_fork() {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
-            m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            m.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
         entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
@@ -99,8 +101,8 @@ fn handles_fork() {
 
 #[test]
 fn follows_call_targets_and_prunes_unreachable_definition_entries() {
-    let used = DefVariant::ordinary(DefId::from_raw(0));
-    let unused = DefVariant::ordinary(DefId::from_raw(1));
+    let used = DefSpecialization::ordinary(DefId::from_raw(0));
+    let unused = DefSpecialization::ordinary(DefId::from_raw(1));
     let instructions = vec![
         MatchIR::epsilon(Label(0), Label(1)).into(),
         CallIR::new(Label(1), ReturnAddr(Label(2)), CalleeEntry(Label(3))).into(),
@@ -127,7 +129,7 @@ fn follows_call_targets_and_prunes_unreachable_definition_entries() {
 
 #[test]
 fn keeps_reachable_recursive_definition() {
-    let recursive = DefVariant::ordinary(DefId::from_raw(0));
+    let recursive = DefSpecialization::ordinary(DefId::from_raw(0));
     let instructions = vec![
         MatchIR::epsilon(Label(0), Label(1)).into(),
         CallIR::new(Label(1), ReturnAddr(Label(2)), CalleeEntry(Label(3))).into(),

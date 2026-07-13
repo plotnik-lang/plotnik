@@ -90,7 +90,7 @@ mod debug_impl {
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
-        DefRoute, DefVariant, InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint,
+        DefRoute, DefSpecialization, InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint,
         PredicateValueIR, ReturnOutcome,
     };
 
@@ -151,7 +151,7 @@ mod debug_impl {
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum WalkRoot {
         EntryPoint(DefId),
-        Def(DefVariant),
+        Def(DefSpecialization),
     }
 
     struct PassSnapshot {
@@ -337,14 +337,14 @@ mod debug_impl {
     impl<'a> GraphWalk<'a> {
         fn new(
             instructions: &'a [InstructionIR],
-            def_entries: &IndexMap<DefVariant, Label>,
+            def_entries: &IndexMap<DefSpecialization, Label>,
             ctx: &'a LowerInput<'a>,
         ) -> Self {
             Self {
                 instr_map: instructions.iter().map(|i| (i.label(), i)).collect(),
                 label_to_def: def_entries
                     .iter()
-                    .map(|(variant, &label)| (label, variant.def_id()))
+                    .map(|(specialization, &label)| (label, specialization.def_id()))
                     .collect(),
                 ctx,
             }
@@ -620,7 +620,7 @@ mod debug_impl {
         for (root, entry) in entries(nfa) {
             let route = match &root {
                 WalkRoot::EntryPoint(_) => DefRoute::Caller,
-                WalkRoot::Def(variant) => variant.route(),
+                WalkRoot::Def(specialization) => specialization.route(),
             };
             check_depth_root(root, entry, route, &instr_map)?;
         }
@@ -808,8 +808,8 @@ mod debug_impl {
         for (&def_id, &label) in &nfa.entry_point_wrappers {
             v.push((WalkRoot::EntryPoint(def_id), label));
         }
-        for (variant, &label) in &nfa.def_entries {
-            v.push((WalkRoot::Def(variant.clone()), label));
+        for (specialization, &label) in &nfa.def_entries {
+            v.push((WalkRoot::Def(specialization.clone()), label));
         }
         v
     }
@@ -900,7 +900,7 @@ mod debug_impl {
         pass(nfa);
         before.fingerprints.retain(|(root, _, _)| match root {
             WalkRoot::EntryPoint(_) => true,
-            WalkRoot::Def(variant) => nfa.def_entries.contains_key(variant),
+            WalkRoot::Def(specialization) => nfa.def_entries.contains_key(specialization),
         });
         verify_after_pass(name, &before, nfa, ctx);
     }

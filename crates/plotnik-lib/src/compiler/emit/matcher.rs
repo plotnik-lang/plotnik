@@ -395,7 +395,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             .expect("every pre-pack label carries an origin")
         {
             LabelOrigin::Def(_) => StateOrigin::Definition,
-            LabelOrigin::DefVariant { route, .. } => {
+            LabelOrigin::DefSpecialization { route, .. } => {
                 if route.requires_consumption() {
                     StateOrigin::ConsumingDefinition
                 } else {

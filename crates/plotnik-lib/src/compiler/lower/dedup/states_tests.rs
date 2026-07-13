@@ -1,6 +1,8 @@
 use super::*;
 use crate::compiler::ids::DefId;
-use crate::compiler::lower::ir::{CallIR, CalleeEntry, DefVariant, MatchIR, ReturnAddr, ReturnIR};
+use crate::compiler::lower::ir::{
+    CallIR, CalleeEntry, DefSpecialization, MatchIR, ReturnAddr, ReturnIR,
+};
 use indexmap::IndexMap;
 
 fn graph(instructions: Vec<InstructionIR>, entry: u32) -> NfaGraph {
@@ -8,7 +10,10 @@ fn graph(instructions: Vec<InstructionIR>, entry: u32) -> NfaGraph {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
-            m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(entry));
+            m.insert(
+                DefSpecialization::ordinary(DefId::from_raw(0)),
+                Label(entry),
+            );
             m
         },
         entry_point_wrappers: {
@@ -66,7 +71,7 @@ fn merges_identical_nav_twins() {
 
     assert_eq!(labels(&nfa), vec![0, 1, 2]);
     assert_eq!(
-        nfa.def_entries[&DefVariant::ordinary(DefId::from_raw(0))],
+        nfa.def_entries[&DefSpecialization::ordinary(DefId::from_raw(0))],
         Label(2)
     );
     assert_eq!(nfa.entry_point_wrappers[&DefId::from_raw(0)], Label(2));
@@ -171,7 +176,7 @@ fn call_references_rewritten() {
     assert_eq!(call.matched_return(), Label(5));
     assert_eq!(call.target, Label(5));
     assert_eq!(
-        nfa.def_entries[&DefVariant::ordinary(DefId::from_raw(0))],
+        nfa.def_entries[&DefSpecialization::ordinary(DefId::from_raw(0))],
         Label(5)
     );
     assert_eq!(nfa.entry_point_wrappers[&DefId::from_raw(0)], Label(5));

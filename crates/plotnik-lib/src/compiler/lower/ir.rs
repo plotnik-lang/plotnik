@@ -52,7 +52,7 @@ pub(crate) enum DefOutputMode {
     CaptureType(CaptureTypePlan),
 }
 
-/// Copyable output provenance retained after a definition variant is lowered.
+/// Copyable output provenance retained after a definition specialization is lowered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DefOutputOrigin {
     Ordinary,
@@ -231,13 +231,13 @@ impl DefRoute {
 
 /// One memoized definition body and its lowering mode.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct DefVariant {
+pub(crate) struct DefSpecialization {
     def_id: DefId,
     mode: DefBodyMode,
     route: DefRoute,
 }
 
-impl DefVariant {
+impl DefSpecialization {
     pub(crate) fn ordinary(def_id: DefId) -> Self {
         Self {
             def_id,
@@ -914,8 +914,8 @@ impl From<ReturnIR> for InstructionIR {
 pub(crate) enum LabelOrigin {
     /// Allocated while compiling this definition's body.
     Def(DefId),
-    /// Allocated while compiling a non-ordinary definition-body variant.
-    DefVariant {
+    /// Allocated while compiling a non-ordinary definition specialization.
+    DefSpecialization {
         def_id: DefId,
         output: DefOutputOrigin,
         source: SourceMode,
@@ -929,8 +929,8 @@ pub(crate) enum LabelOrigin {
 #[derive(Clone, Debug)]
 pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
-    /// Entry labels for every emitted definition-body variant.
-    pub(in crate::compiler::lower) def_entries: IndexMap<DefVariant, Label>,
+    /// Entry labels for every emitted definition specialization.
+    pub(in crate::compiler::lower) def_entries: IndexMap<DefSpecialization, Label>,
     /// Entry labels for each emitted entry point wrapper, in definition order.
     pub(in crate::compiler::lower) entry_point_wrappers: IndexMap<DefId, Label>,
     /// Inspection span table, present iff the query was compiled with inspection.

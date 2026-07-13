@@ -1,6 +1,6 @@
 //! Dead code elimination pass.
 //!
-//! Removes unreachable instructions and definition variants after epsilon
+//! Removes unreachable instructions and definition specializations after epsilon
 //! elimination. Reachability starts at wrappers for exported entry points; a
 //! call reaches both
 //! its return continuations and its callee body.

@@ -10,7 +10,7 @@ use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{
-    CalleeEntry, DefBodyMode, DefOutputMode, DefVariant, EffectIR, InstructionIR, Label,
+    CalleeEntry, DefBodyMode, DefOutputMode, DefSpecialization, EffectIR, InstructionIR, Label,
     LabelOrigin, NfaGraph, ReturnAddr, ReturnIR,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
@@ -34,9 +34,9 @@ pub struct NfaBuilder<'a> {
     current_origin: Option<LabelOrigin>,
     /// Origin per allocated label id (index = `Label.0`), moved into the graph.
     label_origins: Vec<Option<LabelOrigin>>,
-    pub(super) def_entries: IndexMap<DefVariant, Label>,
-    compiled_def_variants: HashSet<DefVariant>,
-    active_def_variants: HashSet<DefVariant>,
+    pub(super) def_entries: IndexMap<DefSpecialization, Label>,
+    compiled_def_specializations: HashSet<DefSpecialization>,
+    active_def_specializations: HashSet<DefSpecialization>,
     /// Stack of active record scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<RecordScope>,
@@ -69,8 +69,8 @@ impl<'a> NfaBuilder<'a> {
             current_origin: None,
             label_origins: Vec::new(),
             def_entries: IndexMap::new(),
-            compiled_def_variants: HashSet::new(),
-            active_def_variants: HashSet::new(),
+            compiled_def_specializations: HashSet::new(),
+            active_def_specializations: HashSet::new(),
             scope_stack: Vec::new(),
             suppress_depth: 0,
             source_mark_depth: 0,
@@ -131,7 +131,7 @@ impl<'a> NfaBuilder<'a> {
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
         for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
-            compiler.ensure_def_variant(DefVariant::ordinary(def_id));
+            compiler.ensure_def_specialization(DefSpecialization::ordinary(def_id));
         }
 
         let mut entry_point_wrappers = IndexMap::new();
@@ -182,7 +182,7 @@ impl<'a> NfaBuilder<'a> {
             Nav::Stay,
             None,
             ReturnAddr(after_body),
-            CalleeEntry(self.def_entries[&DefVariant::ordinary(def_id)]),
+            CalleeEntry(self.def_entries[&DefSpecialization::ordinary(def_id)]),
         );
 
         if wraps_record {
@@ -200,54 +200,64 @@ impl<'a> NfaBuilder<'a> {
         l
     }
 
-    /// Return the entry for one semantic definition-body variant, compiling it
+    /// Return the entry for one semantic definition specialization, compiling it
     /// once when first requested. The entry is registered before the body so a
-    /// recursive component can call back into an active variant safely.
-    pub(super) fn ensure_def_variant(&mut self, variant: DefVariant) -> Label {
-        let entry = self.reserve_def_variant(&variant);
-        if self.compiled_def_variants.contains(&variant)
-            || !self.active_def_variants.insert(variant.clone())
+    /// recursive component can call back into an active specialization safely.
+    pub(super) fn ensure_def_specialization(&mut self, specialization: DefSpecialization) -> Label {
+        let entry = self.reserve_def_specialization(&specialization);
+        if self.compiled_def_specializations.contains(&specialization)
+            || !self
+                .active_def_specializations
+                .insert(specialization.clone())
         {
             return entry;
         }
 
-        let previous_origin = self.current_origin.replace(Self::variant_origin(&variant));
-        self.compile_def_variant_body(&variant, entry);
+        let previous_origin = self
+            .current_origin
+            .replace(Self::specialization_origin(&specialization));
+        self.compile_def_specialization_body(&specialization, entry);
         self.current_origin = previous_origin;
 
-        let removed = self.active_def_variants.remove(&variant);
-        assert!(removed, "compiled definition variant was active");
-        self.compiled_def_variants.insert(variant);
+        let removed = self.active_def_specializations.remove(&specialization);
+        assert!(removed, "compiled definition specialization was active");
+        self.compiled_def_specializations.insert(specialization);
         entry
     }
 
-    fn reserve_def_variant(&mut self, variant: &DefVariant) -> Label {
-        if let Some(&entry) = self.def_entries.get(variant) {
+    fn reserve_def_specialization(&mut self, specialization: &DefSpecialization) -> Label {
+        if let Some(&entry) = self.def_entries.get(specialization) {
             return entry;
         }
 
-        let previous_origin = self.current_origin.replace(Self::variant_origin(variant));
+        let previous_origin = self
+            .current_origin
+            .replace(Self::specialization_origin(specialization));
         let entry = self.fresh_label();
         self.current_origin = previous_origin;
-        self.def_entries.insert(variant.clone(), entry);
+        self.def_entries.insert(specialization.clone(), entry);
         entry
     }
 
-    fn variant_origin(variant: &DefVariant) -> LabelOrigin {
-        if variant.is_ordinary() {
-            return LabelOrigin::Def(variant.def_id());
+    fn specialization_origin(specialization: &DefSpecialization) -> LabelOrigin {
+        if specialization.is_ordinary() {
+            return LabelOrigin::Def(specialization.def_id());
         }
 
-        LabelOrigin::DefVariant {
-            def_id: variant.def_id(),
-            output: variant.mode().output().origin(),
-            source: variant.mode().source(),
-            route: variant.route(),
+        LabelOrigin::DefSpecialization {
+            def_id: specialization.def_id(),
+            output: specialization.mode().output().origin(),
+            source: specialization.mode().source(),
+            route: specialization.route(),
         }
     }
 
-    fn compile_def_variant_body(&mut self, variant: &DefVariant, entry_label: Label) {
-        let def_id = variant.def_id();
+    fn compile_def_specialization_body(
+        &mut self,
+        specialization: &DefSpecialization,
+        entry_label: Label,
+    ) {
+        let def_id = specialization.def_id();
         let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
         let name = self.ctx.analysis.interner.resolve(name_sym);
 
@@ -258,14 +268,14 @@ impl<'a> NfaBuilder<'a> {
             .expect("analyzed definition has a body");
 
         let matched_return = self.fresh_label();
-        let matched_return_instr = match variant.route() {
+        let matched_return_instr = match specialization.route() {
             crate::compiler::lower::ir::DefRoute::Caller => ReturnIR::matched(matched_return),
             crate::compiler::lower::ir::DefRoute::Routed { .. } => {
                 ReturnIR::routed_matched(matched_return)
             }
         };
         self.instructions.push(matched_return_instr.into());
-        let exits = if variant.route().splits() {
+        let exits = if specialization.route().splits() {
             let empty_return = self.fresh_label();
             self.instructions
                 .push(ReturnIR::routed_empty(empty_return).into());
@@ -273,7 +283,7 @@ impl<'a> NfaBuilder<'a> {
                 match_exit: matched_return,
                 skip_exit: SkipExit::To(empty_return),
             }
-        } else if variant.route().requires_consumption() {
+        } else if specialization.route().requires_consumption() {
             CaptureExits::Split {
                 match_exit: matched_return,
                 skip_exit: SkipExit::Fail,
@@ -282,10 +292,10 @@ impl<'a> NfaBuilder<'a> {
             CaptureExits::Single(matched_return)
         };
 
-        // Ordinary variants are exact because their caller owns navigation.
-        // Routed recursive variants own the original call-site navigation so
+        // Ordinary specializations are exact because their caller owns navigation.
+        // Routed recursive specializations own the original call-site navigation so
         // their authored nullable alternative order stays above candidate retries.
-        let body_nav = Some(variant.route().body_nav());
+        let body_nav = Some(specialization.route().body_nav());
 
         // Definitions are compiled in normalized form: body -> Return
         // No record wrapper - that's the caller's responsibility (call-site scoping).
@@ -301,7 +311,7 @@ impl<'a> NfaBuilder<'a> {
         let (body_exits, def_span) = self.bracket_def_body_exits(body, exits);
 
         self.inline_stack.push(def_id);
-        let mode = variant.mode().clone();
+        let mode = specialization.mode().clone();
         let body_entry = self.compile_with_optional_scope(type_id, |this| {
             this.compile_def_body(body, &mode, body_exits, body_nav)
         });

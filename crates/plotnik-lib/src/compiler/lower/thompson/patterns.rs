@@ -11,8 +11,8 @@ use crate::bytecode::{EffectKind, Nav, PredicateOp, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
-    CalleeEntry, DefBodyMode, DefRoute, DefVariant, EffectArg, EffectIR, InstructionIR, Label,
-    MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,
+    CalleeEntry, DefBodyMode, DefRoute, DefSpecialization, EffectArg, EffectIR, InstructionIR,
+    Label, MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,
 };
 use crate::compiler::parse::ast::{self, MissingArg, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
@@ -504,7 +504,7 @@ impl NfaBuilder<'_> {
             return self.compile_ref_inline(def_id, ctx, skip_exit);
         }
         let mode = self.propagate_source_mode(DefBodyMode::ordinary());
-        self.compile_ref_call(DefVariant::new(def_id, mode), ctx, field_override)
+        self.compile_ref_call(DefSpecialization::new(def_id, mode), ctx, field_override)
     }
 
     /// Compile a reference as a `Call` to the definition's standalone body.
@@ -524,11 +524,11 @@ impl NfaBuilder<'_> {
     /// is the caller's own return value (a quantifier at a definition's root).
     fn compile_ref_call(
         &mut self,
-        variant: DefVariant,
+        specialization: DefSpecialization,
         ctx: PatternCtx,
         field_override: Option<NodeFieldId>,
     ) -> Label {
-        let def_id = variant.def_id();
+        let def_id = specialization.def_id();
         let is_captured = ctx.consumes_value();
         let PatternCtx {
             exit,
@@ -540,13 +540,13 @@ impl NfaBuilder<'_> {
         // Entry points are compiled eagerly; fragments arrive here through a
         // reference and are compiled on demand with the exact output protocol
         // this call site needs.
-        let compile_time_suppressed = variant.mode().suppresses_output();
+        let compile_time_suppressed = specialization.mode().suppresses_output();
         assert!(
             !compile_time_suppressed || !is_captured,
-            "compile-time suppressed variants are only used for bare references"
+            "compile-time suppressed specializations are only used for bare references"
         );
-        let route = variant.route();
-        let target = self.ensure_def_variant(variant);
+        let route = specialization.route();
+        let target = self.ensure_def_specialization(specialization);
         let callee = CalleeEntry(target);
 
         let def_output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
@@ -657,7 +657,7 @@ impl NfaBuilder<'_> {
 
     pub(super) fn propagate_source_mode(&self, mode: DefBodyMode) -> DefBodyMode {
         // A capture-type body owns its provenance transformation. Adding the
-        // ambient Mark axis would compile a duplicate variant without changing
+        // ambient Mark axis would compile a duplicate specialization without changing
         // its effects (source marking is depth-based, not additive).
         if self.marks_source() && !mode.has_capture_type() {
             return mode.mark_source();
@@ -719,14 +719,14 @@ impl NfaBuilder<'_> {
         field_override: Option<NodeFieldId>,
     ) -> Label {
         let mode = self.propagate_source_mode(DefBodyMode::ordinary());
-        let variant = DefVariant::new(def_id, mode);
+        let specialization = DefSpecialization::new(def_id, mode);
         let pattern_ctx = PatternCtx {
             exit,
             nav: nav_override,
             capture: CaptureEffects::default(),
             value: true,
         };
-        self.compile_ref_call(variant, pattern_ctx, field_override)
+        self.compile_ref_call(specialization, pattern_ctx, field_override)
     }
 
     fn compile_ref_inline_in(
@@ -876,7 +876,7 @@ impl NfaBuilder<'_> {
     /// A nullable reference back into a definition currently being compiled —
     /// a consuming-position cycle through the def's own body, e.g.
     /// `A = (x (A) (y))?`. Inlining would not terminate, so fall back to a
-    /// real call. A routed variant owns the call-site navigation, and its two
+    /// real call. A routed specialization owns the call-site navigation, and its two
     /// return outcomes preserve the body's authored consuming/empty ordering.
     fn compile_ref_guarded_call(
         &mut self,
@@ -901,14 +901,14 @@ impl NfaBuilder<'_> {
         let SkipExit::To(zero_exit) = skip_exit else {
             let mode = output.specialize(DefBodyMode::ordinary());
             let mode = self.propagate_source_mode(mode);
-            let variant = DefVariant::routed_match(def_id, mode, entry_nav);
+            let specialization = DefSpecialization::routed_match(def_id, mode, entry_nav);
             let pattern_ctx = PatternCtx {
                 exit: match_exit,
                 nav: None,
                 capture: CaptureEffects { pre, post },
                 value: false,
             };
-            return self.compile_ref_call(variant, pattern_ctx, None);
+            return self.compile_ref_call(specialization, pattern_ctx, None);
         };
 
         let suppresses_output = output == GuardedRefOutput::RuntimeSuppressed;
@@ -917,7 +917,8 @@ impl NfaBuilder<'_> {
         let empty_return = self.guarded_ref_return(zero_exit, post, suppresses_output);
         let mode = output.specialize(DefBodyMode::ordinary());
         let mode = self.propagate_source_mode(mode);
-        let target = self.ensure_def_variant(DefVariant::routed_split(def_id, mode, entry_nav));
+        let target = self
+            .ensure_def_specialization(DefSpecialization::routed_split(def_id, mode, entry_nav));
         let call = self.emit_split_call(
             entry_nav,
             SplitReturnAddrs {
