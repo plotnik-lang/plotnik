@@ -52,8 +52,8 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
-    AlternationPattern, Alternative, CapturedPattern, DefRef, FieldPattern, Labeling, NodePattern,
-    Pattern, QuantifiedPattern, SeqPattern, TokenPattern, is_empty_group,
+    AlternationPattern, Alternative, AnonymousNodePattern, CapturedPattern, DefRef, FieldPattern,
+    Labeling, NamedNodePattern, Pattern, QuantifiedPattern, SeqPattern, is_empty_group,
 };
 
 mod diagnostics;
@@ -369,8 +369,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     fn compute_pattern(&mut self, pattern: &Located<Pattern>) -> PatternShape {
         match pattern.node() {
-            Pattern::NodePattern(n) => self.infer_named_node(&pattern.wrap(n.clone())),
-            Pattern::TokenPattern(n) => self.infer_anonymous_node(n),
+            Pattern::NamedNodePattern(n) => self.infer_named_node(&pattern.wrap(n.clone())),
+            Pattern::AnonymousNodePattern(n) => self.infer_anonymous_node(n),
+            Pattern::NodeWildcard(_) => {
+                PatternShape::new(RootExtent::SingleNode, PatternFlow::NoValue)
+            }
             Pattern::DefRef(r) => self.infer_ref(r),
             Pattern::SeqPattern(s) => self.infer_seq_pattern(&pattern.wrap(s.clone())),
             Pattern::Alternation(alternation) => match alternation.labeling() {
@@ -393,14 +396,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// Named node: matches one position, bubbles up child captures.
-    fn infer_named_node(&mut self, node: &Located<NodePattern>) -> PatternShape {
+    fn infer_named_node(&mut self, node: &Located<NamedNodePattern>) -> PatternShape {
         let children = node.node().children().map(|child| node.wrap(child));
         let merged = self.collect_child_fields(children);
         PatternShape::new(RootExtent::SingleNode, self.merged_fields_flow(merged))
     }
 
     /// Anonymous node (literal or wildcard): matches one position, produces nothing.
-    fn infer_anonymous_node(&mut self, _node: &TokenPattern) -> PatternShape {
+    fn infer_anonymous_node(&mut self, _node: &AnonymousNodePattern) -> PatternShape {
         PatternShape::new(RootExtent::SingleNode, PatternFlow::NoValue)
     }
 

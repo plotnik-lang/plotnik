@@ -8,11 +8,11 @@
 
 use super::ValidationInput;
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
+use crate::compiler::analyze::visitor::{Visitor, walk_named_node_pattern, walk_seq_pattern};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast::{NodePattern, SeqItem, SeqPattern};
+use crate::compiler::parse::ast::{NamedNodePattern, SeqItem, SeqPattern};
 
 pub fn validate_anchors(input: ValidationInput) {
     let ValidationInput {
@@ -33,14 +33,14 @@ struct AnchorValidator<'d> {
 }
 
 impl Visitor for AnchorValidator<'_> {
-    fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
+    fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
         let prev = self.in_named_node;
         self.in_named_node = true;
 
         self.check_items(node.source(), node.node().items());
 
         // Named node provides first/last/adjacent context, so any anchor inside is valid.
-        walk_node_pattern(self, node);
+        walk_named_node_pattern(self, node);
 
         self.in_named_node = prev;
     }

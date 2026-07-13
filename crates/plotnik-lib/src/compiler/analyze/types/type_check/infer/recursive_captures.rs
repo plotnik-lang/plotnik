@@ -96,7 +96,7 @@ impl InferVisitor<'_, '_> {
                 }
                 recurse(self, &inner);
             }
-            Pattern::NodePattern(n) => {
+            Pattern::NamedNodePattern(n) => {
                 for child in n.children() {
                     recurse(self, &child);
                 }
@@ -126,7 +126,7 @@ impl InferVisitor<'_, '_> {
                     recurse(self, &value);
                 }
             }
-            Pattern::TokenPattern(_) | Pattern::DefRef(_) => {}
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) | Pattern::DefRef(_) => {}
         }
     }
 

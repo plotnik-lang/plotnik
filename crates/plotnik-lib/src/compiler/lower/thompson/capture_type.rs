@@ -218,7 +218,12 @@ impl CaptureTypeLowerer<'_, '_> {
         }
 
         if terminal.data() == TerminalData::NodeRepresentation
-            && matches!(pattern, Pattern::NodePattern(_) | Pattern::TokenPattern(_))
+            && matches!(
+                pattern,
+                Pattern::NamedNodePattern(_)
+                    | Pattern::AnonymousNodePattern(_)
+                    | Pattern::NodeWildcard(_)
+            )
         {
             return self.node_terminal(pattern, destination, terminal);
         }

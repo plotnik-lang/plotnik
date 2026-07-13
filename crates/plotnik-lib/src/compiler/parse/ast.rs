@@ -99,7 +99,7 @@ macro_rules! define_pattern {
 impl Pattern {
     pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
         match self {
-            Pattern::NodePattern(n) => {
+            Pattern::NamedNodePattern(n) => {
                 PatternChildren::Direct(n.syntax().children().filter_map(Pattern::cast))
             }
             Pattern::SeqPattern(s) => {
@@ -114,7 +114,7 @@ impl Pattern {
                     .filter_map(Alternative::cast as fn(SyntaxNode) -> Option<Alternative>)
                     .filter_map(alternative_body as fn(Alternative) -> Option<Pattern>),
             ),
-            Pattern::DefRef(_) | Pattern::TokenPattern(_) => {
+            Pattern::DefRef(_) | Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => {
                 PatternChildren::Empty(std::iter::empty())
             }
         }
@@ -156,7 +156,7 @@ fn alternative_body(alternative: Alternative) -> Option<Pattern> {
 
 ast_node!(Root, Root);
 ast_node!(Def, Def);
-ast_node!(NodePattern, NamedNode);
+ast_node!(NamedNodePattern, NamedNode);
 ast_node!(DefRef, DefRef);
 ast_node!(
     /// Alternation `[a b]` or `[A: a B: b]`.
@@ -204,25 +204,23 @@ impl SeqItem {
 }
 
 ast_node!(
-    /// Token pattern: an anonymous token (`"+"`) or the wildcard (`_`).
-    /// Maps from CST `Str` or `Wildcard`.
-    TokenPattern,
-    Str | Wildcard
+    /// Anonymous-node pattern written as a string literal, such as `"+"`.
+    AnonymousNodePattern,
+    Str
 );
 
-impl TokenPattern {
-    /// Returns the token's string value, `None` if this is the wildcard.
+impl AnonymousNodePattern {
+    /// Returns the string literal's content token.
     pub fn value(&self) -> Option<SyntaxToken> {
-        if self.0.kind() == SyntaxKind::Wildcard {
-            return None;
-        }
         find_token(&self.0, |k| k == SyntaxKind::StringContent)
     }
-
-    pub fn is_any(&self) -> bool {
-        self.0.kind() == SyntaxKind::Wildcard
-    }
 }
+
+ast_node!(
+    /// Bare node wildcard `_`, which matches named or anonymous nodes.
+    NodeWildcard,
+    Wildcard
+);
 
 /// Whether an alternation's alternatives are consistently labeled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -354,9 +352,10 @@ fn quantifier_operator_from_syntax_kind(kind: SyntaxKind) -> Option<QuantifierOp
 }
 
 define_pattern!(
-    NodePattern,
+    NamedNodePattern,
     DefRef,
-    TokenPattern,
+    AnonymousNodePattern,
+    NodeWildcard,
     SeqPattern,
     CapturedPattern,
     QuantifiedPattern,
@@ -392,7 +391,7 @@ pub enum MissingArg {
     Anonymous(SyntaxToken),
 }
 
-impl NodePattern {
+impl NamedNodePattern {
     pub fn kind_token(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| {
             matches!(
@@ -529,7 +528,7 @@ macro_rules! sequence_accessors {
     };
 }
 
-sequence_accessors!(NodePattern, SeqPattern);
+sequence_accessors!(NamedNodePattern, SeqPattern);
 
 impl CapturedPattern {
     /// Returns the capture token (@name or @_name).

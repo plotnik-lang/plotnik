@@ -208,14 +208,17 @@ fn collect_pattern(
     out: &mut Vec<Candidate>,
 ) {
     match pattern {
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             push_pattern(source, SpanKind::Pattern, node.syntax(), out);
             for child in node.children() {
                 collect_pattern(input, source, &child, visibility, out);
             }
         }
-        Pattern::TokenPattern(token) => {
-            push_pattern(source, SpanKind::Pattern, token.syntax(), out);
+        Pattern::AnonymousNodePattern(node) => {
+            push_pattern(source, SpanKind::Pattern, node.syntax(), out);
+        }
+        Pattern::NodeWildcard(wildcard) => {
+            push_pattern(source, SpanKind::Pattern, wildcard.syntax(), out);
         }
         Pattern::DefRef(reference) => {
             let name = reference

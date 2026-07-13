@@ -284,7 +284,7 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
         let span = self.printer.span_str(pattern.text_range());
 
         match pattern {
-            ast::Pattern::NodePattern(n) => {
+            ast::Pattern::NamedNodePattern(n) => {
                 if n.is_any() {
                     writeln!(self.w, "{}NamedNode{}{} (any)", prefix, extent, span)?;
                 } else {
@@ -302,17 +302,19 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
                 writeln!(self.w, "{}Ref{}{} {}", prefix, extent, span, name)?;
             }
-            ast::Pattern::TokenPattern(a) => {
-                if a.is_any() {
-                    writeln!(self.w, "{}AnonymousNode{}{} (any)", prefix, extent, span)?;
-                } else {
-                    let value = a.value().map(|t| t.text().to_string()).unwrap_or_default();
-                    writeln!(
-                        self.w,
-                        "{}AnonymousNode{}{} \"{}\"",
-                        prefix, extent, span, value
-                    )?;
-                }
+            ast::Pattern::AnonymousNodePattern(node) => {
+                let value = node
+                    .value()
+                    .map(|token| token.text().to_string())
+                    .unwrap_or_default();
+                writeln!(
+                    self.w,
+                    "{}AnonymousNode{}{} \"{}\"",
+                    prefix, extent, span, value
+                )?;
+            }
+            ast::Pattern::NodeWildcard(_) => {
+                writeln!(self.w, "{}NodeWildcard{}{}", prefix, extent, span)?;
             }
             ast::Pattern::Alternation(a) => {
                 writeln!(self.w, "{}Alternation{}{}", prefix, extent, span)?;

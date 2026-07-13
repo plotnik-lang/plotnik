@@ -60,9 +60,10 @@ fn pattern_root_extent(
     interner: &Interner,
 ) -> RootExtent {
     match pattern {
-        Pattern::NodePattern(_) | Pattern::TokenPattern(_) | Pattern::FieldPattern(_) => {
-            RootExtent::SingleNode
-        }
+        Pattern::NamedNodePattern(_)
+        | Pattern::AnonymousNodePattern(_)
+        | Pattern::NodeWildcard(_)
+        | Pattern::FieldPattern(_) => RootExtent::SingleNode,
         // A quantifier has variable top-level extent. A recovery stub with no
         // inner defaults to `SingleNode` to avoid cascading diagnostics; it is
         // never an admitted definition.

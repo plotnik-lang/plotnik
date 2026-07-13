@@ -28,7 +28,7 @@ use indexmap::IndexSet;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::limits::SatisfiabilityLimits;
-use crate::compiler::parse::ast::NodePattern;
+use crate::compiler::parse::ast::NamedNodePattern;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
@@ -194,7 +194,7 @@ impl<'a> Frozen<'a> {
 
     fn build_automaton(
         &mut self,
-        node: &Located<NodePattern>,
+        node: &Located<NamedNodePattern>,
         remaining_budget: u64,
     ) -> ChildAutomaton {
         automaton::build(
@@ -400,7 +400,11 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// Whether some realizer of grammar kind `kind` can realize `node`'s child structure.
     /// Errs toward `true` (accept) whenever the question cannot be decided, so a
     /// rejection is always sound.
-    pub(super) fn satisfiable(&mut self, node: &Located<NodePattern>, kind: NodeKindId) -> bool {
+    pub(super) fn satisfiable(
+        &mut self,
+        node: &Located<NamedNodePattern>,
+        kind: NodeKindId,
+    ) -> bool {
         // Already over budget on an earlier node: accept here too and let the pass
         // reject the whole query, rather than start a fresh solve we cannot finish.
         if self.solve.exhausted {
@@ -438,7 +442,7 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// own. Accept on the first candidate that works; only an impossible wildcard pays
     /// for ruling every candidate out, and only a wildcard with child-structure
     /// constraints reaches here at all.
-    pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NodePattern>) -> bool {
+    pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NamedNodePattern>) -> bool {
         for index in 0..self.frozen.parent_candidate_kinds().len() {
             let kind = self.frozen.parent_candidate_kinds()[index];
             if self.satisfiable(node, kind) {

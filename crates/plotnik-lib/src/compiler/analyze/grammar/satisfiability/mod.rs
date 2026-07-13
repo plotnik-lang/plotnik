@@ -41,7 +41,7 @@ use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::limits::SatisfiabilityLimits;
-use crate::compiler::parse::ast::{self, NodePattern, Pattern, Root, token_src};
+use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern, Root, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
@@ -152,7 +152,7 @@ impl Reporter<'_, '_> {
     /// must then stop rather than spending fresh probe budgets on later nodes.
     fn walk(&mut self, located: &Located<Pattern>, participation: Participation) -> WalkOutcome {
         match located.node() {
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 let node = located.wrap(node.clone());
                 if !participation.is_required() {
                     return WalkOutcome::Continue;
@@ -207,8 +207,10 @@ impl Reporter<'_, '_> {
                 }
                 WalkOutcome::Continue
             }
-            // A token always matches; a reference is walked at its own definition.
-            Pattern::TokenPattern(_) | Pattern::DefRef(_) => WalkOutcome::Continue,
+            // Leaf patterns are checked by grammar binding; a reference is walked at its definition.
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) | Pattern::DefRef(_) => {
+                WalkOutcome::Continue
+            }
         }
     }
 
@@ -228,7 +230,7 @@ impl Reporter<'_, '_> {
 
     fn report_dead_child_alternation(
         &mut self,
-        node: &Located<NodePattern>,
+        node: &Located<NamedNodePattern>,
     ) -> Option<WalkOutcome> {
         for child in node.node().children() {
             let located = node.wrap(child);
@@ -263,11 +265,11 @@ impl Reporter<'_, '_> {
     /// Whether `located` provably cannot match any grammar tree — the cautious counterpart
     /// to satisfiability, used to decide an alternation is dead. It answers `true` only when
     /// impossibility is certain, never on doubt. An alternation is impossible only when every
-    /// alternative is; a sequence when any item is; a node when the solver says so; tokens,
+    /// alternative is; a sequence when any item is; a node when the solver says so; leaf patterns,
     /// references, and optional bodies stay matchable.
     fn impossible(&mut self, located: &Located<Pattern>) -> bool {
         match located.node() {
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 let node = located.wrap(node.clone());
                 Goal::from_node(self.solver.context(), node)
                     .is_some_and(|goal| goal.is_impossible(self.solver))
@@ -289,7 +291,7 @@ impl Reporter<'_, '_> {
             }
             Pattern::DefRef(def_ref) => Goal::from_def_ref(self.solver.context(), def_ref)
                 .is_some_and(|goal| goal.is_impossible(self.solver)),
-            Pattern::TokenPattern(_) => false,
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => false,
         }
     }
 
@@ -308,16 +310,16 @@ impl Reporter<'_, '_> {
 /// A required node-position satisfiability goal.
 enum Goal {
     Concrete {
-        node: Located<NodePattern>,
+        node: Located<NamedNodePattern>,
         kind: NodeKindId,
     },
     Wildcard {
-        node: Located<NodePattern>,
+        node: Located<NamedNodePattern>,
     },
 }
 
 impl Goal {
-    fn from_node(ctx: AutomatonContext<'_>, node: Located<NodePattern>) -> Option<Self> {
+    fn from_node(ctx: AutomatonContext<'_>, node: Located<NamedNodePattern>) -> Option<Self> {
         if let Some(kind) = root_kind(ctx, &node) {
             return Some(Self::Concrete { node, kind });
         }
@@ -327,13 +329,13 @@ impl Goal {
     fn from_def_ref(ctx: AutomatonContext<'_>, def_ref: &ast::DefRef) -> Option<Self> {
         let name = def_ref.name()?;
         let target = ctx.symbol_table.located_definition(name.text())?;
-        let Pattern::NodePattern(node) = target.node() else {
+        let Pattern::NamedNodePattern(node) = target.node() else {
             return None;
         };
         Self::from_node(ctx, target.wrap(node.clone()))
     }
 
-    fn node(&self) -> &Located<NodePattern> {
+    fn node(&self) -> &Located<NamedNodePattern> {
         match self {
             Self::Concrete { node, .. } | Self::Wildcard { node } => node,
         }
@@ -360,7 +362,7 @@ fn collect_goals(
     out: &mut Vec<Goal>,
 ) {
     match located.node() {
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             if !participation.is_required() {
                 return;
             }
@@ -369,8 +371,8 @@ fn collect_goals(
                 out.push(goal);
             }
         }
-        // An anonymous literal at a goal position matches some token of the grammar.
-        Pattern::TokenPattern(_) => {}
+        // A leaf pattern at a goal position is handled by grammar binding.
+        Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => {}
         Pattern::CapturedPattern(cap) => {
             if let Some(inner) = cap.inner() {
                 collect_goals(&located.wrap(inner), participation, ctx, out);
@@ -413,7 +415,7 @@ fn collect_goals(
 
 /// The concrete named kind a node pattern roots a goal at, or `None` when the
 /// position should be skipped (wildcard, supertype, error keyword, unresolved).
-fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Option<NodeKindId> {
+fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NamedNodePattern>) -> Option<NodeKindId> {
     let node = located.node();
     if node.is_any() {
         return None;
@@ -439,11 +441,11 @@ fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Optio
 /// make it possibly impossible: satisfiability then asks whether *any* node kind can
 /// realize them. A bare `(_)` constrains nothing and is always matchable, so it is
 /// excluded.
-fn is_wildcard_parent(node: &Located<NodePattern>) -> bool {
+fn is_wildcard_parent(node: &Located<NamedNodePattern>) -> bool {
     node.node().is_any() && node_constrains_children(node.node())
 }
 
-fn node_constrains_children(node: &NodePattern) -> bool {
+fn node_constrains_children(node: &NamedNodePattern) -> bool {
     node.items().next().is_some()
         || node
             .syntax()

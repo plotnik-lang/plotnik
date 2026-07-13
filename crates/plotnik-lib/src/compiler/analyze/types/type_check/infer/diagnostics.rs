@@ -313,7 +313,7 @@ impl InferVisitor<'_, '_> {
 fn capture_brackets(quant: &QuantifiedPattern) -> &'static str {
     match quant.inner() {
         Some(Pattern::Alternation(_)) => "[...]",
-        Some(Pattern::DefRef(_) | Pattern::NodePattern(_)) => "(...)",
+        Some(Pattern::DefRef(_) | Pattern::NamedNodePattern(_)) => "(...)",
         _ => "{...}",
     }
 }

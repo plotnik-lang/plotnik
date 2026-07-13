@@ -438,8 +438,9 @@ impl<'a> NfaBuilder<'a> {
     pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
         let ctx = self.bracket_pattern_ctx(pattern, ctx);
         match pattern {
-            Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
-            Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
+            Pattern::NamedNodePattern(n) => self.compile_named_node_pattern(n, ctx),
+            Pattern::AnonymousNodePattern(n) => self.compile_anonymous_node_pattern(n, ctx),
+            Pattern::NodeWildcard(n) => self.compile_node_wildcard(n, ctx),
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
             Pattern::Alternation(alternation) => {
                 // Inference decides tagging from output context. A labeled
@@ -483,7 +484,9 @@ impl<'a> NfaBuilder<'a> {
     /// marker starts.
     pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
         let (kind, start_at) = match pattern {
-            Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),
+            Pattern::NamedNodePattern(_)
+            | Pattern::AnonymousNodePattern(_)
+            | Pattern::NodeWildcard(_) => (SpanKind::Pattern, true),
             Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
             Pattern::Alternation(alternation) => (
                 match alternation.labeling() {

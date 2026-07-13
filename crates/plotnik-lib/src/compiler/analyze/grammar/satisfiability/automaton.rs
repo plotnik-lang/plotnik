@@ -20,7 +20,7 @@ use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass, has_direct_al
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::parse::ast::{
-    self, NodePattern, Pattern, QuantifierKind, SeqItem, TokenPattern, token_src,
+    self, AnonymousNodePattern, NamedNodePattern, Pattern, QuantifierKind, SeqItem, token_src,
 };
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::strings::unescape;
@@ -90,14 +90,6 @@ impl ChildMatcher {
         Self {
             kind,
             nested_pattern,
-            field,
-        }
-    }
-
-    fn token(kind: KindConstraint, field: Option<NodeFieldId>) -> Self {
-        Self {
-            kind,
-            nested_pattern: None,
             field,
         }
     }
@@ -206,16 +198,16 @@ impl<'a> AutomatonContext<'a> {
     }
 }
 
-/// Interns query node patterns to [`PatternId`]s. Keyed by `(source, range)` so the
+/// Interns query named-node patterns to [`PatternId`]s. Keyed by `(source, range)` so the
 /// same definition body interns once however many references reach it.
 #[derive(Default)]
 pub(super) struct PatternTable {
     by_loc: HashMap<(SourceId, TextRange), PatternId>,
-    nodes: Vec<Located<NodePattern>>,
+    nodes: Vec<Located<NamedNodePattern>>,
 }
 
 impl PatternTable {
-    pub(super) fn intern(&mut self, node: Located<NodePattern>) -> PatternId {
+    pub(super) fn intern(&mut self, node: Located<NamedNodePattern>) -> PatternId {
         let key = (node.source(), node.node().text_range());
         if let Some(&id) = self.by_loc.get(&key) {
             return id;
@@ -226,7 +218,7 @@ impl PatternTable {
         id
     }
 
-    pub(super) fn node_at(&self, index: usize) -> &Located<NodePattern> {
+    pub(super) fn node_at(&self, index: usize) -> &Located<NamedNodePattern> {
         &self.nodes[index]
     }
 
@@ -239,7 +231,7 @@ impl PatternTable {
 /// `relax_anchors` widens every gap to [`GapClass::Any`] so the diagnostic probe
 /// can ask whether anchors alone are the obstacle.
 pub(super) fn build<'a>(
-    node: &Located<NodePattern>,
+    node: &Located<NamedNodePattern>,
     ctx: AutomatonContext<'a>,
     table: &mut PatternTable,
     anchor_semantics: &AnchorSemantics<'a>,
@@ -284,7 +276,7 @@ pub(super) fn build<'a>(
 }
 
 /// The fields a node pattern asserts absent through `-field` items, resolved to ids.
-fn negated_fields(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Vec<NodeFieldId> {
+fn negated_fields(node: &Located<NamedNodePattern>, ctx: AutomatonContext<'_>) -> Vec<NodeFieldId> {
     node.node()
         .syntax()
         .children()
@@ -514,14 +506,18 @@ impl<'a, 'b> Builder<'a, 'b> {
                 Some(inner) => self.emit_pattern(&inner, descent, from),
                 None => from,
             },
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 let matcher = self.node_matcher(node, descent);
                 self.emit_single(matcher, from)
             }
-            Pattern::TokenPattern(token) => {
-                let matcher = self.token_matcher(token, descent);
+            Pattern::AnonymousNodePattern(node) => {
+                let matcher = self.anonymous_node_matcher(node, descent);
                 self.emit_single(matcher, from)
             }
+            Pattern::NodeWildcard(_) => self.emit_single(
+                ChildMatcher::node(KindConstraint::AnyNode, None, descent.field),
+                from,
+            ),
             Pattern::FieldPattern(field_pattern) => match field_pattern.value() {
                 Some(value) => {
                     let field = self.field_id(field_pattern);
@@ -635,7 +631,7 @@ impl<'a, 'b> Builder<'a, 'b> {
 
         // A reference to a single node is an atomic child: one matcher whose body is
         // the referenced node, so its own structure is checked against the realizer.
-        if let Pattern::NodePattern(node) = target.node() {
+        if let Pattern::NamedNodePattern(node) = target.node() {
             let matcher = self.node_matcher(node, descent);
             return self.emit_single(matcher, from);
         }
@@ -648,7 +644,7 @@ impl<'a, 'b> Builder<'a, 'b> {
         exit
     }
 
-    fn node_matcher(&mut self, node: &NodePattern, descent: Descent) -> ChildMatcher {
+    fn node_matcher(&mut self, node: &NamedNodePattern, descent: Descent) -> ChildMatcher {
         let kind = self.node_kind(node, descent.source);
         // Intern (build a child automaton for) the node whenever it constrains its
         // children at all. A `-field` has no `items()`, so testing items alone would
@@ -660,8 +656,16 @@ impl<'a, 'b> Builder<'a, 'b> {
         ChildMatcher::node(kind, nested_pattern, descent.field)
     }
 
-    fn token_matcher(&self, token: &TokenPattern, descent: Descent) -> ChildMatcher {
-        ChildMatcher::token(self.token_kind(token, descent.source), descent.field)
+    fn anonymous_node_matcher(
+        &self,
+        node: &AnonymousNodePattern,
+        descent: Descent,
+    ) -> ChildMatcher {
+        ChildMatcher::node(
+            self.anonymous_node_kind(node, descent.source),
+            None,
+            descent.field,
+        )
     }
 
     fn field_id(&self, field_pattern: &ast::FieldPattern) -> NodeFieldId {
@@ -671,7 +675,7 @@ impl<'a, 'b> Builder<'a, 'b> {
         checked_field(self.ctx, name.text())
     }
 
-    fn node_kind(&self, node: &NodePattern, source: SourceId) -> KindConstraint {
+    fn node_kind(&self, node: &NamedNodePattern, source: SourceId) -> KindConstraint {
         if node.is_any() {
             return KindConstraint::AnyNamed;
         }
@@ -690,11 +694,8 @@ impl<'a, 'b> Builder<'a, 'b> {
         KindConstraint::Exact(checked_named_node(self.ctx, text))
     }
 
-    fn token_kind(&self, token: &TokenPattern, source: SourceId) -> KindConstraint {
-        if token.is_any() {
-            return KindConstraint::AnyNode;
-        }
-        let Some(value_token) = token.value() else {
+    fn anonymous_node_kind(&self, node: &AnonymousNodePattern, source: SourceId) -> KindConstraint {
+        let Some(value_token) = node.value() else {
             return KindConstraint::Unconstrained;
         };
         let text = unescape(token_src(&value_token, self.ctx.content(source))).0;

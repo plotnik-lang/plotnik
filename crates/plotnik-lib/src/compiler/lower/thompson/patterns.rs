@@ -15,7 +15,7 @@ use crate::compiler::lower::ir::{
     Label, MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,
 };
 use crate::compiler::parse::ast::{self, MissingArg, Pattern};
-use crate::compiler::parse::cst::SyntaxKind;
+use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode};
 use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeFieldId, NodeKindId};
 
@@ -71,9 +71,9 @@ impl CaptureRequest {
 }
 
 impl NfaBuilder<'_> {
-    pub(super) fn compile_node_pattern(
+    pub(super) fn compile_named_node_pattern(
         &mut self,
-        node: &ast::NodePattern,
+        node: &ast::NamedNodePattern,
         ctx: PatternCtx,
     ) -> Label {
         let pattern_span = self
@@ -86,7 +86,7 @@ impl NfaBuilder<'_> {
             value: _,
         } = ctx;
         let entry = self.fresh_label();
-        let node_kind = self.resolve_node_kind(node);
+        let node_kind = self.resolve_named_node_kind(node);
         // MISSING nodes take no children, so the flag only ever rides the empty-items
         // (leaf) path below; the with-items path never sees a missing node.
         let missing = node.is_missing();
@@ -341,14 +341,33 @@ fn take_scalar_close_prefix(
 }
 
 impl NfaBuilder<'_> {
-    pub(super) fn compile_token_pattern(
+    pub(super) fn compile_anonymous_node_pattern(
         &mut self,
-        node: &ast::TokenPattern,
+        node: &ast::AnonymousNodePattern,
         ctx: PatternCtx,
     ) -> Label {
-        let pattern_span = self
-            .span_id(node.syntax(), SpanKind::Pattern)
-            .map(|id| id.0);
+        let value = node
+            .value()
+            .expect("validated anonymous-node pattern has string content");
+        let node_kind = self.resolve_anonymous_node_kind(&unescape(value.text()).0);
+        self.compile_leaf_pattern(node.syntax(), node_kind, ctx)
+    }
+
+    pub(super) fn compile_node_wildcard(
+        &mut self,
+        wildcard: &ast::NodeWildcard,
+        ctx: PatternCtx,
+    ) -> Label {
+        self.compile_leaf_pattern(wildcard.syntax(), NodeKindConstraint::Any, ctx)
+    }
+
+    fn compile_leaf_pattern(
+        &mut self,
+        syntax: &SyntaxNode,
+        node_kind: NodeKindConstraint,
+        ctx: PatternCtx,
+    ) -> Label {
+        let pattern_span = self.span_id(syntax, SpanKind::Pattern).map(|id| id.0);
         let PatternCtx {
             exit,
             nav: nav_override,
@@ -357,11 +376,6 @@ impl NfaBuilder<'_> {
         } = ctx;
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
-
-        let node_kind = match node.value() {
-            Some(token) => self.resolve_anonymous_node_kind(&unescape(token.text()).0),
-            None => NodeKindConstraint::Any, // `_` wildcard matches any node
-        };
 
         let mut post = capture.post;
         let scalar_close = take_scalar_close_prefix(&mut post, pattern_span);
@@ -1372,12 +1386,15 @@ impl NfaBuilder<'_> {
         NodeKindConstraint::Anonymous(Some(self.ctx.analysis.grammar.expect_anonymous_kind(sym)))
     }
 
-    /// Resolve a NodePattern to its node kind constraint.
+    /// Resolve a named-node pattern to its node kind constraint.
     ///
     /// Returns `NodeKindConstraint::Named` with:
     /// - `None` for wildcard `(_)` (any named node)
     /// - `Some(id)` for specific types like `(identifier)`
-    pub(super) fn resolve_node_kind(&mut self, node: &ast::NodePattern) -> NodeKindConstraint {
+    pub(super) fn resolve_named_node_kind(
+        &mut self,
+        node: &ast::NamedNodePattern,
+    ) -> NodeKindConstraint {
         if node.is_any() {
             return NodeKindConstraint::Named(None);
         }
@@ -1390,7 +1407,7 @@ impl NfaBuilder<'_> {
         if type_token.kind() == SyntaxKind::KwError {
             return NodeKindConstraint::Named(Some(NodeKindId::ERROR));
         }
-        // `(MISSING …)` sets the orthogonal `missing` flag (see `compile_node_pattern`);
+        // `(MISSING …)` sets the orthogonal `missing` flag (see `compile_named_node_pattern`);
         // the kind here only narrows WHICH missing node. Bare `(MISSING)` matches any
         // missing node — named or anonymous — so it is a full wildcard (`Any`), not
         // `Named(None)` which would exclude a missing anonymous token like `(MISSING ";")`.
@@ -1444,7 +1461,7 @@ impl NfaBuilder<'_> {
         self.ctx.analysis.grammar.expect_field(sym)
     }
 
-    pub(super) fn collect_neg_fields(&mut self, node: &ast::NodePattern) -> Vec<NodeFieldId> {
+    pub(super) fn collect_neg_fields(&mut self, node: &ast::NamedNodePattern) -> Vec<NodeFieldId> {
         node.syntax()
             .children()
             .filter_map(ast::NegatedField::cast)
@@ -1460,7 +1477,10 @@ impl NfaBuilder<'_> {
     /// Compile a predicate from AST to IR.
     ///
     /// Returns `Some(PredicateIR)` if the node has a valid predicate, `None` otherwise.
-    pub(super) fn compile_predicate(&mut self, node: &ast::NodePattern) -> Option<PredicateIR> {
+    pub(super) fn compile_predicate(
+        &mut self,
+        node: &ast::NamedNodePattern,
+    ) -> Option<PredicateIR> {
         let pred = node.predicate()?;
         let op = lower_predicate_op(pred.operator()?);
 

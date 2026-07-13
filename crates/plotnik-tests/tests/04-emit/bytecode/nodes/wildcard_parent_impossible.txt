@@ -6,4 +6,4 @@ error: no node the grammar builds takes these children
 1 | Q = (_ (program) @p)
   |      ^
   |
-help: `(_)` and `_` match any node, but no node kind admits this combination of children in this order
+help: `(_)` matches any named node, but no named node kind admits this combination of children in this order

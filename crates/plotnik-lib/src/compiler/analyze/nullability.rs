@@ -67,7 +67,9 @@ pub(crate) fn pattern_nullable(
     interner: &Interner,
 ) -> bool {
     match pattern {
-        Pattern::NodePattern(_) | Pattern::TokenPattern(_) => false,
+        Pattern::NamedNodePattern(_)
+        | Pattern::AnonymousNodePattern(_)
+        | Pattern::NodeWildcard(_) => false,
         // A nullable value has `RootExtent::Other`, which field values reject
         // upstream ("field cannot match a sequence") — mirror that verdict.
         Pattern::FieldPattern(_) => false,

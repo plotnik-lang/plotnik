@@ -10,9 +10,9 @@
 //!
 //! ```ignore
 //! impl Visitor for MyPass {
-//!     fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
+//!     fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
 //!         // Pre-order logic
-//!         walk_node_pattern(self, node);
+//!         walk_named_node_pattern(self, node);
 //!         // Post-order logic
 //!     }
 //! }
@@ -20,8 +20,8 @@
 
 use crate::compiler::analyze::Located;
 use crate::compiler::parse::ast::{
-    AlternationPattern, CapturedPattern, Def, DefRef, FieldPattern, NodePattern, Pattern,
-    QuantifiedPattern, Root, SeqPattern, TokenPattern,
+    AlternationPattern, AnonymousNodePattern, CapturedPattern, Def, DefRef, FieldPattern,
+    NamedNodePattern, NodeWildcard, Pattern, QuantifiedPattern, Root, SeqPattern,
 };
 
 pub trait Visitor: Sized {
@@ -37,11 +37,13 @@ pub trait Visitor: Sized {
         walk_pattern(self, pattern);
     }
 
-    fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
-        walk_node_pattern(self, node);
+    fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
+        walk_named_node_pattern(self, node);
     }
 
-    fn visit_token_pattern(&mut self, _node: &Located<TokenPattern>) {}
+    fn visit_anonymous_node_pattern(&mut self, _node: &Located<AnonymousNodePattern>) {}
+
+    fn visit_node_wildcard(&mut self, _node: &Located<NodeWildcard>) {}
 
     fn visit_def_ref(&mut self, _ref: &Located<DefRef>) {}
 
@@ -80,8 +82,11 @@ pub fn walk_def<V: Visitor>(visitor: &mut V, def: &Located<Def>) {
 
 pub fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Located<Pattern>) {
     match pattern.node() {
-        Pattern::NodePattern(n) => visitor.visit_node_pattern(&pattern.wrap(n.clone())),
-        Pattern::TokenPattern(n) => visitor.visit_token_pattern(&pattern.wrap(n.clone())),
+        Pattern::NamedNodePattern(n) => visitor.visit_named_node_pattern(&pattern.wrap(n.clone())),
+        Pattern::AnonymousNodePattern(n) => {
+            visitor.visit_anonymous_node_pattern(&pattern.wrap(n.clone()))
+        }
+        Pattern::NodeWildcard(n) => visitor.visit_node_wildcard(&pattern.wrap(n.clone())),
         Pattern::DefRef(r) => visitor.visit_def_ref(&pattern.wrap(r.clone())),
         Pattern::Alternation(alternation) => {
             visitor.visit_alternation_pattern(&pattern.wrap(alternation.clone()))
@@ -93,7 +98,7 @@ pub fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Located<Pattern>) {
     }
 }
 
-pub fn walk_node_pattern<V: Visitor>(visitor: &mut V, node: &Located<NodePattern>) {
+pub fn walk_named_node_pattern<V: Visitor>(visitor: &mut V, node: &Located<NamedNodePattern>) {
     for child in node.node().children() {
         visitor.visit_pattern(&node.wrap(child));
     }

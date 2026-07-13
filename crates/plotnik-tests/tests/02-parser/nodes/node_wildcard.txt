@@ -11,4 +11,4 @@ Root
 # query.ptk
 Root
   Def Q
-    AnonymousNode (any)
+    NodeWildcard

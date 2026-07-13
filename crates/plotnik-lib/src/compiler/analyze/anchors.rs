@@ -162,8 +162,8 @@ impl<'a> AnonymousClassifier<'a> {
     /// carrying it is not safe to memoize.
     fn classify(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> (bool, bool) {
         match pattern {
-            Pattern::TokenPattern(_) => (true, false),
-            Pattern::NodePattern(_) => (false, false),
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => (true, false),
+            Pattern::NamedNodePattern(_) => (false, false),
             Pattern::CapturedPattern(cap) => self.classify_opt(cap.inner().as_ref(), visited),
             Pattern::QuantifiedPattern(q) => self.classify_opt(q.inner().as_ref(), visited),
             Pattern::FieldPattern(field) => self.classify_opt(field.value().as_ref(), visited),

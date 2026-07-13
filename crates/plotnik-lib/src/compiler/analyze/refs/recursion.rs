@@ -10,13 +10,11 @@ use rowan::TextRange;
 use super::dependencies::{DependencyAnalysis, collect_defined_refs};
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern};
+use crate::compiler::analyze::visitor::{Visitor, walk_named_node_pattern, walk_pattern};
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
-use crate::compiler::parse::ast::{
-    Def, DefRef, NodePattern, Pattern, Root, SeqPattern, TokenPattern,
-};
+use crate::compiler::parse::ast::{Def, DefRef, NamedNodePattern, Pattern, Root, SeqPattern};
 use crate::core::Interner;
 
 pub fn validate_recursion(
@@ -299,7 +297,7 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
             };
             !scc_names.contains(name_token.text())
         }
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             let children: Vec<_> = node.children().collect();
             children.is_empty() || children.iter().all(|c| pattern_has_escape(c, scc_names))
         }
@@ -319,13 +317,15 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => pattern
             .children()
             .all(|c| pattern_has_escape(&c, scc_names)),
-        Pattern::TokenPattern(_) => true,
+        Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => true,
     }
 }
 
 fn pattern_guarantees_progress(pattern: &Pattern) -> bool {
     match pattern {
-        Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
+        Pattern::NamedNodePattern(_)
+        | Pattern::AnonymousNodePattern(_)
+        | Pattern::NodeWildcard(_) => true,
         Pattern::DefRef(_) => false,
         Pattern::Alternation(_) => pattern
             .children()
@@ -383,16 +383,11 @@ impl Visitor for RefFinder<'_> {
         walk_pattern(self, pattern);
     }
 
-    fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
+    fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
         if self.mode == CycleSearchScope::BeforeProgress {
             return; // Matching this node establishes progress before any nested reference.
         }
-        walk_node_pattern(self, node);
-    }
-
-    fn visit_token_pattern(&mut self, _node: &Located<TokenPattern>) {
-        // TokenPattern has no child patterns, so nothing to walk.
-        // In BeforeProgress mode this also stops the search once the path has progressed.
+        walk_named_node_pattern(self, node);
     }
 
     fn visit_def_ref(&mut self, r: &Located<DefRef>) {

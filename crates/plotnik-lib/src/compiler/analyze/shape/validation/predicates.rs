@@ -12,11 +12,11 @@ use rowan::TextRange;
 
 use super::PredicateInput;
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern};
+use crate::compiler::analyze::visitor::{Visitor, walk_named_node_pattern};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast::NodePattern;
+use crate::compiler::parse::ast::NamedNodePattern;
 
 pub fn validate_predicates(input: PredicateInput) {
     let PredicateInput {
@@ -56,13 +56,13 @@ impl RegexLiteral<'_> {
 }
 
 impl Visitor for PredicateValidator<'_, '_> {
-    fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
+    fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
         let Some(predicate) = node.node().predicate() else {
-            walk_node_pattern(self, node);
+            walk_named_node_pattern(self, node);
             return;
         };
         let Some(operator) = predicate.operator() else {
-            walk_node_pattern(self, node);
+            walk_named_node_pattern(self, node);
             return;
         };
         if operator.is_regex_op()
@@ -73,7 +73,7 @@ impl Visitor for PredicateValidator<'_, '_> {
                 range: regex.text_range(),
             });
         }
-        walk_node_pattern(self, node);
+        walk_named_node_pattern(self, node);
     }
 }
 
