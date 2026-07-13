@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NODE, TypeShape};
 use crate::core::Interner;
 
 #[test]
@@ -35,7 +35,7 @@ fn record_types_are_nominal() {
 
     let x_sym = interner.intern("x");
     let mut fields = BTreeMap::new();
-    fields.insert(x_sym, FieldInfo::required(TYPE_NODE));
+    fields.insert(x_sym, RecordField::new(TYPE_NODE));
 
     let id1 = ctx.intern_type(TypeShape::Record(fields.clone()));
     let id2 = ctx.intern_type(TypeShape::Record(fields));

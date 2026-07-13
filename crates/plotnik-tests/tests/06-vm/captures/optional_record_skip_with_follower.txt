@@ -40,20 +40,20 @@ S9 "debugger_statement"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { id }
-T2 = Record  M1:2  ; { x, d }
-T3 = Option(T1)  ; QX?
+T2 = Option(T1)  ; QX?
+T3 = Record  M1:2  ; { x, d }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
-M1: S2 → T3  ; x: T3
+M1: S2 → T2  ; x: T2
 M2: S3 → T0  ; d: <Node>
 
 [type_names]
 N0: S4 → T1  ; QX
-N1: S5 → T2  ; Q
+N1: S5 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T3
 
 [transitions]
 Q:

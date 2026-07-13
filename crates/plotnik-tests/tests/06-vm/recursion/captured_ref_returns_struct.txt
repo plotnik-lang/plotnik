@@ -49,23 +49,23 @@ S10 "function"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:2  ; { name, inner }
-T2 = Record  M2:1  ; { top }
-T3 = Option(T0)  ; <Node>?
-T4 = Option(T1)  ; Nested?
+T1 = Option(T0)  ; <Node>?
+T2 = Option(T3)  ; Nested?
+T3 = Record  M0:2  ; { name, inner }
+T4 = Record  M2:1  ; { top }
 
 [type_members]
-M0: S01 → T3  ; name: T3
-M1: S02 → T4  ; inner: T4
-M2: S03 → T1  ; top: Nested
+M0: S01 → T1  ; name: T1
+M1: S02 → T2  ; inner: T2
+M2: S03 → T3  ; top: Nested
 
 [type_names]
-N0: S04 → T1  ; Nested
-N1: S05 → T2  ; Q
+N0: S04 → T3  ; Nested
+N1: S05 → T4  ; Q
 
 [entrypoints]
-Nested = 00 :: T1
-Q      = 06 :: T2
+Nested = 00 :: T3
+Q      = 06 :: T4
 
 [transitions]
 Nested:

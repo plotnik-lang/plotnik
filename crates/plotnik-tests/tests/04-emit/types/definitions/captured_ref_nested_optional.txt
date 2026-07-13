@@ -9,7 +9,7 @@ Q = (program
 )
 ------------------- TYPESCRIPT -------------------
 export interface Q {
-  x: MaybeId | null;
+  x: MaybeId;
 }
 
 export type MaybeId = Node | null;
@@ -18,7 +18,7 @@ use ::plotnik_rt::Node;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
-    pub x: ::core::option::Option<::core::option::Option<Node<'t>>>,
+    pub x: ::core::option::Option<Node<'t>>,
 }
 
 pub type MaybeId<'t> = ::core::option::Option<Node<'t>>;

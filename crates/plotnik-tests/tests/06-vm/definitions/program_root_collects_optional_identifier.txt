@@ -21,17 +21,17 @@ S4 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:1  ; { id }
-T2 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { id }
 
 [type_members]
-M0: S1 → T2  ; id: T2
+M0: S1 → T1  ; id: T1
 
 [type_names]
-N0: S2 → T1  ; Q
+N0: S2 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T1
+Q = 00 :: T2
 
 [transitions]
 Q:

@@ -14,7 +14,7 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId, TypeShape,
+    RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
@@ -79,7 +79,7 @@ pub(crate) enum CaptureScopeKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureMemberKind {
-    Field(FieldInfo),
+    Field(RecordField),
     Case(TypeId),
 }
 
@@ -406,7 +406,7 @@ impl<'a> ItemCollector<'a> {
         match self.types.expect_type_shape(ty) {
             TypeShape::Record(fields) => {
                 for info in fields.values() {
-                    self.collect_position(info.type_id);
+                    self.collect_position(info.final_type);
                 }
             }
             TypeShape::Variant(cases) => {
@@ -418,7 +418,7 @@ impl<'a> ItemCollector<'a> {
                         unreachable!("variant case payload is void or an anonymous record");
                     };
                     for info in fields.values() {
-                        self.collect_position(info.type_id);
+                        self.collect_position(info.final_type);
                     }
                 }
             }

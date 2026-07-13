@@ -67,28 +67,28 @@ T1 = <Text>
 T2 = Record  M0:1  ; { c }
 T3 = Record  M1:1  ; { c }
 T4 = Variant M2:2  ; Rec | Base
-T5 = Record  M4:2  ; { first, second }
-T6 = Option(T1)  ; <Text>?
-T7 = Record  M6:2  ; { x, rest }
-T8 = Option(T4)  ; Body?
+T5 = Option(T4)  ; Body?
+T6 = Record  M4:2  ; { first, second }
+T7 = Option(T1)  ; <Text>?
+T8 = Record  M6:2  ; { x, rest }
 
 [type_members]
 M0: S03 → T0  ; c: <Node>
 M1: S03 → T0  ; c: <Node>
 M2: S04 → T2  ; Rec: T2
 M3: S05 → T3  ; Base: T3
-M4: S06 → T8  ; first: T8
-M5: S07 → T8  ; second: T8
-M6: S08 → T6  ; x: T6
+M4: S06 → T5  ; first: T5
+M5: S07 → T5  ; second: T5
+M6: S08 → T7  ; x: T7
 M7: S09 → T1  ; rest: <Text>
 
 [type_names]
-N0: S10 → T5  ; B
+N0: S10 → T6  ; B
 N1: S11 → T4  ; Body
-N2: S12 → T7  ; Q
+N2: S12 → T8  ; Q
 
 [entrypoints]
-Q = 00 :: T7
+Q = 00 :: T8
 
 [transitions]
 Q:

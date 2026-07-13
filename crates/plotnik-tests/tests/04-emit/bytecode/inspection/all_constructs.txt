@@ -85,8 +85,8 @@ T1 = Record  M0:1  ; { id }
 T2 = Record  M1:1  ; { num }
 T3 = Variant M2:2  ; Id | Num
 T4 = Alias(T0)
-T5 = Record  M4:3  ; { decl, name, str }
-T6 = Option(T0)  ; <Node>?
+T5 = Option(T0)  ; <Node>?
+T6 = Record  M4:3  ; { decl, name, str }
 
 [type_members]
 M0: S01 → T0  ; id: <Node>
@@ -95,15 +95,15 @@ M2: S03 → T1  ; Id: T1
 M3: S04 → T2  ; Num: T2
 M4: S05 → T0  ; decl: <Node>
 M5: S06 → T4  ; name: Name
-M6: S07 → T6  ; str: T6
+M6: S07 → T5  ; str: T5
 
 [type_names]
 N0: S08 → T3  ; Value
 N1: S09 → T4  ; Name
-N2: S10 → T5  ; Q
+N2: S10 → T6  ; Q
 
 [entrypoints]
-Q     = 02 :: T5
+Q     = 02 :: T6
 Value = 00 :: T3
 
 [spans]
@@ -115,15 +115,15 @@ P04 pattern    16..28  src0
 P05 alternative 35..53  src0  T3.M3
 P06 capture    49..53  src0  T2.M1
 P07 pattern    40..48  src0
-P08 def        57..292  src0  T5
+P08 def        57..292  src0  T6
 P09 pattern    61..292  src0
 P10 sequence   72..290  src0
 P11 quantifier 100..101  src0
 P12 pattern    78..100  src0
-P13 capture    281..286  src0  T5.M4
+P13 capture    281..286  src0  T6.M4
 P14 pattern    109..280  src0
 P15 pattern    136..274  src0
-P16 capture    184..189  src0  T5.M5
+P16 capture    184..189  src0  T6.M5
 P17 capture_type 190..197  src0  T4
 P18 field      165..169  src0
 P19 pattern    171..183  src0
@@ -132,7 +132,7 @@ P21 unlabeled_alternation 213..266  src0
 P22 alternative 225..232  src0
 P23 ref        225..232  src0  T3
 P24 alternative 243..256  src0
-P25 capture    252..256  src0  T5.M6
+P25 capture    252..256  src0  T6.M6
 P26 pattern    243..251  src0
 
 [transitions]

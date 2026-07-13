@@ -43,25 +43,25 @@ S10 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:1  ; { id }
-T2 = Record  M1:1  ; { d }
-T3 = Variant M2:2  ; A | B
-T4 = Record  M4:1  ; { x }
-T5 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { id }
+T3 = Record  M1:1  ; { d }
+T4 = Variant M2:2  ; A | B
+T5 = Record  M4:1  ; { x }
 
 [type_members]
-M0: S01 → T5  ; id: T5
+M0: S01 → T1  ; id: T1
 M1: S02 → T0  ; d: <Node>
-M2: S03 → T1  ; A: T1
-M3: S04 → T2  ; B: T2
-M4: S05 → T3  ; x: QX
+M2: S03 → T2  ; A: T2
+M3: S04 → T3  ; B: T3
+M4: S05 → T4  ; x: QX
 
 [type_names]
-N0: S06 → T3  ; QX
-N1: S07 → T4  ; Q
+N0: S06 → T4  ; QX
+N1: S07 → T5  ; Q
 
 [entrypoints]
-Q = 00 :: T4
+Q = 00 :: T5
 
 [transitions]
 Q:

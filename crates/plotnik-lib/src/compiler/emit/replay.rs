@@ -10,7 +10,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::compiler::analyze::output::{CaptureLayout, OutputItem, OutputItemKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId, TypeShape};
 use crate::core::Symbol;
 
 #[derive(Clone, Debug)]
@@ -170,23 +170,16 @@ impl ReplayPlanBuilder<'_, '_> {
 
     fn scope<'b>(
         &self,
-        fields: impl Iterator<Item = (&'b Symbol, &'b FieldInfo)>,
+        fields: impl Iterator<Item = (&'b Symbol, &'b RecordField)>,
         twins: &[TypeId],
     ) -> ReplayScopePlan {
         ReplayScopePlan {
             fields: fields
                 .enumerate()
-                .map(|(index, (&name, info))| {
-                    let value = self.value(info.type_id);
-                    ReplayFieldPlan {
-                        name,
-                        indices: member_indices(self.schema.layout(), twins, index),
-                        value: if info.optional {
-                            ReplayValuePlan::Nullable(Box::new(value))
-                        } else {
-                            value
-                        },
-                    }
+                .map(|(index, (&name, info))| ReplayFieldPlan {
+                    name,
+                    indices: member_indices(self.schema.layout(), twins, index),
+                    value: self.value(info.final_type),
                 })
                 .collect(),
         }

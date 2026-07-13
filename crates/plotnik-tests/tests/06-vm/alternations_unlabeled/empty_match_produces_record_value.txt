@@ -43,26 +43,26 @@ S8 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:1  ; { comment }
-T2 = Record  M1:1  ; { identifier }
-T3 = Record  M2:2  ; { left, right }
-T4 = Option(T0)  ; <Node>?
-T5 = Option(T1)  ; QLeft?
-T6 = Option(T2)  ; QRight?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { comment }
+T3 = Option(T2)  ; QLeft?
+T4 = Record  M1:1  ; { identifier }
+T5 = Option(T4)  ; QRight?
+T6 = Record  M2:2  ; { left, right }
 
 [type_members]
-M0: S1 → T4  ; comment: T4
-M1: S2 → T4  ; identifier: T4
-M2: S3 → T5  ; left: T5
-M3: S4 → T6  ; right: T6
+M0: S1 → T1  ; comment: T1
+M1: S2 → T1  ; identifier: T1
+M2: S3 → T3  ; left: T3
+M3: S4 → T5  ; right: T5
 
 [type_names]
-N0: S5 → T1  ; QLeft
-N1: S6 → T2  ; QRight
-N2: S7 → T3  ; Q
+N0: S5 → T2  ; QLeft
+N1: S6 → T4  ; QRight
+N2: S7 → T6  ; Q
 
 [entrypoints]
-Q = 00 :: T3
+Q = 00 :: T6
 
 [transitions]
 Q:

@@ -9,8 +9,10 @@ Q = (program
 --------------------- INPUT ----------------------
 ------------------- TYPESCRIPT -------------------
 export interface Q {
-  d: Node | null;
+  d: A;
 }
+
+export type A = Node | null;
 --------------------- OUTPUT ---------------------
 {
   "d": null
@@ -29,10 +31,9 @@ S6 "debugger_statement"
 T0 = <Node>
 T1 = Option(T0)  ; <Node>?
 T2 = Record  M0:1  ; { d }
-T3 = Option(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T3  ; d: T3
+M0: S1 → T1  ; d: A
 
 [type_names]
 N0: S2 → T1  ; A

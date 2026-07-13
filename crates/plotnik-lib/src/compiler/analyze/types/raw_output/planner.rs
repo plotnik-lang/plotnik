@@ -35,16 +35,11 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
 
     fn plan_str(&mut self, contract: RawCaptureContract) -> Result<PlannedCapture, &'static str> {
         let raw = contract.fact.field();
-        let (mut plan, mut absorbs_null) = self.str_plan(
-            raw.type_id,
+        let (plan, absorbs_null) = self.str_plan(
+            raw.final_type,
             contract.zero_node_terminal,
             &mut HashSet::new(),
         )?;
-        if raw.optional {
-            let option = self.types.intern_type(TypeShape::Option(plan.final_type()));
-            plan = CaptureTypePlan::option(option, OptionMode::Preserve, plan);
-            absorbs_null = true;
-        }
         let on_absence = if absorbs_null {
             AbsencePolicy::CompleteWith(FieldCompletion::Absent)
         } else if matches!(
@@ -57,7 +52,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         };
         Ok(PlannedCapture {
             field: NormalizedField {
-                info: FieldInfo::required(plan.final_type()),
+                info: RecordField::new(plan.final_type()),
                 on_absence,
             },
             plan,
@@ -81,7 +76,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             )),
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let final_type = if zero_node_terminal {
-                    self.types.intern_type(TypeShape::Option(TYPE_TEXT))
+                    self.types.intern_option(TYPE_TEXT)
                 } else {
                     TYPE_TEXT
                 };
@@ -92,9 +87,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             }
             TypeShape::Option(inner) => {
                 let (inner, _) = self.str_plan(*inner, false, visiting)?;
-                let option = self
-                    .types
-                    .intern_type(TypeShape::Option(inner.final_type()));
+                let option = self.types.intern_option(inner.final_type());
                 Ok((
                     CaptureTypePlan::option(option, OptionMode::Preserve, inner),
                     true,
@@ -122,19 +115,14 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
 
     fn plan_bool(
         &mut self,
-        raw: FieldInfo,
+        raw: RecordField,
         may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
-        let plan = if raw.optional {
-            let inner = self.bool_present(raw.type_id, &mut HashSet::new())?;
-            CaptureTypePlan::option(TYPE_BOOL, OptionMode::Bool, inner)
-        } else {
-            self.bool_required(raw.type_id, may_be_absent, &mut HashSet::new())?
-        };
+        let plan = self.bool_required(raw.final_type, may_be_absent, &mut HashSet::new())?;
         Ok(PlannedCapture {
             plan,
             field: NormalizedField {
-                info: FieldInfo::required(TYPE_BOOL),
+                info: RecordField::new(TYPE_BOOL),
                 on_absence: AbsencePolicy::CompleteWith(FieldCompletion::False),
             },
         })

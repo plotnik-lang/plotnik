@@ -17,7 +17,7 @@ use crate::compiler::analyze::types::raw_output::{
     RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId,
+    PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId,
     TypeShape,
 };
 use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
@@ -85,7 +85,7 @@ impl TypeAnalysis {
             .expect("admitted type id must reference a registered type")
     }
 
-    pub fn record_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
+    pub fn record_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, RecordField>> {
         match self.type_shape(id)? {
             TypeShape::Record(fields) => Some(fields),
             _ => None,
@@ -99,7 +99,7 @@ impl TypeAnalysis {
     /// site), so a non-`Record` id here is a broken type-system invariant, not a
     /// runtime condition the query can trigger. We surface it loudly instead of
     /// fabricating an empty record that would silently mistype the output.
-    pub fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
+    pub fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, RecordField> {
         match self.expect_type_shape(id) {
             TypeShape::Record(fields) => fields,
             _ => panic!("Fields flow must point to a Record type"),
@@ -107,7 +107,7 @@ impl TypeAnalysis {
     }
 
     /// Whether a type is a meaningful structured output (variant/record, or a
-    /// array/optional thereof). Plain `Node` is not — it is the matched node,
+    /// list/option thereof). Plain `Node` is not — it is the matched node,
     /// captured directly.
     ///
     /// A `Ref` resolves through its target: a reference to a void definition
@@ -395,7 +395,7 @@ impl TypeAnalysisView<'_> {
         self.analysis.type_shape(id)
     }
 
-    pub(crate) fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
+    pub(crate) fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, RecordField> {
         self.analysis.expect_record_fields(id)
     }
 
@@ -500,11 +500,15 @@ impl TypeAnalysisBuilder {
         id
     }
 
-    pub fn intern_record(&mut self, fields: BTreeMap<Symbol, FieldInfo>) -> TypeId {
+    pub fn intern_option(&mut self, inner: TypeId) -> TypeId {
+        self.intern_type(TypeShape::Option(inner))
+    }
+
+    pub fn intern_record(&mut self, fields: BTreeMap<Symbol, RecordField>) -> TypeId {
         self.intern_type(TypeShape::Record(fields))
     }
 
-    pub fn intern_single_field_record(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
+    pub fn intern_single_field_record(&mut self, name: Symbol, info: RecordField) -> TypeId {
         self.intern_type(TypeShape::Record(BTreeMap::from([(name, info)])))
     }
 
@@ -658,9 +662,7 @@ impl TypeAnalysisBuilder {
             (TypeShape::Record(fa), TypeShape::Record(fb)) => {
                 fa.len() == fb.len()
                     && fa.iter().zip(fb.iter()).all(|((ka, ia), (kb, ib))| {
-                        ka == kb
-                            && ia.optional == ib.optional
-                            && self.types_structurally_equal(ia.type_id, ib.type_id)
+                        ka == kb && self.types_structurally_equal(ia.final_type, ib.final_type)
                     })
             }
             (TypeShape::Variant(va), TypeShape::Variant(vb)) => {

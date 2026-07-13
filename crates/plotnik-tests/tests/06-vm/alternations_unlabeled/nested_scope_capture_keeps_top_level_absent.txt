@@ -44,22 +44,22 @@ S8 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:1  ; { x }
-T2 = Record  M1:2  ; { x, row }
-T3 = Option(T0)  ; <Node>?
-T4 = Option(T1)  ; QRow?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { x }
+T3 = Option(T2)  ; QRow?
+T4 = Record  M1:2  ; { x, row }
 
 [type_members]
 M0: S1 → T0  ; x: <Node>
-M1: S1 → T3  ; x: T3
-M2: S2 → T4  ; row: T4
+M1: S1 → T1  ; x: T1
+M2: S2 → T3  ; row: T3
 
 [type_names]
-N0: S3 → T1  ; QRow
-N1: S4 → T2  ; Q
+N0: S3 → T2  ; QRow
+N1: S4 → T4  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T4
 
 [transitions]
 Q:

@@ -4,7 +4,7 @@ use super::representation::TypeFacts;
 use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    RecordField, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::Interner;
@@ -38,7 +38,7 @@ fn recursive_def(wrap: impl FnOnce(&mut TypeAnalysisBuilder, TypeId) -> TypeId) 
     let payload_ty = wrap(&mut builder, ref_ty);
     let payload = builder.intern_record(BTreeMap::from([(
         interner.intern("inner"),
-        FieldInfo::required(payload_ty),
+        RecordField::new(payload_ty),
     )]));
     let variants = BTreeMap::from([
         (interner.intern("Leaf"), TYPE_VOID),
@@ -86,7 +86,7 @@ fn shared_ref_node_boxes_only_inside_the_cycle() {
     let ref_ty = builder.intern_type(TypeShape::Ref(expr_def));
     let payload = builder.intern_record(BTreeMap::from([(
         interner.intern("inner"),
-        FieldInfo::required(ref_ty),
+        RecordField::new(ref_ty),
     )]));
     let variants = BTreeMap::from([
         (interner.intern("Leaf"), TYPE_VOID),
@@ -96,7 +96,7 @@ fn shared_ref_node_boxes_only_inside_the_cycle() {
     record_def(&mut builder, expr_def, enum_ty);
     let top_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("expr"),
-        FieldInfo::required(ref_ty),
+        RecordField::new(ref_ty),
     )]));
     record_def(&mut builder, top_def, top_struct);
     let types = builder.finish();
@@ -124,13 +124,13 @@ fn cycle_through_an_array_boxes_nothing() {
     });
     let a_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("items"),
-        FieldInfo::required(list_of_b),
+        RecordField::new(list_of_b),
     )]));
     record_def(&mut builder, a_def, a_struct);
     let ref_to_a = builder.intern_type(TypeShape::Ref(a_def));
     let b_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("parent"),
-        FieldInfo::required(ref_to_a),
+        RecordField::new(ref_to_a),
     )]));
     record_def(&mut builder, b_def, b_struct);
     let types = builder.finish();
@@ -153,13 +153,13 @@ fn ref_from_outside_the_cycle_is_not_boxed() {
 
     let leaf_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("id"),
-        FieldInfo::required(TYPE_NODE),
+        RecordField::new(TYPE_NODE),
     )]));
     record_def(&mut builder, leaf_def, leaf_struct);
     let ref_ty = builder.intern_type(TypeShape::Ref(leaf_def));
     let top_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("leaf"),
-        FieldInfo::required(ref_ty),
+        RecordField::new(ref_ty),
     )]));
     record_def(&mut builder, top_def, top_struct);
     let types = builder.finish();
@@ -183,14 +183,14 @@ fn mutual_recursion_boxes_both_edges() {
     let opt_ref_to_b = builder.intern_type(TypeShape::Option(ref_to_b));
     let a_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("b"),
-        FieldInfo::required(opt_ref_to_b),
+        RecordField::new(opt_ref_to_b),
     )]));
     record_def(&mut builder, a_def, a_struct);
     let ref_to_a = builder.intern_type(TypeShape::Ref(a_def));
     let opt_ref_to_a = builder.intern_type(TypeShape::Option(ref_to_a));
     let b_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("a"),
-        FieldInfo::required(opt_ref_to_a),
+        RecordField::new(opt_ref_to_a),
     )]));
     record_def(&mut builder, b_def, b_struct);
     let types = builder.finish();
@@ -214,7 +214,7 @@ fn node_free_enum_needs_no_lifetime() {
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     let holder = builder.intern_record(BTreeMap::from([(
         interner.intern("state"),
-        FieldInfo::required(enum_ty),
+        RecordField::new(enum_ty),
     )]));
     record_def(&mut builder, def, holder);
     let types = builder.finish();
@@ -234,7 +234,7 @@ fn custom_node_alias_carries_tree_lifetime_into_its_owner() {
     let custom = builder.intern_type(TypeShape::Custom(interner.intern("Identifier")));
     let holder = builder.intern_record(BTreeMap::from([(
         interner.intern("name"),
-        FieldInfo::required(custom),
+        RecordField::new(custom),
     )]));
     record_def(&mut builder, def, holder);
     let types = builder.finish();
@@ -260,14 +260,14 @@ fn lifetime_crosses_mutual_recursion() {
     });
     let a_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("items"),
-        FieldInfo::required(list_of_b),
+        RecordField::new(list_of_b),
     )]));
     record_def(&mut builder, a_def, a_struct);
     let ref_to_a = builder.intern_type(TypeShape::Ref(a_def));
     let opt_ref_to_a = builder.intern_type(TypeShape::Option(ref_to_a));
     let b_struct = builder.intern_record(BTreeMap::from([
-        (interner.intern("name"), FieldInfo::required(TYPE_NODE)),
-        (interner.intern("parent"), FieldInfo::required(opt_ref_to_a)),
+        (interner.intern("name"), RecordField::new(TYPE_NODE)),
+        (interner.intern("parent"), RecordField::new(opt_ref_to_a)),
     ]));
     record_def(&mut builder, b_def, b_struct);
     let types = builder.finish();

@@ -37,23 +37,23 @@ S9 "program"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { id }
-T2 = Record  M1:1  ; { x }
-T3 = ArrayPlus(T2)  ; A+
-T4 = Record  M2:1  ; { xs }
-T5 = Option(T1)  ; AX?
+T2 = Option(T1)  ; AX?
+T3 = Record  M1:1  ; { x }
+T4 = ArrayPlus(T3)  ; A+
+T5 = Record  M2:1  ; { xs }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
-M1: S2 → T5  ; x: T5
-M2: S3 → T3  ; xs: T3
+M1: S2 → T2  ; x: T2
+M2: S3 → T4  ; xs: T4
 
 [type_names]
 N0: S4 → T1  ; AX
-N1: S5 → T2  ; A
-N2: S6 → T4  ; Q
+N1: S5 → T3  ; A
+N2: S6 → T5  ; Q
 
 [entrypoints]
-Q = 00 :: T4
+Q = 00 :: T5
 
 [transitions]
 Q:

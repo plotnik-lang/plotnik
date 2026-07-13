@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use super::compute_invalid_containment;
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TypeId, TypeShape};
 use crate::compiler::ids::DefId;
 use crate::core::Interner;
 
@@ -20,8 +20,8 @@ fn invalid_containment_propagates_through_recursive_cycle() {
         TypeShape::Text,
         TypeShape::Bool,
         TypeShape::Record(BTreeMap::from([
-            (cycle, FieldInfo::required(reference)),
-            (bad, FieldInfo::required(invalid)),
+            (cycle, RecordField::new(reference)),
+            (bad, RecordField::new(invalid)),
         ])),
         TypeShape::Ref(definition),
         TypeShape::Custom(interner.intern("Invalid")),

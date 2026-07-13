@@ -147,7 +147,7 @@ impl Emitter<'_, '_> {
         let usage = fields
             .values()
             .fold((false, false), |(tree, source), info| {
-                let field = self.lifetime_usage(info.type_id);
+                let field = self.lifetime_usage(info.final_type);
                 (tree || field.tree, source || field.source)
             });
         let (decl_generics, impl_generics) = match usage {

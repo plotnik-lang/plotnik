@@ -38,7 +38,7 @@ pub enum TypeShape {
     /// User-specified name for a captured node via `@x :: TypeName`.
     Custom(Symbol),
     /// Record with named fields.
-    Record(BTreeMap<Symbol, FieldInfo>),
+    Record(BTreeMap<Symbol, RecordField>),
     /// Variant type from a labeled alternation.
     Variant(BTreeMap<Symbol, TypeId>),
     /// Array type with element type.
@@ -50,8 +50,8 @@ pub enum TypeShape {
 }
 
 type RecordFieldTypeIds<'a> = std::iter::Map<
-    std::collections::btree_map::Values<'a, Symbol, FieldInfo>,
-    fn(&FieldInfo) -> TypeId,
+    std::collections::btree_map::Values<'a, Symbol, RecordField>,
+    fn(&RecordField) -> TypeId,
 >;
 type CasePayloadTypeIds<'a> =
     std::iter::Copied<std::collections::btree_map::Values<'a, Symbol, TypeId>>;
@@ -84,7 +84,7 @@ impl TypeShape {
             Self::Record(fields) => TypeShapeChildIdsInner::Fields(
                 fields
                     .values()
-                    .map(field_type_id as fn(&FieldInfo) -> TypeId),
+                    .map(field_type_id as fn(&RecordField) -> TypeId),
             ),
             Self::Variant(cases) => TypeShapeChildIdsInner::Cases(cases.values().copied()),
             Self::Array { element, .. } | Self::Option(element) => {
@@ -98,36 +98,19 @@ impl TypeShape {
     }
 }
 
-fn field_type_id(field: &FieldInfo) -> TypeId {
-    field.type_id
+fn field_type_id(field: &RecordField) -> TypeId {
+    field.final_type
 }
 
-/// Field information within a record type.
+/// One finalized field in a record type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct FieldInfo {
-    /// The type of this field's value.
-    pub type_id: TypeId,
-    /// Whether this field may be absent (from alternation branches).
-    pub optional: bool,
+pub struct RecordField {
+    pub final_type: TypeId,
 }
 
-impl FieldInfo {
-    pub fn with_optional(type_id: TypeId, optional: bool) -> Self {
-        Self { type_id, optional }
-    }
-
-    pub fn required(type_id: TypeId) -> Self {
-        Self {
-            type_id,
-            optional: false,
-        }
-    }
-
-    pub fn make_optional(self) -> Self {
-        Self {
-            optional: true,
-            ..self
-        }
+impl RecordField {
+    pub fn new(final_type: TypeId) -> Self {
+        Self { final_type }
     }
 }
 

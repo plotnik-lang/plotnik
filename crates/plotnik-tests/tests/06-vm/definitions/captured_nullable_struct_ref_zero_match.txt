@@ -50,23 +50,23 @@ S11 "debugger_statement"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { id }
-T2 = Record  M1:1  ; { x }
-T3 = Record  M2:2  ; { a, d }
-T4 = Option(T1)  ; AX?
+T2 = Option(T1)  ; AX?
+T3 = Record  M1:1  ; { x }
+T4 = Record  M2:2  ; { a, d }
 
 [type_members]
 M0: S01 → T0  ; id: <Node>
-M1: S02 → T4  ; x: T4
-M2: S03 → T2  ; a: A
+M1: S02 → T2  ; x: T2
+M2: S03 → T3  ; a: A
 M3: S04 → T0  ; d: <Node>
 
 [type_names]
 N0: S05 → T1  ; AX
-N1: S06 → T2  ; A
-N2: S07 → T3  ; Q
+N1: S06 → T3  ; A
+N2: S07 → T4  ; Q
 
 [entrypoints]
-Q = 00 :: T3
+Q = 00 :: T4
 
 [transitions]
 Q:

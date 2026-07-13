@@ -175,7 +175,7 @@ impl<'a> SchemaEmitter<'a> {
             .collect::<Vec<_>>();
         fields.sort_by(|left, right| left.0.cmp(&right.0));
         for (field, info, member) in fields {
-            let value = self.render_field(info.type_id, info.optional);
+            let value = self.render_ty(info.final_type);
             self.sink.reset_style();
             self.sink.push("  ");
             self.push_mapped(&field, ty, Some(member));
@@ -287,17 +287,6 @@ impl<'a> SchemaEmitter<'a> {
         }
     }
 
-    fn render_field(&self, ty: TypeId, optional: bool) -> Sink<SemanticTag> {
-        if !optional {
-            return self.render_ty(ty);
-        }
-        let mut out = self.render_ty(ty);
-        out.push(" ");
-        out.styled(Style::Dim, "|");
-        out.push(" null");
-        out
-    }
-
     fn render_nullable(&self, inner: TypeId) -> Sink<SemanticTag> {
         let mut out = self.render_ty(inner);
         out.push(" ");
@@ -363,7 +352,7 @@ impl<'a> SchemaEmitter<'a> {
             out.push(":");
             out.reset_style();
             out.push(" ");
-            out.append(self.render_field(info.type_id, info.optional));
+            out.append(self.render_ty(info.final_type));
             if position != last {
                 out.set_style(Style::Dim);
                 out.push("; ");

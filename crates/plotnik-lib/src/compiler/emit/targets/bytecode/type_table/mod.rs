@@ -8,7 +8,7 @@ use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeN
 use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeShape,
+    RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeShape,
 };
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
@@ -241,22 +241,10 @@ fn emit_type_at_slot(
 
 fn resolve_field_type(
     types: &mut TypeTableBuilder,
-    field_info: &FieldInfo,
+    field_info: &RecordField,
     type_ctx: &TypeAnalysis,
 ) -> Result<WireTypeId, EmitError> {
-    let base_type = types.resolve_type(field_info.type_id, type_ctx)?;
-
-    if field_info.optional {
-        // Wrappers compose: a base that is itself `Option` (a reference to
-        // an optional-rooted definition under a call-site `?`) legitimately
-        // nests — the two nulls come from two distinct syntax sites, the
-        // definition's `?` and the capture's. For everything else inference
-        // keeps field optionality single-sourced (the captured `?`'s null
-        // lives on the capture field alone, never on the base type too).
-        types.intern_option(base_type)
-    } else {
-        Ok(base_type)
-    }
+    types.resolve_type(field_info.final_type, type_ctx)
 }
 
 struct TypeEmitCtx<'a> {

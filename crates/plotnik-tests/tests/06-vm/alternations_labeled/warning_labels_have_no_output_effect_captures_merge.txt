@@ -43,18 +43,18 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:2  ; { e, d }
-T2 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { e, d }
 
 [type_members]
-M0: S1 → T2  ; e: T2
-M1: S2 → T2  ; d: T2
+M0: S1 → T1  ; e: T1
+M1: S2 → T1  ; d: T1
 
 [type_names]
-N0: S3 → T1  ; Q
+N0: S3 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T1
+Q = 00 :: T2
 
 [transitions]
 Q:

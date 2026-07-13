@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NODE};
 use crate::compiler::ids::DefId;
 use crate::compiler::test_utils::synthetic_grammar;
 use crate::compiler::{QueryBuilder, TypeScriptCodegenConfig};
@@ -16,11 +16,11 @@ fn capture_layout_assigns_one_absolute_member_sequence() {
     let mut types = TypeAnalysisBuilder::new();
     let child = types.intern_record(BTreeMap::from([(
         interner.intern("value"),
-        FieldInfo::required(TYPE_NODE),
+        RecordField::new(TYPE_NODE),
     )]));
     let parent = types.intern_record(BTreeMap::from([
-        (interner.intern("child"), FieldInfo::required(child)),
-        (interner.intern("name"), FieldInfo::required(TYPE_NODE)),
+        (interner.intern("child"), RecordField::new(child)),
+        (interner.intern("name"), RecordField::new(TYPE_NODE)),
     ]));
     let def = DefId::from_raw(0);
     types.record_def_output(def, parent);
@@ -47,7 +47,7 @@ fn capture_layout_accepts_256_fields() {
         .map(|index| {
             (
                 interner.intern(&format!("field_{index}")),
-                FieldInfo::required(TYPE_NODE),
+                RecordField::new(TYPE_NODE),
             )
         })
         .collect();
@@ -73,7 +73,7 @@ fn capture_layout_reports_the_actual_total_member_count() {
             .map(|field| {
                 (
                     interner.intern(&format!("scope_{scope}_field_{field}")),
-                    FieldInfo::required(TYPE_NODE),
+                    RecordField::new(TYPE_NODE),
                 )
             })
             .collect();
@@ -83,7 +83,7 @@ fn capture_layout_reports_the_actual_total_member_count() {
         .map(|field| {
             (
                 interner.intern(&format!("overflow_field_{field}")),
-                FieldInfo::required(TYPE_NODE),
+                RecordField::new(TYPE_NODE),
             )
         })
         .collect();

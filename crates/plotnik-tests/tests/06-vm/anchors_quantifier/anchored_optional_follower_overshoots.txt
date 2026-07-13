@@ -35,19 +35,19 @@ S10 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:3  ; { a, b, c }
-T2 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:3  ; { a, b, c }
 
 [type_members]
-M0: S02 → T2  ; a: T2
-M1: S03 → T2  ; b: T2
+M0: S02 → T1  ; a: T1
+M1: S03 → T1  ; b: T1
 M2: S04 → T0  ; c: <Node>
 
 [type_names]
-N0: S05 → T1  ; Q
+N0: S05 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T1
+Q = 00 :: T2
 
 [transitions]
 Q:

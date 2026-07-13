@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, PatternFlow, TYPE_VOID, TypeId, TypeShape,
+    PatternFlow, RecordField, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::core::Symbol;
 
@@ -98,31 +98,28 @@ fn suppress_value(flow: PatternFlow) -> PatternFlow {
 /// Relax a field that is absent from some branch, keeping the output shape stable
 /// (every key present).
 ///
-/// A *required* list stays present as a (possibly empty) array — the absent branch
-/// emits `[]`, never null — so it relaxes to zero-or-more. Everything else becomes
-/// nullable, including an already-optional list: `((x)+ @a)?` emits null when its
-/// `?` is skipped, so forcing it to a non-null `[]` here would make the declared
-/// type lie. Nullability (`optional`), not the array shape, decides the default,
-/// which keeps inference in lockstep with what the emitter writes.
-fn relax_for_absence(ctx: &mut TypeAnalysisBuilder, info: FieldInfo) -> FieldInfo {
-    if !info.optional
-        && let Some(TypeShape::Array { element, .. }) = ctx.in_progress().type_shape(info.type_id)
-    {
+/// A list stays present as a (possibly empty) array when the list itself is the
+/// field type: the absent branch emits `[]`, never null, so it relaxes to
+/// zero-or-more. Everything else becomes an option. In particular,
+/// `Option<Array<T>>` remains an option: `((x)+ @a)?` emits null when its `?` is
+/// skipped, so forcing it to a non-null `[]` would make the declared type lie.
+fn relax_for_absence(ctx: &mut TypeAnalysisBuilder, info: RecordField) -> RecordField {
+    if let Some(TypeShape::Array { element, .. }) = ctx.in_progress().type_shape(info.final_type) {
         let element = *element;
         let array = ctx.intern_type(TypeShape::Array {
             element,
             non_empty: false,
         });
-        return FieldInfo::required(array);
+        return RecordField::new(array);
     }
-    info.make_optional()
+    RecordField::new(ctx.intern_option(info.final_type))
 }
 
 /// Relax every field in a map for absence (see [`relax_for_absence`]).
 fn relax_all_for_absence(
     ctx: &mut TypeAnalysisBuilder,
-    fields: BTreeMap<Symbol, FieldInfo>,
-) -> BTreeMap<Symbol, FieldInfo> {
+    fields: BTreeMap<Symbol, RecordField>,
+) -> BTreeMap<Symbol, RecordField> {
     fields
         .into_iter()
         .map(|(k, v)| (k, relax_for_absence(ctx, v)))
@@ -132,21 +129,20 @@ fn relax_all_for_absence(
 /// Merge two field maps.
 ///
 /// Rules:
-/// - Keys in both: types must be compatible, field is required iff required in both.
-/// - Keys in only one: relaxed for absence (nullable, or an empty-able list).
+/// - Keys in both: types must be compatible.
+/// - Keys in only one: relaxed for absence (an option, or an empty-able list).
 fn merge_fields(
     ctx: &mut TypeAnalysisBuilder,
-    a: BTreeMap<Symbol, FieldInfo>,
-    mut b: BTreeMap<Symbol, FieldInfo>,
-) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {
+    a: BTreeMap<Symbol, RecordField>,
+    mut b: BTreeMap<Symbol, RecordField>,
+) -> Result<BTreeMap<Symbol, RecordField>, UnifyError> {
     let mut result = BTreeMap::new();
     let mut absent_fields = Vec::new();
 
     for (key, a_info) in a {
         if let Some(b_info) = b.remove(&key) {
-            let type_id = unify_type_ids(ctx, a_info.type_id, b_info.type_id, key)?;
-            let optional = a_info.optional || b_info.optional;
-            result.insert(key, FieldInfo::with_optional(type_id, optional));
+            let final_type = unify_type_ids(ctx, a_info.final_type, b_info.final_type, key)?;
+            result.insert(key, RecordField::new(final_type));
         } else {
             absent_fields.push((key, a_info));
         }
@@ -193,6 +189,22 @@ fn unify_type_ids(
         .type_shape(b)
         .cloned()
         .expect("unified field type is registered");
+
+    match (&a_shape, &b_shape) {
+        (TypeShape::Option(a_inner), TypeShape::Option(b_inner)) => {
+            let inner = unify_type_ids(ctx, *a_inner, *b_inner, field)?;
+            return Ok(ctx.intern_option(inner));
+        }
+        (TypeShape::Option(inner), _) => {
+            let inner = unify_type_ids(ctx, *inner, b, field)?;
+            return Ok(ctx.intern_option(inner));
+        }
+        (_, TypeShape::Option(inner)) => {
+            let inner = unify_type_ids(ctx, a, *inner, field)?;
+            return Ok(ctx.intern_option(inner));
+        }
+        _ => {}
+    }
 
     // Arrays that differ only in cardinality relax to zero-or-more: only one
     // branch matches, so the merged list is non-empty only when the `+` branch

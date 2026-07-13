@@ -24,7 +24,7 @@ impl RawOutputGraph {
             .enumerate()
             .filter_map(|(index, capture)| {
                 let fact = capture.observation.contract.fact;
-                (!fact.is_valid() || raw_types.type_contains_invalid(fact.field().type_id))
+                (!fact.is_valid() || raw_types.type_contains_invalid(fact.field().final_type))
                     .then_some(RawCaptureId(index as u32))
             })
             .collect::<HashSet<_>>();
@@ -278,18 +278,17 @@ pub(super) enum AbsencePolicy {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct NormalizedField {
-    pub(super) info: FieldInfo,
+    pub(super) info: RecordField,
     pub(super) on_absence: AbsencePolicy,
 }
 
 impl NormalizedField {
-    fn ordinary(info: FieldInfo, raw_types: &RawTypeSnapshot) -> Self {
-        let on_absence =
-            if !info.optional && matches!(raw_types.shape(info.type_id), TypeShape::Array { .. }) {
-                AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
-            } else {
-                AbsencePolicy::MakeOption
-            };
+    fn ordinary(info: RecordField, raw_types: &RawTypeSnapshot) -> Self {
+        let on_absence = if matches!(raw_types.shape(info.final_type), TypeShape::Array { .. }) {
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
+        } else {
+            AbsencePolicy::MakeOption
+        };
         Self { info, on_absence }
     }
 
@@ -299,13 +298,13 @@ impl NormalizedField {
     ) -> (Self, FieldCompletion) {
         let completion = match self.on_absence {
             AbsencePolicy::MakeOption => {
-                self.info = self.info.make_optional();
+                self.info = RecordField::new(types.intern_option(self.info.final_type));
                 FieldCompletion::Absent
             }
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList) => {
                 let TypeShape::Array { element, .. } = types
                     .in_progress()
-                    .type_shape(self.info.type_id)
+                    .type_shape(self.info.final_type)
                     .cloned()
                     .expect("empty-list completion requires a registered list")
                 else {
@@ -315,7 +314,7 @@ impl NormalizedField {
                     element,
                     non_empty: false,
                 });
-                self.info = FieldInfo::required(array);
+                self.info = RecordField::new(array);
                 FieldCompletion::EmptyList
             }
             AbsencePolicy::CompleteWith(
@@ -492,35 +491,63 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             return field;
         }
 
-        if raw_source.type_id == raw_output.info.type_id {
-            if raw_output.info.optional && field.on_absence == AbsencePolicy::MakeOption {
-                field.info = field.info.make_optional();
-            }
+        if matches!(
+            field.on_absence,
+            AbsencePolicy::CompleteWith(FieldCompletion::Absent | FieldCompletion::False)
+        ) && matches!(
+            self.session.raw_types.shape(raw_output.info.final_type),
+            TypeShape::Option(inner) if *inner == raw_source.final_type
+        ) {
             return field;
         }
 
-        let TypeShape::Array { element, non_empty } =
-            self.session.raw_types.shape(raw_output.info.type_id)
-        else {
+        let Some(final_type) = self.adapt_final_type(
+            raw_source.final_type,
+            raw_output.info.final_type,
+            field.info.final_type,
+        ) else {
             return field;
         };
-        if *element != raw_source.type_id {
-            return field;
-        }
-        let array = self.session.types.intern_type(TypeShape::Array {
-            element: field.info.type_id,
-            non_empty: *non_empty,
-        });
-        field.info = FieldInfo::with_optional(array, raw_output.info.optional);
-        field.on_absence = if field.info.optional {
-            AbsencePolicy::MakeOption
-        } else {
+        field.info = RecordField::new(final_type);
+        field.on_absence = if matches!(
+            self.session.types.in_progress().type_shape(final_type),
+            Some(TypeShape::Array { .. })
+        ) {
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
+        } else {
+            AbsencePolicy::MakeOption
         };
         field
     }
 
-    fn raw_source_info(&self, source: RawFieldSource) -> FieldInfo {
+    fn adapt_final_type(
+        &mut self,
+        raw_source: TypeId,
+        raw_output: TypeId,
+        normalized: TypeId,
+    ) -> Option<TypeId> {
+        if raw_source == raw_output {
+            return Some(normalized);
+        }
+
+        match self.session.raw_types.shape(raw_output).clone() {
+            TypeShape::Option(inner) => {
+                let inner = self.adapt_final_type(raw_source, inner, normalized)?;
+                Some(self.session.types.intern_option(inner))
+            }
+            TypeShape::Array { element, non_empty } => {
+                let element = self.adapt_final_type(raw_source, element, normalized)?;
+                Some(
+                    self.session
+                        .types
+                        .intern_type(TypeShape::Array { element, non_empty }),
+                )
+            }
+            _ => None,
+        }
+    }
+
+    fn raw_source_info(&self, source: RawFieldSource) -> RecordField {
         match source {
             RawFieldSource::Capture(capture) => self
                 .session
@@ -547,7 +574,7 @@ fn unify_normalized_fields(
     a: NormalizedField,
     b: NormalizedField,
 ) -> Result<NormalizedField, ()> {
-    let type_id = unify_normalized_types(types, a.info.type_id, b.info.type_id)?;
+    let final_type = unify_normalized_types(types, a.info.final_type, b.info.final_type)?;
     let on_absence = match (a.on_absence, b.on_absence) {
         (
             AbsencePolicy::CompleteWith(FieldCompletion::False),
@@ -564,7 +591,7 @@ fn unify_normalized_fields(
         _ => AbsencePolicy::MakeOption,
     };
     Ok(NormalizedField {
-        info: FieldInfo::with_optional(type_id, a.info.optional || b.info.optional),
+        info: RecordField::new(final_type),
         on_absence,
     })
 }
@@ -590,15 +617,15 @@ fn unify_normalized_types(
     match (a_shape, b_shape) {
         (TypeShape::Option(a), TypeShape::Option(b)) => {
             let inner = unify_normalized_types(types, a, b)?;
-            Ok(types.intern_type(TypeShape::Option(inner)))
+            Ok(types.intern_option(inner))
         }
         (TypeShape::Option(inner), _) => {
             let inner = unify_normalized_types(types, inner, b)?;
-            Ok(types.intern_type(TypeShape::Option(inner)))
+            Ok(types.intern_option(inner))
         }
         (_, TypeShape::Option(inner)) => {
             let inner = unify_normalized_types(types, a, inner)?;
-            Ok(types.intern_type(TypeShape::Option(inner)))
+            Ok(types.intern_option(inner))
         }
         (
             TypeShape::Array {

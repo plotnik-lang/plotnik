@@ -53,24 +53,24 @@ S17 "object"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:8  ; { a, b, c, d, e, f, g, h }
-T2 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:8  ; { a, b, c, d, e, f, g, h }
 
 [type_members]
-M0: S01 → T2  ; a: T2
-M1: S02 → T2  ; b: T2
-M2: S03 → T2  ; c: T2
-M3: S04 → T2  ; d: T2
-M4: S05 → T2  ; e: T2
-M5: S06 → T2  ; f: T2
-M6: S07 → T2  ; g: T2
-M7: S08 → T2  ; h: T2
+M0: S01 → T1  ; a: T1
+M1: S02 → T1  ; b: T1
+M2: S03 → T1  ; c: T1
+M3: S04 → T1  ; d: T1
+M4: S05 → T1  ; e: T1
+M5: S06 → T1  ; f: T1
+M6: S07 → T1  ; g: T1
+M7: S08 → T1  ; h: T1
 
 [type_names]
-N0: S09 → T1  ; Q
+N0: S09 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T1
+Q = 00 :: T2
 
 [transitions]
 Q:

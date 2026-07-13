@@ -145,7 +145,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             TypeShape::Record(fields) => {
                 for (field_sym, info) in &fields {
                     let field = self.interner.resolve(*field_sym).to_owned();
-                    self.visit_field_element(info.type_id, name, &field);
+                    self.visit_field_element(info.final_type, name, &field);
                 }
             }
             TypeShape::Variant(cases) => {
@@ -162,7 +162,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     let prefix = format!("{name}{label}");
                     for (field_sym, info) in &payload_fields {
                         let field = self.interner.resolve(*field_sym).to_owned();
-                        self.visit_field_element(info.type_id, &prefix, &field);
+                        self.visit_field_element(info.final_type, &prefix, &field);
                     }
                 }
             }

@@ -47,29 +47,29 @@ S8 "string"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:2  ; { id, num }
-T2 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { id, num }
 
 [type_members]
-M0: S1 → T2  ; id: T2
-M1: S2 → T2  ; num: T2
+M0: S1 → T1  ; id: T1
+M1: S2 → T1  ; num: T1
 
 [type_names]
-N0: S3 → T1  ; Q
+N0: S3 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T1
+Q = 00 :: T2
 
 [spans]
-P00 def        0..113  src0  T1
+P00 def        0..113  src0  T2
 P01 pattern    4..113  src0
 P02 pattern    15..111  src0
 P03 unlabeled_alternation 41..107  src0
 P04 alternative 49..65  src0
-P05 capture    62..65  src0  T1.M0
+P05 capture    62..65  src0  T2.M0
 P06 pattern    49..61  src0
 P07 alternative 72..85  src0
-P08 capture    81..85  src0  T1.M1
+P08 capture    81..85  src0  T2.M1
 P09 pattern    72..80  src0
 P10 alternative 92..101  src0
 P11 quantifier 100..101  src0

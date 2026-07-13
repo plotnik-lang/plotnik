@@ -16,7 +16,7 @@ use crate::compiler::analyze::types::capture_type::{
 };
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_TEXT, TYPE_VOID, TypeId, TypeShape,
+    PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_TEXT, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
@@ -47,10 +47,6 @@ pub(crate) struct RawCaptureContract {
 
 impl RawCaptureContract {
     pub(crate) fn new(fact: RawCaptureFact, zero_node_terminal: bool) -> Self {
-        assert!(
-            !zero_node_terminal || !fact.field().optional,
-            "zero-node terminal is distinct from field optionality",
-        );
         Self {
             fact,
             zero_node_terminal,
@@ -67,7 +63,7 @@ pub(crate) struct RawCaptureObservation {
     name: Symbol,
     contract: RawCaptureContract,
     intent: RawCaptureIntent,
-    emitted_field: Option<FieldInfo>,
+    emitted_field: Option<RecordField>,
 }
 
 impl RawCaptureObservation {
@@ -84,7 +80,7 @@ impl RawCaptureObservation {
         }
     }
 
-    pub(crate) fn emitting(mut self, field: FieldInfo) -> Self {
+    pub(crate) fn emitting(mut self, field: RecordField) -> Self {
         self.emitted_field = Some(field);
         self
     }
@@ -110,7 +106,7 @@ struct RawCaptureOutput {
 
 #[derive(Clone, Debug)]
 struct RawFieldOutput {
-    info: FieldInfo,
+    info: RecordField,
     producers: Vec<RawCaptureId>,
     sources: Vec<RawFieldSource>,
 }

@@ -128,67 +128,67 @@ S14 "identifier"
 
 [type_defs]
 T00 = <Node>
-T01 = Record  M0:1  ; { stmt }
-T02 = ArrayStar(T00)  ; <Node>*
-T03 = Record  M1:1  ; { stmts }
-T04 = ArrayPlus(T00)  ; <Node>+
-T05 = Record  M2:1  ; { stmts }
-T06 = Record  M3:1  ; { stmts }
-T07 = Record  M4:1  ; { name }
-T08 = ArrayStar(T07)  ; FuncsFuncs*
-T09 = Record  M5:1  ; { funcs }
-T10 = Option(T00)  ; <Node>?
+T01 = Option(T00)  ; <Node>?
+T02 = Record  M0:1  ; { stmt }
+T03 = ArrayStar(T00)  ; <Node>*
+T04 = Record  M1:1  ; { stmts }
+T05 = ArrayPlus(T00)  ; <Node>+
+T06 = Record  M2:1  ; { stmts }
+T07 = Record  M3:1  ; { stmts }
+T08 = Record  M4:1  ; { name }
+T09 = ArrayStar(T08)  ; FuncsFuncs*
+T10 = Record  M5:1  ; { funcs }
 
 [type_members]
-M0: S01 → T10  ; stmt: T10
-M1: S02 → T02  ; stmts: T02
-M2: S02 → T04  ; stmts: T04
-M3: S02 → T02  ; stmts: T02
+M0: S01 → T01  ; stmt: T01
+M1: S02 → T03  ; stmts: T03
+M2: S02 → T05  ; stmts: T05
+M3: S02 → T03  ; stmts: T03
 M4: S03 → T00  ; name: <Node>
-M5: S04 → T08  ; funcs: T08
+M5: S04 → T09  ; funcs: T09
 
 [type_names]
-N0: S05 → T01  ; Maybe
-N1: S06 → T03  ; Many
-N2: S07 → T05  ; Some
-N3: S08 → T06  ; Lazy
-N4: S09 → T07  ; FuncsFuncs
-N5: S10 → T09  ; Funcs
+N0: S05 → T02  ; Maybe
+N1: S06 → T04  ; Many
+N2: S07 → T06  ; Some
+N3: S08 → T07  ; Lazy
+N4: S09 → T08  ; FuncsFuncs
+N5: S10 → T10  ; Funcs
 
 [entrypoints]
-Funcs = 024 :: T09
-Lazy  = 019 :: T06
-Many  = 006 :: T03
-Maybe = 000 :: T01
-Some  = 012 :: T05
+Funcs = 024 :: T10
+Lazy  = 019 :: T07
+Many  = 006 :: T04
+Maybe = 000 :: T02
+Some  = 012 :: T06
 
 [spans]
-P00 def        0..50  src0  T01
+P00 def        0..50  src0  T02
 P01 pattern    8..50  src0
-P02 capture    43..48  src0  T01.M0
+P02 capture    43..48  src0  T02.M0
 P03 quantifier 41..42  src0
 P04 pattern    19..41  src0
-P05 def        52..102  src0  T03
+P05 def        52..102  src0  T04
 P06 pattern    59..102  src0
-P07 capture    94..100  src0  T03.M1
+P07 capture    94..100  src0  T04.M1
 P08 quantifier 92..93  src0
 P09 pattern    70..92  src0
-P10 def        104..154  src0  T05
+P10 def        104..154  src0  T06
 P11 pattern    111..154  src0
-P12 capture    146..152  src0  T05.M2
+P12 capture    146..152  src0  T06.M2
 P13 quantifier 144..145  src0
 P14 pattern    122..144  src0
-P15 def        156..207  src0  T06
+P15 def        156..207  src0  T07
 P16 pattern    163..207  src0
-P17 capture    199..205  src0  T06.M3
+P17 capture    199..205  src0  T07.M3
 P18 quantifier 196..198  src0
 P19 pattern    174..196  src0
-P20 def        209..292  src0  T09
+P20 def        209..292  src0  T10
 P21 pattern    217..292  src0
-P22 capture    284..290  src0  T09.M5
+P22 capture    284..290  src0  T10.M5
 P23 quantifier 282..283  src0
 P24 pattern    228..282  src0
-P25 capture    273..278  src0  T07.M4
+P25 capture    273..278  src0  T08.M4
 P26 field      254..258  src0
 P27 pattern    260..272  src0
 

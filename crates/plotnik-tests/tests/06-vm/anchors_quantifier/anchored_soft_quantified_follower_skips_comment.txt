@@ -49,20 +49,20 @@ S10 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Record  M0:3  ; { a, b, c }
-T3 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = ArrayStar(T0)  ; <Node>*
+T3 = Record  M0:3  ; { a, b, c }
 
 [type_members]
-M0: S02 → T3  ; a: T3
-M1: S03 → T1  ; b: T1
+M0: S02 → T1  ; a: T1
+M1: S03 → T2  ; b: T2
 M2: S04 → T0  ; c: <Node>
 
 [type_names]
-N0: S05 → T2  ; Q
+N0: S05 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T3
 
 [transitions]
 Q:

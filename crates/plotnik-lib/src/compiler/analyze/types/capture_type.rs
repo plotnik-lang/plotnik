@@ -12,7 +12,7 @@ use crate::compiler::ids::TypeId;
 use crate::core::Symbol;
 
 use super::CaptureKind;
-use super::type_shape::FieldInfo;
+use super::type_shape::RecordField;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BuiltInCaptureType {
@@ -126,12 +126,12 @@ impl CaptureTypePlan {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RawCaptureFact {
     kind: CaptureKind,
-    field: FieldInfo,
+    field: RecordField,
     valid: bool,
 }
 
 impl RawCaptureFact {
-    pub fn admitted(kind: CaptureKind, field: FieldInfo) -> Self {
+    pub fn admitted(kind: CaptureKind, field: RecordField) -> Self {
         Self {
             kind,
             field,
@@ -139,7 +139,7 @@ impl RawCaptureFact {
         }
     }
 
-    pub fn rejected(kind: CaptureKind, field: FieldInfo) -> Self {
+    pub fn rejected(kind: CaptureKind, field: RecordField) -> Self {
         Self {
             kind,
             field,
@@ -151,7 +151,7 @@ impl RawCaptureFact {
         self.kind
     }
 
-    pub fn field(&self) -> FieldInfo {
+    pub fn field(&self) -> RecordField {
         self.field
     }
 

@@ -50,36 +50,36 @@ S8 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:1  ; { name }
-T2 = Record  M1:2  ; { first, second }
-T3 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { name }
+T3 = Record  M1:2  ; { first, second }
 
 [type_members]
-M0: S1 → T3  ; name: T3
-M1: S2 → T1  ; first: MaybeName
-M2: S3 → T1  ; second: MaybeName
+M0: S1 → T1  ; name: T1
+M1: S2 → T2  ; first: MaybeName
+M2: S3 → T2  ; second: MaybeName
 
 [type_names]
-N0: S4 → T1  ; MaybeName
-N1: S5 → T2  ; Q
+N0: S4 → T2  ; MaybeName
+N1: S5 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T3
 
 [spans]
-P00 def        0..31  src0  T1
-P01 capture    26..31  src0  T1.M0
+P00 def        0..31  src0  T2
+P01 capture    26..31  src0  T2.M0
 P02 quantifier 24..25  src0
 P03 pattern    12..24  src0
-P04 def        33..148  src0  T2
+P04 def        33..148  src0  T3
 P05 pattern    37..148  src0
 P06 sequence   48..146  src0
 P07 pattern    54..95  src0
-P08 capture    88..94  src0  T2.M1
-P09 ref        76..87  src0  T1
+P08 capture    88..94  src0  T3.M1
+P09 ref        76..87  src0  T2
 P10 pattern    100..142  src0
-P11 capture    134..141  src0  T2.M2
-P12 ref        122..133  src0  T1
+P11 capture    134..141  src0  T3.M2
+P12 ref        122..133  src0  T2
 
 [transitions]
 Q:

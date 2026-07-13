@@ -64,21 +64,21 @@ S9 "call_expression"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { c }
-T2 = Record  M1:3  ; { lead, a, b }
-T3 = Option(T1)  ; QLead?
+T2 = Option(T1)  ; QLead?
+T3 = Record  M1:3  ; { lead, a, b }
 
 [type_members]
 M0: S1 → T0  ; c: <Node>
-M1: S2 → T3  ; lead: T3
+M1: S2 → T2  ; lead: T2
 M2: S3 → T0  ; a: <Node>
 M3: S4 → T0  ; b: <Node>
 
 [type_names]
 N0: S5 → T1  ; QLead
-N1: S6 → T2  ; Q
+N1: S6 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T3
 
 [transitions]
 Q:

@@ -33,19 +33,19 @@ S7 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { id }
-T2 = Record  M1:1  ; { outer }
-T3 = Option(T1)  ; QOuter?
+T2 = Option(T1)  ; QOuter?
+T3 = Record  M1:1  ; { outer }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
-M1: S2 → T3  ; outer: T3
+M1: S2 → T2  ; outer: T2
 
 [type_names]
 N0: S3 → T1  ; QOuter
-N1: S4 → T2  ; Q
+N1: S4 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T3
 
 [transitions]
 Q:

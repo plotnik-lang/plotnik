@@ -36,7 +36,7 @@ use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, PatternFlow, PatternShape, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    PatternFlow, PatternShape, QuantifierKind, RecordField, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{
     BuiltInCaptureType, CaptureFact, FieldCompletion, FieldCompletions, RawCaptureFact, RootExtent,
@@ -92,7 +92,7 @@ enum QuantifiedContext {
 
 struct CaptureInner {
     info: PatternShape,
-    makes_field_optional: bool,
+    wraps_field_in_option: bool,
 }
 
 /// Where one capture field lands after the inner pattern has been inferred.
@@ -103,7 +103,7 @@ struct CaptureInner {
 enum CaptureFieldDestination {
     OwnScope,
     Bubbling {
-        fields: BTreeMap<Symbol, FieldInfo>,
+        fields: BTreeMap<Symbol, RecordField>,
         admits_capture: bool,
     },
 }
@@ -120,7 +120,7 @@ impl CaptureFieldDestination {
         self,
         types: &mut TypeAnalysisBuilder,
         capture_name: Symbol,
-        field: FieldInfo,
+        field: RecordField,
     ) -> PatternFlow {
         match self {
             Self::OwnScope => {
@@ -145,7 +145,7 @@ impl CaptureFieldDestination {
 
 struct RawCaptureValue {
     mechanism: CaptureKind,
-    field: FieldInfo,
+    field: RecordField,
     zero_node_terminal: bool,
 }
 
@@ -153,12 +153,12 @@ impl RawCaptureValue {
     fn node() -> Self {
         Self {
             mechanism: CaptureKind::Node,
-            field: FieldInfo::required(TYPE_NODE),
+            field: RecordField::new(TYPE_NODE),
             zero_node_terminal: false,
         }
     }
 
-    fn inferred(mechanism: CaptureKind, field: FieldInfo, zero_node_terminal: bool) -> Self {
+    fn inferred(mechanism: CaptureKind, field: RecordField, zero_node_terminal: bool) -> Self {
         Self {
             mechanism,
             field,
@@ -488,8 +488,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn collect_child_fields(
         &mut self,
         children: impl IntoIterator<Item = Located<Pattern>>,
-    ) -> BTreeMap<Symbol, FieldInfo> {
-        let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
+    ) -> BTreeMap<Symbol, RecordField> {
+        let mut merged_fields: BTreeMap<Symbol, RecordField> = BTreeMap::new();
 
         for child in children {
             let child_info = self.infer_pattern(&child);
@@ -507,7 +507,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         merged_fields
     }
 
-    fn merged_fields_flow(&mut self, merged: BTreeMap<Symbol, FieldInfo>) -> PatternFlow {
+    fn merged_fields_flow(&mut self, merged: BTreeMap<Symbol, RecordField>) -> PatternFlow {
         if merged.is_empty() {
             return PatternFlow::Void;
         }
@@ -745,7 +745,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         };
         let inner = cap.wrap(inner);
 
-        // Determine how inner flow relates to capture (e.g., ? makes field optional)
+        // Determine how the inner flow relates to the capture.
         let captured_inner = self.resolve_capture_inner(&inner);
         let inner_info = captured_inner.info;
 
@@ -774,7 +774,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             mechanism == CaptureKind::Node && matches!(&inner_info.flow, PatternFlow::Fields(_));
 
         let base = self.captured_base_type(inner.node(), &inner_info, should_merge_fields);
-        let raw_field = FieldInfo::with_optional(base, captured_inner.makes_field_optional);
+        let final_type = if captured_inner.wraps_field_in_option {
+            self.ctx.type_ctx.intern_option(base)
+        } else {
+            base
+        };
+        let raw_field = RecordField::new(final_type);
         let destination = self.capture_field_destination(
             capture_name,
             &inner_info,
@@ -795,8 +800,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let raw_capture_valid =
             destination.admits_capture() && !inner_has_capture_error && !owned_inner_error;
         let emits_field = destination.admits_capture();
-        let zero_node_terminal =
-            !raw_field.optional && self.pattern_can_match_zero_nodes(inner.node());
+        let zero_node_terminal = !matches!(
+            self.ctx
+                .type_ctx
+                .in_progress()
+                .type_shape(raw_field.final_type),
+            Some(TypeShape::Option(_))
+        ) && self.pattern_can_match_zero_nodes(inner.node());
         let raw = RawCapture::after_validation(
             node,
             capture_name,
@@ -853,7 +863,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
             Some(TypeShape::Option(inner)) => {
                 let inner = self.apply_custom_capture_type(inner, name, range);
-                self.ctx.type_ctx.intern_type(TypeShape::Option(inner))
+                self.ctx.type_ctx.intern_option(inner)
             }
             // A recursive reference keeps its definition's type; the naming
             // pass warns that the capture type is inert.
@@ -944,15 +954,16 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         &mut self,
         raw: RawCapture,
         capture_type: ResolvedCaptureType,
-    ) -> FieldInfo {
+    ) -> RecordField {
         let pattern = Pattern::CapturedPattern(raw.occurrence.clone());
         let raw_fact = raw.fact();
         let ordinary = || CaptureFact::ordinary(raw_fact.kind());
 
         let field = match capture_type {
             ResolvedCaptureType::Custom(name, range) if raw.valid => {
-                let type_id = self.apply_custom_capture_type(raw.value.field.type_id, name, range);
-                FieldInfo::with_optional(type_id, raw.value.field.optional)
+                let final_type =
+                    self.apply_custom_capture_type(raw.value.field.final_type, name, range);
+                RecordField::new(final_type)
             }
             ResolvedCaptureType::BuiltIn(_, _)
             | ResolvedCaptureType::Custom(_, _)
@@ -1030,14 +1041,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let info = self.infer_quantified_pattern_in(&located, QuantifiedContext::Captured);
             CaptureInner {
                 info,
-                // `?` makes the resulting capture field optional; `*` and `+`
-                // collect record elements into a list that is always present.
-                makes_field_optional: quantifier == QuantifierKind::Optional,
+                // `?` wraps the captured value in Option; `*` and `+` collect
+                // record elements into a list that is always present.
+                wraps_field_in_option: quantifier == QuantifierKind::Optional,
             }
         } else {
             CaptureInner {
                 info: self.infer_pattern_value(inner),
-                makes_field_optional: false,
+                wraps_field_in_option: false,
             }
         }
     }
@@ -1122,7 +1133,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // is the option type itself, not a field-optionality flag.
                 QuantifiedContext::DefinitionValue => {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
-                    PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Option(element)))
+                    PatternFlow::Value(self.ctx.type_ctx.intern_option(element))
                 }
             },
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
@@ -1259,19 +1270,22 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn make_flow_optional(&mut self, flow: PatternFlow) -> PatternFlow {
         match flow {
             PatternFlow::Void => PatternFlow::Void,
-            PatternFlow::Value(t) => {
-                PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Option(t)))
-            }
+            PatternFlow::Value(t) => PatternFlow::Value(self.ctx.type_ctx.intern_option(t)),
             PatternFlow::Fields(type_id) => {
-                let optional_fields: BTreeMap<_, _> = self
+                let fields = self
                     .ctx
                     .type_ctx
                     .in_progress()
                     .expect_record_fields(type_id)
-                    .iter()
-                    .map(|(&k, &v)| (k, v.make_optional()))
+                    .clone();
+                let option_fields = fields
+                    .into_iter()
+                    .map(|(name, field)| {
+                        let final_type = self.ctx.type_ctx.intern_option(field.final_type);
+                        (name, RecordField::new(final_type))
+                    })
                     .collect();
-                PatternFlow::Fields(self.ctx.type_ctx.intern_record(optional_fields))
+                PatternFlow::Fields(self.ctx.type_ctx.intern_record(option_fields))
             }
         }
     }
@@ -1601,12 +1615,10 @@ pub(super) fn freeze_field_completions(types: &mut TypeAnalysisBuilder) {
                     .any(|fields| !fields.contains(&name));
                 let completion = if !omitted {
                     FieldCompletion::AlwaysPresent
-                } else if !info.optional
-                    && matches!(
-                        types.in_progress().type_shape(info.type_id),
-                        Some(TypeShape::Array { .. })
-                    )
-                {
+                } else if matches!(
+                    types.in_progress().type_shape(info.final_type),
+                    Some(TypeShape::Array { .. })
+                ) {
                     FieldCompletion::EmptyList
                 } else {
                     FieldCompletion::Absent

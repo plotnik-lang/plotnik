@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::emit::plan::{ReplayItem, ReplayPlan};
 use crate::compiler::emit::targets::rust::{TypeContext, TypeModel};
 use crate::core::Symbol;
@@ -79,7 +79,11 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
         self.field_scope_frame_bytes(owner, fields)
     }
 
-    fn field_scope_frame_bytes(&self, owner: TypeId, fields: &BTreeMap<Symbol, FieldInfo>) -> u64 {
+    fn field_scope_frame_bytes(
+        &self,
+        owner: TypeId,
+        fields: &BTreeMap<Symbol, RecordField>,
+    ) -> u64 {
         let context = TypeContext::item(owner);
         let slots = fields
             .values()
@@ -93,22 +97,17 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
         slots.saturating_add(widest_assignment)
     }
 
-    fn field_value_bytes(&self, info: &FieldInfo, context: TypeContext) -> u64 {
+    fn field_value_bytes(&self, info: &RecordField, context: TypeContext) -> u64 {
         self.field_value_bytes_seen(info, context, &mut HashSet::new())
     }
 
     fn field_value_bytes_seen(
         &self,
-        info: &FieldInfo,
+        info: &RecordField,
         context: TypeContext,
         seen: &mut HashSet<TypeId>,
     ) -> u64 {
-        let value = self.type_value_bytes(info.type_id, context, seen);
-        if info.optional {
-            self.option_value_bytes(value)
-        } else {
-            value
-        }
+        self.type_value_bytes(info.final_type, context, seen)
     }
 
     fn value_temp_bytes(&self, ty: TypeId, context: TypeContext) -> u64 {

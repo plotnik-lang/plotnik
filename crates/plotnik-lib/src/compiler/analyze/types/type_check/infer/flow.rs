@@ -3,7 +3,7 @@ use std::collections::btree_map::Entry;
 
 use rowan::TextRange;
 
-use crate::compiler::analyze::types::type_shape::FieldInfo;
+use crate::compiler::analyze::types::type_shape::RecordField;
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::core::Symbol;
 
@@ -18,9 +18,9 @@ impl InferVisitor<'_, '_> {
     /// the capture type may run at all.
     pub(super) fn insert_scope_field(
         &mut self,
-        target: &mut BTreeMap<Symbol, FieldInfo>,
+        target: &mut BTreeMap<Symbol, RecordField>,
         name: Symbol,
-        info: FieldInfo,
+        info: RecordField,
         range: TextRange,
     ) {
         match target.entry(name) {
@@ -39,8 +39,8 @@ impl InferVisitor<'_, '_> {
     /// Fold `source` fields into `target` in place, rejecting name collisions.
     pub(super) fn merge_scope_fields(
         &mut self,
-        target: &mut BTreeMap<Symbol, FieldInfo>,
-        source: &BTreeMap<Symbol, FieldInfo>,
+        target: &mut BTreeMap<Symbol, RecordField>,
+        source: &BTreeMap<Symbol, RecordField>,
         range: TextRange,
     ) {
         for (&name, &info) in source {

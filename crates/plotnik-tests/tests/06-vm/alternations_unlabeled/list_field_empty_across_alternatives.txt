@@ -41,18 +41,18 @@ S8 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
-T2 = Record  M0:2  ; { args, id }
-T3 = Option(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
+T3 = Record  M0:2  ; { args, id }
 
 [type_members]
 M0: S1 → T1  ; args: T1
-M1: S2 → T3  ; id: T3
+M1: S2 → T2  ; id: T2
 
 [type_names]
-N0: S3 → T2  ; Q
+N0: S3 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T3
 
 [transitions]
 Q:

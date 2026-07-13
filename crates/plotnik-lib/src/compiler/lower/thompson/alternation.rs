@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
-use crate::compiler::analyze::types::type_shape::FieldInfo;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
+use crate::compiler::analyze::types::type_shape::RecordField;
 use crate::compiler::analyze::types::{FieldCompletion, FieldCompletions};
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{
@@ -449,7 +449,7 @@ impl NfaBuilder<'_> {
     fn merged_field_completion_effects(
         &self,
         completions: &FieldCompletions,
-        fields: &BTreeMap<Symbol, FieldInfo>,
+        fields: &BTreeMap<Symbol, RecordField>,
         provided: &HashSet<Symbol>,
     ) -> Vec<EffectIR> {
         fields

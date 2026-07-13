@@ -13,7 +13,7 @@
 
 use crate::compiler::analyze::output::OutputSchema;
 pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItemKind as ItemKind};
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 use crate::compiler::ids::DefId;
@@ -203,17 +203,8 @@ impl<'m, 'a> Emitter<'m, 'a> {
         }
     }
 
-    /// A field's rendered type: the capture-level `optional` flag wraps one
-    /// more `Option` around the base, composing with an already-optional base
-    /// exactly like the bytecode type table does (two nulls from two distinct
-    /// syntax sites legitimately nest).
-    pub(super) fn field_type(&mut self, context: TypeContext, info: &FieldInfo) -> String {
-        let base = self.position_type(context, info.type_id);
-        if info.optional {
-            format!("::core::option::Option<{base}>")
-        } else {
-            base
-        }
+    pub(super) fn field_type(&mut self, context: TypeContext, info: &RecordField) -> String {
+        self.position_type(context, info.final_type)
     }
 
     /// Render a type at a use site: named types by name, wrappers inline.

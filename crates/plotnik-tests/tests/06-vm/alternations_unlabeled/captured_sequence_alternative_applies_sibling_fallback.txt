@@ -51,24 +51,24 @@ S10 "comment"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { a }
-T2 = Record  M1:2  ; { grp, b }
-T3 = Record  M3:1  ; { w }
-T4 = Option(T1)  ; QWGrp?
-T5 = Option(T0)  ; <Node>?
+T2 = Option(T1)  ; QWGrp?
+T3 = Option(T0)  ; <Node>?
+T4 = Record  M1:2  ; { grp, b }
+T5 = Record  M3:1  ; { w }
 
 [type_members]
 M0: S01 → T0  ; a: <Node>
-M1: S02 → T4  ; grp: T4
-M2: S03 → T5  ; b: T5
-M3: S04 → T2  ; w: QW
+M1: S02 → T2  ; grp: T2
+M2: S03 → T3  ; b: T3
+M3: S04 → T4  ; w: QW
 
 [type_names]
 N0: S05 → T1  ; QWGrp
-N1: S06 → T2  ; QW
-N2: S07 → T3  ; Q
+N1: S06 → T4  ; QW
+N2: S07 → T5  ; Q
 
 [entrypoints]
-Q = 00 :: T3
+Q = 00 :: T5
 
 [transitions]
 Q:

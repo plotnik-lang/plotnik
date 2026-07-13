@@ -31,20 +31,20 @@ S7 "identifier"
 T0 = <Node>
 T1 = Record  M0:1  ; { a }
 T2 = Variant M1:1  ; A
-T3 = Record  M2:1  ; { e }
-T4 = Option(T2)  ; QE?
+T3 = Option(T2)  ; QE?
+T4 = Record  M2:1  ; { e }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T1  ; A: T1
-M2: S3 → T4  ; e: T4
+M2: S3 → T3  ; e: T3
 
 [type_names]
 N0: S4 → T2  ; QE
-N1: S5 → T3  ; Q
+N1: S5 → T4  ; Q
 
 [entrypoints]
-Q = 00 :: T3
+Q = 00 :: T4
 
 [transitions]
 Q:

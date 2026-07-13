@@ -27,19 +27,19 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Record  M0:2  ; { a, b }
-T3 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = ArrayStar(T0)  ; <Node>*
+T3 = Record  M0:2  ; { a, b }
 
 [type_members]
-M0: S1 → T3  ; a: T3
-M1: S2 → T1  ; b: T1
+M0: S1 → T1  ; a: T1
+M1: S2 → T2  ; b: T2
 
 [type_names]
-N0: S3 → T2  ; Q
+N0: S3 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T3
 
 [transitions]
 Q:

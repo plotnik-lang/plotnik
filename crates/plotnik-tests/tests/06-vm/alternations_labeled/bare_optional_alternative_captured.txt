@@ -34,22 +34,22 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:1  ; { id }
-T2 = Variant M1:1  ; A
-T3 = Record  M2:1  ; { x }
-T4 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { id }
+T3 = Variant M1:1  ; A
+T4 = Record  M2:1  ; { x }
 
 [type_members]
-M0: S1 → T4  ; id: T4
-M1: S2 → T1  ; A: T1
-M2: S3 → T2  ; x: QX
+M0: S1 → T1  ; id: T1
+M1: S2 → T2  ; A: T2
+M2: S3 → T3  ; x: QX
 
 [type_names]
-N0: S4 → T2  ; QX
-N1: S5 → T3  ; Q
+N0: S4 → T3  ; QX
+N1: S5 → T4  ; Q
 
 [entrypoints]
-Q = 00 :: T3
+Q = 00 :: T4
 
 [transitions]
 Q:

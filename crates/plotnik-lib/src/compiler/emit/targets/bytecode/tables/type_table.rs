@@ -25,8 +25,6 @@ pub struct TypeTableBuilder {
     type_members: Vec<TypeMember>,
     /// Type names for named types (4 bytes each).
     type_names: Vec<TypeNameEntry>,
-    /// Cache for dynamically created Option wrappers: base type -> Option(base type).
-    option_wrappers: HashMap<WireTypeId, WireTypeId>,
 }
 
 impl TypeTableBuilder {
@@ -36,7 +34,6 @@ impl TypeTableBuilder {
             type_defs: Vec::new(),
             type_members: Vec::new(),
             type_names: Vec::new(),
-            option_wrappers: HashMap::new(),
         }
     }
 
@@ -75,22 +72,6 @@ impl TypeTableBuilder {
 
         self.type_names.push(entry);
         Ok(())
-    }
-
-    /// Intern an `Option(base_type)` wrapper, deduplicating by base type.
-    pub fn intern_option(&mut self, base_type: WireTypeId) -> Result<WireTypeId, EmitError> {
-        if let Some(&option_id) = self.option_wrappers.get(&base_type) {
-            return Ok(option_id);
-        }
-
-        if self.type_defs.len() >= EmitError::MAX_TYPES {
-            return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
-        }
-
-        let option_id = WireTypeId::from(self.type_defs.len() as u16);
-        self.type_defs.push(TypeDef::option(base_type));
-        self.option_wrappers.insert(base_type, option_id);
-        Ok(option_id)
     }
 
     /// Resolve a query TypeId to its underlying bytecode WireTypeId.

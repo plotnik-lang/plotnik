@@ -38,18 +38,18 @@ S10 "value"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:2  ; { n, v }
-T2 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { n, v }
 
 [type_members]
 M0: S01 → T0  ; n: <Node>
-M1: S02 → T2  ; v: T2
+M1: S02 → T1  ; v: T1
 
 [type_names]
-N0: S03 → T1  ; Q
+N0: S03 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T1
+Q = 00 :: T2
 
 [transitions]
 Q:
