@@ -1,7 +1,7 @@
 //! Bottom-up type inference visitor.
 //!
-//! Traverses the AST and computes PatternShape (Arity + PatternFlow) for each expression.
-//! Reports diagnostics for type errors like strict dimensionality violations.
+//! Traverses the AST and computes `PatternShape` (`RootExtent` plus
+//! `PatternFlow`) for each pattern.
 //!
 //! # Output model
 //!
@@ -36,11 +36,10 @@ use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    Arity, FieldInfo, PatternFlow, PatternShape, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,
-    TypeShape,
+    FieldInfo, PatternFlow, PatternShape, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{
-    BuiltInCaptureType, CaptureFact, FieldFallback, RawCaptureFact, UnionFlowPlan,
+    BuiltInCaptureType, CaptureFact, FieldFallback, RawCaptureFact, RootExtent, UnionFlowPlan,
 };
 
 use crate::compiler::analyze::Located;
@@ -394,12 +393,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_named_node(&mut self, node: &Located<NodePattern>) -> PatternShape {
         let children = node.node().children().map(|child| node.wrap(child));
         let merged = self.collect_child_fields(children);
-        PatternShape::new(Arity::One, self.merged_fields_flow(merged))
+        PatternShape::new(RootExtent::SingleNode, self.merged_fields_flow(merged))
     }
 
     /// Anonymous node (literal or wildcard): matches one position, produces nothing.
     fn infer_anonymous_node(&mut self, _node: &TokenPattern) -> PatternShape {
-        PatternShape::new(Arity::One, PatternFlow::Void)
+        PatternShape::new(RootExtent::SingleNode, PatternFlow::Void)
     }
 
     /// Reference: an opaque boundary producing the definition's result value.
@@ -432,14 +431,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .def_id_for_sym(name_sym)
             .expect("a defined reference has a DefId");
 
-        // Arity is precomputed to a fixpoint before inference, so every
-        // reference — recursive ones included — delegates its target's real
-        // arity and the exactly-one checks stay sound through recursion.
-        let arity = self
+        // Root extent is precomputed to a fixpoint before inference, so every
+        // reference — recursive ones included — delegates its target's extent
+        // and the single-node checks stay sound through recursion.
+        let root_extent = self
             .ctx
             .type_ctx
-            .def_arity(def_id)
-            .expect("def arities are precomputed before inference");
+            .def_root_extent(def_id)
+            .expect("definition root extents are precomputed before inference");
 
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
             // A recursive target's output type stays behind `TypeShape::Ref`
@@ -456,7 +455,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     PatternFlow::Value(ref_type)
                 }
             };
-            return PatternShape::new(arity, flow);
+            return PatternShape::new(root_extent, flow);
         }
 
         let output =
@@ -468,17 +467,17 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         } else {
             PatternFlow::Value(output)
         };
-        PatternShape::new(arity, flow)
+        PatternShape::new(root_extent, flow)
     }
 
-    /// Sequence: Arity aggregation and strict field merging.
+    /// Sequence: root-extent aggregation and strict field merging.
     fn infer_seq_pattern(&mut self, seq: &Located<SeqPattern>) -> PatternShape {
         let children: Vec<Located<Pattern>> = seq.node().children().map(|c| seq.wrap(c)).collect();
 
-        let arity = self.compute_sequence_arity(&children);
+        let root_extent = self.sequence_root_extent(&children);
         let merged = self.collect_child_fields(children.iter().cloned());
 
-        PatternShape::new(arity, self.merged_fields_flow(merged))
+        PatternShape::new(root_extent, self.merged_fields_flow(merged))
     }
 
     /// Merge the bubbling fields of a scope's children. A `Value` child does not
@@ -513,11 +512,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternFlow::Fields(self.ctx.type_ctx.intern_struct(merged))
     }
 
-    fn compute_sequence_arity(&mut self, children: &[Located<Pattern>]) -> Arity {
+    fn sequence_root_extent(&mut self, children: &[Located<Pattern>]) -> RootExtent {
         match children {
-            [] => Arity::One,
-            [child] => self.infer_pattern(child).arity,
-            _ => Arity::Many,
+            [] => RootExtent::SingleNode,
+            [child] => self.infer_pattern(child).root_extent,
+            _ => RootExtent::Other,
         }
     }
 
@@ -538,7 +537,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
         let mut cases: BTreeMap<Symbol, TypeId> = BTreeMap::new();
-        let mut combined_arity = Arity::One;
+        let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
             let label = alternative
@@ -551,7 +550,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             if cases.contains_key(&label_sym) {
                 self.report_duplicate_case_label(label.text_range(), label.text());
                 if let Some(body_info) = self.infer_alternative_body(alternation, &alternative) {
-                    combined_arity = combined_arity.combine(body_info.arity);
+                    combined_extent = combined_extent.combine(body_info.root_extent);
                 }
                 continue;
             }
@@ -562,12 +561,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 continue;
             };
 
-            combined_arity = combined_arity.combine(body_info.arity);
+            combined_extent = combined_extent.combine(body_info.root_extent);
             cases.insert(label_sym, case_payload_type(&body_info.flow));
         }
 
         let variant_type = self.ctx.type_ctx.intern_type(TypeShape::Variant(cases));
-        PatternShape::new(combined_arity, PatternFlow::Value(variant_type))
+        PatternShape::new(combined_extent, PatternFlow::Value(variant_type))
     }
 
     fn infer_labeled_alternation_discarded(
@@ -576,16 +575,16 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ) -> PatternShape {
         self.check_duplicate_labels(alternation);
 
-        let mut combined_arity = Arity::One;
+        let mut combined_extent = RootExtent::SingleNode;
         for alternative in alternation.node().alternatives() {
             let Some(body) = alternative.body() else {
                 continue;
             };
             let body_info = self.infer_pattern_discarded(&alternation.wrap(body));
-            combined_arity = combined_arity.combine(body_info.arity);
+            combined_extent = combined_extent.combine(body_info.root_extent);
         }
 
-        PatternShape::new(combined_arity, PatternFlow::Void)
+        PatternShape::new(combined_extent, PatternFlow::Void)
     }
 
     /// In a fields context, labels have no output effect. Warn, then merge the
@@ -598,11 +597,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         self.report_unused_alternative_labels(alternation.node());
 
         let mut flows: Vec<PatternFlow> = Vec::new();
-        let mut combined_arity = Arity::One;
+        let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
             if let Some(body_info) = self.infer_alternative_body(alternation, &alternative) {
-                combined_arity = combined_arity.combine(body_info.arity);
+                combined_extent = combined_extent.combine(body_info.root_extent);
                 flows.push(body_info.flow);
             }
         }
@@ -610,7 +609,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let pattern = Pattern::Alternation(alternation.node().clone());
         let unified_flow = self.unify_alternation(pattern, flows);
 
-        PatternShape::new(combined_arity, unified_flow)
+        PatternShape::new(combined_extent, unified_flow)
     }
 
     fn check_duplicate_labels(&mut self, alternation: &Located<AlternationPattern>) {
@@ -647,26 +646,26 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
         let mut flows: Vec<PatternFlow> = Vec::new();
-        let mut combined_arity = Arity::One;
+        let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
             if let Some(body) = alternative.body() {
                 let info = self.infer_pattern(&alternation.wrap(body));
-                combined_arity = combined_arity.combine(info.arity);
+                combined_extent = combined_extent.combine(info.root_extent);
                 flows.push(info.flow);
             }
         }
 
         for pattern in alternation.node().patterns() {
             let info = self.infer_pattern(&alternation.wrap(pattern));
-            combined_arity = combined_arity.combine(info.arity);
+            combined_extent = combined_extent.combine(info.root_extent);
             flows.push(info.flow);
         }
 
         let pattern = Pattern::Alternation(alternation.node().clone());
         let unified_flow = self.unify_alternation(pattern, flows);
 
-        PatternShape::new(combined_arity, unified_flow)
+        PatternShape::new(combined_extent, unified_flow)
     }
 
     fn unify_alternation(&mut self, pattern: Pattern, flows: Vec<PatternFlow>) -> PatternFlow {
@@ -703,7 +702,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 }
                 Some(i) => self.infer_pattern_discarded(&cap.wrap(i)),
             };
-            return PatternShape::new(info.arity, PatternFlow::Void);
+            return PatternShape::new(info.root_extent, PatternFlow::Void);
         }
 
         let Some(name_tok) = node.name() else {
@@ -734,7 +733,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 );
             }
             return PatternShape::new(
-                Arity::One,
+                RootExtent::SingleNode,
                 PatternFlow::Fields(self.ctx.type_ctx.intern_single_field(capture_name, field)),
             );
         };
@@ -752,7 +751,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if !matches!(inner.node(), Pattern::QuantifiedPattern(_))
             && !self.report_capture_on_void_ref(inner.node(), &inner_info)
         {
-            self.report_capture_on_multi_node_void(inner.node(), &inner_info);
+            self.report_capture_without_single_node(inner.node(), &inner_info);
         }
 
         // Only the `Node` mechanism captures the matched node and lets the inner's
@@ -783,7 +782,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // invalidate their raw contract.
         let inner_has_capture_error = !matches!(inner.node(), Pattern::QuantifiedPattern(_))
             && inner_info.flow.is_void()
-            && (inner_info.arity == Arity::Many || matches!(inner.node(), Pattern::DefRef(_)));
+            && (inner_info.root_extent == RootExtent::Other
+                || matches!(inner.node(), Pattern::DefRef(_)));
         let owned_inner_error = mechanism != CaptureKind::Node
             && self.ctx.diag.error_count() != errors_before_raw_capture;
         let raw_capture_valid =
@@ -816,7 +816,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
         let flow = destination.finish(self.ctx.type_ctx, capture_name, field_info);
 
-        PatternShape::new(inner_info.arity, flow)
+        PatternShape::new(inner_info.root_extent, flow)
     }
 
     /// `:: TypeName` — name a structured capture or alias its semantic leaf.
@@ -1142,9 +1142,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
         };
 
-        // One match of a quantified pattern spans a variable range of sibling
-        // positions — never "exactly one node", whatever the inner's arity.
-        PatternShape::new(Arity::Many, flow)
+        // One match of a quantified pattern has variable top-level extent,
+        // regardless of its element's extent.
+        PatternShape::new(RootExtent::Other, flow)
     }
 
     fn check_quantified_array_dimensionality(
@@ -1307,7 +1307,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    /// Field expression: arity One, delegates type to value.
+    /// A grammar-field constraint occupies one child position and delegates its
+    /// result flow to the constrained pattern.
     fn infer_field_pattern_in(
         &mut self,
         field: &Located<FieldPattern>,
@@ -1331,12 +1332,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // of those — and a value matching many nodes never is either.
         let core = Self::field_value_core(value.node());
         if matches!(core, Pattern::SeqPattern(_))
-            || self.core_arity(&core, &value_info) == Arity::Many
+            || self.core_root_extent(&core, &value_info) == RootExtent::Other
         {
-            self.report_field_arity_error(field.node(), value.node());
+            self.report_field_requires_single_node(field.node(), value.node());
         }
 
-        PatternShape::new(Arity::One, value_info.flow)
+        PatternShape::new(RootExtent::SingleNode, value_info.flow)
     }
 
     /// The field value under its capture/quantifier wrappers. `f: (x)* @c`
@@ -1357,15 +1358,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    /// The arity of an already-inferred field-value core; its result is cached
-    /// from inferring the value.
-    fn core_arity(&self, core: &Pattern, value_info: &PatternShape) -> Arity {
+    /// The root extent of an already-inferred field-value core. Its result was
+    /// cached while inferring the value.
+    fn core_root_extent(&self, core: &Pattern, value_info: &PatternShape) -> RootExtent {
         self.ctx
             .type_ctx
             .in_progress()
             .pattern_result(core)
-            .map(|info| info.arity)
-            .unwrap_or(value_info.arity)
+            .map(|info| info.root_extent)
+            .unwrap_or(value_info.root_extent)
     }
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
@@ -1430,7 +1431,7 @@ pub(super) struct InferPassEnv<'a, 'd> {
 /// recomputes them.
 pub(super) struct StructuralFacts {
     nullable_defs: HashSet<DefId>,
-    def_arities: HashMap<DefId, Arity>,
+    definition_root_extents: HashMap<DefId, RootExtent>,
 }
 
 impl StructuralFacts {
@@ -1441,7 +1442,7 @@ impl StructuralFacts {
     ) -> Self {
         Self {
             nullable_defs: compute_nullable_defs(interner, symbol_table, dependency_analysis),
-            def_arities: super::def_arity::compute_def_arities(
+            definition_root_extents: super::root_extent::compute_definition_root_extents(
                 interner,
                 symbol_table,
                 dependency_analysis,
@@ -1472,11 +1473,11 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 
     pub fn run(mut self) -> TypeAnalysisBuilder {
-        // Definition arities are a syntactic fixpoint, computed up front so
-        // that references always report their target's real arity —
-        // recursion included. Only output *types* need SCC deferral.
-        for (&def_id, &arity) in &self.analysis.structural_facts.def_arities {
-            self.ctx.record_def_arity(def_id, arity);
+        // Definition root extents are a syntactic fixpoint, computed up front
+        // so references always report their target's real extent, including
+        // through recursion. Only output types need SCC deferral.
+        for (&def_id, &extent) in &self.analysis.structural_facts.definition_root_extents {
+            self.ctx.record_def_root_extent(def_id, extent);
         }
 
         // Definition identity (names, DefIds) is owned by DependencyAnalysis and
@@ -1573,11 +1574,11 @@ impl<'a, 'd> InferPass<'a, 'd> {
 
         let precomputed = self
             .ctx
-            .def_arity(def_id)
-            .expect("def arities are precomputed before inference");
+            .def_root_extent(def_id)
+            .expect("definition root extents are precomputed before inference");
         assert_eq!(
-            info.arity, precomputed,
-            "def-arity pre-pass must agree with inference",
+            info.root_extent, precomputed,
+            "definition root-extent pre-pass must agree with inference",
         );
     }
 }

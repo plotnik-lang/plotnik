@@ -6,7 +6,7 @@
 //! child it matches) or by a **gap edge** (a self-loop the anchor context lets it
 //! skip). Reaching an accept state means the production's children realize what `p`
 //! demands. Quantifiers become loops, alternations become parallel branches, and a
-//! nested sequence inlines its items — no collapsing, so arity is exact.
+//! nested sequence inlines its items, so child arity remains exact.
 //!
 //! The construction reuses `AnchorSemantics` verbatim, so the gap classes the checker
 //! reasons over are the same navs codegen emits.

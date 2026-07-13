@@ -1,7 +1,7 @@
 //! `TypeAnalysis`: the frozen result of type inference.
 //!
-//! Holds the interned type registry, each definition's output type and arity,
-//! the per-pattern inference results, and explicit type aliases. It is built
+//! Holds the interned type registry, each definition's output type and root
+//! extent, the per-pattern inference results, and explicit type aliases. It is built
 //! incrementally by [`TypeAnalysisBuilder`] and frozen with
 //! [`TypeAnalysisBuilder::finish`]; past that boundary it is immutable and its
 //! accessors are trusted (a structural miss is a compiler bug, not a query
@@ -17,10 +17,10 @@ use crate::compiler::analyze::types::raw_output::{
     RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    Arity, FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId,
+    FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId,
     TypeShape,
 };
-use crate::compiler::analyze::types::{CaptureFact, UnionFlowPlan};
+use crate::compiler::analyze::types::{CaptureFact, RootExtent, UnionFlowPlan};
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
@@ -53,10 +53,9 @@ pub struct TypeAnalysis {
     /// consistent.
     pub(super) def_output: BTreeMap<DefId, TypeId>,
 
-    /// Each definition's structural arity. `Arity::One` definitions are
-    /// callable entrypoints; `Arity::Many` definitions are fragments that can be
-    /// referenced or nested but get no top-level entry surface.
-    def_arity: BTreeMap<DefId, Arity>,
+    /// Each definition's static top-level extent. `SingleNode` definitions are
+    /// selectable as entry points; all others remain reusable fragments.
+    def_root_extent: BTreeMap<DefId, RootExtent>,
 
     pub(super) pattern_result: HashMap<Pattern, PatternShape>,
 
@@ -156,8 +155,10 @@ impl TypeAnalysis {
             .expect("admitted union flow must have an explicit fallback plan")
     }
 
-    pub fn arity(&self, pattern: &Pattern) -> Option<Arity> {
-        self.pattern_result.get(pattern).map(|info| info.arity)
+    pub fn root_extent(&self, pattern: &Pattern) -> Option<RootExtent> {
+        self.pattern_result
+            .get(pattern)
+            .map(|info| info.root_extent)
     }
 
     pub fn def_output(&self, def_id: DefId) -> Option<TypeId> {
@@ -169,17 +170,17 @@ impl TypeAnalysis {
             .expect("admitted definition must have an inferred output type")
     }
 
-    pub fn def_arity(&self, def_id: DefId) -> Option<Arity> {
-        self.def_arity.get(&def_id).copied()
+    pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
+        self.def_root_extent.get(&def_id).copied()
     }
 
-    pub fn expect_def_arity(&self, def_id: DefId) -> Arity {
-        self.def_arity(def_id)
-            .expect("admitted definition must have an inferred arity")
+    pub fn expect_def_root_extent(&self, def_id: DefId) -> RootExtent {
+        self.def_root_extent(def_id)
+            .expect("admitted definition must have an inferred root extent")
     }
 
-    pub fn is_entrypoint_def(&self, def_id: DefId) -> bool {
-        self.expect_def_arity(def_id) == Arity::One
+    pub fn is_selectable_definition(&self, def_id: DefId) -> bool {
+        self.expect_def_root_extent(def_id) == RootExtent::SingleNode
     }
 
     /// Follow a `Ref` chain to the underlying materialized type; non-ref types
@@ -206,10 +207,10 @@ impl TypeAnalysis {
         self.def_output.iter().map(|(&id, &type_id)| (id, type_id))
     }
 
-    /// Iterate over callable definition outputs in definition order.
-    pub fn iter_entrypoint_output(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
+    /// Iterate over selectable definition outputs in definition order.
+    pub fn iter_entry_point_outputs(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
         self.iter_def_output()
-            .filter(|&(def_id, _)| self.is_entrypoint_def(def_id))
+            .filter(|&(def_id, _)| self.is_selectable_definition(def_id))
     }
 
     /// Iterate all named types in `TypeId` order (deterministic).
@@ -258,19 +259,19 @@ impl TypeAnalysis {
 
         assert_eq!(
             self.def_output.len(),
-            self.def_arity.len(),
-            "definition output and arity tables must cover the same definitions",
+            self.def_root_extent.len(),
+            "definition output and root-extent tables must cover the same definitions",
         );
         for def_id in self.def_output.keys() {
             assert!(
-                self.def_arity.contains_key(def_id),
-                "every definition output must have an inferred arity",
+                self.def_root_extent.contains_key(def_id),
+                "every definition output must have an inferred root extent",
             );
         }
-        for def_id in self.def_arity.keys() {
+        for def_id in self.def_root_extent.keys() {
             assert!(
                 self.def_output.contains_key(def_id),
-                "every definition arity must have an inferred output",
+                "every definition root extent must have an inferred output",
             );
         }
 
@@ -372,7 +373,7 @@ impl TypeAnalysisBuilder {
             analysis: TypeAnalysis {
                 types: Vec::new(),
                 def_output: BTreeMap::new(),
-                def_arity: BTreeMap::new(),
+                def_root_extent: BTreeMap::new(),
                 pattern_result: HashMap::new(),
                 capture_facts: HashMap::new(),
                 union_flow: HashMap::new(),
@@ -569,12 +570,12 @@ impl TypeAnalysisBuilder {
         graph.finish().normalize(self, interner, diagnostics);
     }
 
-    pub fn record_def_arity(&mut self, def_id: DefId, arity: Arity) {
-        self.analysis.def_arity.insert(def_id, arity);
+    pub fn record_def_root_extent(&mut self, def_id: DefId, extent: RootExtent) {
+        self.analysis.def_root_extent.insert(def_id, extent);
     }
 
-    pub fn def_arity(&self, def_id: DefId) -> Option<Arity> {
-        self.analysis.def_arity(def_id)
+    pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
+        self.analysis.def_root_extent(def_id)
     }
 
     /// Install the naming pass's result. Names must be complete and validated

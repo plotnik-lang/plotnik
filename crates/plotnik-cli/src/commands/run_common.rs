@@ -186,7 +186,7 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
         plotnik_lib::BytecodeConfig::new()
     };
     let module = super::compile::emit_module(&compiled, config, input.color)?;
-    // Queries conventionally put the top-level callable definition last.
+    // Queries conventionally put the preferred selectable definition last.
     let default_entry = module.entrypoint_names().last().map(str::to_owned);
 
     let entry = input

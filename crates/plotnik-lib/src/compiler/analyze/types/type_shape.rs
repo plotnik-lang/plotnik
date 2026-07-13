@@ -1,8 +1,8 @@
 //! Core type definitions for the type checking pass.
 //!
 //! The type system tracks two orthogonal properties:
-//! - Arity: Whether an expression matches one or many node positions.
-//! - PatternFlow: What data flows through an expression.
+//! - Root extent: whether a match has exactly one top-level node.
+//! - Pattern flow: what result data flows through an expression.
 
 use std::collections::BTreeMap;
 
@@ -11,7 +11,7 @@ pub use crate::compiler::ids::TypeId;
 use crate::compiler::ids::DefId;
 use crate::core::Symbol;
 
-pub use crate::bytecode::type_system::Arity;
+use super::RootExtent;
 use crate::bytecode::type_system::PrimitiveType;
 pub use crate::compiler::parse::ast::QuantifierKind;
 
@@ -159,23 +159,23 @@ impl PatternFlow {
     }
 }
 
-/// Combined arity and type flow information for an expression.
+/// Combined root extent and result flow for a pattern.
 #[derive(Clone, Debug)]
 pub struct PatternShape {
-    /// How many times this expression matches (one vs many).
-    pub arity: Arity,
+    /// Whether one match has exactly one top-level syntax-tree node.
+    pub root_extent: RootExtent,
     /// What data flows through this expression.
     pub flow: PatternFlow,
 }
 
 impl PatternShape {
-    pub fn new(arity: Arity, flow: PatternFlow) -> Self {
-        Self { arity, flow }
+    pub fn new(root_extent: RootExtent, flow: PatternFlow) -> Self {
+        Self { root_extent, flow }
     }
 
     pub fn void() -> Self {
         Self {
-            arity: Arity::One,
+            root_extent: RootExtent::SingleNode,
             flow: PatternFlow::Void,
         }
     }

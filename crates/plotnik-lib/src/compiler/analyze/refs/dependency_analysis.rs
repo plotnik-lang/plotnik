@@ -31,7 +31,7 @@ pub struct DependencyAnalysis {
 ///
 /// The graph is indexed by `DefId`, just like `defs`. Keeping this behavior here
 /// gives lowering, schema projection, and inspection one authoritative notion of
-/// which definition bodies a callable root can demand.
+/// which definition bodies a selectable root can demand.
 #[derive(Clone, Debug)]
 pub(in crate::compiler::analyze::refs) struct DefinitionDependencies {
     outgoing: Vec<Vec<DefId>>,

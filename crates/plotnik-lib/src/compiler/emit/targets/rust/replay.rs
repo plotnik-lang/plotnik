@@ -162,7 +162,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
                     self.parse_impl(&mut out, &def, item);
                 }
                 ReplayItemKind::Alias(_) => {
-                    unreachable!("callable definitions are nominal or void")
+                    unreachable!("selectable definitions are nominal or match-only")
                 }
                 ReplayItemKind::VoidDefinition => self.matches_impl(&mut out, &def, item),
             }

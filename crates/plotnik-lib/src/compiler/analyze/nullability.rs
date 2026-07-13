@@ -9,8 +9,8 @@
 //! split-exit machinery gives the skip path its own continuation
 //! (see `compile_ref_inline` in the lowering).
 //!
-//! Mirrors the `def_arity` pre-pass: a fixpoint over the definition graph in
-//! reverse-topological SCC order, so lowering never guesses.
+//! Mirrors the definition root-extent pre-pass: a fixpoint over the definition
+//! graph in reverse-topological SCC order, so lowering never guesses.
 
 use std::collections::HashSet;
 
@@ -68,13 +68,14 @@ pub(crate) fn pattern_nullable(
 ) -> bool {
     match pattern {
         Pattern::NodePattern(_) | Pattern::TokenPattern(_) => false,
-        // A nullable value would have arity Many, which field values reject
+        // A nullable value has `RootExtent::Other`, which field values reject
         // upstream ("field cannot match a sequence") — mirror that verdict.
         Pattern::FieldPattern(_) => false,
         Pattern::QuantifiedPattern(q) => {
             let Some(inner) = q.inner() else {
                 // Recovery stub with no inner: void, never admitted for
-                // execution — matches `def_arity`'s One recovery.
+                // execution — matches the root-extent pass's `SingleNode`
+                // recovery.
                 return false;
             };
             match q.quantifier_kind() {

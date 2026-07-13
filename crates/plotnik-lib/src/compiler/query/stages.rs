@@ -9,7 +9,7 @@ use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
 use crate::compiler::analyze::types::check_entrypoints;
-use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
+use crate::compiler::analyze::types::type_check::{self, RootExtent, TypeAnalysis};
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::emit::{
     BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
@@ -245,31 +245,25 @@ impl Query {
         self.analysis.is_some() && !self.parsed.diag.has_errors()
     }
 
-    pub(crate) fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
+    pub(crate) fn root_extent(&self, node: &SyntaxNode) -> Option<RootExtent> {
         let analysis = self.analysis.as_ref()?;
 
         use crate::compiler::parse::ast;
 
         if let Some(pattern) = ast::Pattern::cast(node.clone()) {
-            return analysis.type_analysis.arity(&pattern);
-        }
-
-        if let Some(root) = ast::Root::cast(node.clone()) {
-            return Some(if root.defs().nth(1).is_some() {
-                Arity::Many
-            } else {
-                Arity::One
-            });
+            return analysis.type_analysis.root_extent(&pattern);
         }
 
         if let Some(def) = ast::Def::cast(node.clone()) {
-            return def.body().and_then(|b| analysis.type_analysis.arity(&b));
+            return def
+                .body()
+                .and_then(|body| analysis.type_analysis.root_extent(&body));
         }
 
         if let Some(alternative) = ast::Alternative::cast(node.clone()) {
             return alternative
                 .body()
-                .and_then(|body| analysis.type_analysis.arity(&body));
+                .and_then(|body| analysis.type_analysis.root_extent(&body));
         }
 
         None
@@ -579,7 +573,7 @@ impl CompiledQuery {
         self.bound.bound().into_iter().flat_map(|bound| {
             bound
                 .type_analysis()
-                .iter_entrypoint_output()
+                .iter_entry_point_outputs()
                 .map(|(definition, _)| {
                     bound
                         .interner()

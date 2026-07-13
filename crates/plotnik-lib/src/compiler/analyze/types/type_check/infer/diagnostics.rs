@@ -1,6 +1,7 @@
 use rowan::TextRange;
 
-use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape};
+use crate::compiler::analyze::types::RootExtent;
+use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape};
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
@@ -13,7 +14,11 @@ use super::super::unify::UnifyError;
 use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
-    pub(super) fn report_field_arity_error(&mut self, field: &FieldPattern, value: &Pattern) {
+    pub(super) fn report_field_requires_single_node(
+        &mut self,
+        field: &FieldPattern,
+        value: &Pattern,
+    ) {
         let field_name = field
             .name()
             .map(|t| t.text().to_string())
@@ -47,7 +52,8 @@ impl InferVisitor<'_, '_> {
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
     ) {
-        let is_multi_element_scalar = inner_info.arity == Arity::Many && inner_info.flow.is_void();
+        let is_multi_element_scalar =
+            inner_info.root_extent == RootExtent::Other && inner_info.flow.is_void();
         if !is_multi_element_scalar {
             return;
         }
@@ -81,12 +87,12 @@ impl InferVisitor<'_, '_> {
     /// whether several or possibly none, there is no single node to bind.
     /// Without this, the capture would silently bind an arbitrary node (or one
     /// per repeat), or dangle on a zero-width match.
-    pub(super) fn report_capture_on_multi_node_void(
+    pub(super) fn report_capture_without_single_node(
         &mut self,
         inner: &Pattern,
         inner_info: &PatternShape,
     ) {
-        if inner_info.arity != Arity::Many || !inner_info.flow.is_void() {
+        if inner_info.root_extent != RootExtent::Other || !inner_info.flow.is_void() {
             return;
         }
 

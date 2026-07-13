@@ -11,7 +11,7 @@ do not appear in this table.
 - **Section Offset**: Computed (follows TypeNames)
 - **Record Size**: 8 bytes
 - **Count**: `header.entrypoints_count`
-- **Ordering**: Definition order, after filtering to callable definitions. This
+- **Ordering**: Definition order, after filtering to selectable definitions. This
   order is also the CLI defaulting order: without `--entry`, the last entry is
   selected.
 
@@ -29,7 +29,7 @@ struct Entrypoint {
 
 ### Fields
 
-- **name**: The callable definition name (e.g., "Func", "Class"). `StringId`.
+- **name**: The selectable definition name (e.g., "Func", "Class"). `StringId`.
 - **target**: The instruction pointer (`StepAddr`) where execution begins for
   this definition. It points at the definition's entrypoint wrapper in the
   **Transitions** section.

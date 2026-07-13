@@ -16,21 +16,21 @@ fn printer_with_spans() {
 }
 
 #[test]
-fn printer_with_arities() {
+fn printer_with_root_extents() {
     let input = "Q = (call)";
     let q = Query::expect(input);
 
-    let res = q.printer().with_arities(true).dump();
+    let res = q.printer().with_root_extents(true).dump();
 
     insta::assert_snapshot!(res, @r"
-    Root¹
+    Root
       Def¹ Q
         NamedNode¹ call
     ");
 }
 
 #[test]
-fn printer_symbols_with_arities() {
+fn printer_symbols_with_root_extents() {
     let input = indoc! {r#"
         A = (a)
         B = {(b) (c)}
@@ -38,14 +38,18 @@ fn printer_symbols_with_arities() {
     "#};
     let q = Query::expect(input);
 
-    let res = q.printer().definitions_only(true).with_arities(true).dump();
+    let res = q
+        .printer()
+        .definitions_only(true)
+        .with_root_extents(true)
+        .dump();
 
     insta::assert_snapshot!(res, @r"
     A¹
-    B⁺
+    B≠¹
     Q¹
       A¹
-      B⁺
+      B≠¹
     ");
 }
 

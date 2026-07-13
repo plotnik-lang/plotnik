@@ -276,7 +276,7 @@ plotnik run query.ptk app.js --max-steps unbounded
 | `-s, --source` | Inline source text                      |
 | `-l, --lang`   | Language (inferred from file ext)       |
 | `--compact`    | Output compact JSON                     |
-| `--entry NAME` | Start from specific callable definition |
+| `--entry NAME` | Select a specific selectable definition |
 | `--max-steps`  | Work limit (see Execution Limits)       |
 | `--max-memory` | Memory limit (see Execution Limits)     |
 | `--limits`     | Limit preset (`auto`/`unbounded`)       |
@@ -315,7 +315,7 @@ plotnik trace query.ptk app.js -vv  # very verbose
 | `--max-steps`  | Work limit (see Execution Limits)       |
 | `--max-memory` | Memory limit (see Execution Limits)     |
 | `--limits`     | Limit preset (`auto`/`unbounded`)       |
-| `--entry`      | Start from specific callable definition |
+| `--entry`      | Select a specific selectable definition |
 
 ---
 
@@ -341,7 +341,7 @@ plotnik inspect query.ptk app.js --json -v
 | -------------- | --------------------------------------- |
 | `--json`       | Output the full inspect bundle as JSON  |
 | `-v`           | Include VM recording in the JSON bundle |
-| `--entry NAME` | Start from specific callable definition |
+| `--entry NAME` | Select a specific selectable definition |
 | `--max-steps`  | Work limit (see Execution Limits)       |
 | `--max-memory` | Memory limit (see Execution Limits)     |
 | `--limits`     | Limit preset (`auto`/`unbounded`)       |

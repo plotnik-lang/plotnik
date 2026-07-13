@@ -37,7 +37,7 @@ pub use instructions::{EncodeError, StepAddr};
 pub use module::{EntrypointsView, Module, StringsView, TypesView};
 pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
-pub use type_system::{Arity, PrimitiveType, TypeKind};
+pub use type_system::{PrimitiveType, TypeKind};
 
 pub(crate) use constants::{
     HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SPANS,

@@ -79,7 +79,7 @@ impl InferVisitor<'_, '_> {
                             self.in_progress_target_shape(&inner, registration_order, captor_order)
                             && !self.report_capture_on_void_ref(&inner, &shape)
                         {
-                            self.report_capture_on_multi_node_void(&inner, &shape);
+                            self.report_capture_without_single_node(&inner, &shape);
                         }
                     }
                     Pattern::QuantifiedPattern(q) => {
@@ -162,17 +162,17 @@ impl InferVisitor<'_, '_> {
             .in_progress()
             .def_output(def_id)
             .expect("SCC is fully inferred before the re-check");
-        let arity = self
+        let root_extent = self
             .ctx
             .type_ctx
-            .def_arity(def_id)
-            .expect("def arities are precomputed before inference");
+            .def_root_extent(def_id)
+            .expect("definition root extents are precomputed before inference");
         let flow = if output == TYPE_VOID {
             PatternFlow::Void
         } else {
             let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
             PatternFlow::Value(ref_type)
         };
-        Some(PatternShape::new(arity, flow))
+        Some(PatternShape::new(root_extent, flow))
     }
 }

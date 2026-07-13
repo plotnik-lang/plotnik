@@ -58,7 +58,7 @@ impl<'q> GrammarBindInput<'_, 'q> {
             binder.bind(source_id, root);
         }
 
-        // The satisfiability check (sequence/anchor/arity) runs only on a query the
+        // The satisfiability check (sequence, anchor, and grammar arity) runs only on a query the
         // structural check left clean: it adds rejections those checks cannot see, and
         // gating keeps it from piling onto an impossibility already pinned precisely.
         if diagnostics.has_errors() {

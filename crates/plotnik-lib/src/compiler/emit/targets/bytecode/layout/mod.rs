@@ -12,7 +12,7 @@ use crate::compiler::lower::ir::{Label, NfaGraph};
 /// Assign a cache-aligned step address to every label.
 pub fn compute_layout(ir: &NfaGraph) -> Result<LayoutMap, EmitError> {
     let entry_labels: Vec<Label> = ir.entrypoint_wrappers().values().copied().collect();
-    // With no callable definitions, no VM can enter this module. Fragment-only
+    // With no selectable definitions, no VM can enter this module. Fragment-only
     // definitions still contribute type metadata, but their transitions are
     // unreachable and would otherwise make an arbitrary label occupy sentinel
     // step 0.

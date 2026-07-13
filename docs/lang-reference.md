@@ -112,7 +112,7 @@ Stmt = (statement) @stmt
 Definitions whose root matches exactly one node are entrypoints. Sequence- and
 quantifier-rooted definitions are fragments: they can be referenced or captured
 inside an entrypoint, but `--entry <Name>` cannot select them directly. With no
-`--entry`, the last callable definition runs by default.
+`--entry`, the last selectable definition runs by default.
 
 ### Script vs Module Mode
 
@@ -151,9 +151,9 @@ Set with `-l/--lang` or a shebang (`#!/usr/bin/env -S plotnik run -l <language>`
 
 ### Execution
 
-- Single callable definition: it is the default entrypoint.
-- Multiple callable definitions: the **last callable** definition is the default entrypoint; pass `--entry <Name>` to run a different one.
-- Fragment definitions are not entrypoint candidates; nest or reference them from a callable definition.
+- One selectable definition: it is the default entry point.
+- Multiple selectable definitions: the **last selectable definition** is the default entry point; pass `--entry <Name>` to run a different one.
+- Fragment definitions cannot be selected as entry points; nest or reference them from a selectable definition.
 
 ### Example
 

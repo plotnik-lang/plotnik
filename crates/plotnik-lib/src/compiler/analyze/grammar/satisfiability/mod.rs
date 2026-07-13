@@ -1,8 +1,8 @@
-//! Sequence, anchor, and arity satisfiability.
+//! Sequence, anchor, and grammar-arity satisfiability.
 //!
 //! The structural check (`../check.rs`) validates each query position in isolation —
 //! kind exists, field is on the node, child kind is admissible. It is order-,
-//! adjacency-, and arity-blind, so `(function_declaration .! (identifier))` and
+//! adjacency- and grammar-arity-blind, so `(function_declaration .! (identifier))` and
 //! `(array (statement))` slip through. This pass closes that gap: it threads the
 //! grammar's productions through a per-query-node child automaton (`automaton.rs`)
 //! under a least fixed point (`engine.rs`), and rejects a query node exactly when no

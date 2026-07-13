@@ -1,10 +1,9 @@
 //! Unified type checking pass.
 //!
-//! Computes both structural arity (for field validation) and data flow types
-//! (for TypeScript emission) in a single traversal.
+//! Computes static root extent and result flow in one traversal.
 
-mod def_arity;
 mod infer;
+mod root_extent;
 mod unify;
 
 #[cfg(test)]
@@ -12,8 +11,8 @@ mod analysis_tests;
 #[cfg(test)]
 mod unify_tests;
 
+pub use crate::compiler::analyze::types::RootExtent;
 pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
-pub use crate::compiler::analyze::types::type_shape::Arity;
 pub use crate::core::Interner;
 pub(crate) use infer::definition_value_root;
 

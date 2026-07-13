@@ -81,7 +81,7 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
         input
             .analysis
             .type_analysis
-            .iter_entrypoint_output()
+            .iter_entry_point_outputs()
             .map(|(def_id, _)| def_id),
     );
     let mut candidates = Vec::new();

@@ -489,8 +489,8 @@ impl NfaBuilder<'_> {
     ) -> Label {
         let def_id = self.resolve_ref_def_id(r);
         if self.nullable_defs.contains(&def_id) {
-            // A nullable body has arity Many, which field values reject
-            // upstream ("field cannot match a sequence").
+            // A nullable body has `RootExtent::Other`, which field values
+            // reject upstream ("field cannot match a sequence").
             assert!(
                 field_override.is_none(),
                 "field-constrained reference to a nullable definition must be rejected by analysis"

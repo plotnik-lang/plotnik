@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
 use super::representation::TypeFacts;
+use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 use crate::compiler::analyze::types::type_shape::{
-    Arity, FieldInfo, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    FieldInfo, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::Interner;
@@ -18,7 +19,7 @@ struct Fixture {
 
 fn record_def(builder: &mut TypeAnalysisBuilder, def_id: DefId, type_id: TypeId) {
     builder.record_def_output(def_id, type_id);
-    builder.record_def_arity(def_id, Arity::One);
+    builder.record_def_root_extent(def_id, RootExtent::SingleNode);
 }
 
 fn borrows_any(facts: &TypeFacts, ty: TypeId) -> bool {

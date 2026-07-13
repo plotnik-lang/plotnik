@@ -396,7 +396,7 @@ fn render_compile(
             let entry = module
                 .entrypoint_names()
                 .last()
-                .ok_or_else(|| "06-vm fixture produced no callable entrypoints".to_string())?
+                .ok_or_else(|| "06-vm fixture produced no selectable entry points".to_string())?
                 .to_string();
             let run = run_vm(VmScenario {
                 lang: &lang,

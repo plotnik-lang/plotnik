@@ -1,7 +1,8 @@
 //! Dead code elimination pass.
 //!
 //! Removes unreachable instructions and definition variants after epsilon
-//! elimination. Reachability starts at callable wrappers; a call reaches both
+//! elimination. Reachability starts at wrappers for exported entry points; a
+//! call reaches both
 //! its return continuations and its callee body.
 
 use std::collections::HashSet;

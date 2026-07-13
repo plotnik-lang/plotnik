@@ -29,7 +29,7 @@ pub fn build_type_table(
 
 /// Build the type table, remapping query TypeIds to bytecode ids.
 ///
-/// Types reachable from callable definition outputs are emitted. This keeps
+/// Types reachable from selectable definition outputs are emitted. This keeps
 /// demanded fragment capture scopes available to matcher bodies without
 /// shipping unused fragments. Dead inference intermediates — a union
 /// alternation's per-branch merge structs, for instance — are also pruned.
@@ -104,7 +104,8 @@ fn emit_type_names(
     // The naming pass is the single source of names: definition results,
     // path-generated composites, and custom `:: TypeName` capture types, in `TypeId`
     // (deterministic) order. Naming covers the whole analyzed query; output
-    // layout deliberately keeps only names whose types survive callable-root
+    // layout deliberately keeps only names whose types survive selectable
+    // definition roots
     // reachability.
     for (type_id, name_sym) in schema.iter_type_names() {
         if !schema.type_layout().contains(type_id) {

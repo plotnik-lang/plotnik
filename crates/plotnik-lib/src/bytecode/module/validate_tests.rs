@@ -85,7 +85,7 @@ fn assert_linear_body_analyses(stage: &str, analyses: usize) {
 
 #[test]
 fn many_callable_definitions_load_without_global_fixpoint_rescans() {
-    // Every callable definition emits both a wrapper and a called body. This
+    // Every selectable definition emits both a wrapper and a called body. This
     // shape used to spend quadratic time deduplicating roots and repeatedly
     // rescanning the whole definition set as body summaries became known.
     let mut query = String::new();

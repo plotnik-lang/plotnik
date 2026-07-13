@@ -32,7 +32,7 @@ pub(crate) enum OutputItemKind {
     Struct,
     Variant,
     Alias,
-    /// A callable void definition has a nominal marker and a `matches` API,
+    /// A selectable match-only definition has a nominal marker and a `matches` API,
     /// but no replay value.
     VoidDef,
 }
@@ -282,7 +282,7 @@ impl<'a> OutputSchema<'a> {
         interner: &'a Interner,
     ) -> Result<Self, OutputSchemaError> {
         let reachable_defs =
-            deps.reachable_from(types.iter_entrypoint_output().map(|(def_id, _)| def_id));
+            deps.reachable_from(types.iter_entry_point_outputs().map(|(def_id, _)| def_id));
         let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
         let capture_layout = CaptureLayout::build(types, &collected_types.custom)?;
         let mut type_names: BTreeMap<TypeId, Symbol> = types.iter_type_names().collect();
@@ -328,7 +328,7 @@ impl<'a> OutputSchema<'a> {
             .map(|(&type_id, &name)| (type_id, name))
     }
 
-    /// Public output items reachable from callable definition outputs.
+    /// Public output items reachable from selectable definition outputs.
     ///
     /// Reachable fragment definitions still need capture slots and wire types
     /// for matching. A source target, however, must not publish an
@@ -377,7 +377,7 @@ impl<'a> ItemCollector<'a> {
     }
 
     fn collect(mut self) -> Vec<OutputItem> {
-        for (def_id, output) in self.types.iter_entrypoint_output() {
+        for (def_id, output) in self.types.iter_entry_point_outputs() {
             let name = self.deps.def_name_sym(def_id);
             if output == TYPE_VOID {
                 self.items.push(OutputItem::void_definition(name));

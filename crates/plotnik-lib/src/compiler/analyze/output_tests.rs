@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
+use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
-use crate::compiler::analyze::types::type_shape::{Arity, FieldInfo, TYPE_NODE};
+use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE};
 use crate::compiler::ids::DefId;
 use crate::compiler::test_utils::synthetic_grammar;
 use crate::compiler::{QueryBuilder, TypeScriptCodegenConfig};
@@ -23,7 +24,7 @@ fn capture_layout_assigns_one_absolute_member_sequence() {
     ]));
     let def = DefId::from_raw(0);
     types.record_def_output(def, parent);
-    types.record_def_arity(def, Arity::One);
+    types.record_def_root_extent(def, RootExtent::SingleNode);
     let types = types.finish();
 
     let ordered = collect_ordered_types(&types);
@@ -53,7 +54,7 @@ fn capture_layout_accepts_256_fields() {
     let output = types.intern_struct(fields);
     let def = DefId::from_raw(0);
     types.record_def_output(def, output);
-    types.record_def_arity(def, Arity::One);
+    types.record_def_root_extent(def, RootExtent::SingleNode);
     let types = types.finish();
 
     let layout = CaptureLayout::build(&types, &collect_ordered_types(&types))

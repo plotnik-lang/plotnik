@@ -130,12 +130,12 @@ impl<'a> NfaBuilder<'a> {
         let mut compiler = NfaBuilder::new(ctx);
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
-        for (def_id, _) in ctx.analysis.type_analysis.iter_entrypoint_output() {
+        for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
             compiler.ensure_def_variant(DefVariant::ordinary(def_id));
         }
 
         let mut entrypoint_wrappers = IndexMap::new();
-        for (def_id, _) in ctx.analysis.type_analysis.iter_entrypoint_output() {
+        for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
             compiler.current_origin = Some(LabelOrigin::Wrapper(def_id));
             let wrapper = compiler.emit_entrypoint_wrapper(def_id);
             entrypoint_wrappers.insert(def_id, wrapper);
