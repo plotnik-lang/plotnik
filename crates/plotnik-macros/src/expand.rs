@@ -153,7 +153,7 @@ fn compile_strict_query(
 fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<(), ExpandError> {
     let mut entry_names: HashMap<String, String> = HashMap::new();
     for def in compiled.entry_point_names() {
-        let entry = plotnik_lib::matcher_entry_fn_name(&def);
+        let entry = plotnik_lib::matcher_journal_fn_name(&def);
         if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
             return Err(ExpandError::new(
                 span,

@@ -36,7 +36,7 @@ pub use emit::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, Emission,
     EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustTypesOutput,
     TypeScriptBinding, TypeScriptCodegenConfig, TypeScriptMatchOnlyType,
-    TypeScriptNodeRepresentation, TypeScriptTypesOutput, entry_fn_name,
+    TypeScriptNodeRepresentation, TypeScriptTypesOutput, journal_fn_name,
 };
 pub use fmt::{FormatError, FormatResult, format_query};
 pub use parse::{QueryToken, tokenize};

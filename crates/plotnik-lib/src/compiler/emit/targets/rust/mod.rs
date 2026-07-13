@@ -26,7 +26,7 @@ mod representation_tests;
 mod template_tests;
 
 pub(crate) use config::Config;
-pub use entry_names::entry_fn_name;
+pub use entry_names::journal_fn_name;
 pub(crate) use module::generate;
 pub(crate) use type_model::{TypeContext, TypeModel};
 pub(crate) use types_config::Config as TypesConfig;

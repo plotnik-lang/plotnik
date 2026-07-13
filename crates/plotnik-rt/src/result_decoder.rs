@@ -12,13 +12,13 @@
 
 use tree_sitter::Node;
 
-use crate::{JournalEvent, MatchJournal, node_text, source_text};
+use crate::{JournalEvent, OutputEvents, node_text, source_text};
 
 /// `record_set_index` sentinel: no `RecordSet` closes a value starting here.
 const NO_RECORD_SET: u32 = u32::MAX;
 
 pub struct ResultDecoder<'a, 't, 's> {
-    entries: &'a [JournalEvent<'t>],
+    events: OutputEvents<'a, 't>,
     source: &'s str,
     pos: usize,
     /// For each position, where the `RecordSet` that closes a field value
@@ -30,30 +30,29 @@ pub struct ResultDecoder<'a, 't, 's> {
 }
 
 impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
-    pub fn new(journal: &'a MatchJournal<'t>, source: &'s str) -> Self {
-        let entries = journal.as_slice();
+    pub fn new(events: OutputEvents<'a, 't>, source: &'s str) -> Self {
         Self {
-            entries,
+            record_set_index: build_record_set_index(&events),
+            events,
             source,
             pos: 0,
-            record_set_index: build_record_set_index(entries),
         }
     }
 
-    /// Assert the whole trace was consumed — the entry point's value is the
-    /// entire committed stream, so leftovers mean the decoder lost sync.
+    /// Assert the whole output-event stream was consumed — the entry point's
+    /// value is the entire stream, so leftovers mean the decoder lost sync.
     pub fn finish(self) {
         assert!(
-            self.pos == self.entries.len(),
+            self.pos == self.events.len(),
             "result decoder: {} of {} events left unread after the value",
-            self.entries.len() - self.pos,
-            self.entries.len(),
+            self.events.len() - self.pos,
+            self.events.len(),
         );
     }
 
     fn next(&mut self) -> &'a JournalEvent<'t> {
         let entry = self
-            .entries
+            .events
             .get(self.pos)
             .expect("result decoder: read past the end of the committed journal");
         self.pos += 1;
@@ -61,7 +60,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
     }
 
     fn peek(&self) -> Option<&'a JournalEvent<'t>> {
-        self.entries.get(self.pos)
+        self.events.get(self.pos)
     }
 
     /// The member index of the `RecordSet` that will close the field value
@@ -82,7 +81,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
             "result decoder: no RecordSet closes the field value at {}",
             self.pos
         );
-        match &self.entries[record_set_pos as usize] {
+        match &self.events[record_set_pos as usize] {
             JournalEvent::RecordSet(index) => *index,
             other => {
                 unreachable!("record_set_index addresses RecordSet entries, found {other:?}")
@@ -107,8 +106,8 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
 
         let mut depth = 0_u32;
         let mut marked = false;
-        for index in self.pos..self.entries.len() {
-            match &self.entries[index] {
+        for index in self.pos..self.events.len() {
+            match &self.events[index] {
                 JournalEvent::ScalarOpen => depth += 1,
                 JournalEvent::ScalarMark(_) => marked = true,
                 JournalEvent::StrClose => {
@@ -131,7 +130,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
                 _ => {}
             }
         }
-        unreachable!("validated trace balances every scalar frame")
+        unreachable!("validated output events balance every scalar frame")
     }
 
     pub fn at_list_close(&self) -> bool {
@@ -289,15 +288,15 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
 /// `*Open` leaves the group, and the parked answer — the first `RecordSet` after
 /// the group — is exactly the answer *at* the open (a composite field value
 /// starts there) and for whatever precedes it on the outer level.
-fn build_record_set_index(entries: &[JournalEvent<'_>]) -> Vec<u32> {
+fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
     assert!(
-        u32::try_from(entries.len()).is_ok_and(|len| len < NO_RECORD_SET),
-        "trace length fits the u32 index space"
+        u32::try_from(events.len()).is_ok_and(|len| len < NO_RECORD_SET),
+        "output-event count fits the u32 index space"
     );
-    let mut index = vec![NO_RECORD_SET; entries.len()];
+    let mut index = vec![NO_RECORD_SET; events.len()];
     let mut cur = NO_RECORD_SET;
     let mut outer: Vec<u32> = Vec::new();
-    for (i, entry) in entries.iter().enumerate().rev() {
+    for (i, entry) in events.iter().enumerate().rev() {
         match entry {
             JournalEvent::RecordSet(_) => {
                 cur = i as u32;

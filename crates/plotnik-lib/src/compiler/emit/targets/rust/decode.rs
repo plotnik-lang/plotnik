@@ -39,7 +39,7 @@ use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
 
 use super::decoder_frame::DecoderFrameEstimator;
-use super::entry_names::{accepts_entry_fn_name, safe_entry_fn_name};
+use super::entry_names::{limited_journal_fn_name, matches_fn_name};
 
 pub(super) struct DecoderGen<'m, 'a> {
     model: &'m TypeModel<'a>,
@@ -189,7 +189,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
         let sig = InherentParseSignature::for_item(self.model, item);
         let decoder_fn = self.decoder_fn(item.name);
-        let safe = safe_entry_fn_name(def);
+        let journal_fn = limited_journal_fn_name(def);
         let fallible_decoder = item.fallible;
         let _ = writeln!(
             out,
@@ -218,13 +218,13 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         );
         let _ = writeln!(
             out,
-            "        let Some(journal) = matcher::{safe}(tree, source)? else {{"
+            "        let Some(journal) = matcher::{journal_fn}(tree, source)? else {{"
         );
         let _ = writeln!(out, "            return Ok(None);");
         let _ = writeln!(out, "        }};");
         let _ = writeln!(
             out,
-            "        let mut decoder = rt::ResultDecoder::new(&journal, source);"
+            "        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);"
         );
         if fallible_decoder {
             let _ = writeln!(
@@ -251,7 +251,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     }
 
     fn inherent_matches_method(&self, out: &mut String, def: &str) {
-        let accepts = accepts_entry_fn_name(def);
+        let matches_fn = matches_fn_name(def);
         let _ = writeln!(
             out,
             "    /// Whether `{def}` matches `tree` under the module's compiled-in limits."
@@ -263,7 +263,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "    ) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
         );
-        let _ = writeln!(out, "        matcher::{accepts}(tree, source)");
+        let _ = writeln!(out, "        matcher::{matches_fn}(tree, source)");
         let _ = writeln!(out, "    }}");
     }
 

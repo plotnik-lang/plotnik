@@ -17,7 +17,7 @@
 //! tree-sitter's C runtime.
 
 /// ABI implemented by this runtime build and required by generated modules.
-pub const RUNTIME_ABI: u32 = 2;
+pub const RUNTIME_ABI: u32 = 3;
 
 mod dfa;
 mod frame;
@@ -77,7 +77,7 @@ pub use cursor::CursorWrapper;
 #[cfg(feature = "tree-sitter")]
 pub use engine::Engine;
 #[cfg(feature = "tree-sitter")]
-pub use journal::{JournalEvent, MatchJournal, node_text, source_text};
+pub use journal::{JournalEvent, MatchJournal, OutputEvents, node_text, source_text};
 #[cfg(feature = "tree-sitter")]
 pub use result_decoder::ResultDecoder;
 #[cfg(feature = "serde")]

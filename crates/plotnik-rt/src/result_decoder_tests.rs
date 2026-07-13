@@ -16,7 +16,7 @@ fn peek_record_set_sees_through_a_scalar() {
         JournalEvent::RecordSet(7),
     ]);
 
-    let decoder = ResultDecoder::new(&journal, "");
+    let decoder = ResultDecoder::new(journal.output_events(), "");
 
     assert_eq!(decoder.peek_record_set(), 7);
 }
@@ -28,7 +28,7 @@ fn bool_decoder_consumes_one_balanced_scalar() {
         JournalEvent::BoolClose(false),
     ]);
 
-    let mut decoder = ResultDecoder::new(&journal, "");
+    let mut decoder = ResultDecoder::new(journal.output_events(), "");
 
     assert!(!decoder.expect_bool());
     decoder.finish();
@@ -38,7 +38,7 @@ fn bool_decoder_consumes_one_balanced_scalar() {
 fn absent_string_is_consumed_as_an_option() {
     let journal = journal(vec![JournalEvent::ScalarOpen, JournalEvent::StrClose]);
 
-    let mut decoder = ResultDecoder::new(&journal, "");
+    let mut decoder = ResultDecoder::new(journal.output_events(), "");
 
     assert!(decoder.take_absent());
     decoder.finish();
@@ -57,7 +57,7 @@ fn peek_record_set_skips_a_balanced_composite() {
         JournalEvent::RecordSet(9),
     ]);
 
-    let decoder = ResultDecoder::new(&journal, "");
+    let decoder = ResultDecoder::new(journal.output_events(), "");
 
     assert_eq!(decoder.peek_record_set(), 9);
 }
@@ -72,7 +72,7 @@ fn peek_record_set_skips_an_empty_list() {
         JournalEvent::RecordSet(3),
     ]);
 
-    let decoder = ResultDecoder::new(&journal, "");
+    let decoder = ResultDecoder::new(journal.output_events(), "");
 
     assert_eq!(decoder.peek_record_set(), 3);
 }
@@ -90,7 +90,7 @@ fn peek_record_set_answers_at_every_level_of_a_nested_value() {
         JournalEvent::RecordSet(9),
     ]);
 
-    let mut decoder = ResultDecoder::new(&journal, "");
+    let mut decoder = ResultDecoder::new(journal.output_events(), "");
 
     assert_eq!(decoder.peek_record_set(), 9);
     decoder.expect_record_open();
@@ -106,7 +106,7 @@ fn peek_record_set_answers_at_every_level_of_a_nested_value() {
 fn take_absent_consumes_only_absence() {
     let journal = journal(vec![JournalEvent::Absent, JournalEvent::RecordSet(0)]);
 
-    let mut decoder = ResultDecoder::new(&journal, "");
+    let mut decoder = ResultDecoder::new(journal.output_events(), "");
 
     assert!(decoder.take_absent());
     assert!(!decoder.take_absent());
@@ -119,7 +119,7 @@ fn take_absent_consumes_only_absence() {
 fn finish_rejects_leftovers() {
     let journal = journal(vec![JournalEvent::Absent]);
 
-    let decoder = ResultDecoder::new(&journal, "");
+    let decoder = ResultDecoder::new(journal.output_events(), "");
 
     decoder.finish();
 }

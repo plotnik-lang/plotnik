@@ -3,6 +3,8 @@
 //! Journal events carry actual node references, unlike bytecode `Effect`
 //! which only stores kind + payload.
 
+use std::ops::Index;
+
 use tree_sitter::Node;
 
 /// `PartialEq` compares `Node`s by tree-sitter identity (same node in the same
@@ -93,12 +95,90 @@ impl<'t> MatchJournal<'t> {
     pub fn as_slice(&self) -> &[JournalEvent<'t>] {
         &self.0
     }
+
+    /// Logical result-construction view of the committed journal.
+    ///
+    /// Generated matchers record no inspection events, so their view borrows the
+    /// journal directly. Inspection-enabled VM journals build an index that omits
+    /// `SpanStart`/`SpanEnd` without copying output events.
+    pub fn output_events(&self) -> OutputEvents<'_, 't> {
+        OutputEvents::new(&self.0)
+    }
 }
 
 impl Default for MatchJournal<'_> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Result-construction events from a committed [`MatchJournal`].
+#[derive(Debug)]
+pub struct OutputEvents<'a, 't> {
+    journal: &'a [JournalEvent<'t>],
+    positions: Option<Vec<usize>>,
+}
+
+impl<'a, 't> OutputEvents<'a, 't> {
+    fn new(journal: &'a [JournalEvent<'t>]) -> Self {
+        let Some(first_inspection) = journal.iter().position(is_inspection_event) else {
+            return Self {
+                journal,
+                positions: None,
+            };
+        };
+        let positions = (0..first_inspection)
+            .chain(
+                (first_inspection..journal.len())
+                    .filter(|&index| !is_inspection_event(&journal[index])),
+            )
+            .collect();
+        Self {
+            journal,
+            positions: Some(positions),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.positions.as_ref().map_or(self.journal.len(), Vec::len)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn get(&self, index: usize) -> Option<&'a JournalEvent<'t>> {
+        let journal_index = self
+            .positions
+            .as_ref()
+            .map_or(Some(index), |positions| positions.get(index).copied())?;
+        self.journal.get(journal_index)
+    }
+
+    pub fn iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &'a JournalEvent<'t>> + ExactSizeIterator + '_ {
+        (0..self.len()).map(|index| {
+            self.get(index)
+                .expect("output-event index comes from the view's own length")
+        })
+    }
+}
+
+impl<'t> Index<usize> for OutputEvents<'_, 't> {
+    type Output = JournalEvent<'t>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+            .expect("output-event index must be within the view")
+    }
+}
+
+fn is_inspection_event(event: &JournalEvent<'_>) -> bool {
+    matches!(
+        event,
+        JournalEvent::SpanStart { .. } | JournalEvent::SpanEnd(_)
+    )
 }
 
 /// The text a node spans in `source` — what string and regex predicates

@@ -39,7 +39,7 @@ use crate::compiler::emit::targets::rust::template::splice;
 use crate::compiler::regex::compile_native_dfa;
 use plotnik_rt::{Limit, Nav, SkipPolicy};
 
-use super::entry_names::{accepts_entry_fn_name, entry_fn_name, safe_entry_fn_name};
+use super::entry_names::{journal_fn_name, limited_journal_fn_name, matches_fn_name};
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
 ///
@@ -291,8 +291,8 @@ impl<'a> Generator<'a> {
         );
     }
 
-    /// `pub use` every trace entry point at module root, so the public
-    /// surface (`{def}_trace`, per [`entry_fn_name`]) doesn't move when the
+    /// `pub use` every journal entry point at module root, so the public
+    /// surface (`{def}_journal`, per [`journal_fn_name`]) doesn't move when the
     /// machinery does.
     fn entry_reexports(&self, out: &mut String) {
         let names: Vec<String> = self
@@ -300,7 +300,7 @@ impl<'a> Generator<'a> {
             .matcher()
             .entry_points()
             .iter()
-            .map(|entry| entry_fn_name(&entry.name))
+            .map(|entry| journal_fn_name(&entry.name))
             .collect();
         out.push('\n');
         let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
@@ -450,20 +450,20 @@ impl<'a> Generator<'a> {
             let info = self.state(entry.entry);
             let subs = [
                 ("DEF", def),
-                ("FN", &entry_fn_name(def)),
-                ("SAFE_FN", &safe_entry_fn_name(def)),
-                ("ACCEPTS_FN", &accepts_entry_fn_name(def)),
+                ("JOURNAL_FN", &journal_fn_name(def)),
+                ("LIMITED_JOURNAL_FN", &limited_journal_fn_name(def)),
+                ("MATCHES_FN", &matches_fn_name(def)),
                 ("ENTRY", info.const_name.as_str()),
                 ("FUEL_METERED", fuel_metered),
                 ("MEMORY_METERED", memory_metered),
                 ("SAFE_LIMITS", safe_limits),
             ];
             out.push('\n');
-            splice(out, "", ENTRY_FN, &subs);
+            splice(out, "", JOURNAL_ENTRY_FN, &subs);
             out.push('\n');
-            splice(out, "", ENTRY_FN_SAFE, &subs);
+            splice(out, "", LIMITED_JOURNAL_ENTRY_FN, &subs);
             out.push('\n');
-            splice(out, "", ENTRY_ACCEPTS_SAFE, &subs);
+            splice(out, "", LIMITED_MATCHES_ENTRY_FN, &subs);
         }
     }
 
@@ -1093,7 +1093,7 @@ const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
     memory: @MEMORY@,
 };
 
-/// No ceilings — what the unmetered trace entry points run under.
+/// No ceilings — what the unmetered journal entry points run under.
 const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
     fuel_limit: None,
     max_memory: None,
@@ -1199,10 +1199,10 @@ fn verify_language(tree: &rt::Tree) {
 }
 "#;
 
-const ENTRY_FN: &str = r#"
+const JOURNAL_ENTRY_FN: &str = r#"
 /// Match the `@DEF@` entry point against `tree`. `Some` carries the committed
 /// match journal — the same event sequence the VM commits for this query.
-pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
+pub fn @JOURNAL_FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
     let outcome = run::<false, false, true>(tree, source, @ENTRY@, NO_LIMITS);
     outcome.expect("an unmetered run cannot exceed a limit")
 }
@@ -1213,9 +1213,9 @@ pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>
 // `false`, folding its check out of the monomorphized `run`. When both are
 // unbounded there is nothing to resolve, so the entries pass `NO_LIMITS` and
 // skip the per-call node count entirely.
-const ENTRY_FN_SAFE: &str = r#"
-/// [`@FN@`] under the module's compiled-in limits ([`LIMITS`]).
-pub(super) fn @SAFE_FN@<'t>(
+const LIMITED_JOURNAL_ENTRY_FN: &str = r#"
+/// [`@JOURNAL_FN@`] under the module's compiled-in limits ([`LIMITS`]).
+pub(super) fn @LIMITED_JOURNAL_FN@<'t>(
     tree: &'t rt::Tree,
     source: &str,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
@@ -1223,9 +1223,9 @@ pub(super) fn @SAFE_FN@<'t>(
 }
 "#;
 
-const ENTRY_ACCEPTS_SAFE: &str = r#"
+const LIMITED_MATCHES_ENTRY_FN: &str = r#"
 /// Whether `@DEF@` accepts, under [`LIMITS`], with data effects suppressed.
-pub(super) fn @ACCEPTS_FN@(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+pub(super) fn @MATCHES_FN@(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
     Ok(run::<@FUEL_METERED@, @MEMORY_METERED@, false>(tree, source, @ENTRY@, @SAFE_LIMITS@)?.is_some())
 }
 "#;
@@ -1253,17 +1253,17 @@ enum Unwound {
 /// independently: each folds away when its resource is unbounded, so a fully
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
 /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-/// `TRACE` controls whether data events are journaled; `matches` disables it to
-/// avoid output allocation and decode-depth failures. (No let-chains: generated
-/// code targets the embedding crate's edition.)
-fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+/// `RECORD_OUTPUT` controls whether data events are journaled; `matches`
+/// disables it to avoid output allocation and decode-depth failures. (No
+/// let-chains: generated code targets the embedding crate's edition.)
+fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT: bool>(
     tree: &'t rt::Tree,
     source: &str,
     entry: u16,
     limits: rt::ResolvedRuntimeLimits,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
     verify_language(tree);
-    let mut eng = if TRACE {
+    let mut eng = if RECORD_OUTPUT {
         rt::Engine::new(tree.walk())
     } else {
         rt::Engine::new_data_suppressed(tree.walk())

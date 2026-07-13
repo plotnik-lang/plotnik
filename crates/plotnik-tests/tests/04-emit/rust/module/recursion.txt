@@ -17,7 +17,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 2;
+pub const REQUIRED_RUNTIME_ABI: u32 = 3;
 
 use ::plotnik_rt::Node;
 
@@ -41,10 +41,10 @@ impl<'t> Expr<'t> {
         tree: &'t rt::Tree,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let Some(journal) = matcher::expr_safe(tree, source)? else {
+        let Some(journal) = matcher::expr_journal_limited(tree, source)? else {
             return Ok(None);
         };
-        let mut decoder = rt::ResultDecoder::new(&journal, source);
+        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);
         let depth = rt::DecodeDepth::new(matcher::MAX_DECODE_DEPTH);
         let value = decode_expr(&mut decoder, &depth)?;
         decoder.finish();
@@ -56,7 +56,7 @@ impl<'t> Expr<'t> {
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        matcher::expr_accepts(tree, source)
+        matcher::expr_matches(tree, source)
     }
 }
 
@@ -84,10 +84,10 @@ impl<'t> Q<'t> {
         tree: &'t rt::Tree,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let Some(journal) = matcher::q_safe(tree, source)? else {
+        let Some(journal) = matcher::q_journal_limited(tree, source)? else {
             return Ok(None);
         };
-        let mut decoder = rt::ResultDecoder::new(&journal, source);
+        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);
         let depth = rt::DecodeDepth::new(matcher::MAX_DECODE_DEPTH);
         let value = decode_q(&mut decoder, &depth)?;
         decoder.finish();
@@ -99,7 +99,7 @@ impl<'t> Q<'t> {
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        matcher::q_accepts(tree, source)
+        matcher::q_matches(tree, source)
     }
 }
 
@@ -176,7 +176,7 @@ fn decode_q<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>, depth: &rt::Dec
     })
 }
 
-pub use self::matcher::{expr_trace, q_trace};
+pub use self::matcher::{expr_journal, q_journal};
 
 /// The compiled matcher: engine machinery shielded from the query's
 /// type namespace.
@@ -191,7 +191,7 @@ mod matcher {
         memory: rt::Limit::Auto,
     };
 
-    /// No ceilings — what the unmetered trace entry points run under.
+    /// No ceilings — what the unmetered journal entry points run under.
     const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
         fuel_limit: None,
         max_memory: None,
@@ -288,13 +288,13 @@ mod matcher {
 
     /// Match the `Expr` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
-    pub fn expr_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
+    pub fn expr_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
         let outcome = run::<false, false, true>(tree, source, S18_EXPR_EP, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
-    /// [`expr_trace`] under the module's compiled-in limits ([`LIMITS`]).
-    pub(super) fn expr_safe<'t>(
+    /// [`expr_journal`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn expr_journal_limited<'t>(
         tree: &'t rt::Tree,
         source: &str,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
@@ -302,19 +302,19 @@ mod matcher {
     }
 
     /// Whether `Expr` accepts, under [`LIMITS`], with data effects suppressed.
-    pub(super) fn expr_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+    pub(super) fn expr_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
         Ok(run::<true, true, false>(tree, source, S18_EXPR_EP, resolved_limits(tree))?.is_some())
     }
 
     /// Match the `Q` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
-    pub fn q_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
+    pub fn q_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
         let outcome = run::<false, false, true>(tree, source, S22_Q_EP, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
-    /// [`q_trace`] under the module's compiled-in limits ([`LIMITS`]).
-    pub(super) fn q_safe<'t>(
+    /// [`q_journal`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn q_journal_limited<'t>(
         tree: &'t rt::Tree,
         source: &str,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
@@ -322,7 +322,7 @@ mod matcher {
     }
 
     /// Whether `Q` accepts, under [`LIMITS`], with data effects suppressed.
-    pub(super) fn q_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+    pub(super) fn q_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
         Ok(run::<true, true, false>(tree, source, S22_Q_EP, resolved_limits(tree))?.is_some())
     }
 
@@ -348,17 +348,17 @@ mod matcher {
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-    /// `TRACE` controls whether data events are journaled; `matches` disables it to
-    /// avoid output allocation and decode-depth failures. (No let-chains: generated
-    /// code targets the embedding crate's edition.)
-    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+    /// `RECORD_OUTPUT` controls whether data events are journaled; `matches`
+    /// disables it to avoid output allocation and decode-depth failures. (No
+    /// let-chains: generated code targets the embedding crate's edition.)
+    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT: bool>(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         verify_language(tree);
-        let mut eng = if TRACE {
+        let mut eng = if RECORD_OUTPUT {
             rt::Engine::new(tree.walk())
         } else {
             rt::Engine::new_data_suppressed(tree.walk())

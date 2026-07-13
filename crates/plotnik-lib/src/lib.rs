@@ -43,7 +43,7 @@ pub mod diagnostics {
     };
 }
 
-pub use crate::compiler::entry_fn_name as matcher_entry_fn_name;
+pub use crate::compiler::journal_fn_name as matcher_journal_fn_name;
 pub use crate::compiler::{TypeScriptBinding, TypeScriptMatchOnlyType};
 
 pub use crate::core::Colors;

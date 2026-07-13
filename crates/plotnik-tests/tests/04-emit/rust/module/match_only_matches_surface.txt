@@ -8,7 +8,7 @@ Probe = (program)
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 2;
+pub const REQUIRED_RUNTIME_ABI: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Probe;
@@ -19,7 +19,7 @@ impl Probe {
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        matcher::probe_accepts(tree, source)
+        matcher::probe_matches(tree, source)
     }
 }
 
@@ -29,7 +29,7 @@ impl rt::Matches for Probe {
     }
 }
 
-pub use self::matcher::{probe_trace};
+pub use self::matcher::{probe_journal};
 
 /// The compiled matcher: engine machinery shielded from the query's
 /// type namespace.
@@ -44,7 +44,7 @@ mod matcher {
         memory: rt::Limit::Auto,
     };
 
-    /// No ceilings — what the unmetered trace entry points run under.
+    /// No ceilings — what the unmetered journal entry points run under.
     const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
         fuel_limit: None,
         max_memory: None,
@@ -122,13 +122,13 @@ mod matcher {
 
     /// Match the `Probe` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
-    pub fn probe_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
+    pub fn probe_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
         let outcome = run::<false, false, true>(tree, source, S4_PROBE_EP, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
-    /// [`probe_trace`] under the module's compiled-in limits ([`LIMITS`]).
-    pub(super) fn probe_safe<'t>(
+    /// [`probe_journal`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn probe_journal_limited<'t>(
         tree: &'t rt::Tree,
         source: &str,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
@@ -136,7 +136,7 @@ mod matcher {
     }
 
     /// Whether `Probe` accepts, under [`LIMITS`], with data effects suppressed.
-    pub(super) fn probe_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+    pub(super) fn probe_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
         Ok(run::<true, true, false>(tree, source, S4_PROBE_EP, resolved_limits(tree))?.is_some())
     }
 
@@ -162,17 +162,17 @@ mod matcher {
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-    /// `TRACE` controls whether data events are journaled; `matches` disables it to
-    /// avoid output allocation and decode-depth failures. (No let-chains: generated
-    /// code targets the embedding crate's edition.)
-    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+    /// `RECORD_OUTPUT` controls whether data events are journaled; `matches`
+    /// disables it to avoid output allocation and decode-depth failures. (No
+    /// let-chains: generated code targets the embedding crate's edition.)
+    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT: bool>(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         verify_language(tree);
-        let mut eng = if TRACE {
+        let mut eng = if RECORD_OUTPUT {
             rt::Engine::new(tree.walk())
         } else {
             rt::Engine::new_data_suppressed(tree.walk())

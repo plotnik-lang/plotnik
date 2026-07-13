@@ -20,5 +20,5 @@ pub use target::{
 };
 
 pub(crate) use plan::CodegenPlan;
-pub use targets::rust::entry_fn_name;
+pub use targets::rust::journal_fn_name;
 pub use targets::typescript::{MatchOnlyType as TypeScriptMatchOnlyType, TypeScriptBinding};
