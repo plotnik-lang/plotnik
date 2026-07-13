@@ -8,11 +8,11 @@ use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
+use super::bind::GrammarBinder;
 use super::diagnostics::format_list;
-use super::link::GrammarLinker;
 use super::participation::Participation;
 
-impl<'a, 'q> GrammarLinker<'a, 'q> {
+impl<'a, 'q> GrammarBinder<'a, 'q> {
     /// Walk the query, validating each node's own grammar constraints. See
     /// [`Participation`] for why deferred positions skip their checks.
     ///

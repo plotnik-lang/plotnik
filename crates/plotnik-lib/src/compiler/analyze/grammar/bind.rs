@@ -1,4 +1,4 @@
-//! Link pass: resolve node kinds and fields against tree-sitter grammar.
+//! Bind pass: resolve node kinds and fields against a tree-sitter grammar.
 //!
 //! Two-phase approach:
 //! 1. Resolve all symbols (node kinds and fields) against grammar
@@ -23,9 +23,9 @@ use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::Root;
 
-/// The threaded dependencies of the link pass. Decoupled from `Query` to allow
+/// The threaded dependencies of the bind pass. Decoupled from `Query` to allow
 /// testing without a full query context.
-pub struct GrammarLinkInput<'a, 'q> {
+pub struct GrammarBindInput<'a, 'q> {
     pub interner: &'a mut Interner,
     pub grammar: &'a Grammar,
     pub source_map: &'q SourceMap,
@@ -36,14 +36,14 @@ pub struct GrammarLinkInput<'a, 'q> {
     pub satisfiability_limits: SatisfiabilityLimits,
 }
 
-impl<'q> GrammarLinkInput<'_, 'q> {
-    pub(crate) fn link(self, output: &mut GrammarBindingBuilder, diagnostics: &mut Diagnostics) {
+impl<'q> GrammarBindInput<'_, 'q> {
+    pub(crate) fn bind(self, output: &mut GrammarBindingBuilder, diagnostics: &mut Diagnostics) {
         // Local deduplication maps (not exposed in output)
         let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
         let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
 
         for (&source_id, root) in self.ast_map {
-            let mut linker = GrammarLinker {
+            let mut binder = GrammarBinder {
                 interner: &mut *self.interner,
                 grammar: self.grammar,
                 source_map: self.source_map,
@@ -55,7 +55,7 @@ impl<'q> GrammarLinkInput<'_, 'q> {
                 output,
                 diag: diagnostics,
             };
-            linker.link(source_id, root);
+            binder.bind(source_id, root);
         }
 
         // The satisfiability check (sequence/anchor/arity) runs only on a query the
@@ -77,7 +77,7 @@ impl<'q> GrammarLinkInput<'_, 'q> {
     }
 }
 
-pub(super) struct GrammarLinker<'a, 'q> {
+pub(super) struct GrammarBinder<'a, 'q> {
     pub(super) interner: &'a mut Interner,
     pub(super) grammar: &'a Grammar,
     pub(super) source_map: &'q SourceMap,
@@ -90,12 +90,12 @@ pub(super) struct GrammarLinker<'a, 'q> {
     pub(super) diag: &'a mut Diagnostics,
 }
 
-impl<'a, 'q> GrammarLinker<'a, 'q> {
+impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn content(&self, source: SourceId) -> &'q str {
         self.source_map.content(source)
     }
 
-    fn link(&mut self, source: SourceId, root: &Root) {
+    fn bind(&mut self, source: SourceId, root: &Root) {
         self.resolve_symbols(source, root);
         if self.strict_lints {
             self.check_entrypoint_roots(source, root);

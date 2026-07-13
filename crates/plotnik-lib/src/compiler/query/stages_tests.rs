@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::{SourceMap, SourcePath};
 
-use super::{LinkOutcome, Query, QueryBuilder};
+use super::{BindOutcome, Query, QueryBuilder};
 
 macro_rules! expect_invalid {
     ($($name:literal: $content:literal),+ $(,)?) => {{
@@ -56,11 +56,11 @@ impl Query {
     }
 
     #[track_caller]
-    pub(crate) fn expect_valid_linking(src: &str) -> LinkOutcome {
-        let query = Self::parse_and_validate(src).link(grammar());
+    pub(crate) fn expect_valid_binding(src: &str) -> BindOutcome {
+        let query = Self::parse_and_validate(src).bind(grammar());
         if !query.is_valid() {
             panic!(
-                "Expected valid linking, got error:\n{}",
+                "Expected valid grammar binding, got error:\n{}",
                 query.dump_diagnostics()
             );
         }
@@ -130,8 +130,8 @@ fn invalid_three_way_mutual_recursion_across_files() {
 
 #[test]
 fn analysis_rejects_byte_oriented_regex() {
-    let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(grammar());
-    let compiled = linked.compile().expect("compilation answers");
+    let bound = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").bind(grammar());
+    let compiled = bound.compile().expect("compilation answers");
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
@@ -143,8 +143,8 @@ fn analysis_rejects_byte_oriented_regex() {
 
 #[test]
 fn compile_rejects_value_less_definition() {
-    let linked = Query::expect("Q = .").link(grammar());
-    let compiled = linked.compile().expect("compilation answers");
+    let bound = Query::expect("Q = .").bind(grammar());
+    let compiled = bound.compile().expect("compilation answers");
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
@@ -153,9 +153,9 @@ fn compile_rejects_value_less_definition() {
 
 #[test]
 fn compile_accepts_valid_query() {
-    let linked = Query::parse_and_validate("Q = (identifier) @id").link(grammar());
+    let bound = Query::parse_and_validate("Q = (identifier) @id").bind(grammar());
     assert!(
-        !linked
+        !bound
             .compile()
             .expect("compilation answers")
             .diagnostics()
@@ -165,14 +165,14 @@ fn compile_accepts_valid_query() {
 
 #[test]
 fn compile_flags_dropped_value_less_def_among_valid() {
-    let linked = Query::expect(indoc!(
+    let bound = Query::expect(indoc!(
         "
         Bad = .
         Good = (identifier) @id
     "
     ))
-    .link(grammar());
-    let compiled = linked.compile().expect("compilation answers");
+    .bind(grammar());
+    let compiled = bound.compile().expect("compilation answers");
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
@@ -181,9 +181,9 @@ fn compile_flags_dropped_value_less_def_among_valid() {
 
 #[test]
 fn compile_is_total_on_empty_source_map() {
-    let linked = QueryBuilder::new(SourceMap::new()).link(grammar()).unwrap();
+    let bound = QueryBuilder::new(SourceMap::new()).bind(grammar()).unwrap();
     assert!(
-        !linked
+        !bound
             .compile()
             .expect("compilation answers")
             .diagnostics()
@@ -192,7 +192,7 @@ fn compile_is_total_on_empty_source_map() {
 }
 
 #[test]
-fn multifile_link_field_error_in_referenced_body_spans_two_files() {
+fn multifile_bind_field_error_in_referenced_body_spans_two_files() {
     // `Foo`'s body is a bare field — valid on its own (no parent to validate it
     // against). Only when `Bar` places `(Foo)` under `call_expression` does the
     // field-on-node-kind check fire, while validation has crossed into a.ptk. The
@@ -208,9 +208,9 @@ fn multifile_link_field_error_in_referenced_body_spans_two_files() {
         "expected analysis to pass:\n{}",
         analyzed.dump_diagnostics()
     );
-    let linked = analyzed.link(grammar());
-    assert!(!linked.is_valid(), "expected linking to fail");
-    let res = linked.dump_diagnostics();
+    let bound = analyzed.bind(grammar());
+    assert!(!bound.is_valid(), "expected grammar binding to fail");
+    let res = bound.dump_diagnostics();
 
     insta::assert_snapshot!(res, @"
     error: field `name` is not valid on this node kind
@@ -288,10 +288,10 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
         writeln!(src, "A{i} = [(A{p}) (A{p})]", p = i - 1).unwrap();
     }
 
-    let linked = Query::parse_and_validate(&src).link(grammar());
-    assert!(linked.is_valid(), "{}", linked.dump_diagnostics());
+    let bound = Query::parse_and_validate(&src).bind(grammar());
+    assert!(bound.is_valid(), "{}", bound.dump_diagnostics());
     assert!(
-        !linked
+        !bound
             .compile()
             .expect("compilation answers")
             .diagnostics()
@@ -318,7 +318,7 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
         if let Some(budget) = budget {
             builder = builder.with_satisfiability_step_budget(budget);
         }
-        builder.analyze().unwrap().link(grammar())
+        builder.analyze().unwrap().bind(grammar())
     };
 
     let tight = build(Some(100));
@@ -342,22 +342,22 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
 
 #[test]
 fn satisfiability_budget_counts_automaton_construction() {
-    let linked = QueryBuilder::new(SourceMap::from_inline(
+    let bound = QueryBuilder::new(SourceMap::from_inline(
         "Q = (program (expression_statement))",
     ))
     .with_satisfiability_step_budget(1)
     .analyze()
     .unwrap()
-    .link(grammar());
+    .bind(grammar());
 
-    assert!(!linked.is_valid());
+    assert!(!bound.is_valid());
     assert!(
-        linked
+        bound
             .diagnostics()
             .kinds()
             .any(|kind| kind == DiagnosticKind::QueryTooComplex),
         "expected QueryTooComplex:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
 }
 
@@ -373,17 +373,17 @@ fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
         "},
     );
 
-    let linked = QueryBuilder::new(source_map)
+    let bound = QueryBuilder::new(source_map)
         .with_satisfiability_step_budget(2)
         .analyze()
         .unwrap()
-        .link(grammar());
+        .bind(grammar());
 
-    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    let kinds: Vec<_> = bound.diagnostics().kinds().collect();
     assert!(
         kinds.contains(&DiagnosticKind::QueryTooComplex),
         "expected QueryTooComplex:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
     assert_eq!(
         kinds
@@ -392,12 +392,12 @@ fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
             .count(),
         1,
         "primary budget exhaustion must stop the pass:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
     assert!(
         !kinds.contains(&DiagnosticKind::UnsatisfiablePattern),
         "resource exhaustion must not masquerade as unsatisfiable:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
 }
 
@@ -413,22 +413,22 @@ fn exhausted_anchor_probe_budget_keeps_unsatisfiable_verdict() {
         "},
     );
 
-    let linked = QueryBuilder::new(source_map)
+    let bound = QueryBuilder::new(source_map)
         .with_satisfiability_step_budget(20)
         .analyze()
         .unwrap()
-        .link(grammar());
+        .bind(grammar());
 
-    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    let kinds: Vec<_> = bound.diagnostics().kinds().collect();
     assert!(
         !kinds.is_empty()
             && kinds
                 .iter()
                 .all(|&kind| kind == DiagnosticKind::UnsatisfiablePattern),
         "diagnostic probes must not replace a proven rejection:\n{}",
-        linked.dump_diagnostics()
+        bound.dump_diagnostics()
     );
-    let diagnostics = linked.dump_diagnostics();
+    let diagnostics = bound.dump_diagnostics();
     assert!(
         diagnostics.contains("matching this child structure"),
         "exhausted anchor probes should fall back to a generic unsatisfiable diagnostic:\n{diagnostics}",

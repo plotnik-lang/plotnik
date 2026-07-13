@@ -8,12 +8,12 @@ use crate::compiler::parse::cst::{SyntaxKind, SyntaxToken};
 use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeKind, NodeKindId};
 
-use super::link::GrammarLinker;
+use super::bind::GrammarBinder;
 use super::utils::find_similar;
 
-impl<'a, 'q> GrammarLinker<'a, 'q> {
+impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn resolve_symbols(&mut self, source: SourceId, root: &ast::Root) {
-        let mut resolver = GrammarSymbolResolver { linker: self };
+        let mut resolver = GrammarSymbolResolver { binder: self };
         resolver.visit(&Located::new(source, root.clone()));
     }
 
@@ -188,7 +188,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 }
 
 struct GrammarSymbolResolver<'l, 'a, 'q> {
-    linker: &'l mut GrammarLinker<'a, 'q>,
+    binder: &'l mut GrammarBinder<'a, 'q>,
 }
 
 impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
@@ -197,7 +197,7 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
     }
 
     fn visit_node_pattern(&mut self, node: &Located<ast::NodePattern>) {
-        self.linker.resolve_named_node(node);
+        self.binder.resolve_named_node(node);
 
         for neg in node
             .node()
@@ -205,7 +205,7 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
             .children()
             .filter_map(ast::NegatedField::cast)
         {
-            self.linker
+            self.binder
                 .resolve_field_by_token(node.source(), neg.name());
         }
 
@@ -220,11 +220,11 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
         let Some(value_token) = token.value() else {
             return;
         };
-        self.linker.bind_anonymous_kind(node.source(), &value_token);
+        self.binder.bind_anonymous_kind(node.source(), &value_token);
     }
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
-        self.linker
+        self.binder
             .resolve_field_by_token(field.source(), field.node().name());
         crate::compiler::analyze::visitor::walk_field_pattern(self, field);
     }

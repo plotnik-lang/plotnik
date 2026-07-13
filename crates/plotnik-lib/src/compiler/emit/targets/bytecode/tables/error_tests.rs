@@ -14,16 +14,16 @@ use crate::compiler::test_utils::synthetic_grammar as grammar;
 use crate::compiler::{BytecodeConfig, DiagnosticKind, RustCodegenConfig, TypeScriptCodegenConfig};
 use crate::compiler::{SourceMap, SourcePath};
 
-/// Link `src` (which must be valid — capacity limits live at emit, not link) and
+/// Bind `src` to the test grammar (capacity limits live at emission, not binding) and
 /// return the emission result.
 #[track_caller]
 fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
     let mut source_map = SourceMap::new();
     source_map.add_file(SourcePath::new("query.ptk"), src);
     let query = QueryBuilder::new(source_map)
-        .link(grammar())
+        .bind(grammar())
         .expect("query parses");
-    assert!(query.is_valid(), "query should link:\n{src}");
+    assert!(query.is_valid(), "query should bind to the grammar:\n{src}");
     query.emit_bytecode_for_test()
 }
 

@@ -1,6 +1,6 @@
 //! String dump methods for query inspection.
 
-use crate::compiler::query::{LinkOutcome, Query};
+use crate::compiler::query::{BindOutcome, Query};
 
 impl Query {
     pub fn dump_cst(&self) -> String {
@@ -25,7 +25,7 @@ impl Query {
     }
 }
 
-impl LinkOutcome {
+impl BindOutcome {
     #[cfg(test)]
     pub(crate) fn dump_diagnostics(&self) -> String {
         self.diagnostics().render(self.source_map())

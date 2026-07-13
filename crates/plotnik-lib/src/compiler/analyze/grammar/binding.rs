@@ -1,18 +1,18 @@
-//! Grammar binding: the link pass's resolution table and its builder.
+//! Grammar binding: the bind pass's resolution table and its builder.
 //!
 //! `GrammarBinding` is the immutable table; `GrammarBindingBuilder` is the
-//! accumulator the link pass fills. The data and its builder live together; the
-//! link pass that drives the builder lives in `link`.
+//! accumulator the bind pass fills. The data and its builder live together; the
+//! bind pass that drives the builder lives in `bind`.
 
 use indexmap::IndexMap;
 
 use crate::core::grammar::GrammarIdentity;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
-/// Resolution table produced by the link pass: the query's node-kind and field
+/// Resolution table produced by the bind pass: the query's node-kind and field
 /// symbols bound to the target grammar's ids, in both directions.
 ///
-/// Immutable once linking produces it; build one with `GrammarBindingBuilder`.
+/// Immutable once binding produces it; build one with `GrammarBindingBuilder`.
 #[derive(Clone, Debug, Default)]
 pub struct GrammarBinding {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
@@ -21,7 +21,7 @@ pub struct GrammarBinding {
 }
 
 impl GrammarBinding {
-    /// Freeze finished resolution tables into the binding. The link pass's builder
+    /// Freeze finished resolution tables into the binding. The bind pass's builder
     /// is the only constructor; callers that already have admitted compiler state
     /// should use the expecting accessors below.
     fn new(
@@ -43,11 +43,11 @@ impl GrammarBinding {
 
     /// Grammar id for a named kind referenced by an admitted query.
     ///
-    /// Missing here means analysis/link and lower disagree about trusted state; widening to a
+    /// Missing here means analysis/bind and lower disagree about trusted state; widening to a
     /// wildcard would compile the wrong query.
     pub(crate) fn expect_named_kind(&self, sym: Symbol) -> NodeKindId {
         self.resolve_named_kind(sym)
-            .expect("linked named node kind must be bound")
+            .expect("grammar-bound named node kind must be present")
     }
 
     /// Grammar id bound to an anonymous (literal-token) node kind.
@@ -58,7 +58,7 @@ impl GrammarBinding {
     /// Grammar id for a literal token referenced by an admitted query.
     pub(crate) fn expect_anonymous_kind(&self, sym: Symbol) -> NodeKindId {
         self.resolve_anonymous_kind(sym)
-            .expect("linked anonymous token kind must be bound")
+            .expect("grammar-bound anonymous token kind must be present")
     }
 
     /// Grammar id bound to a field name.
@@ -69,7 +69,7 @@ impl GrammarBinding {
     /// Grammar id for a field referenced by an admitted query.
     pub(crate) fn expect_field(&self, sym: Symbol) -> NodeFieldId {
         self.resolve_field(sym)
-            .expect("linked field name must be bound")
+            .expect("grammar-bound field name must be present")
     }
 
     /// Name of a bound node-kind id — reverse lookup for trace/debug rendering.
@@ -109,7 +109,7 @@ impl GrammarBinding {
     }
 }
 
-/// Mutable accumulator for a [`GrammarBinding`], owned by the link pass.
+/// Mutable accumulator for a [`GrammarBinding`], owned by the bind pass.
 #[derive(Default)]
 pub struct GrammarBindingBuilder {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,

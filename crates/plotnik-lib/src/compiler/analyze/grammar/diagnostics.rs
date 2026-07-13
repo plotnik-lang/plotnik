@@ -1,11 +1,11 @@
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::core::{NodeFieldId, NodeKindId};
 
+use super::bind::GrammarBinder;
 use super::check::{FieldRef, ParentNode};
-use super::link::GrammarLinker;
 use super::utils::find_similar;
 
-impl<'a, 'q> GrammarLinker<'a, 'q> {
+impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn emit_field_not_on_node(
         &mut self,
         span: Span,
