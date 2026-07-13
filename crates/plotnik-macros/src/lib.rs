@@ -1,6 +1,6 @@
 //! Proc-macro shell for Plotnik: `query!` runs the full compiler pipeline at
 //! build time and expands to the generated query module (typed output types,
-//! `parse`/`matches` entry points, and the compiled matcher).
+//! `match_tree`/`is_match` entry points, and the compiled matcher).
 //!
 //! All compilation logic lives in `plotnik-lib` (built compiler-only, no C);
 //! this crate only parses macro arguments, locates the grammar, and splices

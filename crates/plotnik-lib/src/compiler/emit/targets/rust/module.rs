@@ -1,7 +1,7 @@
 //! The query-module emitter: fork-point NFA → Rust source.
 //!
 //! The output is one self-contained module: typed output structs/enums (the
-//! Rust type renderer's text, verbatim), the `parse`/`matches` surface and
+//! Rust type renderer's text, verbatim), the `match_tree`/`is_match` surface and
 //! per-type trace readers (`reader.rs`), and the compiled matcher itself —
 //! shielded inside a nested `mod matcher` so its machinery names (`Flow`,
 //! state consts) can never collide with a query's own type names.
@@ -238,7 +238,7 @@ impl<'a> Generator<'a> {
             rust_config,
         ));
         out.push_str(
-            &readers.parse_api(
+            &readers.matching_api(
                 self.plan
                     .matcher()
                     .entrypoints()
@@ -1068,7 +1068,7 @@ pub(super) fn depth_expr(limit: Limit, max_reader_frame_bytes: u64) -> String {
 }
 
 const HEADER: &str = r#"
-// Generated Plotnik query module: typed output types, `parse`/`matches` entry
+// Generated Plotnik query module: typed output types, `match_tree`/`is_match` entry
 // points, per-type trace readers, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
@@ -1104,7 +1104,7 @@ const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 /// frame before runtime padding.
 pub(super) const MAX_READER_FRAME_BYTES: u64 = @READER_FRAME@;
 
-/// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
+/// Ceiling on recursive typed replay for safe `match_tree` (`None` opts out). The
 /// matcher itself is iterative; only reader recursion enters this guard.
 pub(super) const MAX_REPLAY_DEPTH: Option<u64> = @DEPTH@;
 
@@ -1250,7 +1250,7 @@ enum Unwound {
 /// independently: each folds away when its resource is unbounded, so a fully
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
 /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-/// `TRACE` controls whether data effects are recorded; `matches` disables it to
+/// `TRACE` controls whether data effects are recorded; `is_match` disables it to
 /// avoid output allocation and replay-depth failures. (No let-chains: generated
 /// code targets the embedding crate's edition.)
 fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(

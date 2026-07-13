@@ -146,7 +146,7 @@ fn compile_strict_query(
 }
 
 /// Every definition becomes snake_case items (`{def}_trace`, the
-/// `parse`/`matches` surface). Distinct PascalCase names can collapse to one
+/// `match_tree`/`is_match` surface). Distinct PascalCase names can collapse to one
 /// snake form (`HTTPServer` / `HttpServer`); generated code would then fail
 /// with a bare rustc duplicate-definition error, so refuse the query with the
 /// real diagnosis instead.
