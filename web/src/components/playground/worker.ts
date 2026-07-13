@@ -5,7 +5,7 @@ import type {
   GeneratedCode,
   PlotnikApi,
   SessionInfo,
-  TokenSpan,
+  QueryToken,
 } from "./protocol";
 
 /* The engine side of the playground: owns the wasm instance and the one
@@ -70,7 +70,7 @@ const api: PlotnikApi = {
 
   async tokenize(query: string) {
     await wasmReady;
-    return tokenize(query) as TokenSpan[];
+    return tokenize(query) as QueryToken[];
   },
 };
 

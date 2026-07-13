@@ -110,12 +110,13 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     },
   );
 
-  const entrypoints = compiled?.info.entrypoints ?? [];
+  const entrypoints = compiled?.info.entry_points ?? [];
   const effectiveEntry =
     entry !== null && entrypoints.includes(entry)
       ? entry
       : (entrypoints[entrypoints.length - 1] ?? null);
-  const hasModule = compiled !== null && compiled.info.bytecode_size !== null;
+  const hasModule =
+    compiled !== null && compiled.info.bytecode_size_bytes !== null;
 
   const generating = useDebouncedTask(
     ready && generatedOpen && hasModule && generated === null,

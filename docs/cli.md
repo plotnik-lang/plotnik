@@ -322,8 +322,9 @@ plotnik trace query.ptk app.js -vv  # very verbose
 ### inspect
 
 Compile and execute a query, emitting the playground inspection bundle: query
-tokens, diagnostics, generated types with source ranges, the match value,
-span/binding joins, and run stats in one JSON document.
+spans and tokens, diagnostics, TypeScript declarations and bindings, entry
+points, the result and its provenance, run statistics, and an optional
+execution trace in one JSON document.
 
 ```sh
 plotnik inspect query.ptk app.js --json

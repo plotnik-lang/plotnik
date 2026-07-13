@@ -21,6 +21,9 @@ mod libc_shims;
 mod langs;
 mod wire;
 
+#[cfg(test)]
+mod wire_tests;
+
 use std::cell::OnceCell;
 
 use langs::Lang;
@@ -66,26 +69,26 @@ impl Session {
         let bytecode_diagnostics = bytecode.diagnostics().clone();
         let mut diagnostics = compiled.diagnostics().clone();
         let module = bytecode.into_artifact();
-        let bytecode_size = module.as_ref().map(Module::bytecode_size);
+        let bytecode_size_bytes = module.as_ref().map(Module::bytecode_size);
         let types = compiled
             .emit_types(TypeScriptCodegenConfig::new().colored(false))
             .map_err(|error| JsValue::from_str(&error.to_string()))?;
         diagnostics.extend(types.diagnostics().clone());
         diagnostics.extend(bytecode_diagnostics);
         let diagnostics = json_value!(diagnostics.to_wire(compiled.source_map()));
-        let (dts, dts_map) = types
+        let (typescript_declarations, typescript_bindings) = types
             .into_artifact()
             .map(|output| output.into_parts())
             .unwrap_or_else(|| (String::new(), Vec::new()));
         let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
         let info = info_json(InfoParts {
             module: module.as_ref(),
-            tokens: json_value!(tokens),
+            query_tokens: json_value!(tokens),
             diagnostics,
-            dts,
-            dts_map: json_value!(dts_map),
-            entrypoints: &entrypoints,
-            bytecode_size,
+            typescript_declarations,
+            typescript_bindings: json_value!(typescript_bindings),
+            entry_points: &entrypoints,
+            bytecode_size_bytes,
         });
 
         Ok(Session {

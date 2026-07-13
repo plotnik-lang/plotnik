@@ -53,8 +53,8 @@ pub fn run(args: TraceArgs) -> CliResult {
         println!(
             "{}",
             serde_json::json!({
-                "recording": recording,
-                "stats": stats,
+                "execution_trace": recording,
+                "run_stats": stats,
             })
         );
 

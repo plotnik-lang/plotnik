@@ -60,7 +60,7 @@ pub fn run(args: InspectArgs) -> CliResult {
         .iter()
         .next()
         .expect("non-empty query has a source");
-    let tokens = tokenize(source.content);
+    let query_tokens = tokenize(source.content);
     let declared_lang = loaded.shebang.lang.clone();
     let shebang_entry = loaded.shebang.entry.clone();
 
@@ -83,7 +83,7 @@ pub fn run(args: InspectArgs) -> CliResult {
         .emit_types(TypeScriptCodegenConfig::new().colored(false))
         .map_err(|error| CliError::fatal(error.to_string()))?;
     let type_diagnostics = types.diagnostics().clone();
-    let (dts, dts_map) = types
+    let (typescript_declarations, typescript_bindings) = types
         .into_artifact()
         .map(|output| output.into_parts())
         .unwrap_or_else(|| (String::new(), Vec::new()));
@@ -96,7 +96,7 @@ pub fn run(args: InspectArgs) -> CliResult {
     let diagnostics_have_errors = diagnostics.has_errors();
     let diagnostics = diagnostics.to_wire(compiled.source_map());
     let module = bytecode.into_artifact();
-    let spans = module
+    let query_spans = module
         .as_ref()
         .map(spans_json)
         .unwrap_or_else(|| Value::Array(Vec::new()));
@@ -120,12 +120,12 @@ pub fn run(args: InspectArgs) -> CliResult {
     };
 
     let bundle = bundle_json(BundleParts {
-        spans,
-        tokens: json_value!(tokens),
+        query_spans,
+        query_tokens: json_value!(query_tokens),
         diagnostics: json_value!(diagnostics),
-        dts,
-        dts_map: json_value!(dts_map),
-        entrypoints: json_value!(entrypoints),
+        typescript_declarations,
+        typescript_bindings: json_value!(typescript_bindings),
+        entry_points: json_value!(entrypoints),
         run: &run,
     });
 
@@ -146,28 +146,37 @@ pub fn run(args: InspectArgs) -> CliResult {
 }
 
 struct BundleParts<'a> {
-    spans: Value,
-    tokens: Value,
+    query_spans: Value,
+    query_tokens: Value,
     diagnostics: Value,
-    dts: String,
-    dts_map: Value,
-    entrypoints: Value,
+    typescript_declarations: String,
+    typescript_bindings: Value,
+    entry_points: Value,
     run: &'a RunPayload,
 }
 
 fn bundle_json(parts: BundleParts<'_>) -> Value {
     let mut object = Map::new();
-    object.insert("v".to_string(), json!(1));
-    object.insert("spans".to_string(), parts.spans);
-    object.insert("tokens".to_string(), parts.tokens);
+    object.insert("version".to_string(), json!(1));
+    object.insert("query_spans".to_string(), parts.query_spans);
+    object.insert("query_tokens".to_string(), parts.query_tokens);
     object.insert("diagnostics".to_string(), parts.diagnostics);
-    object.insert("dts".to_string(), Value::String(parts.dts));
-    object.insert("dts_map".to_string(), parts.dts_map);
-    object.insert("entrypoints".to_string(), parts.entrypoints);
-    object.insert("value".to_string(), parts.run.value.clone());
-    object.insert("inspection".to_string(), parts.run.inspection.clone());
-    object.insert("stats".to_string(), parts.run.stats.clone());
-    object.insert("trace".to_string(), parts.run.trace.clone());
+    object.insert(
+        "typescript_declarations".to_string(),
+        Value::String(parts.typescript_declarations),
+    );
+    object.insert("typescript_bindings".to_string(), parts.typescript_bindings);
+    object.insert("entry_points".to_string(), parts.entry_points);
+    object.insert("result".to_string(), parts.run.result.clone());
+    object.insert(
+        "result_provenance".to_string(),
+        parts.run.result_provenance.clone(),
+    );
+    object.insert("run_stats".to_string(), parts.run.run_stats.clone());
+    object.insert(
+        "execution_trace".to_string(),
+        parts.run.execution_trace.clone(),
+    );
     if let Some(error) = &parts.run.error {
         object.insert("error".to_string(), error.clone());
     }
@@ -209,38 +218,38 @@ fn run_payload_from_result(
         Result<plotnik_lib::MatchJournal<'_>, RuntimeError>,
         plotnik_lib::RunStats,
     ),
-    trace: Option<Value>,
+    execution_trace: Option<Value>,
 ) -> RunPayload {
     let (result, stats) = result;
     match result {
         Ok(journal) => {
             let colors = Colors::new(false);
-            let value =
+            let result =
                 materialize_verified(source_code, module, entrypoint, journal.as_slice(), colors);
             let result_provenance = (!module.spans().is_empty())
                 .then(|| extract_result_provenance(journal.as_slice(), module));
             RunPayload {
-                value: json_value!(value),
-                inspection: json_value!(result_provenance),
-                stats: json_value!(stats),
-                trace: trace.unwrap_or(Value::Null),
+                result: json_value!(result),
+                result_provenance: json_value!(result_provenance),
+                run_stats: json_value!(stats),
+                execution_trace: execution_trace.unwrap_or(Value::Null),
                 error: None,
                 exit: InspectExit::Ok,
             }
         }
         Err(RuntimeError::NoMatch) => RunPayload {
-            value: Value::Null,
-            inspection: Value::Null,
-            stats: Value::Null,
-            trace: trace.unwrap_or(Value::Null),
+            result: Value::Null,
+            result_provenance: Value::Null,
+            run_stats: Value::Null,
+            execution_trace: execution_trace.unwrap_or(Value::Null),
             error: Some(Value::String("no match".to_string())),
             exit: InspectExit::NoMatch,
         },
         Err(error) => RunPayload {
-            value: Value::Null,
-            inspection: Value::Null,
-            stats: Value::Null,
-            trace: trace.unwrap_or(Value::Null),
+            result: Value::Null,
+            result_provenance: Value::Null,
+            run_stats: Value::Null,
+            execution_trace: execution_trace.unwrap_or(Value::Null),
             error: Some(runtime_error_value(&error)),
             exit: InspectExit::RuntimeError,
         },
@@ -248,10 +257,10 @@ fn run_payload_from_result(
 }
 
 struct RunPayload {
-    value: Value,
-    inspection: Value,
-    stats: Value,
-    trace: Value,
+    result: Value,
+    result_provenance: Value,
+    run_stats: Value,
+    execution_trace: Value,
     error: Option<Value>,
     exit: InspectExit,
 }
@@ -259,10 +268,10 @@ struct RunPayload {
 impl RunPayload {
     fn not_run() -> Self {
         Self {
-            value: Value::Null,
-            inspection: Value::Null,
-            stats: Value::Null,
-            trace: Value::Null,
+            result: Value::Null,
+            result_provenance: Value::Null,
+            run_stats: Value::Null,
+            execution_trace: Value::Null,
             error: None,
             exit: InspectExit::Ok,
         }
@@ -316,22 +325,22 @@ fn runtime_error_value(error: &RuntimeError) -> Value {
 fn print_summary(bundle: &Value, color: bool) {
     let colors = Colors::new(color);
     let span_count = bundle
-        .get("spans")
+        .get("query_spans")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
     let entrypoints = bundle
-        .get("entrypoints")
+        .get("entry_points")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
-    println!("spans: {span_count}");
-    println!("entrypoints: {entrypoints}");
+    println!("query spans: {span_count}");
+    println!("entry points: {entrypoints}");
     if let Some(error) = bundle.get("error") {
         eprintln!("error: {error}");
     }
-    if let Some(value) = bundle.get("value")
-        && !value.is_null()
+    if let Some(result) = bundle.get("result")
+        && !result.is_null()
     {
-        println!("value: {}", value);
+        println!("result: {}", result);
     }
     if let Some(diagnostics) = bundle.get("diagnostics").and_then(Value::as_array)
         && !diagnostics.is_empty()

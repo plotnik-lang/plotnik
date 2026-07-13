@@ -27,59 +27,59 @@ pub(crate) use json_value;
 
 /// Inputs for the `Session::info()` payload (`SessionInfo` in protocol.ts).
 pub struct InfoParts<'a> {
-    /// `None` when the query didn't produce bytecode (spans come back empty).
+    /// `None` when the query didn't produce bytecode (query spans come back empty).
     pub module: Option<&'a Module>,
-    pub tokens: JsonValue,
+    pub query_tokens: JsonValue,
     pub diagnostics: JsonValue,
-    pub dts: String,
-    pub dts_map: JsonValue,
-    pub entrypoints: &'a [String],
-    pub bytecode_size: Option<usize>,
+    pub typescript_declarations: String,
+    pub typescript_bindings: JsonValue,
+    pub entry_points: &'a [String],
+    pub bytecode_size_bytes: Option<usize>,
 }
 
 pub fn info_json(parts: InfoParts) -> JsonValue {
     json!({
         // Version marker for the day the shape needs a breaking change.
-        "v": 1,
-        "spans": parts.module.map(spans_json).unwrap_or_else(|| json!([])),
-        "tokens": parts.tokens,
+        "version": 1,
+        "query_spans": parts.module.map(spans_json).unwrap_or_else(|| json!([])),
+        "query_tokens": parts.query_tokens,
         "diagnostics": parts.diagnostics,
-        "dts": parts.dts,
-        "dts_map": parts.dts_map,
-        "entrypoints": parts.entrypoints,
-        "bytecode_size": parts.bytecode_size,
+        "typescript_declarations": parts.typescript_declarations,
+        "typescript_bindings": parts.typescript_bindings,
+        "entry_points": parts.entry_points,
+        "bytecode_size_bytes": parts.bytecode_size_bytes,
     })
 }
 
-/// A finished run (`RunResult` in protocol.ts): materialized value plus
-/// inspection on success, `{error}` otherwise ("no match" included), with
-/// the recording attached when tracing.
+/// A finished run (`RunResult` in protocol.ts): result plus provenance on
+/// success, `{error}` otherwise ("no match" included), with the execution
+/// trace attached when tracing.
 pub fn result_json(
     module: &Module,
     entrypoint: &Entrypoint,
     source: &str,
     result: (Result<MatchJournal<'_>, RuntimeError>, RunStats),
-    trace: Option<JsonValue>,
+    execution_trace: Option<JsonValue>,
 ) -> JsonValue {
     let (result, stats) = result;
     let mut out = match result {
         Ok(journal) => {
             let colors = Colors::new(false);
-            let value =
+            let result =
                 materialize_verified(source, module, entrypoint, journal.as_slice(), colors);
             let result_provenance = (!module.spans().is_empty())
                 .then(|| extract_result_provenance(journal.as_slice(), module));
             json!({
-                "value": json_value!(value),
-                "inspection": json_value!(result_provenance),
-                "stats": json_value!(stats),
+                "result": json_value!(result),
+                "result_provenance": json_value!(result_provenance),
+                "run_stats": json_value!(stats),
             })
         }
         Err(RuntimeError::NoMatch) => error_json("no match"),
         Err(error) => error_json(error.to_string()),
     };
-    if let Some(trace) = trace {
-        out["trace"] = trace;
+    if let Some(execution_trace) = execution_trace {
+        out["execution_trace"] = execution_trace;
     }
     out
 }
@@ -88,7 +88,7 @@ pub fn error_json(error: impl Into<String>) -> JsonValue {
     json!({ "error": error.into() })
 }
 
-/// The static span table (`InspectionSpan[]` in protocol.ts): the hub the
+/// The static query-span table (`QuerySpan[]` in protocol.ts): the hub the
 /// playground joins every view through — see `docs/wip/playground-design.md`
 /// §2. The array index is the SpanId.
 fn spans_json(module: &Module) -> JsonValue {

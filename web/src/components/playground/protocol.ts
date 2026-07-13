@@ -8,7 +8,7 @@
    reads `offset`.) */
 
 /** `tokenize()` output — crates/plotnik-lib/src/compiler/parse/mod.rs `TokenSpan`. */
-export interface TokenSpan {
+export interface QueryToken {
   kind:
     | "whitespace"
     | "comment"
@@ -47,7 +47,7 @@ export interface WireDiagnostic {
 
 /** The static span table: the hub every future cross-view highlight joins
     through (docs/wip/playground-design.md §2). The array index is the SpanId. */
-export interface InspectionSpan {
+export interface QuerySpan {
   id: number;
   source: number;
   kind: string;
@@ -58,7 +58,7 @@ export interface InspectionSpan {
 }
 
 /** `.d.ts` source map — typegen `DtsRange`. */
-export interface DtsRange {
+export interface TypeScriptBinding {
   start: number;
   end: number;
   type_id: number;
@@ -67,14 +67,14 @@ export interface DtsRange {
 
 /** `Session::info()`. */
 export interface SessionInfo {
-  v: number;
-  spans: InspectionSpan[];
-  tokens: TokenSpan[];
+  version: number;
+  query_spans: QuerySpan[];
+  query_tokens: QueryToken[];
   diagnostics: WireDiagnostic[];
-  dts: string;
-  dts_map: DtsRange[];
-  entrypoints: string[];
-  bytecode_size: number | null;
+  typescript_declarations: string;
+  typescript_bindings: TypeScriptBinding[];
+  entry_points: string[];
+  bytecode_size_bytes: number | null;
 }
 
 /** `Session::generate()` — production generated-code artifact. */
@@ -89,21 +89,21 @@ export interface GeneratedCode {
 }
 
 export interface RunStats {
-  steps_used: number;
+  fuel_used: number;
   heap_high_water: number;
 }
 
 /** `Session::run()`/`trace()` — either a result or a runtime error ("no
-    match" included); `trace` is attached to both when recording. */
+    match" included); `execution_trace` is attached to both when recording. */
 export type RunResult =
   | {
-      value: unknown;
-      inspection: unknown;
-      stats: RunStats;
-      trace?: unknown;
+      result: unknown;
+      result_provenance: unknown;
+      run_stats: RunStats;
+      execution_trace?: unknown;
       error?: undefined;
     }
-  | { error: string; trace?: unknown };
+  | { error: string; execution_trace?: unknown };
 
 /** `ast()` output — crates/plotnik-lib/src/core/tree_dump.rs.
     A pre-rendered dump of the source tree in Plotnik pattern syntax;
@@ -152,5 +152,5 @@ export interface PlotnikApi {
   ): Promise<RunResult>;
   /** Dump `source`'s tree; `raw` includes anonymous nodes. */
   ast(source: string, lang: string, raw: boolean): Promise<AstResult>;
-  tokenize(query: string): Promise<TokenSpan[]>;
+  tokenize(query: string): Promise<QueryToken[]>;
 }

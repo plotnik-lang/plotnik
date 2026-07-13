@@ -122,7 +122,7 @@ export default function Playground() {
         view,
         compiled.query,
         compiled.info.diagnostics,
-        compiled.info.tokens,
+        compiled.info.query_tokens,
       );
     }
   }, [compiled]);
@@ -150,7 +150,7 @@ export default function Playground() {
       (d) => d.severity.toLowerCase() !== "warning",
     ).length ?? 0;
   const warningCount = (compiled?.info.diagnostics.length ?? 0) - errorCount;
-  const bytecodeSize = compiled?.info.bytecode_size ?? null;
+  const bytecodeSize = compiled?.info.bytecode_size_bytes ?? null;
 
   const sourceExtensions = useMemo(
     () => [

@@ -51,9 +51,9 @@ pub fn run(args: RunArgs) -> CliResult {
                 println!(
                     "{}",
                     serde_json::json!({
-                        "value": null,
+                        "result": null,
                         "error": "no match",
-                        "stats": stats,
+                        "run_stats": stats,
                     })
                 );
                 return Err(CliError::No);
@@ -65,7 +65,7 @@ pub fn run(args: RunArgs) -> CliResult {
         };
 
         let colors = Colors::new(false);
-        let value = materialize_verified(
+        let result = materialize_verified(
             &source_code,
             &module,
             &entrypoint,
@@ -77,9 +77,9 @@ pub fn run(args: RunArgs) -> CliResult {
         println!(
             "{}",
             serde_json::json!({
-                "value": value,
-                "inspection": result_provenance,
-                "stats": stats,
+                "result": result,
+                "result_provenance": result_provenance,
+                "run_stats": stats,
             })
         );
         return Ok(());
