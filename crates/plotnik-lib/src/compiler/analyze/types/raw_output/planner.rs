@@ -102,9 +102,9 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 Ok((CaptureTypePlan::list(list, element), false))
             }
             TypeShape::Ref(target) => {
-                self.str_plan(self.raw.definition(*target), zero_node_terminal, visiting)
+                self.str_plan(self.raw.declaration(*target), zero_node_terminal, visiting)
             }
-            TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         };
@@ -142,7 +142,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 Ok(CaptureTypePlan::option(TYPE_BOOL, OptionMode::Bool, inner))
             }
             TypeShape::Ref(target) => {
-                self.bool_required(self.raw.definition(*target), may_be_absent, visiting)
+                self.bool_required(self.raw.declaration(*target), may_be_absent, visiting)
             }
             TypeShape::List { .. } if may_be_absent => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
@@ -157,7 +157,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) => Err(
                 "capture type `bool` requires a value that may be absent; this capture is always present",
             ),
-            TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         };
@@ -172,7 +172,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
     ) -> Result<CaptureTypePlan, &'static str> {
         match self.raw.shape(type_id) {
             TypeShape::Option(_) => self.bool_required(type_id, false, visiting),
-            TypeShape::Ref(target) => self.bool_present(self.raw.definition(*target), visiting),
+            TypeShape::Ref(target) => self.bool_present(self.raw.declaration(*target), visiting),
             TypeShape::Node
             | TypeShape::Record(_)
             | TypeShape::Variant(_)
@@ -180,7 +180,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 TYPE_BOOL,
                 terminal_data(self.raw.shape(type_id)),
             )),
-            TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         }

@@ -16,7 +16,7 @@ use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
-use crate::compiler::ids::DefId;
+use crate::compiler::ids::{DefId, TypeDeclId};
 use crate::core::{Interner, Symbol};
 
 const MAX_MEMBERS: usize = u16::MAX as usize;
@@ -143,12 +143,12 @@ pub(crate) struct CaptureLayout {
 pub(crate) struct OutputTypeLayout {
     no_value: bool,
     builtins: Vec<TypeId>,
-    custom_types: Vec<TypeId>,
+    value_types: Vec<TypeId>,
     output_ids: HashMap<TypeId, u32>,
 }
 
 impl OutputTypeLayout {
-    fn build(no_value: bool, used_builtins: &HashSet<TypeId>, custom_types: Vec<TypeId>) -> Self {
+    fn build(no_value: bool, used_builtins: &HashSet<TypeId>, value_types: Vec<TypeId>) -> Self {
         let builtins = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
             .into_iter()
             .filter(|builtin| used_builtins.contains(builtin))
@@ -156,7 +156,7 @@ impl OutputTypeLayout {
 
         let output_ids = builtins
             .iter()
-            .chain(&custom_types)
+            .chain(&value_types)
             .enumerate()
             .map(|(index, &type_id)| {
                 (
@@ -169,7 +169,7 @@ impl OutputTypeLayout {
         Self {
             no_value,
             builtins,
-            custom_types,
+            value_types,
             output_ids,
         }
     }
@@ -190,8 +190,8 @@ impl OutputTypeLayout {
         0
     }
 
-    pub(crate) fn custom_types(&self) -> &[TypeId] {
-        &self.custom_types
+    pub(crate) fn value_types(&self) -> &[TypeId] {
+        &self.value_types
     }
 
     pub(crate) fn output_id(&self, type_id: TypeId) -> u32 {
@@ -286,15 +286,15 @@ pub(crate) struct OutputSchema<'a> {
     collected_types: CollectedTypes,
     type_layout: OnceLock<OutputTypeLayout>,
     named_types: BTreeMap<TypeId, Symbol>,
-    type_declarations: Vec<TypeDeclaration>,
+    type_name_bindings: Vec<TypeNameBinding>,
     entry_point_items: Vec<OutputItem>,
     capture_layout: CaptureLayout,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct TypeDeclaration {
+pub(crate) struct TypeNameBinding {
     pub(crate) name: Symbol,
-    pub(crate) body: TypeId,
+    pub(crate) type_id: TypeId,
 }
 
 impl<'a> OutputSchema<'a> {
@@ -316,23 +316,23 @@ impl<'a> OutputSchema<'a> {
         let reachable_defs =
             deps.reachable_from(types.iter_entry_point_outputs().map(|(def_id, _)| def_id));
         let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
-        let capture_layout = CaptureLayout::build(types, &collected_types.custom)?;
+        let capture_layout = CaptureLayout::build(types, &collected_types.value_types)?;
         let named_types: BTreeMap<TypeId, Symbol> = types.iter_named_types().collect();
-        let mut type_declarations = named_types
+        let mut type_name_bindings = named_types
             .iter()
-            .map(|(&body, &name)| TypeDeclaration { name, body })
+            .map(|(&type_id, &name)| TypeNameBinding { name, type_id })
             .collect::<Vec<_>>();
         for def_id in reachable_defs.iter() {
             let Some(body) = types.expect_def_output(def_id).value() else {
                 continue;
             };
-            type_declarations.push(TypeDeclaration {
+            type_name_bindings.push(TypeNameBinding {
                 name: deps.def_name_sym(def_id),
-                body,
+                type_id: body,
             });
         }
-        type_declarations.sort_by_key(|declaration| (declaration.body, declaration.name));
-        type_declarations.dedup();
+        type_name_bindings.sort_by_key(|binding| (binding.type_id, binding.name));
+        type_name_bindings.dedup();
         let entry_point_items = ItemCollector::new(types, deps, &named_types).collect();
         Ok(Self {
             types,
@@ -341,7 +341,7 @@ impl<'a> OutputSchema<'a> {
             collected_types,
             type_layout: OnceLock::new(),
             named_types,
-            type_declarations,
+            type_name_bindings,
             entry_point_items,
             capture_layout,
         })
@@ -352,7 +352,7 @@ impl<'a> OutputSchema<'a> {
             OutputTypeLayout::build(
                 self.collected_types.no_value,
                 &self.collected_types.builtins,
-                self.collected_types.custom.clone(),
+                self.collected_types.value_types.clone(),
             )
         })
     }
@@ -361,8 +361,8 @@ impl<'a> OutputSchema<'a> {
         self.named_types.get(&type_id).copied()
     }
 
-    pub(crate) fn iter_type_declarations(&self) -> impl Iterator<Item = TypeDeclaration> + '_ {
-        self.type_declarations.iter().copied()
+    pub(crate) fn iter_type_name_bindings(&self) -> impl Iterator<Item = TypeNameBinding> + '_ {
+        self.type_name_bindings.iter().copied()
     }
 
     /// Public output items reachable from selectable definition outputs.
@@ -463,8 +463,8 @@ impl<'a> ItemCollector<'a> {
             TypeShape::List { element, .. } | TypeShape::Option(element) => {
                 self.collect_position(*element)
             }
-            TypeShape::Ref(def_id) => self.collect_reference(*def_id),
-            TypeShape::Node | TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {}
+            TypeShape::Ref(declaration) => self.collect_reference(*declaration),
+            TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
         }
     }
 
@@ -477,7 +477,6 @@ impl<'a> ItemCollector<'a> {
                     .expect("naming pass names every non-payload composite");
                 self.add_item(name, ty);
             }
-            TypeShape::Custom(name) => self.add_item(*name, ty),
             TypeShape::List { .. } | TypeShape::Option(_) => {
                 let Some(&name) = self.named_types.get(&ty) else {
                     self.walk(ty);
@@ -485,28 +484,28 @@ impl<'a> ItemCollector<'a> {
                 };
                 self.add_item(name, ty);
             }
-            TypeShape::Ref(def_id) => self.collect_reference(*def_id),
+            TypeShape::Ref(declaration) => self.collect_reference(*declaration),
             TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
         }
     }
 
-    fn collect_reference(&mut self, def_id: DefId) {
-        let Some(output) = self.types.expect_def_output(def_id).value() else {
+    fn collect_reference(&mut self, declaration: TypeDeclId) {
+        let Some(declaration) = self.types.declaration(declaration) else {
             return;
         };
-        self.add_item(self.deps.def_name_sym(def_id), output);
+        self.add_item(declaration.name, declaration.body);
     }
 }
 
 /// Value types in dependency order for wire-table emission.
 #[cfg(test)]
 pub(super) fn collect_ordered_types(types: &TypeAnalysis) -> Vec<TypeId> {
-    CollectedTypes::collect(types, types.iter_def_output().map(|(def_id, _)| def_id)).custom
+    CollectedTypes::collect(types, types.iter_def_output().map(|(def_id, _)| def_id)).value_types
 }
 
 #[derive(Clone, Debug)]
 struct CollectedTypes {
-    custom: Vec<TypeId>,
+    value_types: Vec<TypeId>,
     builtins: HashSet<TypeId>,
     no_value: bool,
 }
@@ -529,7 +528,7 @@ impl CollectedTypes {
             }
         }
         Self {
-            custom: collector.out,
+            value_types: collector.out,
             builtins: collector.builtins,
             no_value: no_value || collector.no_value,
         }
@@ -567,19 +566,19 @@ impl TypeCollector {
         {
             self.no_value = true;
         }
-        if let TypeShape::Ref(def_id) = shape {
-            let Some(target) = types.expect_def_output(*def_id).value() else {
+        if let TypeShape::Ref(declaration) = shape {
+            let Some(declaration) = types.declaration(*declaration) else {
                 self.builtins.insert(TYPE_NODE);
                 return;
             };
-            self.collect(target, types);
+            self.collect(declaration.body, types);
+            if types.declaration_definition(declaration.id).is_none() && self.seen.insert(type_id) {
+                self.out.push(type_id);
+            }
             return;
         }
 
         self.seen.insert(type_id);
-        if matches!(shape, TypeShape::Custom(_)) {
-            self.builtins.insert(TYPE_NODE);
-        }
         for child in shape.child_type_ids() {
             self.collect(child, types);
         }
@@ -589,7 +588,6 @@ impl TypeCollector {
                 | TypeShape::Variant(_)
                 | TypeShape::List { .. }
                 | TypeShape::Option(_)
-                | TypeShape::Custom(_)
         ) {
             self.out.push(type_id);
         }

@@ -252,11 +252,7 @@ impl<'a> EmitPipeline<'a> {
         for entry in &spans.entries {
             let (type_id, member) = match entry.binding {
                 Some(SpanBindingIR::Type(type_id)) => {
-                    let type_id = self.input.type_analysis.resolve_underlying_type_id(type_id);
-                    let wire_type = self
-                        .types
-                        .lookup(type_id)
-                        .expect("validated span type binding must reference an emitted type");
+                    let wire_type = self.types.resolve_type(type_id, self.input.type_analysis)?;
                     (u16::from(wire_type), SPAN_NO_BINDING)
                 }
                 Some(SpanBindingIR::Member(member_ref)) => {

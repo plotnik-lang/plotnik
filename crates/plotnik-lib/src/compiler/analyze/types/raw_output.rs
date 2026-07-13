@@ -16,13 +16,12 @@ use crate::compiler::analyze::types::capture_type::{
 };
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    DefinitionOutput, ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NODE,
-    TYPE_TEXT, TypeId, TypeShape,
+    ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId,
+    TypeShape,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
@@ -87,12 +86,6 @@ impl RawCaptureObservation {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RawDefinitionValueRole {
-    Fields,
-    Value,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct RawCaptureId(u32);
 
@@ -127,7 +120,7 @@ struct RawFieldsFlow {
 #[derive(Clone, Debug)]
 enum RawPatternFlow {
     NoValue,
-    Value(TypeId),
+    Value,
     Fields(RawFieldsFlow),
 }
 
@@ -135,7 +128,7 @@ impl RawPatternFlow {
     fn fields(&self) -> Option<&BTreeMap<Symbol, RawFieldOutput>> {
         match self {
             Self::Fields(fields) => Some(&fields.fields),
-            Self::NoValue | Self::Value(_) => None,
+            Self::NoValue | Self::Value => None,
         }
     }
 }
@@ -164,25 +157,6 @@ struct RawAlternationOutput {
     incompatible_field: Option<Symbol>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct RawDefinitionOutput {
-    body: RawFlowId,
-    value_role: RawDefinitionValueRole,
-}
-
-impl RawDefinitionOutput {
-    fn output(self, graph: &RawOutputGraph) -> DefinitionOutput {
-        match &graph.flow(self.body).flow {
-            RawPatternFlow::NoValue => DefinitionOutput::MatchOnly,
-            RawPatternFlow::Fields(fields) => DefinitionOutput::Value(fields.type_id),
-            RawPatternFlow::Value(type_id) if self.value_role == RawDefinitionValueRole::Value => {
-                DefinitionOutput::Value(*type_id)
-            }
-            RawPatternFlow::Value(_) => DefinitionOutput::MatchOnly,
-        }
-    }
-}
-
 /// Frozen, builtin-only provenance projection read by the capture-type
 /// normalizer. It never leaks raw producer identities into public output.
 #[derive(Clone, Debug)]
@@ -190,7 +164,6 @@ pub(crate) struct RawOutputGraph {
     captures: Vec<RawCaptureOutput>,
     flows: Vec<RawPatternOutput>,
     alternations: HashMap<Pattern, RawAlternationOutput>,
-    definitions: BTreeMap<DefId, RawDefinitionOutput>,
 }
 
 impl RawOutputGraph {
@@ -214,7 +187,6 @@ pub(crate) struct RawOutputGraphBuilder {
     flows: Vec<RawPatternOutput>,
     flow_ids: HashMap<Pattern, RawFlowId>,
     alternations: HashMap<Pattern, RawAlternationOutput>,
-    definitions: BTreeMap<DefId, RawDefinitionOutput>,
     incompatibilities: HashMap<Pattern, Symbol>,
 }
 
@@ -253,7 +225,7 @@ impl RawOutputGraphBuilder {
         // enabled only for queries whose cheap pre-scan found a builtin.
         let flow = match &shape.flow {
             PatternFlow::NoValue => RawPatternFlow::NoValue,
-            PatternFlow::Value(type_id) => RawPatternFlow::Value(*type_id),
+            PatternFlow::Value(_) => RawPatternFlow::Value,
             PatternFlow::Fields(type_id) => {
                 let mut sources = self.pattern_field_sources(&occurrence);
                 let fields = analysis
@@ -306,25 +278,11 @@ impl RawOutputGraphBuilder {
         self.incompatibilities.insert(pattern, field);
     }
 
-    pub(crate) fn record_definition(
-        &mut self,
-        def_id: DefId,
-        body: &Pattern,
-        value_role: RawDefinitionValueRole,
-    ) {
-        let body = self.flow_id(body);
-        let previous = self
-            .definitions
-            .insert(def_id, RawDefinitionOutput { body, value_role });
-        assert!(previous.is_none(), "raw definition output recorded once");
-    }
-
     pub(crate) fn finish(self) -> RawOutputGraph {
         RawOutputGraph {
             captures: self.captures,
             flows: self.flows,
             alternations: self.alternations,
-            definitions: self.definitions,
         }
     }
 

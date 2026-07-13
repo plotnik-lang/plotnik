@@ -130,7 +130,7 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
         }
 
         match self.types.expect_type_shape(ty) {
-            TypeShape::Node | TypeShape::Custom(_) => NODE_VALUE_BYTES,
+            TypeShape::Node => NODE_VALUE_BYTES,
             TypeShape::Text => 2 * WORD_BYTES,
             TypeShape::Bool => 1,
             TypeShape::Option(inner) => {
@@ -160,8 +160,8 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
                     .unwrap_or(0);
                 WORD_BYTES.saturating_add(widest)
             }
-            TypeShape::Ref(def_id) => {
-                let Some(target) = self.types.expect_def_output(*def_id).value() else {
+            TypeShape::Ref(declaration) => {
+                let Some(target) = self.types.declaration_body(*declaration) else {
                     return NODE_VALUE_BYTES;
                 };
                 if self.model.is_boxed_ref(context, ty) {

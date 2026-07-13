@@ -2,6 +2,7 @@
 
 use super::planner::CaptureTypePlanner;
 use super::*;
+use crate::compiler::ids::TypeDeclId;
 
 #[cfg(test)]
 #[path = "normalize_tests.rs"]
@@ -76,7 +77,7 @@ impl<'a, 'd> NormalizationSession<'a, 'd> {
     ) -> Self {
         Self {
             graph,
-            raw_types: RawTypeSnapshot::new(types, graph),
+            raw_types: RawTypeSnapshot::new(types),
             types,
             interner,
             diagnostics,
@@ -184,29 +185,34 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
 #[derive(Clone)]
 pub(super) struct RawTypeSnapshot {
     types: Vec<Option<TypeShape>>,
-    definitions: BTreeMap<DefId, TypeId>,
+    declarations: BTreeMap<TypeDeclId, TypeId>,
     invalid_containment: HashSet<TypeId>,
 }
 
 impl RawTypeSnapshot {
-    fn new(
-        types: &crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
-        graph: &RawOutputGraph,
-    ) -> Self {
+    fn new(types: &crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder) -> Self {
         let type_shapes = types.type_shapes_snapshot();
-        let definitions = graph
-            .definitions
+        let declarations = type_shapes
             .iter()
-            .map(|(&def_id, &output)| {
-                let body = output.output(graph).value().unwrap_or(TYPE_NODE);
-                (def_id, body)
+            .filter_map(|shape| match shape {
+                Some(TypeShape::Ref(declaration)) => Some(*declaration),
+                _ => None,
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .map(|declaration| {
+                let body = types
+                    .in_progress()
+                    .declaration_body(declaration)
+                    .unwrap_or(TYPE_NODE);
+                (declaration, body)
             })
             .collect();
         let invalid_containment =
-            compute_invalid_containment(&type_shapes, &definitions, &types.invalid_types);
+            compute_invalid_containment(&type_shapes, &declarations, &types.invalid_types);
         Self {
             types: type_shapes,
-            definitions,
+            declarations,
             invalid_containment,
         }
     }
@@ -218,11 +224,11 @@ impl RawTypeSnapshot {
             .expect("raw capture type must be registered")
     }
 
-    pub(super) fn definition(&self, def_id: DefId) -> TypeId {
+    pub(super) fn declaration(&self, declaration: TypeDeclId) -> TypeId {
         *self
-            .definitions
-            .get(&def_id)
-            .expect("raw referenced definition must have an output")
+            .declarations
+            .get(&declaration)
+            .expect("raw referenced declaration must have a body")
     }
 
     fn type_contains_invalid(&self, type_id: TypeId) -> bool {
@@ -232,7 +238,7 @@ impl RawTypeSnapshot {
 
 fn compute_invalid_containment(
     types: &[Option<TypeShape>],
-    definitions: &BTreeMap<DefId, TypeId>,
+    declarations: &BTreeMap<TypeDeclId, TypeId>,
     invalid: &HashSet<TypeId>,
 ) -> HashSet<TypeId> {
     // Work backwards from invalid types. Unlike recursive DFS memoization,
@@ -244,10 +250,10 @@ fn compute_invalid_containment(
             continue;
         };
         let container = TypeId(index as u32);
-        if let TypeShape::Ref(def_id) = shape {
-            let child = *definitions
-                .get(def_id)
-                .expect("raw referenced definition has an output");
+        if let TypeShape::Ref(declaration) = shape {
+            let child = *declarations
+                .get(declaration)
+                .expect("raw referenced declaration has a body");
             containers
                 .get_mut(child.0 as usize)
                 .expect("raw child type must be registered")
@@ -366,7 +372,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         let output = self.session.graph.flow(id).clone();
         let raw_fields = match &output.flow {
             RawPatternFlow::Fields(fields) => fields.clone(),
-            RawPatternFlow::NoValue | RawPatternFlow::Value(_) => {
+            RawPatternFlow::NoValue | RawPatternFlow::Value => {
                 self.visiting.remove(&id);
                 return None;
             }

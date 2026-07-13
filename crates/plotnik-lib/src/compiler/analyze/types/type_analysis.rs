@@ -1,21 +1,18 @@
 //! `TypeAnalysis`: the frozen result of type inference.
 //!
-//! Holds the interned type registry, each definition's output type and root
-//! extent, the per-pattern inference results, and explicit type aliases. It is built
+//! Holds the interned type registry, named type declarations, each definition's
+//! output and root extent, and the per-pattern inference results. It is built
 //! incrementally by [`TypeAnalysisBuilder`] and frozen with
 //! [`TypeAnalysisBuilder::finish`]; past that boundary it is immutable and its
 //! accessors are trusted (a structural miss is a compiler bug, not a query
 //! condition).
 //!
-//! Definition *identity* (names, `DefId`s, recursion) is not stored here — it is
-//! owned by `DependencyAnalysis` and read from there. This artifact only maps the
-//! `DefId`s that analysis already assigned to the types it inferred for them.
+//! Definition matching identity remains owned by `DependencyAnalysis`. This
+//! artifact records the separate type declaration owned by each definition.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::compiler::analyze::types::raw_output::{
-    RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
-};
+use crate::compiler::analyze::types::raw_output::{RawCaptureObservation, RawOutputGraphBuilder};
 use crate::compiler::analyze::types::type_shape::{
     DefinitionOutput, PatternFlow, PatternShape, RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL,
     TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
@@ -23,7 +20,7 @@ use crate::compiler::analyze::types::type_shape::{
 use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::ids::DefId;
+use crate::compiler::ids::{DefId, TypeDeclId};
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
@@ -36,6 +33,21 @@ pub struct CustomCaptureTypeOccurrence {
     pub type_id: TypeId,
 }
 
+/// A named result type whose identity is independent of its structural body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TypeDeclaration {
+    pub id: TypeDeclId,
+    pub name: Symbol,
+    pub body: TypeId,
+}
+
+#[derive(Clone, Debug)]
+struct TypeDeclarationEntry {
+    name: Symbol,
+    body: Option<TypeId>,
+    definition: Option<DefId>,
+}
+
 /// Frozen registry of inferred types and per-definition / per-pattern results.
 ///
 /// Constructed only via [`TypeAnalysisBuilder`]; the private fields and
@@ -44,6 +56,8 @@ pub struct CustomCaptureTypeOccurrence {
 #[non_exhaustive]
 pub struct TypeAnalysis {
     types: Vec<TypeEntry>,
+    declarations: Vec<TypeDeclarationEntry>,
+    definition_declarations: BTreeMap<DefId, TypeDeclId>,
 
     /// Each definition's output, keyed by `DefId`. `BTreeMap` so iteration
     /// is in `DefId` order — the SCC/emission order entry points rely on. Total
@@ -89,14 +103,49 @@ impl TypeAnalysis {
             .expect("admitted type id must reference a registered type")
     }
 
+    pub fn declaration(&self, id: TypeDeclId) -> Option<TypeDeclaration> {
+        let entry = self.declarations.get(id.index())?;
+        Some(TypeDeclaration {
+            id,
+            name: entry.name,
+            body: entry.body?,
+        })
+    }
+
+    pub fn declaration_body(&self, id: TypeDeclId) -> Option<TypeId> {
+        self.declarations
+            .get(id.index())
+            .and_then(|entry| entry.body)
+    }
+
+    pub fn declaration_name(&self, id: TypeDeclId) -> Symbol {
+        self.declarations
+            .get(id.index())
+            .expect("type declaration id must be registered")
+            .name
+    }
+
+    pub fn declaration_definition(&self, id: TypeDeclId) -> Option<DefId> {
+        self.declarations
+            .get(id.index())
+            .expect("type declaration id must be registered")
+            .definition
+    }
+
+    pub fn definition_declaration(&self, def_id: DefId) -> TypeDeclId {
+        *self
+            .definition_declarations
+            .get(&def_id)
+            .expect("every definition must own a type declaration slot")
+    }
+
     fn type_is_option(&self, mut type_id: TypeId) -> bool {
         let mut seen = HashSet::new();
         while seen.insert(type_id) {
             match self.type_shape(type_id) {
                 Some(TypeShape::Option(_)) => return true,
-                Some(TypeShape::Ref(def_id)) => {
-                    let Some(target) = self.def_output(*def_id).and_then(DefinitionOutput::value)
-                    else {
+                Some(TypeShape::Ref(declaration)) => {
+                    let Some(target) = self.declaration_body(*declaration) else {
                         return false;
                     };
                     type_id = target;
@@ -140,9 +189,8 @@ impl TypeAnalysis {
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
             Some(TypeShape::Variant(_) | TypeShape::Record(_)) => true,
-            Some(TypeShape::Ref(def_id)) => self
-                .def_output(*def_id)
-                .and_then(DefinitionOutput::value)
+            Some(TypeShape::Ref(declaration)) => self
+                .declaration_body(*declaration)
                 .is_none_or(|t| self.is_structured_output(t)),
             Some(shape @ (TypeShape::List { .. } | TypeShape::Option(_))) => shape
                 .child_type_ids()
@@ -214,10 +262,10 @@ impl TypeAnalysis {
     /// capture of such a reference takes the matched node (the callee leaves no
     /// pending value), so `Node` is the shape the reference stands for.
     pub fn resolve_underlying_type_id(&self, type_id: TypeId) -> TypeId {
-        let Some(TypeShape::Ref(def_id)) = self.type_shape(type_id) else {
+        let Some(TypeShape::Ref(declaration)) = self.type_shape(type_id) else {
             return type_id;
         };
-        let Some(target) = self.expect_def_output(*def_id).value() else {
+        let Some(target) = self.declaration_body(*declaration) else {
             return TYPE_NODE;
         };
         self.resolve_underlying_type_id(target)
@@ -279,10 +327,10 @@ impl TypeAnalysis {
                 assert!(!self.type_is_option(*inner), "Option must be idempotent",);
             }
 
-            if let TypeShape::Ref(def_id) = shape {
+            if let TypeShape::Ref(declaration) = shape {
                 assert!(
-                    self.def_output.contains_key(def_id),
-                    "every Ref target must have an inferred output type",
+                    self.declarations.get(declaration.index()).is_some(),
+                    "every Ref target must be a registered type declaration",
                 );
             }
         }
@@ -291,6 +339,15 @@ impl TypeAnalysis {
             if let DefinitionOutput::Value(type_id) = output {
                 self.assert_type_id_registered(*type_id, "def output type id out of range");
             }
+        }
+
+        for (&def_id, &declaration) in &self.definition_declarations {
+            let entry = self
+                .declarations
+                .get(declaration.index())
+                .expect("definition declaration id must be registered");
+            assert_eq!(entry.definition, Some(def_id));
+            assert_eq!(entry.body, self.expect_def_output(def_id).value());
         }
 
         assert_eq!(
@@ -405,6 +462,9 @@ pub struct TypeAnalysisBuilder {
     /// Scratch: only the naming pass consults it.
     custom_capture_types: Vec<CustomCaptureTypeOccurrence>,
 
+    /// Explicit capture-type declarations deduplicated by name and body.
+    capture_type_declarations: HashMap<(Symbol, TypeId), TypeDeclId>,
+
     /// Present only when the builtin pre-scan requests producer provenance.
     /// Keeping the recorder on the builder prevents normalization details from
     /// leaking into the ordinary public type model.
@@ -435,6 +495,18 @@ impl TypeAnalysisView<'_> {
     pub(crate) fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
         self.analysis.def_output(def_id)
     }
+
+    pub(crate) fn declaration_body(&self, declaration: TypeDeclId) -> Option<TypeId> {
+        self.analysis.declaration_body(declaration)
+    }
+
+    pub(crate) fn declaration_definition(&self, declaration: TypeDeclId) -> Option<DefId> {
+        self.analysis.declaration_definition(declaration)
+    }
+
+    pub(crate) fn declaration_name(&self, declaration: TypeDeclId) -> Symbol {
+        self.analysis.declaration_name(declaration)
+    }
 }
 
 impl Default for TypeAnalysisBuilder {
@@ -448,6 +520,8 @@ impl TypeAnalysisBuilder {
         let mut builder = Self {
             analysis: TypeAnalysis {
                 types: Vec::new(),
+                declarations: Vec::new(),
+                definition_declarations: BTreeMap::new(),
                 def_output: BTreeMap::new(),
                 def_root_extent: BTreeMap::new(),
                 pattern_result: HashMap::new(),
@@ -458,6 +532,7 @@ impl TypeAnalysisBuilder {
             intern_index: HashMap::new(),
             type_provenance: HashMap::new(),
             custom_capture_types: Vec::new(),
+            capture_type_declarations: HashMap::new(),
             raw_output_graph: None,
             invalid_types: HashSet::new(),
         };
@@ -569,8 +644,46 @@ impl TypeAnalysisBuilder {
         *current = fields;
     }
 
-    pub fn intern_custom(&mut self, name: Symbol) -> TypeId {
-        self.intern_type(TypeShape::Custom(name))
+    pub fn declare_definitions(&mut self, definitions: impl IntoIterator<Item = (DefId, Symbol)>) {
+        for (def_id, name) in definitions {
+            assert!(
+                !self.analysis.definition_declarations.contains_key(&def_id),
+                "definition declaration slots are reserved once",
+            );
+            let id = TypeDeclId::from_raw(
+                u32::try_from(self.analysis.declarations.len())
+                    .expect("type declaration count fits u32"),
+            );
+            self.analysis.declarations.push(TypeDeclarationEntry {
+                name,
+                body: None,
+                definition: Some(def_id),
+            });
+            self.analysis.definition_declarations.insert(def_id, id);
+        }
+    }
+
+    pub fn definition_ref(&mut self, def_id: DefId) -> TypeId {
+        let declaration = self.analysis.definition_declaration(def_id);
+        self.intern_type(TypeShape::Ref(declaration))
+    }
+
+    pub fn declare_capture_type(&mut self, name: Symbol, body: TypeId) -> TypeId {
+        if let Some(&declaration) = self.capture_type_declarations.get(&(name, body)) {
+            return self.intern_type(TypeShape::Ref(declaration));
+        }
+        let declaration = TypeDeclId::from_raw(
+            u32::try_from(self.analysis.declarations.len())
+                .expect("type declaration count fits u32"),
+        );
+        self.analysis.declarations.push(TypeDeclarationEntry {
+            name,
+            body: Some(body),
+            definition: None,
+        });
+        self.capture_type_declarations
+            .insert((name, body), declaration);
+        self.intern_type(TypeShape::Ref(declaration))
     }
 
     /// Record where a fresh record/variant type came from, for naming-pass diagnostics.
@@ -658,18 +771,8 @@ impl TypeAnalysisBuilder {
 
     pub fn record_def_output(&mut self, def_id: DefId, output: DefinitionOutput) {
         self.analysis.def_output.insert(def_id, output);
-    }
-
-    pub(crate) fn record_raw_definition(
-        &mut self,
-        def_id: DefId,
-        body: &Pattern,
-        value_role: RawDefinitionValueRole,
-    ) {
-        let Some(graph) = &mut self.raw_output_graph else {
-            return;
-        };
-        graph.record_definition(def_id, body, value_role);
+        let declaration = self.analysis.definition_declaration(def_id);
+        self.analysis.declarations[declaration.index()].body = output.value();
     }
 
     pub(crate) fn normalize_capture_types(
@@ -755,15 +858,11 @@ impl TypeAnalysisBuilder {
 
     fn transparent_alias_body(&self, mut type_id: TypeId) -> TypeId {
         let mut seen = HashSet::new();
-        while let Some(TypeShape::Ref(def_id)) = self.analysis.type_shape(type_id) {
-            if !seen.insert(*def_id) {
+        while let Some(TypeShape::Ref(declaration)) = self.analysis.type_shape(type_id) {
+            if !seen.insert(*declaration) {
                 return type_id;
             }
-            let Some(body) = self
-                .analysis
-                .def_output(*def_id)
-                .and_then(DefinitionOutput::value)
-            else {
+            let Some(body) = self.analysis.declaration_body(*declaration) else {
                 return type_id;
             };
             match self.analysis.type_shape(body) {

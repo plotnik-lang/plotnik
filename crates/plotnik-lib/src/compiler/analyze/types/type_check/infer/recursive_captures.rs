@@ -10,9 +10,7 @@
 
 use std::collections::HashMap;
 
-use crate::compiler::analyze::types::type_shape::{
-    DefinitionOutput, PatternFlow, PatternShape, TypeShape,
-};
+use crate::compiler::analyze::types::type_shape::{DefinitionOutput, PatternFlow, PatternShape};
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 
@@ -170,7 +168,7 @@ impl InferVisitor<'_, '_> {
         let flow = match output {
             DefinitionOutput::MatchOnly => PatternFlow::NoValue,
             DefinitionOutput::Value(_) => {
-                let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
+                let ref_type = self.ctx.type_ctx.definition_ref(def_id);
                 PatternFlow::Value(ref_type)
             }
         };

@@ -9,8 +9,6 @@ warning: this capture already has type `Node`; naming it `Node` has no effect
 export interface Q {
   x: Node;
 }
-
-export type Node = Node;
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 
@@ -18,5 +16,3 @@ use ::plotnik_rt::Node;
 pub struct Q<'t> {
     pub x: Node<'t>,
 }
-
-pub type Node<'t> = Node<'t>;

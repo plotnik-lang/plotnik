@@ -30,7 +30,7 @@ use rowan::TextRange;
 use super::unify::unify_flows;
 use crate::compiler::analyze::types::capture_kind::CaptureKind;
 use crate::compiler::analyze::types::raw_output::{
-    RawCaptureContract, RawCaptureIntent, RawCaptureObservation, RawDefinitionValueRole,
+    RawCaptureContract, RawCaptureIntent, RawCaptureObservation,
 };
 use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
@@ -454,7 +454,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let flow = match resolved_output {
                 Some(DefinitionOutput::MatchOnly) => PatternFlow::NoValue,
                 _ => {
-                    let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
+                    let ref_type = self.ctx.type_ctx.definition_ref(def_id);
                     PatternFlow::Value(ref_type)
                 }
             };
@@ -468,7 +468,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let flow = match output {
             DefinitionOutput::MatchOnly => PatternFlow::NoValue,
             DefinitionOutput::Value(_) => {
-                let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
+                let ref_type = self.ctx.type_ctx.definition_ref(def_id);
                 PatternFlow::Value(ref_type)
             }
         };
@@ -880,17 +880,27 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     });
                 type_id
             }
-            // A custom leaf capture type is a nominal alias for Node.
-            Some(TypeShape::Node | TypeShape::Custom(_)) => {
-                let custom = self.ctx.type_ctx.intern_custom(name);
+            // A custom leaf capture type declares a name whose body is Node.
+            Some(TypeShape::Node) => {
+                if self.ctx.interner.resolve(name) == "Node" {
+                    self.ctx
+                        .type_ctx
+                        .record_custom_capture_type(CustomCaptureTypeOccurrence {
+                            name,
+                            span: Span::new(self.source, range),
+                            type_id,
+                        });
+                    return type_id;
+                }
+                let declared = self.ctx.type_ctx.declare_capture_type(name, TYPE_NODE);
                 self.ctx
                     .type_ctx
                     .record_custom_capture_type(CustomCaptureTypeOccurrence {
                         name,
                         span: Span::new(self.source, range),
-                        type_id: custom,
+                        type_id: declared,
                     });
-                custom
+                declared
             }
             Some(TypeShape::Text | TypeShape::Bool) => {
                 unreachable!("ordinary captures cannot produce text or boolean roots")
@@ -898,15 +908,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // Recovery-only no-value flow falls back to a Node alias, matching the raw
             // capture's recovery type.
             _ => {
-                let custom = self.ctx.type_ctx.intern_custom(name);
+                let declared = self.ctx.type_ctx.declare_capture_type(name, TYPE_NODE);
                 self.ctx
                     .type_ctx
                     .record_custom_capture_type(CustomCaptureTypeOccurrence {
                         name,
                         span: Span::new(self.source, range),
-                        type_id: custom,
+                        type_id: declared,
                     });
-                custom
+                declared
             }
         }
     }
@@ -1505,6 +1515,20 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 
     pub fn run(mut self) -> TypeAnalysisBuilder {
+        self.ctx.declare_definitions(
+            self.analysis
+                .dependency_analysis
+                .sccs()
+                .iter()
+                .flatten()
+                .map(|&def_id| {
+                    (
+                        def_id,
+                        self.analysis.dependency_analysis.def_name_sym(def_id),
+                    )
+                }),
+        );
+
         // Definition root extents are a syntactic fixpoint, computed up front
         // so references always report their target's real extent, including
         // through recursion. Only output types need SCC deferral.
@@ -1512,8 +1536,6 @@ impl<'a, 'd> InferPass<'a, 'd> {
             self.ctx.record_def_root_extent(def_id, extent);
         }
 
-        // Definition identity (names, DefIds) is owned by DependencyAnalysis and
-        // read from there; the builder only accumulates inferred types.
         self.process_sccs();
         self.assert_all_definitions_processed();
         self.check_in_progress_reference_captures();
@@ -1597,13 +1619,6 @@ impl<'a, 'd> InferPass<'a, 'd> {
             }
         };
         self.ctx.record_def_output(def_id, output);
-        let value_role = if definition_value_root(&body) {
-            RawDefinitionValueRole::Value
-        } else {
-            RawDefinitionValueRole::Fields
-        };
-        self.ctx.record_raw_definition(def_id, &body, value_role);
-
         let precomputed = self
             .ctx
             .def_root_extent(def_id)

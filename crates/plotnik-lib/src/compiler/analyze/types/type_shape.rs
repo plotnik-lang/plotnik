@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 pub use crate::compiler::ids::TypeId;
 
-use crate::compiler::ids::DefId;
+use crate::compiler::ids::TypeDeclId;
 use crate::core::Symbol;
 
 use super::RootExtent;
@@ -69,8 +69,6 @@ pub enum TypeShape {
     Text,
     /// Boolean value.
     Bool,
-    /// User-specified name for a captured node via `@x :: TypeName`.
-    Custom(Symbol),
     /// Record with named fields.
     Record(BTreeMap<Symbol, RecordField>),
     /// Variant type from a labeled alternation.
@@ -82,8 +80,8 @@ pub enum TypeShape {
     },
     /// Option type containing zero or one value.
     Option(TypeId),
-    /// Forward reference to a recursive type.
-    Ref(DefId),
+    /// Reference to a named type declaration.
+    Ref(TypeDeclId),
 }
 
 type RecordFieldTypeIds<'a> = std::iter::Map<
@@ -134,7 +132,7 @@ impl TypeShape {
             Self::List { element, .. } | Self::Option(element) => {
                 TypeShapeChildIdsInner::One(Some(*element).into_iter())
             }
-            Self::Node | Self::Text | Self::Bool | Self::Custom(_) | Self::Ref(_) => {
+            Self::Node | Self::Text | Self::Bool | Self::Ref(_) => {
                 TypeShapeChildIdsInner::Empty(std::iter::empty())
             }
         };

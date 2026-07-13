@@ -23,6 +23,7 @@ fn capture_layout_assigns_one_absolute_member_sequence() {
         (interner.intern("name"), RecordField::new(TYPE_NODE)),
     ]));
     let def = DefId::from_raw(0);
+    types.declare_definitions([(def, interner.intern("Q"))]);
     types.record_def_output(def, DefinitionOutput::Value(parent));
     types.record_def_root_extent(def, RootExtent::SingleNode);
     let types = types.finish();
@@ -53,6 +54,7 @@ fn capture_layout_accepts_256_fields() {
         .collect();
     let output = types.intern_record(fields);
     let def = DefId::from_raw(0);
+    types.declare_definitions([(def, interner.intern("Q"))]);
     types.record_def_output(def, DefinitionOutput::Value(output));
     types.record_def_root_extent(def, RootExtent::SingleNode);
     let types = types.finish();

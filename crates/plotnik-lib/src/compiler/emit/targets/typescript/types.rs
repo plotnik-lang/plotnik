@@ -110,12 +110,11 @@ impl<'a> SchemaEmitter<'a> {
             return false;
         }
         match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Node | TypeShape::Custom(_) => true,
-            TypeShape::Ref(definition) => self
+            TypeShape::Node => true,
+            TypeShape::Ref(declaration) => self
                 .schema
                 .types
-                .expect_def_output(*definition)
-                .value()
+                .declaration_body(*declaration)
                 .is_none_or(|target| self.type_uses_node(target, seen)),
             shape => shape
                 .child_type_ids()
@@ -266,22 +265,16 @@ impl<'a> SchemaEmitter<'a> {
 
     fn render_shape(&self, ty: TypeId) -> Sink<SemanticTag> {
         match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Node | TypeShape::Custom(_) => text("Node"),
+            TypeShape::Node => text("Node"),
             TypeShape::Text => self.render_builtin("string", ty),
             TypeShape::Bool => self.render_builtin("boolean", ty),
             TypeShape::Option(inner) => self.render_nullable(*inner),
             TypeShape::List { element, minimum } => self.render_array(*element, *minimum),
-            TypeShape::Ref(definition) => {
-                if self
-                    .schema
-                    .types
-                    .expect_def_output(*definition)
-                    .value()
-                    .is_none()
-                {
+            TypeShape::Ref(declaration) => {
+                if self.schema.types.declaration_body(*declaration).is_none() {
                     return text("Node");
                 }
-                let name = self.schema.deps.def_name_sym(*definition);
+                let name = self.schema.types.declaration_name(*declaration);
                 let mut out = Sink::new();
                 out.styled(Style::Blue, &self.name(name));
                 out

@@ -196,7 +196,7 @@ impl DecodePlanBuilder<'_, '_> {
 
     fn value(&self, ty: TypeId) -> DecodeValue {
         match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Node | TypeShape::Custom(_) => DecodeValue::Node,
+            TypeShape::Node => DecodeValue::Node,
             TypeShape::Text => DecodeValue::Text,
             TypeShape::Bool => DecodeValue::Bool,
             TypeShape::Option(inner) => DecodeValue::Nullable(Box::new(self.value(*inner))),
@@ -208,18 +208,12 @@ impl DecodePlanBuilder<'_, '_> {
                     .expect("naming pass names every non-payload composite"),
                 source_type: ty,
             },
-            TypeShape::Ref(definition) => {
-                if self
-                    .schema
-                    .types
-                    .expect_def_output(*definition)
-                    .value()
-                    .is_none()
-                {
+            TypeShape::Ref(declaration) => {
+                if self.schema.types.declaration_body(*declaration).is_none() {
                     return DecodeValue::Node;
                 }
                 DecodeValue::Nested {
-                    item: self.schema.deps.def_name_sym(*definition),
+                    item: self.schema.types.declaration_name(*declaration),
                     source_type: ty,
                 }
             }
@@ -250,11 +244,14 @@ impl DecodePlanBuilder<'_, '_> {
             return true;
         }
         match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Ref(definition) => {
-                let Some(target) = self.schema.types.expect_def_output(*definition).value() else {
+            TypeShape::Ref(declaration) => {
+                let Some(target) = self.schema.types.declaration_body(*declaration) else {
                     return false;
                 };
-                self.schema.deps.is_recursive_def(*definition)
+                self.schema
+                    .types
+                    .declaration_definition(*declaration)
+                    .is_some_and(|definition| self.schema.deps.is_recursive_def(definition))
                     || self.type_reaches_recursive_ref(target, seen)
             }
             shape => shape

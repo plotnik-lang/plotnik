@@ -28,7 +28,6 @@ use crate::compiler::analyze::types::type_analysis::{
 use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast;
 use crate::core::utils::to_pascal_case;
 use crate::core::{Interner, Symbol};
@@ -45,7 +44,6 @@ pub(crate) struct TypeNamer<'a, 'd> {
     interner: &'a mut Interner,
     diag: Option<&'d mut Diagnostics>,
     custom_capture_types: HashMap<TypeId, CustomCaptureTypeOccurrence>,
-    definition_names: HashMap<DefId, Symbol>,
     claims: HashMap<Symbol, Claim>,
     names: BTreeMap<TypeId, Symbol>,
 }
@@ -66,7 +64,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             interner,
             diag: Some(diag),
             custom_capture_types,
-            definition_names: HashMap::new(),
             claims: HashMap::new(),
             names: BTreeMap::new(),
         }
@@ -77,21 +74,11 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         symbol_table: &SymbolTable,
         dependency_analysis: &DependencyAnalysis,
     ) {
-        self.index_definitions(dependency_analysis);
         self.reserve_builtins();
         self.claim_definitions(symbol_table, dependency_analysis);
         self.walk_definitions(dependency_analysis);
 
         self.ctx.set_named_types(self.names);
-    }
-
-    fn index_definitions(&mut self, deps: &DependencyAnalysis) {
-        self.definition_names = deps
-            .sccs()
-            .iter()
-            .flatten()
-            .map(|&def_id| (def_id, deps.def_name_sym(def_id)))
-            .collect();
     }
 
     fn reserve_builtins(&mut self) {
@@ -228,47 +215,52 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     self.walk_named(element, &name);
                 }
             }
-            TypeShape::Custom(sym) => {
-                // A leaf alias from `@x :: TypeName`. `:: Node` restates the
-                // default; leave it unnamed so it renders as plain `Node`.
-                if self.interner.resolve(sym) == "Node" {
-                    if let Some(capture_type) = self.custom_capture_types.get(&element).copied() {
-                        self.warn_redundant_capture_type(
-                            capture_type.span,
-                            "this capture already has type `Node`; naming it `Node` has no effect",
-                        );
-                    }
+            TypeShape::Ref(declaration) => {
+                let declaration_name = self.ctx.in_progress().declaration_name(declaration);
+                if self
+                    .ctx
+                    .in_progress()
+                    .declaration_definition(declaration)
+                    .is_some()
+                {
+                    // A definition reference already has its declaration's name;
+                    // a capture type cannot rename it.
+                    let Some(capture_type) = self.custom_capture_types.get(&element).copied()
+                    else {
+                        return;
+                    };
+                    let declaration_name = self.interner.resolve(declaration_name).to_owned();
+                    let written_name = self.interner.resolve(capture_type.name).to_owned();
+                    let detail = format!(
+                        "this capture already has type `{declaration_name}`; naming it `{written_name}` has no effect"
+                    );
+                    self.warn_redundant_capture_type(capture_type.span, &detail);
                     return;
                 }
+
+                let body = self
+                    .ctx
+                    .in_progress()
+                    .declaration_body(declaration)
+                    .expect("capture type declaration has a body");
                 let span = self
                     .custom_capture_types
                     .get(&element)
                     .map(|capture_type| capture_type.span);
-                if self.claim(sym, Some(element), span) {
-                    self.names.insert(element, sym);
+                if self.claim(declaration_name, Some(body), span) {
+                    self.names.insert(element, declaration_name);
                 }
             }
-            TypeShape::Ref(def_id) => {
-                // Named by its own definition; a capture type cannot rename it.
-                if let Some(capture_type) = self.custom_capture_types.get(&element).copied() {
-                    let definition_name = self
-                        .definition_names
-                        .get(&def_id)
-                        .copied()
-                        .expect("every definition reference has an indexed name");
-                    let definition_name = self.interner.resolve(definition_name).to_owned();
-                    let written_name = self.interner.resolve(capture_type.name).to_owned();
-                    let detail = format!(
-                        "this capture already has type `{definition_name}`; naming it `{written_name}` has no effect"
-                    );
-                    self.warn_redundant_capture_type(capture_type.span, &detail);
-                }
+            TypeShape::Node => {
+                let Some(capture_type) = self.custom_capture_types.get(&element).copied() else {
+                    return;
+                };
+                self.warn_redundant_capture_type(
+                    capture_type.span,
+                    "this capture already has type `Node`; naming it `Node` has no effect",
+                );
             }
-            TypeShape::Node
-            | TypeShape::Text
-            | TypeShape::Bool
-            | TypeShape::List { .. }
-            | TypeShape::Option(_) => {}
+            TypeShape::Text | TypeShape::Bool | TypeShape::List { .. } | TypeShape::Option(_) => {}
         }
     }
 
@@ -396,11 +388,9 @@ impl<'a> RawTypeNameValidator<'a> {
             interner: self.interner,
             diag: None,
             custom_capture_types,
-            definition_names: HashMap::new(),
             claims: HashMap::new(),
             names: BTreeMap::new(),
         };
-        validator.index_definitions(dependency_analysis);
         validator.reserve_builtins();
         validator.claim_definitions(symbol_table, dependency_analysis);
         validator.walk_definitions(dependency_analysis);

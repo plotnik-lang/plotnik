@@ -27,13 +27,13 @@ pub fn build_type_table(
     Ok((types, strings))
 }
 
-/// Build the type table, remapping query TypeIds to bytecode ids.
+/// Build the type table, remapping analysis type IDs to bytecode type IDs.
 ///
 /// Types reachable from selectable definition outputs are emitted. This keeps
 /// demanded fragment capture scopes available to matcher bodies without
-/// shipping unused fragments. Dead inference intermediates — a union
+/// shipping unused fragments. Dead inference intermediates — an unlabeled
 /// alternation's per-alternative merged records, for instance — are also pruned.
-/// Used builtins lead, then custom types follow in definition order,
+/// Used built-ins lead, then value types follow in definition order,
 /// depth-first.
 fn build(
     types: &mut TypeTableBuilder,
@@ -42,7 +42,7 @@ fn build(
 ) -> Result<(), EmitError> {
     let type_analysis = schema.types;
     let type_layout = schema.type_layout();
-    let ordered_types = type_layout.custom_types();
+    let ordered_types = type_layout.value_types();
 
     emit_builtins(types, type_layout)?;
     reserve_slots(types, ordered_types)?;
@@ -106,14 +106,14 @@ fn emit_type_names(
     schema: &OutputSchema<'_>,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    for declaration in schema.iter_type_declarations() {
-        if !schema.type_layout().contains(declaration.body) {
+    for binding in schema.iter_type_name_bindings() {
+        if !schema.type_layout().contains(binding.type_id) {
             continue;
         }
         let bc_type_id = types
-            .lookup(declaration.body)
-            .expect("declared type body must be mapped");
-        let name = ctx.strings.intern(declaration.name, ctx.interner)?;
+            .lookup(binding.type_id)
+            .expect("named output type must be mapped");
+        let name = ctx.strings.intern(binding.name, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
 
@@ -134,17 +134,6 @@ fn emit_type_at_slot(
     match type_shape {
         TypeShape::Node | TypeShape::Text | TypeShape::Bool => {
             unreachable!("builtins should be handled separately")
-        }
-
-        TypeShape::Custom(_) => {
-            // A custom capture type is a nominal alias for Node.
-            // The name entry comes from the naming pass via `emit_type_names`;
-            // here only the alias shape is emitted.
-            let node = types
-                .lookup(TYPE_NODE)
-                .expect("Node is mapped before aliases are emitted");
-            types.fill_slot(slot_index, TypeDef::alias(node));
-            Ok(())
         }
 
         TypeShape::Option(inner) => {
@@ -224,12 +213,8 @@ fn emit_type_at_slot(
             Ok(())
         }
 
-        TypeShape::Ref(def_id) => {
-            // A recursive reference to a definition that is match-only (its
-            // captures all suppressed) leaves no pending value at runtime: the
-            // capture takes the matched node, so the alias targets Node.
-            let target = ctx.type_analysis.expect_def_output(*def_id);
-            let alias = match target.value() {
+        TypeShape::Ref(declaration) => {
+            let alias = match ctx.type_analysis.declaration_body(*declaration) {
                 None => types
                     .lookup(TYPE_NODE)
                     .expect("Node is mapped before a Ref alias that targets it is emitted"),

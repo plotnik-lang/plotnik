@@ -32,11 +32,13 @@ fn option_interning_is_idempotent() {
 #[test]
 fn option_interning_preserves_an_option_declaration_reference() {
     let mut ctx = TypeAnalysisBuilder::new();
+    let mut interner = Interner::new();
     let definition = DefId::from_raw(0);
+    ctx.declare_definitions([(definition, interner.intern("Definition"))]);
     let option = ctx.intern_option(TYPE_NODE);
     ctx.record_def_output(definition, DefinitionOutput::Value(option));
     ctx.record_def_root_extent(definition, RootExtent::SingleNode);
-    let reference = ctx.intern_type(TypeShape::Ref(definition));
+    let reference = ctx.definition_ref(definition);
 
     let wrapped = ctx.intern_option(reference);
 
@@ -66,12 +68,16 @@ fn distinct_record_declarations_are_nominal() {
     let field = interner.intern("field");
     let left = DefId::from_raw(0);
     let right = DefId::from_raw(1);
+    ctx.declare_definitions([
+        (left, interner.intern("Left")),
+        (right, interner.intern("Right")),
+    ]);
     let left_body = ctx.intern_record(BTreeMap::from([(field, RecordField::new(TYPE_NODE))]));
     let right_body = ctx.intern_record(BTreeMap::from([(field, RecordField::new(TYPE_NODE))]));
     ctx.record_def_output(left, DefinitionOutput::Value(left_body));
     ctx.record_def_output(right, DefinitionOutput::Value(right_body));
-    let left_ref = ctx.intern_type(TypeShape::Ref(left));
-    let right_ref = ctx.intern_type(TypeShape::Ref(right));
+    let left_ref = ctx.definition_ref(left);
+    let right_ref = ctx.definition_ref(right);
 
     assert!(!ctx.types_structurally_equal(left_ref, right_ref));
 }
@@ -79,12 +85,17 @@ fn distinct_record_declarations_are_nominal() {
 #[test]
 fn transparent_definition_aliases_compare_by_body() {
     let mut ctx = TypeAnalysisBuilder::new();
+    let mut interner = Interner::new();
     let left = DefId::from_raw(0);
     let right = DefId::from_raw(1);
+    ctx.declare_definitions([
+        (left, interner.intern("Left")),
+        (right, interner.intern("Right")),
+    ]);
     ctx.record_def_output(left, DefinitionOutput::Value(TYPE_NODE));
     ctx.record_def_output(right, DefinitionOutput::Value(TYPE_NODE));
-    let left_ref = ctx.intern_type(TypeShape::Ref(left));
-    let right_ref = ctx.intern_type(TypeShape::Ref(right));
+    let left_ref = ctx.definition_ref(left);
+    let right_ref = ctx.definition_ref(right);
 
     assert!(ctx.types_structurally_equal(left_ref, right_ref));
     assert!(ctx.types_structurally_equal(left_ref, TYPE_NODE));

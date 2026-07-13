@@ -16,7 +16,7 @@ pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItem
 use crate::compiler::analyze::types::type_shape::{CasePayload, RecordField, TypeId, TypeShape};
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
-use crate::compiler::ids::DefId;
+use crate::compiler::ids::TypeDeclId;
 use crate::core::Symbol;
 
 use super::TypesConfig as Config;
@@ -184,7 +184,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
     fn alias_body(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
-            TypeShape::Node | TypeShape::Custom(_) => self.node_type(),
+            TypeShape::Node => self.node_type(),
             TypeShape::Text => "&'s str".to_string(),
             TypeShape::Bool => "bool".to_string(),
             TypeShape::List { element, .. } => {
@@ -199,7 +199,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                     self.position_type(context, *inner)
                 )
             }
-            TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
+            TypeShape::Ref(declaration) => self.ref_type(context, *declaration, ty),
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 unreachable!("alias items cover non-composite outputs only")
             }
@@ -217,10 +217,6 @@ impl<'m, 'a> Emitter<'m, 'a> {
             TypeShape::Node => self.node_type(),
             TypeShape::Text => "&'s str".to_string(),
             TypeShape::Bool => "bool".to_string(),
-            TypeShape::Custom(_) => match self.schema.type_name_of(ty) {
-                Some(name) => self.named_type(name, ty),
-                None => self.node_type(),
-            },
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let name = self
                     .schema
@@ -240,7 +236,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                     self.position_type(context, *inner)
                 )
             }
-            TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
+            TypeShape::Ref(declaration) => self.ref_type(context, *declaration, ty),
         }
     }
 
@@ -255,16 +251,21 @@ impl<'m, 'a> Emitter<'m, 'a> {
         format!("{ident}{lt}")
     }
 
-    /// A reference renders as its target definition's type name, boxed when
+    /// A reference renders as its target declaration's type name, boxed when
     /// this occurrence closes a by-value cycle through the enclosing item's
     /// declaration. A match-only target contributes no value, so the capture holds
     /// the matched node itself.
-    fn ref_type(&mut self, context: TypeContext, def_id: DefId, ref_ty: TypeId) -> String {
-        let Some(target) = self.schema.types.expect_def_output(def_id).value() else {
+    fn ref_type(
+        &mut self,
+        context: TypeContext,
+        declaration: TypeDeclId,
+        ref_ty: TypeId,
+    ) -> String {
+        let Some(target) = self.schema.types.declaration_body(declaration) else {
             return self.node_type();
         };
 
-        let name = self.schema.deps.def_name_sym(def_id);
+        let name = self.schema.types.declaration_name(declaration);
         let base = self.named_type(name, target);
         if self.model.is_boxed_ref(context, ref_ty) {
             format!("::std::boxed::Box<{base}>")

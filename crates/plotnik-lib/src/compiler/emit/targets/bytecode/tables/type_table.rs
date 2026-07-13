@@ -15,10 +15,10 @@ use crate::compiler::ids::TypeId;
 
 use super::error::EmitError;
 
-/// Holds the type metadata, mapping query TypeIds to wire TypeIds.
+/// Holds type metadata, mapping analysis type IDs to wire type IDs.
 #[derive(Debug)]
 pub struct TypeTableBuilder {
-    /// Map from query TypeId to bytecode WireTypeId.
+    /// Map from analysis `TypeId` to bytecode `WireTypeId`.
     mapping: HashMap<TypeId, WireTypeId>,
     /// Type definitions (4 bytes each).
     type_defs: Vec<TypeDef>,
@@ -41,7 +41,7 @@ impl TypeTableBuilder {
     }
 
     /// Map `query_id` to the next bytecode slot and push `def`; returns the id.
-    /// Used to emit builtins and to reserve placeholder slots for custom types.
+    /// Used to emit built-ins and reserve slots for value types.
     pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> Result<WireTypeId, EmitError> {
         if self.type_defs.len() >= EmitError::MAX_TYPES {
             return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
@@ -101,16 +101,22 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    /// Resolve a query TypeId to its underlying bytecode WireTypeId.
-    ///
-    /// Ref types are emitted as aliases only when they are definition results. In
-    /// every materialized position, follow the reference chain to the actual shape.
+    /// Resolve a semantic type to the wire type used at a value position.
+    /// Definition references use their underlying body; an explicit capture-type
+    /// declaration preserves its alias identity.
     pub fn resolve_type(
         &self,
         type_id: TypeId,
         type_ctx: &TypeAnalysis,
     ) -> Result<WireTypeId, EmitError> {
-        let type_id = type_ctx.resolve_underlying_type_id(type_id);
+        let type_id = match type_ctx.type_shape(type_id) {
+            Some(crate::compiler::analyze::types::type_shape::TypeShape::Ref(declaration))
+                if type_ctx.declaration_definition(*declaration).is_none() =>
+            {
+                type_id
+            }
+            _ => type_ctx.resolve_underlying_type_id(type_id),
+        };
         let bc_id = self
             .mapping
             .get(&type_id)
