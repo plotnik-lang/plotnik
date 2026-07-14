@@ -47,21 +47,19 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    let discovery_started = Instant::now();
     let corpus = corpus::discover(manifest_dir, args.filter.as_deref())?;
-    eprintln!(
-        "codegen corpus: {} selected, {} runnable, {} skipped in {:.2?}",
-        corpus.selected,
-        corpus.cases.len(),
-        corpus.skipped,
-        discovery_started.elapsed()
-    );
     if corpus.cases.is_empty() {
         return Err("codegen corpus selection contains no runnable fixtures".to_string());
     }
 
     rust::generate(manifest_dir, &plotnik, &corpus.cases)?;
-    eprintln!("generated Rust corpus in {:.2?}", started.elapsed());
+    eprintln!(
+        "generated {} Rust tests from {} golden fixtures ({} diagnostic-only skipped) in {:.2?}",
+        corpus.cases.len(),
+        corpus.selected,
+        corpus.skipped,
+        started.elapsed()
+    );
     Ok(())
 }
 

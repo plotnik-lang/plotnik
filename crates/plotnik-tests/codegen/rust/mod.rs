@@ -3,7 +3,6 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Instant;
 
 use crate::corpus::{Case, SourceLanguage};
 use crate::{generate, process};
@@ -60,7 +59,6 @@ fn generate_and_promote(
     let pending = project.join(format!("tests.pending-{}", std::process::id()));
     remove_stale_staging(project)?;
 
-    let generation_started = Instant::now();
     let result = stage(&pending, plotnik, cases);
     if let Err(error) = result {
         let _ = fs::remove_dir_all(&pending);
@@ -72,11 +70,6 @@ fn generate_and_promote(
     }
     fs::rename(&pending, &tests)
         .map_err(|error| format!("promote generated tests into {}: {error}", tests.display()))?;
-    eprintln!(
-        "generated {} Rust fixtures in {:.2?}",
-        cases.len(),
-        generation_started.elapsed()
-    );
     Ok(())
 }
 

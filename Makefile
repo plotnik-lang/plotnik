@@ -5,8 +5,9 @@ WASM_CC ?= $(LLVM_PREFIX)/bin/clang
 WASM_AR ?= $(LLVM_PREFIX)/bin/llvm-ar
 BENCH ?= vm
 CODEGEN_TARGET_DIR ?= $(if $(strip $(CARGO_TARGET_DIR)),$(abspath $(CARGO_TARGET_DIR)),$(CURDIR)/target)
-CODEGEN_RUST_MANIFEST := $(CURDIR)/crates/plotnik-tests/codegen/rust/Cargo.toml
-CODEGEN_RUST_TESTS := $(CURDIR)/crates/plotnik-tests/codegen/rust/tests
+CODEGEN_RUST_DIR := $(CURDIR)/crates/plotnik-tests/codegen/rust
+CODEGEN_RUST_MANIFEST := $(CODEGEN_RUST_DIR)/Cargo.toml
+CODEGEN_RUST_TESTS := $(CODEGEN_RUST_DIR)/tests
 
 check:
 	@cargo check \
@@ -165,3 +166,7 @@ fmt:
 
 clean:
 	@cargo clean
+	@cargo clean --manifest-path "$(CODEGEN_RUST_MANIFEST)"
+	@rm -rf \
+		"$(CODEGEN_RUST_TESTS)" \
+		"$(CODEGEN_RUST_DIR)"/tests.pending-*
