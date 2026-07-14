@@ -25,6 +25,7 @@ pub struct GenerateArgs {
     pub grammar: Option<PathBuf>,
     pub target: GenerateTarget,
     pub output: Option<PathBuf>,
+    pub debug: bool,
     pub color: bool,
 }
 
@@ -56,18 +57,18 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
         compile_query_with_grammar(loaded.sources, &external.grammar, args.color)
             .map_err(generate_compile_error)?
     } else {
-        let lang = require_lang(
-            args.lang.as_deref(),
-            loaded.shebang.lang.as_deref(),
-            "generate",
-        )?;
+        let lang = require_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref(), "gen")?;
         compile_query(loaded.sources, lang, args.color).map_err(generate_compile_error)?
     };
 
     match args.target {
         GenerateTarget::Rust => {
             let emission = compiled
-                .emit(RustCodegenConfig::new().provenance(CodegenProvenance::Full))
+                .emit(
+                    RustCodegenConfig::new()
+                        .debug(args.debug)
+                        .provenance(CodegenProvenance::Full),
+                )
                 .map_err(|error| CliError::fatal(error.to_string()))?;
             let has_errors = emission.diagnostics().has_errors();
             if !emission.diagnostics().is_empty() {

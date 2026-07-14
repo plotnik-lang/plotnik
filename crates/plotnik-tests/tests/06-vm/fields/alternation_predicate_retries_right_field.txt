@@ -22,8 +22,8 @@ export interface Q {
   "left": null,
   "right": {
     "kind": "identifier",
-    "text": "target",
-    "span": [8, 14]
+    "span": [8, 14],
+    "text": "target"
   }
 }
 -------------------- BYTECODE --------------------

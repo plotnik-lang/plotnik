@@ -15,6 +15,7 @@ fn registry_generation_records_embedded_grammar_provenance() {
         grammar: None,
         target: GenerateTarget::Rust,
         output: None,
+        debug: false,
         color: false,
     };
 
@@ -45,6 +46,7 @@ fn external_generation_hashes_exact_grammar_bytes() {
         grammar: Some(path.clone()),
         target: GenerateTarget::Rust,
         output: None,
+        debug: false,
         color: false,
     };
 
@@ -68,12 +70,33 @@ fn invalid_query_is_a_domain_no() {
         grammar: None,
         target: GenerateTarget::Rust,
         output: None,
+        debug: false,
         color: false,
     };
 
     let error = generate(&args).expect_err("invalid query must not generate");
 
     assert!(matches!(error, CliError::No));
+}
+
+#[test]
+fn debug_generation_emits_json_entrypoint() {
+    let args = GenerateArgs {
+        query_path: None,
+        query_text: Some("Q = (program) @root".to_string()),
+        lang: Some("javascript".to_string()),
+        grammar: None,
+        target: GenerateTarget::Rust,
+        output: None,
+        debug: true,
+        color: false,
+    };
+
+    let output = generate(&args).expect("debug query generates");
+
+    assert!(output.contains("pub fn parse_to_json("));
+    assert!(output.contains("rt::debug::to_json"));
+    assert!(output.contains("SerializeWithSource for Q"));
 }
 
 fn scratch_path(name: &str) -> PathBuf {

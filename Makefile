@@ -1,9 +1,10 @@
-.PHONY: check clippy test bench coverage coverage-lines check-wasm wasm-web clean
+.PHONY: check clippy test test-codegen-rust bench coverage coverage-lines check-wasm wasm-web clean
 
 LLVM_PREFIX ?= /opt/homebrew/opt/llvm
 WASM_CC ?= $(LLVM_PREFIX)/bin/clang
 WASM_AR ?= $(LLVM_PREFIX)/bin/llvm-ar
 BENCH ?= vm
+CODEGEN_TARGET_DIR ?= $(if $(strip $(CARGO_TARGET_DIR)),$(abspath $(CARGO_TARGET_DIR)),$(CURDIR)/target)
 
 check:
 	@cargo check \
@@ -30,6 +31,33 @@ test:
 		--quiet \
 		-- \
 		$(FILTER)
+
+test-codegen-rust:
+	@cargo build \
+		--package plotnik-cli \
+		--no-default-features \
+		--target-dir "$(CODEGEN_TARGET_DIR)"
+	@cargo build \
+		--package plotnik-tests \
+		--bin plotnik-codegen-tests \
+		--features codegen-tests \
+		--target-dir "$(CODEGEN_TARGET_DIR)"
+	@cargo clippy \
+		--package plotnik-tests \
+		--bin plotnik-codegen-tests \
+		--features codegen-tests \
+		--target-dir "$(CODEGEN_TARGET_DIR)" \
+		-- \
+		-D warnings
+	@cargo test \
+		--package plotnik-tests \
+		--bin plotnik-codegen-tests \
+		--features codegen-tests \
+		--target-dir "$(CODEGEN_TARGET_DIR)" \
+		--quiet
+	@"$(CODEGEN_TARGET_DIR)/debug/plotnik-codegen-tests" rust \
+		--plotnik "$(CODEGEN_TARGET_DIR)/debug/plotnik" \
+		$(if $(strip $(FILTER)),--filter "$(FILTER)",)
 
 shot:
 	@# See AGENTS.md for diagnostic guidelines

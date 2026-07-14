@@ -12,13 +12,13 @@ export interface Q {
   "decls": [
     {
       "kind": "lexical_declaration",
-      "text": "let a;",
-      "span": [0, 6]
+      "span": [0, 6],
+      "text": "let a;"
     },
     {
       "kind": "lexical_declaration",
-      "text": "let b;",
-      "span": [12, 18]
+      "span": [12, 18],
+      "text": "let b;"
     }
   ]
 }

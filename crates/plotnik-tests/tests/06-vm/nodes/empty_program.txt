@@ -8,8 +8,8 @@ export interface Q {
 {
   "p": {
     "kind": "program",
-    "text": "",
-    "span": [0, 0]
+    "span": [0, 0],
+    "text": ""
   }
 }
 -------------------- BYTECODE --------------------

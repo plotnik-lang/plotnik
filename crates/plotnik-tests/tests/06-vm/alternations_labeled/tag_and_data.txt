@@ -19,14 +19,14 @@ export type QE =
 --------------------- OUTPUT ---------------------
 {
   "e": {
-    "$tag": "A",
     "$data": {
       "a": {
         "kind": "identifier",
-        "text": "foo",
-        "span": [0, 3]
+        "span": [0, 3],
+        "text": "foo"
       }
-    }
+    },
+    "$tag": "A"
   }
 }
 -------------------- BYTECODE --------------------

@@ -16,13 +16,13 @@ export interface Q {
   "commas": [
     {
       "kind": ",",
-      "text": ",",
-      "span": [2, 3]
+      "span": [2, 3],
+      "text": ","
     },
     {
       "kind": ",",
-      "text": ",",
-      "span": [5, 6]
+      "span": [5, 6],
+      "text": ","
     }
   ]
 }

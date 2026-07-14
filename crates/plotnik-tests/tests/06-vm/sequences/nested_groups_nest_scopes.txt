@@ -25,8 +25,8 @@ export interface QOuterInner {
     "inner": {
       "e": {
         "kind": "expression_statement",
-        "text": "foo;",
-        "span": [0, 4]
+        "span": [0, 4],
+        "text": "foo;"
       }
     }
   }

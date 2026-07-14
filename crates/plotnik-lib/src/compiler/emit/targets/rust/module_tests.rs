@@ -91,3 +91,48 @@ fn inspection_does_not_change_generated_matcher() {
 
     assert_eq!(inspected, plain);
 }
+
+#[test]
+fn normal_generation_omits_debug_json_surface() {
+    let generated = generated_module("Q = (program) @root", RustCodegenConfig::new());
+
+    assert!(!generated.contains("parse_to_json"));
+    assert!(!generated.contains("rt::debug"));
+}
+
+#[test]
+fn debug_generation_wraps_result_and_match_only_callables() {
+    let generated = generated_module(
+        "Q = (program) @root\nPredicate = (program)",
+        RustCodegenConfig::new().debug(true),
+    );
+
+    assert_eq!(generated.matches("pub fn parse_to_json(").count(), 2);
+    assert!(generated.contains("let Some(value) = Self::parse(tree, source)? else"));
+    assert!(generated.contains("rt::debug::to_json(&rt::WithSource::new(&value, source))"));
+    assert!(generated.contains("if !Self::matches(tree, source)?"));
+    assert!(generated.contains("::std::string::String::from(\"null\")"));
+    assert!(generated.contains("SerializeWithSource for Q"));
+}
+
+#[test]
+fn debug_implies_serde_regardless_of_builder_order() {
+    let generated = generated_module(
+        "Q = (program) @root",
+        RustCodegenConfig::new().debug(true).serde(false),
+    );
+
+    assert!(generated.contains("SerializeWithSource for Q"));
+    assert!(generated.contains("pub fn parse_to_json("));
+}
+
+fn generated_module(query: &str, config: RustCodegenConfig) -> String {
+    QueryBuilder::from_inline(query)
+        .compile(synthetic_grammar())
+        .expect("test query compiles")
+        .emit(config)
+        .expect("emission succeeds")
+        .into_artifact()
+        .expect("valid query generates a matcher")
+        .into_source()
+}

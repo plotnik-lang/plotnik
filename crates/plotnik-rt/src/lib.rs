@@ -26,6 +26,9 @@ mod limits;
 mod nav;
 mod node_class;
 
+#[cfg(feature = "debug")]
+pub mod debug;
+
 #[cfg(feature = "tree-sitter")]
 mod checkpoint;
 #[cfg(feature = "tree-sitter")]
@@ -44,6 +47,9 @@ mod surface;
 #[cfg(test)]
 #[cfg(feature = "tree-sitter")]
 mod checkpoint_tests;
+#[cfg(test)]
+#[cfg(feature = "debug")]
+mod debug_tests;
 #[cfg(test)]
 mod dfa_tests;
 #[cfg(test)]

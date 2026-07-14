@@ -135,6 +135,7 @@ pub enum CodegenProvenance {
 pub struct RustCodegenConfig {
     runtime_crate: Cow<'static, str>,
     serde: bool,
+    debug: bool,
     limits: RuntimeLimitSpec,
     decode_depth: Limit,
     provenance: CodegenProvenance,
@@ -145,6 +146,7 @@ impl Default for RustCodegenConfig {
         Self {
             runtime_crate: Cow::Borrowed("::plotnik_rt"),
             serde: false,
+            debug: false,
             limits: RuntimeLimitSpec {
                 fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
@@ -167,6 +169,12 @@ impl RustCodegenConfig {
 
     pub fn serde(mut self, enabled: bool) -> Self {
         self.serde = enabled;
+        self
+    }
+
+    /// Emit debug-only helpers that serialize callable results as canonical JSON.
+    pub fn debug(mut self, enabled: bool) -> Self {
+        self.debug = enabled;
         self
     }
 
@@ -199,13 +207,14 @@ impl RustCodegenConfig {
     pub(crate) fn rust_types_config(&self) -> crate::compiler::emit::targets::rust::TypesConfig {
         crate::compiler::emit::targets::rust::TypesConfig::new()
             .rt_crate(self.runtime_crate.clone())
-            .serde(self.serde)
+            .serde(self.serde || self.debug)
     }
 
     pub(crate) fn matcher_config(&self) -> crate::compiler::emit::targets::rust::Config {
         crate::compiler::emit::targets::rust::Config::new()
             .rt_crate(self.runtime_crate.clone())
-            .serde(self.serde)
+            .serde(self.serde || self.debug)
+            .debug(self.debug)
             .limits(self.limits)
             .decode_depth(self.decode_depth)
     }

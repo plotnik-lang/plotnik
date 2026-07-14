@@ -13,8 +13,8 @@ export interface Q {
 {
   "id": {
     "kind": "identifier",
-    "text": "foo",
-    "span": [0, 3]
+    "span": [0, 3],
+    "text": "foo"
   }
 }
 -------------------- BYTECODE --------------------

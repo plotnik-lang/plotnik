@@ -21,14 +21,14 @@ export interface QRow {
 }
 --------------------- OUTPUT ---------------------
 {
-  "x": null,
   "row": {
     "x": {
       "kind": "identifier",
-      "text": "foo",
-      "span": [0, 3]
+      "span": [0, 3],
+      "text": "foo"
     }
-  }
+  },
+  "x": null
 }
 -------------------- BYTECODE --------------------
 [strings]

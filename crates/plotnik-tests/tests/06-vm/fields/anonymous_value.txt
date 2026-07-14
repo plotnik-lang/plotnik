@@ -15,8 +15,8 @@ export interface Q {
 {
   "op": {
     "kind": "+",
-    "text": "+",
-    "span": [2, 3]
+    "span": [2, 3],
+    "text": "+"
   }
 }
 -------------------- BYTECODE --------------------

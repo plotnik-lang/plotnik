@@ -16,8 +16,8 @@ export interface Q {
 {
   "name": {
     "kind": "identifier",
-    "text": "f",
-    "span": [9, 10]
+    "span": [9, 10],
+    "text": "f"
   }
 }
 ------------------- INSPECTION -------------------

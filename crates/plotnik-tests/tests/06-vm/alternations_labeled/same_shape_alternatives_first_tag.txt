@@ -21,14 +21,14 @@ export type QItem =
 --------------------- OUTPUT ---------------------
 {
   "item": {
-    "$tag": "A",
     "$data": {
       "x": {
         "kind": "identifier",
-        "text": "x",
-        "span": [0, 1]
+        "span": [0, 1],
+        "text": "x"
       }
-    }
+    },
+    "$tag": "A"
   }
 }
 -------------------- BYTECODE --------------------

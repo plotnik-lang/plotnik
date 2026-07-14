@@ -19,18 +19,18 @@ export interface Q {
 {
   "a": {
     "kind": "lexical_declaration",
-    "text": "let x;",
-    "span": [0, 6]
+    "span": [0, 6],
+    "text": "let x;"
   },
   "b": {
     "kind": "empty_statement",
-    "text": ";",
-    "span": [7, 8]
+    "span": [7, 8],
+    "text": ";"
   },
   "c": {
     "kind": "debugger_statement",
-    "text": "debugger;",
-    "span": [9, 18]
+    "span": [9, 18],
+    "text": "debugger;"
   }
 }
 -------------------- BYTECODE --------------------

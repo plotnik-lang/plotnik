@@ -17,13 +17,13 @@ export interface Q {
 {
   "name": {
     "kind": "identifier",
-    "text": "f",
-    "span": [9, 10]
+    "span": [9, 10],
+    "text": "f"
   },
   "retval": {
     "kind": "number",
-    "text": "1",
-    "span": [22, 23]
+    "span": [22, 23],
+    "text": "1"
   }
 }
 -------------------- BYTECODE --------------------

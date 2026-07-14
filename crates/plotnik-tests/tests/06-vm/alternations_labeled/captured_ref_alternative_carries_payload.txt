@@ -23,16 +23,16 @@ export type QV =
 --------------------- OUTPUT ---------------------
 {
   "v": {
-    "$tag": "Call",
     "$data": {
       "data": {
         "name": {
           "kind": "identifier",
-          "text": "x",
-          "span": [0, 1]
+          "span": [0, 1],
+          "text": "x"
         }
       }
-    }
+    },
+    "$tag": "Call"
   }
 }
 -------------------- BYTECODE --------------------

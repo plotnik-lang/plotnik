@@ -1,4 +1,54 @@
-//! Shared parsing for golden-fixture section boundaries.
+//! Shared parsing for golden-fixture documents and section boundaries.
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Document {
+    pub query: String,
+    pub sections: Vec<Section>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Section {
+    pub name: String,
+    pub body: String,
+}
+
+pub fn parse_document(raw: &str) -> Result<Document, String> {
+    let normalized = raw.replace("\r\n", "\n");
+    let mut query_lines = Vec::new();
+    let mut sections: Vec<(String, Vec<&str>)> = Vec::new();
+    let mut current: Option<(String, Vec<&str>)> = None;
+
+    for line in normalized.lines() {
+        if let Some(name) = parse_section_header(line) {
+            if let Some(previous) = current.take() {
+                sections.push(previous);
+            }
+            current = Some((name, Vec::new()));
+            continue;
+        }
+        if let Some((_, body)) = current.as_mut() {
+            body.push(line);
+            continue;
+        }
+        query_lines.push(line);
+    }
+    if let Some(previous) = current {
+        sections.push(previous);
+    }
+
+    let query = query_lines.join("\n");
+    if query.trim().is_empty() {
+        return Err("fixture has no query (text before the first `--- … ---` rule)".into());
+    }
+    let sections = sections
+        .into_iter()
+        .map(|(name, body)| Section {
+            name,
+            body: body.join("\n"),
+        })
+        .collect();
+    Ok(Document { query, sections })
+}
 
 /// A known fixture section at column zero, normalized to the harness's internal
 /// name. Unknown dash-padded source lines are fixture data, not boundaries.
@@ -48,4 +98,29 @@ fn rule_label(line: &str) -> Option<&str> {
         .strip_suffix(' ')?
         .trim();
     (!label.is_empty()).then_some(label)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn document_preserves_authored_section_bytes() {
+        let document = parse_document(
+            "Q = (program)\r\n--- INPUT (ts) ---\r\nconst π = 1;\r\n--- OUTPUT ---\r\n{\r\n  \"span\": [0, 3]\r\n}\r\n",
+        )
+        .unwrap();
+
+        assert_eq!(document.query, "Q = (program)");
+        assert_eq!(document.sections[0].name, "input.ts");
+        assert_eq!(document.sections[0].body, "const π = 1;");
+        assert_eq!(document.sections[1].body, "{\n  \"span\": [0, 3]\n}");
+    }
+
+    #[test]
+    fn document_requires_query_text() {
+        let error = parse_document("--- INPUT ---\nx").unwrap_err();
+
+        assert!(error.contains("fixture has no query"));
+    }
 }

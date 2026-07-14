@@ -11,15 +11,15 @@ export interface Q {
 }
 --------------------- OUTPUT ---------------------
 {
-  "decl": {
-    "kind": "lexical_declaration",
-    "text": "let x;",
-    "span": [0, 6]
-  },
   "d": {
     "kind": "debugger_statement",
-    "text": "debugger;",
-    "span": [7, 16]
+    "span": [7, 16],
+    "text": "debugger;"
+  },
+  "decl": {
+    "kind": "lexical_declaration",
+    "span": [0, 6],
+    "text": "let x;"
   }
 }
 -------------------- BYTECODE --------------------

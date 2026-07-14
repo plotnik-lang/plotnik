@@ -52,7 +52,7 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
             let params = InferOpts::from_matches(m);
             commands::infer::run(params.into())
         }
-        Some(("generate", m)) => {
+        Some(("gen", m)) => {
             let params = GenerateOpts::from_matches(m);
             commands::generate::run(params.into())
         }

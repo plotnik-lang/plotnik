@@ -40,8 +40,8 @@ warning: capture type `str` replaces structured data with source text
 help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
 {
-  "x": "//a\n//b",
-  "rest": "//stop"
+  "rest": "//stop",
+  "x": "//a\n//b"
 }
 -------------------- BYTECODE --------------------
 [strings]

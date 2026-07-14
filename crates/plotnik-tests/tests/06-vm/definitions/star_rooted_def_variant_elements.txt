@@ -26,34 +26,34 @@ export type Items = Entry[];
 {
   "items": [
     {
-      "$tag": "Id",
       "$data": {
         "id": {
           "kind": "identifier",
-          "text": "a",
-          "span": [1, 2]
+          "span": [1, 2],
+          "text": "a"
         }
-      }
+      },
+      "$tag": "Id"
     },
     {
-      "$tag": "Num",
       "$data": {
         "num": {
           "kind": "number",
-          "text": "1",
-          "span": [4, 5]
+          "span": [4, 5],
+          "text": "1"
         }
-      }
+      },
+      "$tag": "Num"
     },
     {
-      "$tag": "Id",
       "$data": {
         "id": {
           "kind": "identifier",
-          "text": "b",
-          "span": [7, 8]
+          "span": [7, 8],
+          "text": "b"
         }
-      }
+      },
+      "$tag": "Id"
     }
   ]
 }

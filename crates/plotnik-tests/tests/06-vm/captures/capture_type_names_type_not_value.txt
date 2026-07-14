@@ -15,8 +15,8 @@ export type Ident = Node;
 {
   "id": {
     "kind": "identifier",
-    "text": "foo",
-    "span": [0, 3]
+    "span": [0, 3],
+    "text": "foo"
   }
 }
 -------------------- BYTECODE --------------------
