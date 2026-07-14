@@ -3,25 +3,25 @@
 //! Every iteration measures the user-visible query cost minus parsing: build a
 //! VM, execute the compiled module against a pre-parsed tree, and materialize
 //! the result. `parse` benches tree-sitter parsing of the same corpus for
-//! scale, and `scan_rows_execute` skips materialization to split VM time from
+//! scale, and `scan_items_execute` skips materialization to split VM time from
 //! output building.
 //!
 //! Scenarios, each isolating a different runtime path:
-//! - `scan_rows`: enum rows over every top-level statement — sibling
-//!   navigation, alternation checkpoints, and effect logging in bulk.
-//! - `fn_params`: nested field constraints plus an inner list per row.
+//! - `scan_items`: variants over every top-level statement — sibling
+//!   navigation, alternation checkpoints, and match-journal recording in bulk.
+//! - `fn_params`: nested field constraints plus an inner list per variant.
 //! - `deep_calls`: self-recursive definition descending nested call chains —
 //!   Call/Return frames and call-retry checkpoints.
 //! - `pred_eq` / `pred_regex`: string and regex predicates that mostly fail —
 //!   per-candidate navigation plus `utf8_text` extraction.
 //! - `backtrack_storm`: greedy any-star that never finds its tail, capped by
-//!   an explicit step budget — pure dispatch + backtracking, zero output.
+//!   an explicit fuel budget — pure dispatch + backtracking, zero output.
 //!
-//! Run: `make bench` (or `make bench FILTER=scan_rows`).
+//! Run: `make bench` (or `make bench FILTER=scan_items`).
 //! Save/compare: `cargo bench -p plotnik-tests --bench vm -- --save-baseline
 //! <name>`, then `critcmp <a> <b>`.
 //! Profile: `samply record cargo bench -p plotnik-tests --bench vm --
-//! --profile-time 15 scan_rows` (bench profile keeps line tables).
+//! --profile-time 15 scan_items` (bench profile keeps line tables).
 
 use std::hint::black_box;
 use std::sync::LazyLock;
@@ -148,7 +148,7 @@ struct Scenario {
 
 const SCENARIOS: &[Scenario] = &[
     Scenario {
-        name: "scan_rows",
+        name: "scan_items",
         entry: "Items",
         query: indoc! {r#"
             Items = (program [
@@ -182,7 +182,7 @@ const SCENARIOS: &[Scenario] = &[
             Chains = (program [
               Hit: (lexical_declaration (variable_declarator value: (arrow_function body: (Nest) @chain)))
               Skip: (_)
-            ]* @rows)
+            ]* @items)
         "#},
     },
     Scenario {
@@ -192,7 +192,7 @@ const SCENARIOS: &[Scenario] = &[
             Strs = (program [
               Hit: (expression_statement (call_expression arguments: (arguments (string (string_fragment == "needle")) @s)))
               Other: (_)
-            ]* @rows)
+            ]* @items)
         "#},
     },
     Scenario {
@@ -202,7 +202,7 @@ const SCENARIOS: &[Scenario] = &[
             Strs = (program [
               Hit: (expression_statement (call_expression arguments: (arguments (string (string_fragment =~ /^ne+dle$/)) @s)))
               Other: (_)
-            ]* @rows)
+            ]* @items)
         "#},
     },
 ];
@@ -213,7 +213,7 @@ static MEDIUM_ONLY: [(&str, &LazyLock<String>); 1] = [("medium", &MEDIUM)];
 
 fn corpora_for(name: &str) -> &'static [(&'static str, &'static LazyLock<String>)] {
     match name {
-        "scan_rows" => &ALL_SIZES,
+        "scan_items" => &ALL_SIZES,
         _ => &MEDIUM_ONLY,
     }
 }
@@ -229,7 +229,9 @@ fn bench_parse(c: &mut Criterion) {
 fn bench_scenarios(c: &mut Criterion) {
     for s in SCENARIOS {
         let module = compile(s.query);
-        let entry = module.entrypoint(s.entry).expect("bench entrypoint exists");
+        let entry = module
+            .entry_point(s.entry)
+            .expect("bench entry point exists");
         let mut group = c.benchmark_group(s.name);
         for (size_name, source) in corpora_for(s.name) {
             let source: &str = source;
@@ -238,12 +240,12 @@ fn bench_scenarios(c: &mut Criterion) {
             group.bench_function(*size_name, |b| {
                 b.iter(|| {
                     let vm = VM::builder(source, &tree).build();
-                    let effects = vm.execute(&module, &entry).expect("bench query matches");
+                    let journal = vm.execute(&module, &entry).expect("bench query matches");
                     materialize_verified(
                         source,
                         &module,
                         &entry,
-                        effects.as_slice(),
+                        journal.output_events(),
                         Colors::new(false),
                     )
                 })
@@ -253,21 +255,23 @@ fn bench_scenarios(c: &mut Criterion) {
     }
 }
 
-/// The scan without materialization: subtracting this from `scan_rows/medium`
+/// The scan without materialization: subtracting this from `scan_items/medium`
 /// attributes time between the VM proper and output building.
 fn bench_scan_execute(c: &mut Criterion) {
     let s = &SCENARIOS[0];
     let module = compile(s.query);
-    let entry = module.entrypoint(s.entry).expect("bench entrypoint exists");
+    let entry = module
+        .entry_point(s.entry)
+        .expect("bench entry point exists");
     let source: &str = &MEDIUM;
     let tree = parse_js(source);
-    let mut group = c.benchmark_group("scan_rows_execute");
+    let mut group = c.benchmark_group("scan_items_execute");
     group.throughput(Throughput::Bytes(source.len() as u64));
     group.bench_function("medium", |b| {
         b.iter(|| {
             let vm = VM::builder(source, &tree).build();
-            let effects = vm.execute(&module, &entry).expect("bench query matches");
-            black_box(effects.as_slice().len());
+            let journal = vm.execute(&module, &entry).expect("bench query matches");
+            black_box(journal.as_slice().len());
         })
     });
     group.finish();
@@ -275,23 +279,24 @@ fn bench_scan_execute(c: &mut Criterion) {
 
 /// Raw dispatch + backtrack throughput. The anchorless star lets every `(_)`
 /// element re-bind to any later sibling on backtrack, so the search space is
-/// exponential and the run always exhausts its step budget; a fixed budget
-/// turns that storm into a stable time-per-step measurement.
+/// exponential and the run always exhausts its fuel budget; a fixed budget
+/// turns that storm into a stable dispatch-throughput measurement while fuel
+/// and matcher dispatches have their current one-to-one relationship.
 fn bench_backtrack_storm(c: &mut Criterion) {
-    const STEP_BUDGET: u64 = 50_000;
+    const FUEL_BUDGET: u64 = 50_000;
     let module = compile("Missing = (program {(_)* (debugger_statement)})");
     let entry = module
-        .entrypoint("Missing")
-        .expect("bench entrypoint exists");
+        .entry_point("Missing")
+        .expect("bench entry point exists");
     let source: &str = &SMALL;
     let tree = parse_js(source);
     let mut group = c.benchmark_group("backtrack_storm");
-    group.throughput(Throughput::Elements(STEP_BUDGET));
-    group.bench_function("50k_steps", |b| {
+    group.throughput(Throughput::Elements(FUEL_BUDGET));
+    group.bench_function("50k_dispatches", |b| {
         b.iter(|| {
             let vm = VM::builder(source, &tree)
                 .limits(RuntimeLimitSpec {
-                    steps: Limit::Of(STEP_BUDGET),
+                    fuel_limit: Limit::Of(FUEL_BUDGET),
                     memory: Limit::Auto,
                 })
                 .build();

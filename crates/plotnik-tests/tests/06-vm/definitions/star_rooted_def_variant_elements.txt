@@ -1,0 +1,247 @@
+Entry = [
+  Id: (identifier) @id
+  Num: (number) @num
+]
+
+Items = (Entry)*
+
+Q = (program
+  (expression_statement
+    (array (Items) @items)
+  )
+)
+--------------------- INPUT ----------------------
+[a, 1, b];
+------------------- TYPESCRIPT -------------------
+export type Entry =
+  | { $tag: "Id"; $data: { id: Node } }
+  | { $tag: "Num"; $data: { num: Node } };
+
+export interface Q {
+  items: Items;
+}
+
+export type Items = Entry[];
+--------------------- OUTPUT ---------------------
+{
+  "items": [
+    {
+      "$tag": "Id",
+      "$data": {
+        "id": {
+          "kind": "identifier",
+          "text": "a",
+          "span": [1, 2]
+        }
+      }
+    },
+    {
+      "$tag": "Num",
+      "$data": {
+        "num": {
+          "kind": "number",
+          "text": "1",
+          "span": [4, 5]
+        }
+      }
+    },
+    {
+      "$tag": "Id",
+      "$data": {
+        "id": {
+          "kind": "identifier",
+          "text": "b",
+          "span": [7, 8]
+        }
+      }
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "id"
+S02 "num"
+S03 "Id"
+S04 "Num"
+S05 "items"
+S06 "Entry"
+S07 "Items"
+S08 "Q"
+S09 "identifier"
+S10 "number"
+S11 "program"
+S12 "expression_statement"
+S13 "array"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { num }
+T3 = Variant M2:2  ; Id | Num
+T4 = ListZeroOrMore(T3)  ; Entry*
+T5 = Record  M4:1  ; { items }
+
+[type_members]
+M0: S01 → T0  ; id: <Node>
+M1: S02 → T0  ; num: <Node>
+M2: S03 → T1  ; Id: T1
+M3: S04 → T2  ; Num: T2
+M4: S05 → T4  ; items: Items
+
+[type_names]
+N0: S06 → T3  ; Entry
+N1: S07 → T4  ; Items
+N2: S08 → T5  ; Q
+
+[entry_points]
+Entry = 00 :: T3
+Q     = 02 :: T5
+
+[instructions]
+Entry:
+  00       (@19)                            19 : 01
+  01                                        ▶
+
+Q:
+  02  -ε-  [RecordOpen]                     04
+  04       (@36)                            36 : 05
+  05  -ε-  [RecordClose]                    07
+  07                                        ▶
+  08  -ε-  [ListClose]                      10
+  10  ─‣┘  _ [RecordSet(M4)]                31
+  12                                        ▶
+  13   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+  16   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+  19  -ε-                                   13, 16
+  21                                        ▶
+  22  -ε-  [ListClose RecordSet(M4)]        31
+  24  -ε-  [ArrayPush]                      27, 08
+  26   !   (@19)                            19 : 24
+  27  ──!  _                                26, 27
+  29  └─!  _                                26, 27
+  31  ─‣┘² _                                21
+  32  -ε-  [ListOpen]                       29, 22
+  34  └‣─  (array)                          32
+  35  └‣─  (expression_statement)           34
+  36   !   (program)                        35
+--------------------- TRACE ----------------------
+Q:
+  02  -ε-  [RecordOpen]                     04
+  04       (@36)                            36 : 05
+       ▶   (@36)
+
+@36:
+  36       (program)                        35
+       ●   program
+  35       (expression_statement)           34
+       ●   expression_statement
+  34       (array)                          32
+       ●   array
+  32  -ε-  [ListOpen]                       29, 22
+  29       _                                26, 27
+       ●   [
+  26       (@19)                            19 : 24
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   [
+  19  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ○   [
+  29  ❮❮❮ 
+  27       _                                26, 27
+       ●   identifier
+  26       (@19)                            19 : 24
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ●   identifier
+  12   ◀   (@19)                            
+
+@36:
+  24  -ε-  [ArrayPush]                      27, 08
+  27       _                                26, 27
+       ●   ,
+  26       (@19)                            19 : 24
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   ,
+  19  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                26, 27
+       ●   number
+  26       (@19)                            19 : 24
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   number
+  19  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ●   number
+  12   ◀   (@19)                            
+
+@36:
+  24  -ε-  [ArrayPush]                      27, 08
+  27       _                                26, 27
+       ●   ,
+  26       (@19)                            19 : 24
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   ,
+  19  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                26, 27
+       ●   identifier
+  26       (@19)                            19 : 24
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ●   identifier
+  12   ◀   (@19)                            
+
+@36:
+  24  -ε-  [ArrayPush]                      27, 08
+  27       _                                26, 27
+       ●   ]
+  26       (@19)                            19 : 24
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   ]
+  19  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ○   ]
+  27  ❮❮❮ 
+  27       _                                26, 27
+  24  ❮❮❮ 
+  08  -ε-  [ListClose]                      10
+  10       _ [RecordSet(M4)]                31
+       ●   array
+  31       _                                21
+       ●   program
+  21   ◀   (@36)                            
+
+Q:
+  05  -ε-  [RecordClose]                    07
+  07   ◀   (Q)                              ◼

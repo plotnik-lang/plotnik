@@ -135,9 +135,9 @@ fn semantic_landmarks_include_navigation_predicates_and_modifiers() {
 }
 
 #[test]
-fn semantic_landmarks_count_contextual_branch_prefixes() {
+fn semantic_landmarks_count_contextual_alternative_prefixes() {
     assert_eq!(
-        format_query("Q = [Only: (wrapper (identifier))]").expect("enum formats"),
+        format_query("Q = [Only: (wrapper (identifier))]").expect("labeled alternation formats"),
         indoc! {"
             Q = [
               Only: (wrapper (identifier))
@@ -145,7 +145,8 @@ fn semantic_landmarks_count_contextual_branch_prefixes() {
         "}
     );
     assert_eq!(
-        format_query("Q = [Only: (outer (wrapper (identifier)))]").expect("dense enum formats"),
+        format_query("Q = [Only: (outer (wrapper (identifier)))]")
+            .expect("dense labeled alternation formats"),
         indoc! {"
             Q = [
               Only: (outer
@@ -247,7 +248,7 @@ fn preserves_comments_owned_by_pattern_wrappers() {
         "Q = (call (a) (b)) /* capture */ @x",
         "Q = (call (a) (b)) /* quantifier */ *",
         "Q /* separator */ = (call (a) (b))",
-        "Q = [Label /* branch */ : (call (a) (b))]",
+        "Q = [Label /* alternative */ : (call (a) (b))]",
         "Q = (Foo /* ref */)",
         "Q = (identifier /* predicate */ == \"x\")",
         "Q = (identifier) @x :: /* capture type */ Name",

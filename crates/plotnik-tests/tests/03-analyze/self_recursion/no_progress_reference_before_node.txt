@@ -1,0 +1,20 @@
+E = [
+  {
+    (E)
+    (a)
+  }
+  (x)
+]
+------------------ DIAGNOSTICS -------------------
+error: infinite recursion: cycle makes no progress
+ --> query.ptk:3:6
+  |
+3 |     (E)
+  |      ^
+  |      |
+  |      references itself
+  |
+help: match at least one syntax-tree node before recursing
+-------------------- SYMBOLS ---------------------
+E
+  E (cycle)

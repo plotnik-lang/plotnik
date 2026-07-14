@@ -46,8 +46,8 @@ S8 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:2  ; { a, b }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:2  ; { a, b }
 
 [type_members]
 M0: S1 → T0  ; name: <Node>
@@ -58,73 +58,73 @@ M2: S3 → T1  ; b: Id
 N0: S4 → T1  ; Id
 N1: S5 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Id = 00 :: T1
 Q  = 06 :: T2
 
-[transitions]
+[instructions]
 Id:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@21)                            21 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@30)                            30 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
-  12  -ε-  [StructClose]                    14
-  14  ─‣┘² _ [Set(M2)]                      23
-  16  -ε-  [StructClose]                    18
-  18  ─‣┘  _ [Set(M1)]                      25
+  12  -ε-  [RecordClose]                    14
+  14  ─‣┘² _ [RecordSet(M2)]                23
+  16  -ε-  [RecordClose]                    18
+  18  ─‣┘  _ [RecordSet(M1)]                25
   20                                        ▶
-  21   !   (identifier) [Node Set(M0)]      20
+  21   !   (identifier) [Node RecordSet(M0)]  20
   23                                        ▶
   24  └‣─  (@21)                            21 : 12
-  25  ─‣─  (expression_statement) [StructOpen]  24
+  25  ─‣─  (expression_statement) [RecordOpen]  24
   27  └‣─  (@21)                            21 : 16
-  28  └‣─  (expression_statement) [StructOpen]  27
+  28  └‣─  (expression_statement) [RecordOpen]  27
   30   !   (program)                        28
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@30)                            30 : 09
        ▶   (@30)
 
 @30:
   30       (program)                        28
        ●   program
-  28       (expression_statement) [StructOpen]  27
+  28       (expression_statement) [RecordOpen]  27
        ●   expression_statement
   27       (@21)                            21 : 16
        ▶   (@21)
 
 @21:
-  21       (identifier) [Node Set(M0)]      20
+  21       (identifier) [Node RecordSet(M0)]  20
        ●   identifier
   20   ◀   (@21)                            
 
 @30:
-  16  -ε-  [StructClose]                    18
-  18       _ [Set(M1)]                      25
+  16  -ε-  [RecordClose]                    18
+  18       _ [RecordSet(M1)]                25
        ●   expression_statement
-  25       (expression_statement) [StructOpen]  24
+  25       (expression_statement) [RecordOpen]  24
        ●   expression_statement
   24       (@21)                            21 : 12
        ▶   (@21)
 
 @21:
-  21       (identifier) [Node Set(M0)]      20
+  21       (identifier) [Node RecordSet(M0)]  20
        ●   identifier
   20   ◀   (@21)                            
 
 @30:
-  12  -ε-  [StructClose]                    14
-  14       _ [Set(M2)]                      23
+  12  -ε-  [RecordClose]                    14
+  14       _ [RecordSet(M2)]                23
        ●   program
   23   ◀   (@30)                            
 
 Q:
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11   ◀   (Q)                              ◼

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use plotnik_lib::{
-    Colors, NoopTracer, RuntimeError, RuntimeLimitSpec, VM, extract_inspection,
+    Colors, NoopTracer, RuntimeError, RuntimeLimitSpec, VM, extract_result_provenance,
     materialize_verified,
 };
 
@@ -27,7 +27,7 @@ pub struct RunArgs {
 pub fn run(args: RunArgs) -> CliResult {
     let ExecPlan {
         module,
-        entrypoint,
+        entry_point,
         tree,
         source_code,
     } = run_common::plan_exec(ExecRequest {
@@ -44,16 +44,16 @@ pub fn run(args: RunArgs) -> CliResult {
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
     if args.json {
         let mut tracer = NoopTracer;
-        let (result, stats) = vm.execute_with_stats(&module, &entrypoint, &mut tracer);
-        let effects = match result {
-            Ok(effects) => effects,
+        let (result, stats) = vm.execute_with_stats(&module, &entry_point, &mut tracer);
+        let journal = match result {
+            Ok(journal) => journal,
             Err(RuntimeError::NoMatch) => {
                 println!(
                     "{}",
                     serde_json::json!({
-                        "value": null,
+                        "result": null,
                         "error": "no match",
-                        "stats": stats,
+                        "run_stats": stats,
                     })
                 );
                 return Err(CliError::No);
@@ -65,28 +65,28 @@ pub fn run(args: RunArgs) -> CliResult {
         };
 
         let colors = Colors::new(false);
-        let value = materialize_verified(
+        let result = materialize_verified(
             &source_code,
             &module,
-            &entrypoint,
-            effects.as_slice(),
+            &entry_point,
+            journal.output_events(),
             colors,
         );
-        let inspection =
-            (!module.spans().is_empty()).then(|| extract_inspection(effects.as_slice(), &module));
+        let result_provenance =
+            (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, &module));
         println!(
             "{}",
             serde_json::json!({
-                "value": value,
-                "inspection": inspection,
-                "stats": stats,
+                "result": result,
+                "result_provenance": result_provenance,
+                "run_stats": stats,
             })
         );
         return Ok(());
     }
 
-    let effects = match vm.execute(&module, &entrypoint) {
-        Ok(effects) => effects,
+    let journal = match vm.execute(&module, &entry_point) {
+        Ok(journal) => journal,
         Err(RuntimeError::NoMatch) => {
             // Zero matches must never be silent
             eprintln!("no match");
@@ -102,8 +102,8 @@ pub fn run(args: RunArgs) -> CliResult {
     let value = materialize_verified(
         &source_code,
         &module,
-        &entrypoint,
-        effects.as_slice(),
+        &entry_point,
+        journal.output_events(),
         colors,
     );
 

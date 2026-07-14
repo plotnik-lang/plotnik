@@ -21,7 +21,7 @@ Funcs = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Funcs = 95
 Lazy  = 91
 Many  = 83
@@ -33,81 +33,81 @@ Maybe:
   01                                        ▶
   02   !   (program)                        08, 04
   03  ─‣┘  _                                01
-  04  -ε-  [Null Set(stmt)]                 01
-  05   !   (expression_statement) [Node Set(stmt)]  03
+  04  -ε-  [Absent RecordSet(stmt)]         01
+  05   !   (expression_statement) [Node RecordSet(stmt)]  03
   07  ──!  _                                05, 07
   08  └─!  _                                05, 07
 
 Many:
   11                                        ▶
   12   !   (program)                        25
-  13  ─‣┘  _ [ArrayClose Set(stmts)]        11
-  15  -ε-  [ArrayClose Set(stmts)]          11
-  17   !   (expression_statement) [Node Push]  19, 13
+  13  ─‣┘  _ [ListClose RecordSet(stmts)]   11
+  15  -ε-  [ListClose RecordSet(stmts)]     11
+  17   !   (expression_statement) [Node ArrayPush]  19, 13
   19  ──!  _                                17, 19
   20  └─!  _                                17, 19
-  25  -ε-  [ArrayOpen]                      20, 15
+  25  -ε-  [ListOpen]                       20, 15
 
 Some:
   27                                        ▶
   28   !   (program)                        35
-  29  ─‣┘  _ [ArrayClose Set(stmts)]        27
-  32   !   (expression_statement) [Node Push]  34, 29
+  29  ─‣┘  _ [ListClose RecordSet(stmts)]   27
+  32   !   (expression_statement) [Node ArrayPush]  34, 29
   34  ──!  _                                32, 34
-  35  └─!  _ [ArrayOpen]                    32, 34
+  35  └─!  _ [ListOpen]                     32, 34
 
 Lazy:
   41                                        ▶
   42   !   (program)                        55
-  43  ─‣┘  _ [ArrayClose Set(stmts)]        41
-  45  -ε-  [ArrayClose Set(stmts)]          41
-  47   !   (expression_statement) [Node Push]  43, 49
+  43  ─‣┘  _ [ListClose RecordSet(stmts)]   41
+  45  -ε-  [ListClose RecordSet(stmts)]     41
+  47   !   (expression_statement) [Node ArrayPush]  43, 49
   49  ──!  _                                47, 49
   50  └─!  _                                47, 49
-  55  -ε-  [ArrayOpen]                      45, 50
+  55  -ε-  [ListOpen]                       45, 50
 
 Funcs:
   57                                        ▶
   58   !   (program)                        75
-  59  ─‣┘  _ [ArrayClose Set(funcs)]        57
-  61  -ε-  [ArrayClose Set(funcs)]          57
-  63  -ε-  [StructClose Push]               69, 59
-  64   !   (function_declaration) [StructOpen]  66
+  59  ─‣┘  _ [ListClose RecordSet(funcs)]   57
+  61  -ε-  [ListClose RecordSet(funcs)]     57
+  63  -ε-  [RecordClose ArrayPush]          69, 59
+  64   !   (function_declaration) [RecordOpen]  66
   65  ─‣┘  _                                63
-  66  └‣─  name: (identifier) [Node Set(name)]  65
+  66  └‣─  name: (identifier) [Node RecordSet(name)]  65
   69  ──!  _                                64, 69
   70  └─!  _                                64, 69
-  75  -ε-  [ArrayOpen]                      70, 61
+  75  -ε-  [ListOpen]                       70, 61
 
-Maybe (entrypoint):
+Maybe (entry point):
   76                                        ▶
-  77  -ε-  [StructClose]                    76
+  77  -ε-  [RecordClose]                    76
   78       (Maybe)                          02 : 77
-  79  -ε-  [StructOpen]                     78
+  79  -ε-  [RecordOpen]                     78
 
-Many (entrypoint):
+Many (entry point):
   80                                        ▶
-  81  -ε-  [StructClose]                    80
+  81  -ε-  [RecordClose]                    80
   82       (Many)                           12 : 81
-  83  -ε-  [StructOpen]                     82
+  83  -ε-  [RecordOpen]                     82
 
-Some (entrypoint):
+Some (entry point):
   84                                        ▶
-  85  -ε-  [StructClose]                    84
+  85  -ε-  [RecordClose]                    84
   86       (Some)                           28 : 85
-  87  -ε-  [StructOpen]                     86
+  87  -ε-  [RecordOpen]                     86
 
-Lazy (entrypoint):
+Lazy (entry point):
   88                                        ▶
-  89  -ε-  [StructClose]                    88
+  89  -ε-  [RecordClose]                    88
   90       (Lazy)                           42 : 89
-  91  -ε-  [StructOpen]                     90
+  91  -ε-  [RecordOpen]                     90
 
-Funcs (entrypoint):
+Funcs (entry point):
   92                                        ▶
-  93  -ε-  [StructClose]                    92
+  93  -ε-  [RecordClose]                    92
   94       (Funcs)                          58 : 93
-  95  -ε-  [StructOpen]                     94
+  95  -ε-  [RecordOpen]                     94
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -128,147 +128,147 @@ S14 "identifier"
 
 [type_defs]
 T00 = <Node>
-T01 = Struct  M0:1  ; { stmt }
-T02 = ArrayStar(T00)  ; <Node>*
-T03 = Struct  M1:1  ; { stmts }
-T04 = ArrayPlus(T00)  ; <Node>+
-T05 = Struct  M2:1  ; { stmts }
-T06 = Struct  M3:1  ; { stmts }
-T07 = Struct  M4:1  ; { name }
-T08 = ArrayStar(T07)  ; FuncsFuncs*
-T09 = Struct  M5:1  ; { funcs }
-T10 = Optional(T00)  ; <Node>?
+T01 = Option(T00)  ; <Node>?
+T02 = Record  M0:1  ; { stmt }
+T03 = ListZeroOrMore(T00)  ; <Node>*
+T04 = Record  M1:1  ; { stmts }
+T05 = ListOneOrMore(T00)  ; <Node>+
+T06 = Record  M2:1  ; { stmts }
+T07 = Record  M3:1  ; { stmts }
+T08 = Record  M4:1  ; { name }
+T09 = ListZeroOrMore(T08)  ; FuncsFuncs*
+T10 = Record  M5:1  ; { funcs }
 
 [type_members]
-M0: S01 → T10  ; stmt: T10
-M1: S02 → T02  ; stmts: T02
-M2: S02 → T04  ; stmts: T04
-M3: S02 → T02  ; stmts: T02
+M0: S01 → T01  ; stmt: T01
+M1: S02 → T03  ; stmts: T03
+M2: S02 → T05  ; stmts: T05
+M3: S02 → T03  ; stmts: T03
 M4: S03 → T00  ; name: <Node>
-M5: S04 → T08  ; funcs: T08
+M5: S04 → T09  ; funcs: T09
 
 [type_names]
-N0: S05 → T01  ; Maybe
-N1: S06 → T03  ; Many
-N2: S07 → T05  ; Some
-N3: S08 → T06  ; Lazy
-N4: S09 → T07  ; FuncsFuncs
-N5: S10 → T09  ; Funcs
+N0: S05 → T02  ; Maybe
+N1: S06 → T04  ; Many
+N2: S07 → T06  ; Some
+N3: S08 → T07  ; Lazy
+N4: S09 → T08  ; FuncsFuncs
+N5: S10 → T10  ; Funcs
 
-[entrypoints]
-Funcs = 024 :: T09
-Lazy  = 019 :: T06
-Many  = 006 :: T03
-Maybe = 000 :: T01
-Some  = 012 :: T05
+[entry_points]
+Funcs = 024 :: T10
+Lazy  = 019 :: T07
+Many  = 006 :: T04
+Maybe = 000 :: T02
+Some  = 012 :: T06
 
 [spans]
-P00 def        0..50  src0  T01
-P01 pattern    8..50  src0
-P02 capture    43..48  src0  T01.M0
-P03 quantifier 41..42  src0
-P04 pattern    19..41  src0
-P05 def        52..102  src0  T03
-P06 pattern    59..102  src0
-P07 capture    94..100  src0  T03.M1
-P08 quantifier 92..93  src0
-P09 pattern    70..92  src0
-P10 def        104..154  src0  T05
-P11 pattern    111..154  src0
-P12 capture    146..152  src0  T05.M2
-P13 quantifier 144..145  src0
-P14 pattern    122..144  src0
-P15 def        156..207  src0  T06
-P16 pattern    163..207  src0
-P17 capture    199..205  src0  T06.M3
-P18 quantifier 196..198  src0
-P19 pattern    174..196  src0
-P20 def        209..292  src0  T09
-P21 pattern    217..292  src0
-P22 capture    284..290  src0  T09.M5
-P23 quantifier 282..283  src0
-P24 pattern    228..282  src0
-P25 capture    273..278  src0  T07.M4
-P26 field      254..258  src0
-P27 pattern    260..272  src0
+P00 def        0..50  source_id=0  T02
+P01 pattern    8..50  source_id=0
+P02 capture    43..48  source_id=0  T02.M0
+P03 quantifier 41..42  source_id=0
+P04 pattern    19..41  source_id=0
+P05 def        52..102  source_id=0  T04
+P06 pattern    59..102  source_id=0
+P07 capture    94..100  source_id=0  T04.M1
+P08 quantifier 92..93  source_id=0
+P09 pattern    70..92  source_id=0
+P10 def        104..154  source_id=0  T06
+P11 pattern    111..154  source_id=0
+P12 capture    146..152  source_id=0  T06.M2
+P13 quantifier 144..145  source_id=0
+P14 pattern    122..144  source_id=0
+P15 def        156..207  source_id=0  T07
+P16 pattern    163..207  source_id=0
+P17 capture    199..205  source_id=0  T07.M3
+P18 quantifier 196..198  source_id=0
+P19 pattern    174..196  source_id=0
+P20 def        209..292  source_id=0  T10
+P21 pattern    217..292  source_id=0
+P22 capture    284..290  source_id=0  T10.M5
+P23 quantifier 282..283  source_id=0
+P24 pattern    228..282  source_id=0
+P25 capture    273..278  source_id=0  T08.M4
+P26 grammar_field 254..258  source_id=0
+P27 pattern    260..272  source_id=0
 
-[transitions]
+[instructions]
 Maybe:
-  000  -ε-  [StructOpen]                    002
+  000  -ε-  [RecordOpen]                    002
   002       (@058)                          058 : 003
-  003  -ε-  [StructClose]                   005
+  003  -ε-  [RecordClose]                   005
   005                                       ▶
 
 Many:
-  006  -ε-  [StructOpen]                    008
+  006  -ε-  [RecordOpen]                    008
   008       (@077)                          077 : 009
-  009  -ε-  [StructClose]                   011
+  009  -ε-  [RecordClose]                   011
   011                                       ▶
 
 Some:
-  012  -ε-  [StructOpen]                    014
+  012  -ε-  [RecordOpen]                    014
   014       (@091)                          091 : 016
   015                                       ▶
-  016  -ε-  [StructClose]                   018
+  016  -ε-  [RecordClose]                   018
   018                                       ▶
 
 Lazy:
-  019  -ε-  [StructOpen]                    021
+  019  -ε-  [RecordOpen]                    021
   021       (@112)                          112 : 022
-  022  -ε-  [StructClose]                   015
+  022  -ε-  [RecordClose]                   015
 
 Funcs:
-  024  -ε-  [StructOpen]                    026
+  024  -ε-  [RecordOpen]                    026
   026       (@128)                          128 : 027
-  027  -ε-  [StructClose]                   029
+  027  -ε-  [RecordClose]                   029
   029                                       ▶
   030                                       ▶
   031  ...
-  032   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node Set(M0) SpanEnd#2 SpanEnd#4]  035
+  032   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  035
   035  ─‣┘  _ [SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
-  037  ─‣┘  _ [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  114
-  040  └‣─  name: (identifier) [SpanStart#26 SpanStartAt#27 SpanStart#25 Node Set(M4) SpanEnd#25 SpanEnd#27 SpanEnd#26]  044
+  037  ─‣┘  _ [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  114
+  040  └‣─  name: (identifier) [SpanStart#26 SpanStartAt#27 SpanStart#25 Node RecordSet(M4) SpanEnd#25 SpanEnd#27 SpanEnd#26]  044
   044  ─‣┘  _ [SpanEnd#24]                  118
   046  ...
   047  ...
-  048  -ε-  [SpanStart#2 Null Set(M0) SpanEnd#2 SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
+  048  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2 SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
   051  ──!  _                               032, 051
   053  └─!  _                               032, 051
   055  ...
   056  -ε-  [SpanStart#3]                   053, 048
   058   !   (program) [SpanStart#0 SpanStartAt#1]  056
   060                                       ▶
-  061  -ε-  [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
-  064   !   (expression_statement) [SpanStartAt#9 Node Push SpanEnd#9]  067, 074
+  061  -ε-  [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
+  064   !   (expression_statement) [SpanStartAt#9 Node ArrayPush SpanEnd#9]  067, 074
   067  ──!  _                               064, 067
   069  └─!  _                               064, 067
   071  ...
-  072  -ε-  [ArrayOpen SpanStart#8]         069, 061
-  074  ─‣┘  _ [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
+  072  -ε-  [ListOpen SpanStart#8]          069, 061
+  074  ─‣┘  _ [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
   077   !   (program) [SpanStart#5 SpanStartAt#6]  072
   079                                       ▶
-  080   !   (expression_statement) [SpanStartAt#14 Node Push SpanEnd#14]  083, 088
+  080   !   (expression_statement) [SpanStartAt#14 Node ArrayPush SpanEnd#14]  083, 088
   083  ──!  _                               080, 083
-  085  └─!  _ [ArrayOpen SpanStart#13]      080, 083
+  085  └─!  _ [ListOpen SpanStart#13]       080, 083
   087  ...
-  088  ─‣┘  _ [SpanEnd#13 ArrayClose SpanStart#12 Set(M2) SpanEnd#12 SpanEnd#11 SpanEnd#10]  079
+  088  ─‣┘  _ [SpanEnd#13 ListClose SpanStart#12 RecordSet(M2) SpanEnd#12 SpanEnd#11 SpanEnd#10]  079
   091   !   (program) [SpanStart#10 SpanStartAt#11]  085
   093                                       ▶
   094  ──!  _                               120, 094
-  096  -ε-  [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
-  099   !   (expression_statement) [SpanStartAt#19 Node Push SpanEnd#19]  108, 102
+  096  -ε-  [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
+  099   !   (expression_statement) [SpanStartAt#19 Node ArrayPush SpanEnd#19]  108, 102
   102  ──!  _                               099, 102
   104  └─!  _                               099, 102
-  106  -ε-  [ArrayOpen SpanStart#18]        096, 104
-  108  ─‣┘  _ [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
+  106  -ε-  [ListOpen SpanStart#18]         096, 104
+  108  ─‣┘  _ [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
   111  ...
   112   !   (program) [SpanStart#15 SpanStartAt#16]  106
   114                                       ▶
-  115  -ε-  [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  114
-  118  -ε-  [StructClose Push]              094, 037
-  120   !   (function_declaration) [StructOpen SpanStartAt#24]  040
+  115  -ε-  [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  114
+  118  -ε-  [RecordClose ArrayPush]         094, 037
+  120   !   (function_declaration) [RecordOpen SpanStartAt#24]  040
   122  └─!  _                               120, 094
-  124  -ε-  [ArrayOpen SpanStart#23]        122, 115
+  124  -ε-  [ListOpen SpanStart#23]         122, 115
   126  ...
   127  ...
   128   !   (program) [SpanStart#20 SpanStartAt#21]  124

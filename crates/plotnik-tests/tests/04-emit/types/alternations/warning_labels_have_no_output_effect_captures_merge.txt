@@ -1,0 +1,30 @@
+Q = (program
+  [
+    A: (expression_statement) @e
+    B: (debugger_statement) @d
+  ]
+)
+------------------ DIAGNOSTICS -------------------
+warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
+ --> query.ptk:2:3
+  |
+2 | /   [
+3 | |     A: (expression_statement) @e
+4 | |     B: (debugger_statement) @d
+5 | |   ]
+  | |___^
+  |
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  d: Node | null;
+  e: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub e: ::core::option::Option<Node<'t>>,
+    pub d: ::core::option::Option<Node<'t>>,
+}

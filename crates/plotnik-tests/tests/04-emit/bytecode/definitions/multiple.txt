@@ -1,30 +1,30 @@
 Foo = (identifier) @id
 Bar = (string) @str
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Bar = 13
 Foo = 09
 
 [transitions]
 Foo:
   01                                        ▶
-  02   !   (identifier) [Node Set(id)]      01
+  02   !   (identifier) [Node RecordSet(id)]  01
 
 Bar:
   04                                        ▶
-  05   !   (string) [Node Set(str)]         04
+  05   !   (string) [Node RecordSet(str)]   04
 
-Foo (entrypoint):
+Foo (entry point):
   06                                        ▶
-  07  -ε-  [StructClose]                    06
+  07  -ε-  [RecordClose]                    06
   08       (Foo)                            02 : 07
-  09  -ε-  [StructOpen]                     08
+  09  -ε-  [RecordOpen]                     08
 
-Bar (entrypoint):
+Bar (entry point):
   10                                        ▶
-  11  -ε-  [StructClose]                    10
+  11  -ε-  [RecordClose]                    10
   12       (Bar)                            05 : 11
-  13  -ε-  [StructOpen]                     12
+  13  -ε-  [RecordOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -37,8 +37,8 @@ S6 "string"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { str }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { str }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
@@ -48,23 +48,23 @@ M1: S2 → T0  ; str: <Node>
 N0: S3 → T1  ; Foo
 N1: S4 → T2  ; Bar
 
-[entrypoints]
+[entry_points]
 Bar = 06 :: T2
 Foo = 00 :: T1
 
-[transitions]
+[instructions]
 Foo:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@13)                            13 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Bar:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@16)                            16 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
   12                                        ▶
-  13   !   (identifier) [Node Set(M0)]      12
+  13   !   (identifier) [Node RecordSet(M0)]  12
   15                                        ▶
-  16   !   (string) [Node Set(M1)]          15
+  16   !   (string) [Node RecordSet(M1)]    15

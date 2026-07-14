@@ -8,7 +8,7 @@ use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR};
 const MAX_NEG_FIELDS: usize = 7;
 
 fn make_effect(_idx: u16) -> EffectIR {
-    EffectIR::literal(EffectKind::Null, 0)
+    EffectIR::literal(EffectKind::Absent, 0)
 }
 
 #[test]
@@ -21,7 +21,7 @@ fn lower_no_overflow_unchanged() {
                 .into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -42,7 +42,7 @@ fn lower_effects_overflow() {
                 .into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -74,7 +74,7 @@ fn lower_neg_fields_overflow() {
                 .into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -101,7 +101,7 @@ fn lower_successors_overflow() {
     let mut result = NfaGraph {
         instructions: vec![MatchIR::terminal(Label(0)).successors(succs).into()],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -128,7 +128,7 @@ fn lower_successors_overflow_preserves_all_successors() {
     let mut result = NfaGraph {
         instructions: vec![MatchIR::terminal(Label(0)).successors(succs.clone()).into()],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -172,7 +172,7 @@ fn lower_successors_with_payload_respect_combined_limit() {
                 .into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -219,7 +219,7 @@ fn lower_combined_overflow() {
                 .into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };

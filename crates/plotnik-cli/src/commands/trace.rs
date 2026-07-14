@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use plotnik_lib::{
-    Colors, PrintTracer, RecordingTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity,
+    Colors, PrintTracer, RuntimeError, RuntimeLimitSpec, TraceRecorder, VM, Verbosity,
     materialize_verified,
 };
 
@@ -30,7 +30,7 @@ pub struct TraceArgs {
 pub fn run(args: TraceArgs) -> CliResult {
     let ExecPlan {
         module,
-        entrypoint,
+        entry_point,
         tree,
         source_code,
     } = run_common::plan_exec(ExecRequest {
@@ -47,14 +47,14 @@ pub fn run(args: TraceArgs) -> CliResult {
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
 
     if args.json {
-        let mut tracer = RecordingTracer::new(&module, DEFAULT_MAX_RECORDS);
-        let (result, stats) = vm.execute_with_stats(&module, &entrypoint, &mut tracer);
-        let recording = tracer.finish();
+        let mut tracer = TraceRecorder::new(&module, DEFAULT_MAX_RECORDS);
+        let (result, stats) = vm.execute_with_stats(&module, &entry_point, &mut tracer);
+        let execution_trace = tracer.finish();
         println!(
             "{}",
             serde_json::json!({
-                "recording": recording,
-                "stats": stats,
+                "execution_trace": execution_trace,
+                "run_stats": stats,
             })
         );
 
@@ -74,10 +74,10 @@ pub fn run(args: TraceArgs) -> CliResult {
         .colored(args.color)
         .build();
 
-    let effects = match vm.execute_with(&module, &entrypoint, &mut tracer) {
-        Ok(effects) => {
+    let journal = match vm.execute_with(&module, &entry_point, &mut tracer) {
+        Ok(journal) => {
             tracer.print();
-            effects
+            journal
         }
         Err(RuntimeError::NoMatch) => {
             tracer.print();
@@ -102,8 +102,8 @@ pub fn run(args: TraceArgs) -> CliResult {
     let value = materialize_verified(
         &source_code,
         &module,
-        &entrypoint,
-        effects.as_slice(),
+        &entry_point,
+        journal.output_events(),
         colors,
     );
 

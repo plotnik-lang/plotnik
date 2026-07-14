@@ -12,7 +12,7 @@ Test = (program
   (expression_statement (Expr) @expr)
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Expr = 21
 Test = 25
 
@@ -20,30 +20,30 @@ Test = 25
 Expr:
   00  -ε-                                   02, 03
   01                                        ▶
-  02   !   (number) [EnumOpen(Lit) Node Set(value) EnumClose]  01
-  03   !   (call_expression) [EnumOpen(Nested)]  10
-  05  ─‣┘  _ [EnumClose]                    01
+  02   !   (number) [VariantOpen(Lit) Node RecordSet(value) VariantClose]  01
+  03   !   (call_expression) [VariantOpen(Nested)]  10
+  05  ─‣┘  _ [VariantClose]                 01
   06  ─‣─  arguments: (arguments)           09
-  07  ─‣┘  _ [Set(inner)]                   05
+  07  ─‣┘  _ [RecordSet(inner)]             05
   09  └‣─  (Expr)                           00 : 07
-  10  └‣─  function: (identifier) [Node Set(fn)]  06
+  10  └‣─  function: (identifier) [Node RecordSet(fn)]  06
 
 Test:
   13                                        ▶
   14   !   (program)                        16
   16  └‣─  (expression_statement)           19
-  17  ─‣┘² _ [Set(expr)]                    13
+  17  ─‣┘² _ [RecordSet(expr)]              13
   19  └‣─  (Expr)                           00 : 17
 
-Expr (entrypoint):
+Expr (entry point):
   20                                        ▶
   21       (Expr)                           00 : 20
 
-Test (entrypoint):
+Test (entry point):
   22                                        ▶
-  23  -ε-  [StructClose]                    22
+  23  -ε-  [RecordClose]                    22
   24       (Test)                           14 : 23
-  25  -ε-  [StructOpen]                     24
+  25  -ε-  [RecordOpen]                     24
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -65,10 +65,10 @@ S15 "function"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { value }
-T2 = Struct  M1:2  ; { fn, inner }
-T3 = Enum    M3:2  ; Lit | Nested
-T4 = Struct  M5:1  ; { expr }
+T1 = Record  M0:1  ; { value }
+T2 = Record  M1:2  ; { fn, inner }
+T3 = Variant M3:2  ; Lit | Nested
+T4 = Record  M5:1  ; { expr }
 
 [type_members]
 M0: S01 → T0  ; value: <Node>
@@ -82,31 +82,31 @@ M5: S06 → T3  ; expr: Expr
 N0: S07 → T3  ; Expr
 N1: S08 → T4  ; Test
 
-[entrypoints]
+[entry_points]
 Expr = 00 :: T3
 Test = 02 :: T4
 
-[transitions]
+[instructions]
 Expr:
   00       (@26)                            26 : 01
   01                                        ▶
 
 Test:
-  02  -ε-  [StructOpen]                     04
+  02  -ε-  [RecordOpen]                     04
   04       (@29)                            29 : 05
-  05  -ε-  [StructClose]                    07
+  05  -ε-  [RecordClose]                    07
   07                                        ▶
   08  └‣─  (@26)                            26 : 09
-  09  ─‣┘  _ [Set(M2)]                      11
-  11  ─‣┘  _ [EnumClose]                    16
+  09  ─‣┘  _ [RecordSet(M2)]                11
+  11  ─‣┘  _ [VariantClose]                 16
   13  └‣─  (@26)                            26 : 14
-  14  ─‣┘² _ [Set(M5)]                      23
+  14  ─‣┘² _ [RecordSet(M5)]                23
   16                                        ▶
-  17   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  16
+  17   !   (number) [VariantOpen(M3) Node RecordSet(M0) VariantClose]  16
   20  ─‣─  arguments: (arguments)           08
-  21  └‣─  function: (identifier) [Node Set(M1)]  20
+  21  └‣─  function: (identifier) [Node RecordSet(M1)]  20
   23                                        ▶
-  24   !   (call_expression) [EnumOpen(M4)]  21
+  24   !   (call_expression) [VariantOpen(M4)]  21
   26  -ε-                                   17, 24
   28  └‣─  (expression_statement)           13
   29   !   (program)                        28

@@ -10,4 +10,4 @@ error: no node the grammar builds takes these children
 2 |   (_
   |    ^
   |
-help: `(_)` and `_` match any node, but no node kind admits this combination of children in this order
+help: `(_)` matches any named node, but no named node kind admits this combination of children in this order

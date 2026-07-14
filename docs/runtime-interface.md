@@ -29,9 +29,9 @@ first cross-language runtime contract. The ABI changes when generated code and
 a runtime must change together, including changes to:
 
 - navigation, checkpoint, or resume behavior;
-- the capture-trace vocabulary or payload meanings;
+- the match-journal vocabulary or payload meanings;
 - the document and tree-adapter operations generated matchers call;
-- limit accounting or the errors returned by safe entrypoints.
+- limit accounting or the errors returned by safe entry points.
 
 Adding a backend-only helper or a source-compatible convenience API does not
 change the ABI. Rust gets the same compatibility check from Cargo dependency
@@ -41,18 +41,18 @@ integer gate.
 An ABI mismatch is a module initialization error. It must report the required
 ABI and the runtime's supported range.
 
-## 2. Entrypoints and documents
+## 2. Entry points and documents
 
 Every generated definition exposes two logical operations:
 
 ```text
-parse(document)   -> Result<Optional<Output>, LimitExceeded>
+parse(document)   -> Result<Option<Output>, LimitExceeded>
 matches(document) -> Result<Boolean, LimitExceeded>
 ```
 
-`parse` runs the matcher, then replays its committed capture trace into the
-generated output type. `matches` runs the same matcher with data effects
-suppressed; it does not allocate an output trace and cannot fail a replay-depth
+`parse` runs the matcher, then decodes the output-event view of its committed
+match journal into the generated result type. `matches` runs the same matcher with output events
+suppressed; it does not allocate a match journal and cannot fail a decode-depth
 limit.
 
 A document binds together five things that must not drift independently:
@@ -76,7 +76,7 @@ The document must provide these semantic operations:
 | `root_position()`     | A fresh matcher position rooted at the tree root.             |
 | `node(position)`      | The binding-native node at a position.                        |
 | `source_bytes()`      | The exact source, encoded as canonical UTF-8 bytes.           |
-| `byte_span(node)`     | Half-open `[start, end)` offsets into the UTF-8 source bytes. |
+| `byte_range(node)`    | Half-open `[start, end)` offsets into the UTF-8 source bytes. |
 | `text_bytes(node)`    | The canonical source-byte slice for this node.                |
 | `text(node)`          | Unicode text decoded from `text_bytes(node)`.                 |
 | `source_node_count()` | Root descendant count used to resolve automatic limits.       |
@@ -133,7 +133,8 @@ The adapter normalizes binding quirks before the matcher sees them:
 - field ids and kind ids use the same numeric namespace verified at module
   initialization.
 
-The following node class is normative:
+The following Plotnik navigation class is normative; it groups nodes by skip
+behavior and does not claim they are semantically insignificant:
 
 ```text
 trivia(node) = !node.named || node.extra
@@ -141,7 +142,7 @@ trivia(node) = !node.named || node.extra
 
 An explicit match always gets a chance before the skip policy is applied. In
 particular, an explicitly requested comment can match even though comments are
-usually extras and therefore trivia.
+usually extras and therefore fall in this navigation class.
 
 ### 3.1 Navigation
 
@@ -180,11 +181,11 @@ The mutable engine state consists of:
 - the current position;
 - call frames and current recursion depth;
 - a LIFO checkpoint stack;
-- the capture trace and its current length;
+- the match journal and its current length;
 - the current suppression depth;
 - the number of open, logged scalar frames.
 
-An instruction pointer, step counter, and resolved limit policy may live in the
+An instruction pointer, matcher-dispatch counter, and resolved limit policy may live in the
 generated driver's representation instead of the runtime object.
 
 Every checkpoint snapshots all state that affects future matching:
@@ -192,35 +193,35 @@ Every checkpoint snapshots all state that affects future matching:
 ```text
 CheckpointState {
     position
-    effect_watermark
+    journal_watermark
     frame
     recursion_depth
     effect_depths { suppression: u32, scalar: u32 }
 }
 ```
 
-Restoring a checkpoint restores the position and frame, truncates the capture
-trace to its watermark, and restores all depth counters. Adding mutable engine
+Restoring a checkpoint restores the position and frame, truncates the match
+journal to its watermark, and restores all depth counters. Adding mutable engine
 state requires classifying it as restored or deliberately cumulative.
 The two effect-control depths share one packed `u64` checkpoint field, retaining
 the regression-required range above `u16` without padding every checkpoint.
 
 There are three resume forms:
 
-- `Branch(target)` resumes dispatch at an alternative successor;
+- `Successor(target)` resumes dispatch at a non-preferred successor;
 - `CallRetry(target, return, field, policy)` advances to the next admissible
   candidate and re-enters the callee without repeating the call's initial
   navigation;
 - `MatchRetry(state, policy)` advances past the accepted candidate and repeats
   that match's candidate checks, effects, and successor flow.
 
-Branch alternatives are pushed in reverse priority order so a LIFO pop tries
-them in source order. A match-retry checkpoint sits below branch checkpoints
-created after accepting that candidate. All alternatives at one candidate are
+Non-preferred successors are pushed in reverse priority order so a LIFO pop tries
+them in source order. A match-retry checkpoint sits below successor checkpoints
+created after accepting that candidate. All successor paths at one candidate are
 therefore exhausted before the search advances.
 
 A `Call` enters a frame carrying its return state. `Return` exits that frame;
-returning with no active frame accepts the entrypoint. Frames that no live
+returning with no active frame accepts the entry point. Frames that no live
 checkpoint can restore may be pruned, but pruning must not change behavior.
 
 ## 5. Candidate checks and predicates
@@ -275,31 +276,31 @@ source. Predicate execution does not byte-walk and TypeScript does not use
 Rust is the representation exception, not a semantic exception: generated
 Rust and bytecode use `rt::StaticDfa` compiled by regex-automata from the same
 normalized HIR. Regex execution is not charged to Plotnik's state-dispatch
-step counter. Engine class and worst-case running time are target properties
+matcher-dispatch counter. Engine class and worst-case running time are target properties
 (Rust remains linear; some dynamic hosts backtrack), not conformance
 properties; the observable boolean result is shared.
 
-## 6. Capture trace
+## 6. Match journal
 
 The matcher never constructs typed values while it can still backtrack. It
-records an in-memory capture trace on the active path and truncates that trace
-when restoring a checkpoint. The committed trace is replayed exactly once
-after acceptance.
+records an in-memory match journal on the active path and truncates that journal
+when restoring a checkpoint. After acceptance, its logical output-event stream
+is decoded exactly once.
 
 Generated runtimes implement this vocabulary:
 
-| Effect              | Payload and meaning                                |
+| Journal event       | Payload and meaning                                |
 | ------------------- | -------------------------------------------------- |
 | `Node`              | Current binding-native node.                       |
-| `Null`              | One absent optional/union value.                   |
-| `ArrayOpen`         | Begin an array value.                              |
-| `Push`              | Append the pending value to the current array.     |
-| `ArrayClose`        | Close the array and make it pending.               |
-| `StructOpen`        | Begin a struct value.                              |
-| `Set(member)`       | Assign the pending value to a layout member index. |
-| `StructClose`       | Close the struct and make it pending.              |
-| `EnumOpen(variant)` | Begin the selected layout variant.                 |
-| `EnumClose`         | Close the enum and make it pending.                |
+| `Absent`            | One absent option value.                           |
+| `ListOpen`          | Begin a list value.                                |
+| `ArrayPush`         | Append the pending value to its backing list.      |
+| `ListClose`         | Close the list and make it pending.                |
+| `RecordOpen`        | Begin a record value.                              |
+| `RecordSet(member)` | Assign the pending value to a record member index. |
+| `RecordClose`       | Close the record and make it pending.              |
+| `VariantOpen(case)` | Begin the selected variant case.                   |
+| `VariantClose`      | Close the variant value and make it pending.       |
 | `ScalarOpen`        | Begin one value-local source-provenance frame.     |
 | `ScalarMark(node)`  | Add an explicit matched node to every open scalar. |
 | `StrClose`          | Close a scalar and produce source text or null.    |
@@ -308,94 +309,96 @@ Generated runtimes implement this vocabulary:
 | `NodeBool(node)`    | Produce `true` for one matched node directly.      |
 | `BoolValue(value)`  | Produce a boolean without source provenance.       |
 
-Member and variant payloads are the indices assigned by the compiler's shared
+`RecordSet` and `VariantOpen` payloads are the member indices assigned by the compiler's shared
 `CaptureLayout`; they are not target-specific field ordinals. Values appear
-before their closing `Set`. The order of sibling `Set` entries inside one
-struct is not stable and must not be used as declaration order.
+before their closing `RecordSet`. The order of sibling `RecordSet` entries inside one
+record is not stable and must not be used as declaration order.
 
 `SuppressBegin` and `SuppressEnd` change the suppression depth but are not
-capture-trace entries. While suppression is nonzero, ordinary data effects,
-including scalar opens and closes, are skipped. `ScalarMark` bypasses data
+journal entries. While suppression is nonzero, ordinary output events,
+including scalar opens and closes, are skipped. `ScalarMark` bypasses output-event
 suppression so an enclosing scalar still sees nodes matched inside a suppressed
 definition. A mark is a no-op when no scalar frame is open. Suppression still
 nests during `matches`, whose initial depth is nonzero, so `matches` allocates
-no scalar trace.
+no scalar events.
 
-Inspection-span effects belong to the VM/playground inspection path. Generated
+Inspection-span events belong to the VM/playground inspection path. Generated
 production matchers reject inspection-compiled queries and do not include those
-effects in the generated-runtime ABI.
+events in the generated-runtime ABI.
 
-Scalar effects use balanced value semantics. `ScalarOpen` starts with no range;
-every mark unions the node's half-open UTF-8 byte span into the frame's hull.
-`StrClose` returns `null` when the hull is absent and otherwise borrows that
+Scalar events use balanced value semantics. `ScalarOpen` starts with no range;
+every mark expands the frame's document bounding range to include the node's
+half-open UTF-8 byte range. `StrClose` returns `null` when the range is absent and otherwise borrows that
 slice from the source. A real `n..n` mark therefore returns `""`, not `null`.
-`BoolClose` uses its boolean payload and retains the hull only as inspection
+`BoolClose` uses its boolean payload and retains the bounding range only as result
 provenance; it never derives truthiness from marks.
 For a scalar whose raw value is one node, `NodeStr` and `NodeBool` are the
-equivalent one-entry fast path; the node also carries inspection provenance.
+equivalent one-entry fast path; the node also carries result provenance.
 Production lowering uses `BoolValue(true)` for presence booleans because their
-source range is not observable there; `NodeBool` and balanced boolean frames
+document range is not observable there; `NodeBool` and balanced boolean frames
 are emitted only when inspection requests that provenance.
 
-### 6.1 Replay reader
+### 6.1 Result decoder
 
-Typed readers consume the committed trace linearly. A runtime reader provides:
+Typed decoders consume `OutputEvents`, the logical result-construction view of
+the committed match journal, linearly. A runtime decoder provides:
 
-- `take_null`;
-- `expect_node`, `expect_set`, and `expect_enum_open`;
+- `take_absent`;
+- `expect_node`, `expect_record_set`, and `expect_variant_open`;
 - `expect_str` and `expect_bool` scalar leaves;
-- `expect_*_open` and `expect_*_close` for arrays and structs;
-- `expect_push` and close lookahead for repeated values;
-- `peek_set`, which returns the first `Set` after the balanced value beginning
+- `expect_*_open` and `expect_*_close` for lists and records;
+- `expect_array_push` and close lookahead for repeated values;
+- `peek_record_set`, which returns the first `RecordSet` after the balanced value beginning
   at the current position;
-- `finish`, which asserts that the whole trace was consumed.
+- `finish`, which asserts that the whole output-event stream was consumed.
 
-`peek_set` is required because a field's value precedes its member index and
-different members may require different typed readers. Implementations should
-precompute matching `Set` positions in one backward pass so replay remains
+`peek_record_set` is required because a field's value precedes its member index and
+different members may require different typed decoders. Implementations should
+precompute matching `RecordSet` positions in one backward pass so decoding remains
 linear on deeply nested output. Its balanced-value scan treats `ScalarOpen`
 through either scalar close as one value, including nested scalar frames.
 
-The reader receives the exact source used to parse the tree. A string leaf
+The decoder receives the exact source used to parse the tree. A string leaf
 returns a source slice and therefore carries the source lifetime; a node leaf
 carries the independent tree lifetime. Rust expresses the generic contract as
 `Parse<'t, 's>`, and generated types include only the lifetimes reachable from
 their output (`Q<'t>`, `Q<'s>`, `Q<'t, 's>`, or `Q`).
 
-The compiler validates balanced trace shapes. A mismatch during replay is an
+The compiler validates balanced output-event shapes. A mismatch during decoding is an
 inside-zone generated-code/runtime defect and should assert or throw as an
 internal error, not be returned as invalid user input.
 
 ## 7. Limits
 
-Safe runs resolve independent step and memory policies. Each policy is
+Safe runs resolve independent fuel and memory policies. Each policy is
 `Auto`, an explicit nonnegative ceiling, or `Unbounded`.
 
-| Resource | Automatic ceiling                | What is metered                                                 |
-| -------- | -------------------------------- | --------------------------------------------------------------- |
-| Steps    | `1_000_000 + 1_024 * node_count` | Generated state dispatches.                                     |
-| Memory   | `64 MiB + 256 * node_count`      | Live frames, checkpoints, capture effects, and saved positions. |
+| Resource | Automatic ceiling                | What is metered                                                |
+| -------- | -------------------------------- | -------------------------------------------------------------- |
+| Fuel     | `1_000_000 + 1_024 * node_count` | Matcher dispatches; one fuel unit each today.                  |
+| Memory   | `64 MiB + 256 * node_count`      | Live frames, checkpoints, journal events, and saved positions. |
 
 Arithmetic saturates at the target's supported maximum. A runtime may sample
 memory rather than calculate it on every dispatch; the reference implementation
-samples every 1,024 steps. The error reports both ceiling and observed usage
-because geometric container growth can overshoot a sampled ceiling.
+samples every 1,024 matcher dispatches. The error reports both ceiling and
+observed usage because geometric container growth can overshoot a sampled
+ceiling.
 
-Generated typed replay has a third limit, depth, because recursive readers use
+Generated typed decoding has a third limit, depth, because recursive decoders use
 the platform's native stack. Its automatic ceiling is target-specific and may
 use a conservative generated frame-size estimate. The iterative matcher and
-the VM materializer do not have a replay-depth limit.
+the VM materializer do not have a decode-depth limit.
 
 The portable error categories are:
 
 ```text
-LimitExceeded::Steps(limit)
+LimitExceeded::OutOfFuel(limit)
 LimitExceeded::Memory { used, limit }
-LimitExceeded::Depth(limit)
+LimitExceeded::DecodeDepth(limit)
 ```
 
-Limit exhaustion is an ordinary safe-entrypoint result. Exhausted checkpoints
-mean no match, not an error. An unmetered/internal entrypoint may assert that
+Limit exhaustion is an ordinary safe entry point result. Exhausted checkpoints
+mean no match, not an error. An unmetered/internal entry point may assert that
 limit exhaustion is impossible.
 
 ## 8. Debug value format
@@ -403,12 +406,12 @@ limit exhaustion is impossible.
 Conformance compares values rather than platform object layouts. Every runtime
 provides a test-side serializer with this recursive JSON mapping:
 
-- optional absence and void output: `null`;
+- option absence and match-only output: `null`;
 - source string: JSON string;
 - boolean: JSON boolean;
-- array: JSON array;
-- struct: object keyed by generated member name;
-- enum: `{ "$tag": "Variant" }`, plus `$data` when the selected variant has a
+- list: JSON array;
+- record: object keyed by generated member name;
+- variant: `{ "$tag": "Variant" }`, plus `$data` when the selected case has a
   payload;
 - captured node:
 
@@ -429,7 +432,7 @@ not a commitment that public output objects are JSON-shaped.
 
 Generated code bakes numeric kind and field ids. A parser built from another
 grammar revision can renumber them while still returning a valid tree, so every
-entrypoint verifies the tree's language before matching.
+entry point verifies the tree's language before matching.
 
 The generated module records this provenance:
 
@@ -443,12 +446,12 @@ GrammarIdentity {
 
 - `name` is the grammar's declared name;
 - `grammar_sha256` is lowercase SHA-256 of the exact `grammar.json` bytes used
-  for linking;
+  for binding;
 - `source` is a diagnostic label, such as a registry language/version or the
   path passed to `--grammar`.
 
 The identity appears in generated header comments and constants. It is
-diagnostic provenance, not something most tree-sitter bindings can verify from
+diagnostic provenance, not something most Tree-sitter bindings can verify from
 a live language object.
 
 Enforcement is a subset check over the ids the generated matcher actually uses:
@@ -481,14 +484,14 @@ A target is conforming when its runner executes the shared corpus and agrees
 with the VM oracle on:
 
 - match/no-match and portable limit category;
-- the committed capture trace, including layout indices, captured-node byte
+- the committed match journal, including layout indices, captured-node byte
   spans, scalar marks, and scalar close values;
-- the debug value after typed replay;
+- the debug value after typed decoding;
 - grammar-skew and runtime-ABI failures.
 
 The corpus must cover every navigation and resume mode, field and missing-node
-checks, all predicate operators, suppression, recursive calls, ordered branch
-priority, trace truncation after backtracking, nested replay shapes, automatic
+checks, all predicate operators, suppression, recursive calls, source-order
+alternative priority, journal truncation after backtracking, nested decode shapes, automatic
 and explicit limits, scalar item boundaries and zero-byte ranges, and non-ASCII
 source before captured nodes. Regex cases
 exercise every dialect printer's semantic traps and are the tripwire for

@@ -17,7 +17,7 @@ fn split_frame_selects_the_reported_outcome_after_restore() {
     assert_eq!(frames.pop(ReturnOutcome::Matched), 11);
 
     frames.restore(Some(frame));
-    assert_eq!(frames.pop(ReturnOutcome::Zero), 13);
+    assert_eq!(frames.pop(ReturnOutcome::Empty), 13);
 }
 
 #[test]

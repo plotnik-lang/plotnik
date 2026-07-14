@@ -1,6 +1,6 @@
 Q = (program .)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 5
 
 [transitions]
@@ -9,7 +9,7 @@ Q:
   2   !   (program)                         3
   3  └•┘  _                                 1
 
-Q (entrypoint):
+Q (entry point):
   4                                         ▶
   5       (Q)                               2 : 4
 -------------------- BYTECODE --------------------
@@ -19,16 +19,16 @@ S1 "program"
 S2 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T0
 
-[transitions]
+[instructions]
 Q:
   0       (@4)                              4 : 1
   1                                         ▶

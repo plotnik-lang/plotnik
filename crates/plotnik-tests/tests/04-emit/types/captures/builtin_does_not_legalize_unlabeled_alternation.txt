@@ -1,0 +1,17 @@
+Q = [
+  (identifier) @x :: str
+  {
+    (identifier) @id
+  } @x :: str
+]
+------------------ DIAGNOSTICS -------------------
+error: capture `@x` has incompatible types across alternatives
+ --> query.ptk:2:16
+  |
+2 |   (identifier) @x :: str
+  |                ^^
+...
+5 |   } @x :: str
+  |     -- and a different type here
+  |
+help: make every alternative produce the same type, or label the alternatives for a variant type

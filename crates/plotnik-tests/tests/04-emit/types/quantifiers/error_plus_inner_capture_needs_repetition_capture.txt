@@ -1,0 +1,16 @@
+Q = (program
+  (expression_statement
+    (identifier) @id
+  )+
+)
+------------------ DIAGNOSTICS -------------------
+error: captures `@id` repeat with `+` but aren't collected into a list
+ --> query.ptk:2:3
+  |
+2 | /   (expression_statement
+3 | |     (identifier) @id
+4 | |   )+
+  | |____^
+  |
+help: add a repetition capture so each repeat becomes one record in a list: `(...)+ @items`
+help: or discard the captures if only the structure matters: `(...)+ @_`

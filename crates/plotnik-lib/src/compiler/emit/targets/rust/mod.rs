@@ -1,12 +1,12 @@
 //! Rust source target.
 
 mod config;
+mod decode;
+mod decoder_frame;
 mod entry_names;
 mod ident;
 mod literal;
 mod module;
-mod reader_frame;
-mod replay;
 mod representation;
 mod serde_impls;
 mod template;
@@ -26,7 +26,7 @@ mod representation_tests;
 mod template_tests;
 
 pub(crate) use config::Config;
-pub use entry_names::entry_fn_name;
+pub use entry_names::journal_fn_name;
 pub(crate) use module::generate;
 pub(crate) use type_model::{TypeContext, TypeModel};
 pub(crate) use types_config::Config as TypesConfig;
@@ -41,8 +41,8 @@ pub(crate) fn emit_types(
     interner: &Interner,
     config: &TypesConfig,
 ) -> String {
-    let schema = crate::compiler::analyze::output::OutputSchema::new(types, deps, interner)
-        .expect("target-neutral compilation validated the output schema");
+    let schema = crate::compiler::analyze::result::ResultSchema::new(types, deps, interner)
+        .expect("target-neutral compilation validated the result schema");
     let model = TypeModel::new(schema);
     emit_model(&model, config)
 }

@@ -1,0 +1,24 @@
+Q = (call (arguments) @_)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "call"
+      Capture
+        NamedNode
+          ParenOpen "("
+          Id "arguments"
+          ParenClose ")"
+        DiscardToken "@_"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode call
+      CapturedPattern @_
+        NamedNode arguments

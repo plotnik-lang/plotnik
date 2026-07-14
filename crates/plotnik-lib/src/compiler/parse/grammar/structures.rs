@@ -396,7 +396,7 @@ impl<'q> Parser<'q, '_> {
             }
             _ => {}
         }
-        // A missing node is a zero-width token, so children could never
+        // A missing node is a zero-byte node, so children could never
         // match anything; only the optional kind argument above is legal.
         if !self.at(SyntaxKind::ParenClose) && !self.eof() {
             self.parse_forbidden_children(DiagnosticKind::MissingTakesNoChildren);
@@ -568,17 +568,17 @@ impl<'q> Parser<'q, '_> {
                 continue;
             }
 
-            // LL(2): Id followed by Colon → branch label or field (check casing)
+            // LL(2): Id followed by Colon → alternative label or field (check casing)
             if self.at(SyntaxKind::Id) && self.next_is(SyntaxKind::Colon) {
                 if starts_uppercase(self.current_text()) {
-                    self.parse_branch();
+                    self.parse_alternative();
                 } else {
-                    self.parse_branch_lowercase_label();
+                    self.parse_alternative_lowercase_label();
                 }
                 continue;
             }
-            // Anchors and negated fields cannot form branches — a branch must
-            // be a pattern, and these are zero-width assertions. Parse them
+            // Anchors and negated fields cannot form alternatives — an alternative must
+            // be a pattern, and these constraints occupy no sibling position. Parse them
             // anyway (with their suffix rejection) and report on the spot.
             if matches!(self.current(), SyntaxKind::Dot | SyntaxKind::DotBang) {
                 self.parse_rejected_positional(DiagnosticKind::AnchorInAlternation);
@@ -593,7 +593,7 @@ impl<'q> Parser<'q, '_> {
                 continue;
             }
             if self.at_ts(PATTERN_FIRST_TOKENS) {
-                self.start_node(SyntaxKind::Branch);
+                self.start_node(SyntaxKind::Alternative);
                 self.parse_pattern();
                 self.finish_node();
                 continue;
@@ -601,11 +601,11 @@ impl<'q> Parser<'q, '_> {
             if self.at_ts(ALT_RECOVERY_TOKENS) {
                 break;
             }
-            self.report_unexpected_branch_run();
+            self.report_unexpected_alternative_run();
         }
     }
 
-    fn report_unexpected_branch_run(&mut self) {
+    fn report_unexpected_alternative_run(&mut self) {
         let Some(range) = self.consume_unexpected_run(|parser| {
             parser.at(SyntaxKind::BracketClose)
                 || parser.at_ts(SEPARATORS)
@@ -618,7 +618,9 @@ impl<'q> Parser<'q, '_> {
             return;
         };
         if let Some(report) = self.report_at(DiagnosticKind::UnexpectedToken, range) {
-            report.detail("expected a branch, or `]` to close").emit();
+            report
+                .detail("expected an alternative, or `]` to close")
+                .emit();
         }
     }
 
@@ -646,36 +648,36 @@ impl<'q> Parser<'q, '_> {
         Some(TextRange::new(start, end))
     }
 
-    /// Enum branch: `Label: pattern`
-    fn parse_branch(&mut self) {
-        self.start_node(SyntaxKind::Branch);
+    /// Labeled alternative: `Label: pattern`.
+    fn parse_alternative(&mut self) {
+        self.start_node(SyntaxKind::Alternative);
 
         let ident = self.bump_ident();
-        self.validate_branch_label(ident);
+        self.validate_alternative_label(ident);
 
-        self.expect(SyntaxKind::Colon, "':' after branch label");
+        self.expect(SyntaxKind::Colon, "':' after alternative label");
 
-        self.parse_branch_body();
+        self.parse_alternative_body();
 
         self.finish_node();
     }
 
-    /// Parse a branch with lowercase label - parse as Branch but emit error.
-    fn parse_branch_lowercase_label(&mut self) {
-        self.start_node(SyntaxKind::Branch);
+    /// Parse a lowercase label as an alternative, then emit an error.
+    fn parse_alternative_lowercase_label(&mut self) {
+        self.start_node(SyntaxKind::Alternative);
 
         let span = self.current_span();
         let label_text = self.current_text();
         let pascal = to_pascal_case(label_text);
 
-        if let Some(report) = self.report_at(DiagnosticKind::BranchLabelInvalid, span) {
+        if let Some(report) = self.report_at(DiagnosticKind::AlternativeLabelInvalid, span) {
             report.fix(format!("use `{}`", pascal), pascal).emit();
         }
 
         self.bump();
-        self.expect(SyntaxKind::Colon, "':' after branch label");
+        self.expect(SyntaxKind::Colon, "':' after alternative label");
 
-        self.parse_branch_body();
+        self.parse_alternative_body();
 
         self.finish_node();
     }

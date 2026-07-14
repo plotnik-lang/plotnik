@@ -1,0 +1,17 @@
+Q = (function_declaration
+  (class_declaration)
+  [
+    (identifier)
+    (number)
+  ]
+)
+------------------ DIAGNOSTICS -------------------
+error: `class_declaration` cannot be a child of this node
+ --> query.ptk:2:4
+  |
+1 | Q = (function_declaration
+  |      -------------------- on `function_declaration`
+2 |   (class_declaration)
+  |    ^^^^^^^^^^^^^^^^^
+  |
+help: `function_declaration` has no unlabeled children — use its grammar fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`

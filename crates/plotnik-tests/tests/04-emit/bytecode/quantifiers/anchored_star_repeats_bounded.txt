@@ -3,24 +3,24 @@ Q = (array
   (identifier)* @ids
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 15
 
 [transitions]
 Q:
   01                                        ▶
   02   !   (array)                          11
-  03  └•┘  _ [ArrayClose Set(ids)]          01
-  04  ─‣┘  _ [ArrayClose Set(ids)]          01
-  08  └•─  (identifier) [Node Push]         09, 04
-  09  ─•─  (identifier) [Node Push]         09, 04
-  11  -ε-  [ArrayOpen]                      08, 03
+  03  └•┘  _ [ListClose RecordSet(ids)]     01
+  04  ─‣┘  _ [ListClose RecordSet(ids)]     01
+  08  └•─  (identifier) [Node ArrayPush]    09, 04
+  09  ─•─  (identifier) [Node ArrayPush]    09, 04
+  11  -ε-  [ListOpen]                       08, 03
 
-Q (entrypoint):
+Q (entry point):
   12                                        ▶
-  13  -ε-  [StructClose]                    12
+  13  -ε-  [RecordClose]                    12
   14       (Q)                              02 : 13
-  15  -ε-  [StructOpen]                     14
+  15  -ε-  [RecordOpen]                     14
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -31,8 +31,8 @@ S4 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:1  ; { ids }
+T1 = ListZeroOrMore(T0)  ; <Node>*
+T2 = Record  M0:1  ; { ids }
 
 [type_members]
 M0: S1 → T1  ; ids: T1
@@ -40,20 +40,20 @@ M0: S1 → T1  ; ids: T1
 [type_names]
 N0: S2 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  └•┘  _ [ArrayClose Set(M0)]           06
-  10  └•─  (identifier) [Node Push]         12, 16
-  12  ─•─  (identifier) [Node Push]         12, 16
-  14  -ε-  [ArrayOpen]                      10, 08
-  16  ─‣┘  _ [ArrayClose Set(M0)]           06
+  08  └•┘  _ [ListClose RecordSet(M0)]      06
+  10  └•─  (identifier) [Node ArrayPush]    12, 16
+  12  ─•─  (identifier) [Node ArrayPush]    12, 16
+  14  -ε-  [ListOpen]                       10, 08
+  16  ─‣┘  _ [ListClose RecordSet(M0)]      06
   18   !   (array)                          14

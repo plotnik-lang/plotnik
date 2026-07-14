@@ -34,7 +34,7 @@ pub struct Row<'t> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
-    pub rows: ::std::vec::Vec<Row<'t>>,
+    pub rows: Rows<'t>,
 }
 
 pub type Rows<'t> = ::std::vec::Vec<Row<'t>>;

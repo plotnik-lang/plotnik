@@ -1,0 +1,73 @@
+Q = (expression_statement
+  [
+    A: (identifier) @id
+    B: (number)
+  ] @kind
+)
+---------------------- NFA -----------------------
+[entry_points]
+Q = 14
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (expression_statement)           10
+  03  ─‣┘  _ [RecordSet(kind)]              01
+  05   !   (identifier) [VariantOpen(A) Node RecordSet(id) VariantClose]  03
+  06   !   (number) [VariantOpen(B) VariantClose]  03
+  09  ──!  _                                05, 06, 09
+  10  └─!  _                                05, 06, 09
+
+Q (entry point):
+  11                                        ▶
+  12  -ε-  [RecordClose]                    11
+  13       (Q)                              02 : 12
+  14  -ε-  [RecordOpen]                     13
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "A"
+S3 "B"
+S4 "kind"
+S5 "QKind"
+S6 "Q"
+S7 "expression_statement"
+S8 "identifier"
+S9 "number"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Record  M0:1  ; { id }
+T3 = Variant M1:2  ; A | B
+T4 = Record  M3:1  ; { kind }
+
+[type_members]
+M0: S1 → T1  ; id: <Node>
+M1: S2 → T2  ; A: T2
+M2: S3 → T0  ; B: <NoValue>
+M3: S4 → T3  ; kind: QKind
+
+[type_names]
+N0: S5 → T3  ; QKind
+N1: S6 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  18
+  11   !   (number) [VariantOpen(M2) VariantClose]  18
+  13  ──!  _                                08, 11, 13
+  15  ...
+  16  └─!  _                                08, 11, 13
+  18  ─‣┘  _ [RecordSet(M3)]                06
+  20   !   (expression_statement)           16

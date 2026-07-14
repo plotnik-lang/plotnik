@@ -37,7 +37,7 @@ S6 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { a, b }
+T1 = Record  M0:2  ; { a, b }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
@@ -46,25 +46,25 @@ M1: S2 → T0  ; b: <Node>
 [type_names]
 N0: S3 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─•─  (expression_statement) [Node Set(M1)]  08
+  06  ─•─  (expression_statement) [Node RecordSet(M1)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10   !   (lexical_declaration) [Node Set(M0)]  06
+  10   !   (lexical_declaration) [Node RecordSet(M0)]  06
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
   16   !   (program)                        14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
        ▶   (@16)
 
@@ -73,21 +73,21 @@ Q:
        ●   program
   14       _                                10, 12
        ●   lexical_declaration
-  10       (lexical_declaration) [Node Set(M0)]  06
+  10       (lexical_declaration) [Node RecordSet(M0)]  06
        ●   lexical_declaration
-  06       (expression_statement) [Node Set(M1)]  08
+  06       (expression_statement) [Node RecordSet(M1)]  08
        ○   lexical_declaration
   14  ❮❮❮ 
   12       _                                10, 12
        ●   lexical_declaration
-  10       (lexical_declaration) [Node Set(M0)]  06
+  10       (lexical_declaration) [Node RecordSet(M0)]  06
        ●   lexical_declaration
-  06       (expression_statement) [Node Set(M1)]  08
+  06       (expression_statement) [Node RecordSet(M1)]  08
        ●   expression_statement
   08       _                                09
        ●   program
   09   ◀   (@16)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

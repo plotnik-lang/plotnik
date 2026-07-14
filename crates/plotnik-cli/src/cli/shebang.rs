@@ -1,7 +1,7 @@
 //! Shebang parsing: the in-file language declaration for `.ptk` files.
 //!
 //! Line 1 of a query file may declare its language (and optionally an
-//! entrypoint) via a shebang, e.g.:
+//! entry point) via a shebang, e.g.:
 //!
 //! ```text
 //! #!/usr/bin/env -S plotnik run -l typescript
@@ -16,7 +16,7 @@
 use clap::Command;
 
 use super::args::*;
-use super::limits::{limits_preset_arg, max_memory_arg, max_steps_arg};
+use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ShebangDecl {
@@ -25,7 +25,7 @@ pub struct ShebangDecl {
 }
 
 const SUBCOMMANDS: &[&str] = &[
-    "run", "exec", "check", "infer", "ast", "trace", "dump", "test",
+    "run", "exec", "check", "infer", "tree", "trace", "dump", "test",
 ];
 
 const CANONICAL_FORM: &str = "#!/usr/bin/env -S plotnik run -l <lang>";
@@ -75,19 +75,18 @@ fn shebang_parser() -> Command {
         .arg(entry_arg())
         .arg(color_arg())
         .arg(strict_arg())
-        .arg(raw_arg())
         .arg(json_arg())
         .arg(compact_arg())
-        .arg(verbose_nodes_arg())
+        .arg(include_points_arg())
         .arg(verbose_arg())
         .arg(no_result_arg())
-        .arg(max_steps_arg())
+        .arg(fuel_arg())
         .arg(max_memory_arg())
         .arg(limits_preset_arg())
         .arg(format_arg())
         .arg(no_node_type_arg())
         .arg(no_export_arg())
-        .arg(void_type_arg())
+        .arg(match_only_type_arg())
         .arg(output_file_arg())
 }
 

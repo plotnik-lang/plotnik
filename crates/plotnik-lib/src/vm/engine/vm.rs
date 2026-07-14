@@ -3,46 +3,49 @@
 use tree_sitter::Tree;
 
 use crate::bytecode::{
-    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall, DecodedSplitCall,
-    Effect, EffectKind, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp,
+    CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall,
+    DecodedSplitCall, Effect, EffectKind, EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp,
+    SuccessorAddr,
 };
 
 use crate::core::NodeFieldId;
 
 use plotnik_rt::{
-    CallResume, Checkpoint, EffectLog, Engine, ResolvedRuntimeLimits, Resume, ReturnOutcome,
-    RuntimeEffect, RuntimeLimitSpec, SkipPolicy,
+    CallResume, Checkpoint, Engine, JournalEvent, MatchJournal, ResolvedRuntimeLimits, Resume,
+    ReturnOutcome, RuntimeLimitSpec, SkipPolicy,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
 use super::trace::{NoopTracer, Tracer};
 use super::value::node_text;
 
-/// Bitmask selecting the dispatch steps on which the memory ceiling is
+/// Bitmask selecting the matcher dispatches on which the memory ceiling is
 /// sampled; must be a power of two minus one.
 const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
 /// Resource usage observed during one VM run.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct RunStats {
-    pub steps_used: u64,
+    /// Fuel consumed by matcher execution. Each matcher dispatch currently
+    /// consumes one unit; this is not a stable cross-version performance metric.
+    pub fuel_used: u64,
     /// Peak live runtime heap observed at memory-sampling points and run exit.
-    pub heap_high_water: u64,
+    pub peak_live_heap_bytes: u64,
 }
 
 /// Virtual machine state for query execution.
 ///
-/// The engine core — cursor, frames, checkpoints, effect log, suppression —
+/// The engine core — cursor, frames, checkpoints, match journal, suppression —
 /// lives in [`plotnik_rt::Engine`], shared with generated matchers so the
 /// checkpoint contract stays single-sourced. The VM keeps only the
 /// interpretive layer: the instruction pointer into decoded bytecode and the
-/// step/memory budget.
+/// fuel/memory budget.
 pub struct VM<'t> {
     pub(crate) engine: Engine<'t>,
-    /// Current instruction pointer (raw u16, 0 is valid at runtime).
-    pub(crate) ip: u16,
+    /// Current address in the decoded instruction stream.
+    pub(crate) ip: CodeAddr,
 
-    pub(crate) steps_used: u64,
+    pub(crate) fuel_used: u64,
     pub(crate) limits: ResolvedRuntimeLimits,
 
     pub(crate) source: &'t str,
@@ -77,8 +80,8 @@ impl<'t> VMBuilder<'t> {
             u32::try_from(self.tree.root_node().descendant_count()).unwrap_or(u32::MAX);
         VM {
             engine: Engine::new(self.tree.walk()),
-            ip: 0,
-            steps_used: 0,
+            ip: CodeAddr::ZERO,
+            fuel_used: 0,
             limits: self.spec.resolve(source_nodes),
             source: self.source,
         }
@@ -92,20 +95,20 @@ impl<'t> VM<'t> {
 
     /// Checkpoint that, on backtrack, advances the cursor and re-enters the
     /// callee. `call_ip` is the Call's address (for trace rendering only).
-    fn call_retry_checkpoint(&self, call_ip: u16, resume: CallResume) -> Checkpoint {
-        Checkpoint::call_retry(self.engine.checkpoint_state(), call_ip, resume)
+    fn call_retry_checkpoint(&self, call_ip: CodeAddr, resume: CallResume) -> Checkpoint {
+        Checkpoint::call_retry(self.engine.checkpoint_state(), u16::from(call_ip), resume)
     }
 
-    /// Execute query from entrypoint, returning effect log.
+    /// Execute a query from an entry point, returning its committed match journal.
     ///
     /// This is a convenience method that uses `NoopTracer`, which gets
     /// completely optimized away at compile time.
     pub fn execute(
         self,
         module: &Module,
-        entrypoint: &Entrypoint,
-    ) -> Result<EffectLog<'t>, RuntimeError> {
-        self.execute_with(module, entrypoint, &mut NoopTracer)
+        entry_point: &EntryPoint,
+    ) -> Result<MatchJournal<'t>, RuntimeError> {
+        self.execute_with(module, entry_point, &mut NoopTracer)
     }
 
     /// Execute query with a tracer for debugging.
@@ -116,10 +119,10 @@ impl<'t> VM<'t> {
     pub fn execute_with<T: Tracer>(
         self,
         module: &Module,
-        entrypoint: &Entrypoint,
+        entry_point: &EntryPoint,
         tracer: &mut T,
-    ) -> Result<EffectLog<'t>, RuntimeError> {
-        let (result, _) = self.execute_with_stats(module, entrypoint, tracer);
+    ) -> Result<MatchJournal<'t>, RuntimeError> {
+        let (result, _) = self.execute_with_stats(module, entry_point, tracer);
         result
     }
 
@@ -127,39 +130,39 @@ impl<'t> VM<'t> {
     pub fn execute_with_stats<T: Tracer>(
         mut self,
         module: &Module,
-        entrypoint: &Entrypoint,
+        entry_point: &EntryPoint,
         tracer: &mut T,
-    ) -> (Result<EffectLog<'t>, RuntimeError>, RunStats) {
-        self.ip = u16::from(entrypoint.target());
+    ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
+        self.ip = entry_point.target();
         if T::ENABLED {
-            tracer.trace_enter_entrypoint(self.ip);
+            tracer.trace_enter_entry_point(self.ip);
         }
 
-        let mut heap_high_water = self.engine.heap_bytes();
+        let mut peak_live_heap_bytes = self.engine.heap_bytes();
 
         loop {
-            // Step ceiling: bound total work. `None` opts out (Unbounded).
-            if let Some(max) = self.limits.max_steps
-                && self.steps_used >= max
+            // One matcher dispatch currently consumes one fuel unit.
+            if let Some(limit) = self.limits.fuel_limit
+                && self.fuel_used >= limit
             {
-                let stats = self.finish_stats(&mut heap_high_water);
-                return (Err(RuntimeError::StepLimitExceeded(max)), stats);
+                let stats = self.finish_stats(&mut peak_live_heap_bytes);
+                return (Err(RuntimeError::OutOfFuel(limit)), stats);
             }
-            self.steps_used += 1;
+            self.fuel_used += 1;
 
             // Memory ceiling: bound the live runtime heap, sampled every
-            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded
+            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-dispatch growth is bounded
             // (≤30 checkpoints + ≤15 effects + 1 frame + ≤1 pooled snapshot
-            // ≈ 4.4 KiB), so sampling every 1024 steps bounds the unobserved
+            // ≈ 4.4 KiB), so sampling every 1024 dispatches bounds the unobserved
             // overshoot to ~4.5 MiB — noise against the ≥64 MiB auto ceiling.
             // `None` opts out (Unbounded), but the sample still feeds stats.
-            if self.steps_used & MEMORY_SAMPLE_MASK == 0 {
+            if self.fuel_used & MEMORY_SAMPLE_MASK == 0 {
                 let used = self.engine.heap_bytes();
-                heap_high_water = heap_high_water.max(used);
+                peak_live_heap_bytes = peak_live_heap_bytes.max(used);
                 if let Some(max) = self.limits.max_memory
                     && used > max
                 {
-                    let stats = self.finish_stats_with(&mut heap_high_water, used);
+                    let stats = self.finish_stats_with(&mut peak_live_heap_bytes, used);
                     return (
                         Err(RuntimeError::MemoryLimitExceeded { used, limit: max }),
                         stats,
@@ -168,21 +171,21 @@ impl<'t> VM<'t> {
             }
 
             // Fetch and dispatch. The IP must address a validated instruction
-            // start; a violation localizes a bad jump to the step that wrote `ip`,
-            // before `decode_step` begins decoding mid-instruction.
+            // start; a violation localizes a bad jump to the address that wrote
+            // `ip`, before decoding begins mid-instruction.
             #[cfg(debug_assertions)]
             debug_assert!(
-                module.is_validated_step_start(self.ip),
+                module.is_validated_instruction_start(self.ip),
                 "ip {} is not a validated instruction start",
                 self.ip
             );
             // Tracing renders from the byte-level decoder so trace output stays
             // identical; the hot path reads the pre-decoded stream.
             if T::ENABLED {
-                tracer.trace_instruction(self.ip, &module.decode_step(self.ip));
+                tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));
             }
 
-            let result = match module.decoded().step(self.ip) {
+            let result = match module.decoded().instruction_at(self.ip) {
                 DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
                 DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
                 DecodedInstr::RoutedCall(c) => self.exec_routed_call(c, tracer),
@@ -193,27 +196,27 @@ impl<'t> VM<'t> {
             match result {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
                 Err(Signal::Flow(ControlFlow::Accept)) => {
-                    let stats = self.finish_stats(&mut heap_high_water);
-                    return (Ok(self.engine.into_effects()), stats);
+                    let stats = self.finish_stats(&mut peak_live_heap_bytes);
+                    return (Ok(self.engine.into_journal()), stats);
                 }
                 Err(Signal::Error(e)) => {
-                    let stats = self.finish_stats(&mut heap_high_water);
+                    let stats = self.finish_stats(&mut peak_live_heap_bytes);
                     return (Err(e), stats);
                 }
             }
         }
     }
 
-    fn finish_stats(&self, heap_high_water: &mut u64) -> RunStats {
+    fn finish_stats(&self, peak_live_heap_bytes: &mut u64) -> RunStats {
         let used = self.engine.heap_bytes();
-        self.finish_stats_with(heap_high_water, used)
+        self.finish_stats_with(peak_live_heap_bytes, used)
     }
 
-    fn finish_stats_with(&self, heap_high_water: &mut u64, used: u64) -> RunStats {
-        *heap_high_water = (*heap_high_water).max(used);
+    fn finish_stats_with(&self, peak_live_heap_bytes: &mut u64, used: u64) -> RunStats {
+        *peak_live_heap_bytes = (*peak_live_heap_bytes).max(used);
         RunStats {
-            steps_used: self.steps_used,
-            heap_high_water: *heap_high_water,
+            fuel_used: self.fuel_used,
+            peak_live_heap_bytes: *peak_live_heap_bytes,
         }
     }
 
@@ -230,10 +233,10 @@ impl<'t> VM<'t> {
         self.finish_match(m, module, tracer)
     }
 
-    /// The post-acceptance half of a Match: run its effects, then branch.
+    /// The post-acceptance half of a Match: run its effects, then follow its successors.
     /// Shared by the dispatch path and the match-retry resume in
-    /// [`Self::backtrack`], so a resumed candidate replays exactly what the
-    /// original acceptance would have.
+    /// [`Self::backtrack`], so a resumed candidate emits exactly what the
+    /// original acceptance would have emitted.
     fn finish_match<T: Tracer>(
         &mut self,
         m: DecodedMatch,
@@ -244,7 +247,7 @@ impl<'t> VM<'t> {
             self.emit_effect(op, tracer);
         }
 
-        self.branch_to_successors(m, module, tracer)
+        self.follow_successors(m, module, tracer)
     }
 
     fn navigate_and_match<T: Tracer>(
@@ -287,7 +290,7 @@ impl<'t> VM<'t> {
 
     /// Accepting a candidate in an engine-owned sibling search is a choice
     /// point: leave a resume checkpoint so a later failure retries the search
-    /// past this candidate. Skipped when the search cannot legally step over
+    /// past this candidate. Skipped when the search cannot legally advance past
     /// the accepted node — either the nav owns no sibling search
     /// ([`Nav::is_sibling_search`]; NFA-level retry loops are compiled with
     /// exact navs precisely to opt out here), or the skip policy does not
@@ -303,7 +306,7 @@ impl<'t> VM<'t> {
             return;
         }
 
-        let cp = Checkpoint::match_retry(self.engine.checkpoint_state(), self.ip);
+        let cp = Checkpoint::match_retry(self.engine.checkpoint_state(), u16::from(self.ip));
         self.engine.push_checkpoint(cp);
         if T::ENABLED {
             tracer.trace_checkpoint_created(self.ip);
@@ -430,7 +433,7 @@ impl<'t> VM<'t> {
         true
     }
 
-    fn branch_to_successors<T: Tracer>(
+    fn follow_successors<T: Tracer>(
         &mut self,
         m: DecodedMatch,
         module: &Module,
@@ -441,10 +444,10 @@ impl<'t> VM<'t> {
             return Err(ControlFlow::Accept.into());
         }
 
-        // Push checkpoints for alternate branches (in reverse order, so LIFO
+        // Push checkpoints for non-preferred successors (in reverse order, so LIFO
         // backtracking takes them in priority order).
         if succs.len() > 1 {
-            self.engine.push_branches(&succs[1..]);
+            self.engine.push_successors(&succs[1..]);
             if T::ENABLED {
                 for _ in &succs[1..] {
                     tracer.trace_checkpoint_created(self.ip);
@@ -452,7 +455,7 @@ impl<'t> VM<'t> {
             }
         }
 
-        self.ip = succs[0];
+        self.ip = CodeAddr::from(u16::from(succs[0]));
         Ok(())
     }
 
@@ -472,8 +475,8 @@ impl<'t> VM<'t> {
             && policy != SkipPolicy::Exact
         {
             let resume = CallResume {
-                target: c.target,
-                next: c.next,
+                target: u16::from(c.target),
+                next: u16::from(c.next),
                 field: c.node_field,
                 policy,
             };
@@ -494,10 +497,11 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if T::ENABLED {
-            tracer.trace_call(call.target);
+            tracer.trace_call(CodeAddr::from(u16::from(call.target)));
         }
-        self.engine.enter_split_frame(call.matched, call.zero);
-        self.ip = call.target;
+        self.engine
+            .enter_split_frame(u16::from(call.matched), u16::from(call.empty));
+        self.ip = CodeAddr::from(u16::from(call.target));
         Ok(())
     }
 
@@ -507,20 +511,25 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if T::ENABLED {
-            tracer.trace_call(call.target);
+            tracer.trace_call(CodeAddr::from(u16::from(call.target)));
         }
-        self.engine.enter_frame(call.next);
-        self.ip = call.target;
+        self.engine.enter_frame(u16::from(call.next));
+        self.ip = CodeAddr::from(u16::from(call.target));
         Ok(())
     }
 
     /// Push a frame for `target` (returning to `next`) and jump in.
-    fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
+    fn enter_callee<T: Tracer>(
+        &mut self,
+        target: SuccessorAddr,
+        next: SuccessorAddr,
+        tracer: &mut T,
+    ) {
         if T::ENABLED {
-            tracer.trace_call(target);
+            tracer.trace_call(CodeAddr::from(u16::from(target)));
         }
-        self.engine.enter_frame(next);
-        self.ip = target;
+        self.engine.enter_frame(u16::from(next));
+        self.ip = CodeAddr::from(u16::from(target));
     }
 
     /// Navigate to a field and return the skip policy for retry support.
@@ -597,17 +606,17 @@ impl<'t> VM<'t> {
             tracer.trace_return(outcome);
         }
 
-        // If no frames, we're returning from top-level entrypoint → Accept
+        // If no frames, we're returning from the top-level entry point → Accept
         if self.engine.frames_empty() {
             assert_eq!(
                 outcome,
                 ReturnOutcome::Matched,
-                "entrypoint returned through a zero-width call continuation"
+                "entry point returned through an empty call continuation"
             );
             return Err(ControlFlow::Accept.into());
         }
 
-        self.ip = self.engine.exit_frame(outcome);
+        self.ip = CodeAddr::from(self.engine.exit_frame(outcome));
         Ok(())
     }
 
@@ -629,15 +638,15 @@ impl<'t> VM<'t> {
             self.engine.restore_checkpoint_state(cp.state, snapshot);
 
             match cp.resume {
-                Resume::Branch => {
-                    self.ip = cp.ip;
+                Resume::Successor => {
+                    self.ip = CodeAddr::from(cp.ip);
                     return ControlFlow::Backtracked.into();
                 }
 
                 // Call retry: advance to the next candidate satisfying the field
                 // constraint, then re-enter the callee. The scan mirrors the
                 // navigate-time field search: non-field siblings the policy admits
-                // are stepped over, so a retry sees exactly the candidate set the
+                // are skipped, so a retry sees exactly the candidate set the
                 // original navigation saw. If siblings are exhausted, keep
                 // backtracking to an earlier checkpoint.
                 Resume::Call(resume) => {
@@ -671,23 +680,31 @@ impl<'t> VM<'t> {
                         }
                     }
 
-                    let retry = self.call_retry_checkpoint(cp.ip, resume);
+                    let retry = self.call_retry_checkpoint(CodeAddr::from(cp.ip), resume);
                     self.engine.push_checkpoint(retry);
                     if T::ENABLED {
-                        tracer.trace_checkpoint_created(cp.ip);
+                        tracer.trace_checkpoint_created(CodeAddr::from(cp.ip));
                     }
-                    self.enter_callee(resume.target, resume.next, tracer);
+                    self.enter_callee(
+                        SuccessorAddr::try_from(resume.target)
+                            .expect("validated call target is non-zero"),
+                        SuccessorAddr::try_from(resume.next)
+                            .expect("validated call continuation is non-zero"),
+                        tracer,
+                    );
                     return ControlFlow::Backtracked.into();
                 }
 
                 // Match retry: the checkpoint sits at the accepted-but-failed
-                // candidate of an engine-owned sibling search. Step past it (the
+                // candidate of an engine-owned sibling search. Advance past it (the
                 // push gate proved the policy admits it into the gap) and re-run
                 // the same instruction's candidate search from there; acceptance
-                // replays the match — fresh retry checkpoint, effects, branches —
-                // exactly as the dispatch path would.
+                // repeats the match — fresh retry checkpoint, effects, successor
+                // dispatch — exactly as the dispatch path would.
                 Resume::Match => {
-                    let DecodedInstr::Match(m) = module.decoded().step(cp.ip) else {
+                    let DecodedInstr::Match(m) =
+                        module.decoded().instruction_at(CodeAddr::from(cp.ip))
+                    else {
                         unreachable!("match-retry checkpoint ip must address a Match");
                     };
                     let policy = m.nav.skip_policy();
@@ -720,7 +737,7 @@ impl<'t> VM<'t> {
                         tracer.trace_field_success(field_id);
                     }
 
-                    self.ip = cp.ip;
+                    self.ip = CodeAddr::from(cp.ip);
                     self.push_match_retry_if_resumable(m, policy, tracer);
                     return match self.finish_match(m, module, tracer) {
                         Ok(()) => ControlFlow::Backtracked.into(),
@@ -751,7 +768,7 @@ impl<'t> VM<'t> {
         use crate::bytecode::EffectSuppression;
         use EffectKind::*;
 
-        let effect = match op.kind.suppression() {
+        let event = match op.kind.suppression() {
             EffectSuppression::Control => match op.kind {
                 SuppressBegin => {
                     let was_suppressed = self.engine.suppress_begin();
@@ -774,24 +791,24 @@ impl<'t> VM<'t> {
                     let logged = self.engine.scalar_mark();
                     if T::ENABLED {
                         match logged {
-                            Some(effect) => tracer.trace_effect(effect),
+                            Some(event) => tracer.trace_journal_event(event),
                             None => tracer.trace_effect_suppressed(op.kind, op.payload),
                         }
                     }
                     return;
                 }
-                SpanStartAt => RuntimeEffect::SpanStart {
+                SpanStartAt => JournalEvent::SpanStart {
                     id: op.payload as u16,
                     node: Some(self.engine.node()),
                 },
-                SpanStart => RuntimeEffect::SpanStart {
+                SpanStart => JournalEvent::SpanStart {
                     id: op.payload as u16,
                     node: None,
                 },
-                SpanEnd => RuntimeEffect::SpanEnd(op.payload as u16),
+                SpanEnd => JournalEvent::SpanEnd(op.payload as u16),
                 _ => unreachable!("bypass metadata only classifies spans and scalar marks"),
             },
-            EffectSuppression::Data => {
+            EffectSuppression::Output => {
                 let logged = match op.kind {
                     ScalarOpen => self.engine.scalar_open(),
                     StrClose => self.engine.scalar_close_str(),
@@ -799,27 +816,27 @@ impl<'t> VM<'t> {
                     NodeStr => self.engine.node_str(),
                     NodeBool => self.engine.node_bool(),
                     BoolValue => self.engine.bool_value(op.payload != 0),
-                    _ => self.engine.emit_data(|cursor| match op.kind {
-                        Node => RuntimeEffect::Node(cursor.node()),
-                        ArrayOpen => RuntimeEffect::ArrayOpen,
-                        Push => RuntimeEffect::Push,
-                        ArrayClose => RuntimeEffect::ArrayClose,
-                        StructOpen => RuntimeEffect::StructOpen,
-                        StructClose => RuntimeEffect::StructClose,
-                        Set => RuntimeEffect::Set(op.payload as u16),
-                        EnumOpen => RuntimeEffect::EnumOpen(op.payload as u16),
-                        EnumClose => RuntimeEffect::EnumClose,
-                        Null => RuntimeEffect::Null,
+                    _ => self.engine.emit_output_event(|cursor| match op.kind {
+                        Node => JournalEvent::Node(cursor.node()),
+                        ListOpen => JournalEvent::ListOpen,
+                        ArrayPush => JournalEvent::ArrayPush,
+                        ListClose => JournalEvent::ListClose,
+                        RecordOpen => JournalEvent::RecordOpen,
+                        RecordClose => JournalEvent::RecordClose,
+                        RecordSet => JournalEvent::RecordSet(op.payload as u16),
+                        VariantOpen => JournalEvent::VariantOpen(op.payload as u16),
+                        VariantClose => JournalEvent::VariantClose,
+                        Absent => JournalEvent::Absent,
                         SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd
                         | ScalarOpen | ScalarMark | StrClose | BoolClose | NodeStr | NodeBool
                         | BoolValue => {
-                            unreachable!("metadata routes non-ordinary data effects first")
+                            unreachable!("metadata routes non-ordinary output effects first")
                         }
                     }),
                 };
                 if T::ENABLED {
                     match logged {
-                        Some(effect) => tracer.trace_effect(effect),
+                        Some(event) => tracer.trace_journal_event(event),
                         None => tracer.trace_effect_suppressed(op.kind, op.payload),
                     }
                 }
@@ -828,8 +845,8 @@ impl<'t> VM<'t> {
         };
 
         if T::ENABLED {
-            tracer.trace_effect(&effect);
+            tracer.trace_journal_event(&event);
         }
-        self.engine.emit_span(effect);
+        self.engine.emit_span(event);
     }
 }

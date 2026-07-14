@@ -1,0 +1,63 @@
+Q = (expression_statement
+  [
+    A: (identifier)
+    B: (number)
+  ]
+)
+------------------ DIAGNOSTICS -------------------
+warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
+ --> query.ptk:2:3
+  |
+2 | /   [
+3 | |     A: (identifier)
+4 | |     B: (number)
+5 | |   ]
+  | |___^
+  |
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
+---------------------- NFA -----------------------
+[entry_points]
+Q = 11
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (expression_statement)           09
+  03  ─‣┘  _                                01
+  04   !   (identifier)                     03
+  05   !   (number)                         03
+  08  ──!  _                                04, 05, 08
+  09  └─!  _                                04, 05, 08
+
+Q (entry point):
+  10                                        ▶
+  11       (Q)                              02 : 10
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "expression_statement"
+S2 "identifier"
+S3 "number"
+S4 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 00 :: T0
+
+[instructions]
+Q:
+  00       (@10)                            10 : 01
+  01                                        ▶
+  02                                        ▶
+  03   !   (identifier)                     07
+  04   !   (number)                         07
+  05  ──!  _                                03, 04, 05
+  07  ─‣┘  _                                02
+  08  └─!  _                                03, 04, 05
+  10   !   (expression_statement)           08

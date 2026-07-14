@@ -33,7 +33,7 @@
 //! handed against that grammar and panics on version skew.
 //!
 //! For the dynamic side of Plotnik (running query files against sources,
-//! inspecting ASTs, tracing execution), use the `plotnik-cli` crate.
+//! inspecting syntax trees, tracing execution), use the `plotnik-cli` crate.
 
 /// Compile a Plotnik query to a typed Rust module at build time.
 ///

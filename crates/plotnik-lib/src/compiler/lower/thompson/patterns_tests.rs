@@ -47,8 +47,8 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
 }
 
 #[test]
-#[should_panic(expected = "linked anonymous token kind must be bound")]
-fn resolve_anonymous_node_kind_requires_linked_binding() {
+#[should_panic(expected = "grammar-bound anonymous token kind must be present")]
+fn resolve_anonymous_node_kind_requires_grammar_binding() {
     let mut interner = Interner::new();
     interner.intern("number");
     let type_ctx = TypeAnalysisBuilder::new().finish();
@@ -71,8 +71,8 @@ fn resolve_anonymous_node_kind_requires_linked_binding() {
 }
 
 #[test]
-#[should_panic(expected = "linked field name must be bound")]
-fn resolve_field_by_name_requires_linked_binding() {
+#[should_panic(expected = "grammar-bound field name must be present")]
+fn resolve_field_by_name_requires_grammar_binding() {
     let mut interner = Interner::new();
     interner.intern("name");
     let type_ctx = TypeAnalysisBuilder::new().finish();

@@ -1,0 +1,23 @@
+Q = [
+  A: (a)
+  A: (b)
+  A: (c)
+]
+------------------ DIAGNOSTICS -------------------
+error: alternative label `A` is already used in this alternation
+ --> query.ptk:3:3
+  |
+3 |   A: (b)
+  |   ^
+  |
+help: each alternative label must be unique within an alternation
+
+error: alternative label `A` is already used in this alternation
+ --> query.ptk:4:3
+  |
+4 |   A: (c)
+  |   ^
+  |
+help: each alternative label must be unique within an alternation
+-------------------- SYMBOLS ---------------------
+Q

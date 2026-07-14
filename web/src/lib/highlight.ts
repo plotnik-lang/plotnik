@@ -172,7 +172,7 @@ const highlighterPromise = createHighlighter({
   langs: [plotnikGrammar, "typescript", "json"],
 });
 
-/** A decorated range: an exact substring (nth occurrence) or a byte span. */
+/** A decorated range: an exact substring (nth occurrence) or a byte range. */
 export type MarkSpec = { class?: string } & (
   { find: string; occurrence?: number | "all" } | { start: number; end: number }
 );

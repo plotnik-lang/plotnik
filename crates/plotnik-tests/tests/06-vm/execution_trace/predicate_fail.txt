@@ -1,0 +1,274 @@
+Q = (program
+  (expression_statement
+    (identifier == "y") @id
+  )
+)
+------------------- INPUT (ts) -------------------
+x
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  id: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+---------------- EXECUTION_TRACE -----------------
+{
+  "v": 1,
+  "records": [
+    {
+      "ip": 0,
+      "event": {
+        "kind": "enter_entry_point",
+        "target": 0
+      },
+      "query_span_id": null,
+      "node": null,
+      "journal_len": 0
+    },
+    {
+      "ip": 0,
+      "event": {
+        "kind": "instruction"
+      },
+      "query_span_id": null,
+      "node": null,
+      "journal_len": 0
+    },
+    {
+      "ip": 0,
+      "event": {
+        "kind": "journal_event",
+        "event": "RecordOpen"
+      },
+      "query_span_id": null,
+      "node": null,
+      "journal_len": 1
+    },
+    {
+      "ip": 2,
+      "event": {
+        "kind": "instruction"
+      },
+      "query_span_id": null,
+      "node": null,
+      "journal_len": 1
+    },
+    {
+      "ip": 2,
+      "event": {
+        "kind": "call",
+        "target": 18
+      },
+      "query_span_id": null,
+      "node": null,
+      "journal_len": 1
+    },
+    {
+      "ip": 18,
+      "event": {
+        "kind": "instruction"
+      },
+      "query_span_id": null,
+      "node": null,
+      "journal_len": 1
+    },
+    {
+      "ip": 18,
+      "event": {
+        "kind": "nav"
+      },
+      "query_span_id": null,
+      "node": {
+        "kind_id": 166,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 1
+    },
+    {
+      "ip": 18,
+      "event": {
+        "kind": "match_ok"
+      },
+      "query_span_id": null,
+      "node": {
+        "kind_id": 166,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 1
+    },
+    {
+      "ip": 18,
+      "event": {
+        "kind": "journal_event",
+        "event": "SpanStart#0"
+      },
+      "query_span_id": 0,
+      "node": null,
+      "journal_len": 2
+    },
+    {
+      "ip": 18,
+      "event": {
+        "kind": "journal_event",
+        "event": "SpanStartAt#1"
+      },
+      "query_span_id": 1,
+      "node": {
+        "kind_id": 166,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 3
+    },
+    {
+      "ip": 16,
+      "event": {
+        "kind": "instruction"
+      },
+      "query_span_id": 1,
+      "node": null,
+      "journal_len": 3
+    },
+    {
+      "ip": 16,
+      "event": {
+        "kind": "nav"
+      },
+      "query_span_id": 1,
+      "node": {
+        "kind_id": 182,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 3
+    },
+    {
+      "ip": 16,
+      "event": {
+        "kind": "match_ok"
+      },
+      "query_span_id": 1,
+      "node": {
+        "kind_id": 182,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 3
+    },
+    {
+      "ip": 16,
+      "event": {
+        "kind": "checkpoint_new"
+      },
+      "query_span_id": 1,
+      "node": null,
+      "journal_len": 3
+    },
+    {
+      "ip": 16,
+      "event": {
+        "kind": "journal_event",
+        "event": "SpanStartAt#2"
+      },
+      "query_span_id": 2,
+      "node": {
+        "kind_id": 182,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 4
+    },
+    {
+      "ip": 8,
+      "event": {
+        "kind": "instruction"
+      },
+      "query_span_id": 2,
+      "node": null,
+      "journal_len": 4
+    },
+    {
+      "ip": 8,
+      "event": {
+        "kind": "nav"
+      },
+      "query_span_id": 2,
+      "node": {
+        "kind_id": 1,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 4
+    },
+    {
+      "ip": 8,
+      "event": {
+        "kind": "predicate_fail"
+      },
+      "query_span_id": 2,
+      "node": {
+        "kind_id": 1,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 4
+    },
+    {
+      "ip": 8,
+      "event": {
+        "kind": "backtrack",
+        "to_record": 13
+      },
+      "query_span_id": 1,
+      "node": null,
+      "journal_len": 3
+    }
+  ],
+  "truncated": false
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "y"
+S2 "id"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { id }
+
+[type_members]
+M0: S2 → T0  ; id: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entry_points]
+Q = 00 :: T1
+
+[spans]
+P0 def        0..70  source_id=0  T1
+P1 pattern    4..70  source_id=0
+P2 pattern    15..68  source_id=0
+P3 capture    61..64  source_id=0  T1.M0
+P4 pattern    41..60  source_id=0
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@18)                            18 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4] == "y"  12
+  12  ─‣┘  _                                13
+  13  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  15
+  15                                        ▶
+  16  └‣─  (expression_statement) [SpanStartAt#2]  08
+  18   !   (program) [SpanStart#0 SpanStartAt#1]  16

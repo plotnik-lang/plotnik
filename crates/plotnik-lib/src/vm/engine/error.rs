@@ -3,8 +3,10 @@
 /// Errors during VM execution.
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
-    #[error("exceeded the step limit of {0} steps")]
-    StepLimitExceeded(u64),
+    /// The matcher exhausted its fuel before the run finished. The value is
+    /// the resolved fuel limit for that run.
+    #[error("exhausted the fuel limit of {0}")]
+    OutOfFuel(u64),
 
     /// `used` is the live-heap measurement at the trip point; because the arenas
     /// grow geometrically it can overshoot `limit` by up to a doubling, so it is
@@ -16,20 +18,20 @@ pub enum RuntimeError {
     NoMatch,
 }
 
-/// Non-error outcomes that unwind a step back to the main execution loop.
+/// Non-error outcomes that unwind a dispatch back to the main execution loop.
 ///
 /// These are propagated through the same `Err` channel as `RuntimeError` (so
-/// `?` can short-circuit a step), but they are not failures: the main loop
+/// `?` can short-circuit a dispatch), but they are not failures: the main loop
 /// either continues (`Backtracked`) or completes the run (`Accept`).
 #[derive(Debug)]
 pub(crate) enum ControlFlow {
-    /// Successful completion: the run is done and the effect log is final.
+    /// Successful completion: the run is done and the match journal is committed.
     Accept,
     /// Backtracking occurred; control returns to the main loop to continue.
     Backtracked,
 }
 
-/// The `Err` channel of a VM step: either a control-flow signal or a real error.
+/// The `Err` channel of a VM dispatch: either a control-flow signal or a real error.
 #[derive(Debug)]
 pub(crate) enum Signal {
     Flow(ControlFlow),

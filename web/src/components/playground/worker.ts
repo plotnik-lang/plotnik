@@ -1,11 +1,11 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
-import init, { Session, ast, tokenize } from "@/lib/plotnik-wasm/plotnik_wasm";
+import init, { Session, tokenize, tree } from "@/lib/plotnik-wasm/plotnik_wasm";
 import type {
   GeneratedCode,
   PlotnikApi,
   SessionInfo,
-  TokenSpan,
+  QueryToken,
 } from "./protocol";
 
 /* The engine side of the playground: owns the wasm instance and the one
@@ -63,14 +63,14 @@ const api: PlotnikApi = {
     return session.trace(source, entry ?? null, maxRecords);
   },
 
-  async ast(source: string, lang: string, raw: boolean) {
+  async tree(source: string, lang: string, includeAnonymous: boolean) {
     await wasmReady;
-    return ast(source, lang, raw);
+    return tree(source, lang, includeAnonymous);
   },
 
   async tokenize(query: string) {
     await wasmReady;
-    return tokenize(query) as TokenSpan[];
+    return tokenize(query) as QueryToken[];
   },
 };
 

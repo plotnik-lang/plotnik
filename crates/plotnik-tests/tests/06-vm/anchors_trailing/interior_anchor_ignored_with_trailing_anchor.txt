@@ -27,37 +27,37 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { a, b }
-T2 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { a, b }
 
 [type_members]
-M0: S1 → T2  ; a: T2
+M0: S1 → T1  ; a: T1
 M1: S2 → T0  ; b: <Node>
 
 [type_names]
-N0: S3 → T1  ; Q
+N0: S3 → T2  ; Q
 
-[entrypoints]
-Q = 00 :: T1
+[entry_points]
+Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─•┘  _                                06
-  08  └•─  (debugger_statement) [Null Set(M0) Node Set(M1)]  07
-  11  ─•─  (debugger_statement) [Node Set(M1)]  07
-  13   !   (lexical_declaration) [Node Set(M0)]  11
+  08  └•─  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  11  ─•─  (debugger_statement) [Node RecordSet(M1)]  07
+  13   !   (lexical_declaration) [Node RecordSet(M0)]  11
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
   20   !   (program)                        18, 08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
        ▶   (@20)
 
@@ -66,15 +66,15 @@ Q:
        ●   program
   18       _                                13, 16
        ●   expression_statement
-  13       (lexical_declaration) [Node Set(M0)]  11
+  13       (lexical_declaration) [Node RecordSet(M0)]  11
        ○   expression_statement
   18  ❮❮❮ 
   16       _                                13, 16
        ●   debugger_statement
-  13       (lexical_declaration) [Node Set(M0)]  11
+  13       (lexical_declaration) [Node RecordSet(M0)]  11
        ○   debugger_statement
   16  ❮❮❮ 
   16       _                                13, 16
   20  ❮❮❮ 
-  08       (debugger_statement) [Null Set(M0) Node Set(M1)]  07
+  08       (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
        ○   expression_statement

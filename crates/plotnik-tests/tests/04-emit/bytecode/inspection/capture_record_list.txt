@@ -1,0 +1,90 @@
+Q = (program
+  (function_declaration
+    name: (identifier) @name
+  )* @funcs
+)
+------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entry_points]
+Q = 23
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        19
+  03  ─‣┘  _ [ListClose RecordSet(funcs)]   01
+  05  -ε-  [ListClose RecordSet(funcs)]     01
+  07  -ε-  [RecordClose ArrayPush]          13, 03
+  08   !   (function_declaration) [RecordOpen]  10
+  09  ─‣┘  _                                07
+  10  └‣─  name: (identifier) [Node RecordSet(name)]  09
+  13  ──!  _                                08, 13
+  14  └─!  _                                08, 13
+  19  -ε-  [ListOpen]                       14, 05
+
+Q (entry point):
+  20                                        ▶
+  21  -ε-  [RecordClose]                    20
+  22       (Q)                              02 : 21
+  23  -ε-  [RecordOpen]                     22
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "funcs"
+S3 "QFuncs"
+S4 "Q"
+S5 "program"
+S6 "function_declaration"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { name }
+T2 = ListZeroOrMore(T1)  ; QFuncs*
+T3 = Record  M1:1  ; { funcs }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T2  ; funcs: T2
+
+[type_names]
+N0: S3 → T1  ; QFuncs
+N1: S4 → T3  ; Q
+
+[entry_points]
+Q = 00 :: T3
+
+[spans]
+P0 def        0..79  source_id=0  T3
+P1 pattern    4..79  source_id=0
+P2 capture    71..77  source_id=0  T3.M1
+P3 quantifier 69..70  source_id=0
+P4 pattern    15..69  source_id=0
+P5 capture    60..65  source_id=0  T1.M0
+P6 grammar_field 41..45  source_id=0
+P7 pattern    47..59  source_id=0
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@35)                            35 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  ──!  _                                21, 06
+  08  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
+  12  ─‣┘  _ [SpanEnd#4]                    19
+  14                                        ▶
+  15  ...
+  16  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  19  -ε-  [RecordClose ArrayPush]          06, 32
+  21   !   (function_declaration) [RecordOpen SpanStartAt#4]  08
+  23  ...
+  24  └─!  _                                21, 06
+  26  -ε-  [ListOpen SpanStart#3]           24, 16
+  28  ...
+  29  ...
+  30  ...
+  31  ...
+  32  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  35   !   (program) [SpanStart#0 SpanStartAt#1]  26

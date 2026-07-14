@@ -2,25 +2,25 @@ Q = (function_declaration
   (decorator)* @decs
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 19
 
 [transitions]
 Q:
   01                                        ▶
   02   !   (function_declaration)           15
-  03  ─‣┘  _ [ArrayClose Set(decs)]         01
-  05  -ε-  [ArrayClose Set(decs)]           01
-  07   !   (decorator) [Node Push]          09, 03
+  03  ─‣┘  _ [ListClose RecordSet(decs)]    01
+  05  -ε-  [ListClose RecordSet(decs)]      01
+  07   !   (decorator) [Node ArrayPush]     09, 03
   09  ──!  _                                07, 09
   10  └─!  _                                07, 09
-  15  -ε-  [ArrayOpen]                      10, 05
+  15  -ε-  [ListOpen]                       10, 05
 
-Q (entrypoint):
+Q (entry point):
   16                                        ▶
-  17  -ε-  [StructClose]                    16
+  17  -ε-  [RecordClose]                    16
   18       (Q)                              02 : 17
-  19  -ε-  [StructOpen]                     18
+  19  -ε-  [RecordOpen]                     18
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -31,8 +31,8 @@ S4 "decorator"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:1  ; { decs }
+T1 = ListZeroOrMore(T0)  ; <Node>*
+T2 = Record  M0:1  ; { decs }
 
 [type_members]
 M0: S1 → T1  ; decs: T1
@@ -40,21 +40,21 @@ M0: S1 → T1  ; decs: T1
 [type_names]
 N0: S2 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose Set(M0)]             06
-  10   !   (decorator) [Node Push]          12, 18
+  08  -ε-  [ListClose RecordSet(M0)]        06
+  10   !   (decorator) [Node ArrayPush]     12, 18
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  -ε-  [ArrayOpen]                      14, 08
-  18  ─‣┘  _ [ArrayClose Set(M0)]           06
+  16  -ε-  [ListOpen]                       14, 08
+  18  ─‣┘  _ [ListClose RecordSet(M0)]      06
   20   !   (function_declaration)           16

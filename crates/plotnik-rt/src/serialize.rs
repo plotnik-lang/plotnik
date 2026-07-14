@@ -1,4 +1,4 @@
-//! Source-threading serialization for query output values.
+//! Source-threading serialization for query result values.
 //!
 //! Generated query outputs hold `tree_sitter::Node` handles, and a node's text
 //! lives in the source buffer — a plain `serde::Serialize` impl has no way to

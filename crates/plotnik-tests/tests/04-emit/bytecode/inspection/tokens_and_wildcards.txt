@@ -13,7 +13,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 18
 
 [transitions]
@@ -32,7 +32,7 @@ Q:
   15  ──!  _                                06, 11, 12, 15
   16  └─!  _                                06, 11, 12, 15
 
-Q (entrypoint):
+Q (entry point):
   17                                        ▶
   18       (Q)                              02 : 17
 -------------------- BYTECODE --------------------
@@ -46,31 +46,31 @@ S5 "+"
 S6 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
 [spans]
-P00 def        0..150  src0  T0
-P01 pattern    4..150  src0
-P02 pattern    15..148  src0
-P03 union      41..144  src0
-P04 branch     49..120  src0
-P05 pattern    49..120  src0
-P06 pattern    76..88  src0
-P07 pattern    97..100  src0
-P08 pattern    109..112  src0
-P09 branch     127..130  src0
-P10 pattern    127..130  src0
-P11 branch     137..138  src0
-P12 pattern    137..138  src0
+P00 def        0..150  source_id=0
+P01 pattern    4..150  source_id=0
+P02 pattern    15..148  source_id=0
+P03 unlabeled_alternation 41..144  source_id=0
+P04 alternative 49..120  source_id=0
+P05 pattern    49..120  source_id=0
+P06 pattern    76..88  source_id=0
+P07 pattern    97..100  source_id=0
+P08 pattern    109..112  source_id=0
+P09 alternative 127..130  source_id=0
+P10 pattern    127..130  source_id=0
+P11 alternative 137..138  source_id=0
+P12 pattern    137..138  source_id=0
 
-[transitions]
+[instructions]
 Q:
   00       (@30)                            30 : 01
   01                                        ▶

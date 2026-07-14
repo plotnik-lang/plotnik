@@ -8,7 +8,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 13
 
 [transitions]
@@ -18,14 +18,14 @@ Q:
   04  └‣─  (expression_statement)           06
   06  └‣─  (binary_expression)              09
   07  ─‣┘³ _                                01
-  08  ─‣─  right: (identifier) [Node Set(right)]  07
-  09  └‣─  left: (identifier) [Node Set(left)]  08
+  08  ─‣─  right: (identifier) [Node RecordSet(right)]  07
+  09  └‣─  left: (identifier) [Node RecordSet(left)]  08
 
-Q (entrypoint):
+Q (entry point):
   10                                        ▶
-  11  -ε-  [StructClose]                    10
+  11  -ε-  [RecordClose]                    10
   12       (Q)                              02 : 11
-  13  -ε-  [StructOpen]                     12
+  13  -ε-  [RecordOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -39,7 +39,7 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { left, right }
+T1 = Record  M0:2  ; { left, right }
 
 [type_members]
 M0: S1 → T0  ; left: <Node>
@@ -48,34 +48,34 @@ M1: S2 → T0  ; right: <Node>
 [type_names]
 N0: S3 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [spans]
-P0 def        0..135  src0  T1
-P1 pattern    4..135  src0
-P2 pattern    15..133  src0
-P3 pattern    41..129  src0
-P4 capture    85..90  src0  T1.M0
-P5 field      66..70  src0
-P6 pattern    72..84  src0
-P7 capture    117..123  src0  T1.M1
-P8 field      97..102  src0
-P9 pattern    104..116  src0
+P0 def        0..135  source_id=0  T1
+P1 pattern    4..135  source_id=0
+P2 pattern    15..133  source_id=0
+P3 pattern    41..129  source_id=0
+P4 capture    85..90  source_id=0  T1.M0
+P5 grammar_field 66..70  source_id=0
+P6 pattern    72..84  source_id=0
+P7 capture    117..123  source_id=0  T1.M1
+P8 grammar_field 97..102  source_id=0
+P9 pattern    104..116  source_id=0
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  16
-  08  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  12
+  08  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  12
   12  ─‣┘  _                                13
   13  ─‣┘  _ [SpanEnd#3]                    06
   15  ...
   16                                        ▶
-  17  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  08
+  17  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  08
   21  ...
   22  ...
   23  ...

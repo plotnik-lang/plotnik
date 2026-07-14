@@ -66,10 +66,10 @@ Q = (p
       (field
         (identifier)
         (alternation
-          (branch
+          (alternative
             (named_node
               (identifier)))
-          (branch
+          (alternative
             (named_node
               (identifier)))))
       (field
@@ -134,11 +134,11 @@ Q = (statement value: [A: (x) B: (y)] @kind)
         (field
           (identifier)
           (alternation
-            (branch
+            (alternative
               (type_identifier)
               (named_node
                 (identifier)))
-            (branch
+            (alternative
               (type_identifier)
               (named_node
                 (identifier)))))

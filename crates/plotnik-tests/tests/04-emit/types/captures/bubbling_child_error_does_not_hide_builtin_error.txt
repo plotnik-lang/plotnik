@@ -11,7 +11,7 @@ error: capture `@dup` already defined in this scope
 4 |     (identifier) @dup
   |     ^^^^^^^^^^^^^^^^^
   |
-help: rename one capture, or use an enum if they are mutually exclusive branches
+help: rename one capture, or use labeled alternatives to preserve which alternative matched
 
 error: capture type `bool` requires a value that may be absent; this capture is always present
  --> query.ptk:5:11

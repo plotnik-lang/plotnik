@@ -1,6 +1,6 @@
 //! Scope management for structured captures.
 //!
-//! Handles StructOpen/StructClose and Arr/EndArr wrapper emission for struct and array captures.
+//! Handles `RecordOpen`/`RecordClose` and `ListOpen`/`ListClose` wrappers for captures.
 
 use crate::bytecode::Nav;
 use crate::compiler::ids::TypeId;
@@ -11,24 +11,24 @@ use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 
 #[derive(Clone, Copy, Debug)]
-pub struct Struct(pub TypeId);
+pub struct RecordScope(pub TypeId);
 
 /// Where a captured pattern's compiled scope continues.
 ///
 /// Most captures have one continuation (`Single`). A capture wrapping an
-/// optional/star at a navigating first-child position needs two: the parent must
-/// restore the cursor and take a different path when the inner matches zero
+/// `?`/`*` at a navigating first-child position needs two: the parent must
+/// restore the cursor and take a different path when the inner matches empty
 /// times, so the match and skip paths exit separately (`Split`). A scope emitter
 /// closes its scope on *every* continuation, so the only difference between the
-/// two modes is how many close steps it emits. Threading this through one
+/// two modes is how many close states it emits. Threading this through one
 /// mechanism dispatch (`compile_captured`) keeps the single- and split-exit paths
-/// from drifting — the gap behind both #470 and the suppressive `@_` panic.
+/// from drifting — the gap behind both #470 and the `@_` discard panic.
 #[derive(Clone, Copy)]
 pub(super) enum CaptureExits {
     /// One continuation for the matched path (a non-skippable capture, or the
     /// single-exit caller where match and skip coincide).
     Single(Label),
-    /// Distinct continuations for the matched path and the zero-match skip path.
+    /// Distinct continuations for the node-consuming path and the empty skip path.
     Split {
         match_exit: Label,
         skip_exit: SkipExit,
@@ -62,13 +62,13 @@ impl CaptureExits {
     }
 }
 
-/// Continuation for a zero-width (skip) outcome.
+/// Continuation for an empty (skip) outcome.
 ///
-/// `Fail` prunes the path: no continuation is emitted, so a zero-width outcome
+/// `Fail` prunes the path: no continuation is emitted, so an empty outcome
 /// backtracks like a plain match failure (the effect journal unwinds with it).
-/// Quantifier iterations and alternation branches compile nullable elements
+/// Quantifier iterations and alternation alternatives compile nullable elements
 /// this way — there, consuming nothing is a failed attempt, never an empty
-/// element or a zero-width win.
+/// element or an empty win.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum SkipExit {
     To(Label),
@@ -76,7 +76,7 @@ pub(super) enum SkipExit {
 }
 
 /// The two distinct continuations a skippable pattern (`?`/`*`) routes to:
-/// the matched path and the zero-match skip path. Bundling them keeps the two
+/// the node-consuming path and the empty skip path. Bundling them keeps the two
 /// from being transposed at a call site.
 #[derive(Clone, Copy)]
 pub(super) struct SplitExits {
@@ -86,8 +86,8 @@ pub(super) struct SplitExits {
 
 /// The per-capture inputs shared by every capture lowering. The continuation is
 /// not among them: it is a sibling argument whose type encodes the capability —
-/// the scope-emitting helpers ([`NfaBuilder::compile_struct_capture`] /
-/// [`NfaBuilder::compile_array_capture`]) take a [`CaptureExits`], so a zero-match
+/// the scope-emitting helpers ([`NfaBuilder::compile_record_capture`] /
+/// [`NfaBuilder::compile_list_capture`]) take a [`CaptureExits`], so an empty
 /// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
 /// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
 /// unrepresentable for them rather than silently collapsed via `match_exit`.
@@ -99,9 +99,9 @@ pub(super) struct CaptureRequest {
 }
 
 impl CaptureRequest {
-    /// A definition-root array produces a pending value rather than assigning
+    /// A definition-root list produces a pending value rather than assigning
     /// a named capture at this site.
-    pub(super) fn pending_array(
+    pub(super) fn pending_list(
         inner: Pattern,
         nav: Option<Nav>,
         outer_capture: CaptureEffects,
@@ -115,7 +115,7 @@ impl CaptureRequest {
     }
 }
 
-/// Emitted in order after a scope-closing epsilon (`EndArr`/`EndStruct`): the
+/// Emitted in order after a scope-closing epsilon (`ListClose`/`RecordClose`): the
 /// capture's own value effects first, then the enclosing scope's. Bundled so the
 /// two same-type slices can't be transposed at a call site.
 #[derive(Clone, Copy)]
@@ -137,7 +137,7 @@ impl ScopeCloseEffects<'_> {
 
 impl NfaBuilder<'_> {
     /// Avoids the repeated `if let Some(type_id) = type_id { with_scope } else { f }` pattern.
-    pub(super) fn compile_with_optional_scope<T>(
+    pub(super) fn with_scope_if_present<T>(
         &mut self,
         type_id: Option<TypeId>,
         f: impl FnOnce(&mut Self) -> T,
@@ -150,15 +150,15 @@ impl NfaBuilder<'_> {
     }
 
     pub(super) fn with_scope<T>(&mut self, type_id: TypeId, f: impl FnOnce(&mut Self) -> T) -> T {
-        self.scope_stack.push(Struct(type_id));
+        self.scope_stack.push(RecordScope(type_id));
         let result = f(self);
         self.scope_stack.pop();
         result
     }
 
-    /// Returns a `MemberRef` keyed by (struct_type, relative_index).
+    /// Returns a `MemberRef` keyed by `(record_type, relative_index)`.
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
-        let fields = self.ctx.analysis.type_analysis.struct_fields(type_id)?;
+        let fields = self.ctx.analysis.type_analysis.record_fields(type_id)?;
         for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
             if self.ctx.analysis.interner.resolve(field_sym) == capture_name {
                 return Some(MemberRef::new(type_id, relative_index as u16));
@@ -168,32 +168,32 @@ impl NfaBuilder<'_> {
     }
 
     pub(super) fn lookup_member_in_scope(&self, capture_name: &str) -> Option<MemberRef> {
-        let Struct(type_id) = *self.scope_stack.last()?;
+        let RecordScope(type_id) = *self.scope_stack.last()?;
         self.lookup_member(capture_name, type_id)
     }
 
-    /// Compile a struct-scope capture: `Struct → inner → EndStruct+capture → exit(s)`.
+    /// Compile a record-scope capture: `RecordOpen → inner → RecordClose+capture → exit(s)`.
     ///
     /// A quantified inner (`{...}? @cap`) routes to
-    /// [`compile_optional_row_capture`](Self::compile_optional_row_capture): the
-    /// row is optional as a whole, so the struct scope must not open on the skip
-    /// path. For the remaining (non-quantified) inners the struct opens once and
+    /// [`compile_option_record_capture`](Self::compile_option_record_capture): the
+    /// record value has option type, so the record scope must not open on the skip
+    /// path. For the remaining (non-quantified) inners the record opens once and
     /// closes on every continuation.
     ///
-    /// `outer_capture.pre` runs in the enclosing scope before the struct opens
-    /// (e.g. an alternation branch's null-injected defaults, or an enum variant's
-    /// `Enum`); dropping it would lose those and close a scope that never opened.
+    /// `outer_capture.pre` runs in the enclosing scope before the record opens
+    /// (e.g. an alternative's default-value effects, or a variant's
+    /// `VariantOpen`); dropping it would lose those and close a scope that never opened.
     /// `@cap` is resolved by the caller, against the enclosing scope.
-    pub(super) fn compile_struct_capture(
+    pub(super) fn compile_record_capture(
         &mut self,
         req: CaptureRequest,
         exits: CaptureExits,
     ) -> Label {
-        // `{...}? @x`: the row is optional as a whole. The struct scope moves
-        // inside the quantifier iteration so a skip emits a bare `Null` for the
-        // capture — never a hollow `{ field: null }` struct.
+        // `{...}? @x`: the record value has option type. The record scope moves
+        // inside the quantifier iteration so a skip emits a bare `Absent` for the
+        // capture — never a hollow `{ field: null }` record.
         if matches!(&req.inner, Pattern::QuantifiedPattern(_)) {
-            return self.compile_optional_row_capture(req, exits);
+            return self.compile_option_record_capture(req, exits);
         }
 
         let CaptureRequest {
@@ -203,7 +203,7 @@ impl NfaBuilder<'_> {
             outer_capture,
         } = req;
 
-        // The struct scope's type drives the inner captures' Set member resolution.
+        // The record scope's type drives the inner captures' `RecordSet` member resolution.
         let scope_type_id = self
             .ctx
             .analysis
@@ -219,42 +219,42 @@ impl NfaBuilder<'_> {
         };
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let struct_close = self.emit_struct_close_step_with_effects(end_effects, exit);
-                self.compile_with_optional_scope(scope_type_id, |this| {
-                    this.compile_pattern(&inner, struct_close, nav)
+                let record_close = self.emit_record_close_with_effects(end_effects, exit);
+                self.with_scope_if_present(scope_type_id, |this| {
+                    this.compile_pattern(&inner, record_close, nav)
                 })
             }
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
             } => {
-                let match_struct_close =
-                    self.emit_struct_close_step_with_effects(end_effects, match_exit);
-                let skip_struct_close = match skip_exit {
+                let match_record_close =
+                    self.emit_record_close_with_effects(end_effects, match_exit);
+                let skip_record_close = match skip_exit {
                     SkipExit::To(skip) => {
-                        SkipExit::To(self.emit_struct_close_step_with_effects(end_effects, skip))
+                        SkipExit::To(self.emit_record_close_with_effects(end_effects, skip))
                     }
                     SkipExit::Fail => SkipExit::Fail,
                 };
-                self.compile_with_optional_scope(scope_type_id, |this| {
+                self.with_scope_if_present(scope_type_id, |this| {
                     let pattern_ctx = PatternCtx {
-                        exit: match_struct_close,
+                        exit: match_record_close,
                         nav,
                         capture: CaptureEffects::default(),
-                        value: false,
+                        observe_value: false,
                     };
-                    this.compile_nullable_pattern(&inner, pattern_ctx, skip_struct_close)
+                    this.compile_nullable_pattern(&inner, pattern_ctx, skip_record_close)
                 })
             }
         };
 
-        self.emit_struct_step_with_pre(inner_entry, outer_capture.pre)
+        self.emit_record_open_with_pre(inner_entry, outer_capture.pre)
     }
 
     /// Compile a node capture that also contains bubbling inner captures.
     ///
-    /// `capture_effects` land on the inner match instruction (not an EndStruct step).
-    /// The inner captures use the already-open outer scope, so no Struct/EndStruct
+    /// `capture_effects` land on the inner match instruction, not a `RecordClose` state.
+    /// The inner captures use the already-open outer scope, so no RecordOpen/RecordClose
     /// wrapper is emitted.
     pub(super) fn compile_bubble_with_node_capture(
         &mut self,
@@ -271,13 +271,13 @@ impl NfaBuilder<'_> {
         let actual_exit = if outer_capture.post.is_empty() {
             exit
         } else {
-            let outer_step = self.fresh_label();
+            let outer_state = self.fresh_label();
             self.instructions.push(
-                MatchIR::epsilon(outer_step, exit)
+                MatchIR::epsilon(outer_state, exit)
                     .append_effects(outer_capture.post)
                     .into(),
             );
-            outer_step
+            outer_state
         };
 
         let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
@@ -285,58 +285,51 @@ impl NfaBuilder<'_> {
             exit: actual_exit,
             nav,
             capture: inner_capture,
-            value: false,
+            observe_value: false,
         };
         self.dispatch_pattern(&inner, pattern_ctx)
     }
 
-    /// Compile a pattern with Struct/EndStruct wrapping for array iteration.
+    /// Compile a pattern with RecordOpen/RecordClose wrapping for list iteration.
     ///
     /// Used when inner is a scope-creating pattern (sequence/alternation) with
-    /// internal captures. Each iteration produces: Struct → inner → EndStruct Push
-    pub(super) fn compile_struct_for_array(
+    /// internal captures. Each iteration produces `RecordOpen → inner → RecordClose ArrayPush`.
+    pub(super) fn compile_record_for_list(
         &mut self,
         inner: &Pattern,
         exit: Label,
         nav_override: Option<Nav>,
-        row_type_id: Option<TypeId>,
+        element_type_id: Option<TypeId>,
     ) -> Label {
-        let struct_close_step = self.fresh_label();
+        let record_close = self.fresh_label();
         self.instructions.push(
-            MatchIR::epsilon(struct_close_step, exit)
-                .append_effect(EffectIR::end_struct())
-                .append_effect(EffectIR::push())
+            MatchIR::epsilon(record_close, exit)
+                .append_effect(EffectIR::record_close())
+                .append_effect(EffectIR::array_push())
                 .into(),
         );
 
-        // row_type_id drives Set effects inside the struct scope.
-        let inner_entry = self.compile_with_optional_scope(row_type_id, |this| {
-            this.compile_iteration_element(
-                inner,
-                PatternCtx::with_nav(struct_close_step, nav_override),
-            )
+        // `element_type_id` drives `RecordSet` effects inside the record scope.
+        let inner_entry = self.with_scope_if_present(element_type_id, |this| {
+            this.compile_iteration_element(inner, PatternCtx::with_nav(record_close, nav_override))
         });
 
-        let struct_step = self.fresh_label();
+        let record_open = self.fresh_label();
         self.instructions.push(
-            MatchIR::epsilon(struct_step, inner_entry)
-                .prepend_effect(EffectIR::start_struct())
+            MatchIR::epsilon(record_open, inner_entry)
+                .prepend_effect(EffectIR::record_open())
                 .into(),
         );
 
-        struct_step
+        record_open
     }
 
-    pub(super) fn emit_endarr_step(
-        &mut self,
-        effects: ScopeCloseEffects<'_>,
-        exit: Label,
-    ) -> Label {
+    pub(super) fn emit_list_close(&mut self, effects: ScopeCloseEffects<'_>, exit: Label) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
                 .append_effects(effects.leading.iter().cloned())
-                .append_effect(EffectIR::end_arr())
+                .append_effect(EffectIR::list_close())
                 .append_effects(effects.capture.iter().cloned())
                 .append_effects(effects.outer.iter().cloned())
                 .into(),
@@ -344,22 +337,22 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a struct epsilon step (no enclosing pre-effects).
-    pub(super) fn emit_struct_step(&mut self, successor: Label) -> Label {
-        self.emit_struct_step_with_pre(successor, vec![])
+    /// Emit a record-open epsilon state with no enclosing pre-effects.
+    pub(super) fn emit_record_open(&mut self, successor: Label) -> Label {
+        self.emit_record_open_with_pre(successor, vec![])
     }
 
-    /// Emit a struct-close epsilon step (no capture or outer effects).
-    pub(super) fn emit_struct_close_step(&mut self, successor: Label) -> Label {
-        self.emit_struct_close_step_with_effects(ScopeCloseEffects::none(), successor)
+    /// Emit a record-close epsilon state with no capture or outer effects.
+    pub(super) fn emit_record_close(&mut self, successor: Label) -> Label {
+        self.emit_record_close_with_effects(ScopeCloseEffects::none(), successor)
     }
 
-    /// Emit a struct-close epsilon step carrying capture + outer effects.
+    /// Emit a record-close epsilon state carrying capture and outer effects.
     ///
-    /// The struct-scope counterpart of [`emit_endarr_step`](Self::emit_endarr_step),
-    /// used by split-exit struct captures to close the struct and Set the capture
+    /// The record-scope counterpart of [`emit_list_close`](Self::emit_list_close),
+    /// used by split-exit record captures to close the record and apply `RecordSet`
     /// on each exit.
-    pub(super) fn emit_struct_close_step_with_effects(
+    pub(super) fn emit_record_close_with_effects(
         &mut self,
         effects: ScopeCloseEffects<'_>,
         exit: Label,
@@ -368,7 +361,7 @@ impl NfaBuilder<'_> {
         self.instructions.push(
             MatchIR::epsilon(label, exit)
                 .append_effects(effects.leading.iter().cloned())
-                .append_effect(EffectIR::end_struct())
+                .append_effect(EffectIR::record_close())
                 .append_effects(effects.capture.iter().cloned())
                 .append_effects(effects.outer.iter().cloned())
                 .into(),
@@ -376,8 +369,8 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit an Arr epsilon step with optional pre-effects before start_arr.
-    pub(super) fn emit_arr_step(
+    /// Emit a list-open epsilon state with optional leading and trailing effects.
+    pub(super) fn emit_list_open(
         &mut self,
         successor: Label,
         leading_effects: Vec<EffectIR>,
@@ -386,7 +379,7 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, successor)
-                .prepend_effect(EffectIR::start_arr())
+                .prepend_effect(EffectIR::list_open())
                 .prepend_effects(leading_effects)
                 .append_effects(trailing_effects)
                 .into(),
@@ -394,12 +387,12 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a struct epsilon step with optional pre-effects before start_struct.
+    /// Emit a record-open epsilon state with optional leading effects.
     ///
-    /// The struct-scope counterpart of [`emit_arr_step`](Self::emit_arr_step),
-    /// used by split-exit struct captures to open the struct after the enclosing
-    /// scope's pre-effects (e.g. an enum variant's `Enum`).
-    pub(super) fn emit_struct_step_with_pre(
+    /// The record-scope counterpart of [`emit_list_open`](Self::emit_list_open),
+    /// used by split-exit record captures to open the record after the enclosing
+    /// scope's pre-effects (e.g. a variant case's `VariantOpen`).
+    pub(super) fn emit_record_open_with_pre(
         &mut self,
         successor: Label,
         leading_effects: Vec<EffectIR>,
@@ -407,7 +400,7 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, successor)
-                .prepend_effect(EffectIR::start_struct())
+                .prepend_effect(EffectIR::record_open())
                 .prepend_effects(leading_effects)
                 .into(),
         );

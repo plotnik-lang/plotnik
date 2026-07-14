@@ -32,8 +32,8 @@ pub enum GapClass {
     AnonymousAndExtras,
     /// Soft `.` with an anonymous operand: skip extras only.
     ExtrasOnly,
-    /// Strict `.!`: nothing may intervene.
-    Nothing,
+    /// Exact `.!`: no syntax-tree node may intervene.
+    Exact,
 }
 
 impl GapClass {
@@ -42,7 +42,7 @@ impl GapClass {
             Self::Any => SkipClass::Any,
             Self::AnonymousAndExtras => SkipClass::Trivia,
             Self::ExtrasOnly => SkipClass::Extras,
-            Self::Nothing => SkipClass::Exact,
+            Self::Exact => SkipClass::Exact,
         }
     }
 
@@ -51,13 +51,13 @@ impl GapClass {
         self.skip_class().admits(node)
     }
 
-    /// Rank by permissiveness. The classes nest — `Nothing ⊂ ExtrasOnly ⊂
+    /// Rank by permissiveness. The classes nest — `Exact ⊂ ExtrasOnly ⊂
     /// AnonymousAndExtras ⊂ Any` — so a total order captures their intersection and
     /// union exactly, which is what [`tighten`](Self::tighten)/[`loosen`](Self::loosen)
     /// need.
     fn permissiveness(self) -> u8 {
         match self {
-            Self::Nothing => 0,
+            Self::Exact => 0,
             Self::ExtrasOnly => 1,
             Self::AnonymousAndExtras => 2,
             Self::Any => 3,
@@ -96,7 +96,7 @@ impl GapClass {
             Nav::Next | Nav::Down | Nav::Up(_) => Self::Any,
             Nav::NextSkip | Nav::DownSkip | Nav::UpSkipTrivia(_) => Self::AnonymousAndExtras,
             Nav::NextSkipExtras | Nav::DownSkipExtras | Nav::UpSkipExtras(_) => Self::ExtrasOnly,
-            Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Nothing,
+            Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Exact,
             // Childless asserts at the current position without moving; it
             // opens no sibling gap, like the other stay-in-place navs.
             Nav::Epsilon
@@ -130,17 +130,16 @@ pub struct AnchorSemantics<'a> {
     classifier: AnonymousClassifier<'a>,
 }
 
-/// Whether this pattern's immediate branches compile branch-local entry navs.
+/// Whether this pattern's immediate alternatives compile alternative-local entry navs.
 ///
-/// A soft anchor before such a pattern is decided by each branch, not by the
+/// A soft anchor before such a pattern is decided by each alternative, not by the
 /// alternation's whole-pattern anonymous classification.
-pub(crate) fn has_direct_alternation_branch_nav(pattern: &Pattern) -> bool {
+pub(crate) fn has_direct_alternative_nav(pattern: &Pattern) -> bool {
     match pattern {
-        Pattern::Union(_) | Pattern::Enum(_) => true,
-        Pattern::CapturedPattern(cap) => cap
-            .inner()
-            .as_ref()
-            .is_some_and(has_direct_alternation_branch_nav),
+        Pattern::Alternation(_) => true,
+        Pattern::CapturedPattern(cap) => {
+            cap.inner().as_ref().is_some_and(has_direct_alternative_nav)
+        }
         _ => false,
     }
 }
@@ -163,12 +162,12 @@ impl<'a> AnonymousClassifier<'a> {
     /// carrying it is not safe to memoize.
     fn classify(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> (bool, bool) {
         match pattern {
-            Pattern::TokenPattern(_) => (true, false),
-            Pattern::NodePattern(_) => (false, false),
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => (true, false),
+            Pattern::NamedNodePattern(_) => (false, false),
             Pattern::CapturedPattern(cap) => self.classify_opt(cap.inner().as_ref(), visited),
             Pattern::QuantifiedPattern(q) => self.classify_opt(q.inner().as_ref(), visited),
             Pattern::FieldPattern(field) => self.classify_opt(field.value().as_ref(), visited),
-            Pattern::Union(_) | Pattern::Enum(_) => self.classify_any(pattern.children(), visited),
+            Pattern::Alternation(_) => self.classify_any(pattern.children(), visited),
             Pattern::SeqPattern(seq) => self.classify_any(seq.children(), visited),
             Pattern::DefRef(r) => self.classify_ref(r, visited),
         }
@@ -182,9 +181,9 @@ impl<'a> AnonymousClassifier<'a> {
         pattern.map_or((false, false), |p| self.classify(p, visited))
     }
 
-    /// OR over children: any branch that may match anonymous makes the whole pattern.
+    /// OR over children: any alternative that may match anonymous makes the whole pattern.
     /// A `true` short-circuits (and is always sound to cache); an all-`false` answer
-    /// inherits a cut from any branch, since a cut branch might have masked a `true`.
+    /// inherits a cut from any alternative, since a cut alternative might have masked a `true`.
     fn classify_any(
         &self,
         children: impl Iterator<Item = Pattern>,
@@ -246,7 +245,7 @@ impl<'a> AnchorSemantics<'a> {
     /// Check for trailing anchor in items, descending into a sole-child sequence if needed.
     pub fn check_trailing_anchor(&self, items: &[SeqItem]) -> (bool, Option<Nav>) {
         if let Some(SeqItem::Anchor(anchor)) = items.last() {
-            if anchor.is_strict() {
+            if anchor.is_exact() {
                 return (true, Some(Nav::UpExact(1)));
             }
 
@@ -280,7 +279,7 @@ impl<'a> AnchorSemantics<'a> {
     /// `None` when the item list has no leading anchor. Descends into a sole-child
     /// sequence like [`check_trailing_anchor`](Self::check_trailing_anchor), and
     /// reads the nav off [`compute_nav_modes`](Self::compute_nav_modes) so the
-    /// zero-width arm of the anchor cannot drift from the arm that matches.
+    /// empty-match arm of the anchor cannot drift from the arm that matches.
     pub fn check_leading_anchor(&self, items: &[SeqItem]) -> Option<Nav> {
         if items.len() == 1
             && let Some(SeqItem::Pattern(Pattern::SeqPattern(seq))) = items.first()
@@ -306,27 +305,26 @@ impl<'a> AnchorSemantics<'a> {
         is_inside_node: bool,
     ) -> Vec<(usize, Option<Nav>)> {
         let mut result = Vec::new();
-        let mut pending_anchor_strict = None;
+        let mut pending_anchor_exact = None;
         let mut prev_is_anonymous = false;
         let mut is_first_pattern = true;
 
         for (idx, item) in items.iter().enumerate() {
             match item {
                 SeqItem::Anchor(anchor) => {
-                    pending_anchor_strict = Some(anchor.is_strict());
+                    pending_anchor_exact = Some(anchor.is_exact());
                 }
                 SeqItem::Pattern(pattern) => {
                     let current_is_anonymous =
                         self.classifier.pattern_may_match_anonymous(Some(pattern));
-                    // Alternation branches compile their own entry nav, so the branch body—not
+                    // Alternation alternatives compile their own entry nav, so the alternative body—not
                     // the whole alternation—decides whether soft anchors use extras-only nav.
-                    let current_is_anonymous_for_anchor =
-                        if has_direct_alternation_branch_nav(pattern) {
-                            false
-                        } else {
-                            current_is_anonymous
-                        };
-                    let nav = if let Some(is_exact) = pending_anchor_strict {
+                    let current_is_anonymous_for_anchor = if has_direct_alternative_nav(pattern) {
+                        false
+                    } else {
+                        current_is_anonymous
+                    };
+                    let nav = if let Some(is_exact) = pending_anchor_exact {
                         if is_first_pattern && is_inside_node {
                             Some(if is_exact {
                                 Nav::DownExact
@@ -353,7 +351,7 @@ impl<'a> AnchorSemantics<'a> {
                     };
 
                     result.push((idx, nav));
-                    pending_anchor_strict = None;
+                    pending_anchor_exact = None;
                     prev_is_anonymous = current_is_anonymous;
                     is_first_pattern = false;
                 }

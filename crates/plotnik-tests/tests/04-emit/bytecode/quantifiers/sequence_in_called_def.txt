@@ -6,14 +6,14 @@ Collect = {
 
 Q = (array (Collect))
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Item = 21
 Q    = 23
 
 [transitions]
 Item:
   01                                        ▶
-  02   !   (identifier) [Node Set(name)]    01
+  02   !   (identifier) [Node RecordSet(name)]  01
 
 Q:
   04                                        ▶
@@ -25,13 +25,13 @@ Q:
   12  ──!  _                                10, 12
   13  └─!  _                                10, 12
 
-Item (entrypoint):
+Item (entry point):
   18                                        ▶
-  19  -ε-  [StructClose]                    18
+  19  -ε-  [RecordClose]                    18
   20       (Item)                           02 : 19
-  21  -ε-  [StructOpen]                     20
+  21  -ε-  [RecordOpen]                     20
 
-Q (entrypoint):
+Q (entry point):
   22                                        ▶
   23       (Q)                              05 : 22
 -------------------- BYTECODE --------------------
@@ -48,12 +48,12 @@ S8 "array"
 S9 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
-T2 = Struct  M0:1  ; { name }
-T3 = Struct  M1:1  ; { item }
-T4 = ArrayStar(T3)  ; CollectItems*
-T5 = Struct  M2:1  ; { items }
+T2 = Record  M0:1  ; { name }
+T3 = Record  M1:1  ; { item }
+T4 = ListZeroOrMore(T3)  ; CollectItems*
+T5 = Record  M2:1  ; { items }
 
 [type_members]
 M0: S1 → T1  ; name: <Node>
@@ -65,22 +65,22 @@ N0: S4 → T2  ; Item
 N1: S5 → T3  ; CollectItems
 N2: S6 → T5  ; Collect
 
-[entrypoints]
+[entry_points]
 Item = 00 :: T2
 Q    = 06 :: T0
 
-[transitions]
+[instructions]
 Item:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@09)                            09 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
   06       (@24)                            24 : 07
   07                                        ▶
   08                                        ▶
-  09   !   (identifier) [Node Set(M0)]      08
+  09   !   (identifier) [Node RecordSet(M0)]  08
   11                                        ▶
   12  -ε-  [SuppressEnd]                    18, 15
   14   !   (@09)                            09 : 12

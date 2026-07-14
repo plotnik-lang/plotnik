@@ -1,0 +1,51 @@
+Q = {
+  (identifier) @fn
+} @outer :: FunctionInfo
+---------------------- NFA -----------------------
+[entry_points]
+Q = 8
+
+[transitions]
+Q:
+  1                                         ▶
+  3   !   (identifier) [RecordOpen Node RecordSet(fn) RecordClose RecordSet(outer)]  1
+
+Q (entry point):
+  5                                         ▶
+  6  -ε-  [RecordClose]                     5
+  7       (Q)                               3 : 6
+  8  -ε-  [RecordOpen]                      7
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "fn"
+S2 "outer"
+S3 "FunctionInfo"
+S4 "Q"
+S5 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { fn }
+T2 = Record  M1:1  ; { outer }
+
+[type_members]
+M0: S1 → T0  ; fn: <Node>
+M1: S2 → T1  ; outer: FunctionInfo
+
+[type_names]
+N0: S3 → T1  ; FunctionInfo
+N1: S4 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@08)                            08 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  06

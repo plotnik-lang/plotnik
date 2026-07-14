@@ -1,0 +1,38 @@
+Q = [
+  (identifier)
+  (string)* @strings
+]
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alternation
+      BracketOpen "["
+      Alternative
+        NamedNode
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Alternative
+        Capture
+          Quantifier
+            NamedNode
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
+            Star "*"
+          CaptureToken "@strings"
+      BracketClose "]"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    Alternation
+      Alternative
+        NamedNode identifier
+      Alternative
+        CapturedPattern @strings
+          QuantifiedPattern *
+            NamedNode string

@@ -1,7 +1,7 @@
 //! Read-only view over sealed bytecode constant tables.
 
 use crate::bytecode::StringId;
-use crate::compiler::analyze::output::CaptureLayout;
+use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::TypeId;
 
 use super::{RegexId, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};

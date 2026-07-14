@@ -1,0 +1,76 @@
+Q = (program
+  {
+    (lexical_declaration)+? @d
+  }
+)
+--------------------- INPUT ----------------------
+let a; let b;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  d: [Node, ...Node[]];
+}
+--------------------- OUTPUT ---------------------
+{
+  "d": [
+    {
+      "kind": "lexical_declaration",
+      "text": "let a;",
+      "span": [0, 6]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "d"
+S2 "Q"
+S3 "program"
+S4 "lexical_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = ListOneOrMore(T0)  ; <Node>+
+T2 = Record  M0:1  ; { d }
+
+[type_members]
+M0: S1 → T1  ; d: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (lexical_declaration) [Node ArrayPush]  14, 10
+  10  ──!  _                                08, 10
+  12  └─!  _ [ListOpen]                     08, 10
+  14  ─‣┘  _ [ListClose RecordSet(M0)]      06
+  16   !   (program)                        12
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@16)                            16 : 03
+       ▶   (@16)
+
+@16:
+  16       (program)                        12
+       ●   program
+  12       _ [ListOpen]                     08, 10
+       ●   lexical_declaration
+  08       (lexical_declaration) [Node ArrayPush]  14, 10
+       ●   lexical_declaration
+  14       _ [ListClose RecordSet(M0)]      06
+       ●   program
+  06   ◀   (@16)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

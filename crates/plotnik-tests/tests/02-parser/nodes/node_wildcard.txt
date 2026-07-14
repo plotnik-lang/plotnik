@@ -1,0 +1,14 @@
+Q = _
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Wildcard
+      Underscore "_"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NodeWildcard

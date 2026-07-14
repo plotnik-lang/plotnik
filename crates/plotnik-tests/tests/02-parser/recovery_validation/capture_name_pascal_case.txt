@@ -11,4 +11,4 @@ help: use `@name`
 1 - Q = (a) @Name
 1 + Q = (a) @name
   |
-help: captures become fields in the output
+help: capture names become result field names

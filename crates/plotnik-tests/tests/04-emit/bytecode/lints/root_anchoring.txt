@@ -8,7 +8,7 @@ Bad = (identifier) @bad
 ------------------- INPUT (ts) -------------------
 let x = 1;
 ------------------ DIAGNOSTICS -------------------
-warning: entrypoint can never match: matching starts at the tree root
+warning: entry point can never match: matching starts at the syntax-tree root
  --> query.ptk:7:7
   |
 7 | Bad = (identifier) @bad
@@ -16,7 +16,7 @@ warning: entrypoint can never match: matching starts at the tree root
   |
 help: wrap the pattern in the grammar's root node, e.g. `(program ...)`
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Bad  = 27
 Leaf = 19
 Q    = 23
@@ -24,37 +24,37 @@ Q    = 23
 [transitions]
 Leaf:
   01                                        ▶
-  02   !   (identifier) [Node Set(id)]      01
+  02   !   (identifier) [Node RecordSet(id)]  01
 
 Q:
   04                                        ▶
   05   !   (program)                        07
-  07  └‣─  (expression_statement) [StructOpen]  11
-  08  ─‣┘² _ [Set(leaf)]                    04
-  10  -ε-  [StructClose]                    08
+  07  └‣─  (expression_statement) [RecordOpen]  11
+  08  ─‣┘² _ [RecordSet(leaf)]              04
+  10  -ε-  [RecordClose]                    08
   11  └‣─  (Leaf)                           02 : 10
 
 Bad:
   14                                        ▶
-  15   !   (identifier) [Node Set(bad)]     14
+  15   !   (identifier) [Node RecordSet(bad)]  14
 
-Leaf (entrypoint):
+Leaf (entry point):
   16                                        ▶
-  17  -ε-  [StructClose]                    16
+  17  -ε-  [RecordClose]                    16
   18       (Leaf)                           02 : 17
-  19  -ε-  [StructOpen]                     18
+  19  -ε-  [RecordOpen]                     18
 
-Q (entrypoint):
+Q (entry point):
   20                                        ▶
-  21  -ε-  [StructClose]                    20
+  21  -ε-  [RecordClose]                    20
   22       (Q)                              05 : 21
-  23  -ε-  [StructOpen]                     22
+  23  -ε-  [RecordOpen]                     22
 
-Bad (entrypoint):
+Bad (entry point):
   24                                        ▶
-  25  -ε-  [StructClose]                    24
+  25  -ε-  [RecordClose]                    24
   26       (Bad)                            15 : 25
-  27  -ε-  [StructOpen]                     26
+  27  -ε-  [RecordOpen]                     26
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -70,9 +70,9 @@ S9 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { leaf }
-T3 = Struct  M2:1  ; { bad }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { leaf }
+T3 = Record  M2:1  ; { bad }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
@@ -84,37 +84,37 @@ N0: S4 → T1  ; Leaf
 N1: S5 → T2  ; Q
 N2: S6 → T3  ; Bad
 
-[entrypoints]
+[entry_points]
 Bad  = 12 :: T3
 Leaf = 00 :: T1
 Q    = 06 :: T2
 
-[transitions]
+[instructions]
 Leaf:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@29)                            29 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
 
 Bad:
-  12  -ε-  [StructOpen]                     14
+  12  -ε-  [RecordOpen]                     14
   14       (@32)                            32 : 16
   15                                        ▶
-  16  -ε-  [StructClose]                    18
+  16  -ε-  [RecordClose]                    18
   18                                        ▶
-  19  -ε-  [StructClose]                    21
-  21  ─‣┘² _ [Set(M1)]                      15
+  19  -ε-  [RecordClose]                    21
+  21  ─‣┘² _ [RecordSet(M1)]                15
   23                                        ▶
-  24   !   (identifier) [Node Set(M0)]      23
+  24   !   (identifier) [Node RecordSet(M0)]  23
   26  └‣─  (@24)                            24 : 19
-  27  └‣─  (expression_statement) [StructOpen]  26
+  27  └‣─  (expression_statement) [RecordOpen]  26
   29   !   (program)                        27
   30                                        ▶
   31  ...
-  32   !   (identifier) [Node Set(M2)]      30
+  32   !   (identifier) [Node RecordSet(M2)]  30

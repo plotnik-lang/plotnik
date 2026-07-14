@@ -1,7 +1,7 @@
 //! Item collection and rendering.
 //!
-//! One item per named type: every non-void definition (struct, enum, or a
-//! `pub type` alias for scalar/wrapper outputs), plus every named composite
+//! One item per named type: every value-producing definition (struct, enum, or a
+//! `pub type` alias for leaf/wrapper result types), plus every named composite
 //! its output reaches, emitted parent-first right after their owner. Names
 //! come verbatim from the naming pass; the only unnamed composites are enum
 //! variant payload structs, which render inline as struct variants.
@@ -11,12 +11,12 @@
 //! declarations shadow the prelude inside the generated module. `Node` alone
 //! can stay bare: the naming pass reserves it.
 
-use crate::compiler::analyze::output::OutputSchema;
-pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItemKind as ItemKind};
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::result::ResultSchema;
+pub(crate) use crate::compiler::analyze::result::{ResultItem as Item, ResultItemKind as ItemKind};
+use crate::compiler::analyze::types::type_shape::{CasePayload, RecordField, TypeId, TypeShape};
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
-use crate::compiler::ids::DefId;
+use crate::compiler::ids::TypeDeclId;
 use crate::core::Symbol;
 
 use super::TypesConfig as Config;
@@ -26,7 +26,7 @@ const DERIVES: &str = "#[derive(Debug, Clone, PartialEq, Eq, Hash)]";
 
 pub(crate) struct Emitter<'m, 'a> {
     model: &'m TypeModel<'a>,
-    pub(super) schema: &'m OutputSchema<'a>,
+    pub(super) schema: &'m ResultSchema<'a>,
     pub(super) config: &'m Config,
     uses_node: bool,
 }
@@ -82,34 +82,35 @@ impl<'m, 'a> Emitter<'m, 'a> {
 
     fn render_item(&mut self, item: &Item) -> String {
         match item.kind {
-            ItemKind::Struct => self.render_struct(item),
-            ItemKind::Enum => self.render_enum(item),
+            ItemKind::Record => self.render_struct(item),
+            ItemKind::Variant => self.render_enum(item),
             ItemKind::Alias => self.render_alias(item),
-            ItemKind::VoidDef => self.render_void_marker(item),
+            ItemKind::MatchOnlyDef => self.render_match_only_marker(item),
         }
     }
 
-    fn render_void_marker(&mut self, item: &Item) -> String {
+    fn render_match_only_marker(&mut self, item: &Item) -> String {
         let ident = self.item_ident(item.name).to_string();
         format!("{DERIVES}\npub struct {ident};")
     }
 
     fn render_struct(&mut self, item: &Item) -> String {
+        let item_ty = item.value_type();
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
-            unreachable!("struct item must have a struct shape");
+        let TypeShape::Record(fields) = types.expect_type_shape(item_ty) else {
+            unreachable!("struct item must have a record shape");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
-        let lt = self.lifetime_args(item.ty);
+        let lt = self.lifetime_args(item_ty);
 
         let mut out = Sink::<()>::new();
         out.line(DERIVES);
         out.line(&format!("pub struct {ident}{lt} {{"));
         out.indented(|out| {
             for (info, field_ident) in fields.values().zip(&field_idents) {
-                let field_ty = self.field_type(TypeContext::item(item.ty), info);
+                let field_ty = self.field_type(TypeContext::item(item_ty), info);
                 out.line(&format!("pub {field_ident}: {field_ty},"));
             }
         });
@@ -118,21 +119,22 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     fn render_enum(&mut self, item: &Item) -> String {
+        let item_ty = item.value_type();
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
-            unreachable!("enum item must have an enum shape");
+        let TypeShape::Variant(variants) = types.expect_type_shape(item_ty) else {
+            unreachable!("Rust enum item must have a variant shape");
         };
         let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
-        let lt = self.lifetime_args(item.ty);
+        let lt = self.lifetime_args(item_ty);
 
         let mut out = Sink::<()>::new();
         out.line(DERIVES);
         out.line(&format!("pub enum {ident}{lt} {{"));
         out.indented(|out| {
             for ((_, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
-                let payload = self.render_variant_payload(item.ty, payload);
+                let payload = self.render_variant_payload(item_ty, payload);
                 out.line(&format!("{variant_ident}{payload},"));
             }
         });
@@ -140,15 +142,15 @@ impl<'m, 'a> Emitter<'m, 'a> {
         out.plain().to_string()
     }
 
-    fn render_variant_payload(&mut self, item_ty: TypeId, payload: TypeId) -> String {
-        if payload == TYPE_VOID {
+    fn render_variant_payload(&mut self, item_ty: TypeId, payload: CasePayload) -> String {
+        let Some(payload) = payload.type_id() else {
             return String::new();
-        }
+        };
 
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
-            unreachable!("enum variant payload is void or an anonymous struct");
+        let TypeShape::Record(fields) = types.expect_type_shape(payload) else {
+            unreachable!("enum variant has no payload or an anonymous record payload");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let rendered: Vec<String> = fields
@@ -165,9 +167,10 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     fn render_alias(&mut self, item: &Item) -> String {
+        let item_ty = item.value_type();
         let ident = self.item_ident(item.name).to_string();
-        let lt = self.lifetime_args(item.ty);
-        let body = self.alias_body(TypeContext::item(item.ty), item.ty);
+        let lt = self.lifetime_args(item_ty);
+        let body = self.alias_body(TypeContext::item(item_ty), item_ty);
         format!("pub type {ident}{lt} = {body};")
     }
 
@@ -176,44 +179,35 @@ impl<'m, 'a> Emitter<'m, 'a> {
     ///
     /// Throughout the rendering recursion, `cut` is the item declaration a
     /// by-value path from this position is still inside — the context
-    /// the shared type model keys on. Descending into an array element
+    /// the shared type model keys on. Descending into a list element
     /// clears it: `Vec` indirects, so no cycle below is by-value.
     fn alias_body(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
-            TypeShape::Node | TypeShape::Custom(_) => self.node_type(),
-            TypeShape::Str => "&'s str".to_string(),
+            TypeShape::Node => self.node_type(),
+            TypeShape::Text => "&'s str".to_string(),
             TypeShape::Bool => "bool".to_string(),
-            TypeShape::Array { element, .. } => {
+            TypeShape::List { element, .. } => {
                 format!(
                     "::std::vec::Vec<{}>",
-                    self.position_type(context.array_element(), *element)
+                    self.position_type(context.list_element(), *element)
                 )
             }
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 format!(
                     "::core::option::Option<{}>",
                     self.position_type(context, *inner)
                 )
             }
-            TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Void => {
+            TypeShape::Ref(declaration) => self.ref_type(context, *declaration, ty),
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 unreachable!("alias items cover non-composite outputs only")
             }
         }
     }
 
-    /// A field's rendered type: the capture-level `optional` flag wraps one
-    /// more `Option` around the base, composing with an already-optional base
-    /// exactly like the bytecode type table does (two nulls from two distinct
-    /// syntax sites legitimately nest).
-    pub(super) fn field_type(&mut self, context: TypeContext, info: &FieldInfo) -> String {
-        let base = self.position_type(context, info.type_id);
-        if info.optional {
-            format!("::core::option::Option<{base}>")
-        } else {
-            base
-        }
+    pub(super) fn field_type(&mut self, context: TypeContext, info: &RecordField) -> String {
+        self.position_type(context, info.final_type)
     }
 
     /// Render a type at a use site: named types by name, wrappers inline.
@@ -221,33 +215,28 @@ impl<'m, 'a> Emitter<'m, 'a> {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
             TypeShape::Node => self.node_type(),
-            TypeShape::Str => "&'s str".to_string(),
+            TypeShape::Text => "&'s str".to_string(),
             TypeShape::Bool => "bool".to_string(),
-            TypeShape::Custom(_) => match self.schema.type_name_of(ty) {
-                Some(name) => self.named_type(name, ty),
-                None => self.node_type(),
-            },
-            TypeShape::Struct(_) | TypeShape::Enum(_) => {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let name = self
                     .schema
                     .type_name_of(ty)
                     .expect("naming pass names every composite outside enum-variant payloads");
                 self.named_type(name, ty)
             }
-            TypeShape::Array { element, .. } => {
+            TypeShape::List { element, .. } => {
                 format!(
                     "::std::vec::Vec<{}>",
-                    self.position_type(context.array_element(), *element)
+                    self.position_type(context.list_element(), *element)
                 )
             }
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 format!(
                     "::core::option::Option<{}>",
                     self.position_type(context, *inner)
                 )
             }
-            TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::Void => unreachable!("void cannot appear in an output position"),
+            TypeShape::Ref(declaration) => self.ref_type(context, *declaration, ty),
         }
     }
 
@@ -262,17 +251,21 @@ impl<'m, 'a> Emitter<'m, 'a> {
         format!("{ident}{lt}")
     }
 
-    /// A reference renders as its target definition's type name, boxed when
+    /// A reference renders as its target declaration's type name, boxed when
     /// this occurrence closes a by-value cycle through the enclosing item's
-    /// declaration. A void target contributes no value, so the capture holds
+    /// declaration. A match-only target contributes no value, so the capture holds
     /// the matched node itself.
-    fn ref_type(&mut self, context: TypeContext, def_id: DefId, ref_ty: TypeId) -> String {
-        let target = self.schema.types.expect_def_output(def_id);
-        if target == TYPE_VOID {
+    fn ref_type(
+        &mut self,
+        context: TypeContext,
+        declaration: TypeDeclId,
+        ref_ty: TypeId,
+    ) -> String {
+        let Some(target) = self.schema.types.declaration_body(declaration) else {
             return self.node_type();
-        }
+        };
 
-        let name = self.schema.deps.def_name_sym(def_id);
+        let name = self.schema.types.declaration_name(declaration);
         let base = self.named_type(name, target);
         if self.model.is_boxed_ref(context, ref_ty) {
             format!("::std::boxed::Box<{base}>")

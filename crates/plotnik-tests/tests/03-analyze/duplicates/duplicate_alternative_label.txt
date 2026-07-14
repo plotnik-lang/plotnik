@@ -1,0 +1,14 @@
+Q = [
+  A: (a) @x
+  A: (b) @y
+]
+------------------ DIAGNOSTICS -------------------
+error: alternative label `A` is already used in this alternation
+ --> query.ptk:3:3
+  |
+3 |   A: (b) @y
+  |   ^
+  |
+help: each alternative label must be unique within an alternation
+-------------------- SYMBOLS ---------------------
+Q

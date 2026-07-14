@@ -45,9 +45,9 @@ S8 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { e }
-T2 = Struct  M1:1  ; { inner }
-T3 = Struct  M2:1  ; { outer }
+T1 = Record  M0:1  ; { e }
+T2 = Record  M1:1  ; { inner }
+T3 = Record  M2:1  ; { outer }
 
 [type_members]
 M0: S1 → T0  ; e: <Node>
@@ -59,36 +59,36 @@ N0: S4 → T1  ; QOuterInner
 N1: S5 → T2  ; QOuter
 N2: S6 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08  └‣─  (expression_statement) [StructOpen Node Set(M0) StructClose Set(M1)]  11
-  11  ─‣┘  _ [StructClose Set(M2)]          13
+  08  └‣─  (expression_statement) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  11
+  11  ─‣┘  _ [RecordClose RecordSet(M2)]    13
   13                                        ▶
-  14   !   (program) [StructOpen]           08
+  14   !   (program) [RecordOpen]           08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
        ▶   (@14)
 
 @14:
-  14       (program) [StructOpen]           08
+  14       (program) [RecordOpen]           08
        ●   program
-  08       (expression_statement) [StructOpen Node Set(M0) StructClose Set(M1)]  11
+  08       (expression_statement) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  11
        ●   expression_statement
-  11       _ [StructClose Set(M2)]          13
+  11       _ [RecordClose RecordSet(M2)]    13
        ●   program
   13   ◀   (@14)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

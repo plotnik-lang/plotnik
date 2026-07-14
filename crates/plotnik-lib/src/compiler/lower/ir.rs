@@ -1,13 +1,13 @@
 //! Instruction IR with symbolic labels.
 //!
 //! Pre-layout instructions use `Label` for symbolic references.
-//! After layout, labels are resolved to step addresses (u16) for serialization.
+//! After layout, labels are resolved to bytecode-word addresses (u16) for serialization.
 //! A `MemberRef` stores a parent type plus a relative index, resolved to an
 //! absolute member index at emit time.
 
 use std::collections::BTreeMap;
 
-use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
+use crate::bytecode::{CodeAddr, EffectKind, Nav, PredicateOp, select_match_opcode};
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::types::CaptureTypePlan;
@@ -25,13 +25,13 @@ pub use plotnik_rt::ReturnOutcome;
 /// consumers can name it as `ir::NodeKindConstraint`.
 pub(crate) use crate::bytecode::NodeKindConstraint;
 
-/// Symbolic reference, resolved to step address at layout time.
+/// Symbolic reference, resolved to a bytecode-word address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Label(pub u32);
 
 impl Label {
     #[inline]
-    pub fn resolve(self, map: &BTreeMap<Label, StepAddr>) -> StepAddr {
+    pub fn resolve(self, map: &BTreeMap<Label, CodeAddr>) -> CodeAddr {
         *map.get(&self).expect("label not in layout")
     }
 }
@@ -52,7 +52,7 @@ pub(crate) enum DefOutputMode {
     CaptureType(CaptureTypePlan),
 }
 
-/// Copyable output provenance retained after a definition variant is lowered.
+/// Copyable output provenance retained after a definition specialization is lowered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DefOutputOrigin {
     Ordinary,
@@ -147,7 +147,7 @@ impl DefBodyMode {
 /// Navigation and return routing for one definition body.
 ///
 /// Ordinary calls navigate before entering an exact body. Recursive nullable
-/// calls route navigation into the body instead, so the body's authored branch
+/// calls route navigation into the body instead, so the body's authored alternative
 /// order remains above any candidate-search checkpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DefRoute {
@@ -202,21 +202,21 @@ impl DefRoute {
     pub(crate) fn return_depth(self, outcome: ReturnOutcome) -> Option<i32> {
         match (self, outcome) {
             (Self::Caller, ReturnOutcome::Matched) => Some(0),
-            (Self::Caller, ReturnOutcome::Zero) => None,
+            (Self::Caller, ReturnOutcome::Empty) => None,
             (Self::Routed { nav, .. }, ReturnOutcome::Matched) => Some(nav.depth_delta()),
             (
                 Self::Routed {
                     returns: RoutedReturns::Split,
                     ..
                 },
-                ReturnOutcome::Zero,
+                ReturnOutcome::Empty,
             ) => Some(0),
             (
                 Self::Routed {
                     returns: RoutedReturns::MatchOnly,
                     ..
                 },
-                ReturnOutcome::Zero,
+                ReturnOutcome::Empty,
             ) => None,
         }
     }
@@ -231,13 +231,13 @@ impl DefRoute {
 
 /// One memoized definition body and its lowering mode.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct DefVariant {
+pub(crate) struct DefSpecialization {
     def_id: DefId,
     mode: DefBodyMode,
     route: DefRoute,
 }
 
-impl DefVariant {
+impl DefSpecialization {
     pub(crate) fn ordinary(def_id: DefId) -> Self {
         Self {
             def_id,
@@ -287,15 +287,15 @@ impl DefVariant {
     }
 }
 
-/// Symbolic reference to a struct field or enum variant.
+/// Symbolic reference to a record field or variant case.
 ///
 /// Resolved to an absolute member index at emit time: the parent type's member
 /// base (`member_base`) plus `relative_index`. The parent type is a scope or
-/// enum that an entrypoint result reaches, so it is always present in the emitted
+/// variant type that an entry point result reaches, so it is always present in the emitted
 /// type table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MemberRef {
-    /// The query type whose member table this indexes (struct or enum).
+    /// The query type whose member table this indexes (record or variant type).
     pub parent_type: TypeId,
     /// Relative index within the parent type's members.
     pub relative_index: u16,
@@ -319,7 +319,7 @@ pub struct EffectIR {
 }
 
 /// An effect's argument: a literal value, or a symbolic member reference — used by
-/// Set/Enum effects — resolved to a member index during emission.
+/// `RecordSet`/`VariantOpen` effects — resolved to a member index during emission.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EffectArg {
     Literal(usize),
@@ -357,39 +357,39 @@ impl EffectIR {
         Self::literal(EffectKind::Node, 0)
     }
 
-    /// Push null value.
-    pub fn null() -> Self {
-        Self::literal(EffectKind::Null, 0)
+    /// Produce an absent value.
+    pub fn absent() -> Self {
+        Self::literal(EffectKind::Absent, 0)
     }
 
-    /// Push accumulated value to array.
-    pub fn push() -> Self {
-        Self::literal(EffectKind::Push, 0)
+    /// Append the pending value to the open list.
+    pub fn array_push() -> Self {
+        Self::literal(EffectKind::ArrayPush, 0)
     }
 
-    /// Begin array scope.
-    pub fn start_arr() -> Self {
-        Self::literal(EffectKind::ArrayOpen, 0)
+    /// Begin a list value.
+    pub fn list_open() -> Self {
+        Self::literal(EffectKind::ListOpen, 0)
     }
 
-    /// End array scope.
-    pub fn end_arr() -> Self {
-        Self::literal(EffectKind::ArrayClose, 0)
+    /// End a list value.
+    pub fn list_close() -> Self {
+        Self::literal(EffectKind::ListClose, 0)
     }
 
-    /// Begin struct scope.
-    pub fn start_struct() -> Self {
-        Self::literal(EffectKind::StructOpen, 0)
+    /// Begin a record value.
+    pub fn record_open() -> Self {
+        Self::literal(EffectKind::RecordOpen, 0)
     }
 
-    /// End struct scope.
-    pub fn end_struct() -> Self {
-        Self::literal(EffectKind::StructClose, 0)
+    /// End a record value.
+    pub fn record_close() -> Self {
+        Self::literal(EffectKind::RecordClose, 0)
     }
 
-    /// End enum scope.
-    pub fn end_enum() -> Self {
-        Self::literal(EffectKind::EnumClose, 0)
+    /// End variant scope.
+    pub fn end_variant() -> Self {
+        Self::literal(EffectKind::VariantClose, 0)
     }
 
     /// Begin suppression (suppress effects within).
@@ -569,7 +569,7 @@ pub struct MatchIR {
     pub neg_fields: Vec<NodeFieldId>,
     /// Predicate for node text filtering (None = no text check).
     pub predicate: Option<PredicateIR>,
-    /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
+    /// Successor labels (empty = accept, 1 = linear, 2+ = fork).
     pub successors: Vec<Label>,
 }
 
@@ -714,7 +714,7 @@ pub enum CallProtocol {
     },
     /// The callee owns entry navigation and has one matched continuation.
     Routed { entry_nav: Nav, next: Label },
-    /// The callee owns entry navigation and selects matched or zero-width.
+    /// The callee owns entry navigation and selects node-consuming or empty.
     Split { entry_nav: Nav, returns: [Label; 2] },
 }
 
@@ -749,7 +749,7 @@ impl CallIR {
         }
     }
 
-    /// Create a call whose nullable callee reports matched and zero-width
+    /// Create a call whose nullable callee reports node-consuming and empty
     /// outcomes separately. Navigation belongs to the routed callee variant.
     pub fn split(
         label: Label,
@@ -761,7 +761,7 @@ impl CallIR {
             label,
             protocol: CallProtocol::Split {
                 entry_nav,
-                returns: [returns.matched.0, returns.zero.0],
+                returns: [returns.matched.0, returns.empty.0],
             },
             target: callee.0,
         }
@@ -815,7 +815,7 @@ impl CallIR {
         self.return_labels()[0]
     }
 
-    pub fn zero_return(&self) -> Option<Label> {
+    pub fn empty_return(&self) -> Option<Label> {
         match self.protocol {
             CallProtocol::Split { returns, .. } => Some(returns[1]),
             CallProtocol::Ordinary { .. } | CallProtocol::Routed { .. } => None,
@@ -838,11 +838,11 @@ impl CallIR {
 /// The two semantic continuations of a nullable recursive call.
 ///
 /// Bundling the same-typed labels prevents callers from silently transposing
-/// the matched and zero-width routes.
+/// the node-consuming and empty routes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SplitReturnAddrs {
     pub matched: ReturnAddr,
-    pub zero: ReturnAddr,
+    pub empty: ReturnAddr,
 }
 
 impl From<CallIR> for InstructionIR {
@@ -879,10 +879,10 @@ impl ReturnIR {
         }
     }
 
-    pub fn routed_zero(label: Label) -> Self {
+    pub fn routed_empty(label: Label) -> Self {
         Self {
             label,
-            mode: ReturnMode::RoutedZero,
+            mode: ReturnMode::RoutedEmpty,
         }
     }
 
@@ -914,14 +914,14 @@ impl From<ReturnIR> for InstructionIR {
 pub(crate) enum LabelOrigin {
     /// Allocated while compiling this definition's body.
     Def(DefId),
-    /// Allocated while compiling a non-ordinary definition-body variant.
-    DefVariant {
+    /// Allocated while compiling a non-ordinary definition specialization.
+    DefSpecialization {
         def_id: DefId,
         output: DefOutputOrigin,
         source: SourceMode,
         route: DefRoute,
     },
-    /// Allocated for this definition's entrypoint wrapper.
+    /// Allocated for this definition's entry point wrapper.
     Wrapper(DefId),
 }
 
@@ -929,10 +929,10 @@ pub(crate) enum LabelOrigin {
 #[derive(Clone, Debug)]
 pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
-    /// Entry labels for every emitted definition-body variant.
-    pub(in crate::compiler::lower) def_entries: IndexMap<DefVariant, Label>,
-    /// Entry labels for each emitted entrypoint wrapper, in definition order.
-    pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
+    /// Entry labels for every emitted definition specialization.
+    pub(in crate::compiler::lower) def_entries: IndexMap<DefSpecialization, Label>,
+    /// Entry labels for each emitted entry point wrapper, in definition order.
+    pub(in crate::compiler::lower) entry_point_wrappers: IndexMap<DefId, Label>,
     /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
     /// Origin per label id (index = `Label.0`), recorded at allocation.
@@ -944,8 +944,8 @@ impl NfaGraph {
         &self.instructions
     }
 
-    pub(crate) fn entrypoint_wrappers(&self) -> &IndexMap<DefId, Label> {
-        &self.entrypoint_wrappers
+    pub(crate) fn entry_point_wrappers(&self) -> &IndexMap<DefId, Label> {
+        &self.entry_point_wrappers
     }
 
     pub(crate) fn spans(&self) -> Option<&SpanTable> {

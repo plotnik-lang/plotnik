@@ -16,20 +16,20 @@ Q = {
   } @h
 }
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 20
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen StructOpen StructOpen StructOpen StructOpen StructOpen]  09
+  00  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  09
   01                                        ▶
-  09   !   (identifier) [StructOpen Node Set(a) StructClose Set(b) StructClose Set(c) StructClose Set(d) StructClose Set(e) StructClose Set(f) StructClose Set(g) StructClose Set(h)]  01
+  09   !   (identifier) [RecordOpen Node RecordSet(a) RecordClose RecordSet(b) RecordClose RecordSet(c) RecordClose RecordSet(d) RecordClose RecordSet(e) RecordClose RecordSet(f) RecordClose RecordSet(g) RecordClose RecordSet(h)]  01
 
-Q (entrypoint):
+Q (entry point):
   17                                        ▶
-  18  -ε-  [StructClose]                    17
+  18  -ε-  [RecordClose]                    17
   19       (Q)                              00 : 18
-  20  -ε-  [StructOpen]                     19
+  20  -ε-  [RecordOpen]                     19
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -53,14 +53,14 @@ S17 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-T2 = Struct  M1:1  ; { b }
-T3 = Struct  M2:1  ; { c }
-T4 = Struct  M3:1  ; { d }
-T5 = Struct  M4:1  ; { e }
-T6 = Struct  M5:1  ; { f }
-T7 = Struct  M6:1  ; { g }
-T8 = Struct  M7:1  ; { h }
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { b }
+T3 = Record  M2:1  ; { c }
+T4 = Record  M3:1  ; { d }
+T5 = Record  M4:1  ; { e }
+T6 = Record  M5:1  ; { f }
+T7 = Record  M6:1  ; { g }
+T8 = Record  M7:1  ; { h }
 
 [type_members]
 M0: S01 → T0  ; a: <Node>
@@ -82,17 +82,17 @@ N5: S14 → T6  ; QHG
 N6: S15 → T7  ; QH
 N7: S16 → T8  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T8
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [StructClose Set(M7)]            06
-  10   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1) StructClose Set(M2) StructClose Set(M3) StructClose Set(M4) StructClose Set(M5) StructClose Set(M6)]  08
-  16  -ε-  [StructOpen StructOpen StructOpen StructOpen StructOpen StructOpen]  10
+  08  -ε-  [RecordClose RecordSet(M7)]      06
+  10   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1) RecordClose RecordSet(M2) RecordClose RecordSet(M3) RecordClose RecordSet(M4) RecordClose RecordSet(M5) RecordClose RecordSet(M6)]  08
+  16  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  10

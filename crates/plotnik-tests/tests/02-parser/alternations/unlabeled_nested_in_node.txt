@@ -1,0 +1,39 @@
+Q = (expr
+  [
+    (binary)
+    (unary)
+  ]
+)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "expr"
+      Alternation
+        BracketOpen "["
+        Alternative
+          NamedNode
+            ParenOpen "("
+            Id "binary"
+            ParenClose ")"
+        Alternative
+          NamedNode
+            ParenOpen "("
+            Id "unary"
+            ParenClose ")"
+        BracketClose "]"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode expr
+      Alternation
+        Alternative
+          NamedNode binary
+        Alternative
+          NamedNode unary

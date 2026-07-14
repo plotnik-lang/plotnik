@@ -34,7 +34,7 @@ pub struct Row<'t> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
-    pub first: ::core::option::Option<Row<'t>>,
+    pub first: MaybeRow<'t>,
 }
 
 pub type MaybeRow<'t> = ::core::option::Option<Row<'t>>;

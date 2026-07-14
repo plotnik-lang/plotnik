@@ -8,9 +8,9 @@
 //!
 //! It then names the obstacle. If relaxing the node's anchors would let it match
 //! (proven by re-solving with every gap widened), the anchors are to blame, and the
-//! message contrasts the adjacency they demand with what the grammar actually places
+//! message contrasts the positions they demand with what the grammar actually places
 //! first or last. Otherwise the children's kinds or order are the obstacle, and the
-//! message lists what a node of that kind does allow. Each branch produces its own
+//! message lists what a node of that kind does allow. Each alternative produces its own
 //! shape of message — a leading anchor reads differently from a trailing one, which
 //! reads differently from a wrong arrangement — so the variety mirrors the cause.
 
@@ -19,7 +19,7 @@ use std::collections::HashSet;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics, Span};
-use crate::compiler::parse::ast::{self, NodePattern, Pattern, SeqItem};
+use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern, SeqItem};
 use crate::compiler::parse::cst::SyntaxNode;
 use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeFieldId, NodeKindId};
@@ -122,12 +122,12 @@ fn report_culprit(
 }
 
 struct ConcreteCulprit {
-    node: Located<NodePattern>,
+    node: Located<NamedNodePattern>,
     kind: NodeKindId,
 }
 
 impl ConcreteCulprit {
-    fn from_goal(goal: Goal) -> Result<Self, Located<NodePattern>> {
+    fn from_goal(goal: Goal) -> Result<Self, Located<NamedNodePattern>> {
         match goal {
             Goal::Concrete { node, kind } => Ok(Self { node, kind }),
             Goal::Wildcard { node } => Err(node),
@@ -146,11 +146,11 @@ impl ConcreteCulprit {
 /// Emit an impossible wildcard parent `(_ …)`: no kind the grammar builds takes the
 /// children it constrains. A wildcard fixes no kind of its own, so there is no single
 /// node to blame — the obstacle is that no production anywhere realizes this child list.
-fn emit_wildcard_failure(node: &Located<NodePattern>, diag: &mut Diagnostics) {
+fn emit_wildcard_failure(node: &Located<NamedNodePattern>, diag: &mut Diagnostics) {
     diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(node))
         .detail("no node the grammar builds takes these children".to_string())
         .hint(
-            "`(_)` and `_` match any node, but no node kind admits this combination of \
+            "`(_)` matches any named node, but no named node kind admits this combination of \
              children in this order",
         )
         .emit();
@@ -166,7 +166,7 @@ pub(super) fn report_too_complex(body: &Located<Pattern>, diag: &mut Diagnostics
     emit_too_complex(span, diag);
 }
 
-fn report_node_too_complex(node: &Located<NodePattern>, diag: &mut Diagnostics) {
+fn report_node_too_complex(node: &Located<NamedNodePattern>, diag: &mut Diagnostics) {
     let span = Span::new(node.source(), node.node().syntax().text_range());
     emit_too_complex(span, diag);
 }
@@ -318,7 +318,7 @@ fn pattern_matches_field(
                     pattern_matches_field(ctx, parent, &pattern.wrap(inner), field)
                 })
         }
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             let located = pattern.wrap(node.clone());
             root_kind(ctx, &located)
                 .is_some_and(|kind| field_value_admits(ctx, parent, field, kind))
@@ -327,10 +327,10 @@ fn pattern_matches_field(
             Some(Goal::Concrete { kind, .. }) => field_value_admits(ctx, parent, field, kind),
             _ => false,
         },
-        Pattern::TokenPattern(_)
+        Pattern::AnonymousNodePattern(_)
+        | Pattern::NodeWildcard(_)
         | Pattern::SeqPattern(_)
-        | Pattern::Union(_)
-        | Pattern::Enum(_) => false,
+        | Pattern::Alternation(_) => false,
     }
 }
 
@@ -430,13 +430,13 @@ pub(super) struct AnchorProbes<'a> {
 }
 
 impl<'a> AnchorProbes<'a> {
-    pub(super) fn new(primary: &SatisfiabilitySolver<'a>, step_budget: u64) -> Self {
+    pub(super) fn new(primary: &SatisfiabilitySolver<'a>, work_budget: u64) -> Self {
         Self {
-            solver: primary.relaxing_anchors(step_budget),
+            solver: primary.relaxing_anchors(work_budget),
         }
     }
 
-    fn relax(&mut self, node: &Located<NodePattern>, kind: NodeKindId) -> AnchorProbe {
+    fn relax(&mut self, node: &Located<NamedNodePattern>, kind: NodeKindId) -> AnchorProbe {
         if self.solver.is_too_complex() || self.solver.remaining_budget() == 0 {
             return AnchorProbe::Inconclusive;
         }
@@ -462,20 +462,20 @@ fn emit_anchor_failure(
     let node_pattern = culprit.node.node();
     let kind_name = culprit.kind_name(ctx);
     let span = culprit.span();
-    let strict = strictest_anchor(node_pattern);
+    let exact = has_exact_anchor(node_pattern);
 
     // A leading anchor pins the first child; a trailing one the last. The two read
     // differently, so each gets its own message naming the boundary the grammar fixes.
     let Some(boundary) = Boundary::of(node_pattern) else {
-        return emit_interior_anchor_failure(ctx, culprit, strict, diag);
+        return emit_interior_anchor_failure(ctx, culprit, exact, diag);
     };
     let boundary_name = boundary.name();
     let boundary_verb = boundary.verb();
     let allowed = boundary.child_kinds(solver, culprit.kind);
     let wanted = boundary.pattern_label(&culprit.node, ctx);
 
-    let demand = if strict {
-        "with strict adjacency (`.!`)"
+    let demand = if exact {
+        "with the exact anchor (`.!`)"
     } else {
         "after the soft anchor (`.`)"
     };
@@ -498,7 +498,7 @@ fn emit_anchor_failure(
     let mut builder = diag
         .report(DiagnosticKind::UnsatisfiablePattern, span)
         .detail(detail);
-    builder = builder.hint(anchor_fix_hint(&culprit.node, ctx, strict));
+    builder = builder.hint(anchor_fix_hint(&culprit.node, ctx, exact));
     builder.emit();
 }
 
@@ -506,14 +506,14 @@ fn emit_anchor_failure(
 fn emit_interior_anchor_failure(
     ctx: AutomatonContext<'_>,
     culprit: &ConcreteCulprit,
-    strict: bool,
+    exact: bool,
     diag: &mut Diagnostics,
 ) {
     let kind_name = culprit.kind_name(ctx);
     let detail = format!("no {kind_name} places these children in this adjacency");
     diag.report(DiagnosticKind::UnsatisfiablePattern, culprit.span())
         .detail(detail)
-        .hint(anchor_fix_hint(&culprit.node, ctx, strict))
+        .hint(anchor_fix_hint(&culprit.node, ctx, exact))
         .emit();
 }
 
@@ -598,7 +598,10 @@ fn order_diagnosis(ctx: AutomatonContext<'_>, culprit: &ConcreteCulprit) -> Opti
     diagnosis
 }
 
-fn query_child_demands(ctx: AutomatonContext<'_>, node: &Located<NodePattern>) -> Vec<QueryChild> {
+fn query_child_demands(
+    ctx: AutomatonContext<'_>,
+    node: &Located<NamedNodePattern>,
+) -> Vec<QueryChild> {
     node.node()
         .children()
         .filter_map(|child| {
@@ -620,24 +623,20 @@ fn query_demand(ctx: AutomatonContext<'_>, pattern: &Located<Pattern>) -> Option
         Pattern::CapturedPattern(cap) => cap
             .inner()
             .and_then(|inner| query_demand(ctx, &pattern.wrap(inner))),
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             if node.is_any() {
                 return None;
             }
             root_kind(ctx, &pattern.wrap(node.clone())).map(ChildDemand::Kind)
         }
-        Pattern::TokenPattern(token) => {
-            if token.is_any() {
-                return None;
-            }
-            token
-                .value()
-                .and_then(|value| {
-                    ctx.grammar
-                        .resolve_anonymous_node(&unescape(value.text()).0)
-                })
-                .map(ChildDemand::Kind)
-        }
+        Pattern::AnonymousNodePattern(node) => node
+            .value()
+            .and_then(|value| {
+                ctx.grammar
+                    .resolve_anonymous_node(&unescape(value.text()).0)
+            })
+            .map(ChildDemand::Kind),
+        Pattern::NodeWildcard(_) => None,
         Pattern::DefRef(def_ref) => match Goal::from_def_ref(ctx, def_ref) {
             Some(Goal::Concrete { kind, .. }) => Some(ChildDemand::Kind(kind)),
             _ => None,
@@ -645,7 +644,7 @@ fn query_demand(ctx: AutomatonContext<'_>, pattern: &Located<Pattern>) -> Option
         Pattern::QuantifiedPattern(q) => q
             .inner()
             .and_then(|inner| query_demand(ctx, &pattern.wrap(inner))),
-        Pattern::SeqPattern(_) | Pattern::Union(_) | Pattern::Enum(_) => None,
+        Pattern::SeqPattern(_) | Pattern::Alternation(_) => None,
     }
 }
 
@@ -757,18 +756,23 @@ fn describe_allowed_children(
     Some(format!("{kind_name} allows {}", parts.join("; ")))
 }
 
-/// The fix hint: for a strict anchor, the soft form often matches; for a soft anchor,
+/// The fix hint: for an exact anchor, the soft form often matches; for a soft anchor,
 /// dropping it does. Shows the rewritten node where it can be derived by swapping the
 /// anchor token in the node's own source.
-fn anchor_fix_hint(node: &Located<NodePattern>, ctx: AutomatonContext<'_>, strict: bool) -> String {
-    if strict {
+fn anchor_fix_hint(
+    node: &Located<NamedNodePattern>,
+    ctx: AutomatonContext<'_>,
+    exact: bool,
+) -> String {
+    if exact {
         match relaxed_anchor_text(node, ctx) {
             Some(soft) => format!(
-                "`.!` allows nothing between — not even anonymous tokens or comments; \
+                "`.!` allows no syntax-tree node in its gap — not even an anonymous \
+                 token or comment; \
                  the soft anchor `.` skips those: `{soft}`"
             ),
-            None => "`.!` allows nothing between — not even anonymous tokens or comments; \
-                 try the soft anchor `.`, which skips them"
+            None => "`.!` allows no syntax-tree node in its gap — not even an anonymous \
+                 token or comment; try the soft anchor `.`, which skips them"
                 .to_string(),
         }
     } else {
@@ -785,14 +789,20 @@ fn anchor_fix_hint(node: &Located<NodePattern>, ctx: AutomatonContext<'_>, stric
 }
 
 /// The node's own source with `.!` rewritten to `.` — a concrete suggestion.
-fn relaxed_anchor_text(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Option<String> {
+fn relaxed_anchor_text(
+    node: &Located<NamedNodePattern>,
+    ctx: AutomatonContext<'_>,
+) -> Option<String> {
     let range = node.node().text_range();
     let text = ctx.content(node.source());
     let slice = text.get(usize::from(range.start())..usize::from(range.end()))?;
     slice.contains(".!").then(|| slice.replace(".!", "."))
 }
 
-fn soft_anchor_skips_extras_only(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> bool {
+fn soft_anchor_skips_extras_only(
+    node: &Located<NamedNodePattern>,
+    ctx: AutomatonContext<'_>,
+) -> bool {
     let items: Vec<_> = node.node().items().collect();
     let semantics = AnchorSemantics::new(ctx.symbol_table);
     semantics
@@ -806,7 +816,7 @@ fn soft_anchor_skips_extras_only(node: &Located<NodePattern>, ctx: AutomatonCont
             == Some(GapClass::ExtrasOnly)
 }
 
-fn has_anchor(node: &NodePattern) -> bool {
+fn has_anchor(node: &NamedNodePattern) -> bool {
     node.items().any(|item| matches!(item, SeqItem::Anchor(_)))
 }
 
@@ -817,7 +827,7 @@ enum Boundary {
 }
 
 impl Boundary {
-    fn of(node: &NodePattern) -> Option<Self> {
+    fn of(node: &NamedNodePattern) -> Option<Self> {
         if matches!(node.items().next(), Some(SeqItem::Anchor(_))) {
             Some(Self::First)
         } else if matches!(node.items().last(), Some(SeqItem::Anchor(_))) {
@@ -850,7 +860,7 @@ impl Boundary {
 
     fn pattern_label(
         self,
-        node: &Located<NodePattern>,
+        node: &Located<NamedNodePattern>,
         ctx: AutomatonContext<'_>,
     ) -> Option<String> {
         let pattern = match self {
@@ -861,11 +871,11 @@ impl Boundary {
     }
 }
 
-/// Whether any anchor in the node is strict — strict adjacency is the harsher demand,
+/// Whether any anchor in the node is exact — exact anchoring is the tighter constraint,
 /// so its explanation governs when both kinds are present.
-fn strictest_anchor(node: &NodePattern) -> bool {
+fn has_exact_anchor(node: &NamedNodePattern) -> bool {
     node.items()
-        .any(|item| matches!(item, SeqItem::Anchor(a) if a.is_strict()))
+        .any(|item| matches!(item, SeqItem::Anchor(a) if a.is_exact()))
 }
 
 fn seq_pattern(item: SeqItem) -> Option<Pattern> {
@@ -880,19 +890,17 @@ fn seq_pattern(item: SeqItem) -> Option<Pattern> {
 fn pattern_label(located: &Located<Pattern>, ctx: AutomatonContext<'_>) -> Option<String> {
     match located.node() {
         Pattern::CapturedPattern(cap) => pattern_label(&located.wrap(cap.inner()?), ctx),
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             if node.is_any() {
                 return Some("any named node".to_string());
             }
             root_kind(ctx, &located.wrap(node.clone())).map(|kind| render_kind(ctx, kind))
         }
-        Pattern::TokenPattern(token) => {
-            if token.is_any() {
-                return Some("any node".to_string());
-            }
-            let value = token.value()?;
+        Pattern::AnonymousNodePattern(node) => {
+            let value = node.value()?;
             Some(format!("`\"{}\"`", value.text()))
         }
+        Pattern::NodeWildcard(_) => Some("any node".to_string()),
         _ => None,
     }
 }
@@ -902,7 +910,7 @@ fn pattern_span(pattern: &Located<Pattern>) -> Span {
 }
 
 /// The span of a node pattern's kind token, falling back to the whole node.
-fn kind_span(node: &Located<NodePattern>) -> Span {
+fn kind_span(node: &Located<NamedNodePattern>) -> Span {
     let range = node
         .node()
         .kind_token()

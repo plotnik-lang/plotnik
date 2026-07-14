@@ -1,4 +1,4 @@
-// Link-stage diagnostics (grammar mismatches) render the same way.
+// Bind-stage diagnostics (grammar mismatches) render the same way.
 
 plotnik::query! {
     grammar = "arborium-javascript",

@@ -1,0 +1,14 @@
+Q = [My_branch: (a) Other: (b)]
+------------------ DIAGNOSTICS -------------------
+error: alternative labels must be PascalCase
+ --> query.ptk:1:6
+  |
+1 | Q = [My_branch: (a) Other: (b)]
+  |      ^^^^^^^^^
+  |
+help: use `MyBranch`
+  |
+1 - Q = [My_branch: (a) Other: (b)]
+1 + Q = [MyBranch: (a) Other: (b)]
+  |
+help: alternative labels name variant cases when the alternation produces a value

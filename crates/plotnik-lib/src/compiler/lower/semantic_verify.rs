@@ -10,8 +10,8 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
-use crate::compiler::analyze::output::{CaptureMemberKind, CaptureScopeKind, OutputSchema};
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeShape};
+use crate::compiler::analyze::result::{CaptureMemberKind, CaptureScopeKind, ResultSchema};
+use crate::compiler::analyze::types::type_shape::CasePayload;
 use crate::compiler::lower::ir::{
     CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, MemberRef, NfaGraph,
     ReturnEntry, ReturnOutcome, SemanticNfa,
@@ -44,8 +44,8 @@ fn record_body_analysis() {
 pub(crate) enum SemanticVerifyError {
     #[error("semantic matcher has {0} states (max {MAX_STATES})")]
     StateLimit(usize),
-    #[error("semantic matcher has {0} entrypoints (max {max})", max = u16::MAX)]
-    EntrypointLimit(usize),
+    #[error("semantic matcher has {0} entry points (max {max})", max = u16::MAX)]
+    EntryPointLimit(usize),
     #[error("malformed semantic NFA: {0}")]
     Malformed(String),
     #[error("effect stack is imbalanced at state {0:?}")]
@@ -58,28 +58,28 @@ pub(crate) enum SemanticVerifyError {
     CaptureMember { state: Label, detail: String },
     #[error("cursor depth is imbalanced: {0}")]
     CursorDepth(String),
-    #[error("cursor-reading effect is reachable on a zero-width path at state {0:?}")]
-    ZeroWidthCursorRead(Label),
+    #[error("cursor-reading effect is reachable on an empty-match path at state {0:?}")]
+    EmptyPathCursorRead(Label),
     #[error("native regex DFA compilation failed for `{pattern}`: {error}")]
     Regex { pattern: String, error: String },
 }
 
 pub(crate) fn verify(
     semantic: &SemanticNfa,
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
 ) -> Result<(), SemanticVerifyError> {
     verify_state_count(semantic)?;
 
     let graph = semantic.raw();
-    if graph.entrypoint_wrappers().len() > u16::MAX as usize {
-        return Err(SemanticVerifyError::EntrypointLimit(
-            graph.entrypoint_wrappers().len(),
+    if graph.entry_point_wrappers().len() > u16::MAX as usize {
+        return Err(SemanticVerifyError::EntryPointLimit(
+            graph.entry_point_wrappers().len(),
         ));
     }
     verify_regexes(graph)?;
     let program = Program::new(graph, schema)?;
     program.verify_cursor_depth()?;
-    program.verify_zero_width_cursor_reads()?;
+    program.verify_empty_path_cursor_reads()?;
     program.verify_effects()
 }
 
@@ -143,7 +143,7 @@ mod tests {
         SemanticNfa::new(NfaGraph {
             instructions,
             def_entries: IndexMap::new(),
-            entrypoint_wrappers: IndexMap::new(),
+            entry_point_wrappers: IndexMap::new(),
             spans: None,
             label_origins: vec![None; count],
         })
@@ -152,18 +152,21 @@ mod tests {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum FrameKind {
-    Array,
-    Struct,
-    Enum { is_void: bool, got_data: bool },
+    List,
+    Record,
+    Variant {
+        has_no_payload: bool,
+        wrote_payload_fields: bool,
+    },
     Scalar,
 }
 
 impl FrameKind {
     fn bit(self) -> u8 {
         match self {
-            Self::Array => KS_ARRAY,
-            Self::Struct => KS_STRUCT,
-            Self::Enum { .. } => KS_ENUM,
+            Self::List => KS_LIST,
+            Self::Record => KS_RECORD,
+            Self::Variant { .. } => KS_VARIANT,
             Self::Scalar => KS_SCALAR,
         }
     }
@@ -190,18 +193,18 @@ impl PendingState {
     }
 }
 
-const KS_ARRAY: u8 = 0b001;
-const KS_STRUCT: u8 = 0b010;
-const KS_ENUM: u8 = 0b100;
+const KS_LIST: u8 = 0b001;
+const KS_RECORD: u8 = 0b010;
+const KS_VARIANT: u8 = 0b100;
 const KS_SCALAR: u8 = 0b1000;
-const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM | KS_SCALAR;
-const KS_SET: u8 = KS_STRUCT | KS_ENUM;
+const KS_ANY: u8 = KS_LIST | KS_RECORD | KS_VARIANT | KS_SCALAR;
+const KS_RECORD_SET_TARGET: u8 = KS_RECORD | KS_VARIANT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct DefSummary {
     entry_tos: u8,
     returns_pending: Option<bool>,
-    sets_caller_top: bool,
+    record_sets_caller_top: bool,
 }
 
 impl DefSummary {
@@ -209,7 +212,7 @@ impl DefSummary {
         Self {
             entry_tos: KS_ANY,
             returns_pending: None,
-            sets_caller_top: false,
+            record_sets_caller_top: false,
         }
     }
 
@@ -224,7 +227,7 @@ impl DefSummary {
         Some(Self {
             entry_tos: self.entry_tos & next.entry_tos,
             returns_pending,
-            sets_caller_top: self.sets_caller_top | next.sets_caller_top,
+            record_sets_caller_top: self.record_sets_caller_top | next.record_sets_caller_top,
         })
     }
 }
@@ -242,7 +245,7 @@ impl ReturnOutcomes {
     fn insert(&mut self, outcome: crate::compiler::lower::ir::ReturnOutcome) {
         self.0 |= match outcome {
             crate::compiler::lower::ir::ReturnOutcome::Matched => Self::MATCHED.0,
-            crate::compiler::lower::ir::ReturnOutcome::Zero => 2,
+            crate::compiler::lower::ir::ReturnOutcome::Empty => 2,
         };
     }
 }
@@ -277,12 +280,12 @@ impl ReturnContract {
 
 struct Program<'a> {
     graph: &'a NfaGraph,
-    schema: &'a OutputSchema<'a>,
+    schema: &'a ResultSchema<'a>,
     instructions: HashMap<Label, &'a InstructionIR>,
 }
 
 impl<'a> Program<'a> {
-    fn new(graph: &'a NfaGraph, schema: &'a OutputSchema<'a>) -> Result<Self, SemanticVerifyError> {
+    fn new(graph: &'a NfaGraph, schema: &'a ResultSchema<'a>) -> Result<Self, SemanticVerifyError> {
         let mut instructions = HashMap::with_capacity(graph.instructions().len());
         for instruction in graph.instructions() {
             if instructions
@@ -324,13 +327,13 @@ impl<'a> Program<'a> {
 
     fn verify_return_routes(&self) -> Result<(), SemanticVerifyError> {
         let mut cache = HashMap::new();
-        for &entry in self.graph.entrypoint_wrappers().values() {
+        for &entry in self.graph.entry_point_wrappers().values() {
             if !self
                 .return_contract(entry, &mut cache)
                 .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
             {
                 return Err(SemanticVerifyError::Malformed(format!(
-                    "entrypoint {entry:?} has the wrong return contract"
+                    "entry point {entry:?} has the wrong return contract"
                 )));
             }
         }
@@ -383,7 +386,12 @@ impl<'a> Program<'a> {
     }
 
     fn verify_effects(&self) -> Result<(), SemanticVerifyError> {
-        let wrappers: Vec<Label> = self.graph.entrypoint_wrappers().values().copied().collect();
+        let wrappers: Vec<Label> = self
+            .graph
+            .entry_point_wrappers()
+            .values()
+            .copied()
+            .collect();
         let mut definitions = Vec::new();
         let mut known = HashSet::new();
         let mut called = HashSet::new();
@@ -429,7 +437,7 @@ impl<'a> Program<'a> {
             let analysis_summary = DefSummary {
                 entry_tos: analysis.entry_tos,
                 returns_pending: analysis.returns_pending,
-                sets_caller_top: analysis.sets_caller_top,
+                record_sets_caller_top: analysis.record_sets_caller_top,
             };
             let old = summaries[&entry];
             let Some(next) = old.refine(analysis_summary) else {
@@ -480,7 +488,7 @@ impl<'a> Program<'a> {
 
         let mut entry_tos = KS_ANY;
         let mut returns_pending = None;
-        let mut sets_caller_top = false;
+        let mut record_sets_caller_top = false;
         let mut discovered = Vec::new();
         let mut discovered_set = HashSet::new();
         let mut memo: HashMap<Label, HashMap<AbsState, ()>> = HashMap::new();
@@ -499,9 +507,9 @@ impl<'a> Program<'a> {
                 if let InstructionIR::Match(matched) = instruction {
                     for effect in &matched.effects {
                         match effect.kind() {
-                            EffectKind::ArrayOpen
-                            | EffectKind::StructOpen
-                            | EffectKind::EnumOpen
+                            EffectKind::ListOpen
+                            | EffectKind::RecordOpen
+                            | EffectKind::VariantOpen
                             | EffectKind::ScalarOpen => frame_openers += 1,
                             EffectKind::SuppressBegin => suppression_openers += 1,
                             EffectKind::SpanStartAt | EffectKind::SpanStart => span_openers += 1,
@@ -546,7 +554,7 @@ impl<'a> Program<'a> {
                                 span_stack: &mut span_stack,
                                 pending: &mut pending,
                                 entry_tos: &mut entry_tos,
-                                sets_caller_top: &mut sets_caller_top,
+                                record_sets_caller_top: &mut record_sets_caller_top,
                             },
                             label,
                         )?;
@@ -602,7 +610,7 @@ impl<'a> Program<'a> {
                         }
                         None => {
                             entry_tos &= summary.entry_tos;
-                            sets_caller_top |= summary.sets_caller_top;
+                            record_sets_caller_top |= summary.record_sets_caller_top;
                         }
                         Some(_) => {}
                     }
@@ -610,14 +618,19 @@ impl<'a> Program<'a> {
                         .returns_pending
                         .map(PendingState::from_bool)
                         .unwrap_or(PendingState::Unknown);
-                    if summary.sets_caller_top
-                        && let Some(FrameKind::Enum {
-                            got_data: false, ..
+                    if summary.record_sets_caller_top
+                        && let Some(FrameKind::Variant {
+                            wrote_payload_fields: false,
+                            ..
                         }) = stack.last()
                     {
                         let mut written = stack.clone();
-                        if let Some(FrameKind::Enum { got_data, .. }) = written.last_mut() {
-                            *got_data = true;
+                        if let Some(FrameKind::Variant {
+                            wrote_payload_fields,
+                            ..
+                        }) = written.last_mut()
+                        {
+                            *wrote_payload_fields = true;
                         }
                         push_call_returns(
                             &mut work,
@@ -647,7 +660,7 @@ impl<'a> Program<'a> {
         Ok(BodyAnalysis {
             entry_tos,
             returns_pending,
-            sets_caller_top,
+            record_sets_caller_top,
             discovered,
         })
     }
@@ -677,7 +690,7 @@ impl<'a> Program<'a> {
         }
 
         match effect.kind() {
-            Node | Null | NodeStr | NodeBool | BoolValue => {
+            Node | Absent | NodeStr | NodeBool | BoolValue => {
                 if *state.pending == PendingState::Full {
                     return Err(SemanticVerifyError::EffectStack(label));
                 }
@@ -688,32 +701,35 @@ impl<'a> Program<'a> {
             SpanStartAt | SpanStart => state.span_stack.push(literal(effect, label)?),
             SpanEnd => close_span(state.span_stack, literal(effect, label)?, label)?,
             ScalarMark => {}
-            Push => {
+            ArrayPush => {
                 require_pending(state.pending, label)?;
                 match state.stack.last() {
-                    Some(FrameKind::Array) => {}
+                    Some(FrameKind::List) => {}
                     Some(_) => return Err(SemanticVerifyError::EffectStack(label)),
-                    None => *state.entry_tos &= KS_ARRAY,
+                    None => *state.entry_tos &= KS_LIST,
                 }
                 *state.pending = PendingState::Empty;
             }
-            Set => {
-                self.validate_set_member(member(effect, label)?, label)?;
+            RecordSet => {
+                self.validate_record_set_member(member(effect, label)?, label)?;
                 require_pending(state.pending, label)?;
                 match state.stack.last_mut() {
-                    Some(FrameKind::Struct) => {}
-                    Some(FrameKind::Enum { got_data, .. }) => *got_data = true,
-                    Some(FrameKind::Array | FrameKind::Scalar) => {
+                    Some(FrameKind::Record) => {}
+                    Some(FrameKind::Variant {
+                        wrote_payload_fields,
+                        ..
+                    }) => *wrote_payload_fields = true,
+                    Some(FrameKind::List | FrameKind::Scalar) => {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
                     None => {
-                        *state.entry_tos &= KS_SET;
-                        *state.sets_caller_top = true;
+                        *state.entry_tos &= KS_RECORD_SET_TARGET;
+                        *state.record_sets_caller_top = true;
                     }
                 }
                 *state.pending = PendingState::Empty;
             }
-            ArrayOpen | ArrayClose | StructOpen | StructClose | EnumOpen | EnumClose
+            ListOpen | ListClose | RecordOpen | RecordClose | VariantOpen | VariantClose
             | ScalarOpen | StrClose | BoolClose => {
                 unreachable!("frame effects return before data dispatch")
             }
@@ -734,24 +750,29 @@ impl<'a> Program<'a> {
         match action {
             FrameAction::Open(kind) => {
                 let frame = match kind {
-                    ValueFrameKind::Array => FrameKind::Array,
-                    ValueFrameKind::Struct => FrameKind::Struct,
-                    ValueFrameKind::Enum => FrameKind::Enum {
-                        is_void: self.enum_member_is_void(member(effect, label)?, label)?,
-                        got_data: false,
+                    ValueFrameKind::List => FrameKind::List,
+                    ValueFrameKind::Record => FrameKind::Record,
+                    ValueFrameKind::Variant => FrameKind::Variant {
+                        has_no_payload: self.case_has_no_payload(member(effect, label)?, label)?,
+                        wrote_payload_fields: false,
                     },
                     ValueFrameKind::Scalar => FrameKind::Scalar,
                 };
                 open_frame(state.stack, state.pending, frame, label)?;
             }
-            FrameAction::Close(ValueFrameKind::Enum) => match state.stack.pop() {
-                Some(FrameKind::Enum { is_void, got_data }) => {
-                    let data_pending = match *state.pending {
+            FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
+                Some(FrameKind::Variant {
+                    has_no_payload,
+                    wrote_payload_fields,
+                }) => {
+                    let payload_pending = match *state.pending {
                         PendingState::Full => true,
                         PendingState::Empty => false,
-                        PendingState::Unknown => !got_data && !is_void,
+                        PendingState::Unknown => !wrote_payload_fields && !has_no_payload,
                     };
-                    if data_pending && got_data || (data_pending || got_data) == is_void {
+                    if payload_pending && wrote_payload_fields
+                        || (payload_pending || wrote_payload_fields) == has_no_payload
+                    {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
                     *state.pending = PendingState::Full;
@@ -760,10 +781,10 @@ impl<'a> Program<'a> {
             },
             FrameAction::Close(kind) => {
                 let expected = match kind {
-                    ValueFrameKind::Array => FrameKind::Array,
-                    ValueFrameKind::Struct => FrameKind::Struct,
+                    ValueFrameKind::List => FrameKind::List,
+                    ValueFrameKind::Record => FrameKind::Record,
                     ValueFrameKind::Scalar => FrameKind::Scalar,
-                    ValueFrameKind::Enum => unreachable!("enum close handled above"),
+                    ValueFrameKind::Variant => unreachable!("variant close handled above"),
                 };
                 close_simple_frame(state.stack, state.pending, expected, label)?;
             }
@@ -771,46 +792,44 @@ impl<'a> Program<'a> {
         Ok(())
     }
 
-    fn enum_member_is_void(
+    fn case_has_no_payload(
         &self,
         member: MemberRef,
         label: Label,
     ) -> Result<bool, SemanticVerifyError> {
         let scope = self.member_scope(member, label)?;
-        if scope.kind() != CaptureScopeKind::Enum {
+        if scope.kind() != CaptureScopeKind::Variant {
             return Err(capture_error(
                 label,
-                "EnumOpen does not reference an enum variant",
+                "VariantOpen does not reference a variant case",
             ));
         }
-        let CaptureMemberKind::Variant(payload) =
-            scope.members()[member.relative_index as usize].kind
+        let CaptureMemberKind::Case(payload) = scope.members()[member.relative_index as usize].kind
         else {
             return Err(capture_error(
                 label,
-                "EnumOpen does not reference an enum variant",
+                "VariantOpen does not reference a variant case",
             ));
         };
-        Ok(payload == TYPE_VOID
-            || matches!(
-                self.schema.types.expect_type_shape(payload),
-                TypeShape::Void
-            ))
+        Ok(payload == CasePayload::NoPayload)
     }
 
-    fn validate_set_member(
+    fn validate_record_set_member(
         &self,
         member: MemberRef,
         label: Label,
     ) -> Result<(), SemanticVerifyError> {
         let scope = self.member_scope(member, label)?;
-        if scope.kind() == CaptureScopeKind::Struct
+        if scope.kind() == CaptureScopeKind::Record
             && !matches!(
                 scope.members()[member.relative_index as usize].kind,
                 CaptureMemberKind::Field(_)
             )
         {
-            return Err(capture_error(label, "Set references a non-field member"));
+            return Err(capture_error(
+                label,
+                "RecordSet references a non-field member",
+            ));
         }
         Ok(())
     }
@@ -819,7 +838,7 @@ impl<'a> Program<'a> {
         &self,
         member: MemberRef,
         label: Label,
-    ) -> Result<&crate::compiler::analyze::output::CaptureScope, SemanticVerifyError> {
+    ) -> Result<&crate::compiler::analyze::result::CaptureScope, SemanticVerifyError> {
         let Some(scope) = self.schema.layout().scope(member.parent_type) else {
             return Err(capture_error(label, "member parent has no capture scope"));
         };
@@ -866,8 +885,8 @@ impl<'a> Program<'a> {
                             call.matched_return(),
                             depth + call.entry_nav().depth_delta(),
                         ));
-                        if let Some(zero) = call.zero_return() {
-                            work.push((zero, depth));
+                        if let Some(empty) = call.empty_return() {
+                            work.push((empty, depth));
                         }
                     }
                     InstructionIR::Return(return_) => {
@@ -896,27 +915,27 @@ impl<'a> Program<'a> {
         Ok(())
     }
 
-    fn verify_zero_width_cursor_reads(&self) -> Result<(), SemanticVerifyError> {
+    fn verify_empty_path_cursor_reads(&self) -> Result<(), SemanticVerifyError> {
         for entry in self.entries() {
             let mut memo: HashMap<Label, bool> = HashMap::new();
             let mut work = vec![(entry, true)];
-            while let Some((label, zero_width)) = work.pop() {
-                if let Some(seen_zero_width) = memo.get(&label)
-                    && (*seen_zero_width || !zero_width)
+            while let Some((label, empty_path)) = work.pop() {
+                if let Some(seen_empty_path) = memo.get(&label)
+                    && (*seen_empty_path || !empty_path)
                 {
                     continue;
                 }
-                memo.insert(label, zero_width);
+                memo.insert(label, empty_path);
                 match self.instructions[&label] {
                     InstructionIR::Match(matched) => {
-                        let after = zero_width && matched.nav == plotnik_rt::Nav::Epsilon;
+                        let after = empty_path && matched.nav == plotnik_rt::Nav::Epsilon;
                         if after
                             && matched
                                 .effects
                                 .iter()
                                 .any(|effect| effect.kind().reads_cursor())
                         {
-                            return Err(SemanticVerifyError::ZeroWidthCursorRead(label));
+                            return Err(SemanticVerifyError::EmptyPathCursorRead(label));
                         }
                         for successor in &matched.successors {
                             work.push((*successor, after));
@@ -924,8 +943,8 @@ impl<'a> Program<'a> {
                     }
                     InstructionIR::Call(call) => {
                         work.push((call.matched_return(), false));
-                        if let Some(zero) = call.zero_return() {
-                            work.push((zero, zero_width));
+                        if let Some(empty) = call.empty_return() {
+                            work.push((empty, empty_path));
                         }
                     }
                     InstructionIR::Return(_) => {}
@@ -937,7 +956,7 @@ impl<'a> Program<'a> {
 
     fn entries(&self) -> impl Iterator<Item = Label> + '_ {
         self.graph
-            .entrypoint_wrappers
+            .entry_point_wrappers
             .values()
             .chain(self.graph.def_entries.values())
             .copied()
@@ -946,7 +965,7 @@ impl<'a> Program<'a> {
     fn depth_entries(&self) -> Vec<(Label, DefRoute)> {
         let wrappers = self
             .graph
-            .entrypoint_wrappers
+            .entry_point_wrappers
             .values()
             .copied()
             .map(|entry| (entry, DefRoute::Caller));
@@ -999,7 +1018,7 @@ enum VerifyPhase {
 struct BodyAnalysis {
     entry_tos: u8,
     returns_pending: Option<bool>,
-    sets_caller_top: bool,
+    record_sets_caller_top: bool,
     discovered: Vec<Label>,
 }
 
@@ -1063,7 +1082,7 @@ struct EffectState<'a> {
     span_stack: &'a mut Vec<usize>,
     pending: &'a mut PendingState,
     entry_tos: &'a mut u8,
-    sets_caller_top: &'a mut bool,
+    record_sets_caller_top: &'a mut bool,
 }
 
 fn literal(effect: &EffectIR, label: Label) -> Result<usize, SemanticVerifyError> {

@@ -7,7 +7,7 @@ Rec = [
 
 Q = (Rec)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q   = 19
 Rec = 17
 
@@ -15,12 +15,12 @@ Rec = 17
 Rec:
   00  -ε-                                   02, 09
   01                                        ▶
-  02   !   (program) [EnumOpen(A)]          05
-  04  ─‣┘  _ [EnumClose]                    01
+  02   !   (program) [VariantOpen(A)]       05
+  04  ─‣┘  _ [VariantClose]                 01
   05  └‣─  (expression_statement)           08
-  06  ─‣┘  _ [Set(inner)]                   04
+  06  ─‣┘  _ [RecordSet(inner)]             04
   08  └‣─  (Rec)                            00 : 06
-  09   !   (identifier) [EnumOpen(B) Node Set(id) EnumClose]  01
+  09   !   (identifier) [VariantOpen(B) Node RecordSet(id) VariantClose]  01
 
 Q:
   11  -ε-  [SuppressBegin]                  14
@@ -28,11 +28,11 @@ Q:
   13  -ε-  [SuppressEnd]                    12
   14   !   (Rec)                            00 : 13
 
-Rec (entrypoint):
+Rec (entry point):
   16                                        ▶
   17       (Rec)                            00 : 16
 
-Q (entrypoint):
+Q (entry point):
   18                                        ▶
   19       (Q)                              11 : 18
 -------------------- BYTECODE --------------------
@@ -49,11 +49,11 @@ S8 "identifier"
 S9 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
-T2 = Struct  M0:1  ; { inner }
-T3 = Struct  M1:1  ; { id }
-T4 = Enum    M2:2  ; A | B
+T2 = Record  M0:1  ; { inner }
+T3 = Record  M1:1  ; { id }
+T4 = Variant M2:2  ; A | B
 
 [type_members]
 M0: S1 → T4  ; inner: Rec
@@ -64,11 +64,11 @@ M3: S4 → T3  ; B: T3
 [type_names]
 N0: S5 → T4  ; Rec
 
-[entrypoints]
+[entry_points]
 Q   = 02 :: T0
 Rec = 00 :: T4
 
-[transitions]
+[instructions]
 Rec:
   00       (@19)                            19 : 01
   01                                        ▶
@@ -77,15 +77,15 @@ Q:
   02       (@25)                            25 : 03
   03                                        ▶
   04  └‣─  (@19)                            19 : 05
-  05  ─‣┘  _ [Set(M0)]                      08
+  05  ─‣┘  _ [RecordSet(M0)]                08
   07  ...
-  08  ─‣┘  _ [EnumClose]                    10
+  08  ─‣┘  _ [VariantClose]                 10
   10                                        ▶
   11  └‣─  (expression_statement)           04
-  12   !   (program) [EnumOpen(M2)]         11
+  12   !   (program) [VariantOpen(M2)]      11
   14  ...
   15  ...
-  16   !   (identifier) [EnumOpen(M3) Node Set(M1) EnumClose]  10
+  16   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  10
   19  -ε-                                   12, 16
   21                                        ▶
   22  -ε-  [SuppressEnd]                    21

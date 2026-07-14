@@ -1,7 +1,7 @@
 //! Post-SCC re-check of captures on in-progress reference targets.
 //!
 //! While an SCC is being inferred, a reference to a member that hasn't been
-//! registered yet flows as a pending value (`TypeShape::Ref`) — its void-ness
+//! registered yet flows as a pending value (`TypeShape::Ref`) — its no-value state
 //! is unknown, so the single-referent checks at capture sites stay silent.
 //! Once the SCC completes, every member's facts are final; this pass walks
 //! exactly those sites again. Sites whose target registered *before* the
@@ -10,9 +10,7 @@
 
 use std::collections::HashMap;
 
-use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, PatternShape, TYPE_VOID, TypeShape,
-};
+use crate::compiler::analyze::types::type_shape::{DefinitionOutput, PatternFlow, PatternShape};
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 
@@ -67,9 +65,9 @@ impl InferVisitor<'_, '_> {
 
         match pattern {
             Pattern::CapturedPattern(cap) => {
-                // A suppressed subtree makes no output demands (inline checks
+                // A suppressed subtree makes no result-construction demands (inline checks
                 // skip it too).
-                if cap.is_suppressive() {
+                if cap.is_discard() {
                     return;
                 }
                 let Some(inner) = cap.inner() else { return };
@@ -77,9 +75,9 @@ impl InferVisitor<'_, '_> {
                     Pattern::DefRef(_) => {
                         if let Some(shape) =
                             self.in_progress_target_shape(&inner, registration_order, captor_order)
-                            && !self.report_capture_on_void_ref(&inner, &shape)
+                            && !self.report_capture_on_match_only_ref(&inner, &shape)
                         {
-                            self.report_capture_on_multi_node_void(&inner, &shape);
+                            self.report_capture_without_single_node(&inner, &shape);
                         }
                     }
                     Pattern::QuantifiedPattern(q) => {
@@ -91,14 +89,14 @@ impl InferVisitor<'_, '_> {
                                 captor_order,
                             )
                         {
-                            self.report_multi_element_scalar(q, &shape);
+                            self.report_quantified_capture_without_single_node(q, &shape);
                         }
                     }
                     _ => {}
                 }
                 recurse(self, &inner);
             }
-            Pattern::NodePattern(n) => {
+            Pattern::NamedNodePattern(n) => {
                 for child in n.children() {
                     recurse(self, &child);
                 }
@@ -108,21 +106,14 @@ impl InferVisitor<'_, '_> {
                     recurse(self, &child);
                 }
             }
-            Pattern::Union(u) => {
-                for branch in u.branches() {
-                    if let Some(body) = branch.body() {
+            Pattern::Alternation(alternation) => {
+                for alternative in alternation.alternatives() {
+                    if let Some(body) = alternative.body() {
                         recurse(self, &body);
                     }
                 }
-                for p in u.patterns() {
+                for p in alternation.patterns() {
                     recurse(self, &p);
-                }
-            }
-            Pattern::Enum(e) => {
-                for branch in e.branches() {
-                    if let Some(body) = branch.body() {
-                        recurse(self, &body);
-                    }
                 }
             }
             Pattern::QuantifiedPattern(q) => {
@@ -135,7 +126,7 @@ impl InferVisitor<'_, '_> {
                     recurse(self, &value);
                 }
             }
-            Pattern::TokenPattern(_) | Pattern::DefRef(_) => {}
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) | Pattern::DefRef(_) => {}
         }
     }
 
@@ -169,17 +160,18 @@ impl InferVisitor<'_, '_> {
             .in_progress()
             .def_output(def_id)
             .expect("SCC is fully inferred before the re-check");
-        let arity = self
+        let root_extent = self
             .ctx
             .type_ctx
-            .def_arity(def_id)
-            .expect("def arities are precomputed before inference");
-        let flow = if output == TYPE_VOID {
-            PatternFlow::Void
-        } else {
-            let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
-            PatternFlow::Value(ref_type)
+            .def_root_extent(def_id)
+            .expect("definition root extents are precomputed before inference");
+        let flow = match output {
+            DefinitionOutput::MatchOnly => PatternFlow::NoValue,
+            DefinitionOutput::Value(_) => {
+                let ref_type = self.ctx.type_ctx.definition_ref(def_id);
+                PatternFlow::Value(ref_type)
+            }
         };
-        Some(PatternShape::new(arity, flow))
+        Some(PatternShape::new(root_extent, flow))
     }
 }

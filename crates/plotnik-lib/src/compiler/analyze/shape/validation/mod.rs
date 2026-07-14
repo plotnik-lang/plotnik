@@ -1,7 +1,7 @@
 //! Semantic validation passes.
 //!
 //! Validates semantic constraints that aren't captured by parsing or type checking:
-//! - Alternation kind consistency (alt_kinds)
+//! - Alternative-label consistency
 //! - Anchor placement rules (anchors)
 //! - Empty constructs (empty_constructs)
 //! - Predicate regex patterns (predicates)
@@ -14,13 +14,13 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::source::SourceMap;
 use crate::compiler::parse::ast::Root;
 
-pub mod alt_kinds;
+pub mod alternative_labels;
 pub mod anchors;
 pub mod empty_constructs;
 pub mod predicates;
 pub mod strings;
 
-/// Inputs for the AST-only validation passes (alt kinds, anchors, empty
+/// Inputs for the AST-only validation passes (alternative labeling, anchors, empty
 /// constructs).
 pub struct ValidationInput<'q, 'd> {
     pub source_id: SourceId,
@@ -85,7 +85,7 @@ pub fn validate_ast<'q>(input: ShapeValidationInput<'q, '_>) -> Option<Validated
             .ast_map
             .get(&source.id)
             .expect("parsed source must have an AST");
-        validate_alt_kinds(ValidationInput {
+        validate_alternative_labels(ValidationInput {
             source_id: source.id,
             ast,
             diag: &mut *input.diag,
@@ -116,7 +116,7 @@ pub fn validate_ast<'q>(input: ShapeValidationInput<'q, '_>) -> Option<Validated
     (!input.diag.has_errors()).then(|| ValidatedAst::new(input.source_map, input.ast_map))
 }
 
-pub use alt_kinds::validate_alt_kinds;
+pub use alternative_labels::validate_alternative_labels;
 pub use anchors::validate_anchors;
 pub use empty_constructs::validate_empty_constructs;
 pub use predicates::validate_predicates;

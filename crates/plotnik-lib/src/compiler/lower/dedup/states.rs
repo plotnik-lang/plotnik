@@ -2,7 +2,7 @@
 //!
 //! Thompson construction freely duplicates small states — a search-nav
 //! quantifier's first and repeat iterations each emit a position search whose
-//! `navigate` and `retry` states are byte-identical wildcard `Next` steps into
+//! `navigate` and `retry` states are byte-identical wildcard `Next` transitions into
 //! the same `try` state (#475). Two instructions that perform the same
 //! operation and continue to the same successors are bisimilar: no execution
 //! can tell which one it is in, so every reference to the duplicate is
@@ -21,7 +21,7 @@
 //!   self-normalization renders differently.
 //!
 //! Duplicate entries within one successor list also collapse (keep first):
-//! successor attempts replay from the same origin state, so a repeated label
+//! successor attempts restart from the same origin state, so a repeated label
 //! is a provably identical retry. Merges create these (`→ [a, b]` where `b`
 //! merged into `a`), and removing them re-enables further merges.
 //!
@@ -177,7 +177,7 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     for entry in nfa.def_entries.values_mut() {
         *entry = resolve(*entry);
     }
-    for entry in nfa.entrypoint_wrappers.values_mut() {
+    for entry in nfa.entry_point_wrappers.values_mut() {
         *entry = resolve(*entry);
     }
 }

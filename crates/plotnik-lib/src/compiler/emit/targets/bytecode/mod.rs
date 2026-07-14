@@ -13,7 +13,7 @@ pub(in crate::compiler) mod type_table;
 mod regex_table_tests;
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::OutputSchema;
+use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::lower::ir::LoweredNfa;
 
 use self::instructions::emit_instructions;
@@ -26,7 +26,7 @@ pub(in crate::compiler) fn emit(
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let nfa = lowered_ir.raw();
-    let schema = OutputSchema::from_artifacts(input)?;
+    let schema = ResultSchema::from_artifacts(input)?;
     let mut pipeline = EmitPipeline::prepare(input, nfa, &schema)?;
     let tables = pipeline.build_tables()?;
     let regexes = build_regex_table(nfa, pipeline.strings())?;
@@ -36,6 +36,6 @@ pub(in crate::compiler) fn emit(
         &regexes,
         schema.layout(),
     );
-    let transitions = emit_instructions(nfa.instructions(), pipeline.layout(), pool)?;
-    pipeline.write_module(pool, &tables, &transitions)
+    let instructions = emit_instructions(nfa.instructions(), pipeline.layout(), pool)?;
+    pipeline.write_module(pool, &tables, &instructions)
 }

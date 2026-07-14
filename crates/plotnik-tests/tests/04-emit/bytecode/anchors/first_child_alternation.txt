@@ -9,7 +9,7 @@ Q = (program
   )
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 15
 
 [transitions]
@@ -20,13 +20,13 @@ Q:
   06  └‣─  (call_expression)                08
   08  └‣─  arguments: (arguments)           11
   10  ─‣┘⁴ _                                01
-  11  └•─  (identifier) [Node Set(arg)]     10
+  11  └•─  (identifier) [Node RecordSet(arg)]  10
 
-Q (entrypoint):
+Q (entry point):
   12                                        ▶
-  13  -ε-  [StructClose]                    12
+  13  -ε-  [RecordClose]                    12
   14       (Q)                              02 : 13
-  15  -ε-  [StructOpen]                     14
+  15  -ε-  [RecordOpen]                     14
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -40,7 +40,7 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { arg }
+T1 = Record  M0:1  ; { arg }
 
 [type_members]
 M0: S1 → T0  ; arg: <Node>
@@ -48,16 +48,16 @@ M0: S1 → T0  ; arg: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@13)                            13 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └•─  (identifier) [Node Set(M0)]      08
+  06  └•─  (identifier) [Node RecordSet(M0)]  08
   08  ─‣┘⁴ _                                09
   09                                        ▶
   10  └‣─  arguments: (arguments)           06

@@ -2,9 +2,9 @@
 //!
 //! The runtime `ValueMaterializer` is a stack machine over the flat effect
 //! sequence of the winning path. Five of its operations panic on an ill-shaped
-//! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` a `Struct` or
-//! `Enum`, `StructClose` a `Struct`, `EnumClose` an `Enum`
-//! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — plus `EnumClose`
+//! builder stack — `ArrayPush`/`ListClose` want a `List` on top, `RecordSet` a
+//! `Record` or `Variant`, `RecordClose` a `Record`, `VariantClose` a `Variant`
+//! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — plus `VariantClose`
 //! panics when a payload arrives both as the pending value and as direct
 //! fields, the end-of-log assert panics on unclosed frames, and the VM's
 //! `emit_effect` panics if a `SuppressEnd` underflows the suppression counter
@@ -25,21 +25,21 @@
 //! materializer's pending-value register is full. Tracking span *ids* (not just
 //! a depth) proves every `SpanEnd` closes the span the matching bracket opened,
 //! so inspection extraction can assert pairing instead of re-validating. The
-//! walk starts from each entrypoint wrapper and follows `Match` successors,
+//! walk starts from each entry point wrapper and follows `Match` successors,
 //! descending through `Call` and resuming at its return address — exactly the
 //! edge set that orders effects at runtime.
 //!
 //! ## Why state *sets* (collecting semantics)
 //!
-//! The panic-freedom property is per *path*: every graph path must replay to a
-//! well-shaped effect sequence. Distinct paths may legally reach the same step
+//! The panic-freedom property is per *path*: every graph path must execute to a
+//! well-shaped effect sequence. Distinct paths may legally reach the same instruction
 //! with different abstract states — the dedup pass hash-conses structurally
-//! identical branch tails, so e.g. two enum branches share one `EnumClose`
-//! step, reached once under `Enum(A)` and once under `Enum(B)`. Each arrival
+//! identical alternative tails, so e.g. two alternatives share one `VariantClose`
+//! instruction, reached once under `Variant(A)` and once under `Variant(B)`. Each arrival
 //! is individually sound (dedup is a bisimulation quotient: it preserves the
-//! op-labeled path set exactly), so the walk keeps a *set* of states per step
+//! op-labeled path set exactly), so the walk keeps a *set* of states per instruction
 //! and verifies every effect against every state that reaches it. Requiring a
-//! single state per step — as this pass once did — rejected modules the
+//! single state per instruction — as this pass once did — rejected modules the
 //! compiler itself emitted.
 //!
 //! Termination cannot rely on the state sets converging on their own — malformed
@@ -48,17 +48,17 @@
 //! them:
 //!
 //! - **Derived depth bounds.** A state's frame stack can never legitimately be
-//!   deeper than the total number of frame-opening effects on the steps the
-//!   walk has visited: every push comes from a visited step, and revisiting a
-//!   step at a strictly greater depth proves a net-positive cycle, which can
+//!   deeper than the total number of frame-opening effects on the instructions the
+//!   walk has visited: every push comes from a visited instruction, and revisiting
+//!   one at a strictly greater depth proves a net-positive cycle, which can
 //!   never rebalance — every exit requires an empty local stack, so some path
 //!   through such a cycle is provably ill-formed. The suppression counter and
 //!   span stack get the same treatment against their own opener counts.
-//! - **A state budget.** Frame payloads (enum member, `got_data`, pending) are
+//! - **A state budget.** Frame payloads (variant member, `wrote_payload_fields`, pending) are
 //!   finite but can multiply across nesting; a hard cap on states explored per
 //!   body bounds load time on pathological compiler output. Valid output stays
-//!   far below it: the states at a merged step correspond to the pre-dedup
-//!   twins, and step addresses are `u16`, so a body contributes at most tens of
+//!   far below it: the states at a merged instruction correspond to the pre-dedup
+//!   twins, and code addresses are `u16`, so a body contributes at most tens of
 //!   thousands of states in total.
 //!
 //! ## Why summaries
@@ -69,25 +69,25 @@
 //! builder stack (it closes every frame it opens) and reads at most the caller's
 //! top frame before pushing one of its own. So a body's whole interprocedural
 //! effect collapses to a small summary — the set of caller-top kinds it
-//! tolerates (`entry_tos`), whether it may `Set` into the caller's top frame
-//! (`sets_caller_top`), and the pending state it returns — plus the verified
+//! tolerates (`entry_tos`), whether it may `RecordSet` into the caller's top frame
+//! (`record_sets_caller_top`), and the pending state it returns — plus the verified
 //! facts that it is net-neutral and suppression-balanced. Calls apply that
 //! summary instead of inlining, which both terminates and stays sound. The
 //! summaries are computed by a monotone fixpoint (a callee that reads its
 //! caller's top before pushing propagates the constraint up to its own
-//! callers), then a final pass checks every call site and every entrypoint
+//! callers), then a final pass checks every call site and every entry point
 //! wrapper against the stabilized summaries.
 //!
-//! `sets_caller_top` exists because a below-entry `Set` mutates state the
-//! caller's walk otherwise cannot see: setting a field on the caller's *enum*
-//! frame flips the data the frame will carry at its `EnumClose`. A call site
-//! whose local top is an enum therefore forks the state — one branch assumes
-//! the write happened, one that it did not — so a stale `got_data` can never
+//! `record_sets_caller_top` exists because a below-entry `RecordSet` mutates state the
+//! caller's walk otherwise cannot see: setting a field on the caller's *variant*
+//! frame gives the frame a payload at its `VariantClose`. A call site
+//! whose local top is a variant therefore forks the state — one path assumes
+//! the write happened, one that it did not — so stale payload-field state can never
 //! smuggle a "payload arrived both as pending value and as direct fields"
 //! panic past the check.
 //!
 //! A successor-less `Match` accepts the *whole run* from any call depth,
-//! freezing the log with every caller frame still open. Inside an entrypoint
+//! freezing the log with every caller frame still open. Inside an entry point
 //! wrapper the local stack is the global stack, so the existing exit check is
 //! exact; inside a body reachable through `Call` the caller's frames are
 //! invisible here, so such accepts are rejected outright — the compiler ends
@@ -100,7 +100,7 @@
 //! ## Scope
 //!
 //! This pass proves the release-build panic surface unreachable, plus the
-//! span-pairing and enum void/data-consistency assertions. Full agreement
+//! span-pairing and variant payload-consistency assertions. Full agreement
 //! between materialized values and the declared type tables (checked by
 //! `debug_verify_type` in debug builds) is a compiler self-check, not a load
 //! guarantee: malformed bytecode can still declare types its effects do not
@@ -112,24 +112,29 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{Instruction, Module, ModuleError};
-use crate::bytecode::{Effect, EffectKind, FrameAction, TypeDefKind, TypeKind, ValueFrameKind};
+use crate::bytecode::{
+    CodeAddr, Effect, EffectKind, FrameAction, TypeDefKind, TypeKind, ValueFrameKind,
+};
 
 /// Builder frames the materializer pushes. The root/result frame can be a
 /// scalar, but compiled effects only push these three frame kinds.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum FrameKind {
-    Array,
-    Struct,
-    Enum { member: u16, got_data: bool },
+    List,
+    Record,
+    Variant {
+        member: u16,
+        wrote_payload_fields: bool,
+    },
     Scalar,
 }
 
 impl FrameKind {
     fn bit(self) -> u8 {
         match self {
-            FrameKind::Array => KS_ARRAY,
-            FrameKind::Struct => KS_STRUCT,
-            FrameKind::Enum { .. } => KS_ENUM,
+            FrameKind::List => KS_LIST,
+            FrameKind::Record => KS_RECORD,
+            FrameKind::Variant { .. } => KS_VARIANT,
             FrameKind::Scalar => KS_SCALAR,
         }
     }
@@ -163,17 +168,17 @@ impl PendingState {
 }
 
 // `entry_tos` is a set of tolerated caller-top kinds, a 3-bit mask.
-const KS_ARRAY: u8 = 0b001;
-const KS_STRUCT: u8 = 0b010;
-const KS_ENUM: u8 = 0b100;
+const KS_LIST: u8 = 0b001;
+const KS_RECORD: u8 = 0b010;
+const KS_VARIANT: u8 = 0b100;
 const KS_SCALAR: u8 = 0b1000;
 /// No constraint (every kind tolerated): the body never reads its caller's top.
-const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM | KS_SCALAR;
-/// `Set` targets — a `Struct` or an `Enum` frame.
-const KS_SET: u8 = KS_STRUCT | KS_ENUM;
+const KS_ANY: u8 = KS_LIST | KS_RECORD | KS_VARIANT | KS_SCALAR;
+/// `RecordSet` targets — a `Record` or a `Variant` frame.
+const KS_RECORD_SET_TARGET: u8 = KS_RECORD | KS_VARIANT;
 
 /// Hard cap on abstract states explored per body walk. Valid output is bounded
-/// by the pre-dedup instruction count (`u16` step space); pathological compiler
+/// by the pre-dedup instruction count (`u16` address space); pathological compiler
 /// output is rejected before a combinatorial frame-payload blowup can monopolize
 /// load time.
 const STATE_BUDGET: usize = 1 << 18;
@@ -202,10 +207,10 @@ fn record_body_analysis() {
 struct DefSummary {
     entry_tos: u8,
     returns_pending: Option<bool>,
-    /// Some path in the body `Set`s the caller's top frame (directly or via a
+    /// Some path in the body applies `RecordSet` to the caller's top frame (directly or via a
     /// transitive callee). Call sites must account for the write both having
     /// and not having happened.
-    sets_caller_top: bool,
+    record_sets_caller_top: bool,
 }
 
 impl DefSummary {
@@ -213,7 +218,7 @@ impl DefSummary {
         Self {
             entry_tos: KS_ANY,
             returns_pending: None,
-            sets_caller_top: false,
+            record_sets_caller_top: false,
         }
     }
 
@@ -228,27 +233,27 @@ impl DefSummary {
         Some(Self {
             entry_tos: self.entry_tos & next.entry_tos,
             returns_pending,
-            sets_caller_top: self.sets_caller_top | next.sets_caller_top,
+            record_sets_caller_top: self.record_sets_caller_top | next.record_sets_caller_top,
         })
     }
 }
 
-/// Summaries keyed by definition-entry step.
-type DefSummaries = HashMap<u16, DefSummary>;
+/// Summaries keyed by definition-entry address.
+type DefSummaries = HashMap<CodeAddr, DefSummary>;
 
 /// Verify that no path can drive the materializer or the suppression counter
-/// into a panic. Assumes [`Module::validate_transitions`] has already run, so
-/// every `decode_step` and every jump target is safe.
+/// into a panic. Assumes [`Module::validate_instructions`] has already run, so
+/// every instruction decode and every jump target is safe.
 pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> {
-    let entrypoints = module.entrypoints();
+    let entry_points = module.entry_points();
 
     let mut defs = Vec::new();
     let mut known = HashSet::new();
     let mut summaries = DefSummaries::new();
     let mut queue = VecDeque::new();
     let mut queued = HashSet::new();
-    for entrypoint in entrypoints.iter() {
-        let target = u16::from(entrypoint.target());
+    for entry_point in entry_points.iter() {
+        let target = entry_point.target();
         if known.insert(target) {
             defs.push(target);
             summaries.insert(target, DefSummary::unknown());
@@ -260,11 +265,11 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     let mut called = HashSet::new();
     // A summary change only invalidates direct callers. Keeping reverse edges
     // avoids rescanning every definition for every link in a dependency chain.
-    let mut callers: HashMap<u16, Vec<u16>> = HashMap::new();
+    let mut callers: HashMap<CodeAddr, Vec<CodeAddr>> = HashMap::new();
     let mut call_edges = HashSet::new();
 
     // Monotone fixpoint: `entry_tos` only ever shrinks (intersection),
-    // `sets_caller_top` only flips on, `returns_pending` only becomes known,
+    // `record_sets_caller_top` only flips on, `returns_pending` only becomes known,
     // and the definition/called sets only grow. FIFO scheduling coalesces a
     // batch of callee changes before a wide caller is revisited.
     while let Some(entry) = queue.pop_front() {
@@ -294,7 +299,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
         let analysis_summary = DefSummary {
             entry_tos: analysis.entry_tos,
             returns_pending: analysis.returns_pending,
-            sets_caller_top: analysis.sets_caller_top,
+            record_sets_caller_top: analysis.record_sets_caller_top,
         };
         let old = summaries[&entry];
         let Some(next) = old.refine(analysis_summary) else {
@@ -323,11 +328,11 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
         )?;
     }
 
-    // ...and every entrypoint wrapper. A wrapper has no caller, so a residual
+    // ...and every entry point wrapper. A wrapper has no caller, so a residual
     // caller-top constraint means some effect would read below the frames the
     // wrapper itself opened and hit the materializer's result root frame.
-    for entrypoint in entrypoints.iter() {
-        let target = u16::from(entrypoint.target());
+    for entry_point in entry_points.iter() {
+        let target = entry_point.target();
         let wrapper = analyze(
             module,
             &summaries,
@@ -343,7 +348,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     Ok(())
 }
 
-fn enqueue(queue: &mut VecDeque<u16>, queued: &mut HashSet<u16>, entry: u16) {
+fn enqueue(queue: &mut VecDeque<CodeAddr>, queued: &mut HashSet<CodeAddr>, entry: CodeAddr) {
     if queued.insert(entry) {
         queue.push_back(entry);
     }
@@ -354,10 +359,10 @@ struct Analysis {
     entry_tos: u8,
     /// Whether every exit from this body leaves a pending value.
     returns_pending: Option<bool>,
-    /// Whether some path `Set`s into the caller's top frame.
-    sets_caller_top: bool,
+    /// Whether some path applies `RecordSet` to the caller's top frame.
+    record_sets_caller_top: bool,
     /// Call targets reached — definitions to summarize.
-    discovered: Vec<u16>,
+    discovered: Vec<CodeAddr>,
 }
 
 /// Abstract state at instruction entry: the builder frames pushed so far
@@ -384,19 +389,19 @@ impl AbsState {
     fn record_exit(
         &self,
         returns_pending: &mut Option<bool>,
-        step: u16,
+        addr: CodeAddr,
     ) -> Result<(), ModuleError> {
         if !self.stack.is_empty() || self.suppress != 0 {
-            return Err(ModuleError::EffectStackImbalance(step));
+            return Err(ModuleError::EffectStackImbalance(addr));
         }
         if !self.span_stack.is_empty() {
-            return Err(ModuleError::SpanImbalance(step));
+            return Err(ModuleError::SpanImbalance(addr));
         }
         if let Some(pending) = self.pending.known() {
             if let Some(seen) = *returns_pending
                 && seen != pending
             {
-                return Err(ModuleError::EffectStackImbalance(step));
+                return Err(ModuleError::EffectStackImbalance(addr));
             }
             *returns_pending = Some(pending);
         }
@@ -418,12 +423,12 @@ fn take_unseen_state(seen: &mut HashMap<AbsState, ()>, state: AbsState) -> Optio
 }
 
 /// Walk one body, computing its summary facts and verifying its structural
-/// invariants against every abstract state that reaches each step. When
-/// In the final phase, also verify each call site against `summaries`.
+/// invariants against every abstract state that reaches each instruction. In
+/// the final phase, also verify each call site against `summaries`.
 fn analyze(
     module: &Module,
     summaries: &DefSummaries,
-    entry: u16,
+    entry: CodeAddr,
     role: BodyRole,
     phase: VerifyPhase,
 ) -> Result<Analysis, ModuleError> {
@@ -432,32 +437,32 @@ fn analyze(
 
     let mut entry_tos = KS_ANY;
     let mut returns_pending = None;
-    let mut sets_caller_top = false;
+    let mut record_sets_caller_top = false;
     let mut discovered = Vec::new();
     let mut discovered_set = HashSet::new();
 
-    // Collecting semantics: every distinct abstract state a step is reached
+    // Collecting semantics: every distinct abstract state an instruction is reached
     // with is kept and processed once. The opener tallies accumulate, per
-    // visited step, how many frame/suppression/span openers exist — a state
+    // visited instruction, how many frame/suppression/span openers exist — a state
     // outgrowing them proves a net-positive cycle (see module docs).
-    let mut memo: HashMap<u16, HashMap<AbsState, ()>> = HashMap::new();
+    let mut memo: HashMap<CodeAddr, HashMap<AbsState, ()>> = HashMap::new();
     let mut states_spent: usize = 0;
     let mut frame_openers: usize = 0;
     let mut suppress_openers: i32 = 0;
     let mut span_openers: usize = 0;
 
-    let mut work: Vec<(u16, AbsState)> = vec![(entry, AbsState::initial())];
+    let mut work: Vec<(CodeAddr, AbsState)> = vec![(entry, AbsState::initial())];
 
-    while let Some((step, state)) = work.pop() {
-        let instruction = module.decode_step(step);
+    while let Some((addr, state)) = work.pop() {
+        let instruction = module.decode_instruction(addr);
 
-        let seen = memo.entry(step).or_insert_with(|| {
+        let seen = memo.entry(addr).or_insert_with(|| {
             if let Instruction::Match(m) = &instruction {
                 for eff in m.effects() {
                     match eff.kind {
-                        EffectKind::ArrayOpen
-                        | EffectKind::StructOpen
-                        | EffectKind::EnumOpen
+                        EffectKind::ListOpen
+                        | EffectKind::RecordOpen
+                        | EffectKind::VariantOpen
                         | EffectKind::ScalarOpen => {
                             frame_openers += 1;
                         }
@@ -473,17 +478,17 @@ fn analyze(
             continue;
         };
         if state.stack.len() > frame_openers || state.suppress > suppress_openers {
-            return Err(ModuleError::EffectStackImbalance(step));
+            return Err(ModuleError::EffectStackImbalance(addr));
         }
         if state.span_stack.len() > span_openers {
-            return Err(ModuleError::SpanImbalance(step));
+            return Err(ModuleError::SpanImbalance(addr));
         }
         states_spent += 1;
         if states_spent > STATE_BUDGET {
-            return Err(ModuleError::EffectStackBudget(step));
+            return Err(ModuleError::EffectStackBudget(addr));
         }
         if matches!(instruction, Instruction::Return(_)) {
-            state.record_exit(&mut returns_pending, step)?;
+            state.record_exit(&mut returns_pending, addr)?;
             continue;
         }
         let AbsState {
@@ -499,7 +504,7 @@ fn analyze(
             }
 
             if suppress > 0 {
-                // A suppressed callee is frozen: all its data effects are
+                // A suppressed callee is frozen: all its output effects are
                 // dropped, so it is a no-op on the builder stack.
                 call.push_returns(
                     &mut work,
@@ -513,7 +518,7 @@ fn analyze(
                 continue;
             }
             if pending == PendingState::Full {
-                return Err(ModuleError::EffectStackImbalance(step));
+                return Err(ModuleError::EffectStackImbalance(addr));
             }
 
             let summary = summaries
@@ -524,13 +529,13 @@ fn analyze(
                 Some(&kind)
                     if phase == VerifyPhase::Final && kind.bit() & summary.entry_tos == 0 =>
                 {
-                    return Err(ModuleError::EffectStackImbalance(step));
+                    return Err(ModuleError::EffectStackImbalance(addr));
                 }
                 None => {
                     // The callee's reads and writes land on *our* caller's top
                     // frame: inherit the constraint and the write flag.
                     entry_tos &= summary.entry_tos;
-                    sets_caller_top |= summary.sets_caller_top;
+                    record_sets_caller_top |= summary.record_sets_caller_top;
                 }
                 Some(_) => {}
             }
@@ -539,14 +544,19 @@ fn analyze(
                 .returns_pending
                 .map(PendingState::from_bool)
                 .unwrap_or(PendingState::Unknown);
-            if summary.sets_caller_top
-                && let Some(FrameKind::Enum {
-                    got_data: false, ..
+            if summary.record_sets_caller_top
+                && let Some(FrameKind::Variant {
+                    wrote_payload_fields: false,
+                    ..
                 }) = stack.last()
             {
                 let mut written = stack.clone();
-                if let Some(FrameKind::Enum { got_data, .. }) = written.last_mut() {
-                    *got_data = true;
+                if let Some(FrameKind::Variant {
+                    wrote_payload_fields,
+                    ..
+                }) = written.last_mut()
+                {
+                    *wrote_payload_fields = true;
                 }
                 call.push_returns(
                     &mut work,
@@ -584,9 +594,9 @@ fn analyze(
                             span_stack: &mut span_stack,
                             pending: &mut pending,
                             entry_tos: &mut entry_tos,
-                            sets_caller_top: &mut sets_caller_top,
+                            record_sets_caller_top: &mut record_sets_caller_top,
                         },
-                        step,
+                        addr,
                     )?;
                 }
                 if m.succ_count() == 0 {
@@ -595,18 +605,18 @@ fn analyze(
                     // here is exact; under a `Call` the caller's frames are
                     // still open in the log, so this is never sound.
                     if role == BodyRole::Called {
-                        return Err(ModuleError::EffectStackImbalance(step));
+                        return Err(ModuleError::EffectStackImbalance(addr));
                     }
                     if !stack.is_empty() || suppress != 0 {
-                        return Err(ModuleError::EffectStackImbalance(step));
+                        return Err(ModuleError::EffectStackImbalance(addr));
                     }
                     if !span_stack.is_empty() {
-                        return Err(ModuleError::SpanImbalance(step));
+                        return Err(ModuleError::SpanImbalance(addr));
                     }
                 } else {
                     for succ in m.successors() {
                         work.push((
-                            u16::from(succ),
+                            CodeAddr::from(u16::from(succ)),
                             AbsState {
                                 stack: stack.clone(),
                                 suppress,
@@ -626,44 +636,44 @@ fn analyze(
     Ok(Analysis {
         entry_tos,
         returns_pending,
-        sets_caller_top,
+        record_sets_caller_top,
         discovered,
     })
 }
 
 #[derive(Clone, Copy)]
 struct CallRoute {
-    target: u16,
-    returns: CallReturnSteps,
+    target: CodeAddr,
+    returns: CallReturnAddrs,
 }
 
 impl CallRoute {
     fn from_instruction(instruction: Instruction<'_>) -> Option<Self> {
         match instruction {
             Instruction::Call(call) => Some(Self {
-                target: u16::from(call.target),
-                returns: CallReturnSteps::Single([u16::from(call.next)]),
+                target: CodeAddr::from(u16::from(call.target)),
+                returns: CallReturnAddrs::Single([CodeAddr::from(u16::from(call.next))]),
             }),
             Instruction::RoutedCall(call) => Some(Self {
-                target: u16::from(call.target),
-                returns: CallReturnSteps::Single([u16::from(call.next)]),
+                target: CodeAddr::from(u16::from(call.target)),
+                returns: CallReturnAddrs::Single([CodeAddr::from(u16::from(call.next))]),
             }),
             Instruction::SplitCall(call) => Some(Self {
-                target: u16::from(call.target),
-                returns: CallReturnSteps::Split([
-                    u16::from(call.returns.matched),
-                    u16::from(call.returns.zero),
+                target: CodeAddr::from(u16::from(call.target)),
+                returns: CallReturnAddrs::Split([
+                    CodeAddr::from(u16::from(call.returns.matched)),
+                    CodeAddr::from(u16::from(call.returns.empty)),
                 ]),
             }),
             Instruction::Match(_) | Instruction::Return(_) => None,
         }
     }
 
-    fn push_returns(self, work: &mut Vec<(u16, AbsState)>, state: AbsState) {
+    fn push_returns(self, work: &mut Vec<(CodeAddr, AbsState)>, state: AbsState) {
         match self.returns {
-            CallReturnSteps::Single([return_]) => work.push((return_, state)),
-            CallReturnSteps::Split([matched, zero]) => {
-                work.push((zero, state.clone()));
+            CallReturnAddrs::Single([return_]) => work.push((return_, state)),
+            CallReturnAddrs::Split([matched, empty]) => {
+                work.push((empty, state.clone()));
                 work.push((matched, state));
             }
         }
@@ -671,9 +681,9 @@ impl CallRoute {
 }
 
 #[derive(Clone, Copy)]
-enum CallReturnSteps {
-    Single([u16; 1]),
-    Split([u16; 2]),
+enum CallReturnAddrs {
+    Single([CodeAddr; 1]),
+    Split([CodeAddr; 2]),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -704,18 +714,18 @@ fn apply_effect(
     module: &Module,
     effect: Effect,
     state: EffectState<'_>,
-    step: u16,
+    addr: CodeAddr,
 ) -> Result<(), ModuleError> {
     use EffectKind::*;
 
-    // Suppression and span brackets act regardless of depth; data effects are
+    // Suppression and span brackets act regardless of depth; output effects are
     // dropped by the VM while suppressed and so must not touch the builder stack.
     if *state.suppress > 0 {
         match effect.kind {
             SuppressBegin => *state.suppress += 1,
             SuppressEnd => *state.suppress -= 1,
             SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
-            SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
+            SpanEnd => close_span(state.span_stack, effect.payload as u16, addr)?,
             ScalarMark => {}
             _ => {}
         }
@@ -723,12 +733,12 @@ fn apply_effect(
     }
 
     if effect.kind.frame_action().is_some() {
-        return apply_frame_action(module, effect, state, step);
+        return apply_frame_action(module, effect, state, addr);
     }
 
-    let err = || ModuleError::EffectStackImbalance(step);
+    let err = || ModuleError::EffectStackImbalance(addr);
     match effect.kind {
-        Node | Null | NodeStr | NodeBool | BoolValue => {
+        Node | Absent | NodeStr | NodeBool | BoolValue => {
             if *state.pending == PendingState::Full {
                 return Err(err());
             }
@@ -739,36 +749,41 @@ fn apply_effect(
         // exact underflow the VM panics on.
         SuppressEnd => return Err(err()),
         SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
-        SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
+        SpanEnd => close_span(state.span_stack, effect.payload as u16, addr)?,
         ScalarMark => {}
-        Push => {
+        ArrayPush => {
             if *state.pending == PendingState::Empty {
                 return Err(err());
             }
             match state.stack.last() {
-                Some(FrameKind::Array) => {}
+                Some(FrameKind::List) => {}
                 Some(_) => return Err(err()),
-                None => *state.entry_tos &= KS_ARRAY,
+                None => *state.entry_tos &= KS_LIST,
             }
             *state.pending = PendingState::Empty;
         }
-        Set => {
+        RecordSet => {
             if *state.pending == PendingState::Empty {
                 return Err(err());
             }
             match state.stack.last_mut() {
-                Some(FrameKind::Struct) => {}
-                Some(FrameKind::Enum { got_data, .. }) => *got_data = true,
-                Some(FrameKind::Array | FrameKind::Scalar) => return Err(err()),
+                Some(FrameKind::Record) => {}
+                Some(FrameKind::Variant {
+                    wrote_payload_fields,
+                    ..
+                }) => *wrote_payload_fields = true,
+                Some(FrameKind::List | FrameKind::Scalar) => return Err(err()),
                 None => {
-                    *state.entry_tos &= KS_SET;
-                    *state.sets_caller_top = true;
+                    *state.entry_tos &= KS_RECORD_SET_TARGET;
+                    *state.record_sets_caller_top = true;
                 }
             }
             *state.pending = PendingState::Empty;
         }
-        ArrayOpen | ArrayClose | StructOpen | StructClose | EnumOpen | EnumClose | ScalarOpen
-        | StrClose | BoolClose => unreachable!("frame effects return before data dispatch"),
+        ListOpen | ListClose | RecordOpen | RecordClose | VariantOpen | VariantClose
+        | ScalarOpen | StrClose | BoolClose => {
+            unreachable!("frame effects return before data dispatch")
+        }
     }
     Ok(())
 }
@@ -777,38 +792,43 @@ fn apply_frame_action(
     module: &Module,
     effect: Effect,
     state: EffectState<'_>,
-    step: u16,
+    addr: CodeAddr,
 ) -> Result<(), ModuleError> {
     let action = effect
         .kind
         .frame_action()
         .expect("frame action effects are dispatched here");
-    let err = || ModuleError::EffectStackImbalance(step);
+    let err = || ModuleError::EffectStackImbalance(addr);
     match action {
         FrameAction::Open(kind) => {
             if *state.pending == PendingState::Full {
                 return Err(err());
             }
             let frame = match kind {
-                ValueFrameKind::Array => FrameKind::Array,
-                ValueFrameKind::Struct => FrameKind::Struct,
-                ValueFrameKind::Enum => FrameKind::Enum {
+                ValueFrameKind::List => FrameKind::List,
+                ValueFrameKind::Record => FrameKind::Record,
+                ValueFrameKind::Variant => FrameKind::Variant {
                     member: effect.payload as u16,
-                    got_data: false,
+                    wrote_payload_fields: false,
                 },
                 ValueFrameKind::Scalar => FrameKind::Scalar,
             };
             state.stack.push(frame);
         }
-        FrameAction::Close(ValueFrameKind::Enum) => match state.stack.pop() {
-            Some(FrameKind::Enum { member, got_data }) => {
-                let is_void = enum_member_is_void(module, member, step)?;
-                let data_pending = match *state.pending {
+        FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
+            Some(FrameKind::Variant {
+                member,
+                wrote_payload_fields,
+            }) => {
+                let has_no_payload = variant_member_has_no_payload(module, member, addr)?;
+                let payload_pending = match *state.pending {
                     PendingState::Full => true,
                     PendingState::Empty => false,
-                    PendingState::Unknown => !got_data && !is_void,
+                    PendingState::Unknown => !wrote_payload_fields && !has_no_payload,
                 };
-                if data_pending && got_data || (data_pending || got_data) == is_void {
+                if payload_pending && wrote_payload_fields
+                    || (payload_pending || wrote_payload_fields) == has_no_payload
+                {
                     return Err(err());
                 }
                 *state.pending = PendingState::Full;
@@ -817,10 +837,10 @@ fn apply_frame_action(
         },
         FrameAction::Close(kind) => {
             let expected = match kind {
-                ValueFrameKind::Array => FrameKind::Array,
-                ValueFrameKind::Struct => FrameKind::Struct,
+                ValueFrameKind::List => FrameKind::List,
+                ValueFrameKind::Record => FrameKind::Record,
                 ValueFrameKind::Scalar => FrameKind::Scalar,
-                ValueFrameKind::Enum => unreachable!("enum close handled above"),
+                ValueFrameKind::Variant => unreachable!("variant close handled above"),
             };
             if state.stack.pop() != Some(expected) || *state.pending == PendingState::Full {
                 return Err(err());
@@ -837,26 +857,30 @@ struct EffectState<'a> {
     span_stack: &'a mut Vec<u16>,
     pending: &'a mut PendingState,
     entry_tos: &'a mut u8,
-    sets_caller_top: &'a mut bool,
+    record_sets_caller_top: &'a mut bool,
 }
 
 /// A `SpanEnd` must close the innermost open span, with the id the matching
 /// bracket opened — a lone or mis-paired close is malformed bytecode.
-fn close_span(span_stack: &mut Vec<u16>, id: u16, step: u16) -> Result<(), ModuleError> {
+fn close_span(span_stack: &mut Vec<u16>, id: u16, addr: CodeAddr) -> Result<(), ModuleError> {
     match span_stack.pop() {
         Some(open) if open == id => Ok(()),
-        _ => Err(ModuleError::SpanImbalance(step)),
+        _ => Err(ModuleError::SpanImbalance(addr)),
     }
 }
 
-fn enum_member_is_void(module: &Module, member: u16, step: u16) -> Result<bool, ModuleError> {
+fn variant_member_has_no_payload(
+    module: &Module,
+    member: u16,
+    addr: CodeAddr,
+) -> Result<bool, ModuleError> {
     let types = module.types();
     let type_id = types.member_type_id(member as usize);
     let Some(type_def) = types.get(type_id) else {
-        return Err(ModuleError::EffectStackImbalance(step));
+        return Err(ModuleError::EffectStackImbalance(addr));
     };
     Ok(matches!(
         type_def.decode(),
-        TypeDefKind::Primitive(TypeKind::Void)
+        TypeDefKind::Primitive(TypeKind::NoValue)
     ))
 }

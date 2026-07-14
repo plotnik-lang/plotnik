@@ -33,7 +33,7 @@ const SNAPSHOT_ACTIVATION_WIDE_MISSES: u32 = 32;
 const SNAPSHOT_ACTIVATION_MIN_JUMP: u32 = 32;
 
 impl SkipPolicy {
-    /// Whether a sibling search under this policy may step over `node` — both
+    /// Whether a sibling search under this policy may skip `node` — both
     /// when scanning forward past a rejected candidate and when resuming past
     /// an accepted-but-failed one (the node then sits in the pattern's gap,
     /// which must admit it).
@@ -94,7 +94,7 @@ pub(crate) struct SnapshotPool<'t> {
 
 struct SnapshotEntry<'t> {
     seq: NonZeroU64,
-    /// Checkpoints on the stack still holding this seq. A branch fan-out shares
+    /// Checkpoints on the stack still holding this seq. A successor fan-out shares
     /// one snapshot across all its alternative checkpoints.
     refs: u32,
     cursor: TreeCursor<'t>,

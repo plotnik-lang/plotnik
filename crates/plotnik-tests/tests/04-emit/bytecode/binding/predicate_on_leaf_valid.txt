@@ -1,0 +1,36 @@
+Q = (identifier == "foo")
+---------------------- NFA -----------------------
+[entry_points]
+Q = 4
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (identifier) == "foo"             1
+
+Q (entry point):
+  3                                         ▶
+  4       (Q)                               2 : 3
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "foo"
+S2 "identifier"
+S3 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0       (@3)                              3 : 1
+  1                                         ▶
+  2                                         ▶
+  3   !   (identifier) == "foo"             2

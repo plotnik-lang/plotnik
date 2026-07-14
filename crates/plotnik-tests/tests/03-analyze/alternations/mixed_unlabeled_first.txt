@@ -1,0 +1,15 @@
+Q = [
+  (a)
+  B: (b)
+]
+------------------ DIAGNOSTICS -------------------
+error: an alternation cannot mix labeled and unlabeled alternatives
+ --> query.ptk:2:3
+  |
+2 |   (a)
+  |   ^^^
+3 |   B: (b)
+  |   - labeled alternative here
+  |
+help: either label every alternative or remove all labels
+-------------------- SYMBOLS ---------------------

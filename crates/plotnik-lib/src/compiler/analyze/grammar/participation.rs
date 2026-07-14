@@ -2,8 +2,8 @@ use crate::compiler::parse::ast;
 
 /// Whether a pattern position must participate in every match.
 ///
-/// Positions under a disjunction branch or a zero-width quantifier body are deferred:
-/// a sibling branch, or zero repetitions, can satisfy the enclosing pattern without
+/// Positions under an alternation alternative or a nullable quantifier body are deferred:
+/// a sibling alternative, or zero repetitions, can satisfy the enclosing pattern without
 /// this position participating. A `+` quantifier keeps the incoming participation
 /// because its body must match at least once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -17,7 +17,7 @@ impl Participation {
         matches!(self, Self::Required)
     }
 
-    pub(super) fn inside_disjunction_branch(self) -> Self {
+    pub(super) fn inside_alternative(self) -> Self {
         Self::Deferred
     }
 

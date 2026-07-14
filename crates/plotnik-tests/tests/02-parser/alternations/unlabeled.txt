@@ -1,0 +1,32 @@
+Q = [
+  (identifier)
+  (string)
+]
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alternation
+      BracketOpen "["
+      Alternative
+        NamedNode
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Alternative
+        NamedNode
+          ParenOpen "("
+          Id "string"
+          ParenClose ")"
+      BracketClose "]"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    Alternation
+      Alternative
+        NamedNode identifier
+      Alternative
+        NamedNode string

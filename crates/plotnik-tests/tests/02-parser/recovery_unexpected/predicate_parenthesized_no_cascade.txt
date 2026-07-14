@@ -1,6 +1,6 @@
 (call (#eq? @x "foo"))
 ------------------ DIAGNOSTICS -------------------
-error: tree-sitter predicates are not supported
+error: Tree-sitter predicates are not supported
  --> query.ptk:1:8
   |
 1 | (call (#eq? @x "foo"))

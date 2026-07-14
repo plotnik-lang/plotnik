@@ -68,7 +68,7 @@ impl Parser<'_, '_> {
         }
 
         if !self.at(SyntaxKind::Id) {
-            if let Some(report) = self.report_current(DiagnosticKind::ExpectedFieldName) {
+            if let Some(report) = self.report_current(DiagnosticKind::ExpectedGrammarFieldName) {
                 report.emit();
             }
             self.finish_node();
@@ -132,7 +132,7 @@ impl Parser<'_, '_> {
 
         self.bump();
         let span = self.current_span();
-        if let Some(report) = self.report_at(DiagnosticKind::InvalidFieldEquals, span) {
+        if let Some(report) = self.report_at(DiagnosticKind::InvalidGrammarFieldEquals, span) {
             report.fix("use `:`", ":").emit();
         }
         self.bump();
@@ -152,9 +152,9 @@ impl Parser<'_, '_> {
 
     pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
         let is_capture = self.at(SyntaxKind::CaptureToken);
-        let is_suppressive = self.at(SyntaxKind::SuppressiveCapture);
+        let is_discard = self.at(SyntaxKind::DiscardToken);
 
-        if !is_capture && !is_suppressive {
+        if !is_capture && !is_discard {
             return;
         }
 

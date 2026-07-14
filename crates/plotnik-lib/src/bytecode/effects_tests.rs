@@ -3,10 +3,10 @@ use crate::bytecode::effects::EFFECT_PAYLOAD_BITS;
 
 #[test]
 fn roundtrip_with_payload() {
-    let op = Effect::new(EffectKind::Set, 42);
+    let op = Effect::new(EffectKind::RecordSet, 42);
     let bytes = op.to_bytes();
     let decoded = Effect::from_bytes(bytes);
-    assert_eq!(decoded.kind, EffectKind::Set);
+    assert_eq!(decoded.kind, EffectKind::RecordSet);
     assert_eq!(decoded.payload, 42);
 }
 
@@ -21,7 +21,7 @@ fn roundtrip_no_payload() {
 
 #[test]
 fn max_payload() {
-    let op = Effect::new(EffectKind::EnumOpen, 1023);
+    let op = Effect::new(EffectKind::VariantOpen, 1023);
     let bytes = op.to_bytes();
     let decoded = Effect::from_bytes(bytes);
     assert_eq!(decoded.payload, 1023);

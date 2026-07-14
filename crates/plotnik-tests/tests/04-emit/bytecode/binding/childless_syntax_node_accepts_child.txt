@@ -1,0 +1,39 @@
+Q = (debugger_statement (_))
+---------------------- NFA -----------------------
+[entry_points]
+Q = 6
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (debugger_statement)              4
+  3  ─‣┘  _                                 1
+  4  └‣─  (_)                               3
+
+Q (entry point):
+  5                                         ▶
+  6       (Q)                               2 : 5
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "debugger_statement"
+S2 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0       (@5)                              5 : 1
+  1                                         ▶
+  2  └‣─  (_)                               3
+  3  ─‣┘  _                                 4
+  4                                         ▶
+  5   !   (debugger_statement)              2

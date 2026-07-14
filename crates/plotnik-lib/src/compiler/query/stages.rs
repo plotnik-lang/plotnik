@@ -2,14 +2,14 @@ use indexmap::IndexMap;
 use rowan::TextRange;
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::grammar::link;
+use crate::compiler::analyze::grammar::bind;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
-use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
+use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
-use crate::compiler::analyze::types::check_entrypoints;
-use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
+use crate::compiler::analyze::types::check_entry_points;
+use crate::compiler::analyze::types::type_check::{self, RootExtent, TypeAnalysis};
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::emit::{
     BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
@@ -78,8 +78,8 @@ impl QueryBuilder {
     /// legitimately needs a wide child list the default rejects as too complex; the
     /// default protects against an adversarial one driving the quadratic solve for an
     /// unbounded stretch.
-    pub fn with_satisfiability_step_budget(mut self, budget: u64) -> Self {
-        self.limits = self.limits.with_satisfiability_step_budget(budget);
+    pub fn with_satisfiability_work_budget(mut self, budget: u64) -> Self {
+        self.limits = self.limits.with_satisfiability_work_budget(budget);
         self
     }
 
@@ -94,11 +94,11 @@ impl QueryBuilder {
     }
 
     pub fn compile(self, grammar: &Grammar) -> crate::compiler::QueryResult<CompiledQuery> {
-        self.link(grammar)?.compile()
+        self.bind(grammar)?.compile()
     }
 
-    pub(crate) fn link(self, grammar: &Grammar) -> crate::compiler::QueryResult<LinkOutcome> {
-        Ok(self.analyze()?.link(grammar))
+    pub(crate) fn bind(self, grammar: &Grammar) -> crate::compiler::QueryResult<BindOutcome> {
+        Ok(self.analyze()?.bind(grammar))
     }
 
     pub(crate) fn parse(self) -> crate::compiler::QueryResult<QueryParsed> {
@@ -169,7 +169,7 @@ impl QueryParsed {
             &mut self.diag,
         );
         if !self.diag.has_errors() {
-            check_entrypoints(
+            check_entry_points(
                 validated.ast_map(),
                 &interner,
                 &type_analysis,
@@ -245,29 +245,25 @@ impl Query {
         self.analysis.is_some() && !self.parsed.diag.has_errors()
     }
 
-    pub(crate) fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
+    pub(crate) fn root_extent(&self, node: &SyntaxNode) -> Option<RootExtent> {
         let analysis = self.analysis.as_ref()?;
 
         use crate::compiler::parse::ast;
 
         if let Some(pattern) = ast::Pattern::cast(node.clone()) {
-            return analysis.type_analysis.arity(&pattern);
-        }
-
-        if let Some(root) = ast::Root::cast(node.clone()) {
-            return Some(if root.defs().nth(1).is_some() {
-                Arity::Many
-            } else {
-                Arity::One
-            });
+            return analysis.type_analysis.root_extent(&pattern);
         }
 
         if let Some(def) = ast::Def::cast(node.clone()) {
-            return def.body().and_then(|b| analysis.type_analysis.arity(&b));
+            return def
+                .body()
+                .and_then(|body| analysis.type_analysis.root_extent(&body));
         }
 
-        if let Some(branch) = ast::Branch::cast(node.clone()) {
-            return branch.body().and_then(|b| analysis.type_analysis.arity(&b));
+        if let Some(alternative) = ast::Alternative::cast(node.clone()) {
+            return alternative
+                .body()
+                .and_then(|body| analysis.type_analysis.root_extent(&body));
         }
 
         None
@@ -315,15 +311,15 @@ impl Query {
         }
     }
 
-    pub(crate) fn link(self, grammar: &Grammar) -> LinkOutcome {
+    pub(crate) fn bind(self, grammar: &Grammar) -> BindOutcome {
         let mut analyzed = match self.into_analyzed() {
             Ok(analyzed) => analyzed,
-            Err(query) => return LinkOutcome::Invalid(Box::new(query)),
+            Err(query) => return BindOutcome::Invalid(Box::new(query)),
         };
 
         let mut output = GrammarBindingBuilder::new();
         output.identity(grammar.identity().cloned());
-        link::GrammarLinkInput {
+        bind::GrammarBindInput {
             interner: &mut analyzed.analysis.interner,
             grammar,
             source_map: &analyzed.parsed.source_map,
@@ -333,13 +329,13 @@ impl Query {
             strict_lints: analyzed.parsed.strict_lints,
             satisfiability_limits: analyzed.parsed.limits.satisfiability(),
         }
-        .link(&mut output, &mut analyzed.parsed.diag);
+        .bind(&mut output, &mut analyzed.parsed.diag);
 
         if analyzed.parsed.diag.has_errors() {
-            return LinkOutcome::Invalid(Box::new(analyzed.into_query()));
+            return BindOutcome::Invalid(Box::new(analyzed.into_query()));
         }
 
-        LinkOutcome::Linked(Box::new(LinkedQuery {
+        BindOutcome::Bound(Box::new(BoundQuery {
             analyzed,
             grammar: output.finish(),
         }))
@@ -388,18 +384,18 @@ impl TryFrom<&str> for Query {
     }
 }
 
-pub(crate) enum LinkOutcome {
-    Linked(Box<LinkedQuery>),
+pub(crate) enum BindOutcome {
+    Bound(Box<BoundQuery>),
     Invalid(Box<Query>),
 }
 
-pub(crate) struct LinkedQuery {
+pub(crate) struct BoundQuery {
     analyzed: AnalyzedQuery,
     grammar: GrammarBinding,
 }
 
 pub struct CompiledQuery {
-    linked: LinkOutcome,
+    bound: BindOutcome,
     semantic_nfa: Option<SemanticNfa>,
     diagnostics: Diagnostics,
 }
@@ -430,18 +426,18 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
-        let linked = self
-            .linked
-            .linked()
-            .expect("valid compiled query is linked");
+        let bound = self
+            .bound
+            .bound()
+            .expect("valid compiled query is grammar-bound");
         let input = LowerInput {
-            analysis: linked.analysis_input(),
-            symbol_table: linked.symbol_table(),
+            analysis: bound.analysis_input(),
+            symbol_table: bound.symbol_table(),
             inspection: config.inspection_enabled(),
         };
         let mut diagnostics = Diagnostics::new();
         if config.inspection_enabled() {
-            self.linked
+            self.bound
                 .report_inspection_span_degradation_for(&input, &mut diagnostics);
         }
         let lowered = if config.inspection_enabled() {
@@ -455,20 +451,21 @@ impl CompiledQuery {
                 &input,
             )
         };
-        let bytes =
-            match crate::compiler::emit::targets::bytecode::emit(linked.analysis_input(), &lowered)
-            {
-                Ok(bytes) => bytes,
-                Err(error) => {
-                    if error.is_target_limit() {
-                        self.linked.report_target_error(&mut diagnostics, error);
-                        return Ok(Emission::failure(diagnostics));
-                    }
-                    return Err(crate::compiler::Error::CompilerInvariantViolation(
-                        error.to_string(),
-                    ));
+        let bytes = match crate::compiler::emit::targets::bytecode::emit(
+            bound.analysis_input(),
+            &lowered,
+        ) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                if error.is_target_limit() {
+                    self.bound.report_target_error(&mut diagnostics, error);
+                    return Ok(Emission::failure(diagnostics));
                 }
-            };
+                return Err(crate::compiler::Error::CompilerInvariantViolation(
+                    error.to_string(),
+                ));
+            }
+        };
         let module = Module::load_compiler_output(&bytes).map_err(|error| {
             crate::compiler::Error::CompilerInvariantViolation(format!(
                 "bytecode target failed module validation: {error}"
@@ -484,14 +481,14 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
-        let linked = self
-            .linked
-            .linked()
-            .expect("valid compiled query is linked");
+        let bound = self
+            .bound
+            .bound()
+            .expect("valid compiled query is grammar-bound");
         let source = crate::compiler::emit::targets::rust::emit_types(
-            linked.type_analysis(),
-            linked.dependency_analysis(),
-            linked.interner(),
+            bound.type_analysis(),
+            bound.dependency_analysis(),
+            bound.interner(),
             &config.rust_types_config(),
         );
         Ok(Emission::success(
@@ -507,20 +504,20 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
-        let linked = self
-            .linked
-            .linked()
-            .expect("valid compiled query is linked");
+        let bound = self
+            .bound
+            .bound()
+            .expect("valid compiled query is grammar-bound");
         let mut matcher = config.matcher_config();
         if config.provenance_mode() == CodegenProvenance::Full {
-            let identity = linked.grammar().identity().cloned().ok_or_else(|| {
+            let identity = bound.grammar().identity().cloned().ok_or_else(|| {
                 crate::compiler::emit::EmitConfigError::new(
-                    "full provenance requested, but the linked grammar has no artifact identity",
+                    "full provenance requested, but the bound grammar has no artifact identity",
                 )
             })?;
             matcher = matcher.grammar_identity(identity);
         }
-        let plan = linked.codegen_plan(
+        let plan = bound.codegen_plan(
             self.semantic_nfa
                 .as_ref()
                 .expect("valid query retains semantic NFA"),
@@ -539,29 +536,29 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
-        let linked = self
-            .linked
-            .linked()
-            .expect("valid compiled query is linked");
-        let schema = OutputSchema::from_artifacts(linked.analysis_input())
-            .expect("target-neutral compilation validated the output schema");
-        let legacy = config.legacy_config();
-        let (source, mappings) = if config.colored_output() {
+        let bound = self
+            .bound
+            .bound()
+            .expect("valid compiled query is grammar-bound");
+        let schema = ResultSchema::from_artifacts(bound.analysis_input())
+            .expect("target-neutral compilation validated the result schema");
+        let emitter = config.emitter_config();
+        let (source, bindings) = if config.colored_output() {
             (
-                crate::compiler::emit::targets::typescript::emit_schema(&schema, legacy),
+                crate::compiler::emit::targets::typescript::emit_schema(&schema, emitter),
                 Vec::new(),
             )
         } else {
-            crate::compiler::emit::targets::typescript::emit_schema_mapped(&schema, legacy)
+            crate::compiler::emit::targets::typescript::emit_schema_mapped(&schema, emitter)
         };
         Ok(Emission::success(
-            TypeScriptTypesOutput::new(source, mappings),
+            TypeScriptTypesOutput::new(source, bindings),
             Diagnostics::new(),
         ))
     }
 
     pub fn source_map(&self) -> &SourceMap {
-        self.linked.source_map()
+        self.bound.source_map()
     }
 
     pub fn diagnostics(&self) -> &Diagnostics {
@@ -569,18 +566,18 @@ impl CompiledQuery {
     }
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.linked.definition_names()
+        self.bound.definition_names()
     }
 
-    pub fn entrypoint_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.linked.linked().into_iter().flat_map(|linked| {
-            linked
+    pub fn entry_point_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.bound.bound().into_iter().flat_map(|bound| {
+            bound
                 .type_analysis()
-                .iter_entrypoint_output()
+                .iter_entry_point_outputs()
                 .map(|(definition, _)| {
-                    linked
+                    bound
                         .interner()
-                        .resolve(linked.dependency_analysis().def_name_sym(definition))
+                        .resolve(bound.dependency_analysis().def_name_sym(definition))
                         .to_string()
                 })
         })
@@ -591,37 +588,37 @@ impl CompiledQuery {
     /// `None` when the query didn't compile, mirroring [`Self::module`].
     pub fn dump_nfa(&self, colors: Colors) -> Option<String> {
         let semantic = self.semantic_nfa.as_ref()?;
-        let linked = self.linked.linked()?;
+        let bound = self.bound.bound()?;
         Some(crate::compiler::lower::dump::dump_nfa(
             semantic,
-            linked.analysis_input(),
+            bound.analysis_input(),
             colors,
         ))
     }
 }
 
-impl LinkOutcome {
+impl BindOutcome {
     #[cfg(test)]
     pub fn is_valid(&self) -> bool {
-        matches!(self, LinkOutcome::Linked(_))
+        matches!(self, BindOutcome::Bound(_))
     }
 
     #[cfg(test)]
     pub(crate) fn interner(&self) -> &Interner {
-        self.expect_linked().interner()
+        self.expect_bound().interner()
     }
 
     pub fn source_map(&self) -> &SourceMap {
         match self {
-            LinkOutcome::Linked(query) => query.source_map(),
-            LinkOutcome::Invalid(query) => query.source_map(),
+            BindOutcome::Bound(query) => query.source_map(),
+            BindOutcome::Invalid(query) => query.source_map(),
         }
     }
 
     pub fn diagnostics(&self) -> &Diagnostics {
         match self {
-            LinkOutcome::Linked(query) => query.diagnostics(),
-            LinkOutcome::Invalid(query) => query.diagnostics(),
+            BindOutcome::Bound(query) => query.diagnostics(),
+            BindOutcome::Invalid(query) => query.diagnostics(),
         }
     }
 
@@ -631,54 +628,54 @@ impl LinkOutcome {
 
     #[cfg(test)]
     pub(crate) fn grammar(&self) -> &GrammarBinding {
-        self.expect_linked().grammar()
+        self.expect_bound().grammar()
     }
 
     #[cfg(test)]
     pub(in crate::compiler) fn emit_bytecode_for_test(&self) -> Result<Vec<u8>, EmitError> {
-        let linked = self
-            .linked()
-            .expect("test bytecode emission requires a linked query");
+        let bound = self
+            .bound()
+            .expect("test bytecode emission requires a grammar-bound query");
         let input = LowerInput {
-            analysis: linked.analysis_input(),
-            symbol_table: linked.symbol_table(),
+            analysis: bound.analysis_input(),
+            symbol_table: bound.symbol_table(),
             inspection: false,
         };
         let lowered = pack_lowered(lower_semantic(&input), &input);
-        crate::compiler::emit::targets::bytecode::emit(linked.analysis_input(), &lowered)
+        crate::compiler::emit::targets::bytecode::emit(bound.analysis_input(), &lowered)
     }
 
     pub(crate) fn compile(self) -> crate::compiler::QueryResult<CompiledQuery> {
         let mut diagnostics = self.diagnostics().clone();
-        let Some(linked) = self.linked() else {
+        let Some(bound) = self.bound() else {
             return Ok(CompiledQuery {
-                linked: self,
+                bound: self,
                 semantic_nfa: None,
                 diagnostics,
             });
         };
         if diagnostics.has_errors() {
             return Ok(CompiledQuery {
-                linked: self,
+                bound: self,
                 semantic_nfa: None,
                 diagnostics,
             });
         }
 
-        let schema = match OutputSchema::from_artifacts(linked.analysis_input()) {
+        let schema = match ResultSchema::from_artifacts(bound.analysis_input()) {
             Ok(schema) => schema,
             Err(error) => {
                 self.report_shared_limit_error(&mut diagnostics, error.to_string());
                 return Ok(CompiledQuery {
-                    linked: self,
+                    bound: self,
                     semantic_nfa: None,
                     diagnostics,
                 });
             }
         };
         let input = LowerInput {
-            analysis: linked.analysis_input(),
-            symbol_table: linked.symbol_table(),
+            analysis: bound.analysis_input(),
+            symbol_table: bound.symbol_table(),
             inspection: false,
         };
         let semantic_nfa = lower_semantic(&input);
@@ -689,29 +686,29 @@ impl LinkOutcome {
             ));
         }
         Ok(CompiledQuery {
-            linked: self,
+            bound: self,
             semantic_nfa: Some(semantic_nfa),
             diagnostics,
         })
     }
 
-    fn linked(&self) -> Option<&LinkedQuery> {
+    fn bound(&self) -> Option<&BoundQuery> {
         match self {
-            LinkOutcome::Linked(query) => Some(query),
-            LinkOutcome::Invalid(_) => None,
+            BindOutcome::Bound(query) => Some(query),
+            BindOutcome::Invalid(_) => None,
         }
     }
 
     #[cfg(test)]
-    fn expect_linked(&self) -> &LinkedQuery {
-        self.linked()
-            .expect("linked query data is only available after link succeeds")
+    fn expect_bound(&self) -> &BoundQuery {
+        self.bound()
+            .expect("grammar-bound query data is only available after binding succeeds")
     }
 
     fn definition_names_vec(&self) -> Vec<String> {
         match self {
-            LinkOutcome::Linked(query) => query.definition_names().collect(),
-            LinkOutcome::Invalid(query) => query.definition_names().collect(),
+            BindOutcome::Bound(query) => query.definition_names().collect(),
+            BindOutcome::Invalid(query) => query.definition_names().collect(),
         }
     }
 
@@ -786,7 +783,7 @@ fn dropped_tier_names(tiers: &[u8]) -> String {
     names.join(", ")
 }
 
-impl LinkedQuery {
+impl BoundQuery {
     pub(crate) fn interner(&self) -> &Interner {
         self.analyzed.interner()
     }

@@ -1,10 +1,10 @@
 //! Navigation command encoding for bytecode instructions.
 //!
-//! Navigation determines how the VM moves through the tree-sitter AST.
+//! Navigation determines how the VM moves through the Tree-sitter syntax tree.
 
 use crate::SkipClass;
 
-/// What a sibling search may step over while looking for (or retrying past) a
+/// What a sibling search may skip while looking for (or retrying past) a
 /// candidate. Derived from the instruction's [`Nav`] via [`Nav::skip_policy`];
 /// the engine consults it both when scanning forward to a first candidate and
 /// when resuming a search past a failed one.
@@ -21,7 +21,7 @@ pub enum SkipPolicy {
 }
 
 impl SkipPolicy {
-    /// The [`SkipClass`] of nodes this policy may step over.
+    /// The [`SkipClass`] of nodes this policy may skip.
     pub fn skip_class(self) -> SkipClass {
         match self {
             Self::Any => SkipClass::Any,
@@ -36,7 +36,7 @@ impl SkipPolicy {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub enum Nav {
     /// Epsilon transition: pure control flow, no cursor movement or node check.
-    /// Used for branching, quantifier loops, and effect-only transitions.
+    /// Used for forks, quantifier loops, and effect-only transitions.
     #[default]
     Epsilon,
     /// Stay at current position.
@@ -53,8 +53,8 @@ pub enum Nav {
     DownExact,
     /// Assert the current node has no children beyond trivia, without moving.
     ///
-    /// The `Childless*` family is the zero-width arm of a leading or trailing
-    /// anchor: when a node's whole child list matches zero-width, the cursor
+    /// The `Childless*` family is the empty-match arm of a leading or trailing
+    /// anchor: when a node's whole child list matches empty, the cursor
     /// never descends, so no `Down*` entry or `Up*` ascent carries the
     /// anchor's check — either one degrades to "the node has no children the
     /// anchor's skip policy would reject".
@@ -161,7 +161,7 @@ impl Nav {
         }
     }
 
-    /// Cursor-depth delta this navigation applies to the abstract AST cursor.
+    /// Cursor-depth delta this navigation applies to the abstract tree cursor.
     ///
     /// The verifier only tracks depth, not sibling position: `Down*` enters a
     /// child, `Up*` exits one or more parents, and stay/next/epsilon variants
@@ -241,7 +241,7 @@ impl Nav {
     }
 
     /// The skip policy this nav's match attempt runs under — the single source
-    /// of truth for what a search may step over (`CursorWrapper::navigate`
+    /// of truth for what a search may skip (`CursorWrapper::navigate`
     /// returns it after moving; backtrack resume re-derives it from the
     /// re-decoded instruction).
     ///
@@ -268,7 +268,7 @@ impl Nav {
     }
 
     /// Whether this nav performs a sibling search the *engine* owns: it moves
-    /// to a first candidate (`Down*`/`Next*`) and may step past rejected ones
+    /// to a first candidate (`Down*`/`Next*`) and may advance past rejected ones
     /// per its skip policy. Acceptance at such a position is a choice point —
     /// the engine leaves a resume checkpoint so a later failure retries the
     /// search from the next admissible candidate.
@@ -276,7 +276,7 @@ impl Nav {
     /// The `*Exact` members navigate but have a single candidate, and
     /// `Stay`/`StayExact` matches run at positions owned by an outer search
     /// (a position-search loop, a Call's retry checkpoint) — none of them are
-    /// engine-owned searches. Lowering upholds the complement: every nav step
+    /// engine-owned searches. Lowering upholds the complement: every navigation state
     /// internal to an NFA-level retry loop is emitted exact
     /// (`emit_wildcard_nav`), so a search always has exactly one retry owner.
     pub fn is_sibling_search(self) -> bool {
@@ -294,7 +294,7 @@ impl Nav {
     /// Navigation that advances to the next sibling while preserving this nav's
     /// skip policy.
     ///
-    /// Shared source of truth for the two places that step a sibling search
+    /// Shared source of truth for the two places that advance a sibling search
     /// forward: the VM's in-instruction `continue_search`, and the compiler's
     /// quantifier repeat iteration. A `Down*` entry and its `Next*` continuation
     /// share a skip policy (trivia/extras/exact), so both map to the same
@@ -318,7 +318,7 @@ impl Nav {
         }
     }
 
-    /// Alternation branches match at their exact cursor position; the search
+    /// Alternation alternatives match at their exact cursor position; the search
     /// among positions is owned by the parent (quantifier skip-retry, sequence
     /// advancement). Strips the search loop from any nav variant.
     pub fn to_exact(self) -> Self {

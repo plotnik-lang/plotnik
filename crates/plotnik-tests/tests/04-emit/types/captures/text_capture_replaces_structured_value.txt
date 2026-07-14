@@ -1,0 +1,25 @@
+Chunk = {
+  (comment) @comment
+  (expression_statement) @statement
+}
+
+Q = (program
+  (Chunk) @text :: str
+)
+------------------ DIAGNOSTICS -------------------
+warning: capture type `str` replaces structured data with source text
+ --> query.ptk:7:17
+  |
+7 |   (Chunk) @text :: str
+  |                 ^^^^^^
+  |
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  text: string;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub text: &'s str,
+}

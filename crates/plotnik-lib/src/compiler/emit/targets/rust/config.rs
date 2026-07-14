@@ -13,12 +13,12 @@ pub struct Config {
     /// trusted, the input is not, and the query's author is the one who knows
     /// the budget it deserves.
     pub(crate) limits: RuntimeLimitSpec,
-    /// The replay-depth policy for safe `parse`. Not part of
+    /// The decode-depth policy for safe `parse`. Not part of
     /// [`RuntimeLimitSpec`] — that spec is shared with the VM, whose output
-    /// rendering is iterative; replay depth is a generated-executor resource
-    /// (its typed replay recurses once per nested value).
-    pub(crate) depth: Limit,
-    /// Diagnostic provenance for the exact grammar used during linking.
+    /// rendering is iterative; decode depth is a generated-executor resource
+    /// (its typed decoder recurses once per nested value).
+    pub(crate) decode_depth: Limit,
+    /// Diagnostic provenance for the exact grammar used during binding.
     /// Proc-macro output leaves this absent because Cargo already couples its
     /// parser and generated module; product `generate` paths always set it.
     pub(crate) grammar_identity: Option<GrammarIdentity>,
@@ -29,10 +29,10 @@ impl Default for Config {
         Self {
             rust_types: RustTypesConfig::new(),
             limits: RuntimeLimitSpec {
-                steps: Limit::Auto,
+                fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
-            depth: Limit::Auto,
+            decode_depth: Limit::Auto,
             grammar_identity: None,
         }
     }
@@ -48,7 +48,7 @@ impl Config {
         self
     }
 
-    /// Also emit `SerializeWithSource` impls for the output types.
+    /// Also emit `SerializeWithSource` impls for the result types.
     pub fn serde(mut self, enabled: bool) -> Self {
         self.rust_types = self.rust_types.serde(enabled);
         self
@@ -60,14 +60,14 @@ impl Config {
         self
     }
 
-    /// Override the compiled-in replay-depth policy for safe `parse` (see the
+    /// Override the compiled-in decode-depth policy for safe `parse` (see the
     /// field's doc for why it lives outside the shared spec).
-    pub fn depth(mut self, depth: Limit) -> Self {
-        self.depth = depth;
+    pub fn decode_depth(mut self, depth: Limit) -> Self {
+        self.decode_depth = depth;
         self
     }
 
-    /// Record the exact grammar artifact used to link this generated module.
+    /// Record the exact grammar artifact used to bind this generated module.
     pub fn grammar_identity(mut self, identity: GrammarIdentity) -> Self {
         self.grammar_identity = Some(identity);
         self

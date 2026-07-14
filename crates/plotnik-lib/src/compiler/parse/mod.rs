@@ -48,7 +48,7 @@ mod tokenize_tests;
 
 pub use cst::{SyntaxKind, SyntaxNode};
 
-pub use ast::{Anchor, Branch, Def, NegatedField, Pattern, Root};
+pub use ast::{Alternative, Anchor, Def, NegatedField, Pattern, Root};
 
 pub use parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 
@@ -71,27 +71,27 @@ pub(crate) fn parse_lossless(
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize)]
-pub struct TokenSpan {
+pub struct QueryToken {
     /// Stable lowercase token class for editor/highlighter consumers.
     pub kind: &'static str,
-    /// Start byte offset in the query text.
-    pub start: u32,
-    /// End byte offset in the query text.
-    pub end: u32,
+    /// Half-open byte span in the query text.
+    pub span: (u32, u32),
 }
 
 /// Editor-grade tokenization from the real query lexer.
 ///
 /// Tokenization is total: malformed input is represented with `error` spans.
-pub fn tokenize(text: &str) -> Vec<TokenSpan> {
+pub fn tokenize(text: &str) -> Vec<QueryToken> {
     lex(text)
         .into_iter()
         .map(|token| {
             let range = std::ops::Range::<usize>::from(token.span);
-            TokenSpan {
+            QueryToken {
                 kind: class_name(token.kind),
-                start: u32::try_from(range.start).expect("token start byte fits in u32"),
-                end: u32::try_from(range.end).expect("token end byte fits in u32"),
+                span: (
+                    u32::try_from(range.start).expect("token start byte fits in u32"),
+                    u32::try_from(range.end).expect("token end byte fits in u32"),
+                ),
             }
         })
         .collect()
@@ -109,7 +109,7 @@ fn class_name(kind: SyntaxKind) -> &'static str {
         SyntaxKind::RegexLiteral
         | SyntaxKind::RegexPredicateMatch
         | SyntaxKind::RegexPredicateNoMatch => "regex",
-        SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture | SyntaxKind::At => "capture",
+        SyntaxKind::CaptureToken | SyntaxKind::DiscardToken | SyntaxKind::At => "capture",
         SyntaxKind::Id | SyntaxKind::KwError | SyntaxKind::KwMissing => "ident",
         SyntaxKind::Garbage | SyntaxKind::Error => "error",
         SyntaxKind::ParenOpen

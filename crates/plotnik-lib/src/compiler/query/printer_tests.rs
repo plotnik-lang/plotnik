@@ -16,21 +16,21 @@ fn printer_with_spans() {
 }
 
 #[test]
-fn printer_with_arities() {
+fn printer_with_root_extents() {
     let input = "Q = (call)";
     let q = Query::expect(input);
 
-    let res = q.printer().with_arities(true).dump();
+    let res = q.printer().with_root_extents(true).dump();
 
     insta::assert_snapshot!(res, @r"
-    Root¹
+    Root
       Def¹ Q
         NamedNode¹ call
     ");
 }
 
 #[test]
-fn printer_symbols_with_arities() {
+fn printer_symbols_with_root_extents() {
     let input = indoc! {r#"
         A = (a)
         B = {(b) (c)}
@@ -38,14 +38,18 @@ fn printer_symbols_with_arities() {
     "#};
     let q = Query::expect(input);
 
-    let res = q.printer().definitions_only(true).with_arities(true).dump();
+    let res = q
+        .printer()
+        .definitions_only(true)
+        .with_root_extents(true)
+        .dump();
 
     insta::assert_snapshot!(res, @r"
     A¹
-    B⁺
+    B≠¹
     Q¹
       A¹
-      B⁺
+      B≠¹
     ");
 }
 
@@ -139,10 +143,10 @@ fn printer_spans_comprehensive() {
             NamedNode [18..22] id
           NegatedField [23..27] -bar
       Def [29..42] Q
-        Union [33..42]
-          Branch [34..37]
+        Alternation [33..42]
+          Alternative [34..37]
             NamedNode [34..37] a
-          Branch [38..41]
+          Alternative [38..41]
             NamedNode [38..41] b
     ");
 }
@@ -182,7 +186,7 @@ fn printer_spans_quantifiers() {
 }
 
 #[test]
-fn printer_spans_alt_branches() {
+fn printer_spans_labeled_alternatives() {
     let input = "Q = [A: (a) B: (b)]";
     let q = Query::expect(input);
 
@@ -191,10 +195,10 @@ fn printer_spans_alt_branches() {
     insta::assert_snapshot!(res, @"
     Root [0..19]
       Def [0..19] Q
-        Enum [4..19]
-          Branch [5..11] A:
+        Alternation [4..19]
+          Alternative [5..11] A:
             NamedNode [8..11] a
-          Branch [12..18] B:
+          Alternative [12..18] B:
             NamedNode [15..18] b
     ");
 }

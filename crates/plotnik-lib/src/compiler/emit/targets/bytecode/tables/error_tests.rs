@@ -14,22 +14,22 @@ use crate::compiler::test_utils::synthetic_grammar as grammar;
 use crate::compiler::{BytecodeConfig, DiagnosticKind, RustCodegenConfig, TypeScriptCodegenConfig};
 use crate::compiler::{SourceMap, SourcePath};
 
-/// Link `src` (which must be valid — capacity limits live at emit, not link) and
+/// Bind `src` to the test grammar (capacity limits live at emission, not binding) and
 /// return the emission result.
 #[track_caller]
 fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
     let mut source_map = SourceMap::new();
     source_map.add_file(SourcePath::new("query.ptk"), src);
     let query = QueryBuilder::new(source_map)
-        .link(grammar())
+        .bind(grammar())
         .expect("query parses");
-    assert!(query.is_valid(), "query should link:\n{src}");
+    assert!(query.is_valid(), "query should bind to the grammar:\n{src}");
     query.emit_bytecode_for_test()
 }
 
 #[test]
-fn struct_field_count_overflow_is_emit_error() {
-    // 300 captures inside one node → a struct with 300 fields, past the u8 limit.
+fn record_field_count_overflow_is_emit_error() {
+    // 300 captures inside one node → a record with 300 fields, past the u8 limit.
     // A concrete child kind (over `(_)`) keeps the satisfiability solve linear here —
     // the field *count* is what this exercises, not how the children are matched.
     let mut query = String::from("Q = (program");
@@ -38,7 +38,7 @@ fn struct_field_count_overflow_is_emit_error() {
     }
     query.push(')');
 
-    let err = try_emit(&query).expect_err("300 struct fields must not encode");
+    let err = try_emit(&query).expect_err("300 record fields must not encode");
     assert!(matches!(err, EmitError::TooManyFields(300)), "got {err:?}");
 }
 
@@ -84,27 +84,23 @@ fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
 }
 
 #[test]
-fn enum_variant_count_overflow_is_emit_error() {
-    // 256 enum branches → an enum with 256 variants, past the u8 limit. Each branch
-    // is `(_)` so every variant is a valid program child and the query is matchable —
-    // an enum of `(identifier)` would be rejected (a program holds no bare identifier).
-    // The alternation is captured so it is consumed (produces the enum) rather
-    // than degrading to a union.
+fn variant_case_count_overflow_is_emit_error() {
+    // 256 labeled alternatives produce a variant with 256 cases, past the u8 limit.
+    // Each alternative is `(_)` so every case is a valid program child and the query
+    // is matchable; `(identifier)` would be rejected because a program has no bare
+    // identifier child. Capturing the alternation makes its labels produce cases.
     let mut query = String::from("Q = (program [");
     for i in 0..256 {
         write!(query, " L{i}: (_) @v{i}").unwrap();
     }
     query.push_str("] @alt)");
 
-    let err = try_emit(&query).expect_err("256 enum variants must not encode");
-    assert!(
-        matches!(err, EmitError::TooManyVariants(256)),
-        "got {err:?}"
-    );
+    let err = try_emit(&query).expect_err("256 variant cases must not encode");
+    assert!(matches!(err, EmitError::TooManyCases(256)), "got {err:?}");
 }
 
 #[test]
-fn variants_256_are_source_capable_but_exceed_the_bytecode_target() {
+fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
     let mut query = String::from("Q = (program [");
     for index in 0..=u8::MAX {
         write!(query, " Variant{index}: (_) @value_{index}").unwrap();
@@ -147,21 +143,21 @@ fn variants_256_are_source_capable_but_exceed_the_bytecode_target() {
 #[test]
 fn emit_error_classification_respects_limit_ownership() {
     assert!(EmitError::TooManyFields(256).is_target_limit());
-    assert!(EmitError::TooManyVariants(256).is_target_limit());
+    assert!(EmitError::TooManyCases(256).is_target_limit());
     assert!(EmitError::Encode(EncodeError::TooManyEffects(8)).is_target_limit());
 
     assert!(!EmitError::TooManyTypeMembers(65_536).is_target_limit());
     assert!(!EmitError::TooManyNodeKinds(65_536).is_target_limit());
     assert!(!EmitError::TooManyNodeFields(65_536).is_target_limit());
-    assert!(!EmitError::TooManyEntrypoints(65_536).is_target_limit());
+    assert!(!EmitError::TooManyEntryPoints(65_536).is_target_limit());
     assert!(!EmitError::RegexCompile("[".into(), "invalid".into()).is_target_limit());
 }
 
 #[test]
 fn effect_member_payload_overflow_is_emit_error() {
     // Members are indexed into a 10-bit effect payload (max 1023). Spread > 1024
-    // globally-distinct captures across several definitions (each struct staying
-    // under the 255-field limit) so a Set effect references an index past 1023.
+    // globally-distinct captures across several definitions (each record staying
+    // under the 255-field limit) so a RecordSet effect references an index past 1023.
     let mut query = String::new();
     for def in 0..5 {
         write!(query, "D{def} = (program").unwrap();
@@ -200,7 +196,7 @@ fn truncated_or_corrupted_module_is_rejected() {
 
     // Flipping any single byte is caught: the CRC covers everything after the
     // 64-byte header, and structural checks (bounds, sentinels, reserved bytes,
-    // type defs, entrypoints) cover the header itself.
+    // type defs, entry points) cover the header itself.
     for i in 0..bytes.len() {
         let mut corrupt = bytes.clone();
         corrupt[i] ^= 0xFF;

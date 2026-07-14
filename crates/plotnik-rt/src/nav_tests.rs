@@ -136,7 +136,7 @@ fn nav_skip_policy_mapping() {
 /// The engine-owned searches are exactly the non-exact `Down*`/`Next*` navs.
 /// Two invariants hang off this set: acceptance there pushes a match-retry
 /// checkpoint, and lowering's `to_exact` (applied to every NFA-loop-internal
-/// step) must map every member out of the set — otherwise a search would have
+/// navigation state) must map every member out of the set — otherwise a search would have
 /// two retry owners and backtracking would enumerate candidates twice.
 #[test]
 fn nav_sibling_search_set() {

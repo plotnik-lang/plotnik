@@ -1,0 +1,72 @@
+Q = (pair
+  key: [
+    A: (identifier) @a
+    B: (number)
+  ] @kind
+)
+---------------------- NFA -----------------------
+[entry_points]
+Q = 12
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (pair)                           08
+  03  ─‣┘  _ [RecordSet(kind)]              01
+  05   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  03
+  06   !   (number) [VariantOpen(B) VariantClose]  03
+  08  └‣─  key: _                           05, 06
+
+Q (entry point):
+  09                                        ▶
+  10  -ε-  [RecordClose]                    09
+  11       (Q)                              02 : 10
+  12  -ε-  [RecordOpen]                     11
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "A"
+S03 "B"
+S04 "kind"
+S05 "QKind"
+S06 "Q"
+S07 "pair"
+S08 "identifier"
+S09 "number"
+S10 "key"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Record  M0:1  ; { a }
+T3 = Variant M1:2  ; A | B
+T4 = Record  M3:1  ; { kind }
+
+[type_members]
+M0: S01 → T1  ; a: <Node>
+M1: S02 → T2  ; A: T2
+M2: S03 → T0  ; B: <NoValue>
+M3: S04 → T3  ; kind: QKind
+
+[type_names]
+N0: S05 → T3  ; QKind
+N1: S06 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@18)                            18 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  16
+  11   !   (number) [VariantOpen(M2) VariantClose]  16
+  13  └‣─  key: _                           08, 11
+  15  ...
+  16  ─‣┘  _ [RecordSet(M3)]                06
+  18   !   (pair)                           13

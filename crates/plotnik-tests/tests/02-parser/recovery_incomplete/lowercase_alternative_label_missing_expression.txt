@@ -1,0 +1,22 @@
+Q = [label:]
+------------------ DIAGNOSTICS -------------------
+error: alternative labels must be PascalCase
+ --> query.ptk:1:6
+  |
+1 | Q = [label:]
+  |      ^^^^^
+  |
+help: use `Label`
+  |
+1 - Q = [label:]
+1 + Q = [Label:]
+  |
+help: alternative labels name variant cases when the alternation produces a value
+
+error: expected an expression
+ --> query.ptk:1:12
+  |
+1 | Q = [label:]
+  |            ^
+  |
+help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

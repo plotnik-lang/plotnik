@@ -5,7 +5,7 @@
 //! 1. An **order-sensitive semantic fingerprint** of the graph reachable from an
 //!    entry: the ordered list (DFS pre-order) of per-path hashes. For a
 //!    backtracking VM transition *order* is semantics, so the fingerprint is
-//!    sensitive to branch priority and to dropped/duplicated successors. Every
+//!    sensitive to successor priority and to dropped/duplicated successors. Every
 //!    optimization pass must preserve it — see [`run_verified`].
 //! 2. **Structural invariants** on the instruction list: no duplicate labels and
 //!    no dangling references (successors and `Call` targets/returns all resolve).
@@ -19,7 +19,7 @@
 //!   `collapse_up` — and epsilon elimination parking effects onto Up nodes — is a
 //!   no-op.
 //!
-//! Anything else a pass does to navigation, matching, effects, or branch order
+//! Anything else a pass does to navigation, matching, effects, or successor order
 //! changes the fingerprint and trips the check.
 //!
 //! Cost is bounded: traversal stops after [`MAX_PATHS`] completed paths (a
@@ -90,7 +90,7 @@ mod debug_impl {
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
-        DefRoute, DefVariant, InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint,
+        DefRoute, DefSpecialization, InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint,
         PredicateValueIR, ReturnOutcome,
     };
 
@@ -150,8 +150,8 @@ mod debug_impl {
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum WalkRoot {
-        Entrypoint(DefId),
-        Def(DefVariant),
+        EntryPoint(DefId),
+        Def(DefSpecialization),
     }
 
     struct PassSnapshot {
@@ -160,7 +160,7 @@ mod debug_impl {
     }
 
     /// What one node contributes to the walk.
-    struct WalkStep {
+    struct NodeContribution {
         /// Effect-free epsilon: contributes no ops and is not marked visited
         /// (laser vision through pure control flow).
         see_through: bool,
@@ -337,14 +337,14 @@ mod debug_impl {
     impl<'a> GraphWalk<'a> {
         fn new(
             instructions: &'a [InstructionIR],
-            def_entries: &IndexMap<DefVariant, Label>,
+            def_entries: &IndexMap<DefSpecialization, Label>,
             ctx: &'a LowerInput<'a>,
         ) -> Self {
             Self {
                 instr_map: instructions.iter().map(|i| (i.label(), i)).collect(),
                 label_to_def: def_entries
                     .iter()
-                    .map(|(variant, &label)| (label, variant.def_id()))
+                    .map(|(specialization, &label)| (label, specialization.def_id()))
                     .collect(),
                 ctx,
             }
@@ -352,9 +352,9 @@ mod debug_impl {
 
         /// Compute one node's contribution. Cycle detection is the walker's job (it
         /// depends on traversal state), so this is a pure function of the graph.
-        fn node_step(&self, label: Label) -> WalkStep {
+        fn node_contribution(&self, label: Label) -> NodeContribution {
             let Some(&instr) = self.instr_map.get(&label) else {
-                return WalkStep {
+                return NodeContribution {
                     see_through: false,
                     ops: vec![SemanticOp::DanglingLabel],
                     succs: vec![],
@@ -364,13 +364,13 @@ mod debug_impl {
             match instr {
                 InstructionIR::Match(m) => {
                     if m.is_epsilon() && m.effects.is_empty() {
-                        return WalkStep {
+                        return NodeContribution {
                             see_through: true,
                             ops: vec![],
                             succs: m.successors.clone(),
                         };
                     }
-                    WalkStep {
+                    NodeContribution {
                         see_through: false,
                         ops: collect_match_ops(m, self.ctx),
                         succs: m.successors.clone(),
@@ -384,13 +384,13 @@ mod debug_impl {
                         .get(&c.target)
                         .map(|def_id| format!("def#{}", def_id.index()))
                         .unwrap_or_else(|| format!("label#{}", c.target.0));
-                    WalkStep {
+                    NodeContribution {
                         see_through: false,
                         ops: vec![SemanticOp::Call(name)],
                         succs: c.return_labels().to_vec(),
                     }
                 }
-                InstructionIR::Return(return_) => WalkStep {
+                InstructionIR::Return(return_) => NodeContribution {
                     see_through: false,
                     ops: vec![SemanticOp::Return(return_.outcome())],
                     succs: vec![],
@@ -400,7 +400,7 @@ mod debug_impl {
 
         /// Iterative DFS over the graph reachable from `entry`, invoking `on_path` with
         /// each completed path (coalesced) in pre-order. An explicit stack (no
-        /// recursion, so deep IRs can't overflow) carries per-branch op prefixes and
+        /// recursion, so deep IRs can't overflow) carries per-successor op prefixes and
         /// visited snapshots. Returns whether traversal was truncated by a budget.
         fn walk(&self, entry: Label, max_paths: usize, mut on_path: impl FnMut(Path)) -> bool {
             let mut count = 0usize;
@@ -429,26 +429,26 @@ mod debug_impl {
                     continue;
                 }
 
-                let walk_step = self.node_step(label);
+                let contribution = self.node_contribution(label);
 
-                if walk_step.see_through {
+                if contribution.see_through {
                     // Reversed pushes so successors pop in priority order (pre-order).
-                    for &succ in walk_step.succs.iter().rev() {
+                    for &succ in contribution.succs.iter().rev() {
                         stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                     }
                     continue;
                 }
 
                 visited.insert(label);
-                ops.extend(walk_step.ops);
+                ops.extend(contribution.ops);
 
-                if walk_step.succs.is_empty() {
+                if contribution.succs.is_empty() {
                     on_path(normalize_path(ops));
                     count += 1;
                     continue;
                 }
 
-                for &succ in walk_step.succs.iter().rev() {
+                for &succ in contribution.succs.iter().rev() {
                     stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                 }
             }
@@ -500,13 +500,13 @@ mod debug_impl {
     fn scope_role(op: EffectKind) -> Option<ScopeRole> {
         use EffectKind::*;
         let role = match op {
-            ArrayOpen | StructOpen | EnumOpen | SuppressBegin | ScalarOpen => ScopeRole::Open(op),
-            ArrayClose => ScopeRole::Close(ArrayOpen),
-            StructClose => ScopeRole::Close(StructOpen),
-            EnumClose => ScopeRole::Close(EnumOpen),
+            ListOpen | RecordOpen | VariantOpen | SuppressBegin | ScalarOpen => ScopeRole::Open(op),
+            ListClose => ScopeRole::Close(ListOpen),
+            RecordClose => ScopeRole::Close(RecordOpen),
+            VariantClose => ScopeRole::Close(VariantOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
             StrClose | BoolClose => ScopeRole::Close(ScalarOpen),
-            Node | Push | Set | Null | ScalarMark | NodeStr | NodeBool | BoolValue
+            Node | ArrayPush | RecordSet | Absent | ScalarMark | NodeStr | NodeBool | BoolValue
             | SpanStartAt | SpanStart | SpanEnd => {
                 return None;
             }
@@ -619,8 +619,8 @@ mod debug_impl {
 
         for (root, entry) in entries(nfa) {
             let route = match &root {
-                WalkRoot::Entrypoint(_) => DefRoute::Caller,
-                WalkRoot::Def(variant) => variant.route(),
+                WalkRoot::EntryPoint(_) => DefRoute::Caller,
+                WalkRoot::Def(specialization) => specialization.route(),
             };
             check_depth_root(root, entry, route, &instr_map)?;
         }
@@ -631,12 +631,12 @@ mod debug_impl {
     /// consumed a candidate. This is only a compiler IR check: once the VM's
     /// `Node` effect reads the cursor directly, malformed bytecode can still
     /// produce wrong values, but it cannot reach undefined state.
-    fn check_no_node_on_zero_width_paths(nfa: &NfaGraph) -> Result<(), String> {
+    fn check_no_node_on_empty_paths(nfa: &NfaGraph) -> Result<(), String> {
         let instr_map: HashMap<Label, &InstructionIR> =
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
 
         for (root, entry) in entries(nfa) {
-            check_zero_width_root(root, entry, &instr_map)?;
+            check_empty_root(root, entry, &instr_map)?;
         }
         Ok(())
     }
@@ -661,7 +661,7 @@ mod debug_impl {
         Ok(())
     }
 
-    fn check_zero_width_root(
+    fn check_empty_root(
         root: WalkRoot,
         entry: Label,
         instr_map: &HashMap<Label, &InstructionIR>,
@@ -669,13 +669,13 @@ mod debug_impl {
         let mut memo: HashMap<Label, bool> = HashMap::new();
         let mut work = vec![(entry, true)];
 
-        while let Some((label, zero_width)) = work.pop() {
-            if let Some(&seen_zero_width) = memo.get(&label)
-                && (seen_zero_width || !zero_width)
+        while let Some((label, empty_path)) = work.pop() {
+            if let Some(&seen_empty_path) = memo.get(&label)
+                && (seen_empty_path || !empty_path)
             {
                 continue;
             }
-            memo.insert(label, zero_width);
+            memo.insert(label, empty_path);
 
             let instr = instr_map
                 .get(&label)
@@ -684,8 +684,8 @@ mod debug_impl {
 
             match instr {
                 InstructionIR::Match(m) => {
-                    let after_nav_zero_width = zero_width && m.nav == Nav::Epsilon;
-                    if after_nav_zero_width
+                    let after_nav_empty = empty_path && m.nav == Nav::Epsilon;
+                    if after_nav_empty
                         && m.effects.iter().any(|effect| effect.kind().reads_cursor())
                     {
                         return Err(format!(
@@ -695,13 +695,13 @@ mod debug_impl {
                     }
 
                     for &succ in &m.successors {
-                        work.push((succ, after_nav_zero_width));
+                        work.push((succ, after_nav_empty));
                     }
                 }
                 InstructionIR::Call(c) => {
                     work.push((c.matched_return(), false));
-                    if let Some(zero) = c.zero_return() {
-                        work.push((zero, zero_width));
+                    if let Some(empty) = c.empty_return() {
+                        work.push((empty, empty_path));
                     }
                 }
                 InstructionIR::Return(_) => {}
@@ -757,8 +757,8 @@ mod debug_impl {
                 }
                 InstructionIR::Call(c) => {
                     work.push((c.matched_return(), net + c.entry_nav().depth_delta()));
-                    if let Some(zero) = c.zero_return() {
-                        work.push((zero, net));
+                    if let Some(empty) = c.empty_return() {
+                        work.push((empty, net));
                     }
                 }
                 InstructionIR::Return(r) => {
@@ -797,19 +797,19 @@ mod debug_impl {
     }
 
     #[cfg(test)]
-    pub(super) fn assert_no_node_on_zero_width_paths(nfa: &NfaGraph, context: &str) {
-        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
-            panic!("[verify] {context} produced zero-width Node effect: {e}");
+    pub(super) fn assert_no_node_on_empty_paths(nfa: &NfaGraph, context: &str) {
+        if let Err(e) = check_no_node_on_empty_paths(nfa) {
+            panic!("[verify] {context} produced empty-match Node effect: {e}");
         }
     }
 
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = Vec::new();
-        for (&def_id, &label) in &nfa.entrypoint_wrappers {
-            v.push((WalkRoot::Entrypoint(def_id), label));
+        for (&def_id, &label) in &nfa.entry_point_wrappers {
+            v.push((WalkRoot::EntryPoint(def_id), label));
         }
-        for (variant, &label) in &nfa.def_entries {
-            v.push((WalkRoot::Def(variant.clone()), label));
+        for (specialization, &label) in &nfa.def_entries {
+            v.push((WalkRoot::Def(specialization.clone()), label));
         }
         v
     }
@@ -855,8 +855,8 @@ mod debug_impl {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }
         assert_depth_neutrality(nfa, &format!("pass `{name}`"));
-        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
-            panic!("[verify] pass `{name}` produced zero-width Node effect: {e}");
+        if let Err(e) = check_no_node_on_empty_paths(nfa) {
+            panic!("[verify] pass `{name}` produced empty-match Node effect: {e}");
         }
 
         let before_walk = GraphWalk::new(&before.instructions, &nfa.def_entries, ctx);
@@ -888,7 +888,7 @@ mod debug_impl {
     }
 
     /// Run a pass that may intentionally remove internal definition roots.
-    /// Entrypoint behavior and every surviving definition body must remain
+    /// Entry-point behavior and every surviving definition body must remain
     /// unchanged; fingerprints for roots the pass deleted are discarded.
     pub fn run_root_pruning_verified(
         name: &str,
@@ -899,8 +899,8 @@ mod debug_impl {
         let mut before = snapshot(nfa, ctx);
         pass(nfa);
         before.fingerprints.retain(|(root, _, _)| match root {
-            WalkRoot::Entrypoint(_) => true,
-            WalkRoot::Def(variant) => nfa.def_entries.contains_key(variant),
+            WalkRoot::EntryPoint(_) => true,
+            WalkRoot::Def(specialization) => nfa.def_entries.contains_key(specialization),
         });
         verify_after_pass(name, &before, nfa, ctx);
     }
@@ -914,8 +914,8 @@ mod debug_impl {
             panic!("[verify] construction produced malformed IR: {e}");
         }
         assert_depth_neutrality(nfa, "construction");
-        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
-            panic!("[verify] construction produced zero-width Node effect: {e}");
+        if let Err(e) = check_no_node_on_empty_paths(nfa) {
+            panic!("[verify] construction produced empty-match Node effect: {e}");
         }
         let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
         for (key, entry) in entries(nfa) {

@@ -1,6 +1,6 @@
 use indoc::indoc;
 
-use crate::bytecode::PredicateOp;
+use crate::bytecode::{CodeAddr, PredicateOp};
 use crate::compiler::test_utils::synthetic_grammar as grammar;
 use crate::compiler::{BytecodeConfig, QueryBuilder, SourceMap, SourcePath};
 
@@ -36,9 +36,12 @@ fn decoded_program_matches_byte_decoder() {
     let mut saw_neg_fields = false;
     let mut saw_predicate = false;
 
-    let mut step = 0u16;
-    while step < module.header().transitions_count {
-        match (module.decode_step(step), module.decoded().step(step)) {
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < module.header().instruction_word_count {
+        match (
+            module.decode_instruction(addr),
+            module.decoded().instruction_at(addr),
+        ) {
             (Instruction::Match(m), DecodedInstr::Match(decoded)) => {
                 assert_eq!(decoded.nav, m.nav);
                 assert_eq!(decoded.node_kind, m.node_kind);
@@ -50,7 +53,7 @@ fn decoded_program_matches_byte_decoder() {
                 let neg_fields = m.neg_fields().collect::<Vec<_>>();
                 assert_eq!(module.decoded().neg_fields(&decoded), neg_fields.as_slice());
 
-                let successors = m.successors().map(u16::from).collect::<Vec<_>>();
+                let successors = m.successors().collect::<Vec<_>>();
                 assert_eq!(module.decoded().successors(&decoded), successors.as_slice());
 
                 let predicate = m
@@ -60,44 +63,57 @@ fn decoded_program_matches_byte_decoder() {
                 assert_eq!(decoded_predicate, predicate);
 
                 saw_effects |= !effects.is_empty();
-                saw_extended_match |= m.step_count() > 1;
+                saw_extended_match |= m.word_count() > 1;
                 saw_multiple_successors |= successors.len() > 1;
                 saw_neg_fields |= !neg_fields.is_empty();
                 saw_predicate |= predicate.is_some();
 
-                for interior in step + 1..step + m.step_count() {
+                for interior in addr.get() + 1..addr.get() + m.word_count() {
                     assert!(
-                        matches!(module.decoded().step(interior), DecodedInstr::Return(_)),
-                        "interior step {interior} should be a placeholder"
+                        matches!(
+                            module.decoded().instruction_at(CodeAddr::from(interior)),
+                            DecodedInstr::Return(_)
+                        ),
+                        "interior word {interior} should be a placeholder"
                     );
                 }
 
-                step += m.step_count();
+                addr = addr
+                    .checked_add(m.word_count())
+                    .expect("decoded instruction address fits in u16");
             }
             (Instruction::Call(c), DecodedInstr::Call(decoded)) => {
                 assert_eq!(decoded.nav, c.nav);
                 assert_eq!(decoded.node_field, c.node_field);
-                assert_eq!(decoded.next, u16::from(c.next));
-                assert_eq!(decoded.target, u16::from(c.target));
-                step += 1;
+                assert_eq!(decoded.next, c.next);
+                assert_eq!(decoded.target, c.target);
+                addr = addr
+                    .checked_add(1)
+                    .expect("instruction address fits in u16");
             }
             (Instruction::RoutedCall(c), DecodedInstr::RoutedCall(decoded)) => {
-                assert_eq!(decoded.next, u16::from(c.next));
-                assert_eq!(decoded.target, u16::from(c.target));
-                step += 1;
+                assert_eq!(decoded.next, c.next);
+                assert_eq!(decoded.target, c.target);
+                addr = addr
+                    .checked_add(1)
+                    .expect("instruction address fits in u16");
             }
             (Instruction::SplitCall(c), DecodedInstr::SplitCall(decoded)) => {
-                assert_eq!(decoded.matched, u16::from(c.returns.matched));
-                assert_eq!(decoded.zero, u16::from(c.returns.zero));
-                assert_eq!(decoded.target, u16::from(c.target));
-                step += 1;
+                assert_eq!(decoded.matched, c.returns.matched);
+                assert_eq!(decoded.empty, c.returns.empty);
+                assert_eq!(decoded.target, c.target);
+                addr = addr
+                    .checked_add(1)
+                    .expect("instruction address fits in u16");
             }
             (Instruction::Return(return_), DecodedInstr::Return(outcome)) => {
                 assert_eq!(outcome, return_.mode.outcome());
-                step += 1;
+                addr = addr
+                    .checked_add(1)
+                    .expect("instruction address fits in u16");
             }
             (byte, decoded) => {
-                panic!("decoded instruction mismatch at step {step}: {byte:?} vs {decoded:?}");
+                panic!("decoded instruction mismatch at address {addr}: {byte:?} vs {decoded:?}");
             }
         }
     }

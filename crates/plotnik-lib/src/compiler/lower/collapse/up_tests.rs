@@ -22,7 +22,7 @@ fn collapse_up_single_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -58,7 +58,7 @@ fn collapse_up_chain_of_three() {
             MatchIR::terminal(Label(3)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -89,7 +89,7 @@ fn collapse_up_mixed_modes_no_merge() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -115,7 +115,7 @@ fn collapse_up_skip_trivia_same_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -146,7 +146,7 @@ fn collapse_up_skip_extras_same_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -177,7 +177,7 @@ fn collapse_up_exact_same_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -206,13 +206,13 @@ fn collapse_up_with_effects_no_merge() {
                 .into(),
             MatchIR::terminal(Label(1))
                 .nav(Nav::Up(1))
-                .append_effects(vec![EffectIR::literal(EffectKind::Null, 0)])
+                .append_effects(vec![EffectIR::literal(EffectKind::Absent, 0)])
                 .next(Label(2))
                 .into(),
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -238,7 +238,7 @@ fn collapse_up_merges_up_to_max() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -256,7 +256,7 @@ fn collapse_up_merges_up_to_max() {
 #[test]
 fn collapse_up_refuses_merge_exceeding_max() {
     // A maxed-out ascent plus more would exceed Nav::MAX_UP_LEVEL. Capping would
-    // silently drop upward movement, so the merge is refused and both steps remain.
+    // silently drop upward movement, so the merge is refused and both states remain.
     let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
@@ -270,7 +270,7 @@ fn collapse_up_refuses_merge_exceeding_max() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -286,7 +286,7 @@ fn collapse_up_refuses_merge_exceeding_max() {
 }
 
 #[test]
-fn collapse_up_branching_no_merge() {
+fn collapse_up_fork_no_merge() {
     // Up(1) with multiple successors should NOT merge
     let mut result = NfaGraph {
         instructions: vec![
@@ -305,7 +305,7 @@ fn collapse_up_branching_no_merge() {
             MatchIR::terminal(Label(3)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -339,7 +339,7 @@ fn collapse_up_deep_chain_splits_without_dangling() {
     let mut result = NfaGraph {
         instructions,
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -389,7 +389,7 @@ fn assert_constraint_chain_splits(make: fn(u8) -> Nav) {
     let mut result = NfaGraph {
         instructions,
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -456,7 +456,7 @@ fn collapse_up_no_up_unchanged() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };

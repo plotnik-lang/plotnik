@@ -9,11 +9,11 @@
 //! Offsets in any payload are byte offsets into the exact text the caller
 //! passed in; the web side converts to UTF-16 at its edge (`byte-offsets.ts`).
 
-use plotnik_lib::bytecode::{Entrypoint, Module, SPAN_NO_BINDING};
+use plotnik_lib::bytecode::{EntryPoint, Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
-    Colors, EffectLog, RunStats, RuntimeError, extract_inspection, materialize_verified,
+    Colors, MatchJournal, RunStats, RuntimeError, extract_result_provenance, materialize_verified,
 };
-use serde_json::{Value as JsonValue, json};
+use serde_json::{Map, Value as JsonValue, json};
 use wasm_bindgen::JsValue;
 
 /// Serialize an engine-produced value, asserting success: everything past
@@ -27,59 +27,59 @@ pub(crate) use json_value;
 
 /// Inputs for the `Session::info()` payload (`SessionInfo` in protocol.ts).
 pub struct InfoParts<'a> {
-    /// `None` when the query didn't produce bytecode (spans come back empty).
+    /// `None` when the query didn't produce bytecode (query spans come back empty).
     pub module: Option<&'a Module>,
-    pub tokens: JsonValue,
+    pub query_tokens: JsonValue,
     pub diagnostics: JsonValue,
-    pub dts: String,
-    pub dts_map: JsonValue,
-    pub entrypoints: &'a [String],
-    pub bytecode_size: Option<usize>,
+    pub typescript_declarations: String,
+    pub typescript_bindings: JsonValue,
+    pub entry_points: &'a [String],
+    pub bytecode_size_bytes: Option<usize>,
 }
 
 pub fn info_json(parts: InfoParts) -> JsonValue {
     json!({
         // Version marker for the day the shape needs a breaking change.
-        "v": 1,
-        "spans": parts.module.map(spans_json).unwrap_or_else(|| json!([])),
-        "tokens": parts.tokens,
+        "version": 1,
+        "query_spans": parts.module.map(query_spans_json).unwrap_or_else(|| json!([])),
+        "query_tokens": parts.query_tokens,
         "diagnostics": parts.diagnostics,
-        "dts": parts.dts,
-        "dts_map": parts.dts_map,
-        "entrypoints": parts.entrypoints,
-        "bytecode_size": parts.bytecode_size,
+        "typescript_declarations": parts.typescript_declarations,
+        "typescript_bindings": parts.typescript_bindings,
+        "entry_points": parts.entry_points,
+        "bytecode_size_bytes": parts.bytecode_size_bytes,
     })
 }
 
-/// A finished run (`RunResult` in protocol.ts): materialized value plus
-/// inspection on success, `{error}` otherwise ("no match" included), with
-/// the recording attached when tracing.
+/// A finished run (`RunResult` in protocol.ts): result plus provenance on
+/// success, `{error}` otherwise ("no match" included), with the execution
+/// trace attached when tracing.
 pub fn result_json(
     module: &Module,
-    entrypoint: &Entrypoint,
+    entry_point: &EntryPoint,
     source: &str,
-    result: (Result<EffectLog<'_>, RuntimeError>, RunStats),
-    trace: Option<JsonValue>,
+    result: (Result<MatchJournal<'_>, RuntimeError>, RunStats),
+    execution_trace: Option<JsonValue>,
 ) -> JsonValue {
     let (result, stats) = result;
     let mut out = match result {
-        Ok(effects) => {
+        Ok(journal) => {
             let colors = Colors::new(false);
-            let value =
-                materialize_verified(source, module, entrypoint, effects.as_slice(), colors);
-            let inspection = (!module.spans().is_empty())
-                .then(|| extract_inspection(effects.as_slice(), module));
+            let result =
+                materialize_verified(source, module, entry_point, journal.output_events(), colors);
+            let result_provenance =
+                (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, module));
             json!({
-                "value": json_value!(value),
-                "inspection": json_value!(inspection),
-                "stats": json_value!(stats),
+                "result": json_value!(result),
+                "result_provenance": json_value!(result_provenance),
+                "run_stats": json_value!(stats),
             })
         }
         Err(RuntimeError::NoMatch) => error_json("no match"),
         Err(error) => error_json(error.to_string()),
     };
-    if let Some(trace) = trace {
-        out["trace"] = trace;
+    if let Some(execution_trace) = execution_trace {
+        out["execution_trace"] = execution_trace;
     }
     out
 }
@@ -88,34 +88,55 @@ pub fn error_json(error: impl Into<String>) -> JsonValue {
     json!({ "error": error.into() })
 }
 
-/// The static span table (`InspectionSpan[]` in protocol.ts): the hub the
+/// The static query-span table (`QuerySpan[]` in protocol.ts): the hub the
 /// playground joins every view through — see `docs/wip/playground-design.md`
 /// §2. The array index is the SpanId.
-fn spans_json(module: &Module) -> JsonValue {
+fn query_spans_json(module: &Module) -> JsonValue {
     let spans = module
         .spans()
         .iter()
         .enumerate()
-        .map(|(id, span)| {
-            json!({
-                "id": id,
-                "source": span.source,
-                "kind": span.kind.name(),
-                "start": span.start,
-                "end": span.end,
-                "type": binding_value(span.type_id),
-                "member": binding_value(span.member),
-            })
-        })
+        .map(|(id, span)| query_span_json(id, span))
         .collect::<Vec<_>>();
     JsonValue::Array(spans)
 }
 
-fn binding_value(value: u16) -> JsonValue {
-    if value == SPAN_NO_BINDING {
-        JsonValue::Null
-    } else {
-        json!(value)
+pub(super) fn query_span_json(id: usize, span: SpanEntry) -> JsonValue {
+    let (kind, labeling) = query_span_kind(span.kind);
+    let mut object = Map::new();
+    object.insert("id".to_string(), json!(id));
+    object.insert("source_id".to_string(), json!(span.source_id));
+    object.insert("kind".to_string(), json!(kind));
+    if let Some(labeling) = labeling {
+        object.insert("labeling".to_string(), json!(labeling));
+    }
+    object.insert("span".to_string(), json!([span.start, span.end]));
+    if span.type_id != SPAN_NO_BINDING {
+        let mut binding = Map::new();
+        binding.insert("type_id".to_string(), json!(span.type_id));
+        if span.member != SPAN_NO_BINDING {
+            binding.insert("member_id".to_string(), json!(span.member));
+        }
+        object.insert("binding".to_string(), JsonValue::Object(binding));
+    }
+    JsonValue::Object(object)
+}
+
+fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
+    match kind {
+        SpanKind::Def => ("definition", None),
+        SpanKind::Ref => ("reference", None),
+        SpanKind::Pattern => ("pattern", None),
+        SpanKind::Capture => ("capture", None),
+        SpanKind::GrammarField => ("grammar_field", None),
+        SpanKind::NegatedGrammarField => ("negated_grammar_field", None),
+        SpanKind::Predicate => ("predicate", None),
+        SpanKind::Quantifier => ("quantifier", None),
+        SpanKind::Sequence => ("sequence", None),
+        SpanKind::Alternation(Labeling::Unlabeled) => ("alternation", Some("unlabeled")),
+        SpanKind::Alternation(Labeling::Labeled) => ("alternation", Some("labeled")),
+        SpanKind::Alternative => ("alternative", None),
+        SpanKind::CaptureType => ("capture_type", None),
     }
 }
 

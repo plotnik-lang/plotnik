@@ -1,6 +1,6 @@
 Q = (pair -key* @x)
 ------------------ DIAGNOSTICS -------------------
-error: negated fields cannot be quantified
+error: negated grammar fields cannot be quantified
  --> query.ptk:1:15
   |
 1 | Q = (pair -key* @x)
@@ -11,9 +11,9 @@ help: remove the quantifier
 1 - Q = (pair -key* @x)
 1 + Q = (pair -key @x)
   |
-help: a negated field asserts absence and produces no value
+help: a negated grammar field asserts absence and produces no value
 
-error: negated fields cannot be captured
+error: negated grammar fields cannot be captured
  --> query.ptk:1:17
   |
 1 | Q = (pair -key* @x)
@@ -24,4 +24,4 @@ help: remove the capture
 1 - Q = (pair -key* @x)
 1 + Q = (pair -key* )
   |
-help: a negated field asserts absence and produces no value
+help: a negated grammar field asserts absence and produces no value

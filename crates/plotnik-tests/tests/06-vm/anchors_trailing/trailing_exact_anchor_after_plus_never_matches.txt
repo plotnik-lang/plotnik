@@ -1,0 +1,104 @@
+Q = (program
+  (expression_statement
+    (assignment_expression
+      right: (array
+        (identifier)+ @ids
+        .!
+      )
+    )
+  )
+)
+--------------------- INPUT ----------------------
+x = [a]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  ids: [Node, ...Node[]];
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "ids"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "assignment_expression"
+S6 "array"
+S7 "identifier"
+S8 "right"
+
+[type_defs]
+T0 = <Node>
+T1 = ListOneOrMore(T0)  ; <Node>+
+T2 = Record  M0:1  ; { ids }
+
+[type_members]
+M0: S1 → T1  ; ids: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@19)                            19 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  !─┘  _ [ListClose RecordSet(M0)]      08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10   !   (identifier) [Node ArrayPush]    12, 06
+  12  ──!  _                                10, 12
+  14  └─!  _ [ListOpen]                     10, 12
+  16  └‣─  right: (array)                   14
+  17  └‣─  (assignment_expression)          16
+  18  └‣─  (expression_statement)           17
+  19   !   (program)                        18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@19)                            19 : 03
+       ▶   (@19)
+
+@19:
+  19       (program)                        18
+       ●   program
+  18       (expression_statement)           17
+       ●   expression_statement
+  17       (assignment_expression)          16
+       ●   assignment_expression
+  16       right: (array)                   14
+       ○   identifier
+       ○   =
+       ●   array
+  14       _ [ListOpen]                     10, 12
+       ●   [
+  10       (identifier) [Node ArrayPush]    12, 06
+       ○   [
+  14  ❮❮❮ 
+  12       _                                10, 12
+       ●   identifier
+  10       (identifier) [Node ArrayPush]    12, 06
+       ●   identifier
+  12       _                                10, 12
+       ●   ]
+  10       (identifier) [Node ArrayPush]    12, 06
+       ○   ]
+  12  ❮❮❮ 
+  12       _                                10, 12
+  10  ❮❮❮ 
+  06       _ [ListClose RecordSet(M0)]      08
+  12  ❮❮❮ 
+  12       _                                10, 12
+       ●   ]
+  10       (identifier) [Node ArrayPush]    12, 06
+       ○   ]
+  12  ❮❮❮ 
+  12       _                                10, 12
+  16  ❮❮❮ 
+  17  ❮❮❮ 
+  18  ❮❮❮ 

@@ -10,7 +10,7 @@ Q = (program
   ]
 )
 ------------------ DIAGNOSTICS -------------------
-warning: branch labels have no effect without capture
+warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
   --> query.ptk:7:3
    |
  7 | /   [
@@ -19,7 +19,7 @@ warning: branch labels have no effect without capture
 10 | |   ]
    | |___^
    |
-help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 ------------------- TYPESCRIPT -------------------
 export interface Q {
   doc: string | null;

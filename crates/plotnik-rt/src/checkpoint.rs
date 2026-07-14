@@ -1,7 +1,7 @@
 //! Checkpoints for backtracking.
 //!
-//! When the VM encounters a branch (multiple successors), it saves
-//! a checkpoint for each alternative. On failure, it restores the
+//! When the VM encounters a fork (multiple successors), it saves
+//! a checkpoint for each non-preferred successor. On failure, it restores the
 //! most recent checkpoint and continues.
 
 use std::num::NonZeroU64;
@@ -41,9 +41,9 @@ impl EffectDepths {
 /// cursor and re-enters the callee without re-running the Call's navigation.
 #[derive(Clone, Copy, Debug)]
 pub struct CallResume {
-    /// Callee entry (raw step index).
+    /// Callee entry (raw code address).
     pub target: u16,
-    /// Return address after the callee (raw step index).
+    /// Return address after the callee (raw code address).
     pub next: u16,
     /// Field constraint the next candidate must satisfy, if any.
     pub field: Option<NodeFieldId>,
@@ -51,16 +51,16 @@ pub struct CallResume {
     pub policy: SkipPolicy,
 }
 
-/// What backtracking does after restoring a checkpoint's state. Every point
-/// with alternatives leaves a checkpoint whose resume says how to take the
-/// next one — branch alternatives jump, sibling searches (Match or Call)
+/// What backtracking does after restoring a checkpoint's state. Every retryable
+/// choice leaves a checkpoint whose resume says how to take the
+/// next one — successor checkpoints jump, sibling searches (Match or Call)
 /// advance the cursor and re-try. This uniform discipline is what makes every
 /// candidate acceptance revisitable; a search with no live resume checkpoint
 /// would silently commit (the historical sibling-retry hole).
 #[derive(Clone, Copy, Debug)]
 pub enum Resume {
-    /// Plain branch alternative: resume dispatch at the checkpoint's `ip`.
-    Branch,
+    /// Resume dispatch at the checkpoint's successor address.
+    Successor,
     /// Call retry: advance the cursor to the next admissible candidate and
     /// re-enter the callee, without re-running the Call's navigation.
     Call(CallResume),
@@ -72,15 +72,15 @@ pub enum Resume {
 }
 
 /// The VM state a checkpoint snapshots and later restores: everything shared
-/// by both branch and Call-retry checkpoints. Bundling these fields keeps the
+/// by both successor and Call-retry checkpoints. Bundling these fields keeps the
 /// snapshot at creation and the restore on backtrack in lockstep.
 #[derive(Clone, Copy, Debug)]
 pub struct CheckpointState {
     /// Cursor position (tree-sitter descendant_index) — always present; the
     /// restore fallback when the pooled snapshot was evicted.
     pub descendant_index: u32,
-    /// Effect stream length at checkpoint.
-    pub effect_watermark: usize,
+    /// Match journal length at checkpoint.
+    pub journal_watermark: usize,
     /// Frame arena state at checkpoint.
     pub frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
@@ -93,7 +93,7 @@ pub struct CheckpointState {
 pub struct Checkpoint {
     /// VM state to restore on backtrack.
     pub state: CheckpointState,
-    /// Branch resume target, or the owning instruction's own address for
+    /// Successor resume target, or the owning instruction's own address for
     /// Call/Match retries (re-decoded on resume; also used for tracing).
     pub ip: u16,
     /// How backtracking continues after restoring `state`.
@@ -111,12 +111,12 @@ struct CheckpointSnapshot {
 }
 
 impl Checkpoint {
-    /// Create a plain (branch alternative) checkpoint that resumes at `ip`.
-    pub fn branch(state: CheckpointState, ip: u16) -> Self {
+    /// Create a checkpoint that resumes at successor address `ip`.
+    pub fn successor(state: CheckpointState, ip: u16) -> Self {
         Self {
             state,
             ip,
-            resume: Resume::Branch,
+            resume: Resume::Successor,
             max_frame_idx_below: None,
         }
     }

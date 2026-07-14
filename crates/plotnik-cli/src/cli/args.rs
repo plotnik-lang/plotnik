@@ -64,11 +64,20 @@ pub fn json_arg() -> Arg {
         .help("Output diagnostics as JSON")
 }
 
-pub fn raw_arg() -> Arg {
-    Arg::new("raw")
-        .long("raw")
+pub fn query_view_arg() -> Arg {
+    Arg::new("query_view")
+        .long("query-view")
+        .value_name("VIEW")
+        .default_value("ast")
+        .value_parser(["ast", "cst"])
+        .help("Choose the query tree view")
+}
+
+pub fn include_anonymous_arg() -> Arg {
+    Arg::new("include_anonymous")
+        .long("include-anonymous")
         .action(ArgAction::SetTrue)
-        .help("Include anonymous nodes (literals, punctuation)")
+        .help("Include anonymous source-tree nodes such as literals and punctuation")
 }
 
 pub fn strict_arg() -> Arg {
@@ -86,18 +95,18 @@ pub fn format_arg() -> Arg {
         .help("Output format (typescript, ts)")
 }
 
-pub fn verbose_nodes_arg() -> Arg {
-    Arg::new("verbose_nodes")
-        .long("verbose-nodes")
+pub fn include_points_arg() -> Arg {
+    Arg::new("include_points")
+        .long("include-points")
         .action(ArgAction::SetTrue)
-        .help("Include verbose node information (line/column positions)")
+        .help("Include zero-based row/byte-column points in nodes")
 }
 
 pub fn no_node_type_arg() -> Arg {
     Arg::new("no_node_type")
         .long("no-node-type")
         .action(ArgAction::SetTrue)
-        .help("Don't emit Node/Point type definitions")
+        .help("Don't emit the Node type definition")
 }
 
 pub fn no_export_arg() -> Arg {
@@ -107,12 +116,12 @@ pub fn no_export_arg() -> Arg {
         .help("Don't export types")
 }
 
-pub fn void_type_arg() -> Arg {
-    Arg::new("void_type")
-        .long("void-type")
+pub fn match_only_type_arg() -> Arg {
+    Arg::new("match_only_type")
+        .long("match-only-type")
         .value_name("TYPE")
         .value_parser(["undefined", "null"])
-        .help("Type for void results: undefined (default) or null")
+        .help("Type for match-only results: undefined (default) or null")
 }
 
 pub fn output_file_arg() -> Arg {
@@ -139,7 +148,7 @@ pub fn grammar_arg() -> Arg {
         .value_name("GRAMMAR_JSON")
         .value_parser(value_parser!(PathBuf))
         .conflicts_with("lang")
-        .help("Link against this exact grammar.json instead of the registry")
+        .help("Bind query names using this exact grammar.json instead of the registry")
 }
 
 pub fn compact_arg() -> Arg {
@@ -167,5 +176,5 @@ pub fn no_result_arg() -> Arg {
     Arg::new("no_result")
         .long("no-result")
         .action(ArgAction::SetTrue)
-        .help("Skip materialization, show effects only")
+        .help("Skip materialization, show the execution trace only")
 }

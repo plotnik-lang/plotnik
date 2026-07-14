@@ -107,7 +107,7 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
         .runtime_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
         .serde(cfg!(feature = "serde"))
         .limits(runtime_limits(&args.limits))
-        .depth(replay_depth(&args.limits));
+        .decode_depth(decode_depth(&args.limits));
     let emission = compiled
         .emit(config)
         .map_err(|error| ExpandError::new(query_span, error.to_string()))?;
@@ -152,8 +152,8 @@ fn compile_strict_query(
 /// real diagnosis instead.
 fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<(), ExpandError> {
     let mut entry_names: HashMap<String, String> = HashMap::new();
-    for def in compiled.entrypoint_names() {
-        let entry = plotnik_lib::matcher_entry_fn_name(&def);
+    for def in compiled.entry_point_names() {
+        let entry = plotnik_lib::matcher_journal_fn_name(&def);
         if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
             return Err(ExpandError::new(
                 span,
@@ -224,12 +224,12 @@ fn invoking_dir() -> Option<PathBuf> {
 
 fn runtime_limits(args: &LimitArgs) -> RuntimeLimitSpec {
     RuntimeLimitSpec {
-        steps: limit(&args.steps),
+        fuel_limit: limit(&args.fuel),
         memory: limit(&args.memory),
     }
 }
 
-fn replay_depth(args: &LimitArgs) -> Limit {
+fn decode_depth(args: &LimitArgs) -> Limit {
     limit(&args.depth)
 }
 

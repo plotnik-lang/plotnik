@@ -8,7 +8,7 @@ The command does not create or consume a bytecode artifact.
 
 The dump prints sections in this fixed order (matching the wire layout, except
 `[spans]` — the final wire section — which is grouped with the other tables so
-`[transitions]` stays last):
+`[instructions]` stays last):
 
 ```text
 [strings]
@@ -16,9 +16,9 @@ The dump prints sections in this fixed order (matching the wire layout, except
 [type_defs]
 [type_members]
 [type_names]
-[entrypoints]
+[entry_points]
 [spans]       ; only when inspection spans exist
-[transitions]
+[instructions]
 ```
 
 Indexes are printed with prefixes:
@@ -48,35 +48,35 @@ the bytecode entry. The section is omitted when `spans_count == 0`.
 For degraded inspection modules, only admitted span ids are printed. Dropped
 detail tiers have no `Pxx` line and no corresponding span effects.
 
-## Transition Lines
+## Instruction Lines
 
-Each transition line uses fixed columns:
+Each instruction line uses fixed columns:
 
 ```text
-  step  nav  content                         successors
+  addr  nav  content                         successors
 ```
 
 Examples:
 
 ```text
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  08   !   (number) [Null Set(M1) Node Set(M0)]  07
+  08   !   (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
 ```
 
 Instruction forms:
 
 | Instruction | Format                                   |
 | ----------- | ---------------------------------------- |
-| Match       | `step nav field: (kind) [effects] succs` |
-| Epsilon     | `step -ε- [effects] succs`               |
-| Call        | `step nav field: (@target) target : ret` |
-| RoutedCall  | `step (@target) target : ret`            |
-| SplitCall   | `step (@target) target : matched / zero` |
-| Return      | `step ▶` or `step ▶ zero`                |
-| Padding     | `step ...`                               |
+| Match       | `addr nav field: (kind) [effects] succs` |
+| Epsilon     | `addr -ε- [effects] succs`               |
+| Call        | `addr nav field: (@target) target : ret` |
+| RoutedCall  | `addr (@target) target : ret`            |
+| SplitCall   | `addr (@target) target : matched / zero` |
+| Return      | `addr ▶` or `addr ▶ empty`               |
+| Padding     | `addr ...`                               |
 
 An empty navigation column means `Stay`. `-ε-` means `Nav::Epsilon`, a distinct
 mode with no cursor movement or node check.
@@ -88,7 +88,7 @@ Inspection effects render as `SpanStartAt#5`, `SpanStart#5`, and `SpanEnd#5`.
 Scalar effects use the stable names `ScalarOpen`, `ScalarMark`, `StrClose`, and
 `BoolClose(0)` / `BoolClose(1)`; direct node scalars use `NodeStr` and
 `NodeBool`; provenance-free booleans use `BoolValue(0)` / `BoolValue(1)`. Primitive type definitions render as
-`<Str>` and `<Bool>`.
+`<Text>` and `<Bool>`.
 
 ## Navigation Symbols
 
@@ -137,8 +137,8 @@ S6 "string"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { n, s }
-T2 = Optional(T0)  ; <Node>?
+T1 = Record  M0:2  ; { n, s }
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T2  ; n: T2
@@ -147,19 +147,19 @@ M1: S2 → T2  ; s: T2
 [type_names]
 N0: S3 → T1  ; Value
 
-[entrypoints]
+[entry_points]
 Value = 00 :: T1
 
-[transitions]
+[instructions]
 Value:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08   !   (number) [Null Set(M1) Node Set(M0)]  07
-  11   !   (string) [Null Set(M0) Node Set(M1)]  07
+  08   !   (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  11   !   (string) [Absent RecordSet(M0) Node RecordSet(M1)]  07
   14  ─‣─  _                                08, 11, 14
   16  └‣─  _                                08, 11, 14
   18   !   (document)                       16

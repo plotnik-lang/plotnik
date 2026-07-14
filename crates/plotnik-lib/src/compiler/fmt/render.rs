@@ -464,8 +464,8 @@ impl Renderer {
                     let mut text = self.inline_text(elements);
                     match kind {
                         PrefixKind::Field => text.push(' '),
-                        PrefixKind::Branch { .. } if !text.is_empty() => text.push(' '),
-                        PrefixKind::Branch { .. } => {}
+                        PrefixKind::Alternative { .. } if !text.is_empty() => text.push(' '),
+                        PrefixKind::Alternative { .. } => {}
                     }
                     let (inline_comments, boundary_comments) = self.split_comments(elements);
                     before_comments.extend(boundary_comments.iter().copied());

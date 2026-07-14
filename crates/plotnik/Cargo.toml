@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Typed tree-sitter queries: the query! macro and its runtime"
 documentation = "https://docs.rs/plotnik"
 readme = "../../README.md"
-keywords = ["tree-sitter", "query", "ast", "parser"]
+keywords = ["tree-sitter", "query", "syntax-tree", "parser"]
 categories = ["development-tools", "parsing"]
 include = ["src/**/*", "Cargo.toml"]
 

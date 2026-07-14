@@ -2,13 +2,13 @@ use clap::Command;
 use plotnik_lib::{Limit, RuntimeLimitSpec};
 
 use super::limits::{
-    limits_preset_arg, max_memory_arg, max_steps_arg, parse_memory, parse_size, parse_steps,
+    fuel_arg, limits_preset_arg, max_memory_arg, parse_fuel, parse_memory, parse_size,
     resolve_limit_spec,
 };
 
 fn spec_from(args: &[&str]) -> RuntimeLimitSpec {
     let cmd = Command::new("t")
-        .arg(max_steps_arg())
+        .arg(fuel_arg())
         .arg(max_memory_arg())
         .arg(limits_preset_arg());
     let argv = std::iter::once("t").chain(args.iter().copied());
@@ -49,14 +49,14 @@ fn parse_size_rejects_fractional_and_garbage() {
 }
 
 #[test]
-fn parse_steps_keywords_and_numbers() {
-    assert_eq!(parse_steps("auto"), Ok(Limit::Auto));
-    assert_eq!(parse_steps("AUTO"), Ok(Limit::Auto));
-    assert_eq!(parse_steps("unbounded"), Ok(Limit::Unbounded));
-    assert_eq!(parse_steps("5000"), Ok(Limit::Of(5000)));
-    assert!(parse_steps("lots").is_err());
+fn parse_fuel_keywords_and_numbers() {
+    assert_eq!(parse_fuel("auto"), Ok(Limit::Auto));
+    assert_eq!(parse_fuel("AUTO"), Ok(Limit::Auto));
+    assert_eq!(parse_fuel("unbounded"), Ok(Limit::Unbounded));
+    assert_eq!(parse_fuel("5000"), Ok(Limit::Of(5000)));
+    assert!(parse_fuel("lots").is_err());
     // `unbounded` is the one opt-out spelling — no `none` synonym, matching `--limits`.
-    assert!(parse_steps("none").is_err());
+    assert!(parse_fuel("none").is_err());
 }
 
 #[test]
@@ -69,31 +69,31 @@ fn parse_memory_keywords_and_sizes() {
 #[test]
 fn default_spec_is_auto_auto() {
     let spec = spec_from(&[]);
-    assert_eq!(spec.steps, Limit::Auto);
+    assert_eq!(spec.fuel_limit, Limit::Auto);
     assert_eq!(spec.memory, Limit::Auto);
 }
 
 #[test]
 fn explicit_overrides_apply_per_field() {
-    let spec = spec_from(&["--max-steps", "5", "--max-memory", "32MiB"]);
-    assert_eq!(spec.steps, Limit::Of(5));
+    let spec = spec_from(&["--fuel", "5", "--max-memory", "32MiB"]);
+    assert_eq!(spec.fuel_limit, Limit::Of(5));
     assert_eq!(spec.memory, Limit::Of(32 << 20));
 }
 
 #[test]
 fn preset_sets_the_baseline_for_both() {
     let spec = spec_from(&["--limits", "unbounded"]);
-    assert_eq!(spec.steps, Limit::Unbounded);
+    assert_eq!(spec.fuel_limit, Limit::Unbounded);
     assert_eq!(spec.memory, Limit::Unbounded);
 }
 
 #[test]
 fn per_field_override_beats_preset_regardless_of_order() {
-    // The canonical case: unbounded runtime limits except steps.
-    let forward = spec_from(&["--limits", "unbounded", "--max-steps", "5"]);
-    let reversed = spec_from(&["--max-steps", "5", "--limits", "unbounded"]);
+    // The canonical case: unbounded runtime limits except fuel.
+    let forward = spec_from(&["--limits", "unbounded", "--fuel", "5"]);
+    let reversed = spec_from(&["--fuel", "5", "--limits", "unbounded"]);
     for spec in [forward, reversed] {
-        assert_eq!(spec.steps, Limit::Of(5));
+        assert_eq!(spec.fuel_limit, Limit::Of(5));
         assert_eq!(spec.memory, Limit::Unbounded);
     }
 }

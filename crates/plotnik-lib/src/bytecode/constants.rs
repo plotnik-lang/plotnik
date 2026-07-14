@@ -12,10 +12,10 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v5: Added extras-only anchor navigation modes.
 /// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
 /// v7: Type kind and effect opcode discriminants renumbered contiguously.
-/// v8: single effects list per Match; per-entrypoint wrappers.
-/// v9: `Childless*` navigation family (anchors over a zero-width child list).
+/// v8: single effects list per Match; one wrapper per entry point.
+/// v9: `Childless*` navigation family (anchors over an empty-matching child list).
 /// v10: inspection spans — three span effect kinds and the `spans` section.
-/// v11: `Str`/`Bool` types and balanced scalar-provenance effects.
+/// v11: `Text`/`Bool` types and balanced scalar-provenance effects.
 pub const VERSION: u32 = 11;
 
 /// Section alignment in bytes.
@@ -28,8 +28,8 @@ pub const SECTION_ALIGN: usize = 64;
 /// size.
 pub const HEADER_SIZE: usize = SECTION_ALIGN;
 
-/// Step size in bytes (all instructions are 8-byte aligned).
-pub const STEP_SIZE: usize = 8;
+/// Bytecode-word size in bytes. Instructions are word-aligned and may span words.
+pub const BYTECODE_WORD_SIZE: usize = 8;
 
 /// String offset table entry size: one little-endian `u32` offset per string.
 pub const STRING_TABLE_ENTRY_SIZE: usize = size_of::<u32>();
@@ -47,7 +47,7 @@ pub const MAX_SPANS: usize = 1 << EFFECT_PAYLOAD_BITS;
 ///
 /// Match64 (the largest variant) supports up to 28 u16 slots for
 /// effects, neg_fields, and successors combined. When an epsilon
-/// transition needs more successors, it must be split into a cascade.
+/// instruction needs more successors, it must be split into a cascade.
 pub const MAX_MATCH_PAYLOAD_SLOTS: usize = 28;
 
 /// Maximum effects per Match instruction (4-bit count field).

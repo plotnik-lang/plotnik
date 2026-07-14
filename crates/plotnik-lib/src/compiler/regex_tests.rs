@@ -142,7 +142,7 @@ fn ecma_prints_folded_classes_without_ignore_case() {
 }
 
 #[test]
-fn ecma_prints_anchors_and_empty_alternation_branch() {
+fn ecma_prints_anchors_and_empty_alternative() {
     assert_eq!(ecma::print(&normalize("^$")).source, "^$");
     assert_eq!(ecma::print(&normalize("a|")).source, "a|(?:)");
 }

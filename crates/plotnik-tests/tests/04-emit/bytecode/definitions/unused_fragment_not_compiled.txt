@@ -3,7 +3,7 @@ Used = (comment)+
 Q = (program (Used))
 --------------------- INPUT ----------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 20
 
 [transitions]
@@ -14,15 +14,15 @@ Q:
 
 Used:
   05                                        ▶
-  06  -ε-  [ArrayClose]                     05
-  08   !   (comment) [Node Push]            10, 06
+  06  -ε-  [ListClose]                      05
+  08   !   (comment) [Node ArrayPush]       10, 06
   10  ──!  _                                08, 10
-  11   !   _ [ArrayOpen]                    08, 10
+  11   !   _ [ListOpen]                     08, 10
 
 Q:
   17  └‣─  (Used)                           11 : 03
 
-Q (entrypoint):
+Q (entry point):
   19                                        ▶
   20       (Q)                              02 : 19
 -------------------- BYTECODE --------------------
@@ -34,19 +34,19 @@ S3 "program"
 S4 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
-T2 = ArrayPlus(T1)  ; <Node>+
+T2 = ListOneOrMore(T1)  ; <Node>+
 
 [type_members]
 
 [type_names]
 N0: S1 → T2  ; Used
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
-[transitions]
+[instructions]
 Q:
   00       (@16)                            16 : 01
   01                                        ▶
@@ -55,8 +55,8 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose]                     06
-  10   !   (comment) [Node Push]            12, 08
+  08  -ε-  [ListClose]                      06
+  10   !   (comment) [Node ArrayPush]       12, 08
   12  ──!  _                                10, 12
-  14   !   _ [ArrayOpen]                    10, 12
+  14   !   _ [ListOpen]                     10, 12
   16   !   (program) [SuppressBegin]        02

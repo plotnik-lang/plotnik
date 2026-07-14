@@ -43,12 +43,12 @@ const STACK_SIZE: usize = 256 * 1024;
 /// - `Top` anchors at the program root and descends to the unary chain. The root
 ///   preamble matches once (no tree-wide search), so the work stays linear in
 ///   `DEPTH` rather than quadratic.
-/// - `Rec`'s escape branch matches `number` — a real expression, so the pattern is
+/// - `Rec`'s escape alternative matches `number` — a real expression, so the pattern is
 ///   matchable in principle (the grammar checker admits it) yet one that never
 ///   appears in a chain of `!` operators over an identifier. Trying it fails and
-///   *consumes* the branch checkpoint at every level, so the descent leaves only
+///   *consumes* the successor checkpoint at every level, so the descent leaves only
 ///   call-retry checkpoints — a contiguous run that backtrack pops without
-///   re-entering. At the leaf `identifier`, both branches fail and the whole run
+///   re-entering. At the leaf `identifier`, both alternatives fail and the whole run
 ///   unwinds at once.
 const QUERY: &str = indoc! {"
     Rec = [Leaf: (number) Deep: (unary_expression (Rec))]
@@ -81,7 +81,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
     // concern; this test isolates the VM's backtracking.
     let tree = support::parse_javascript(&source);
 
-    let entry = module.entrypoint("Top").expect("Top is an entrypoint");
+    let entry = module.entry_point("Top").expect("Top is an entry point");
 
     // Run the VM on a tiny stack so the pre-fix recursive `backtrack` would abort
     // here. Both runtime limits are Unbounded so no resource ceiling cuts the run
@@ -94,7 +94,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
             .spawn_scoped(scope, || {
                 let vm = VM::builder(&source, &tree)
                     .limits(RuntimeLimitSpec {
-                        steps: Limit::Unbounded,
+                        fuel_limit: Limit::Unbounded,
                         memory: Limit::Unbounded,
                     })
                     .build();
@@ -103,7 +103,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
                 match result {
                     Ok(_) => "matched",
                     Err(RuntimeError::NoMatch) => "no-match",
-                    Err(RuntimeError::StepLimitExceeded(_)) => "steps",
+                    Err(RuntimeError::OutOfFuel(_)) => "fuel",
                     Err(RuntimeError::MemoryLimitExceeded { .. }) => "memory",
                 }
             })
@@ -132,9 +132,9 @@ fn deep_value_render_and_drop_do_not_overflow_native_stack() {
             .stack_size(STACK_SIZE)
             .spawn_scoped(scope, || {
                 // Bottom-up so construction itself never recurses.
-                let mut value = Value::Null;
+                let mut value = Value::Absent;
                 for _ in 0..VALUE_DEPTH {
-                    value = Value::Struct(vec![("inner", value)]);
+                    value = Value::Record(vec![("inner", value)]);
                 }
                 let rendered = value.format(false, Colors::new(false));
                 // `value` drops here, on this same tiny stack.

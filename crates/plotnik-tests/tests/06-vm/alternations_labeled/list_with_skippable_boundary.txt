@@ -1,0 +1,138 @@
+Q = (program
+  {
+    [
+      Tag: {
+        (expression_statement) @a
+        (comment)?
+      }
+    ]
+  }* @items
+)
+--------------------- INPUT ----------------------
+a; b;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  items: QItems[];
+}
+
+export interface QItems {
+  a: Node;
+}
+------------------ DIAGNOSTICS -------------------
+warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
+ --> query.ptk:3:5
+  |
+3 | /     [
+4 | |       Tag: {
+5 | |         (expression_statement) @a
+6 | |         (comment)?
+7 | |       }
+8 | |     ]
+  | |_____^
+  |
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
+--------------------- OUTPUT ---------------------
+{
+  "items": [
+    {
+      "a": {
+        "kind": "expression_statement",
+        "text": "a;",
+        "span": [0, 2]
+      }
+    },
+    {
+      "a": {
+        "kind": "expression_statement",
+        "text": "b;",
+        "span": [3, 5]
+      }
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "items"
+S3 "QItems"
+S4 "Q"
+S5 "program"
+S6 "expression_statement"
+S7 "comment"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { a }
+T2 = ListZeroOrMore(T1)  ; QItems*
+T3 = Record  M1:1  ; { items }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T2  ; items: T2
+
+[type_names]
+N0: S3 → T1  ; QItems
+N1: S4 → T3  ; Q
+
+[entry_points]
+Q = 00 :: T3
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ListClose RecordSet(M1)]        06
+  10  -ε-  [RecordClose ArrayPush]          19, 26
+  12   !   (comment)                        10
+  13  ──!  _                                12, 13
+  15  ...
+  16   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  13, 10
+  19  ──!  _                                16, 19
+  21  └─!  _                                16, 19
+  23  ...
+  24  -ε-  [ListOpen]                       21, 08
+  26  ─‣┘  _ [ListClose RecordSet(M1)]      06
+  28   !   (program)                        24
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+       ▶   (@28)
+
+@28:
+  28       (program)                        24
+       ●   program
+  24  -ε-  [ListOpen]                       21, 08
+  21       _                                16, 19
+       ●   expression_statement
+  16       (expression_statement) [RecordOpen Node RecordSet(M0)]  13, 10
+       ●   expression_statement
+  13       _                                12, 13
+       ●   expression_statement
+  12       (comment)                        10
+       ○   expression_statement
+  13  ❮❮❮ 
+  13       _                                12, 13
+  16  ❮❮❮ 
+  10  -ε-  [RecordClose ArrayPush]          19, 26
+  19       _                                16, 19
+       ●   expression_statement
+  16       (expression_statement) [RecordOpen Node RecordSet(M0)]  13, 10
+       ●   expression_statement
+  13       _                                12, 13
+  16  ❮❮❮ 
+  10  -ε-  [RecordClose ArrayPush]          19, 26
+  19       _                                16, 19
+  10  ❮❮❮ 
+  26       _ [ListClose RecordSet(M1)]      06
+       ●   program
+  06   ◀   (@28)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

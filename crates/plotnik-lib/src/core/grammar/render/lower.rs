@@ -19,7 +19,7 @@ use super::super::prepared::{ExtractedLexicalGrammar, ExtractedSyntaxGrammar, Va
 use super::super::rules::{Rule, Symbol, SymbolType};
 use super::super::types::{NodeKindRef, NodeShape};
 use super::lexical::synthesize;
-use super::{Body, Def, DefKind, NodeRef, Quant, Shape, TreeGrammar};
+use super::{Body, Def, DefKind, GrammarNodeRef, Quant, Shape, TreeGrammar};
 
 /// A kind that exists only by aliasing another: `(alias_name)` displays the
 /// `underlying` rule under a new name.
@@ -168,17 +168,17 @@ fn append_alias_defs(
     tree.defs.extend(new_defs);
 }
 
-fn closure_members(refs: &[NodeKindRef], supertype_names: &HashSet<&str>) -> Vec<NodeRef> {
+fn closure_members(refs: &[NodeKindRef], supertype_names: &HashSet<&str>) -> Vec<GrammarNodeRef> {
     refs.iter()
         .map(|kind_ref| {
             if supertype_names.contains(kind_ref.kind_name.as_str()) {
-                NodeRef {
+                GrammarNodeRef {
                     name: de_underscore(&kind_ref.kind_name).to_string(),
                     named: true,
                     category: true,
                 }
             } else {
-                NodeRef {
+                GrammarNodeRef {
                     name: kind_ref.kind_name.clone(),
                     named: kind_ref.named,
                     category: false,
@@ -358,7 +358,7 @@ impl<'a> LowerCtx<'a> {
             Rule::Reserved { rule, .. } => self.lower_shape(rule),
             // No String/Pattern/NamedSymbol survive into a syntax rule after
             // `extract_tokens`; handled defensively so lowering is total.
-            Rule::String(value) => Shape::Node(NodeRef {
+            Rule::String(value) => Shape::Node(GrammarNodeRef {
                 name: value.clone(),
                 named: false,
                 category: false,
@@ -418,7 +418,7 @@ impl<'a> LowerCtx<'a> {
             SymbolType::NonTerminal => {
                 let variable = &self.syntax.variables[symbol.index];
                 if self.supertypes.contains(&symbol) {
-                    Shape::Node(NodeRef {
+                    Shape::Node(GrammarNodeRef {
                         name: de_underscore(&variable.name).to_string(),
                         named: true,
                         category: true,
@@ -426,7 +426,7 @@ impl<'a> LowerCtx<'a> {
                 } else if variable.kind == VariableType::Hidden || self.inlines.contains(&symbol) {
                     Shape::Splice(variable.name.clone())
                 } else {
-                    Shape::Node(NodeRef {
+                    Shape::Node(GrammarNodeRef {
                         name: variable.name.clone(),
                         named: true,
                         category: false,
@@ -436,12 +436,12 @@ impl<'a> LowerCtx<'a> {
             SymbolType::Terminal => {
                 let variable = &self.lexical.variables[symbol.index];
                 match variable.kind {
-                    VariableType::Named => Shape::Node(NodeRef {
+                    VariableType::Named => Shape::Node(GrammarNodeRef {
                         name: variable.name.clone(),
                         named: true,
                         category: false,
                     }),
-                    VariableType::Anonymous => Shape::Node(NodeRef {
+                    VariableType::Anonymous => Shape::Node(GrammarNodeRef {
                         name: variable.name.clone(),
                         named: false,
                         category: false,
@@ -456,7 +456,7 @@ impl<'a> LowerCtx<'a> {
             SymbolType::External => {
                 let token = &self.syntax.external_tokens[symbol.index];
                 match token.kind {
-                    VariableType::Anonymous => Shape::Node(NodeRef {
+                    VariableType::Anonymous => Shape::Node(GrammarNodeRef {
                         name: token.name.clone(),
                         named: false,
                         category: false,
@@ -466,7 +466,7 @@ impl<'a> LowerCtx<'a> {
                     VariableType::Hidden | VariableType::Auxiliary => {
                         Shape::Splice(token.name.clone())
                     }
-                    VariableType::Named => Shape::Node(NodeRef {
+                    VariableType::Named => Shape::Node(GrammarNodeRef {
                         name: token.name.clone(),
                         named: true,
                         category: false,
@@ -512,7 +512,7 @@ fn ref_shape(name: String, named: bool) -> Shape {
     if named && name.starts_with('_') {
         Shape::Splice(name)
     } else {
-        Shape::Node(NodeRef {
+        Shape::Node(GrammarNodeRef {
             name,
             named,
             category: false,

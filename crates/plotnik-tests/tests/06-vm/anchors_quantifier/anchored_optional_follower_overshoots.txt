@@ -35,43 +35,43 @@ S10 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:3  ; { a, b, c }
-T2 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:3  ; { a, b, c }
 
 [type_members]
-M0: S02 → T2  ; a: T2
-M1: S03 → T2  ; b: T2
+M0: S02 → T1  ; a: T1
+M1: S03 → T1  ; b: T1
 M2: S04 → T0  ; c: <Node>
 
 [type_names]
-N0: S05 → T1  ; Q
+N0: S05 → T2  ; Q
 
-[entrypoints]
-Q = 00 :: T1
+[entry_points]
+Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  (identifier) == "foo"            08
   08  ─‣┘  _                                09
   09  ─‣┘  _                                10
   10                                        ▶
-  11  └•─  (expression_statement) [Null Set(M1) Node Set(M2)]  06
-  14  ─•─  (expression_statement) [Node Set(M2)]  06
-  16  └•─  (debugger_statement) [Node Set(M1)]  14
-  18  -ε-  [Null Set(M1)]                   14
-  20  ─•─  (debugger_statement) [Node Set(M1)]  14
-  22  -ε-  [Null Set(M0)]                   16, 11
-  24   !   (lexical_declaration) [Node Set(M0)]  20, 18
+  11  └•─  (expression_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  06
+  14  ─•─  (expression_statement) [Node RecordSet(M2)]  06
+  16  └•─  (debugger_statement) [Node RecordSet(M1)]  14
+  18  -ε-  [Absent RecordSet(M1)]           14
+  20  ─•─  (debugger_statement) [Node RecordSet(M1)]  14
+  22  -ε-  [Absent RecordSet(M0)]           16, 11
+  24   !   (lexical_declaration) [Node RecordSet(M0)]  20, 18
   26  ──!  _                                24, 26
   28  └─!  _                                24, 26
   30   !   (program)                        28, 22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
        ▶   (@30)
 
@@ -80,26 +80,26 @@ Q:
        ●   program
   28       _                                24, 26
        ●   expression_statement
-  24       (lexical_declaration) [Node Set(M0)]  20, 18
+  24       (lexical_declaration) [Node RecordSet(M0)]  20, 18
        ○   expression_statement
   28  ❮❮❮ 
   26       _                                24, 26
        ●   debugger_statement
-  24       (lexical_declaration) [Node Set(M0)]  20, 18
+  24       (lexical_declaration) [Node RecordSet(M0)]  20, 18
        ○   debugger_statement
   26  ❮❮❮ 
   26       _                                24, 26
        ●   expression_statement
-  24       (lexical_declaration) [Node Set(M0)]  20, 18
+  24       (lexical_declaration) [Node RecordSet(M0)]  20, 18
        ○   expression_statement
   26  ❮❮❮ 
   26       _                                24, 26
   30  ❮❮❮ 
-  22  -ε-  [Null Set(M0)]                   16, 11
-  16       (debugger_statement) [Node Set(M1)]  14
+  22  -ε-  [Absent RecordSet(M0)]           16, 11
+  16       (debugger_statement) [Node RecordSet(M1)]  14
        ○   expression_statement
   22  ❮❮❮ 
-  11       (expression_statement) [Null Set(M1) Node Set(M2)]  06
+  11       (expression_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  06
        ●   expression_statement
   06       (identifier) == "foo"            08
        ○   ;

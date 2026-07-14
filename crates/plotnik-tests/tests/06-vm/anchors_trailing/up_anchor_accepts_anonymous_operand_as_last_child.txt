@@ -16,16 +16,16 @@ S3 "debugger"
 S4 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
-[transitions]
+[instructions]
 Q:
   00       (@11)                            11 : 01
   01                                        ▶

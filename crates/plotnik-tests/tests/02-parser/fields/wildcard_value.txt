@@ -23,4 +23,4 @@ Root
     NamedNode pair
       CapturedPattern @key
         FieldPattern key:
-          AnonymousNode (any)
+          NodeWildcard

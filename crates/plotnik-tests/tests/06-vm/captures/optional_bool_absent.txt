@@ -21,7 +21,7 @@ S4 "expression_statement"
 
 [type_defs]
 T0 = <Bool>
-T1 = Struct  M0:1  ; { has_statement }
+T1 = Record  M0:1  ; { has_statement }
 
 [type_members]
 M0: S1 → T0  ; has_statement: <Bool>
@@ -29,27 +29,27 @@ M0: S1 → T0  ; has_statement: <Bool>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06   !   (expression_statement)           08
   07  ...
-  08  ─‣┘  _ [BoolValue(1) Set(M0)]         10
+  08  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   10
   10                                        ▶
   11  ──!  _                                06, 11
   13  └─!  _                                06, 11
   15  ...
-  16  -ε-  [BoolValue(0) Set(M0)]           10
+  16  -ε-  [BoolValue(0) RecordSet(M0)]     10
   18   !   (program)                        13, 16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
        ▶   (@18)
 
@@ -63,9 +63,9 @@ Q:
   13  ❮❮❮ 
   11       _                                06, 11
   18  ❮❮❮ 
-  16  -ε-  [BoolValue(0) Set(M0)]           10
+  16  -ε-  [BoolValue(0) RecordSet(M0)]     10
   10   ◀   (@18)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

@@ -47,8 +47,8 @@ S12 "member"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { m }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:1  ; { m }
 
 [type_members]
 M0: S02 → T0  ; name: <Node>
@@ -58,36 +58,36 @@ M1: S03 → T1  ; m: Member
 N0: S04 → T1  ; Member
 N1: S05 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Member = 00 :: T1
 Q      = 06 :: T2
 
-[transitions]
+[instructions]
 Member:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@21)                            21 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@27)                            27 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
-  12  └‣─  name: (property_identifier) [Node Set(M0)] == "b"  15
+  12  └‣─  name: (property_identifier) [Node RecordSet(M0)] == "b"  15
   15  ─‣┘  _                                20
-  16  -ε-  [StructClose]                    18
-  18  ─‣┘³ _ [Set(M1)]                      22
+  16  -ε-  [RecordClose]                    18
+  18  ─‣┘³ _ [RecordSet(M1)]                22
   20                                        ▶
   21   !   (method_definition)              12
   22                                        ▶
   23  └‣─  member: (@21)                    21 : 16
-  24  └‣─  body: (class_body) [StructOpen]  23
+  24  └‣─  body: (class_body) [RecordOpen]  23
   26  └‣─  (class_declaration)              24
   27   !   (program)                        26
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@27)                            27 : 09
        ▶   (@27)
 
@@ -96,7 +96,7 @@ Q:
        ●   program
   26       (class_declaration)              24
        ●   class_declaration
-  24       body: (class_body) [StructOpen]  23
+  24       body: (class_body) [RecordOpen]  23
        ○   class
        ○   identifier
        ●   class_body
@@ -106,7 +106,7 @@ Q:
 @21:
   21       (method_definition)              12
        ●   method_definition
-  12       name: (property_identifier) [Node Set(M0)] == "b"  15
+  12       name: (property_identifier) [Node RecordSet(M0)] == "b"  15
        ○   formal_parameters
        ○   statement_block
   23  ❮❮❮ 
@@ -115,18 +115,18 @@ Q:
 @21:
   21       (method_definition)              12
        ●   method_definition
-  12       name: (property_identifier) [Node Set(M0)] == "b"  15
+  12       name: (property_identifier) [Node RecordSet(M0)] == "b"  15
        ●   property_identifier
   15       _                                20
        ●   method_definition
   20   ◀   (@21)                            
 
 @27:
-  16  -ε-  [StructClose]                    18
-  18       _ [Set(M1)]                      22
+  16  -ε-  [RecordClose]                    18
+  18       _ [RecordSet(M1)]                22
        ●   program
   22   ◀   (@27)                            
 
 Q:
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11   ◀   (Q)                              ◼

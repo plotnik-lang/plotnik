@@ -34,7 +34,7 @@ S7 "string_fragment"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { s }
+T1 = Record  M0:1  ; { s }
 
 [type_members]
 M0: S1 → T0  ; s: <Node>
@@ -42,26 +42,26 @@ M0: S1 → T0  ; s: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ─‣─  """                              07
   07  ─‣┘³ _                                08
   08                                        ▶
-  09  ─‣─  (string_fragment) [Node Set(M0)]  06
+  09  ─‣─  (string_fragment) [Node RecordSet(M0)]  06
   11  └‣─  """                              09
   12  └‣─  (string)                         11
   13  └‣─  (expression_statement)           12
   14   !   (program)                        13
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
        ▶   (@14)
 
@@ -74,7 +74,7 @@ Q:
        ●   string
   11       """                              09
        ●   "
-  09       (string_fragment) [Node Set(M0)]  06
+  09       (string_fragment) [Node RecordSet(M0)]  06
        ●   string_fragment
   06       """                              07
        ●   "
@@ -83,5 +83,5 @@ Q:
   08   ◀   (@14)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

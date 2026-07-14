@@ -4,7 +4,7 @@
 //! instructions into cascading epsilon chains:
 //! - effects > 15 → epsilon chain after match
 //! - neg_fields > 7 → epsilon chain for overflow checks
-//! - successors > 28 → cascading epsilon branches
+//! - successors > 28 → cascading epsilon forks
 
 use crate::bytecode::{MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS};
 use crate::core::NodeFieldId;
@@ -27,7 +27,7 @@ pub fn pack_instructions(result: &mut NfaGraph) {
         + 1;
 
     // Earlier passes may have deleted the highest-numbered labels, so ids from
-    // `next_label` up get *reused* for cascade steps. Drop the dead labels'
+    // `next_label` up get *reused* for cascade states. Drop the dead labels'
     // origins so a reused id reads as a wire artifact (no origin), not as the
     // dead label's definition.
     result.label_origins.truncate(next_label as usize);
@@ -92,7 +92,7 @@ impl Emitter {
                 }
                 PostChain::Successors(succs) => {
                     // The cascade holds the *overflow* (lowest-priority) successors. It is an
-                    // additional branch, so append its entry after the kept successors rather
+                    // additional successor, so append its entry after the kept successors rather
                     // than replacing them — replacing silently drops the kept successors.
                     self.emit_successors_cascade(chain_entry, succs);
                     current_succs.push(chain_entry);

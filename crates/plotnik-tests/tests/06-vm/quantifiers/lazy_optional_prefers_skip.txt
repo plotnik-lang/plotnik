@@ -1,0 +1,77 @@
+Q = (program
+  (expression_statement)?? @e
+  (expression_statement) @f
+)
+--------------------- INPUT ----------------------
+a; b;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  e: Node | null;
+  f: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "e": null,
+  "f": {
+    "kind": "expression_statement",
+    "text": "a;",
+    "span": [0, 2]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "e"
+S2 "f"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { e, f }
+
+[type_members]
+M0: S1 → T1  ; e: T1
+M1: S2 → T0  ; f: <Node>
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08  └‣─  (expression_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  11  ─‣─  (expression_statement) [Node RecordSet(M1)]  07
+  13   !   (expression_statement) [Node RecordSet(M0)]  11
+  15  ...
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
+  20   !   (program)                        08, 18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
+
+@20:
+  20       (program)                        08, 18
+       ●   program
+  08       (expression_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+       ●   expression_statement
+  07       _                                06
+       ●   program
+  06   ◀   (@20)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

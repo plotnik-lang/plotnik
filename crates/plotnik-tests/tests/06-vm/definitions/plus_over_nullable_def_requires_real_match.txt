@@ -36,57 +36,57 @@ S9 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { x }
-T3 = ArrayPlus(T2)  ; A+
-T4 = Struct  M2:1  ; { xs }
-T5 = Optional(T1)  ; AX?
+T1 = Record  M0:1  ; { id }
+T2 = Option(T1)  ; AX?
+T3 = Record  M1:1  ; { x }
+T4 = ListOneOrMore(T3)  ; A+
+T5 = Record  M2:1  ; { xs }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
-M1: S2 → T5  ; x: T5
-M2: S3 → T3  ; xs: T3
+M1: S2 → T2  ; x: T2
+M2: S3 → T4  ; xs: T4
 
 [type_names]
 N0: S4 → T1  ; AX
-N1: S5 → T2  ; A
-N2: S6 → T4  ; Q
+N1: S5 → T3  ; A
+N2: S6 → T5  ; Q
 
-[entrypoints]
-Q = 00 :: T4
+[entry_points]
+Q = 00 :: T5
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [Node Set(M0)]      08
-  08  ─‣┘  _ [StructClose Set(M1)]          11
+  06  └‣─  (identifier) [Node RecordSet(M0)]  08
+  08  ─‣┘  _ [RecordClose RecordSet(M1)]    11
   10                                        ▶
-  11  -ε-  [StructClose Push]               20, 24
-  13   !   (expression_statement) [StructOpen]  06
+  11  -ε-  [RecordClose ArrayPush]          20, 24
+  13   !   (expression_statement) [RecordOpen]  06
   15  ...
   16  ──!  _                                13, 16
-  18   !   _ [StructOpen]                   13, 16
+  18   !   _ [RecordOpen]                   13, 16
   20  ──!  _                                18, 20
-  22  └─!  _ [ArrayOpen]                    18, 20
-  24  ─‣┘  _ [ArrayClose Set(M2)]           10
+  22  └─!  _ [ListOpen]                     18, 20
+  24  ─‣┘  _ [ListClose RecordSet(M2)]      10
   26   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
        ▶   (@26)
 
 @26:
   26       (program)                        22
        ●   program
-  22       _ [ArrayOpen]                    18, 20
+  22       _ [ListOpen]                     18, 20
        ●   debugger_statement
-  18       _ [StructOpen]                   13, 16
+  18       _ [RecordOpen]                   13, 16
        ●   debugger_statement
-  13       (expression_statement) [StructOpen]  06
+  13       (expression_statement) [RecordOpen]  06
        ○   debugger_statement
   18  ❮❮❮ 
   16       _                                13, 16

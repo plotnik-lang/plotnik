@@ -3,16 +3,16 @@ use std::collections::{HashMap, HashSet};
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::parse::ast::token_src;
-use crate::compiler::parse::ast::{self, NodePattern, Pattern};
+use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
+use super::bind::GrammarBinder;
 use super::diagnostics::format_list;
-use super::link::GrammarLinker;
 use super::participation::Participation;
 
-impl<'a, 'q> GrammarLinker<'a, 'q> {
+impl<'a, 'q> GrammarBinder<'a, 'q> {
     /// Walk the query, validating each node's own grammar constraints. See
     /// [`Participation`] for why deferred positions skip their checks.
     ///
@@ -26,7 +26,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         walk: &mut AdmissibilityWalkState,
     ) {
         match located.node() {
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 let located_node = located.wrap(node.clone());
                 // The VM only matches concrete tree-sitter node kinds today. Stop here so
                 // this unsupported supertype does not become context for child checks.
@@ -95,21 +95,21 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     }
                 }
             }
-            Pattern::TokenPattern(_) => {}
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => {}
             Pattern::FieldPattern(f) => {
-                // Normally handled by the parent NodePattern; reached only on a bare field
+                // Normally handled by the parent named-node pattern; reached only on a bare field
                 // at root or inside a seq without a named-node parent.
                 let located_field = located.wrap(f.clone());
                 self.validate_field_pattern(&located_field, ctx.as_ref(), participation, walk);
             }
-            Pattern::Union(_) | Pattern::Enum(_) => {
-                // A branch is disjunctive — none is guaranteed to match, so defer its contents.
+            Pattern::Alternation(_) => {
+                // An alternative is disjunctive — none is guaranteed to match, so defer its contents.
                 for body in located.node().children() {
                     let body_located = located.wrap(body);
                     self.check_pattern_grammar(
                         &body_located,
                         ctx,
-                        participation.inside_disjunction_branch(),
+                        participation.inside_alternative(),
                         walk,
                     );
                 }
@@ -161,8 +161,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         }
     }
 
-    /// Conservative root-entrypoint admissibility: return `false` only when the
-    /// definition's outermost consumed pattern is known not to be the grammar root.
+    /// Conservative entry point root admissibility: return `false` only when the
+    /// definition's outermost node-consuming pattern is known not to be the grammar root.
     pub(super) fn pattern_can_match_root(
         &self,
         located: &Located<Pattern>,
@@ -170,10 +170,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         seen_refs: &mut HashSet<String>,
     ) -> bool {
         match located.node() {
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 self.node_pattern_can_match_root(&located.wrap(node.clone()), grammar_root)
             }
-            Pattern::TokenPattern(token) => token.is_any(),
+            Pattern::AnonymousNodePattern(_) => false,
+            Pattern::NodeWildcard(_) => true,
             Pattern::CapturedPattern(cap) => {
                 let Some(inner) = cap.inner() else {
                     return true;
@@ -189,29 +190,17 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 };
                 self.pattern_can_match_root(&located.wrap(inner), grammar_root, seen_refs)
             }
-            Pattern::Union(union) => {
-                let mut saw_branch = false;
-                for branch in union.branches() {
-                    saw_branch = true;
-                    if branch.body().is_none_or(|body| {
+            Pattern::Alternation(alternation) => {
+                let mut saw_alternative = false;
+                for alternative in alternation.alternatives() {
+                    saw_alternative = true;
+                    if alternative.body().is_none_or(|body| {
                         self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs)
                     }) {
                         return true;
                     }
                 }
-                !saw_branch
-            }
-            Pattern::Enum(en) => {
-                let mut saw_branch = false;
-                for branch in en.branches() {
-                    saw_branch = true;
-                    if branch.body().is_none_or(|body| {
-                        self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs)
-                    }) {
-                        return true;
-                    }
-                }
-                !saw_branch
+                !saw_alternative
             }
             Pattern::DefRef(def_ref) => {
                 let Some(name) = def_ref.name() else {
@@ -241,14 +230,14 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 self.pattern_can_match_root(&located.wrap(first), grammar_root, seen_refs)
             }
             // Bare fields are already reported by grammar validation; avoid piling a
-            // root-entrypoint warning onto malformed structure.
+            // entry point root warning onto malformed structure.
             Pattern::FieldPattern(_) => true,
         }
     }
 
     fn node_pattern_can_match_root(
         &self,
-        located: &Located<NodePattern>,
+        located: &Located<NamedNodePattern>,
         grammar_root: NodeKindId,
     ) -> bool {
         if located.node().is_any() {
@@ -263,7 +252,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         id == grammar_root
     }
 
-    fn resolve_node_context(&self, located: &Located<NodePattern>) -> Option<ParentNode> {
+    fn resolve_node_context(&self, located: &Located<NamedNodePattern>) -> Option<ParentNode> {
         let node = located.node();
         if node.is_any() {
             return None;
@@ -306,7 +295,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let Some(ctx) = ctx else { return };
 
         if !self.grammar.has_field(ctx.id(), field_id) {
-            // A field absent from this kind can never match here, but a sibling branch or zero
+            // A field absent from this kind can never match here, but a sibling alternative or zero
             // repetitions can — so skip when deferred.
             if participation.is_required() {
                 self.emit_field_not_on_node(
@@ -431,14 +420,14 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     self.check_bare_child(&located.wrap(child), ctx, adm);
                 }
             }
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 self.check_bare_named_child(&located.wrap(node.clone()), ctx, adm);
             }
             // Anonymous children are untracked (grammar children arrays never list anonymous
             // tokens). Alternations, quantifiers, and references are not checked here.
-            Pattern::TokenPattern(_)
-            | Pattern::Union(_)
-            | Pattern::Enum(_)
+            Pattern::AnonymousNodePattern(_)
+            | Pattern::NodeWildcard(_)
+            | Pattern::Alternation(_)
             | Pattern::QuantifiedPattern(_)
             | Pattern::DefRef(_)
             | Pattern::FieldPattern(_) => {}
@@ -447,7 +436,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
     fn check_bare_named_child(
         &mut self,
-        located: &Located<NodePattern>,
+        located: &Located<NamedNodePattern>,
         ctx: &ParentNode,
         adm: &HashSet<NodeKindId>,
     ) {
@@ -495,16 +484,16 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     self.check_field_value(&located.wrap(inner), ctx, field, walk);
                 }
             }
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 self.check_field_named_value(&located.wrap(node.clone()), ctx, field, walk);
             }
-            Pattern::TokenPattern(anon) => {
+            Pattern::AnonymousNodePattern(anon) => {
                 self.check_field_anon_value(&located.wrap(anon.clone()), ctx, field, walk);
             }
+            Pattern::NodeWildcard(_) => {}
             // Alternations, quantifiers, and references are not checked here; a field value
-            // can't be a sequence (rejected earlier as `FieldSequenceValue`).
-            Pattern::Union(_)
-            | Pattern::Enum(_)
+            // can't be a sequence (rejected earlier as `GrammarFieldSequenceValue`).
+            Pattern::Alternation(_)
             | Pattern::QuantifiedPattern(_)
             | Pattern::DefRef(_)
             | Pattern::SeqPattern(_)
@@ -514,7 +503,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
     fn check_field_named_value(
         &mut self,
-        located: &Located<NodePattern>,
+        located: &Located<NamedNodePattern>,
         ctx: &ParentNode,
         field: &FieldRef,
         walk: &mut AdmissibilityWalkState,
@@ -562,16 +551,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
     fn check_field_anon_value(
         &mut self,
-        located: &Located<ast::TokenPattern>,
+        located: &Located<ast::AnonymousNodePattern>,
         ctx: &ParentNode,
         field: &FieldRef,
         walk: &mut AdmissibilityWalkState,
     ) {
         let anon = located.node();
-        // The bare `_` matches any node, anonymous tokens included, so it always fits.
-        if anon.is_any() {
-            return;
-        }
         let Some(value_token) = anon.value() else {
             return;
         };
@@ -619,7 +604,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// Bare `(expression)` gets a syntax-oriented diagnostic; marked `(expression#...)` gets the
     /// unsupported-feature diagnostic.
     /// Returns whether the node was rejected.
-    fn reject_supertype_match(&mut self, located: &Located<NodePattern>) -> bool {
+    fn reject_supertype_match(&mut self, located: &Located<NamedNodePattern>) -> bool {
         let node = located.node();
         let Some(kind_token) = node.kind_token() else {
             return false;

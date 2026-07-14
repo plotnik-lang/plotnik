@@ -2,10 +2,8 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
-use crate::compiler::analyze::types::type_shape::FieldInfo;
-use crate::compiler::analyze::types::type_shape::PatternFlow;
-use crate::compiler::analyze::types::{FieldFallback, UnionFlowPlan};
-use crate::compiler::ids::TypeId;
+use crate::compiler::analyze::types::type_shape::{CasePayload, PatternFlow, RecordField};
+use crate::compiler::analyze::types::{FieldCompletion, FieldCompletions};
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
 };
@@ -19,28 +17,28 @@ use super::navigation::{AnchorSemantics, pattern_owns_iteration, resumable_searc
 use super::scope::SkipExit;
 
 /// The alternation's resumable search nav (from [`resumable_search_nav`]), kept
-/// distinct from a branch's `first_nav` so the two adjacent `Option<Nav>` inputs
-/// to [`nav_for_alt_branch`] cannot be transposed. `Some` means the alternation
-/// owns the retry wrapper and each branch matches exactly at the candidate
+/// distinct from an alternative's `first_nav` so the adjacent `Option<Nav>` inputs
+/// to [`nav_for_alternative`] cannot be transposed. `Some` means the alternation
+/// owns the retry wrapper and each alternative matches exactly at the candidate
 /// (`StayExact`).
 #[derive(Clone, Copy)]
 struct AltSearchNav(Option<Nav>);
 
-struct BranchRouting {
-    branch_named: Vec<bool>,
+struct AlternativeRouting {
+    alternative_named: Vec<bool>,
     named_exit: Option<Label>,
 }
 
-impl BranchRouting {
-    fn branch_exit(&self, branch_idx: usize, default_exit: Label) -> Label {
+impl AlternativeRouting {
+    fn alternative_exit(&self, alternative_idx: usize, default_exit: Label) -> Label {
         match self.named_exit {
-            Some(skip) if self.branch_named[branch_idx] => skip,
+            Some(skip) if self.alternative_named[alternative_idx] => skip,
             _ => default_exit,
         }
     }
 }
 
-fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: AltSearchNav) -> Option<Nav> {
+fn exact_nav_for_alternative(first_nav: Option<Nav>, search_nav: AltSearchNav) -> Option<Nav> {
     if search_nav.0.is_some() {
         return Some(Nav::StayExact);
     }
@@ -60,13 +58,13 @@ fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: AltSearchNav) ->
     Some(nav)
 }
 
-fn nav_for_alt_branch(
+fn nav_for_alternative(
     first_nav: Option<Nav>,
     search_nav: AltSearchNav,
     body: &Pattern,
     anchor_semantics: &AnchorSemantics<'_>,
 ) -> Option<Nav> {
-    let nav = exact_nav_for_alt_branch(first_nav, search_nav)?;
+    let nav = exact_nav_for_alternative(first_nav, search_nav)?;
 
     if !anchor_semantics.pattern_may_match_anonymous(Some(body)) {
         return Some(nav);
@@ -85,22 +83,22 @@ impl NfaBuilder<'_> {
     /// Sequence lowering has already compiled the follower after the alternation's
     /// `exit`. Soft anchors normally conservatively skip extras only
     /// (`NextSkipExtras`) because an anonymous-token left side must not skip
-    /// anonymous tokens before the follower. When a branch definitely matched a
+    /// anonymous tokens before the follower. When an alternative definitely matched a
     /// named node, the soft-anchor rule allows anonymous-token skipping too, so a
     /// `NextSkip` clone of that follower preserves the intended soft-anchor
-    /// semantics for named branches without weakening anonymous branches.
+    /// semantics for named alternatives without weakening anonymous alternatives.
     ///
     /// The clone is intentionally narrow: it reuses the already-compiled follower's
     /// successor, effects, predicate, field constraints, etc., so only navigation
-    /// changes. That keeps the branch-specific tweak local and avoids recompiling a
+    /// changes. That keeps the alternative-specific tweak local and avoids recompiling a
     /// sibling suffix with duplicated effects. The clone is appended after its
     /// successor has already been emitted; label references are symbolic IR, so
     /// the order is irrelevant until packing.
     ///
     /// A captured/tagged alternation does not exit straight into the follower:
-    /// capture lowering interposes effect epsilons (`Set`, scope closes) between
+    /// capture lowering interposes effect epsilons (`RecordSet`, scope closes) between
     /// alternation exit and follower (#472). The walk below sees through that
-    /// chain and clones it along with the follower, so each branch runs the
+    /// chain and clones it along with the follower, so each alternative runs the
     /// chain's effects exactly once — via the named twin or the conservative
     /// original, never both.
     ///
@@ -109,7 +107,7 @@ impl NfaBuilder<'_> {
     /// a `Named` node, the one shape where the upgrade is both safe and needed.
     /// The `Named` check matters because `NextSkipExtras` is ambiguous: it also
     /// appears when the *follower* may match anonymous nodes, and then extras-only
-    /// skipping is correct even after a named branch. Anonymous/`_` followers fail
+    /// skipping is correct even after a named alternative. Anonymous/`_` followers fail
     /// that check; a ref follower (`Call`) is skipped because the IR alone cannot
     /// prove the callee never matches an anonymous node.
     fn clone_named_follower_skip_entry(&mut self, exit: Label) -> Option<Label> {
@@ -153,18 +151,22 @@ impl NfaBuilder<'_> {
         Some(entry)
     }
 
-    /// Per-branch "named" flags plus the soft-skip follower twin — shared by both
-    /// alternation kinds. A branch is "named" (eligible for the twin) when it cannot
+    /// Per-alternative "named" flags plus the soft-skip follower twin. An alternative
+    /// is "named" (eligible for the twin) when it cannot
     /// match an anonymous node and does not own its own iteration. A quantified
-    /// branch's zero-match path leaves no named node on the anchor's left, so the
-    /// soft-skip upgrade is unsound there. The anonymity test is whole-branch,
-    /// matching `nav_for_alt_branch`'s before-anchor classification. The twin is a
+    /// alternative's empty path leaves no named node on the anchor's left, so the
+    /// soft-skip upgrade is unsound there. The anonymity test covers the whole alternative,
+    /// matching `nav_for_alternative`'s before-anchor classification. The twin is a
     /// `NextSkip` clone of a conservative (`NextSkipExtras`) soft follower, worth
-    /// cloning only when at least one branch is itself named.
-    fn alt_branch_routing(&mut self, branches: &[ast::Branch], exit: Label) -> BranchRouting {
-        let branch_named: Vec<bool> = {
+    /// cloning only when at least one alternative is itself named.
+    fn alternative_routing(
+        &mut self,
+        alternatives: &[ast::Alternative],
+        exit: Label,
+    ) -> AlternativeRouting {
+        let alternative_named: Vec<bool> = {
             let anchor_semantics = &self.anchor_semantics;
-            branches
+            alternatives
                 .iter()
                 .map(|b| {
                     b.body().is_some_and(|body| {
@@ -175,35 +177,35 @@ impl NfaBuilder<'_> {
                 .collect()
         };
 
-        let named_exit = branch_named
+        let named_exit = alternative_named
             .iter()
             .any(|&named| named)
             .then(|| self.clone_named_follower_skip_entry(exit))
             .flatten();
 
-        BranchRouting {
-            branch_named,
+        AlternativeRouting {
+            alternative_named,
             named_exit,
         }
     }
 
     /// A resumable search nav (`Down`/`Next`/`Stay`) gets one position-search retry
-    /// wrapper around the fanned-in branches; otherwise each branch already performed
+    /// wrapper around the fanned-in alternatives; otherwise each alternative performed
     /// its own exact navigation.
     ///
-    /// `zero_width` holds the lifted zero-width continuations of nullable
-    /// branches (see [`compile_union_branches`](Self::compile_union_branches)).
-    /// They sit outside the position search — a zero-width outcome needs no
+    /// `empty` holds the lifted empty-match continuations of nullable
+    /// alternatives (see [`compile_unlabeled_alternatives`](Self::compile_unlabeled_alternatives)).
+    /// They sit outside the position search — an empty outcome needs no
     /// candidate node — and after it: consuming matches, at any candidate and
-    /// in any branch, are preferred over a zero-width one.
-    fn assemble_alt_branches(
+    /// in any alternative, are preferred over an empty one.
+    fn assemble_alternatives(
         &mut self,
         successors: Vec<Label>,
-        zero_width: Vec<Label>,
+        empty: Vec<Label>,
         search_nav: Option<Nav>,
         exit: Label,
     ) -> Label {
-        if successors.is_empty() && zero_width.is_empty() {
+        if successors.is_empty() && empty.is_empty() {
             return exit;
         }
 
@@ -223,7 +225,7 @@ impl NfaBuilder<'_> {
             })
         };
 
-        let mut alternatives: Vec<Label> = real_entry.into_iter().chain(zero_width).collect();
+        let mut alternatives: Vec<Label> = real_entry.into_iter().chain(empty).collect();
         if alternatives.len() == 1 {
             return alternatives.remove(0);
         }
@@ -232,58 +234,46 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Union alternation: each branch merges into one struct.
-    pub(super) fn compile_union(&mut self, union: &ast::UnionPattern, ctx: PatternCtx) -> Label {
+    /// An unlabeled alternation merges each alternative's fields into one record.
+    pub(super) fn compile_unlabeled_alternation(
+        &mut self,
+        alternation: &ast::AlternationPattern,
+        ctx: PatternCtx,
+    ) -> Label {
         let skip_exit = SkipExit::To(ctx.exit);
-        self.compile_union_with_exits(union, ctx, skip_exit)
+        self.compile_unlabeled_alternation_with_exits(alternation, ctx, skip_exit)
     }
 
-    /// [`compile_union`](Self::compile_union) with a distinct zero-width
+    /// [`compile_unlabeled_alternation`](Self::compile_unlabeled_alternation) with a distinct empty
     /// continuation (a skippable sequence item, or a pruned iteration element).
-    pub(super) fn compile_union_with_exits(
+    pub(super) fn compile_unlabeled_alternation_with_exits(
         &mut self,
-        union: &ast::UnionPattern,
+        alternation: &ast::AlternationPattern,
         ctx: PatternCtx,
         skip_exit: SkipExit,
     ) -> Label {
-        let branches: Vec<_> = union.branches().collect();
-        self.compile_union_branches(&Pattern::Union(union.clone()), &branches, ctx, skip_exit)
+        let alternatives: Vec<_> = alternation.alternatives().collect();
+        self.compile_unlabeled_alternatives(
+            &Pattern::Alternation(alternation.clone()),
+            &alternatives,
+            ctx,
+            skip_exit,
+        )
     }
 
-    /// A labeled alternation nothing consumes: the labels are inert (inference
-    /// degraded it to a union and warned), so it compiles exactly like one —
-    /// branch captures set into the enclosing scope, no variant tagging.
-    pub(super) fn compile_degraded_enum(&mut self, e: &ast::EnumPattern, ctx: PatternCtx) -> Label {
-        let skip_exit = SkipExit::To(ctx.exit);
-        self.compile_degraded_enum_with_exits(e, ctx, skip_exit)
-    }
-
-    /// [`compile_degraded_enum`](Self::compile_degraded_enum) with a distinct
-    /// zero-width continuation.
-    pub(super) fn compile_degraded_enum_with_exits(
-        &mut self,
-        e: &ast::EnumPattern,
-        ctx: PatternCtx,
-        skip_exit: SkipExit,
-    ) -> Label {
-        let branches: Vec<_> = e.branches().collect();
-        self.compile_union_branches(&Pattern::Enum(e.clone()), &branches, ctx, skip_exit)
-    }
-
-    /// Shared lowering for union alternations and degraded (unconsumed) enum
-    /// alternations. `alternation` is the pattern whose inferred result carries
-    /// the merged output struct.
+    /// Lower an alternation without variant tagging. `alternation` is the pattern whose inferred result carries
+    /// the merged output record.
     ///
-    /// A nullable branch compiles pruned ([`SkipExit::Fail`]) so its body only
-    /// matches by consuming; its zero-width outcome is lifted to one shared
+    /// A nullable alternative compiles pruned ([`SkipExit::Fail`]) so its body only
+    /// matches by consuming; its empty outcome is lifted to one shared
     /// alternative after the candidate search — a pure-effect epsilon that
     /// defaults every merged field and exits to `skip_exit` with the cursor
-    /// untouched. That gives the zero-width path a life outside the search
+    /// untouched. That gives the empty path a life outside the search
     /// (it needs no candidate node) and an honest cursor for any follower.
-    fn compile_union_branches(
+    fn compile_unlabeled_alternatives(
         &mut self,
         alternation: &Pattern,
-        branches: &[ast::Branch],
+        alternatives: &[ast::Alternative],
         ctx: PatternCtx,
         skip_exit: SkipExit,
     ) -> Label {
@@ -291,15 +281,15 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
-        if branches.is_empty() {
+        if alternatives.is_empty() {
             return exit;
         }
 
-        // In a suppressed region there is no output shape to keep stable (and a
-        // consumed enum routed here still flows `Value(enum)`, not a struct).
-        let union_type_id = if self.is_suppressed() {
+        // In a suppressed region there is no result shape to keep stable (and a
+        // value-producing labeled alternation routed here still flows `Value(variant)`, not a record).
+        let alternation_type_id = if self.is_suppressed() {
             None
         } else {
             self.ctx
@@ -310,35 +300,35 @@ impl NfaBuilder<'_> {
                 .type_id()
         };
         let merged_fields =
-            union_type_id.map(|id| self.ctx.analysis.type_analysis.expect_struct_fields(id));
-        let union_flow = union_type_id.map(|_| {
+            alternation_type_id.map(|id| self.ctx.analysis.type_analysis.expect_record_fields(id));
+        let field_completions = alternation_type_id.map(|_| {
             self.ctx
                 .analysis
                 .type_analysis
-                .expect_union_flow_plan(alternation)
+                .expect_field_completions(alternation)
         });
 
         let search_nav = resumable_search_nav(first_nav);
-        let branch_search = AltSearchNav(search_nav);
-        let branch_routing = self.alt_branch_routing(branches, exit);
+        let alternative_search = AltSearchNav(search_nav);
+        let alternative_routing = self.alternative_routing(alternatives, exit);
 
         let mut successors = Vec::new();
-        let mut zero_width = Vec::new();
-        for (branch_idx, branch) in branches.iter().enumerate() {
-            let Some(body) = branch.body() else {
+        let mut empty = Vec::new();
+        for (alternative_idx, alternative) in alternatives.iter().enumerate() {
+            let Some(body) = alternative.body() else {
                 continue;
             };
 
-            let branch_exit = branch_routing.branch_exit(branch_idx, exit);
+            let alternative_exit = alternative_routing.alternative_exit(alternative_idx, exit);
 
-            // Inject a default for every merged field this branch does not itself
-            // produce, so the output shape stays stable. "Produces" means a top-level
-            // (bubbling) field — a capture nested in a child scope (`{...} @row`)
-            // belongs to that scope, not here. The branch's inferred bubble is the
+            // Complete every merged field this alternative does not itself
+            // produce, so the result shape stays stable. "Produces" means a top-level
+            // (bubbling) field — a capture nested in a child scope (`{...} @item`)
+            // belongs to that scope, not here. The alternative's inferred bubble is the
             // single source of truth; a syntactic capture walk would miscount nested
-            // names and drop a needed default.
-            let null_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
-                // Only bubbling fields count as provided; a `Value` branch (a
+            // names and drop a needed completion.
+            let completion_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
+                // Only bubbling fields count as provided; a `Value` alternative (a
                 // bare reference, suppressed) contributes nothing here.
                 let provided: HashSet<Symbol> = match &self
                     .ctx
@@ -351,14 +341,14 @@ impl NfaBuilder<'_> {
                         .ctx
                         .analysis
                         .type_analysis
-                        .expect_struct_fields(*id)
+                        .expect_record_fields(*id)
                         .keys()
                         .copied()
                         .collect(),
                     _ => HashSet::new(),
                 };
-                self.union_default_effects(
-                    union_flow.expect("merged union has a flow plan"),
+                self.merged_field_completion_effects(
+                    field_completions.expect("merged alternation has field completions"),
                     fields,
                     &provided,
                 )
@@ -366,12 +356,12 @@ impl NfaBuilder<'_> {
                 vec![]
             };
 
-            let branch_nav =
-                nav_for_alt_branch(first_nav, branch_search, &body, &self.anchor_semantics);
-            let branch_span = self.span_id(branch.syntax(), SpanKind::Branch);
-            let branch_nullable = self.pattern_is_nullable(&body);
-            let branch_entry = if branch_nullable {
-                let branch_capture = if let Some(id) = branch_span {
+            let alternative_nav =
+                nav_for_alternative(first_nav, alternative_search, &body, &self.anchor_semantics);
+            let alternative_span = self.span_id(alternative.syntax(), SpanKind::Alternative);
+            let alternative_nullable = self.pattern_is_nullable(&body);
+            let alternative_entry = if alternative_nullable {
+                let alternative_capture = if let Some(id) = alternative_span {
                     capture
                         .clone()
                         .nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0))
@@ -380,105 +370,105 @@ impl NfaBuilder<'_> {
                 };
                 // Pruned body: merged effects stay on dominating epsilons —
                 // the body's partial-skip paths must not drop them.
-                let exit = if branch_capture.post.is_empty() {
-                    branch_exit
+                let exit = if alternative_capture.post.is_empty() {
+                    alternative_exit
                 } else {
                     self.emit_effects_epsilon(
-                        branch_exit,
+                        alternative_exit,
                         vec![],
-                        CaptureEffects::new_post(branch_capture.post.clone()),
+                        CaptureEffects::new_post(alternative_capture.post.clone()),
                     )
                 };
                 let pattern_ctx = PatternCtx {
                     exit,
-                    nav: branch_nav,
+                    nav: alternative_nav,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
                 let entry = self.compile_nullable_pattern(&body, pattern_ctx, SkipExit::Fail);
-                let mut pre = branch_capture.pre;
-                pre.extend(null_effects.clone());
+                let mut pre = alternative_capture.pre;
+                pre.extend(completion_effects.clone());
                 self.wrap_entry_pre(entry, pre)
             } else {
-                let branch_capture = if let Some(id) = branch_span {
+                let alternative_capture = if let Some(id) = alternative_span {
                     capture
                         .clone()
                         .nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0))
-                        .with_pre_values(null_effects.clone())
+                        .with_pre_values(completion_effects.clone())
                 } else {
-                    capture.clone().with_pre_values(null_effects.clone())
+                    capture.clone().with_pre_values(completion_effects.clone())
                 };
                 let pattern_ctx = PatternCtx {
-                    exit: branch_exit,
-                    nav: branch_nav,
-                    capture: branch_capture,
-                    value: false,
+                    exit: alternative_exit,
+                    nav: alternative_nav,
+                    capture: alternative_capture,
+                    observe_value: false,
                 };
                 self.dispatch_pattern(&body, pattern_ctx)
             };
-            successors.push(branch_entry);
+            successors.push(alternative_entry);
 
-            // Lower the branch's own zero-width outcome instead of guessing a
+            // Lower the alternative's own empty outcome instead of guessing a
             // value from its final field types. The distinction is semantic:
-            // an omitted field takes its union fallback, while a field that is
-            // present through a zero-node value can produce a struct, `""`, or
+            // an absent field takes its declared completion, while a field that is
+            // present through an empty match can produce a record, `""`, or
             // `true`. Reusing the ordinary skippable lowering also preserves
-            // capture and branch spans around that exact outcome.
-            if branch_nullable && let SkipExit::To(skip) = skip_exit {
-                let branch_capture = if let Some(id) = branch_span {
+            // capture and alternative spans around that exact outcome.
+            if alternative_nullable && let SkipExit::To(skip) = skip_exit {
+                let alternative_capture = if let Some(id) = alternative_span {
                     capture
                         .clone()
                         .nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0))
-                        .with_pre_values(null_effects)
+                        .with_pre_values(completion_effects)
                 } else {
-                    capture.clone().with_pre_values(null_effects)
+                    capture.clone().with_pre_values(completion_effects)
                 };
-                let zero_exit = self.emit_effects_epsilon(
+                let empty_exit = self.emit_effects_epsilon(
                     skip,
                     vec![],
-                    CaptureEffects::new_post(branch_capture.post),
+                    CaptureEffects::new_post(alternative_capture.post),
                 );
                 let pattern_ctx = PatternCtx {
-                    exit: zero_exit,
-                    nav: branch_nav,
+                    exit: empty_exit,
+                    nav: alternative_nav,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
-                let zero_entry = self.compile_zero_width_outcome(&body, pattern_ctx);
-                zero_width.push(self.wrap_entry_pre(zero_entry, branch_capture.pre));
+                let empty_entry = self.compile_empty_outcome(&body, pattern_ctx);
+                empty.push(self.wrap_entry_pre(empty_entry, alternative_capture.pre));
             }
         }
 
-        self.assemble_alt_branches(successors, zero_width, search_nav, exit)
+        self.assemble_alternatives(successors, empty, search_nav, exit)
     }
 
-    /// `[Null, Set]` (or `[Arr, EndArr, Set]` for an omitted list) for every
-    /// merged field not in `provided`, resolved against the enclosing scope —
-    /// the output a path that skips those captures owes.
-    fn union_default_effects(
+    /// Effects that complete every merged field absent from `provided`, resolved
+    /// against the enclosing scope.
+    fn merged_field_completion_effects(
         &self,
-        flow: &UnionFlowPlan,
-        fields: &BTreeMap<Symbol, FieldInfo>,
+        completions: &FieldCompletions,
+        fields: &BTreeMap<Symbol, RecordField>,
         provided: &HashSet<Symbol>,
     ) -> Vec<EffectIR> {
         fields
             .iter()
             .filter(|(sym, _)| !provided.contains(*sym))
             .flat_map(|(sym, _)| {
-                let Some(fallback) = flow.fallback(*sym) else {
-                    return Vec::new();
-                };
+                let completion = completions.completion(*sym);
                 let name = self.ctx.analysis.interner.resolve(*sym);
                 let member_ref = self
                     .lookup_member_in_scope(name)
-                    .expect("union bubbling field must resolve in enclosing scope");
-                let set = EffectIR::with_member(EffectKind::Set, member_ref);
-                match fallback {
-                    FieldFallback::Null => vec![EffectIR::null(), set],
-                    FieldFallback::EmptyArray => {
-                        vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                    .expect("alternation field must resolve in enclosing scope");
+                let set = EffectIR::with_member(EffectKind::RecordSet, member_ref);
+                match completion {
+                    FieldCompletion::AlwaysPresent => {
+                        unreachable!("an always-present field cannot be absent from an alternative")
                     }
-                    FieldFallback::False => {
+                    FieldCompletion::Absent => vec![EffectIR::absent(), set],
+                    FieldCompletion::EmptyList => {
+                        vec![EffectIR::list_open(), EffectIR::list_close(), set]
+                    }
+                    FieldCompletion::False => {
                         vec![EffectIR::bool_value(false), set]
                     }
                 }
@@ -486,21 +476,25 @@ impl NfaBuilder<'_> {
             .collect()
     }
 
-    /// Enum alternation: each enum branch opens its variant scope
-    /// (`EnumOpen`...`EnumClose`) and compiles its payload inside it.
-    pub(super) fn compile_enum(&mut self, e: &ast::EnumPattern, ctx: PatternCtx) -> Label {
+    /// A labeled alternation opens each alternative's variant scope
+    /// (`VariantOpen`...`VariantClose`) and compiles its payload inside it.
+    pub(super) fn compile_labeled_alternation(
+        &mut self,
+        alternation: &ast::AlternationPattern,
+        ctx: PatternCtx,
+    ) -> Label {
         let skip_exit = SkipExit::To(ctx.exit);
-        self.compile_enum_with_exits(e, ctx, skip_exit)
+        self.compile_labeled_alternation_with_exits(alternation, ctx, skip_exit)
     }
 
-    /// [`compile_enum`](Self::compile_enum) with a distinct zero-width
-    /// continuation. A nullable branch compiles pruned; its zero-width outcome
-    /// is lifted to a per-branch alternative after the candidate search — the
+    /// [`compile_labeled_alternation`](Self::compile_labeled_alternation) with a distinct empty
+    /// continuation. A nullable alternative compiles pruned; its empty outcome
+    /// is lifted past the candidate search — the
     /// variant tags with every payload field at its default (see
-    /// [`compile_union_branches`](Self::compile_union_branches)).
-    pub(super) fn compile_enum_with_exits(
+    /// [`compile_unlabeled_alternatives`](Self::compile_unlabeled_alternatives)).
+    pub(super) fn compile_labeled_alternation_with_exits(
         &mut self,
-        e: &ast::EnumPattern,
+        alternation: &ast::AlternationPattern,
         ctx: PatternCtx,
         skip_exit: SkipExit,
     ) -> Label {
@@ -508,121 +502,123 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
-        let branches: Vec<_> = e.branches().collect();
-        if branches.is_empty() {
+        let alternatives: Vec<_> = alternation.alternatives().collect();
+        if alternatives.is_empty() {
             return exit;
         }
 
-        let enum_type_id = self
+        let variant_type_id = self
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&Pattern::Enum(e.clone()))
+            .expect_pattern_result(&Pattern::Alternation(alternation.clone()))
             .flow
             .type_id()
-            .expect("an analyzed enum must produce an enum type");
+            .expect("an analyzed labeled alternation must produce a variant type");
 
-        // BTreeMap order gives stable variant indices independent of AST iteration order.
-        let TypeShape::Enum(variants) = self
+        // BTreeMap order gives stable variant-case member indices independent of AST iteration order.
+        let TypeShape::Variant(cases) = self
             .ctx
             .analysis
             .type_analysis
-            .expect_type_shape(enum_type_id)
+            .expect_type_shape(variant_type_id)
         else {
-            panic!("an analyzed enum must produce an enum type");
+            panic!("an analyzed labeled alternation must produce a variant type");
         };
-        let variant_info: BTreeMap<Symbol, (u16, TypeId)> = variants
+        let case_info: BTreeMap<Symbol, (u16, CasePayload)> = cases
             .iter()
             .enumerate()
             .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
             .collect();
 
         let search_nav = resumable_search_nav(first_nav);
-        let branch_search = AltSearchNav(search_nav);
-        let branch_routing = self.alt_branch_routing(&branches, exit);
+        let alternative_search = AltSearchNav(search_nav);
+        let alternative_routing = self.alternative_routing(&alternatives, exit);
 
         let mut successors = Vec::new();
-        let mut zero_width = Vec::new();
-        for (branch_idx, branch) in branches.iter().enumerate() {
-            let Some(body) = branch.body() else {
+        let mut empty = Vec::new();
+        for (alternative_idx, alternative) in alternatives.iter().enumerate() {
+            let Some(body) = alternative.body() else {
                 continue;
             };
 
-            let branch_exit = branch_routing.branch_exit(branch_idx, exit);
+            let alternative_exit = alternative_routing.alternative_exit(alternative_idx, exit);
 
-            let branch_nav =
-                nav_for_alt_branch(first_nav, branch_search, &body, &self.anchor_semantics);
+            let alternative_nav =
+                nav_for_alternative(first_nav, alternative_search, &body, &self.anchor_semantics);
 
-            let label = branch.label().expect("enum branch must have label");
-            let (variant_idx, payload_type_id) = self
+            let label = alternative
+                .label()
+                .expect("labeled alternative must have label");
+            let (case_idx, payload) = self
                 .ctx
                 .analysis
                 .interner
                 .get(label.text())
-                .and_then(|sym| variant_info.get(&sym))
+                .and_then(|sym| case_info.get(&sym))
                 .map(|&(idx, type_id)| (idx, type_id))
-                .expect("variant must exist for enum branch");
+                .expect("case must exist for labeled alternative");
 
             let e_effect = EffectIR::with_member(
-                EffectKind::EnumOpen,
-                MemberRef::new(enum_type_id, variant_idx),
+                EffectKind::VariantOpen,
+                MemberRef::new(variant_type_id, case_idx),
             );
-            let branch_span = self.span_id(branch.syntax(), SpanKind::Branch);
-            if let Some(id) = branch_span {
+            let alternative_span = self.span_id(alternative.syntax(), SpanKind::Alternative);
+            if let Some(id) = alternative_span {
                 self.bind_span(
                     id,
-                    SpanBindingIR::Member(MemberRef::new(enum_type_id, variant_idx)),
+                    SpanBindingIR::Member(MemberRef::new(variant_type_id, case_idx)),
                 );
             }
-            let branch_start = branch_span.map(|id| EffectIR::span_start(id.0));
-            let branch_end = branch_span.map(|id| EffectIR::span_end(id.0));
+            let alternative_start = alternative_span.map(|id| EffectIR::span_start(id.0));
+            let alternative_end = alternative_span.map(|id| EffectIR::span_end(id.0));
 
-            let branch_nullable = self.pattern_is_nullable(&body);
-            let body_entry = self.with_scope(payload_type_id, |this| {
-                if branch_nullable {
-                    let mut close_effects = vec![EffectIR::end_enum()];
-                    if let Some(end) = branch_end.clone() {
+            let alternative_nullable = self.pattern_is_nullable(&body);
+            let body_entry = self.with_scope_if_present(payload.type_id(), |this| {
+                if alternative_nullable {
+                    let mut close_effects = vec![EffectIR::end_variant()];
+                    if let Some(end) = alternative_end.clone() {
                         close_effects.push(end);
                     }
                     let close_exit = this.emit_effects_epsilon(
-                        branch_exit,
+                        alternative_exit,
                         close_effects,
                         CaptureEffects::new_post(capture.post.clone()),
                     );
                     let pattern_ctx = PatternCtx {
                         exit: close_exit,
-                        nav: branch_nav,
+                        nav: alternative_nav,
                         capture: CaptureEffects::default(),
-                        value: true,
+                        observe_value: true,
                     };
                     let inner_entry =
                         this.compile_nullable_pattern(&body, pattern_ctx, SkipExit::Fail);
                     let mut entry_pre = capture.pre.clone();
-                    if let Some(start) = branch_start.clone() {
+                    if let Some(start) = alternative_start.clone() {
                         entry_pre.push(start);
                     }
                     entry_pre.push(e_effect.clone());
                     this.wrap_entry_pre(inner_entry, entry_pre)
                 } else {
-                    let branch_capture = if let (Some(start), Some(end)) =
-                        (branch_start.clone(), branch_end.clone())
+                    let alternative_capture = if let (Some(start), Some(end)) =
+                        (alternative_start.clone(), alternative_end.clone())
                     {
                         capture
                             .clone()
                             .nest_span(start, end)
-                            .nest_scope(e_effect.clone(), EffectIR::end_enum())
+                            .nest_scope(e_effect.clone(), EffectIR::end_variant())
                     } else {
                         capture
                             .clone()
-                            .nest_scope(e_effect.clone(), EffectIR::end_enum())
+                            .nest_scope(e_effect.clone(), EffectIR::end_variant())
                     };
                     let pattern_ctx = PatternCtx {
-                        exit: branch_exit,
-                        nav: branch_nav,
-                        capture: branch_capture,
-                        value: false,
+                        exit: alternative_exit,
+                        nav: alternative_nav,
+                        capture: alternative_capture,
+                        observe_value: false,
                     };
                     this.dispatch_pattern(&body, pattern_ctx)
                 }
@@ -630,33 +626,36 @@ impl NfaBuilder<'_> {
 
             successors.push(body_entry);
 
-            if branch_nullable && let SkipExit::To(skip) = skip_exit {
-                let branch_capture = if let (Some(start), Some(end)) = (branch_start, branch_end) {
-                    capture
-                        .clone()
-                        .nest_span(start, end)
-                        .nest_scope(e_effect, EffectIR::end_enum())
-                } else {
-                    capture.clone().nest_scope(e_effect, EffectIR::end_enum())
-                };
-                let zero_exit = self.emit_effects_epsilon(
+            if alternative_nullable && let SkipExit::To(skip) = skip_exit {
+                let alternative_capture =
+                    if let (Some(start), Some(end)) = (alternative_start, alternative_end) {
+                        capture
+                            .clone()
+                            .nest_span(start, end)
+                            .nest_scope(e_effect, EffectIR::end_variant())
+                    } else {
+                        capture
+                            .clone()
+                            .nest_scope(e_effect, EffectIR::end_variant())
+                    };
+                let empty_exit = self.emit_effects_epsilon(
                     skip,
                     vec![],
-                    CaptureEffects::new_post(branch_capture.post),
+                    CaptureEffects::new_post(alternative_capture.post),
                 );
-                let zero_entry = self.with_scope(payload_type_id, |this| {
+                let empty_entry = self.with_scope_if_present(payload.type_id(), |this| {
                     let pattern_ctx = PatternCtx {
-                        exit: zero_exit,
-                        nav: branch_nav,
+                        exit: empty_exit,
+                        nav: alternative_nav,
                         capture: CaptureEffects::default(),
-                        value: true,
+                        observe_value: true,
                     };
-                    this.compile_zero_width_outcome(&body, pattern_ctx)
+                    this.compile_empty_outcome(&body, pattern_ctx)
                 });
-                zero_width.push(self.wrap_entry_pre(zero_entry, branch_capture.pre));
+                empty.push(self.wrap_entry_pre(empty_entry, alternative_capture.pre));
             }
         }
 
-        self.assemble_alt_branches(successors, zero_width, search_nav, exit)
+        self.assemble_alternatives(successors, empty, search_nav, exit)
     }
 }

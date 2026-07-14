@@ -1,6 +1,6 @@
 Q = (call -Arguments)
 ------------------ DIAGNOSTICS -------------------
-error: field names must be snake_case
+error: grammar field names must be snake_case
  --> query.ptk:1:12
   |
 1 | Q = (call -Arguments)
@@ -11,4 +11,4 @@ help: use `arguments`
 1 - Q = (call -Arguments)
 1 + Q = (call -arguments)
   |
-help: fields come from the grammar and are snake_case
+help: grammar field names are snake_case

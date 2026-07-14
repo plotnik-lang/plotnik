@@ -37,215 +37,215 @@ export interface Q {
 }
 ------------------- INSPECTION -------------------
 {
-  "v": 1,
+  "version": 1,
   "entries": [
     {
-      "span_id": 3,
+      "query_span_id": 3,
       "parent": null,
-      "hull": [
+      "source_span": [
         0,
         3
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         1,
+        41
+      ]
+    },
+    {
+      "query_span_id": 4,
+      "parent": 0,
+      "source_span": [
+        0,
+        3
+      ],
+      "bindings": [],
+      "range": [
+        2,
         40
       ]
     },
     {
-      "span_id": 4,
-      "parent": 0,
-      "hull": [
+      "query_span_id": 5,
+      "parent": 1,
+      "source_span": [
         0,
         3
       ],
       "bindings": [],
-      "effect_range": [
-        2,
+      "range": [
+        3,
         39
       ]
     },
     {
-      "span_id": 5,
-      "parent": 1,
-      "hull": [
-        0,
-        3
-      ],
-      "bindings": [],
-      "effect_range": [
-        3,
-        38
-      ]
-    },
-    {
-      "span_id": 6,
+      "query_span_id": 6,
       "parent": 2,
-      "hull": [
+      "source_span": [
         0,
         1
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         4,
+        21
+      ]
+    },
+    {
+      "query_span_id": 8,
+      "parent": 3,
+      "source_span": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "range": [
+        5,
         20
       ]
     },
     {
-      "span_id": 8,
-      "parent": 3,
-      "hull": [
+      "query_span_id": 0,
+      "parent": 4,
+      "source_span": [
         0,
         1
       ],
       "bindings": [],
-      "effect_range": [
-        5,
-        19
+      "range": [
+        7,
+        15
       ]
     },
     {
-      "span_id": 0,
-      "parent": 4,
-      "hull": [
+      "query_span_id": 2,
+      "parent": 5,
+      "source_span": [
         0,
         1
       ],
       "bindings": [],
-      "effect_range": [
-        7,
+      "range": [
+        8,
         14
       ]
     },
     {
-      "span_id": 2,
-      "parent": 5,
-      "hull": [
+      "query_span_id": 1,
+      "parent": 6,
+      "source_span": [
         0,
         1
       ],
-      "bindings": [],
-      "effect_range": [
-        8,
+      "bindings": [
+        {
+          "path": "/name",
+          "event_index": 11
+        }
+      ],
+      "range": [
+        9,
         13
       ]
     },
     {
-      "span_id": 1,
-      "parent": 6,
-      "hull": [
-        0,
-        1
-      ],
-      "bindings": [
-        {
-          "path": "/name",
-          "effect_idx": 11
-        }
-      ],
-      "effect_range": [
-        9,
-        12
-      ]
-    },
-    {
-      "span_id": 7,
+      "query_span_id": 7,
       "parent": 4,
-      "hull": null,
+      "source_span": null,
       "bindings": [
         {
           "path": "/first",
-          "effect_idx": 17
+          "event_index": 17
         }
       ],
-      "effect_range": [
+      "range": [
         16,
-        18
+        19
       ]
     },
     {
-      "span_id": 9,
+      "query_span_id": 9,
       "parent": 2,
-      "hull": [
+      "source_span": [
         2,
         3
       ],
       "bindings": [],
-      "effect_range": [
+      "range": [
         21,
+        38
+      ]
+    },
+    {
+      "query_span_id": 11,
+      "parent": 9,
+      "source_span": [
+        2,
+        3
+      ],
+      "bindings": [],
+      "range": [
+        22,
         37
       ]
     },
     {
-      "span_id": 11,
-      "parent": 9,
-      "hull": [
+      "query_span_id": 0,
+      "parent": 10,
+      "source_span": [
         2,
         3
       ],
       "bindings": [],
-      "effect_range": [
-        22,
-        36
+      "range": [
+        24,
+        32
       ]
     },
     {
-      "span_id": 0,
-      "parent": 10,
-      "hull": [
+      "query_span_id": 2,
+      "parent": 11,
+      "source_span": [
         2,
         3
       ],
       "bindings": [],
-      "effect_range": [
-        24,
+      "range": [
+        25,
         31
       ]
     },
     {
-      "span_id": 2,
-      "parent": 11,
-      "hull": [
-        2,
-        3
-      ],
-      "bindings": [],
-      "effect_range": [
-        25,
-        30
-      ]
-    },
-    {
-      "span_id": 1,
+      "query_span_id": 1,
       "parent": 12,
-      "hull": [
+      "source_span": [
         2,
         3
       ],
       "bindings": [
         {
           "path": "/name",
-          "effect_idx": 28
+          "event_index": 28
         }
       ],
-      "effect_range": [
+      "range": [
         26,
-        29
+        30
       ]
     },
     {
-      "span_id": 10,
+      "query_span_id": 10,
       "parent": 10,
-      "hull": null,
+      "source_span": null,
       "bindings": [
         {
           "path": "/second",
-          "effect_idx": 34
+          "event_index": 34
         }
       ],
-      "effect_range": [
+      "range": [
         33,
-        35
+        36
       ]
     }
   ]
@@ -264,8 +264,8 @@ S8 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:2  ; { first, second }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:2  ; { first, second }
 
 [type_members]
 M0: S1 → T0  ; name: <Node>
@@ -276,94 +276,94 @@ M2: S3 → T1  ; second: Name
 N0: S4 → T1  ; Name
 N1: S5 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Name = 00 :: T1
 Q    = 06 :: T2
 
 [spans]
-P00 def        0..25  src0  T1
-P01 capture    20..25  src0  T1.M0
-P02 pattern    7..19  src0
-P03 def        27..132  src0  T2
-P04 pattern    31..132  src0
-P05 sequence   42..130  src0
-P06 pattern    48..84  src0
-P07 capture    77..83  src0  T2.M1
-P08 ref        70..76  src0  T1
-P09 pattern    89..126  src0
-P10 capture    118..125  src0  T2.M2
-P11 ref        111..117  src0  T1
+P00 def        0..25  source_id=0  T1
+P01 capture    20..25  source_id=0  T1.M0
+P02 pattern    7..19  source_id=0
+P03 def        27..132  source_id=0  T2
+P04 pattern    31..132  source_id=0
+P05 sequence   42..130  source_id=0
+P06 pattern    48..84  source_id=0
+P07 capture    77..83  source_id=0  T2.M1
+P08 ref        70..76  source_id=0  T1
+P09 pattern    89..126  source_id=0
+P10 capture    118..125  source_id=0  T2.M2
+P11 ref        111..117  source_id=0  T1
 
-[transitions]
+[instructions]
 Name:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@43)                            43 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
-  12  -ε-  [StructClose]                    16
+  12  -ε-  [RecordClose]                    16
   14                                        ▶
   15  ...
-  16  ─‣┘  _ [SpanStart#10 Set(M2) SpanEnd#10 SpanEnd#11]  19
+  16  ─‣┘  _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  19
   19  ─‣┘  _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
-  22  -ε-  [StructClose]                    24
-  24  ─‣┘  _ [SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#8]  33
+  22  -ε-  [RecordClose]                    24
+  24  ─‣┘  _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  33
   27                                        ▶
-  28   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
+  28   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
   32  └‣─  (@28)                            28 : 12
-  33  ─‣─  (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 StructOpen]  32
+  33  ─‣─  (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  32
   36  └‣─  (@28)                            28 : 22
   37  ...
   38  ...
   39  ...
-  40  └‣─  (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 StructOpen]  36
+  40  └‣─  (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  36
   43   !   (program) [SpanStart#3 SpanStartAt#4]  40
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@43)                            43 : 09
        ▶   (@43)
 
 @43:
   43       (program) [SpanStart#3 SpanStartAt#4]  40
        ●   program
-  40       (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 StructOpen]  36
+  40       (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  36
        ●   expression_statement
   36       (@28)                            28 : 22
        ▶   (@28)
 
 @28:
-  28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
+  28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
        ●   identifier
   27   ◀   (@28)                            
 
 @43:
-  22  -ε-  [StructClose]                    24
-  24       _ [SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#8]  33
+  22  -ε-  [RecordClose]                    24
+  24       _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  33
        ●   expression_statement
-  33       (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 StructOpen]  32
+  33       (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  32
        ●   expression_statement
   32       (@28)                            28 : 12
        ▶   (@28)
 
 @28:
-  28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
+  28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
        ●   identifier
   27   ◀   (@28)                            
 
 @43:
-  12  -ε-  [StructClose]                    16
-  16       _ [SpanStart#10 Set(M2) SpanEnd#10 SpanEnd#11]  19
+  12  -ε-  [RecordClose]                    16
+  16       _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  19
        ●   expression_statement
   19       _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
        ●   program
   14   ◀   (@43)                            
 
 Q:
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11   ◀   (Q)                              ◼

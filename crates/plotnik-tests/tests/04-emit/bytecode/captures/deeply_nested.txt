@@ -6,23 +6,23 @@ Q = (array
   ) @b
 ) @a
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 12
 
 [transitions]
 Q:
   01                                        ▶
-  02   !   (array) [Node Set(a)]            04
-  04  └‣─  (array) [Node Set(b)]            06
-  06  └‣─  (array) [Node Set(c)]            08
+  02   !   (array) [Node RecordSet(a)]      04
+  04  └‣─  (array) [Node RecordSet(b)]      06
+  06  └‣─  (array) [Node RecordSet(c)]      08
   07  ─‣┘³ _                                01
-  08  └‣─  (identifier) [Node Set(d)]       07
+  08  └‣─  (identifier) [Node RecordSet(d)]  07
 
-Q (entrypoint):
+Q (entry point):
   09                                        ▶
-  10  -ε-  [StructClose]                    09
+  10  -ε-  [RecordClose]                    09
   11       (Q)                              02 : 10
-  12  -ε-  [StructOpen]                     11
+  12  -ε-  [RecordOpen]                     11
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -36,7 +36,7 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:4  ; { a, b, c, d }
+T1 = Record  M0:4  ; { a, b, c, d }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
@@ -47,18 +47,18 @@ M3: S4 → T0  ; d: <Node>
 [type_names]
 N0: S5 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [Node Set(M3)]      08
+  06  └‣─  (identifier) [Node RecordSet(M3)]  08
   08  ─‣┘³ _                                09
   09                                        ▶
-  10  └‣─  (array) [Node Set(M2)]           06
-  12  └‣─  (array) [Node Set(M1)]           10
-  14   !   (array) [Node Set(M0)]           12
+  10  └‣─  (array) [Node RecordSet(M2)]     06
+  12  └‣─  (array) [Node RecordSet(M1)]     10
+  14   !   (array) [Node RecordSet(M0)]     12

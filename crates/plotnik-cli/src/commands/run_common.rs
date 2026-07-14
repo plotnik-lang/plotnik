@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
-use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::bytecode::{EntryPoint, Module};
 use plotnik_lib::text_utils::find_similar;
 
 use super::compile::compile_query;
@@ -43,7 +43,7 @@ pub fn load_source(
 /// Reject an input supplied two ways at once. clap fills the query slot from
 /// the first positional and the source slot from the second; when `-q`/`-s`
 /// also supplies that role inline, the loaders below silently prefer the text
-/// and drop the positional. The query+source commands (run/trace/inspect/ast)
+/// and drop the positional. The query+source commands (run/trace/inspect/tree)
 /// refuse to guess. Query-only commands (check/dump/infer) do not call this:
 /// they deliberately ignore an extra positional so a run-shaped command line
 /// still works.
@@ -95,19 +95,19 @@ pub fn resolve_run_lang(
     ))
 }
 
-/// Resolve the selected entrypoint after defaulting has already happened.
-pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypoint, CliError> {
+/// Resolve the selected entry point after defaulting has already happened.
+pub fn resolve_entry_point(module: &Module, name: Option<&str>) -> Result<EntryPoint, CliError> {
     match name {
-        Some(name) => module.entrypoint(name).ok_or_else(|| {
-            let names: Vec<&str> = module.entrypoint_names().collect();
-            let mut msg = format!("invalid entrypoint: {}", name);
+        Some(name) => module.entry_point(name).ok_or_else(|| {
+            let names: Vec<&str> = module.entry_point_names().collect();
+            let mut msg = format!("invalid entry point: {}", name);
             if let Some(similar) = find_similar(name, &names) {
                 msg.push_str(&format!("\n\nDid you mean '{}'?", similar));
             }
-            msg.push_str(&format!("\n\nAvailable entrypoints: {}", names.join(", ")));
+            msg.push_str(&format!("\n\nAvailable entry points: {}", names.join(", ")));
             CliError::fatal(msg)
         }),
-        None => Err(CliError::fatal("no entrypoints in module")),
+        None => Err(CliError::fatal("bytecode module exports no entry points")),
     }
 }
 
@@ -146,7 +146,7 @@ pub struct ExecRequest<'a> {
 /// Prepared query ready for execution.
 pub struct ExecPlan {
     pub module: Module,
-    pub entrypoint: Entrypoint,
+    pub entry_point: EntryPoint,
     pub tree: tree_sitter::Tree,
     pub source_code: String,
 }
@@ -186,20 +186,20 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
         plotnik_lib::BytecodeConfig::new()
     };
     let module = super::compile::emit_module(&compiled, config, input.color)?;
-    // Queries conventionally put the top-level callable definition last.
-    let default_entry = module.entrypoint_names().last().map(str::to_owned);
+    // Queries conventionally put the preferred selectable definition last.
+    let default_entry = module.entry_point_names().last().map(str::to_owned);
 
     let entry = input
         .entry
         .map(str::to_owned)
         .or_else(|| loaded.shebang.entry.clone())
         .or(default_entry);
-    let entrypoint = resolve_entrypoint(&module, entry.as_deref())?;
+    let entry_point = resolve_entry_point(&module, entry.as_deref())?;
     let tree = lang.parse_source(&source_code);
 
     Ok(ExecPlan {
         module,
-        entrypoint,
+        entry_point,
         tree,
         source_code,
     })

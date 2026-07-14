@@ -6,13 +6,13 @@ Q = {
   ]
 }
 ------------------ DIAGNOSTICS -------------------
-error: cannot mix enum and union branches
+error: an alternation cannot mix labeled and unlabeled alternatives
  --> query.ptk:5:5
   |
 4 |     A: (a)
-  |     - enum branch here
+  |     - labeled alternative here
 5 |     (b)
   |     ^^^
   |
-help: use all labels for an enum, or none for a merged struct
+help: either label every alternative or remove all labels
 -------------------- SYMBOLS ---------------------

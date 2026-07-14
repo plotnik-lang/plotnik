@@ -1,10 +1,9 @@
 //! Unified type checking pass.
 //!
-//! Computes both structural arity (for field validation) and data flow types
-//! (for TypeScript emission) in a single traversal.
+//! Computes static root extent and result flow in one traversal.
 
-mod def_arity;
 mod infer;
+mod root_extent;
 mod unify;
 
 #[cfg(test)]
@@ -12,10 +11,10 @@ mod analysis_tests;
 #[cfg(test)]
 mod unify_tests;
 
+pub use crate::compiler::analyze::types::RootExtent;
 pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
-pub use crate::compiler::analyze::types::type_shape::Arity;
 pub use crate::core::Interner;
-pub(crate) use infer::consumable_value_root;
+pub(crate) use infer::definition_value_root;
 
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
@@ -39,7 +38,7 @@ pub fn infer_types(
 
     // One syntax-only O(AST) pre-scan buys the common path zero provenance
     // allocation. Folding this flag into inference would still make every
-    // pattern result carry optional producer state; keep that cost confined to
+    // pattern result carry producer state even when absent; keep that cost confined to
     // queries that actually write a builtin capture type.
     let has_capture_types = symbol_table
         .names()
@@ -60,7 +59,7 @@ pub fn infer_types(
 
     if !has_capture_types {
         TypeNamer::new(&mut types, interner, diag).assign(symbol_table, dependency_analysis);
-        infer::freeze_union_flow_plans(&mut types);
+        infer::freeze_field_completions(&mut types);
         return types.finish();
     }
 

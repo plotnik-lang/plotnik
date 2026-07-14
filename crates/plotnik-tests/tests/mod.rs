@@ -63,9 +63,9 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder,
-    RecordingTracer, RuntimeError, RustCodegenConfig, SourceMap, SourcePath,
-    TypeScriptCodegenConfig, VM, Verbosity, extract_inspection, materialize_verified,
+    BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, PrintTracer, QueryBuilder,
+    RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TraceRecorder, TypeScriptBinding,
+    TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
 use plotnik_tests::fixture::parse_section_header;
 use support::formatter::Assessment;
@@ -383,8 +383,8 @@ fn render_compile(
         }
         FixtureKind::Vm { mode, .. } => {
             let inspection = match mode {
-                VmMode::Recording => InspectionPolicy::Include,
-                VmMode::Traced { inspection } => inspection,
+                VmMode::StructuredTrace => InspectionPolicy::Include,
+                VmMode::TextTrace { inspection } => inspection,
             };
             let emission = emit_bytecode(&compiled, inspection);
             let module = emission
@@ -394,9 +394,9 @@ fn render_compile(
                 "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit".to_string()
             })?;
             let entry = module
-                .entrypoint_names()
+                .entry_point_names()
                 .last()
-                .ok_or_else(|| "06-vm fixture produced no callable entrypoints".to_string())?
+                .ok_or_else(|| "06-vm fixture produced no selectable entry points".to_string())?
                 .to_string();
             let run = run_vm(VmScenario {
                 lang: &lang,
@@ -417,11 +417,17 @@ fn render_compile(
                 ));
             }
             match run {
-                VmArtifacts::Recording { output, recording } => {
+                VmArtifacts::StructuredTrace {
+                    output,
+                    execution_trace,
+                } => {
                     out.push(GeneratedSection::new(SectionKind::Output, output));
-                    out.push(GeneratedSection::new(SectionKind::Recording, recording));
+                    out.push(GeneratedSection::new(
+                        SectionKind::ExecutionTrace,
+                        execution_trace,
+                    ));
                 }
-                VmArtifacts::Traced {
+                VmArtifacts::TextTrace {
                     output,
                     trace,
                     inspection,
@@ -476,20 +482,20 @@ fn emit_bytecode(
     compiled.emit(config).expect("bytecode emission answers")
 }
 
-fn render_mapped(dts: &str, ranges: &[DtsRange]) -> String {
+fn render_mapped(dts: &str, bindings: &[TypeScriptBinding]) -> String {
     let mut out = String::new();
-    for range in ranges {
-        let start = range.start as usize;
-        let end = range.end as usize;
-        let member = range
-            .member
+    for binding in bindings {
+        let start = binding.span.0 as usize;
+        let end = binding.span.1 as usize;
+        let member = binding
+            .member_id
             .map(|idx| format!(".M{idx}"))
             .unwrap_or_default();
         out.push_str(&format!(
             "{}..{} T{}{} {:?}\n",
-            range.start,
-            range.end,
-            range.type_id,
+            binding.span.0,
+            binding.span.1,
+            binding.type_id,
             member,
             &dts[start..end]
         ));
@@ -506,11 +512,11 @@ struct VmScenario<'a> {
 }
 
 enum VmArtifacts {
-    Recording {
+    StructuredTrace {
         output: String,
-        recording: String,
+        execution_trace: String,
     },
-    Traced {
+    TextTrace {
         output: String,
         trace: String,
         inspection: Option<String>,
@@ -519,64 +525,64 @@ enum VmArtifacts {
 
 fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let tree = scenario.lang.parse(scenario.source);
-    let entrypoint = scenario
+    let entry_point = scenario
         .module
-        .entrypoint(scenario.entry)
-        .expect("selected definition must be an entrypoint");
+        .entry_point(scenario.entry)
+        .expect("selected definition must be an entry point");
 
     let vm = VM::builder(scenario.source, &tree).build();
 
-    if matches!(scenario.mode, VmMode::Recording) {
-        let mut tracer = RecordingTracer::new(scenario.module, 65_536);
-        let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
-        let recording = tracer.finish();
-        let mut recording_json =
-            serde_json::to_string_pretty(&recording).expect("recording serialization cannot fail");
-        recording_json.push('\n');
+    if matches!(scenario.mode, VmMode::StructuredTrace) {
+        let mut tracer = TraceRecorder::new(scenario.module, 65_536);
+        let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
+        let execution_trace = tracer.finish();
+        let mut execution_trace_json = serde_json::to_string_pretty(&execution_trace)
+            .expect("execution-trace serialization cannot fail");
+        execution_trace_json.push('\n');
 
         let output = match result {
-            Ok(effects) => {
+            Ok(journal) => {
                 // The verified variant (not plain `materialize`) so a type-unsound emission
                 // panics the fixture in debug; the check compiles out under `--release`.
                 let value = materialize_verified(
                     scenario.source,
                     scenario.module,
-                    &entrypoint,
-                    effects.as_slice(),
+                    &entry_point,
+                    journal.output_events(),
                     Colors::new(false),
                 );
                 value.format(true, Colors::new(false))
             }
             Err(RuntimeError::NoMatch) => "<no match>".to_string(),
-            // A no-match is a real outcome worth pinning; step/memory exhaustion is
+            // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
             // not — fail the trial rather than accept a resource limit as golden output.
             Err(err) => {
                 return Err(format!("VM run failed for `{}`: {err}", scenario.entry));
             }
         };
 
-        return Ok(VmArtifacts::Recording {
+        return Ok(VmArtifacts::StructuredTrace {
             output,
-            recording: recording_json,
+            execution_trace: execution_trace_json,
         });
     }
 
-    let VmMode::Traced { inspection } = scenario.mode else {
-        unreachable!("recording mode returns above")
+    let VmMode::TextTrace { inspection } = scenario.mode else {
+        unreachable!("structured trace mode returns above")
     };
     let mut tracer = PrintTracer::builder(scenario.source, scenario.module)
         .verbosity(Verbosity::Default)
         .colored(false)
         .build();
 
-    let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
+    let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
     let trace = tracer.render();
     let (output, inspection) = match result {
-        Ok(effects) => {
+        Ok(journal) => {
             let inspection = (inspection == InspectionPolicy::Include).then(|| {
-                let inspection = extract_inspection(effects.as_slice(), scenario.module);
-                let mut rendered = serde_json::to_string_pretty(&inspection)
-                    .expect("inspection serialization cannot fail");
+                let result_provenance = extract_result_provenance(&journal, scenario.module);
+                let mut rendered = serde_json::to_string_pretty(&result_provenance)
+                    .expect("result provenance serialization cannot fail");
                 rendered.push('\n');
                 rendered
             });
@@ -585,18 +591,18 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
             let value = materialize_verified(
                 scenario.source,
                 scenario.module,
-                &entrypoint,
-                effects.as_slice(),
+                &entry_point,
+                journal.output_events(),
                 Colors::new(false),
             );
             (value.format(true, Colors::new(false)), inspection)
         }
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
-        // A no-match is a real outcome worth pinning; step/memory exhaustion is
+        // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
         // not — fail the trial rather than accept a resource limit as golden output.
         Err(err) => return Err(format!("VM run failed for `{}`: {err}", scenario.entry)),
     };
-    Ok(VmArtifacts::Traced {
+    Ok(VmArtifacts::TextTrace {
         output,
         trace,
         inspection,
@@ -624,7 +630,7 @@ impl Lang {
                 ts: arborium_dart::language().into(),
             }),
             Some(other) => Err(format!(
-                "input language `{other}` is not wired into the fixture suite yet (have: javascript, typescript, dart)"
+                "source language `{other}` is not wired into the fixture suite yet (have: javascript, typescript, dart)"
             )),
         }
     }

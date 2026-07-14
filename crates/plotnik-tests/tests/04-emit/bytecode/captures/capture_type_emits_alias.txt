@@ -1,0 +1,47 @@
+Q = (identifier) @name :: Identifier
+---------------------- NFA -----------------------
+[entry_points]
+Q = 6
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (identifier) [Node RecordSet(name)]  1
+
+Q (entry point):
+  3                                         ▶
+  4  -ε-  [RecordClose]                     3
+  5       (Q)                               2 : 4
+  6  -ε-  [RecordOpen]                      5
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "Identifier"
+S3 "Q"
+S4 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Alias(T0)
+T2 = Record  M0:1  ; { name }
+
+[type_members]
+M0: S1 → T1  ; name: Identifier
+
+[type_names]
+N0: S2 → T1  ; Identifier
+N1: S3 → T2  ; Q
+
+[entry_points]
+Q = 0 :: T2
+
+[instructions]
+Q:
+  0  -ε-  [RecordOpen]                      2
+  2       (@8)                              8 : 3
+  3  -ε-  [RecordClose]                     5
+  5                                         ▶
+  6                                         ▶
+  7  ...
+  8   !   (identifier) [Node RecordSet(M0)]  6

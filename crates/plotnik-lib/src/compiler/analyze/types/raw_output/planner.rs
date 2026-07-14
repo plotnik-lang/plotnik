@@ -1,6 +1,6 @@
 //! Capture-type planning against the frozen raw type graph.
 
-use super::normalize::{NormalizedField, OmissionPolicy, RawTypeSnapshot};
+use super::normalize::{AbsencePolicy, NormalizedField, RawTypeSnapshot};
 use super::*;
 
 pub(super) struct PlannedCapture {
@@ -25,42 +25,35 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         &mut self,
         capture_type: BuiltInCaptureType,
         contract: RawCaptureContract,
-        observes_omission: bool,
+        may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
         match capture_type {
             BuiltInCaptureType::Str => self.plan_str(contract),
-            BuiltInCaptureType::Bool => self.plan_bool(contract.fact.field(), observes_omission),
+            BuiltInCaptureType::Bool => self.plan_bool(contract.fact.field(), may_be_absent),
         }
     }
 
     fn plan_str(&mut self, contract: RawCaptureContract) -> Result<PlannedCapture, &'static str> {
         let raw = contract.fact.field();
-        let (mut plan, mut absorbs_null) = self.str_plan(
-            raw.type_id,
+        let (plan, absorbs_null) = self.str_plan(
+            raw.final_type,
             contract.zero_node_terminal,
             &mut HashSet::new(),
         )?;
-        if raw.optional {
-            let optional = self
-                .types
-                .intern_type(TypeShape::Optional(plan.final_type()));
-            plan = CaptureTypePlan::optional(optional, OptionalCaptureTypeMode::Preserve, plan);
-            absorbs_null = true;
-        }
-        let omission = if absorbs_null {
-            OmissionPolicy::Value(FieldFallback::Null)
+        let on_absence = if absorbs_null {
+            AbsencePolicy::CompleteWith(FieldCompletion::Absent)
         } else if matches!(
             self.types.in_progress().type_shape(plan.final_type()),
-            Some(TypeShape::Array { .. })
+            Some(TypeShape::List { .. })
         ) {
-            OmissionPolicy::Value(FieldFallback::EmptyArray)
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {
-            OmissionPolicy::FieldOptional
+            AbsencePolicy::MakeOption
         };
         Ok(PlannedCapture {
             field: NormalizedField {
-                info: FieldInfo::required(plan.final_type()),
-                omission,
+                info: RecordField::new(plan.final_type()),
+                on_absence,
             },
             plan,
         })
@@ -78,43 +71,40 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
 
         let result = match self.raw.shape(type_id) {
             TypeShape::Node => Ok((
-                CaptureTypePlan::str_terminal(TYPE_STR, TerminalData::NodeRepresentation),
+                CaptureTypePlan::text_terminal(TYPE_TEXT, TerminalData::NodeRepresentation),
                 false,
             )),
-            TypeShape::Struct(_) | TypeShape::Enum(_) => {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let final_type = if zero_node_terminal {
-                    self.types.intern_type(TypeShape::Optional(TYPE_STR))
+                    self.types.intern_option(TYPE_TEXT)
                 } else {
-                    TYPE_STR
+                    TYPE_TEXT
                 };
                 Ok((
-                    CaptureTypePlan::str_terminal(final_type, TerminalData::Semantic),
+                    CaptureTypePlan::text_terminal(final_type, TerminalData::Semantic),
                     zero_node_terminal,
                 ))
             }
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 let (inner, _) = self.str_plan(*inner, false, visiting)?;
-                let optional = self
-                    .types
-                    .intern_type(TypeShape::Optional(inner.final_type()));
+                let option = self.types.intern_option(inner.final_type());
                 Ok((
-                    CaptureTypePlan::optional(optional, OptionalCaptureTypeMode::Preserve, inner),
+                    CaptureTypePlan::option(option, OptionMode::Preserve, inner),
                     true,
                 ))
             }
-            TypeShape::Array { element, non_empty } => {
+            TypeShape::List { element, minimum } => {
                 let (element, _) = self.str_plan(*element, false, visiting)?;
-                let array = self.types.intern_type(TypeShape::Array {
+                let list = self.types.intern_type(TypeShape::List {
                     element: element.final_type(),
-                    non_empty: *non_empty,
+                    minimum: *minimum,
                 });
-                Ok((CaptureTypePlan::array(array, element), false))
+                Ok((CaptureTypePlan::list(list, element), false))
             }
             TypeShape::Ref(target) => {
-                self.str_plan(self.raw.definition(*target), zero_node_terminal, visiting)
+                self.str_plan(self.raw.declaration(*target), zero_node_terminal, visiting)
             }
-            TypeShape::Void => Err("a capture type requires an ordinary captured value"),
-            TypeShape::Str | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         };
@@ -124,20 +114,15 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
 
     fn plan_bool(
         &mut self,
-        raw: FieldInfo,
-        observes_omission: bool,
+        raw: RecordField,
+        may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
-        let plan = if raw.optional {
-            let inner = self.bool_present(raw.type_id, &mut HashSet::new())?;
-            CaptureTypePlan::optional(TYPE_BOOL, OptionalCaptureTypeMode::Bool, inner)
-        } else {
-            self.bool_required(raw.type_id, observes_omission, &mut HashSet::new())?
-        };
+        let plan = self.bool_required(raw.final_type, may_be_absent, &mut HashSet::new())?;
         Ok(PlannedCapture {
             plan,
             field: NormalizedField {
-                info: FieldInfo::required(TYPE_BOOL),
-                omission: OmissionPolicy::Value(FieldFallback::False),
+                info: RecordField::new(TYPE_BOOL),
+                on_absence: AbsencePolicy::CompleteWith(FieldCompletion::False),
             },
         })
     }
@@ -145,39 +130,34 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
     fn bool_required(
         &mut self,
         type_id: TypeId,
-        observes_omission: bool,
+        may_be_absent: bool,
         visiting: &mut HashSet<TypeId>,
     ) -> Result<CaptureTypePlan, &'static str> {
         if !visiting.insert(type_id) {
             return Err("capture type `bool` cannot normalize a recursive container type");
         }
         let result = match self.raw.shape(type_id) {
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 let inner = self.bool_present(*inner, visiting)?;
-                Ok(CaptureTypePlan::optional(
-                    TYPE_BOOL,
-                    OptionalCaptureTypeMode::Bool,
-                    inner,
-                ))
+                Ok(CaptureTypePlan::option(TYPE_BOOL, OptionMode::Bool, inner))
             }
             TypeShape::Ref(target) => {
-                self.bool_required(self.raw.definition(*target), observes_omission, visiting)
+                self.bool_required(self.raw.declaration(*target), may_be_absent, visiting)
             }
-            TypeShape::Array { .. } if observes_omission => Ok(CaptureTypePlan::bool_terminal(
+            TypeShape::List { .. } if may_be_absent => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
                 TerminalData::Semantic,
             )),
-            TypeShape::Array { .. } => Err(
-                "capture type `bool` cannot be applied to this list; capture an optional value inside the list, or inspect whether the list is empty after parsing",
+            TypeShape::List { .. } => Err(
+                "capture type `bool` cannot be applied to this list; capture an option value inside the list, or inspect whether the list is empty after parsing",
             ),
-            TypeShape::Node | TypeShape::Struct(_) | TypeShape::Enum(_) if observes_omission => Ok(
+            TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) if may_be_absent => Ok(
                 CaptureTypePlan::bool_terminal(TYPE_BOOL, terminal_data(self.raw.shape(type_id))),
             ),
-            TypeShape::Node | TypeShape::Struct(_) | TypeShape::Enum(_) => Err(
+            TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) => Err(
                 "capture type `bool` requires a value that may be absent; this capture is always present",
             ),
-            TypeShape::Void => Err("a capture type requires an ordinary captured value"),
-            TypeShape::Str | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         };
@@ -191,17 +171,16 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         visiting: &mut HashSet<TypeId>,
     ) -> Result<CaptureTypePlan, &'static str> {
         match self.raw.shape(type_id) {
-            TypeShape::Optional(_) => self.bool_required(type_id, false, visiting),
-            TypeShape::Ref(target) => self.bool_present(self.raw.definition(*target), visiting),
+            TypeShape::Option(_) => self.bool_required(type_id, false, visiting),
+            TypeShape::Ref(target) => self.bool_present(self.raw.declaration(*target), visiting),
             TypeShape::Node
-            | TypeShape::Struct(_)
-            | TypeShape::Enum(_)
-            | TypeShape::Array { .. } => Ok(CaptureTypePlan::bool_terminal(
+            | TypeShape::Record(_)
+            | TypeShape::Variant(_)
+            | TypeShape::List { .. } => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
                 terminal_data(self.raw.shape(type_id)),
             )),
-            TypeShape::Void => Err("a capture type requires an ordinary captured value"),
-            TypeShape::Str | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         }

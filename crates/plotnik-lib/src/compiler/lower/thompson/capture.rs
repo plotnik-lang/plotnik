@@ -1,6 +1,6 @@
 //! Capture effects handling for query compilation.
 //!
-//! Manages the construction and propagation of capture effects (Node + Set)
+//! Manages the construction and propagation of capture effects (`Node` + `RecordSet`).
 //! through the compilation pipeline.
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
@@ -11,7 +11,7 @@ use crate::compiler::lower::spans::SpanBindingIR;
 use crate::compiler::parse::ast::{self, Pattern};
 
 use super::NfaBuilder;
-use super::scope::Struct;
+use super::scope::RecordScope;
 
 /// Capture effects to attach to match instructions.
 ///
@@ -23,9 +23,9 @@ use super::scope::Struct;
 /// - `pre` effects go on the first item (entry)
 /// - `post` effects go on the last item (exit)
 ///
-/// For enum alternations `[A: body]`:
-/// - `pre` contains `Enum(variant)` for branch entry
-/// - `post` contains `EndEnum` for branch exit
+/// For labeled alternations `[A: body]`:
+/// - `pre` contains `VariantOpen(case)` for alternative entry
+/// - `post` contains `VariantClose` for alternative exit
 #[derive(Clone, Default)]
 pub struct CaptureEffects {
     /// Effects to place before the compiled subgraph's own effects.
@@ -45,7 +45,7 @@ impl CaptureEffects {
 
     /// Add an inner scope (opens after existing scopes, closes before them).
     ///
-    /// Use for: Struct/EndStruct, Enum/EndEnum, Arr/EndArr, SuppressBegin/SuppressEnd
+    /// Use for paired record, variant, list, and suppression effects.
     ///
     /// Given existing `pre=[A_Open]`, `post=[A_Close]`, adding inner scope B:
     /// - Result: `pre=[A_Open, B_Open]`, `post=[B_Close, A_Close]`
@@ -54,9 +54,9 @@ impl CaptureEffects {
         assert!(
             matches!(
                 open.kind(),
-                EffectKind::StructOpen
-                    | EffectKind::EnumOpen
-                    | EffectKind::ArrayOpen
+                EffectKind::RecordOpen
+                    | EffectKind::VariantOpen
+                    | EffectKind::ListOpen
                     | EffectKind::SuppressBegin
             ),
             "nest_scope expects scope-opening effect, got {:?}",
@@ -65,9 +65,9 @@ impl CaptureEffects {
         assert!(
             matches!(
                 close.kind(),
-                EffectKind::StructClose
-                    | EffectKind::EnumClose
-                    | EffectKind::ArrayClose
+                EffectKind::RecordClose
+                    | EffectKind::VariantClose
+                    | EffectKind::ListClose
                     | EffectKind::SuppressEnd
             ),
             "nest_scope expects scope-closing effect, got {:?}",
@@ -80,7 +80,7 @@ impl CaptureEffects {
 
     /// Add pre-match value effects (run after all scopes open).
     ///
-    /// Use for: Null+Set injection in union alternations
+    /// Use for default-value injection in unlabeled alternations.
     ///
     /// Given `pre=[Scope_Open]`, adding value effects:
     /// - Result: `pre=[Scope_Open, Value1, Value2]`
@@ -91,7 +91,7 @@ impl CaptureEffects {
 
     /// Add post-match value effects (run before any scope closes).
     ///
-    /// Use for: Node+Set capture effects, Push for arrays
+    /// Use for `Node` + `RecordSet` capture effects and `ArrayPush` for lists.
     ///
     /// Given `post=[Scope_Close]`, adding value effects:
     /// - Result: `post=[Value1, Value2, Scope_Close]`
@@ -100,18 +100,18 @@ impl CaptureEffects {
         self
     }
 
-    /// Whether the first trailing effect consumes a value the inner pattern
-    /// leaves pending. Producer effects like `Node` are not consumers; they
-    /// capture the matched node themselves.
-    pub fn post_consumes_value(&self) -> bool {
-        Self::effects_consume_value(&self.post)
+    /// Whether the first trailing effect attaches the value left pending by
+    /// the inner pattern. Producer effects like `Node` capture the matched node
+    /// themselves instead.
+    pub fn post_attaches_value(&self) -> bool {
+        Self::effects_attach_value(&self.post)
     }
 
-    pub fn effects_consume_value(effects: &[EffectIR]) -> bool {
+    pub fn effects_attach_value(effects: &[EffectIR]) -> bool {
         effects
             .iter()
             .find(|e| !e.is_span_marker())
-            .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
+            .is_some_and(|e| matches!(e.kind(), EffectKind::RecordSet | EffectKind::ArrayPush))
     }
 
     /// Wrap this channel in a construct's span brackets. The start runs after
@@ -136,9 +136,9 @@ pub(super) fn first_unmatched_close(post: &[EffectIR]) -> Option<usize> {
                 }
                 span_depth -= 1;
             }
-            EffectKind::ArrayClose
-            | EffectKind::StructClose
-            | EffectKind::EnumClose
+            EffectKind::ListClose
+            | EffectKind::RecordClose
+            | EffectKind::VariantClose
             | EffectKind::SuppressEnd
             | EffectKind::StrClose
             | EffectKind::BoolClose => return Some(i),
@@ -154,14 +154,14 @@ pub(super) fn first_unmatched_close(post: &[EffectIR]) -> Option<usize> {
 /// fragment continues (`exit`), the navigation it should apply to reach its first
 /// candidate (`nav`, `None` meaning "use the form's default"), and the capture
 /// effects that land on its innermost match/scope-close instruction (`capture`).
-/// `value` marks contexts where the pattern's own pending value is observed,
+/// `observe_value` marks contexts where the pattern's own pending value is observed,
 /// such as a definition-root quantifier or a set-after structured capture.
 #[derive(Clone)]
 pub(super) struct PatternCtx {
     pub exit: Label,
     pub nav: Option<Nav>,
     pub capture: CaptureEffects,
-    pub value: bool,
+    pub observe_value: bool,
 }
 
 impl PatternCtx {
@@ -170,26 +170,26 @@ impl PatternCtx {
             exit,
             nav,
             capture: CaptureEffects::default(),
-            value: false,
+            observe_value: false,
         }
     }
 
-    pub(super) fn with_value(exit: Label, nav: Option<Nav>) -> Self {
+    pub(super) fn observing_value(exit: Label, nav: Option<Nav>) -> Self {
         Self {
             exit,
             nav,
             capture: CaptureEffects::default(),
-            value: true,
+            observe_value: true,
         }
     }
 
-    pub(super) fn consumes_value(&self) -> bool {
-        self.value || self.capture.post_consumes_value()
+    pub(super) fn needs_value(&self) -> bool {
+        self.observe_value || self.capture.post_attaches_value()
     }
 }
 
 impl NfaBuilder<'_> {
-    /// Build capture effects (Node + Set) for a capture whose inner was
+    /// Build capture effects (`Node` + `RecordSet`) for a capture whose inner was
     /// classified as `mechanism` (or `None` for a bare `@x`).
     ///
     /// The caller already classifies the inner to dispatch, so it passes the
@@ -203,35 +203,35 @@ impl NfaBuilder<'_> {
         let mut member_ref = None;
 
         // Only the `Node` mechanism captures the matched node directly. Every
-        // other mechanism (struct scope, pass-through ref/enum/forward, array)
-        // produces its value via EndStruct/EndEnum/EndArr/Call, so the capture itself
+        // other mechanism (record scope, pass-through ref/variant/forward, list)
+        // produces its value via RecordClose/VariantClose/ListClose/Call, so the capture itself
         // emits no Node. A bare capture (`@x` with no inner) is a Node.
         let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
         if is_node_mechanism {
             effects.push(EffectIR::node());
         }
 
-        // Add Set effect if we have a capture name.
+        // Add `RecordSet` if we have a capture name.
         // Always look up in the current scope - bubble captures don't create new scopes,
-        // so all fields (including nested bubble captures) reference the same root struct.
+        // so all fields (including nested bubble captures) reference the same root record.
         if let Some(name_token) = cap.name() {
             let capture_name = &name_token.text()[1..];
             // Suppressed regions never reach here (their captures are inert), so
-            // the enclosing scope is a struct at every real capture site — except
-            // an enum-rooted definition body, whose scope carries no fields. Once
-            // a struct scope exists, a missing member is our bug.
-            if let Some(Struct(type_id)) = self.scope_stack.last().copied()
+            // the enclosing scope is a record at every real capture site — except
+            // a variant-rooted definition body, whose scope carries no fields. Once
+            // a record scope exists, a missing member is our bug.
+            if let Some(RecordScope(type_id)) = self.scope_stack.last().copied()
                 && self
                     .ctx
                     .analysis
                     .type_analysis
-                    .struct_fields(type_id)
+                    .record_fields(type_id)
                     .is_some()
             {
                 let member = self
                     .lookup_member(capture_name, type_id)
                     .expect("captured field must resolve in the current scope");
-                effects.push(EffectIR::with_member(EffectKind::Set, member));
+                effects.push(EffectIR::with_member(EffectKind::RecordSet, member));
                 member_ref = Some(member);
             }
         }
@@ -247,11 +247,11 @@ impl NfaBuilder<'_> {
         effects
     }
 
-    /// Check if a quantifier body needs Node effect before Push.
+    /// Check if a quantifier body needs `Node` before `ArrayPush`.
     ///
-    /// For scalar array elements (Node type), we need [Node, Push]
+    /// For node list elements, we need `[Node, ArrayPush]`.
     /// to capture the matched node value.
-    /// For structured elements (Struct/Enum), EndStruct/EndEnum provides the value.
+    /// For structured elements, RecordClose/VariantClose provides the value.
     /// For refs returning structured types, Call provides the value.
     pub(super) fn quantifier_needs_node_for_push(&self, pattern: &Pattern) -> bool {
         let Pattern::QuantifiedPattern(quant) = pattern else {
@@ -267,7 +267,7 @@ impl NfaBuilder<'_> {
     /// Whether a quantifier element needs a `Node` effect to produce its value.
     ///
     /// A ref returning a structured type leaves its value pending via Call/Return;
-    /// a struct- or enum-shaped element leaves it pending via EndStruct/EndEnum.
+    /// a record- or variant-shaped element leaves it pending via RecordClose/VariantClose.
     /// Everything else (a plain node match) needs an explicit `Node`.
     pub(super) fn element_needs_node(&self, element: &Pattern) -> bool {
         if self.is_ref_returning_structured(element) {
@@ -286,13 +286,13 @@ impl NfaBuilder<'_> {
             .flow
             .type_id()
             .map(|id| self.ctx.analysis.type_analysis.expect_type_shape(id))
-            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
+            .is_some_and(|shape| matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)))
     }
 
     /// Check if pattern is (or wraps) a ref returning a structured type.
     ///
     /// For such refs, we skip the Node effect in captures - the Call leaves
-    /// the structured result (Enum/Struct) pending for Set to consume.
+    /// the structured result pending for `RecordSet` to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(
@@ -314,15 +314,15 @@ impl NfaBuilder<'_> {
     }
 }
 
-/// Check if inner needs struct wrapper for array iterations.
+/// Check if inner needs a record wrapper for list iterations.
 ///
-/// Returns true when the inner pattern produces a Struct type (bubbling fields).
+/// Returns true when the inner pattern produces a record type (bubbling fields).
 /// This includes:
 /// - Sequences/alternations with captures: `{(a) @x (b) @y}*`
 /// - Named nodes with bubble captures: `(node (child) @x)*`
 ///
-/// Enums use Enum/EndEnum instead (handled separately).
-pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
+/// Variant types use VariantOpen/VariantClose instead (handled separately).
+pub fn needs_record_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
     let info = type_ctx.expect_pattern_result(inner);
 
     // Must be a bubble (fields flow to parent scope)
@@ -333,10 +333,10 @@ pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
     info.flow
         .type_id()
         .map(|id| type_ctx.expect_type_shape(id))
-        .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)))
+        .is_some_and(|shape| matches!(shape, TypeShape::Record(_)))
 }
 
-/// Get row type ID for array element scoping.
-pub fn row_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
+/// Get the element type ID for list-element scoping.
+pub fn element_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
     type_ctx.expect_pattern_result(inner).flow.type_id()
 }

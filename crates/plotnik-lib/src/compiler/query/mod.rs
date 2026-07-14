@@ -9,5 +9,5 @@ mod printer_tests;
 #[cfg(test)]
 mod stages_tests;
 
-pub(crate) use stages::LinkOutcome;
+pub(crate) use stages::BindOutcome;
 pub use stages::{CompiledQuery, Query, QueryBuilder};

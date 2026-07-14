@@ -1,6 +1,6 @@
 (call_expression (#eq? (identifier) @x))
 ------------------ DIAGNOSTICS -------------------
-error: tree-sitter predicates are not supported
+error: Tree-sitter predicates are not supported
  --> query.ptk:1:19
   |
 1 | (call_expression (#eq? (identifier) @x))

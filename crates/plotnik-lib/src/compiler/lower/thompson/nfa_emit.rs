@@ -9,11 +9,11 @@ use crate::core::NodeFieldId;
 use super::NfaBuilder;
 use super::capture::CaptureEffects;
 
-/// `prefer` is tried first when greedy, `other` first when non-greedy. Bundled
+/// `prefer` is tried first when greedy, `other` first when lazy. Bundled
 /// so the two same-type `Label`s can't be transposed — a swap would silently
 /// flip greediness.
 #[derive(Clone, Copy)]
-pub(super) struct BranchTargets {
+pub(super) struct ForkTargets {
     pub prefer: Label,
     pub other: Label,
 }
@@ -21,7 +21,7 @@ pub(super) struct BranchTargets {
 #[derive(Clone, Copy)]
 pub(super) enum Greediness {
     Greedy,
-    NonGreedy,
+    Lazy,
 }
 
 impl From<QuantifierOperator> for Greediness {
@@ -30,16 +30,16 @@ impl From<QuantifierOperator> for Greediness {
             return Self::Greedy;
         }
 
-        Self::NonGreedy
+        Self::Lazy
     }
 }
 
 impl Greediness {
-    fn successors(self, targets: BranchTargets) -> Vec<Label> {
-        let BranchTargets { prefer, other } = targets;
+    fn successors(self, targets: ForkTargets) -> Vec<Label> {
+        let ForkTargets { prefer, other } = targets;
         match self {
             Self::Greedy => vec![prefer, other],
-            Self::NonGreedy => vec![other, prefer],
+            Self::Lazy => vec![other, prefer],
         }
     }
 }
@@ -89,7 +89,7 @@ impl NfaBuilder<'_> {
     /// Emit an epsilon with combined effects.
     ///
     /// Note: this consumes only `outer.post`. Callers whose capture owns no
-    /// scope-opening step (`PendingValue`, suppressive) must route `outer.pre`
+    /// scope-opening state (`PendingValue`, suppressed region) must route `outer.pre`
     /// separately via [`wrap_entry_pre`](Self::wrap_entry_pre).
     pub(super) fn emit_effects_epsilon(
         &mut self,
@@ -111,29 +111,29 @@ impl NfaBuilder<'_> {
     /// the enclosing scope. Returns the new entry, or `entry` unchanged when
     /// `pre` is empty.
     ///
-    /// Scope-opening captures (`compile_struct_capture`, `compile_array_capture`)
-    /// fold `outer_capture.pre` onto their own `Struct`/`Arr` step. Captures that
-    /// own no such step — `PendingValue` and suppressive — have nowhere to fold it,
-    /// so they call this. Dropping it loses an enum variant's `Enum`-open (or an
-    /// union branch's null-injected defaults), and the path then closes a
+    /// Scope-opening captures (`compile_record_capture`, `compile_list_capture`)
+    /// fold `outer_capture.pre` onto their own `RecordOpen`/`ListOpen` state. Captures that
+    /// own no such state — `PendingValue` and suppressed regions — have nowhere to fold it,
+    /// so they call this. Dropping it loses a case's `VariantOpen` (or an
+    /// an alternative's injected defaults), and the path then closes a
     /// scope it never opened.
     pub(super) fn wrap_entry_pre(&mut self, entry: Label, pre: Vec<EffectIR>) -> Label {
         if pre.is_empty() {
             return entry;
         }
-        let pre_step = self.fresh_label();
+        let pre_state = self.fresh_label();
         self.instructions.push(
-            MatchIR::epsilon(pre_step, entry)
+            MatchIR::epsilon(pre_state, entry)
                 .prepend_effects(pre)
                 .into(),
         );
-        pre_step
+        pre_state
     }
 
-    /// Null-inject captures on the skip path of an optional/star quantifier,
-    /// mirroring what alternations do for asymmetric branches.
-    /// Returns `exit` unchanged when no Set effects are present.
-    pub(super) fn emit_null_for_skip_path(
+    /// Produce absent captures on the skip path of a `?`/`*` quantifier,
+    /// mirroring what alternations do for asymmetric alternatives.
+    /// Returns `exit` unchanged when no `RecordSet` effects are present.
+    pub(super) fn emit_absence_for_skip_path(
         &mut self,
         exit: Label,
         capture: &CaptureEffects,
@@ -151,28 +151,28 @@ impl NfaBuilder<'_> {
                 .is_some_and(|entry| entry.kind == crate::bytecode::SpanKind::Capture)
                 .then_some(*id as u16)
         });
-        let null_effects: Vec<_> = capture
+        let absence_effects: Vec<_> = capture
             .post
             .iter()
-            .filter(|eff| eff.kind() == EffectKind::Set)
-            .flat_map(|set_eff| {
+            .filter(|eff| eff.kind() == EffectKind::RecordSet)
+            .flat_map(|record_set| {
                 capture_span
                     .map(EffectIR::span_start)
                     .into_iter()
-                    .chain([EffectIR::null(), set_eff.clone()])
+                    .chain([EffectIR::absent(), record_set.clone()])
                     .chain(capture_span.map(EffectIR::span_end))
             })
             .collect();
 
-        self.emit_effects_if_nonempty(exit, null_effects)
+        self.emit_effects_if_nonempty(exit, absence_effects)
     }
 
-    /// Emit null effects for internal captures when skipping an optional/star pattern.
+    /// Emit absence events for internal captures when skipping a `?`/`*` pattern.
     ///
-    /// Unlike `emit_null_for_skip_path` which handles captures passed as effects,
+    /// Unlike `emit_absence_for_skip_path` which handles captures passed as effects,
     /// this function handles captures defined INSIDE the pattern (e.g., `{(x) @cap}?`).
-    /// It collects all capture names from the pattern and emits Null Set for each.
-    pub(super) fn emit_null_for_internal_captures(
+    /// It collects all capture names from the pattern and emits `Absent RecordSet` for each.
+    pub(super) fn emit_absence_for_internal_captures(
         &mut self,
         exit: Label,
         inner: &Pattern,
@@ -188,7 +188,7 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        let mut null_effects = Vec::new();
+        let mut absence_effects = Vec::new();
         for capture in captures {
             let name = capture
                 .name()
@@ -197,17 +197,17 @@ impl NfaBuilder<'_> {
                 let span = self.span_id(capture.syntax(), crate::bytecode::SpanKind::Capture);
                 if let Some(span) = span {
                     self.bind_span(span, SpanBindingIR::Member(member_ref));
-                    null_effects.push(EffectIR::span_start(span.0));
+                    absence_effects.push(EffectIR::span_start(span.0));
                 }
-                null_effects.push(EffectIR::null());
-                null_effects.push(EffectIR::with_member(EffectKind::Set, member_ref));
+                absence_effects.push(EffectIR::absent());
+                absence_effects.push(EffectIR::with_member(EffectKind::RecordSet, member_ref));
                 if let Some(span) = span {
-                    null_effects.push(EffectIR::span_end(span.0));
+                    absence_effects.push(EffectIR::span_end(span.0));
                 }
             }
         }
 
-        self.emit_effects_if_nonempty(exit, null_effects)
+        self.emit_effects_if_nonempty(exit, absence_effects)
     }
 
     pub(super) fn emit_effects_if_nonempty(
@@ -236,17 +236,17 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Emit a wildcard navigation step that accepts any node.
+    /// Emit a wildcard navigation state that accepts any node.
     ///
     /// Used for skip-retry logic in quantifiers: navigates to the next position
     /// and matches any node there. If navigation fails (no more siblings/children),
     /// the VM backtracks automatically.
     ///
-    /// The nav is emitted exact: a wildcard step is always internal to an
+    /// The nav is emitted exact: a wildcard state is always internal to an
     /// NFA-level retry loop (position search), and that loop owns the sibling
     /// search. The engine treats a non-exact `Down*`/`Next*` match acceptance
     /// as a choice point and leaves a resume checkpoint
-    /// (`Nav::is_sibling_search`); an exact nav opts these steps out, keeping
+    /// (`Nav::is_sibling_search`); an exact nav opts these states out, keeping
     /// every search under exactly one retry owner. Behavior is otherwise
     /// identical — with an `Any` constraint the skip policy is never consulted.
     pub(super) fn emit_wildcard_nav(&mut self, label: Label, nav: Nav, successor: Label) {
@@ -257,22 +257,22 @@ impl NfaBuilder<'_> {
         );
     }
 
-    /// Emit an epsilon branch preferring `targets.prefer` when greedy,
-    /// `targets.other` when non-greedy.
-    pub(super) fn emit_branch_epsilon(
+    /// Emit an epsilon fork preferring `targets.prefer` when greedy,
+    /// `targets.other` when lazy.
+    pub(super) fn emit_fork_epsilon(
         &mut self,
-        targets: BranchTargets,
+        targets: ForkTargets,
         greediness: Greediness,
     ) -> Label {
         let entry = self.fresh_label();
-        self.emit_branch_epsilon_at(entry, targets, greediness);
+        self.emit_fork_epsilon_at(entry, targets, greediness);
         entry
     }
 
-    pub(super) fn emit_branch_epsilon_at(
+    pub(super) fn emit_fork_epsilon_at(
         &mut self,
         label: Label,
-        targets: BranchTargets,
+        targets: ForkTargets,
         greediness: Greediness,
     ) {
         self.emit_epsilon(label, greediness.successors(targets));
@@ -296,7 +296,7 @@ impl NfaBuilder<'_> {
     ///
     /// The body is always preferred over advancing: the iteration has no exit
     /// edge of its own, so a following pattern can never bind at a
-    /// failed-candidate cursor position (see #414). Greediness and zero-match
+    /// failed-candidate cursor position (see #414). Greediness and empty-match
     /// escape, where applicable, live on the caller's loop-boundary epsilons,
     /// not here.
     ///
@@ -307,9 +307,9 @@ impl NfaBuilder<'_> {
         let retry = self.fresh_label();
         self.emit_wildcard_nav(retry, Nav::Next, try_label);
 
-        self.emit_branch_epsilon_at(
+        self.emit_fork_epsilon_at(
             try_label,
-            BranchTargets {
+            ForkTargets {
                 prefer: body,
                 other: retry,
             },
@@ -326,7 +326,7 @@ impl NfaBuilder<'_> {
 fn collect_capture_occurrences(pattern: &Pattern) -> Vec<ast::CapturedPattern> {
     fn collect(pattern: &Pattern, captures: &mut Vec<ast::CapturedPattern>) {
         if let Pattern::CapturedPattern(capture) = pattern
-            && !capture.is_suppressive()
+            && !capture.is_discard()
             && capture.name().is_some()
         {
             captures.push(capture.clone());

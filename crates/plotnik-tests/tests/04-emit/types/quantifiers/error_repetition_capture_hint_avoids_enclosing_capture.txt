@@ -1,0 +1,17 @@
+Q = {
+  (identifier) @items
+  {
+    (number) @x
+  }*
+}
+------------------ DIAGNOSTICS -------------------
+error: captures `@x` repeat with `*` but aren't collected into a list
+ --> query.ptk:3:3
+  |
+3 | /   {
+4 | |     (number) @x
+5 | |   }*
+  | |____^
+  |
+help: add a repetition capture so each repeat becomes one record in a list: `{...}* @matches`
+help: or discard the captures if only the structure matters: `{...}* @_`

@@ -2,13 +2,13 @@ import { setDiagnostics, type Diagnostic } from "@codemirror/lint";
 import type { EditorView } from "@codemirror/view";
 import { byteToUtf16 } from "./byte-offsets";
 import { setTokenDecorations, type TokenRange } from "./code-editor";
-import type { TokenSpan, WireDiagnostic } from "./protocol";
+import type { QueryToken, WireDiagnostic } from "./protocol";
 
 /* Idents and whitespace keep the default ink; everything else gets a class
    styled in global.css next to the lezer `tok-*` palette. Field names are
    the exception: the lexer calls them plain idents, so they are recovered
-   below and get the calmer `tok-propertyName` ink, matching the AST pane. */
-const TOKEN_CLASS: Partial<Record<TokenSpan["kind"], string>> = {
+   below and get the calmer `tok-propertyName` ink, matching the tree pane. */
+const TOKEN_CLASS: Partial<Record<QueryToken["kind"], string>> = {
   comment: "ptk-comment",
   string: "ptk-string",
   regex: "ptk-regex",
@@ -21,9 +21,9 @@ const TOKEN_CLASS: Partial<Record<TokenSpan["kind"], string>> = {
    PascalCase names and `::` capture types follow captures, so lowercase + single
    colon is exact), or when it is glued to a leading `-` (negated field). */
 function isFieldName(
-  tokens: TokenSpan[],
+  tokens: QueryToken[],
   index: number,
-  text: (token: TokenSpan) => string,
+  text: (token: QueryToken) => string,
 ): boolean {
   const ident = tokens[index];
   if (!/^[a-z_]/.test(text(ident))) return false;
@@ -31,7 +31,7 @@ function isFieldName(
   if (
     prev !== undefined &&
     prev.kind === "punct" &&
-    prev.end === ident.start &&
+    prev.span[1] === ident.span[0] &&
     text(prev) === "-"
   ) {
     return true;
@@ -54,7 +54,7 @@ export function pushQueryFeedback(
   view: EditorView,
   compiledText: string,
   diagnostics: WireDiagnostic[],
-  tokens: TokenSpan[],
+  tokens: QueryToken[],
 ): void {
   if (view.state.doc.toString() !== compiledText) return;
 
@@ -91,8 +91,8 @@ export function pushQueryFeedback(
     };
   });
 
-  const tokenText = (token: TokenSpan) =>
-    compiledText.slice(b2u(token.start), b2u(token.end));
+  const tokenText = (token: QueryToken) =>
+    compiledText.slice(b2u(token.span[0]), b2u(token.span[1]));
 
   const ranges: TokenRange[] = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -101,8 +101,8 @@ export function pushQueryFeedback(
       token.kind === "ident" && isFieldName(tokens, i, tokenText)
         ? "tok-propertyName"
         : TOKEN_CLASS[token.kind];
-    if (!cls || token.start === token.end) continue;
-    ranges.push({ from: b2u(token.start), to: b2u(token.end), cls });
+    if (!cls || token.span[0] === token.span[1]) continue;
+    ranges.push({ from: b2u(token.span[0]), to: b2u(token.span[1]), cls });
   }
 
   view.dispatch(setDiagnostics(view.state, cmDiagnostics), {

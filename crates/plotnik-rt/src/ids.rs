@@ -1,7 +1,7 @@
 //! Grammar-derived id newtypes shared by the compiler and the runtime.
 //!
 //! The values are tree-sitter's own numeric ids: the compiler resolves names to
-//! ids at link time by replicating tree-sitter's symbol numbering, and the
+//! ids during grammar binding by replicating tree-sitter's symbol numbering, and the
 //! runtime compares them against live `Node`s without further translation.
 
 use std::num::NonZeroU16;
@@ -80,7 +80,7 @@ pub struct NodeFieldId(NonZeroU16);
 nonzero_u16_id!(NodeFieldId);
 
 impl NodeFieldId {
-    /// Const constructor for generated code, which bakes linked field ids as
+    /// Const constructor for generated code, which bakes bound field ids as
     /// literals. A zero id fails at *build* time of the generated crate (const
     /// evaluation), never at runtime.
     pub const fn from_raw(id: u16) -> Self {

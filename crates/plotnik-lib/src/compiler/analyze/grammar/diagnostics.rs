@@ -1,11 +1,11 @@
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::core::{NodeFieldId, NodeKindId};
 
+use super::bind::GrammarBinder;
 use super::check::{FieldRef, ParentNode};
-use super::link::GrammarLinker;
 use super::utils::find_similar;
 
-impl<'a, 'q> GrammarLinker<'a, 'q> {
+impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn emit_field_not_on_node(
         &mut self,
         span: Span,
@@ -18,18 +18,18 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report(DiagnosticKind::FieldNotOnNodeKind, span)
+            .report(DiagnosticKind::GrammarFieldNotOnNodeKind, span)
             .detail(field_name)
             .related_to(parent_span, format!("on `{}`", parent_name));
 
         if valid_fields.is_empty() {
-            builder = builder.hint(format!("`{}` has no fields", parent_name));
+            builder = builder.hint(format!("`{}` has no grammar fields", parent_name));
         } else {
             if let Some(similar) = find_similar(field_name, &valid_fields) {
                 builder = builder.fix(format!("did you mean `{}`?", similar), similar);
             }
             builder = builder.hint(format!(
-                "valid fields for `{}`: {}",
+                "valid grammar fields for `{}`: {}",
                 parent_name,
                 format_list(&valid_fields, 5)
             ));
@@ -76,7 +76,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     }
 
     /// Hint for the inadmissible-child diagnostic: list valid unlabeled children, or — when a
-    /// node's only children are field values — surface those as fields so users don't write ghost
+    /// node's only children are grammar-field values — surface those constraints so users don't write ghost
     /// bare-child queries.
     fn child_hint(&self, parent_id: NodeKindId, parent_name: &str) -> String {
         let child_types = self.grammar.valid_child_types(parent_id);
@@ -102,12 +102,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             .collect::<Vec<_>>()
             .join(", ");
         format!(
-            "`{}` has no unlabeled children — its children are fields: {}",
+            "`{}` has no unlabeled children — use its grammar fields: {}",
             parent_name, rendered
         )
     }
 
-    /// Render a field as `name: (kind)` using its first valid kind, for child/field hints.
+    /// Render a grammar field as `name: (kind)` using its first valid kind.
     fn render_field(&self, parent_id: NodeKindId, field_id: NodeFieldId) -> String {
         let field_name = self
             .grammar
@@ -131,14 +131,14 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     ) {
         let hint = self.field_value_hint(ctx.id(), field.id, field.name);
         self.diag
-            .report(DiagnosticKind::InvalidFieldChildType, span)
+            .report(DiagnosticKind::InvalidGrammarFieldChildKind, span)
             .detail(message)
-            .related_to(field.span, format!("field `{}`", field.name))
+            .related_to(field.span, format!("grammar field `{}`", field.name))
             .hint(hint)
             .emit();
     }
 
-    /// Hint for the invalid-field-value diagnostic: the named kinds a field accepts, or — for
+    /// Hint for the invalid-field-value diagnostic: the named kinds a grammar field accepts, or — for
     /// literal-only fields — a concrete `field: "token"` example.
     fn field_value_hint(
         &self,

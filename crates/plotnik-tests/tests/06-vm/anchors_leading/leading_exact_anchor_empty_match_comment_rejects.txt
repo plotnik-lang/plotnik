@@ -1,0 +1,64 @@
+Q = (program
+  {
+    .!
+    (debugger_statement)* @b
+  }
+)
+--------------------- INPUT ----------------------
+// note
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node[];
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "b"
+S2 "Q"
+S3 "program"
+S4 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = ListZeroOrMore(T0)  ; <Node>*
+T2 = Record  M0:1  ; { b }
+
+[type_members]
+M0: S1 → T1  ; b: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@18)                            18 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  └!┘  _ [ListClose RecordSet(M0)]      06
+  10  └─!  (debugger_statement) [Node ArrayPush]  12, 16
+  12  ──!  (debugger_statement) [Node ArrayPush]  12, 16
+  14  -ε-  [ListOpen]                       10, 08
+  16  ─‣┘  _ [ListClose RecordSet(M0)]      06
+  18   !   (program)                        14
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@18)                            18 : 03
+       ▶   (@18)
+
+@18:
+  18       (program)                        14
+       ●   program
+  14  -ε-  [ListOpen]                       10, 08
+  10       (debugger_statement) [Node ArrayPush]  12, 16
+       ○   comment
+  14  ❮❮❮ 
+  08       _ [ListClose RecordSet(M0)]      06

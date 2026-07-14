@@ -31,7 +31,7 @@ pub struct DependencyAnalysis {
 ///
 /// The graph is indexed by `DefId`, just like `defs`. Keeping this behavior here
 /// gives lowering, schema projection, and inspection one authoritative notion of
-/// which definition bodies a callable root can demand.
+/// which definition bodies a selectable root can demand.
 #[derive(Clone, Debug)]
 pub(in crate::compiler::analyze::refs) struct DefinitionDependencies {
     outgoing: Vec<Vec<DefId>>,
@@ -87,7 +87,7 @@ impl DefinitionDependencies {
             pending.extend_from_slice(
                 self.outgoing
                     .get(def_id.index())
-                    .expect("reachable definition must have a dependency row"),
+                    .expect("reachable definition must have a dependency list"),
             );
         }
 
@@ -177,7 +177,7 @@ impl DependencyAnalysis {
         assert_eq!(
             dependencies.outgoing.len(),
             defs.len(),
-            "every definition must have one dependency row",
+            "every definition must have one dependency list",
         );
 
         Self {
@@ -230,7 +230,7 @@ impl DependencyAnalysis {
     ///
     /// The closure includes the roots themselves and is safe for recursive
     /// components. Its iterator is deterministic `DefId` order, making the same
-    /// result reusable by output layout and inspection projection.
+    /// result reusable by result layout and inspection projection.
     pub fn reachable_from(&self, roots: impl IntoIterator<Item = DefId>) -> DefinitionReachability {
         self.dependencies.reachable_from(roots)
     }

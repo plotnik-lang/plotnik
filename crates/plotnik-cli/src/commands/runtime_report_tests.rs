@@ -3,12 +3,12 @@ use plotnik_lib::RuntimeError;
 use super::runtime_report::render_runtime_error;
 
 #[test]
-fn step_limit_text_has_code_grouped_count_and_flag() {
-    let msg = render_runtime_error(&RuntimeError::StepLimitExceeded(2_000_000), false);
-    assert!(msg.contains("step limit exceeded"));
-    assert!(msg.contains("[E-limit-steps]"));
-    assert!(msg.contains("2,000,000 steps"));
-    assert!(msg.contains("--max-steps"));
+fn out_of_fuel_text_has_code_grouped_count_and_flag() {
+    let msg = render_runtime_error(&RuntimeError::OutOfFuel(2_000_000), false);
+    assert!(msg.contains("out of fuel"));
+    assert!(msg.contains("[E-out-of-fuel]"));
+    assert!(msg.contains("2,000,000 fuel units"));
+    assert!(msg.contains("--fuel"));
     assert!(msg.contains("unbounded"));
     // Four lines: what / halted / why / how.
     assert_eq!(msg.lines().count(), 4);
@@ -32,10 +32,10 @@ fn memory_limit_text_shows_usage_and_ceiling() {
 
 #[test]
 fn json_form_is_compact_machine_readable() {
-    let steps = render_runtime_error(&RuntimeError::StepLimitExceeded(500), true);
+    let fuel = render_runtime_error(&RuntimeError::OutOfFuel(500), true);
     assert_eq!(
-        steps,
-        r#"{"error":"limit-exceeded","code":"E-limit-steps","max_steps":500}"#
+        fuel,
+        r#"{"error":"limit-exceeded","code":"E-out-of-fuel","fuel_limit":500}"#
     );
 
     let mem = render_runtime_error(

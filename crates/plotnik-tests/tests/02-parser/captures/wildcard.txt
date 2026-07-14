@@ -14,4 +14,4 @@ Root
 Root
   Def Q
     CapturedPattern @any
-      AnonymousNode (any)
+      NodeWildcard

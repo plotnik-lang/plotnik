@@ -10,14 +10,14 @@ Root
     Equals "="
     Alternation
       BracketOpen "["
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "expression"
           Hash "#"
           Id "identifier"
           ParenClose ")"
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "expression"
@@ -29,8 +29,8 @@ Root
 # query.ptk
 Root
   Def Q
-    Union
-      Branch
+    Alternation
+      Alternative
         NamedNode expression
-      Branch
+      Alternative
         NamedNode expression

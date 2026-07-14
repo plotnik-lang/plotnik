@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 
 use crate::bytecode::{
-    HEADER_SIZE, Header, MAX_SPANS, SPAN_NO_BINDING, STEP_SIZE, SpanEntry, SpanKind,
+    BYTECODE_WORD_SIZE, HEADER_SIZE, Header, MAX_SPANS, SPAN_NO_BINDING, SpanEntry, SpanKind,
 };
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::test_utils::synthetic_grammar;
@@ -24,11 +24,11 @@ fn assigns_dense_spans_in_walk_order() {
             SpanKind::Pattern,
             SpanKind::Capture,
             SpanKind::CaptureType,
-            SpanKind::Field,
+            SpanKind::GrammarField,
             SpanKind::Pattern,
         ]
     );
-    assert!(spans.iter().all(|span| span.source == 0));
+    assert!(spans.iter().all(|span| span.source_id == 0));
 }
 
 #[test]
@@ -38,7 +38,10 @@ fn token_spans_cover_capture_quantifier_field_and_capture_type_tokens() {
 
     assert_eq!(span_text(src, find_kind(&spans, SpanKind::Capture)), "@id");
     assert_eq!(span_text(src, find_kind(&spans, SpanKind::Quantifier)), "?");
-    assert_eq!(span_text(src, find_kind(&spans, SpanKind::Field)), "name");
+    assert_eq!(
+        span_text(src, find_kind(&spans, SpanKind::GrammarField)),
+        "name"
+    );
 
     let capture_type = find_kind(&spans, SpanKind::CaptureType);
     assert_eq!(span_text(src, capture_type), ":: Ident");
@@ -124,7 +127,7 @@ fn ladder_drops_whole_lower_priority_tiers() {
 }
 
 #[test]
-fn capture_markers_change_transition_bytes_when_inspection_is_enabled() {
+fn capture_markers_change_instruction_bytes_when_inspection_is_enabled() {
     let src = "Q = (program (expression_statement (identifier) @id))";
     let plain = QueryBuilder::from_inline(src)
         .compile(synthetic_grammar())
@@ -139,8 +142,8 @@ fn capture_markers_change_transition_bytes_when_inspection_is_enabled() {
         .expect("plain module emits");
 
     assert_ne!(
-        transition_bytes(plain.bytes()),
-        transition_bytes(inspected.bytes()),
+        instruction_bytes(plain.bytes()),
+        instruction_bytes(inspected.bytes()),
     );
     assert!(plain.spans().is_empty());
     assert!(!inspected.spans().is_empty());
@@ -190,10 +193,10 @@ fn span_text(src: &str, span: SpanEntry) -> &str {
     &src[span.start as usize..span.end as usize]
 }
 
-fn transition_bytes(bytes: &[u8]) -> &[u8] {
+fn instruction_bytes(bytes: &[u8]) -> &[u8] {
     let header = Header::from_bytes(&bytes[..HEADER_SIZE]);
     let offsets = header.compute_offsets();
-    let start = offsets.transitions as usize;
-    let len = header.transitions_count as usize * STEP_SIZE;
+    let start = offsets.instructions as usize;
+    let len = header.instruction_word_count as usize * BYTECODE_WORD_SIZE;
     &bytes[start..start + len]
 }

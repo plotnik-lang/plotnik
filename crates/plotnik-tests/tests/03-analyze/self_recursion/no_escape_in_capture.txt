@@ -1,0 +1,14 @@
+E = (call (E) @inner)
+------------------ DIAGNOSTICS -------------------
+error: infinite recursion: no escape path
+ --> query.ptk:1:12
+  |
+1 | E = (call (E) @inner)
+  |            ^
+  |            |
+  |            E references itself
+  |
+help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
+-------------------- SYMBOLS ---------------------
+E
+  E (cycle)

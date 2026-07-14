@@ -3,21 +3,21 @@ use crate::compiler::analyze::visitor::{Visitor, walk};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::token_src;
-use crate::compiler::parse::ast::{self, MissingArg, NodePattern};
+use crate::compiler::parse::ast::{self, MissingArg, NamedNodePattern};
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxToken};
 use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeKind, NodeKindId};
 
-use super::link::GrammarLinker;
+use super::bind::GrammarBinder;
 use super::utils::find_similar;
 
-impl<'a, 'q> GrammarLinker<'a, 'q> {
+impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn resolve_symbols(&mut self, source: SourceId, root: &ast::Root) {
-        let mut resolver = GrammarSymbolResolver { linker: self };
+        let mut resolver = GrammarSymbolResolver { binder: self };
         resolver.visit(&Located::new(source, root.clone()));
     }
 
-    fn resolve_named_node(&mut self, located: &Located<NodePattern>) {
+    fn resolve_named_node(&mut self, located: &Located<NamedNodePattern>) {
         let node = located.node();
         if node.is_any() {
             return;
@@ -40,7 +40,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// argument must additionally be a leaf token, since tree-sitter's error
     /// recovery only ever inserts tokens as missing nodes — `(MISSING binary_expression)`
     /// names a kind with children, can never match, and is rejected here.
-    fn resolve_missing_node(&mut self, located: &Located<NodePattern>) {
+    fn resolve_missing_node(&mut self, located: &Located<NamedNodePattern>) {
         let source = located.source();
         match located.node().missing_arg() {
             None => {}
@@ -152,7 +152,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let mut builder = self
             .diag
             .report(
-                DiagnosticKind::UnknownField,
+                DiagnosticKind::UnknownGrammarField,
                 Span::new(source, name_token.text_range()),
             )
             .detail(field_name);
@@ -163,13 +163,13 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         builder.emit();
     }
 
-    /// Resolve a child/value `NodePattern` to its grammar id, mirroring node-context resolution
+    /// Resolve a child/value named-node pattern to its grammar id, mirroring node-context resolution
     /// but returning just the id. `None` for `(_)`, `ERROR`, `MISSING`, or an unresolved kind
     /// (the latter already reported by the resolution pass) — all of which carry no
     /// check signal and are conservatively accepted.
     pub(super) fn resolve_named_node_id(
         &self,
-        located: &Located<NodePattern>,
+        located: &Located<NamedNodePattern>,
     ) -> Option<NodeKindId> {
         let node = located.node();
         if node.is_any() {
@@ -188,7 +188,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 }
 
 struct GrammarSymbolResolver<'l, 'a, 'q> {
-    linker: &'l mut GrammarLinker<'a, 'q>,
+    binder: &'l mut GrammarBinder<'a, 'q>,
 }
 
 impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
@@ -196,8 +196,8 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
         walk(self, root);
     }
 
-    fn visit_node_pattern(&mut self, node: &Located<ast::NodePattern>) {
-        self.linker.resolve_named_node(node);
+    fn visit_named_node_pattern(&mut self, node: &Located<ast::NamedNodePattern>) {
+        self.binder.resolve_named_node(node);
 
         for neg in node
             .node()
@@ -205,26 +205,22 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
             .children()
             .filter_map(ast::NegatedField::cast)
         {
-            self.linker
+            self.binder
                 .resolve_field_by_token(node.source(), neg.name());
         }
 
-        crate::compiler::analyze::visitor::walk_node_pattern(self, node);
+        crate::compiler::analyze::visitor::walk_named_node_pattern(self, node);
     }
 
-    fn visit_token_pattern(&mut self, node: &Located<ast::TokenPattern>) {
-        let token = node.node();
-        if token.is_any() {
-            return;
-        }
-        let Some(value_token) = token.value() else {
+    fn visit_anonymous_node_pattern(&mut self, node: &Located<ast::AnonymousNodePattern>) {
+        let Some(value_token) = node.node().value() else {
             return;
         };
-        self.linker.bind_anonymous_kind(node.source(), &value_token);
+        self.binder.bind_anonymous_kind(node.source(), &value_token);
     }
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
-        self.linker
+        self.binder
             .resolve_field_by_token(field.source(), field.node().name());
         crate::compiler::analyze::visitor::walk_field_pattern(self, field);
     }

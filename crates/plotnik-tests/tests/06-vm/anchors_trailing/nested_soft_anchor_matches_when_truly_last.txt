@@ -36,7 +36,7 @@ S7 "pair"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { p }
+T1 = Record  M0:1  ; { p }
 
 [type_members]
 M0: S1 → T0  ; p: <Node>
@@ -44,16 +44,16 @@ M0: S1 → T0  ; p: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   (pair) [Node Set(M0)]            08
+  06   !   (pair) [Node RecordSet(M0)]      08
   08  ─•┘² _                                09
   09  ─‣┘² _                                10
   10                                        ▶
@@ -67,7 +67,7 @@ Q:
   22   !   (program)                        21
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
        ▶   (@22)
 
@@ -89,12 +89,12 @@ Q:
        ●   object
   13       _                                06, 11
        ●   {
-  06       (pair) [Node Set(M0)]            08
+  06       (pair) [Node RecordSet(M0)]      08
        ○   {
   13  ❮❮❮ 
   11       _                                06, 11
        ●   pair
-  06       (pair) [Node Set(M0)]            08
+  06       (pair) [Node RecordSet(M0)]      08
        ●   pair
   08       _                                09
        ●   array
@@ -103,5 +103,5 @@ Q:
   10   ◀   (@22)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

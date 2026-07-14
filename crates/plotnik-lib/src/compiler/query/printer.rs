@@ -7,7 +7,7 @@ use indexmap::IndexSet;
 use rowan::NodeOrToken;
 
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::types::type_check::Arity;
+use crate::compiler::analyze::types::type_check::RootExtent;
 use crate::compiler::parse::{self as ast, SyntaxNode};
 use crate::compiler::source::{SourceKind, SourceMap};
 
@@ -21,7 +21,7 @@ pub(crate) struct QueryPrinter<'q> {
     query: &'q Query,
     cst: bool,
     trivia: bool,
-    arities: bool,
+    root_extents: bool,
     spans: bool,
     definitions: bool,
 }
@@ -32,7 +32,7 @@ impl<'q> QueryPrinter<'q> {
             query,
             cst: false,
             trivia: false,
-            arities: false,
+            root_extents: false,
             spans: false,
             definitions: false,
         }
@@ -49,8 +49,8 @@ impl<'q> QueryPrinter<'q> {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_arities(mut self, value: bool) -> Self {
-        self.arities = value;
+    pub(crate) fn with_root_extents(mut self, value: bool) -> Self {
+        self.root_extents = value;
         self
     }
 
@@ -184,12 +184,12 @@ impl<'p, 'q, 'a, W: Write> SymbolWriter<'p, 'q, 'a, W> {
             return Ok(());
         }
 
-        let arity = self
+        let extent = self
             .body_nodes
             .get(name)
-            .map(|n| self.printer.arity_glyph(n))
+            .map(|node| self.printer.root_extent_glyph(node))
             .unwrap_or("");
-        writeln!(self.w, "{}{}{}", prefix, name, arity)?;
+        writeln!(self.w, "{}{}{}", prefix, name, extent)?;
         self.visited.insert(name.to_string());
 
         if let Some(body) = self.symbols.body(name) {
@@ -218,10 +218,10 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
 
     fn format_cst(&mut self, node: &SyntaxNode, depth: usize) -> std::fmt::Result {
         let prefix = indent(depth);
-        let arity = self.printer.arity_glyph(node);
+        let extent = self.printer.root_extent_glyph(node);
         let span = self.printer.span_str(node.text_range());
 
-        writeln!(self.w, "{}{:?}{}{}", prefix, node.kind(), arity, span)?;
+        writeln!(self.w, "{}{:?}{}{}", prefix, node.kind(), extent, span)?;
 
         for child in node.children_with_tokens() {
             match child {
@@ -247,9 +247,8 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
     }
 
     fn format_root(&mut self, root: &ast::Root) -> std::fmt::Result {
-        let arity = self.printer.arity_glyph(root.syntax());
         let span = self.printer.span_str(root.text_range());
-        writeln!(self.w, "Root{}{}", arity, span)?;
+        writeln!(self.w, "Root{}", span)?;
 
         for def in root.defs() {
             self.format_def(&def, 1)?;
@@ -264,13 +263,13 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
 
     fn format_def(&mut self, def: &ast::Def, depth: usize) -> std::fmt::Result {
         let prefix = indent(depth);
-        let arity = self.printer.arity_glyph(def.syntax());
+        let extent = self.printer.root_extent_glyph(def.syntax());
         let span = self.printer.span_str(def.text_range());
         let name = def.name().map(|t| t.text().to_string());
 
         match name {
-            Some(n) => writeln!(self.w, "{}Def{}{} {}", prefix, arity, span, n)?,
-            None => writeln!(self.w, "{}Def{}{}", prefix, arity, span)?,
+            Some(n) => writeln!(self.w, "{}Def{}{} {}", prefix, extent, span, n)?,
+            None => writeln!(self.w, "{}Def{}{}", prefix, extent, span)?,
         }
 
         let Some(body) = def.body() else {
@@ -281,60 +280,50 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
 
     fn format_pattern(&mut self, pattern: &ast::Pattern, depth: usize) -> std::fmt::Result {
         let prefix = indent(depth);
-        let arity = self.printer.arity_glyph(pattern.syntax());
+        let extent = self.printer.root_extent_glyph(pattern.syntax());
         let span = self.printer.span_str(pattern.text_range());
 
         match pattern {
-            ast::Pattern::NodePattern(n) => {
+            ast::Pattern::NamedNodePattern(n) => {
                 if n.is_any() {
-                    writeln!(self.w, "{}NamedNode{}{} (any)", prefix, arity, span)?;
+                    writeln!(self.w, "{}NamedNode{}{} (any)", prefix, extent, span)?;
                 } else {
                     let node_kind = n.kind_token().map(|tok| tok.text().to_string());
                     match node_kind {
                         Some(ty) => {
-                            writeln!(self.w, "{}NamedNode{}{} {}", prefix, arity, span, ty)?
+                            writeln!(self.w, "{}NamedNode{}{} {}", prefix, extent, span, ty)?
                         }
-                        None => writeln!(self.w, "{}NamedNode{}{}", prefix, arity, span)?,
+                        None => writeln!(self.w, "{}NamedNode{}{}", prefix, extent, span)?,
                     }
                 }
                 self.format_tree_children(n.syntax(), depth + 1)?;
             }
             ast::Pattern::DefRef(r) => {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(self.w, "{}Ref{}{} {}", prefix, arity, span, name)?;
+                writeln!(self.w, "{}Ref{}{} {}", prefix, extent, span, name)?;
             }
-            ast::Pattern::TokenPattern(a) => {
-                if a.is_any() {
-                    writeln!(self.w, "{}AnonymousNode{}{} (any)", prefix, arity, span)?;
-                } else {
-                    let value = a.value().map(|t| t.text().to_string()).unwrap_or_default();
-                    writeln!(
-                        self.w,
-                        "{}AnonymousNode{}{} \"{}\"",
-                        prefix, arity, span, value
-                    )?;
-                }
+            ast::Pattern::AnonymousNodePattern(node) => {
+                let value = node
+                    .value()
+                    .map(|token| token.text().to_string())
+                    .unwrap_or_default();
+                writeln!(
+                    self.w,
+                    "{}AnonymousNode{}{} \"{}\"",
+                    prefix, extent, span, value
+                )?;
             }
-            ast::Pattern::Union(u) => {
-                writeln!(self.w, "{}Union{}{}", prefix, arity, span)?;
-                for branch in u.branches() {
-                    self.format_branch(&branch, depth + 1)?;
-                }
-                for pattern in u.patterns() {
-                    self.format_pattern(&pattern, depth + 1)?;
-                }
+            ast::Pattern::NodeWildcard(_) => {
+                writeln!(self.w, "{}NodeWildcard{}{}", prefix, extent, span)?;
             }
-            ast::Pattern::Enum(e) => {
-                writeln!(self.w, "{}Enum{}{}", prefix, arity, span)?;
-                for branch in e.branches() {
-                    self.format_branch(&branch, depth + 1)?;
-                }
-                for pattern in e.patterns() {
-                    self.format_pattern(&pattern, depth + 1)?;
+            ast::Pattern::Alternation(a) => {
+                writeln!(self.w, "{}Alternation{}{}", prefix, extent, span)?;
+                for alternative in a.alternatives() {
+                    self.format_alternative(&alternative, depth + 1)?;
                 }
             }
             ast::Pattern::SeqPattern(s) => {
-                writeln!(self.w, "{}Seq{}{}", prefix, arity, span)?;
+                writeln!(self.w, "{}Seq{}{}", prefix, extent, span)?;
                 self.format_tree_children(s.syntax(), depth + 1)?;
             }
             ast::Pattern::CapturedPattern(c) => {
@@ -350,15 +339,15 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                     Some(ty) => writeln!(
                         self.w,
                         "{}CapturedPattern{}{} @{} :: {}",
-                        prefix, arity, span, name, ty
+                        prefix, extent, span, name, ty
                     )?,
                     None => writeln!(
                         self.w,
                         "{}CapturedPattern{}{} @{}",
-                        prefix, arity, span, name
+                        prefix, extent, span, name
                     )?,
                 }
-                self.format_optional_pattern(c.inner(), depth + 1)?;
+                self.format_pattern_if_present(c.inner(), depth + 1)?;
             }
             ast::Pattern::QuantifiedPattern(q) => {
                 let op = q
@@ -368,20 +357,20 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                 writeln!(
                     self.w,
                     "{}QuantifiedPattern{}{} {}",
-                    prefix, arity, span, op
+                    prefix, extent, span, op
                 )?;
-                self.format_optional_pattern(q.inner(), depth + 1)?;
+                self.format_pattern_if_present(q.inner(), depth + 1)?;
             }
             ast::Pattern::FieldPattern(f) => {
                 let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(self.w, "{}FieldPattern{}{} {}:", prefix, arity, span, name)?;
-                self.format_optional_pattern(f.value(), depth + 1)?;
+                writeln!(self.w, "{}FieldPattern{}{} {}:", prefix, extent, span, name)?;
+                self.format_pattern_if_present(f.value(), depth + 1)?;
             }
         }
         Ok(())
     }
 
-    fn format_optional_pattern(
+    fn format_pattern_if_present(
         &mut self,
         pattern: Option<ast::Pattern>,
         depth: usize,
@@ -415,7 +404,7 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
     }
 
     fn mark_anchor(&mut self, anchor: &ast::Anchor, depth: usize) -> std::fmt::Result {
-        let spelling = if anchor.is_strict() { ".!" } else { "." };
+        let spelling = if anchor.is_exact() { ".!" } else { "." };
         writeln!(self.w, "{}{}", indent(depth), spelling)
     }
 
@@ -426,18 +415,22 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
         writeln!(self.w, "{}NegatedField{} -{}", prefix, span, name)
     }
 
-    fn format_branch(&mut self, branch: &ast::Branch, depth: usize) -> std::fmt::Result {
+    fn format_alternative(
+        &mut self,
+        alternative: &ast::Alternative,
+        depth: usize,
+    ) -> std::fmt::Result {
         let prefix = indent(depth);
-        let arity = self.printer.arity_glyph(branch.syntax());
-        let span = self.printer.span_str(branch.text_range());
-        let label = branch.label().map(|t| t.text().to_string());
+        let extent = self.printer.root_extent_glyph(alternative.syntax());
+        let span = self.printer.span_str(alternative.text_range());
+        let label = alternative.label().map(|t| t.text().to_string());
 
         match label {
-            Some(l) => writeln!(self.w, "{}Branch{}{} {}:", prefix, arity, span, l)?,
-            None => writeln!(self.w, "{}Branch{}{}", prefix, arity, span)?,
+            Some(l) => writeln!(self.w, "{}Alternative{}{} {}:", prefix, extent, span, l)?,
+            None => writeln!(self.w, "{}Alternative{}{}", prefix, extent, span)?,
         }
 
-        let Some(body) = branch.body() else {
+        let Some(body) = alternative.body() else {
             return Ok(());
         };
         self.format_pattern(&body, depth + 1)
@@ -445,14 +438,14 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
 }
 
 impl QueryPrinter<'_> {
-    fn arity_glyph(&self, node: &SyntaxNode) -> &'static str {
-        if !self.arities {
+    fn root_extent_glyph(&self, node: &SyntaxNode) -> &'static str {
+        if !self.root_extents {
             return "";
         }
-        match self.query.arity(node) {
-            Some(Arity::One) => "¹",
-            Some(Arity::Many) => "⁺",
-            None => "ˣ",
+        match self.query.root_extent(node) {
+            Some(RootExtent::SingleNode) => "¹",
+            Some(RootExtent::Other) => "≠¹",
+            None => "",
         }
     }
 

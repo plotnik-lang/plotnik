@@ -19,10 +19,10 @@ fn check_js(query: &str) -> CliResult {
 }
 
 #[test]
-fn accepts_enum_zero_width_branch_in_quantifier() {
-    // A skippable enum arm in a quantifier (`[A: (comment)? @c]*`) used to emit
+fn accepts_labeled_empty_alternative_in_quantifier() {
+    // A skippable labeled alternative in a quantifier (`[A: (comment)? @c]*`) used to emit
     // an unbracketed skip path rejected by bytecode validation;
-    // enum bracket dominance makes both arm paths close the enum, so it compiles.
+    // variant bracket dominance makes both paths close the variant, so it compiles.
     assert!(check_js("Q = (program [A: (comment)? @c]* @items)").is_ok());
 }
 
@@ -36,15 +36,15 @@ fn rejects_byte_oriented_regex_predicate() {
 }
 
 #[test]
-fn rejects_value_less_definition() {
-    // `Q = .` compiles to a module with no entrypoints.
+fn rejects_definition_with_positional_only_body() {
+    // `.` constrains a position inside a node; it is not a definition pattern by itself.
     assert!(matches!(check_js("Q = ."), Err(CliError::No)));
 }
 
 #[test]
-fn rejects_dropped_value_less_def_among_valid() {
-    // A value-less def is silently dropped from the module even when another def
-    // compiles fine; `check` must still flag it instead of exiting 0.
+fn rejects_positional_only_definition_among_valid_definitions() {
+    // A positional-only definition never reaches analysis, even when another
+    // definition compiles; `check` must still flag it instead of exiting 0.
     assert!(matches!(
         check_js("Bad = .\nGood = (identifier) @id"),
         Err(CliError::No)

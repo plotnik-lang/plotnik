@@ -7,24 +7,24 @@
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum TypeKind {
-    /// Unit type - used for definitions with no captures.
-    Void = 0,
-    /// AST node reference.
+    /// Sentinel for successful matching that produces no value.
+    NoValue = 0,
+    /// Tree-sitter node reference.
     Node = 1,
-    /// `T?` - optional wrapper, contains zero or one value.
-    Optional = 2,
-    /// `T*` - array of zero or more values.
-    ArrayZeroOrMore = 3,
-    /// `T+` - array of one or more values (non-empty).
-    ArrayOneOrMore = 4,
+    /// `T?` - option type containing zero or one value.
+    Option = 2,
+    /// `T*` - list of zero or more values.
+    ListZeroOrMore = 3,
+    /// `T+` - list of one or more values.
+    ListOneOrMore = 4,
     /// Record with named fields.
-    Struct = 5,
-    /// Discriminated union with named variants.
-    Enum = 6,
+    Record = 5,
+    /// Variant type with named cases.
+    Variant = 6,
     /// Named reference to another type (e.g., `type Foo = Bar`).
     Alias = 7,
     /// Borrowed source text.
-    Str = 8,
+    Text = 8,
     /// Boolean value.
     Bool = 9,
 }
@@ -33,15 +33,15 @@ impl TypeKind {
     /// Convert from raw discriminant.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
-            0 => Some(Self::Void),
+            0 => Some(Self::NoValue),
             1 => Some(Self::Node),
-            2 => Some(Self::Optional),
-            3 => Some(Self::ArrayZeroOrMore),
-            4 => Some(Self::ArrayOneOrMore),
-            5 => Some(Self::Struct),
-            6 => Some(Self::Enum),
+            2 => Some(Self::Option),
+            3 => Some(Self::ListZeroOrMore),
+            4 => Some(Self::ListOneOrMore),
+            5 => Some(Self::Record),
+            6 => Some(Self::Variant),
             7 => Some(Self::Alias),
-            8 => Some(Self::Str),
+            8 => Some(Self::Text),
             9 => Some(Self::Bool),
             _ => None,
         }
@@ -49,27 +49,23 @@ impl TypeKind {
 
     /// Whether this is a primitive/builtin type.
     pub fn is_primitive(self) -> bool {
-        matches!(self, Self::Void | Self::Node | Self::Str | Self::Bool)
+        matches!(self, Self::NoValue | Self::Node | Self::Text | Self::Bool)
     }
 
-    /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
+    /// Whether this is a wrapper type (`Option`, `ListZeroOrMore`, or
+    /// `ListOneOrMore`).
     ///
     /// Wrapper types contain a single inner type.
-    /// Struct and Enum types carry named members instead.
+    /// Record and Variant types carry named members instead.
     pub fn is_wrapper(self) -> bool {
         matches!(
             self,
-            Self::Optional | Self::ArrayZeroOrMore | Self::ArrayOneOrMore
+            Self::Option | Self::ListZeroOrMore | Self::ListOneOrMore
         )
     }
 
-    pub fn is_array(self) -> bool {
-        matches!(self, Self::ArrayZeroOrMore | Self::ArrayOneOrMore)
-    }
-
-    /// For array types, whether the array is non-empty.
-    pub fn is_non_empty_array(self) -> bool {
-        matches!(self, Self::ArrayOneOrMore)
+    pub fn is_list(self) -> bool {
+        matches!(self, Self::ListZeroOrMore | Self::ListOneOrMore)
     }
 
     pub fn is_alias(self) -> bool {
@@ -78,9 +74,9 @@ impl TypeKind {
 
     pub fn primitive_name(self) -> Option<&'static str> {
         match self {
-            Self::Void => Some("Void"),
+            Self::NoValue => Some("NoValue"),
             Self::Node => Some("Node"),
-            Self::Str => Some("Str"),
+            Self::Text => Some("Text"),
             Self::Bool => Some("Bool"),
             _ => None,
         }

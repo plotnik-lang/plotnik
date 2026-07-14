@@ -7,7 +7,7 @@
 //!      and formatting the result — never panics or overflows the native stack.
 //!
 //! The query side of (2) is covered by a fixed set of diverse templates
-//! (recursive, alternation, quantifier, fields, suppressive capture) rather than
+//! (recursive, alternation, quantifier, fields, discard) rather than
 //! fuzzed query text,
 //! because randomly generated queries almost never compile; the *source* is
 //! fuzzed, including deep nests that exercise the iterative backtrack/output
@@ -30,15 +30,15 @@ use plotnik_lib::{
 mod support;
 
 /// Queries known to compile, spanning the shapes whose runtime paths matter:
-/// a root match, a leaf match, an alternation, a scalar quantifier, a row
-/// quantifier, a self-recursive definition, and a recursive suppressive capture
+/// a root match, a leaf match, an alternation, a node-list quantifier, a record-list
+/// quantifier, a self-recursive definition, and a recursive discard
 /// (the `@_` SuppressBegin/skip/SuppressEnd path).
 const TEMPLATES: &[&str] = &[
     "Q = (program) @p",
     "Q = (identifier) @id",
     "Q = [(identifier) @a (number) @b]",
     "Q = (program (_)* @items)",
-    "Q = (program (expression_statement (_) @stmt)* @rows)",
+    "Q = (program (expression_statement (_) @stmt)* @records)",
     indoc!(
         "
         Rec = [Leaf: (statement_block) Deep: (unary_expression (Rec))]
@@ -53,7 +53,7 @@ const TEMPLATES: &[&str] = &[
     ),
 ];
 
-/// Compile a query without ever panicking: `None` if it does not parse, link
+/// Compile a query without ever panicking: `None` if it does not parse, bind
 /// cleanly, or emit. Mirrors the production `run` path (validity gate + `emit`).
 fn try_compile(query: &str) -> Option<Module> {
     let compiled = QueryBuilder::from_inline(query)
@@ -76,22 +76,22 @@ fn parse_js(source: &str) -> Tree {
     parser.parse(source, None).expect("parse source")
 }
 
-/// Run the full untrusted pipeline for every entrypoint: execute (auto limits),
+/// Run the full untrusted pipeline for every entry point: execute (auto limits),
 /// and on a match materialize + format + drop the value. Any panic or overflow
 /// here fails the property.
 fn exercise_pipeline(module: &Module, source: &str) {
     let tree = parse_js(source);
-    for i in 0..module.entrypoint_count() {
+    for i in 0..module.entry_point_count() {
         let entry = module
-            .entrypoint_at(i)
-            .expect("entrypoint_count bounds entrypoint_at");
+            .entry_point_at(i)
+            .expect("entry_point_count bounds entry_point_at");
         let vm = VM::builder(source, &tree).build();
-        if let Ok(effects) = vm.execute(module, &entry) {
+        if let Ok(journal) = vm.execute(module, &entry) {
             let value = materialize_verified(
                 source,
                 module,
                 &entry,
-                effects.as_slice(),
+                journal.output_events(),
                 Colors::new(false),
             );
             let _ = value.format(false, Colors::new(false));
@@ -191,6 +191,12 @@ proptest! {
         let output = format_query(&query).expect("generated query is parse-clean");
         prop_assert_eq!(format_query(&output).expect("formatted query reparses"), output);
     }
+}
+
+#[test]
+#[ignore = "known formatter panic: parse-clean group has a closer"]
+fn formatting_nested_group_with_literal_closer_never_panics() {
+    let _ = format_query("((\"(\"");
 }
 
 proptest! {

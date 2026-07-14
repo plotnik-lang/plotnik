@@ -14,14 +14,14 @@ Root
       BracketOpen "["
       Newline "\n"
       Whitespace "  "
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "a"
           ParenClose ")"
       Newline "\n"
       Whitespace "  "
-      Branch
+      Alternative
         NamedNode
           ParenOpen "("
           Id "b"
@@ -32,8 +32,8 @@ Root
 # query.ptk
 Root
   Def Q
-    Union
-      Branch
+    Alternation
+      Alternative
         NamedNode a
-      Branch
+      Alternative
         NamedNode b

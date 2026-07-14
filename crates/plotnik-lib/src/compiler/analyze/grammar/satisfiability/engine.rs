@@ -14,7 +14,7 @@
 //!
 //! The domains are finite but not small: a wide query child list yields an automaton
 //! with as many states, and threading the grammar through it is quadratic in that
-//! width. So the solve carries a step budget; once the per-state work exceeds it the
+//! width. So the solve carries a work budget; once the per-state work exceeds it the
 //! solve gives up, every pending verdict reads as *accept* (the sound default), and
 //! the pass rejects the whole query as too complex rather than spend unbounded time.
 //! The budget bounds work, not wall-clock, so the cut-off is the same on every
@@ -28,7 +28,7 @@ use indexmap::IndexSet;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::limits::SatisfiabilityLimits;
-use crate::compiler::parse::ast::NodePattern;
+use crate::compiler::parse::ast::NamedNodePattern;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
@@ -194,7 +194,7 @@ impl<'a> Frozen<'a> {
 
     fn build_automaton(
         &mut self,
-        node: &Located<NodePattern>,
+        node: &Located<NamedNodePattern>,
         remaining_budget: u64,
     ) -> ChildAutomaton {
         automaton::build(
@@ -314,12 +314,12 @@ enum Edge {
 /// Charged for automaton state allocation and in the two quadratic solve loops
 /// (`closure` and a `Visible` `thread_step`) for state visits and pattern-edge scans,
 /// so it caps the dominant costs. The widest real fixture settles in a few thousand
-/// steps, leaving roughly three orders of magnitude of headroom, while a child list
+/// work units, leaving roughly three orders of magnitude of headroom, while a child list
 /// past about a thousand wide trips it in a fraction of a second rather than running
 /// for tens. Tunable per query via
-/// [`QueryBuilder::with_satisfiability_step_budget`](crate::QueryBuilder::with_satisfiability_step_budget)
+/// [`QueryBuilder::with_satisfiability_work_budget`](crate::QueryBuilder::with_satisfiability_work_budget)
 /// for the rare case that legitimately needs a wider one.
-pub const DEFAULT_SATISFIABILITY_STEP_BUDGET: u64 = 2_000_000;
+pub const DEFAULT_SATISFIABILITY_WORK_BUDGET: u64 = 2_000_000;
 
 /// The mutable fixed-point state: memo tables, reverse dependencies, and the worklist.
 #[derive(Default)]
@@ -335,7 +335,7 @@ struct Solve {
     /// Work units charged so far, the ceiling they may reach, and whether they
     /// crossed it. Once `exhausted`, callers stop trusting memo values and reject
     /// the query as too complex instead.
-    steps: u64,
+    work_used: u64,
     budget: u64,
     exhausted: bool,
 }
@@ -356,10 +356,10 @@ impl<'a> SatisfiabilitySolver<'a> {
         )
     }
 
-    pub(super) fn relaxing_anchors(&self, step_budget: u64) -> Self {
+    pub(super) fn relaxing_anchors(&self, work_budget: u64) -> Self {
         let limits = SatisfiabilityLimits {
             automaton_max_depth: self.frozen.automaton_max_depth,
-            step_budget,
+            work_budget,
         };
         let relax_anchors = true;
         Self::with_anchor_relaxation(
@@ -391,7 +391,7 @@ impl<'a> SatisfiabilitySolver<'a> {
                 automaton_max_depth: limits.automaton_max_depth,
             },
             solve: Solve {
-                budget: limits.step_budget,
+                budget: limits.work_budget,
                 ..Solve::default()
             },
         }
@@ -400,7 +400,11 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// Whether some realizer of grammar kind `kind` can realize `node`'s child structure.
     /// Errs toward `true` (accept) whenever the question cannot be decided, so a
     /// rejection is always sound.
-    pub(super) fn satisfiable(&mut self, node: &Located<NodePattern>, kind: NodeKindId) -> bool {
+    pub(super) fn satisfiable(
+        &mut self,
+        node: &Located<NamedNodePattern>,
+        kind: NodeKindId,
+    ) -> bool {
         // Already over budget on an earlier node: accept here too and let the pass
         // reject the whole query, rather than start a fresh solve we cannot finish.
         if self.solve.exhausted {
@@ -438,7 +442,7 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// own. Accept on the first candidate that works; only an impossible wildcard pays
     /// for ruling every candidate out, and only a wildcard with child-structure
     /// constraints reaches here at all.
-    pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NodePattern>) -> bool {
+    pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NamedNodePattern>) -> bool {
         for index in 0..self.frozen.parent_candidate_kinds().len() {
             let kind = self.frozen.parent_candidate_kinds()[index];
             if self.satisfiable(node, kind) {
@@ -484,7 +488,7 @@ impl<'a> SatisfiabilitySolver<'a> {
     }
 
     /// Whether a resource ceiling tripped: an automaton bailed on construction (state
-    /// cap or recursion depth), or the solve ran past its step budget. Either way the
+    /// cap or recursion depth), or the solve ran past its work budget. Either way the
     /// query is rejected as too complex, rather than judged on an automaton we declined
     /// to finish or a fixed point we declined to reach.
     pub(super) fn is_too_complex(&self) -> bool {
@@ -504,12 +508,12 @@ impl<'a> SatisfiabilitySolver<'a> {
 
 impl Solve {
     fn remaining_budget(&self) -> u64 {
-        self.budget.saturating_sub(self.steps)
+        self.budget.saturating_sub(self.work_used)
     }
 
-    fn spend(&mut self, steps: u64) {
-        self.steps = self.steps.saturating_add(steps);
-        if self.steps > self.budget {
+    fn spend(&mut self, work_units: u64) {
+        self.work_used = self.work_used.saturating_add(work_units);
+        if self.work_used > self.budget {
             self.exhausted = true;
         }
     }
@@ -525,8 +529,8 @@ impl Solve {
         if self.exhausted {
             return false;
         }
-        self.steps = self.steps.saturating_add(1);
-        if self.steps > self.budget {
+        self.work_used = self.work_used.saturating_add(1);
+        if self.work_used > self.budget {
             self.exhausted = true;
             return false;
         }
@@ -737,7 +741,7 @@ impl Solve {
                 break;
             }
             // The state's *effective* gap (tightest erasure path that reaches it),
-            // so a strict anchor erased into this position still forbids the skip.
+            // so an exact anchor erased into this position still forbids the skip.
             if thread.gaps[q as usize].admits(node_class) {
                 next.insert(q);
             }
@@ -790,7 +794,7 @@ impl Solve {
         // child matching an inserted extra advances without a production step). Alongside
         // membership, carry each state's effective skip gap: tightest *along* a path
         // (every erased step bounds what may be skipped after it), loosest *across* paths
-        // (a skip is open if any path opens it). So a strict anchor survives erasure — a
+        // (a skip is open if any path opens it). So an exact anchor survives erasure — a
         // state reached only by erasing optionals under `.!` cannot then skip what the
         // anchor forbids — while a state also reachable by consuming keeps its own gap.
         let mut result = set.clone();

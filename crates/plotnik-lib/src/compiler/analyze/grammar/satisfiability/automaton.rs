@@ -5,8 +5,8 @@
 //! child a production emits must be consumed, either by a **pattern edge** (a query
 //! child it matches) or by a **gap edge** (a self-loop the anchor context lets it
 //! skip). Reaching an accept state means the production's children realize what `p`
-//! demands. Quantifiers become loops, alternations become parallel branches, and a
-//! nested sequence inlines its items — no collapsing, so arity is exact.
+//! demands. Quantifiers become loops, alternations become parallel alternatives, and a
+//! nested sequence inlines its items, so child arity remains exact.
 //!
 //! The construction reuses `AnchorSemantics` verbatim, so the gap classes the checker
 //! reasons over are the same navs codegen emits.
@@ -16,13 +16,11 @@ use std::collections::HashMap;
 use rowan::TextRange;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::anchors::{
-    AnchorSemantics, GapClass, has_direct_alternation_branch_nav,
-};
+use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass, has_direct_alternative_nav};
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::parse::ast::{
-    self, NodePattern, Pattern, QuantifierKind, SeqItem, TokenPattern, token_src,
+    self, AnonymousNodePattern, NamedNodePattern, Pattern, QuantifierKind, SeqItem, token_src,
 };
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::strings::unescape;
@@ -92,14 +90,6 @@ impl ChildMatcher {
         Self {
             kind,
             nested_pattern,
-            field,
-        }
-    }
-
-    fn token(kind: KindConstraint, field: Option<NodeFieldId>) -> Self {
-        Self {
-            kind,
-            nested_pattern: None,
             field,
         }
     }
@@ -208,16 +198,16 @@ impl<'a> AutomatonContext<'a> {
     }
 }
 
-/// Interns query node patterns to [`PatternId`]s. Keyed by `(source, range)` so the
+/// Interns query named-node patterns to [`PatternId`]s. Keyed by `(source, range)` so the
 /// same definition body interns once however many references reach it.
 #[derive(Default)]
 pub(super) struct PatternTable {
     by_loc: HashMap<(SourceId, TextRange), PatternId>,
-    nodes: Vec<Located<NodePattern>>,
+    nodes: Vec<Located<NamedNodePattern>>,
 }
 
 impl PatternTable {
-    pub(super) fn intern(&mut self, node: Located<NodePattern>) -> PatternId {
+    pub(super) fn intern(&mut self, node: Located<NamedNodePattern>) -> PatternId {
         let key = (node.source(), node.node().text_range());
         if let Some(&id) = self.by_loc.get(&key) {
             return id;
@@ -228,7 +218,7 @@ impl PatternTable {
         id
     }
 
-    pub(super) fn node_at(&self, index: usize) -> &Located<NodePattern> {
+    pub(super) fn node_at(&self, index: usize) -> &Located<NamedNodePattern> {
         &self.nodes[index]
     }
 
@@ -241,7 +231,7 @@ impl PatternTable {
 /// `relax_anchors` widens every gap to [`GapClass::Any`] so the diagnostic probe
 /// can ask whether anchors alone are the obstacle.
 pub(super) fn build<'a>(
-    node: &Located<NodePattern>,
+    node: &Located<NamedNodePattern>,
     ctx: AutomatonContext<'a>,
     table: &mut PatternTable,
     anchor_semantics: &AnchorSemantics<'a>,
@@ -286,7 +276,7 @@ pub(super) fn build<'a>(
 }
 
 /// The fields a node pattern asserts absent through `-field` items, resolved to ids.
-fn negated_fields(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Vec<NodeFieldId> {
+fn negated_fields(node: &Located<NamedNodePattern>, ctx: AutomatonContext<'_>) -> Vec<NodeFieldId> {
     node.node()
         .syntax()
         .children()
@@ -471,8 +461,8 @@ impl<'a, 'b> Builder<'a, 'b> {
                 .expect("compute_nav_modes yields one entry per pattern item");
             // A sequence spliced under an outer anchor (a `{…}` group, a referenced
             // body) inherits that anchor's gap on its first child: the outer level
-            // already chose it, so recomputing here would drop the adjacency and let a
-            // strict anchor leak through the boundary.
+            // already chose it, so recomputing here would drop the anchor constraint
+            // and let an exact anchor leak through the boundary.
             let gap = match (first, inherited_first_gap) {
                 (true, Some(g)) => g,
                 _ => satisfiability_gap(
@@ -516,14 +506,18 @@ impl<'a, 'b> Builder<'a, 'b> {
                 Some(inner) => self.emit_pattern(&inner, descent, from),
                 None => from,
             },
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 let matcher = self.node_matcher(node, descent);
                 self.emit_single(matcher, from)
             }
-            Pattern::TokenPattern(token) => {
-                let matcher = self.token_matcher(token, descent);
+            Pattern::AnonymousNodePattern(node) => {
+                let matcher = self.anonymous_node_matcher(node, descent);
                 self.emit_single(matcher, from)
             }
+            Pattern::NodeWildcard(_) => self.emit_single(
+                ChildMatcher::node(KindConstraint::AnyNode, None, descent.field),
+                from,
+            ),
             Pattern::FieldPattern(field_pattern) => match field_pattern.value() {
                 Some(value) => {
                     let field = self.field_id(field_pattern);
@@ -532,7 +526,7 @@ impl<'a, 'b> Builder<'a, 'b> {
                 None => from,
             },
             Pattern::QuantifiedPattern(q) => self.emit_quantifier(q, descent, from),
-            Pattern::Union(_) | Pattern::Enum(_) => self.emit_alternation(pattern, descent, from),
+            Pattern::Alternation(_) => self.emit_alternation(pattern, descent, from),
             // A sequence is several siblings, never a single field value (the grammar
             // forbids `field: {…}`), so the field does not carry into its items.
             Pattern::SeqPattern(seq) => {
@@ -599,13 +593,13 @@ impl<'a, 'b> Builder<'a, 'b> {
 
     fn emit_alternation(&mut self, alt: &Pattern, descent: Descent, from: State) -> State {
         let to = self.new_state(GapClass::Any);
-        let mut had_branch = false;
-        for branch in alt.children() {
-            had_branch = true;
-            let branch_exit = self.emit_pattern(&branch, descent, from);
-            self.states[branch_exit as usize].eps_edges.push(to);
+        let mut had_alternative = false;
+        for alternative in alt.children() {
+            had_alternative = true;
+            let alternative_exit = self.emit_pattern(&alternative, descent, from);
+            self.states[alternative_exit as usize].eps_edges.push(to);
         }
-        if !had_branch {
+        if !had_alternative {
             self.states[from as usize].eps_edges.push(to);
         }
         to
@@ -637,7 +631,7 @@ impl<'a, 'b> Builder<'a, 'b> {
 
         // A reference to a single node is an atomic child: one matcher whose body is
         // the referenced node, so its own structure is checked against the realizer.
-        if let Pattern::NodePattern(node) = target.node() {
+        if let Pattern::NamedNodePattern(node) = target.node() {
             let matcher = self.node_matcher(node, descent);
             return self.emit_single(matcher, from);
         }
@@ -650,7 +644,7 @@ impl<'a, 'b> Builder<'a, 'b> {
         exit
     }
 
-    fn node_matcher(&mut self, node: &NodePattern, descent: Descent) -> ChildMatcher {
+    fn node_matcher(&mut self, node: &NamedNodePattern, descent: Descent) -> ChildMatcher {
         let kind = self.node_kind(node, descent.source);
         // Intern (build a child automaton for) the node whenever it constrains its
         // children at all. A `-field` has no `items()`, so testing items alone would
@@ -662,8 +656,16 @@ impl<'a, 'b> Builder<'a, 'b> {
         ChildMatcher::node(kind, nested_pattern, descent.field)
     }
 
-    fn token_matcher(&self, token: &TokenPattern, descent: Descent) -> ChildMatcher {
-        ChildMatcher::token(self.token_kind(token, descent.source), descent.field)
+    fn anonymous_node_matcher(
+        &self,
+        node: &AnonymousNodePattern,
+        descent: Descent,
+    ) -> ChildMatcher {
+        ChildMatcher::node(
+            self.anonymous_node_kind(node, descent.source),
+            None,
+            descent.field,
+        )
     }
 
     fn field_id(&self, field_pattern: &ast::FieldPattern) -> NodeFieldId {
@@ -673,7 +675,7 @@ impl<'a, 'b> Builder<'a, 'b> {
         checked_field(self.ctx, name.text())
     }
 
-    fn node_kind(&self, node: &NodePattern, source: SourceId) -> KindConstraint {
+    fn node_kind(&self, node: &NamedNodePattern, source: SourceId) -> KindConstraint {
         if node.is_any() {
             return KindConstraint::AnyNamed;
         }
@@ -692,11 +694,8 @@ impl<'a, 'b> Builder<'a, 'b> {
         KindConstraint::Exact(checked_named_node(self.ctx, text))
     }
 
-    fn token_kind(&self, token: &TokenPattern, source: SourceId) -> KindConstraint {
-        if token.is_any() {
-            return KindConstraint::AnyNode;
-        }
-        let Some(value_token) = token.value() else {
+    fn anonymous_node_kind(&self, node: &AnonymousNodePattern, source: SourceId) -> KindConstraint {
+        let Some(value_token) = node.value() else {
             return KindConstraint::Unconstrained;
         };
         let text = unescape(token_src(&value_token, self.ctx.content(source))).0;
@@ -723,12 +722,12 @@ fn checked_anonymous_node(ctx: AutomatonContext<'_>, text: &str) -> NodeKindId {
 }
 
 /// Widen a narrow skip to the broad one for direct alternation positions. The VM
-/// computes per-branch navs there, so a named branch may skip an anonymous token
+/// computes per-alternative navs there, so a named alternative may skip an anonymous token
 /// the conservative whole-pattern nav would not; the checker reasons over all
-/// branches at once and so takes the most permissive gap. Strict (`Nothing`) is
-/// never widened — it is the user's adjacency demand.
+/// alternatives at once and so takes the most permissive gap. Exact is
+/// never widened — it is the user's exact-anchor constraint.
 fn satisfiability_gap(gap: GapClass, pattern: &Pattern) -> GapClass {
-    if gap == GapClass::ExtrasOnly && has_direct_alternation_branch_nav(pattern) {
+    if gap == GapClass::ExtrasOnly && has_direct_alternative_nav(pattern) {
         GapClass::AnonymousAndExtras
     } else {
         gap

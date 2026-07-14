@@ -1,0 +1,68 @@
+Comments = (comment)*
+
+Q = (program
+  (Comments) @comments :: str
+)
+---------------------- NFA -----------------------
+[entry_points]
+Q = 21
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        17
+  03  ─‣┘  _ [RecordSet(comments)]          01
+  06  -ε-  [ListClose]                      03
+  07  -ε-  [ListClose RecordSet(comments)]  01
+  09   !   (comment) [NodeStr ArrayPush]    11, 06
+  11  ──!  _                                09, 11
+  12  └─!  _                                09, 11
+  17  -ε-  [ListOpen]                       12, 07
+
+Q (entry point):
+  18                                        ▶
+  19  -ε-  [RecordClose]                    18
+  20       (Q)                              02 : 19
+  21  -ε-  [RecordOpen]                     20
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "comments"
+S2 "Comments"
+S3 "Q"
+S4 "comment"
+S5 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = <Text>
+T2 = ListZeroOrMore(T0)  ; <Node>*
+T3 = ListZeroOrMore(T1)  ; <Text>*
+T4 = Record  M0:1  ; { comments }
+
+[type_members]
+M0: S1 → T3  ; comments: T3
+
+[type_names]
+N0: S2 → T2  ; Comments
+N1: S3 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  -ε-  [ListClose]                      08
+  08  ─‣┘  _ [RecordSet(M0)]                10
+  10                                        ▶
+  11  -ε-  [ListClose RecordSet(M0)]        10
+  13   !   (comment) [NodeStr ArrayPush]    16, 06
+  15  ...
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
+  20  -ε-  [ListOpen]                       18, 11
+  22   !   (program)                        20

@@ -9,7 +9,7 @@ foo(); let x
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ------------------ DIAGNOSTICS -------------------
-warning: branch labels have no effect without capture
+warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
  --> query.ptk:2:3
   |
 2 | /   [
@@ -18,7 +18,7 @@ warning: branch labels have no effect without capture
 5 | |   ]*
   | |___^
   |
-help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 --------------------- OUTPUT ---------------------
 null
 -------------------- BYTECODE --------------------
@@ -30,16 +30,16 @@ S3 "lexical_declaration"
 S4 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
-[transitions]
+[instructions]
 Q:
   00       (@12)                            12 : 01
   01                                        ▶

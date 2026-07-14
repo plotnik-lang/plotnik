@@ -1,0 +1,110 @@
+Q = (program
+  [
+    Tag: {
+      (comment)?
+      (expression_statement) @a
+      (expression_statement) @b
+    }
+  ]
+)
+--------------------- INPUT ----------------------
+/* c */ a; b;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: Node;
+  b: Node;
+}
+------------------ DIAGNOSTICS -------------------
+warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
+ --> query.ptk:2:3
+  |
+2 | /   [
+3 | |     Tag: {
+4 | |       (comment)?
+5 | |       (expression_statement) @a
+... |
+8 | |   ]
+  | |___^
+  |
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
+--------------------- OUTPUT ---------------------
+{
+  "a": {
+    "kind": "expression_statement",
+    "text": "a;",
+    "span": [8, 10]
+  },
+  "b": {
+    "kind": "expression_statement",
+    "text": "b;",
+    "span": [11, 13]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "Q"
+S4 "program"
+S5 "comment"
+S6 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { a, b }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entry_points]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@24)                            24 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  ─‣─  (expression_statement) [Node RecordSet(M1)]  08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10   !   (expression_statement) [Node RecordSet(M0)]  06
+  12  ─‣─  (expression_statement) [Node RecordSet(M0)]  06
+  14   !   (comment)                        12
+  15  ...
+  16  ──!  _                                14, 16
+  18   !   _                                14, 16
+  20  ──!  _                                18, 10, 20
+  22  └─!  _                                18, 10, 20
+  24   !   (program)                        22
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@24)                            24 : 03
+       ▶   (@24)
+
+@24:
+  24       (program)                        22
+       ●   program
+  22       _                                18, 10, 20
+       ●   comment
+  18       _                                14, 16
+       ●   comment
+  14       (comment)                        12
+       ●   comment
+  12       (expression_statement) [Node RecordSet(M0)]  06
+       ●   expression_statement
+  06       (expression_statement) [Node RecordSet(M1)]  08
+       ●   expression_statement
+  08       _                                09
+       ●   program
+  09   ◀   (@24)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

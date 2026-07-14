@@ -1,8 +1,8 @@
 //! Builtin-gated producer provenance for capture-type normalization.
 //!
-//! The public type graph intentionally collapses provenance: a struct field says
+//! The public type graph intentionally collapses provenance: a record field says
 //! what type is returned, not which capture occurrences produced it or which
-//! alternation branches omitted it. Capture-type normalization needs the latter
+//! alternation alternatives omitted it. Capture-type normalization needs the latter
 //! facts. When a query contains a builtin capture type, this projection records
 //! them at the raw inference boundary; the focused normalizer then rewrites the
 //! public type graph from the exact producer and omission relationships.
@@ -11,17 +11,17 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::compiler::analyze::types::capture_kind::CaptureKind;
 use crate::compiler::analyze::types::capture_type::{
-    BuiltInCaptureType, CaptureFact, CaptureTypePlan, FieldFallback, OptionalCaptureTypeMode,
-    RawCaptureFact, TerminalData, UnionFlowPlan,
+    BuiltInCaptureType, CaptureFact, CaptureTypePlan, FieldCompletion, FieldCompletions,
+    OptionMode, RawCaptureFact, TerminalData,
 };
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_STR, TYPE_VOID, TypeId, TypeShape,
+    ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId,
+    TypeShape,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
@@ -47,10 +47,6 @@ pub(crate) struct RawCaptureContract {
 
 impl RawCaptureContract {
     pub(crate) fn new(fact: RawCaptureFact, zero_node_terminal: bool) -> Self {
-        assert!(
-            !zero_node_terminal || !fact.field().optional,
-            "zero-node terminal is distinct from field optionality",
-        );
         Self {
             fact,
             zero_node_terminal,
@@ -67,7 +63,7 @@ pub(crate) struct RawCaptureObservation {
     name: Symbol,
     contract: RawCaptureContract,
     intent: RawCaptureIntent,
-    emitted_field: Option<FieldInfo>,
+    emitted_field: Option<RecordField>,
 }
 
 impl RawCaptureObservation {
@@ -84,16 +80,10 @@ impl RawCaptureObservation {
         }
     }
 
-    pub(crate) fn emitting(mut self, field: FieldInfo) -> Self {
+    pub(crate) fn emitting(mut self, field: RecordField) -> Self {
         self.emitted_field = Some(field);
         self
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RawDefinitionValueRole {
-    Consumed,
-    Suppressed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -110,7 +100,7 @@ struct RawCaptureOutput {
 
 #[derive(Clone, Debug)]
 struct RawFieldOutput {
-    info: FieldInfo,
+    info: RecordField,
     producers: Vec<RawCaptureId>,
     sources: Vec<RawFieldSource>,
 }
@@ -129,8 +119,8 @@ struct RawFieldsFlow {
 
 #[derive(Clone, Debug)]
 enum RawPatternFlow {
-    Void,
-    Value(TypeId),
+    NoValue,
+    Value,
     Fields(RawFieldsFlow),
 }
 
@@ -138,7 +128,7 @@ impl RawPatternFlow {
     fn fields(&self) -> Option<&BTreeMap<Symbol, RawFieldOutput>> {
         match self {
             Self::Fields(fields) => Some(&fields.fields),
-            Self::Void | Self::Value(_) => None,
+            Self::NoValue | Self::Value => None,
         }
     }
 }
@@ -156,46 +146,24 @@ struct RawAlternationField {
 }
 
 #[derive(Clone, Debug)]
-struct RawAlternationBranch {
+struct RawAlternationAlternative {
     omissions: BTreeSet<Symbol>,
 }
 
 #[derive(Clone, Debug)]
 struct RawAlternationOutput {
     fields: BTreeMap<Symbol, RawAlternationField>,
-    branches: Vec<RawAlternationBranch>,
+    alternatives: Vec<RawAlternationAlternative>,
     incompatible_field: Option<Symbol>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct RawDefinitionOutput {
-    body: RawFlowId,
-    value_role: RawDefinitionValueRole,
-}
-
-impl RawDefinitionOutput {
-    fn type_id(self, graph: &RawOutputGraph) -> TypeId {
-        match &graph.flow(self.body).flow {
-            RawPatternFlow::Void => TYPE_VOID,
-            RawPatternFlow::Fields(fields) => fields.type_id,
-            RawPatternFlow::Value(type_id)
-                if self.value_role == RawDefinitionValueRole::Consumed =>
-            {
-                *type_id
-            }
-            RawPatternFlow::Value(_) => TYPE_VOID,
-        }
-    }
-}
-
-/// Frozen, builtin-only provenance projection consumed by the capture-type
+/// Frozen, builtin-only provenance projection read by the capture-type
 /// normalizer. It never leaks raw producer identities into public output.
 #[derive(Clone, Debug)]
 pub(crate) struct RawOutputGraph {
     captures: Vec<RawCaptureOutput>,
     flows: Vec<RawPatternOutput>,
     alternations: HashMap<Pattern, RawAlternationOutput>,
-    definitions: BTreeMap<DefId, RawDefinitionOutput>,
 }
 
 impl RawOutputGraph {
@@ -219,7 +187,6 @@ pub(crate) struct RawOutputGraphBuilder {
     flows: Vec<RawPatternOutput>,
     flow_ids: HashMap<Pattern, RawFlowId>,
     alternations: HashMap<Pattern, RawAlternationOutput>,
-    definitions: BTreeMap<DefId, RawDefinitionOutput>,
     incompatibilities: HashMap<Pattern, Symbol>,
 }
 
@@ -257,12 +224,12 @@ impl RawOutputGraphBuilder {
         // producer identities to the accepted PatternShape. The builder is
         // enabled only for queries whose cheap pre-scan found a builtin.
         let flow = match &shape.flow {
-            PatternFlow::Void => RawPatternFlow::Void,
-            PatternFlow::Value(type_id) => RawPatternFlow::Value(*type_id),
+            PatternFlow::NoValue => RawPatternFlow::NoValue,
+            PatternFlow::Value(_) => RawPatternFlow::Value,
             PatternFlow::Fields(type_id) => {
                 let mut sources = self.pattern_field_sources(&occurrence);
                 let fields = analysis
-                    .expect_struct_fields(*type_id)
+                    .expect_record_fields(*type_id)
                     .iter()
                     .map(|(&name, &info)| {
                         let sources = sources
@@ -302,7 +269,7 @@ impl RawOutputGraphBuilder {
             });
         }
 
-        if matches!(occurrence, Pattern::Union(_) | Pattern::Enum(_)) {
+        if matches!(occurrence, Pattern::Alternation(_)) {
             self.record_alternation(occurrence);
         }
     }
@@ -311,25 +278,11 @@ impl RawOutputGraphBuilder {
         self.incompatibilities.insert(pattern, field);
     }
 
-    pub(crate) fn record_definition(
-        &mut self,
-        def_id: DefId,
-        body: &Pattern,
-        value_role: RawDefinitionValueRole,
-    ) {
-        let body = self.flow_id(body);
-        let previous = self
-            .definitions
-            .insert(def_id, RawDefinitionOutput { body, value_role });
-        assert!(previous.is_none(), "raw definition output recorded once");
-    }
-
     pub(crate) fn finish(self) -> RawOutputGraph {
         RawOutputGraph {
             captures: self.captures,
             flows: self.flows,
             alternations: self.alternations,
-            definitions: self.definitions,
         }
     }
 
@@ -399,17 +352,17 @@ impl RawOutputGraphBuilder {
     }
 
     fn record_alternation(&mut self, pattern: Pattern) {
-        let branch_flows = alternation_bodies(&pattern)
+        let alternative_flows = alternation_bodies(&pattern)
             .into_iter()
             .map(|body| body.map(|body| self.flow_id(&body)))
             .collect::<Vec<_>>();
 
         let mut fields: BTreeMap<Symbol, RawAlternationField> = BTreeMap::new();
-        for &flow in branch_flows.iter().flatten() {
-            let Some(branch_fields) = self.flow(flow).flow.fields() else {
+        for &flow in alternative_flows.iter().flatten() {
+            let Some(alternative_fields) = self.flow(flow).flow.fields() else {
                 continue;
             };
-            for (&name, field) in branch_fields {
+            for (&name, field) in alternative_fields {
                 let output = fields.entry(name).or_insert_with(|| RawAlternationField {
                     producers: BTreeSet::new(),
                 });
@@ -420,7 +373,7 @@ impl RawOutputGraphBuilder {
         }
 
         let all_fields = fields.keys().copied().collect::<BTreeSet<_>>();
-        let branches = branch_flows
+        let alternatives = alternative_flows
             .into_iter()
             .map(|flow| {
                 let present = flow
@@ -428,13 +381,13 @@ impl RawOutputGraphBuilder {
                     .map(|fields| fields.keys().copied().collect::<BTreeSet<_>>())
                     .unwrap_or_default();
                 let omissions = all_fields.difference(&present).copied().collect();
-                RawAlternationBranch { omissions }
+                RawAlternationAlternative { omissions }
             })
             .collect();
 
         let output = RawAlternationOutput {
             fields,
-            branches,
+            alternatives,
             incompatible_field: self.incompatibilities.get(&pattern).copied(),
         };
         self.alternations.insert(pattern, output);
@@ -459,19 +412,12 @@ impl RawOutputGraphBuilder {
 /// no-builtin inference result and cache.
 fn for_each_inference_child(pattern: &Pattern, mut visit: impl FnMut(Pattern)) {
     match pattern {
-        Pattern::Union(union) => {
-            for child in union
-                .branches()
-                .filter_map(|branch| branch.body())
-                .chain(union.patterns())
+        Pattern::Alternation(alternation) => {
+            for child in alternation
+                .alternatives()
+                .filter_map(|alternative| alternative.body())
+                .chain(alternation.patterns())
             {
-                visit(child);
-            }
-        }
-        // Enum inference only visits proper branch bodies. Malformed bare
-        // patterns are syntax-recovery artifacts and do not contribute output.
-        Pattern::Enum(enumeration) => {
-            for child in enumeration.branches().filter_map(|branch| branch.body()) {
                 visit(child);
             }
         }
@@ -485,12 +431,11 @@ fn for_each_inference_child(pattern: &Pattern, mut visit: impl FnMut(Pattern)) {
 
 fn alternation_bodies(pattern: &Pattern) -> Vec<Option<Pattern>> {
     match pattern {
-        Pattern::Union(union) => union
-            .branches()
-            .map(|branch| branch.body())
-            .chain(union.patterns().map(Some))
+        Pattern::Alternation(alternation) => alternation
+            .alternatives()
+            .map(|alternative| alternative.body())
+            .chain(alternation.patterns().map(Some))
             .collect(),
-        Pattern::Enum(enumeration) => enumeration.branches().map(|branch| branch.body()).collect(),
         _ => unreachable!("raw alternation output requires an alternation pattern"),
     }
 }

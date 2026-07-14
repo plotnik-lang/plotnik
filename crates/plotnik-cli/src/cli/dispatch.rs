@@ -13,7 +13,6 @@ use plotnik_lib::RuntimeLimitSpec;
 
 use super::ColorChoice;
 use super::limits::resolve_limit_spec;
-use crate::commands::ast::AstArgs;
 use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
 use crate::commands::generate::{GenerateArgs, GenerateTarget};
@@ -21,19 +20,21 @@ use crate::commands::infer::InferArgs;
 use crate::commands::inspect::InspectArgs;
 use crate::commands::run::RunArgs;
 use crate::commands::trace::TraceArgs;
+use crate::commands::tree::{QueryView, TreeArgs};
 
-pub struct AstOpts {
+pub struct TreeOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub source_path: Option<PathBuf>,
     pub source_text: Option<String>,
     pub lang: Option<String>,
-    pub raw: bool,
+    pub query_view: QueryView,
+    pub include_anonymous: bool,
     pub json: bool,
     pub color: ColorChoice,
 }
 
-impl AstOpts {
+impl TreeOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         let query_path = m.get_one::<PathBuf>("query_path").cloned();
         let query_text = m.get_one::<String>("query_text").cloned();
@@ -43,7 +44,7 @@ impl AstOpts {
             shift_positional_to_source(query_text.is_some(), query_path, source_path);
 
         let (query_path, source_path) =
-            classify_ast_positional(query_path, source_path, query_text.is_some());
+            classify_tree_positional(query_path, source_path, query_text.is_some());
 
         Self {
             query_path,
@@ -51,22 +52,27 @@ impl AstOpts {
             source_path,
             source_text: m.get_one::<String>("source_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
-            raw: m.get_flag("raw"),
+            query_view: match m.get_one::<String>("query_view").map(String::as_str) {
+                Some("cst") => QueryView::Cst,
+                _ => QueryView::Ast,
+            },
+            include_anonymous: m.get_flag("include_anonymous"),
             json: m.get_flag("json"),
             color: ColorChoice::from_matches(m),
         }
     }
 }
 
-impl From<AstOpts> for AstArgs {
-    fn from(p: AstOpts) -> Self {
+impl From<TreeOpts> for TreeArgs {
+    fn from(p: TreeOpts) -> Self {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
             source_path: p.source_path,
             source_text: p.source_text,
             lang: p.lang,
-            raw: p.raw,
+            query_view: p.query_view,
+            include_anonymous: p.include_anonymous,
             json: p.json,
             color: p.color.should_colorize(),
         }
@@ -113,7 +119,7 @@ pub struct DumpOpts {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub color: ColorChoice,
-    // Note: source_path, source_text, entry, compact, verbose_nodes, verbose,
+    // Note: source_path, source_text, entry, compact, include_points, verbose,
     // no_result, and the runtime-limit flags are parsed but not extracted.
 }
 
@@ -144,10 +150,10 @@ pub struct InferOpts {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub format: String,
-    pub verbose_nodes: bool,
+    pub include_points: bool,
     pub no_node_type: bool,
     pub no_export: bool,
-    pub void_type: Option<String>,
+    pub match_only_type: Option<String>,
     pub output: Option<PathBuf>,
     pub color: ColorChoice,
 }
@@ -162,10 +168,10 @@ impl InferOpts {
                 .get_one::<String>("format")
                 .cloned()
                 .unwrap_or_else(|| "typescript".to_string()),
-            verbose_nodes: m.get_flag("verbose_nodes"),
+            include_points: m.get_flag("include_points"),
             no_node_type: m.get_flag("no_node_type"),
             no_export: m.get_flag("no_export"),
-            void_type: m.get_one::<String>("void_type").cloned(),
+            match_only_type: m.get_one::<String>("match_only_type").cloned(),
             output: m.get_one::<PathBuf>("output").cloned(),
             color: ColorChoice::from_matches(m),
         }
@@ -179,12 +185,12 @@ impl From<InferOpts> for InferArgs {
             query_text: p.query_text,
             lang: p.lang,
             format: p.format,
-            verbose_nodes: p.verbose_nodes,
+            include_points: p.include_points,
             no_node_type: p.no_node_type,
             export: !p.no_export,
             output: p.output,
             color: p.color.should_colorize(),
-            void_type: p.void_type,
+            match_only_type: p.match_only_type,
         }
     }
 }
@@ -241,7 +247,7 @@ pub struct RunOpts {
     pub limits: RuntimeLimitSpec,
     pub json: bool,
     pub color: ColorChoice,
-    // Note: verbose_nodes, verbose, no_result are hidden unified flags,
+    // Note: include_points, verbose, no_result are hidden unified flags,
     // parsed but not extracted.
 }
 
@@ -300,7 +306,7 @@ pub struct TraceOpts {
     pub limits: RuntimeLimitSpec,
     pub json: bool,
     pub color: ColorChoice,
-    // Note: compact, verbose_nodes are parsed but not extracted (unified flags)
+    // Note: compact, include_points are parsed but not extracted (unified flags)
 }
 
 impl TraceOpts {
@@ -442,8 +448,8 @@ fn shift_positional_to_source(
     }
 }
 
-// `ast` takes a single positional for either role; disambiguate by extension.
-fn classify_ast_positional(
+// `tree` takes a single positional for either role; disambiguate by extension.
+fn classify_tree_positional(
     query_path: Option<PathBuf>,
     source_path: Option<PathBuf>,
     has_query_text: bool,

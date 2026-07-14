@@ -1,12 +1,12 @@
 # Plotnik CLI Guide
 
-> Query language for tree-sitter ASTs with type inference.
+> Query language for Tree-sitter syntax trees with type inference.
 
 ## Quick Start
 
 ```sh
-# Explore a source file's tree-sitter AST
-plotnik ast app.ts
+# Explore a source file's syntax tree
+plotnik tree app.ts
 
 # Validate a query against a grammar
 plotnik check -q 'Func = (function_declaration) @fn' -l typescript
@@ -32,10 +32,10 @@ plotnik lang dump typescript
 | ------------- | ----- | ------------------------------- | ------------------------------------- |
 | `run`         | both  | Run query, output JSON          | Shebang or extension                  |
 | `check`       | query | Validate query                  | Optional (enables grammar validation) |
-| `ast`         | both  | Show AST of query and/or source | Shebang or extension                  |
+| `tree`        | both  | Show query and/or source trees  | Shebang or extension                  |
 | `infer`       | query | Generate type definitions       | Required                              |
 | `generate`    | query | Generate a compiled matcher     | Required unless `--grammar` is used   |
-| `dump`        | query | Show bytecode                   | Optional (enables linking)            |
+| `dump`        | query | Show bytecode                   | Optional (enables grammar binding)    |
 | `trace`       | both  | Trace query execution           | Shebang or extension                  |
 | `inspect`     | both  | Emit playground inspection JSON | Shebang or extension                  |
 | `lang list`   | —     | List supported languages        | —                                     |
@@ -51,33 +51,38 @@ shebang line, query files become directly executable (see
 
 ---
 
-### ast
+### tree
 
-Show AST of query and/or source file. Use this to discover node kinds and structure.
+Show the query tree, the source syntax tree, or both. Query input supports AST
+and CST views; source input omits anonymous nodes unless requested.
 
 ```sh
-# Show tree-sitter AST of source file
-plotnik ast app.ts
+# Show source syntax tree
+plotnik tree app.ts
 
 # Show query AST
-plotnik ast query.ptk
+plotnik tree query.ptk
 
-# Show both query and source AST
-plotnik ast query.ptk app.ts
+# Show query CST, including trivia
+plotnik tree query.ptk --query-view cst
+
+# Show both query and source trees
+plotnik tree query.ptk app.ts
 
 # Include anonymous nodes (literals, punctuation)
-plotnik ast app.ts --raw
+plotnik tree app.ts --include-anonymous
 
-# Source tree as JSON (query AST output is skipped)
-plotnik ast app.ts --json
+# Source tree as JSON
+plotnik tree app.ts --json
 ```
 
 **Flags:**
 
-| Flag     | Purpose                                         |
-| -------- | ----------------------------------------------- |
-| `--raw`  | Include anonymous nodes (literals, punctuation) |
-| `--json` | Output source tree as JSON                      |
+| Flag                  | Purpose                                          |
+| --------------------- | ------------------------------------------------ |
+| `--query-view VIEW`   | Select query AST or CST                          |
+| `--include-anonymous` | Include anonymous source nodes and punctuation   |
+| `--json`              | Output `query_tree` and/or `source_tree` as JSON |
 
 ---
 
@@ -97,19 +102,19 @@ Requires a language via `-l` or a shebang; node kinds are resolved to grammar ID
 
 ### check
 
-Validate a query. Like `cargo check`, this parses, analyzes, links, lowers, and
+Validate a query. Like `cargo check`, this parses, analyzes, binds, lowers, and
 verifies the shared executor contracts without selecting an emission target.
 
 ```sh
 # Validate syntax, types, recursion (no grammar)
 plotnik check -q 'Q = (identifier) @id'
 
-# Also validate node kinds and fields against grammar
+# Also validate node kinds and grammar fields
 plotnik check -q 'Q = (function_declaration) @fn' -l typescript
 ```
 
-Without `-l`: validates syntax, type inference, recursion rules, alt consistency.
-With `-l`: also validates node kinds and field names exist in grammar.
+Without `-l`: validates syntax, type inference, recursion rules, and alternative-label consistency.
+With `-l`: also validates that node kinds and grammar-field names exist.
 
 **Flags:**
 
@@ -125,7 +130,7 @@ On error: prints diagnostics to stderr, exits 1.
 
 `check` does not test bytecode-format capacities. A query can pass `check` and
 emit source while a later VM-bytecode emission reports a target limit (for
-example, the bytecode type table's per-struct field width).
+example, the bytecode type table's per-record field width).
 
 With `--json`, on exit 0 or 1 stdout is a JSON array of diagnostics (`[]`
 when the query is clean), each with `code`, `severity`, `message`, `span`
@@ -150,36 +155,36 @@ plotnik infer -q 'Func = (function_declaration) @fn' -l javascript
 # Write to file
 plotnik infer -q 'Func = (function_declaration) @fn' -l javascript -o types.d.ts
 
-# Verbose node shape (includes line/column)
-plotnik infer -q 'Func = (function_declaration) @fn' -l javascript --verbose-nodes
+# Include zero-based row/byte-column points
+plotnik infer -q 'Func = (function_declaration) @fn' -l javascript --include-points
 
-# Skip boilerplate (Node/Point types, exports)
+# Skip boilerplate (Node type, exports)
 plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 ```
 
 **Flags:**
 
-| Flag                | Purpose                                       |
-| ------------------- | --------------------------------------------- |
-| `-l, --lang LANG`   | Target language grammar (required)            |
-| `-o, --output FILE` | Write output to file                          |
-| `--format FORMAT`   | Output format (`typescript`, `ts`)            |
-| `--verbose-nodes`   | Include line/column in Node type              |
-| `--no-node-type`    | Don't emit Node/Point definitions             |
-| `--no-export`       | Don't add `export` keyword                    |
-| `--void-type TYPE`  | Type for void results (`undefined` or `null`) |
+| Flag                     | Purpose                                             |
+| ------------------------ | --------------------------------------------------- |
+| `-l, --lang LANG`        | Source language (required)                          |
+| `-o, --output FILE`      | Write output to file                                |
+| `--format FORMAT`        | Output format (`typescript`, `ts`)                  |
+| `--include-points`       | Include row/byte-column points in `Node`            |
+| `--no-node-type`         | Don't emit the `Node` definition                    |
+| `--no-export`            | Don't add `export` keyword                          |
+| `--match-only-type TYPE` | Type for match-only results (`undefined` or `null`) |
 
 ### generate
 
 Generate a self-contained compiled matcher module. Rust is the first target;
-the generated file contains typed output types, `parse`/`matches` entrypoints,
+the generated file contains typed result types, `parse`/`matches` entry points,
 and the matcher that runs on `plotnik-rt`.
 
 ```sh
-# Link against the bundled language registry
+# Bind using the bundled language registry
 plotnik generate query.ptk --target rust -l typescript -o query.rs
 
-# Link against the exact grammar shipped by the production parser package
+# Bind using the exact grammar shipped by the production parser package
 plotnik generate query.ptk --target rust \
   --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json \
   -o query.rs
@@ -189,18 +194,18 @@ plotnik generate -q 'Q = (program)' --target rust -l javascript
 ```
 
 The output records the grammar name, SHA-256 of the exact `grammar.json` bytes,
-and its source. At runtime, the generated matcher verifies every kind and field
+and its source. At runtime, the generated matcher verifies every node-kind and grammar-field
 id it uses against the tree's live language. If verification fails, regenerate
 with `--grammar` pointing at the parser package used in production.
 
 **Flags:**
 
-| Flag                     | Purpose                                              |
-| ------------------------ | ---------------------------------------------------- |
-| `--target rust`          | Generated-code target (currently Rust)               |
-| `-l, --lang LANG`        | Link against the bundled registry grammar            |
-| `--grammar GRAMMAR_JSON` | Bypass the registry and link against this exact file |
-| `-o, --output FILE`      | Write the generated module instead of stdout         |
+| Flag                     | Purpose                                            |
+| ------------------------ | -------------------------------------------------- |
+| `--target rust`          | Generated-code target (currently Rust)             |
+| `-l, --lang LANG`        | Bind using the bundled registry grammar            |
+| `--grammar GRAMMAR_JSON` | Bypass the registry and bind using this exact file |
+| `-o, --output FILE`      | Write the generated module instead of stdout       |
 
 ### lang
 
@@ -208,7 +213,7 @@ Language information and grammar tools.
 
 #### lang list
 
-List all supported tree-sitter languages with their aliases.
+List all supported Tree-sitter languages with their aliases.
 
 ```sh
 plotnik lang list
@@ -238,10 +243,10 @@ The output uses a syntax similar to Plotnik queries:
 - `"literal"` — anonymous node (queryable)
 - `(_hidden ...)` — hidden rule (not queryable, children inline)
 - `{...}` — sequence (ordered children)
-- `[...]` — alternation (first match)
+- `[...]` — alternation
 - `? * +` — quantifiers
 - `"x"!` — immediate token (no whitespace before)
-- `field: ...` — named field
+- `field: ...` — grammar-field constraint
 - `T :: supertype` — supertype declaration
 
 ### run
@@ -264,22 +269,22 @@ plotnik run -q 'Q = (identifier) @id' -s 'let x = 1' -l javascript
 # Start from a specific definition
 plotnik run query.ptk app.js --entry FunctionDef
 
-# Lift the work limit for a known-heavy query
-plotnik run query.ptk app.js --max-steps unbounded
+# Lift the fuel limit for a known-heavy query
+plotnik run query.ptk app.js --fuel unbounded
 ```
 
 **Flags:**
 
-| Flag           | Purpose                                 |
-| -------------- | --------------------------------------- |
-| `-q, --query`  | Inline query text                       |
-| `-s, --source` | Inline source text                      |
-| `-l, --lang`   | Language (inferred from file ext)       |
-| `--compact`    | Output compact JSON                     |
-| `--entry NAME` | Start from specific callable definition |
-| `--max-steps`  | Work limit (see Execution Limits)       |
-| `--max-memory` | Memory limit (see Execution Limits)     |
-| `--limits`     | Limit preset (`auto`/`unbounded`)       |
+| Flag           | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `-q, --query`  | Inline query text                          |
+| `-s, --source` | Inline source text                         |
+| `-l, --lang`   | Language (inferred from file ext)          |
+| `--compact`    | Output compact JSON                        |
+| `--entry NAME` | Select a specific selectable definition    |
+| `--fuel`       | Matcher work budget (see Execution Limits) |
+| `--max-memory` | Memory limit (see Execution Limits)        |
+| `--limits`     | Limit preset (`auto`/`unbounded`)          |
 
 ---
 
@@ -307,23 +312,24 @@ plotnik trace query.ptk app.js -vv  # very verbose
 
 **Flags:**
 
-| Flag           | Purpose                                 |
-| -------------- | --------------------------------------- |
-| `-v`           | Verbose output                          |
-| `-vv`          | Very verbose output                     |
-| `--no-result`  | Skip materialization                    |
-| `--max-steps`  | Work limit (see Execution Limits)       |
-| `--max-memory` | Memory limit (see Execution Limits)     |
-| `--limits`     | Limit preset (`auto`/`unbounded`)       |
-| `--entry`      | Start from specific callable definition |
+| Flag           | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `-v`           | Verbose output                             |
+| `-vv`          | Very verbose output                        |
+| `--no-result`  | Skip materialization                       |
+| `--fuel`       | Matcher work budget (see Execution Limits) |
+| `--max-memory` | Memory limit (see Execution Limits)        |
+| `--limits`     | Limit preset (`auto`/`unbounded`)          |
+| `--entry`      | Select a specific selectable definition    |
 
 ---
 
 ### inspect
 
 Compile and execute a query, emitting the playground inspection bundle: query
-tokens, diagnostics, generated types with source ranges, the match value,
-span/binding joins, and run stats in one JSON document.
+spans and tokens, diagnostics, TypeScript declarations and bindings, entry
+points, the result and its provenance, run statistics, and an optional
+execution trace in one JSON document.
 
 ```sh
 plotnik inspect query.ptk app.js --json
@@ -331,20 +337,20 @@ plotnik inspect query.ptk app.js --json
 # All inline
 plotnik inspect -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l js --json
 
-# Include the step-by-step VM recording in the bundle
+# Include the VM execution trace in the bundle
 plotnik inspect query.ptk app.js --json -v
 ```
 
 **Flags:**
 
-| Flag           | Purpose                                 |
-| -------------- | --------------------------------------- |
-| `--json`       | Output the full inspect bundle as JSON  |
-| `-v`           | Include VM recording in the JSON bundle |
-| `--entry NAME` | Start from specific callable definition |
-| `--max-steps`  | Work limit (see Execution Limits)       |
-| `--max-memory` | Memory limit (see Execution Limits)     |
-| `--limits`     | Limit preset (`auto`/`unbounded`)       |
+| Flag           | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `--json`       | Output the full inspect bundle as JSON     |
+| `-v`           | Include the VM execution trace             |
+| `--entry NAME` | Select a specific selectable definition    |
+| `--fuel`       | Matcher work budget (see Execution Limits) |
+| `--max-memory` | Memory limit (see Execution Limits)        |
+| `--limits`     | Limit preset (`auto`/`unbounded`)          |
 
 Exit codes follow `run`: `0` match, `1` no match or invalid query (the bundle is
 still printed, with diagnostics), `2` couldn't answer.
@@ -358,42 +364,41 @@ sized from the input so they stay invisible to legitimate queries:
 
 | Flag           | Accepts                              | Default |
 | -------------- | ------------------------------------ | ------- |
-| `--max-steps`  | a step count, `auto`, `unbounded`    | `auto`  |
+| `--fuel`       | a fuel amount, `auto`, `unbounded`   | `auto`  |
 | `--max-memory` | a binary size, `auto`, `unbounded`   | `auto`  |
 | `--limits`     | `auto` or `unbounded` runtime preset | `auto`  |
 
-- **Steps** bound total work (instruction dispatches) — the guard against
-  catastrophic backtracking.
+- **Fuel** bounds matcher work — the guard against catastrophic backtracking.
+  One matcher dispatch currently consumes one fuel unit.
 - **Memory** bounds the VM's live execution state (frame, checkpoint, and effect
-  arenas), summed and sampled once per step against a fixed ceiling. The arenas
-  grow on demand rather than pre-allocating, so a generous default is free on
-  small inputs. It meters execution, not the separate output-rendering pass (see
-  below).
+  arenas), sampled every 1,024 matcher dispatches against a fixed ceiling. The
+  arenas grow on demand rather than pre-allocating, so a generous default is
+  free on small inputs. It meters execution, not the separate output-rendering
+  pass (see below).
 - `auto` scales each ceiling with the source's node count; `unbounded` opts out.
 
 **Sizes** use binary units only: a bare integer is bytes; `KiB`/`MiB`/`GiB`
 scale by 1024. SI units (`MB`, `GB`) are rejected as ambiguous — use `MiB`/`GiB`.
 
 **Precedence** is order-independent: `--limits` sets the baseline for both
-runtime resources, and an explicit `--max-*` overrides that one. So
-`--limits unbounded --max-steps 5` means "unbounded runtime limits except
-steps = 5".
+runtime resources, and an explicit resource flag overrides that resource. So
+`--limits unbounded --fuel 5` means "unbounded runtime limits except fuel = 5".
 
 ```sh
-plotnik run q.ptk app.js --max-steps 5000000      # explicit work ceiling
+plotnik run q.ptk app.js --fuel 5000000           # explicit work ceiling
 plotnik run q.ptk app.js --max-memory 256MiB      # explicit memory ceiling
 plotnik run q.ptk app.js --limits unbounded       # opt out of both
 ```
 
 A run that exceeds a limit stops cleanly with exit code `2` and a message
-carrying a stable code (`E-limit-steps` / `E-limit-memory`); with `--json` the
+carrying a stable code (`E-out-of-fuel` / `E-limit-memory`); with `--json` the
 message is a one-line JSON object instead.
 
 There is no recursion/depth limit: backtracking and output rendering are
 iterative, so deep nesting consumes heap, not the native stack. `--max-memory`
 meters the VM's execution arenas during the run; output rendering happens
 afterward and is not separately metered, though its size tracks the
-already-bounded effect log.
+already-bounded match journal.
 
 ---
 
@@ -406,7 +411,7 @@ These commands take a single input. Use either:
 - **Positional**: `plotnik dump query.ptk`
 - **Flag**: `plotnik dump -q 'Q = ...'`
 
-### Query+Source Commands (ast, run, trace)
+### Query+Source Commands (tree, run, trace, inspect)
 
 These commands can take query, source, or both inputs. Use any combination:
 
@@ -437,14 +442,14 @@ source file extension.
 ### Shebang (Language Declaration)
 
 Line 1 of a `.ptk` file may declare its language (and optionally an
-entrypoint) via a shebang:
+entry point) via a shebang:
 
 ```
 #!/usr/bin/env -S plotnik run -l typescript
 Func = (function_declaration name: (identifier) @name)
 ```
 
-All commands (`run`, `check`, `infer`, `ast`, `trace`, `dump`) read the
+All commands (`run`, `check`, `infer`, `tree`, `trace`, `dump`) read the
 declaration; presentation flags in the shebang are ignored unless executing.
 An explicit `-l` must agree with the declaration, otherwise the command errors.
 
@@ -467,7 +472,7 @@ Use `-` as the file argument:
 echo 'Q = (identifier) @id' | plotnik dump -
 
 # Source from stdin
-cat app.ts | plotnik ast -
+cat app.ts | plotnik tree -
 
 # Run: query from stdin, source from file
 echo 'Q = (identifier) @id' | plotnik run - app.js
@@ -479,10 +484,10 @@ echo 'Q = (identifier) @id' | plotnik run - app.js
 
 ### Developing a Query
 
-1. **Explore the source AST** to understand node structure:
+1. **Explore the source syntax tree** to understand node structure:
 
    ```sh
-   plotnik ast example.ts
+   plotnik tree example.ts
    ```
 
 2. **Write a query and validate** against the grammar:
@@ -553,12 +558,12 @@ help: did you mean 'function_declaration'?
 
 Common errors:
 
-| Error                             | Cause                                | Fix                                      |
-| --------------------------------- | ------------------------------------ | ---------------------------------------- |
-| `unknown node kind`               | Typo in node kind                    | Check `plotnik ast file` for valid kinds |
-| `missing closing )`               | Unclosed tree pattern                | Match parentheses                        |
-| `expected expression`             | Invalid syntax                       | Check query syntax                       |
-| `strict dimensionality violation` | Quantified captures need row wrapper | Use `{...}* @rows` pattern               |
+| Error                                                    | Cause                                     | Fix                                       |
+| -------------------------------------------------------- | ----------------------------------------- | ----------------------------------------- |
+| `unknown node kind`                                      | Typo in node kind                         | Check `plotnik tree file` for valid kinds |
+| `missing closing )`                                      | Unclosed tree pattern                     | Match parentheses                         |
+| `expected expression`                                    | Invalid syntax                            | Check query syntax                        |
+| `captures under a quantifier must be collected together` | Quantified captures have no item boundary | Capture the quantified group              |
 
 ---
 
@@ -576,8 +581,8 @@ Uniform across all commands:
 
 ## Tips
 
-1. **Start with `ast`** to explore unfamiliar codebases
-2. **Use `--raw`** to see all tokens including literals
+1. **Start with `tree`** to explore unfamiliar codebases
+2. **Use `--include-anonymous`** to see literal and punctuation nodes
 3. **Run `check`** before `infer` to catch grammar errors early
 4. **Use `dump`** to debug query parsing or bytecode
 5. **Use query files** for anything beyond one-liners

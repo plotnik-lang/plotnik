@@ -1,0 +1,66 @@
+Q = (program
+  (expression_statement
+    (identifier == "a")
+    .!
+  )
+)
+--------------------- INPUT ----------------------
+a
+------------------- TYPESCRIPT -------------------
+export type Q = undefined;
+--------------------- OUTPUT ---------------------
+null
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "program"
+S3 "expression_statement"
+S4 "identifier"
+S5 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 00 :: T0
+
+[instructions]
+Q:
+  00       (@13)                            13 : 01
+  01                                        ▶
+  02   !   (identifier) == "a"              04
+  04  !─┘  _                                05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  ──!  _                                02, 08
+  10  └─!  _                                02, 08
+  12  └‣─  (expression_statement)           10
+  13   !   (program)                        12
+--------------------- TRACE ----------------------
+Q:
+  00       (@13)                            13 : 01
+       ▶   (@13)
+
+@13:
+  13       (program)                        12
+       ●   program
+  12       (expression_statement)           10
+       ●   expression_statement
+  10       _                                02, 08
+       ●   identifier
+  02       (identifier) == "a"              04
+       ●   identifier
+  04       _                                05
+       ●   expression_statement
+  05       _                                06
+       ●   program
+  06   ◀   (@13)                            
+
+Q:
+  01   ◀   (Q)                              ◼

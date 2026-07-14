@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Typed query language for tree-sitter AST"
+description = "Typed query language for Tree-sitter syntax trees"
 documentation = "https://docs.rs/plotnik-lib"
 readme = "../../README.md"
-keywords = ["tree-sitter", "query", "ast", "parser"]
+keywords = ["tree-sitter", "query", "syntax-tree", "parser"]
 categories = ["parsing", "development-tools"]
 
 [lints]

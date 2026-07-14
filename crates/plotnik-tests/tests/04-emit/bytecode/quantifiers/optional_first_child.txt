@@ -3,7 +3,7 @@ Q = (program
   (debugger_statement) @n
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 15
 
 [transitions]
@@ -11,17 +11,17 @@ Q:
   01                                        ▶
   02   !   (program)                        10, 04
   03  ─‣┘  _                                01
-  04  └‣─  (debugger_statement) [Null Set(id) Node Set(n)]  03
-  05  ─‣─  (debugger_statement) [Node Set(n)]  03
-  07   !   (lexical_declaration) [Node Set(id)]  05
+  04  └‣─  (debugger_statement) [Absent RecordSet(id) Node RecordSet(n)]  03
+  05  ─‣─  (debugger_statement) [Node RecordSet(n)]  03
+  07   !   (lexical_declaration) [Node RecordSet(id)]  05
   09  ──!  _                                07, 09
   10  └─!  _                                07, 09
 
-Q (entrypoint):
+Q (entry point):
   12                                        ▶
-  13  -ε-  [StructClose]                    12
+  13  -ε-  [RecordClose]                    12
   14       (Q)                              02 : 13
-  15  -ε-  [StructOpen]                     14
+  15  -ε-  [RecordOpen]                     14
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -34,30 +34,30 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { id, n }
-T2 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { id, n }
 
 [type_members]
-M0: S1 → T2  ; id: T2
+M0: S1 → T1  ; id: T1
 M1: S2 → T0  ; n: <Node>
 
 [type_names]
-N0: S3 → T1  ; Q
+N0: S3 → T2  ; Q
 
-[entrypoints]
-Q = 00 :: T1
+[entry_points]
+Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [Null Set(M0) Node Set(M1)]  07
-  11  ─‣─  (debugger_statement) [Node Set(M1)]  07
-  13   !   (lexical_declaration) [Node Set(M0)]  11
+  08  └‣─  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  11  ─‣─  (debugger_statement) [Node RecordSet(M1)]  07
+  13   !   (lexical_declaration) [Node RecordSet(M0)]  11
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16

@@ -3,7 +3,7 @@ import type { LanguageRegistration } from "shiki";
 /**
  * Deliberately lexical TextMate grammar for plotnik query syntax.
  * Token-level only (no structural nesting): captures, node kinds,
- * PascalCase defs/refs, fields, strings, predicates, quantifiers.
+ * PascalCase definitions/references, grammar fields, strings, predicates, quantifiers.
  * The tree-sitter grammar (separate repo) owns editor/playground
  * highlighting; this one feeds Shiki (site + docs) and, later,
  * GitHub linguist. Keep them in sync at the token level only.
@@ -22,7 +22,7 @@ export const plotnikGrammar: LanguageRegistration = {
     { include: "#negated-field" },
     { include: "#node-ref" },
     { include: "#node-kind" },
-    { include: "#enum-tag" },
+    { include: "#alternative-label" },
     { include: "#string" },
     { include: "#regex" },
     { include: "#predicate-op" },
@@ -50,8 +50,8 @@ export const plotnikGrammar: LanguageRegistration = {
         "2": { name: "keyword.operator.assignment.plotnik" },
       },
     },
-    "enum-tag": {
-      // `Tag:` inside [...] enum branches
+    "alternative-label": {
+      // `Tag:` labels an alternative inside `[...]`.
       match: "\\b([A-Z][A-Za-z0-9_]*)(:)",
       captures: {
         "1": { name: "entity.name.type.variant.plotnik" },

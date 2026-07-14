@@ -1,0 +1,9 @@
+Q = (function_declaration
+  xyzzy: (identifier) @name
+) @fn
+------------------ DIAGNOSTICS -------------------
+error: `xyzzy` is not a valid grammar field
+ --> query.ptk:2:3
+  |
+2 |   xyzzy: (identifier) @name
+  |   ^^^^^

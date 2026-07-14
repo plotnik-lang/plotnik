@@ -1,4 +1,4 @@
-use crate::compiler::analyze::grammar::DEFAULT_SATISFIABILITY_STEP_BUDGET;
+use crate::compiler::analyze::grammar::DEFAULT_SATISFIABILITY_WORK_BUDGET;
 use crate::compiler::parse::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig};
 
 #[derive(Debug, Clone, Copy)]
@@ -20,7 +20,7 @@ impl Default for CompilerLimits {
             },
             satisfiability: SatisfiabilityLimits {
                 automaton_max_depth: DEFAULT_MAX_DEPTH,
-                step_budget: DEFAULT_SATISFIABILITY_STEP_BUDGET,
+                work_budget: DEFAULT_SATISFIABILITY_WORK_BUDGET,
             },
         }
     }
@@ -59,8 +59,8 @@ impl CompilerLimits {
         self
     }
 
-    pub(crate) fn with_satisfiability_step_budget(mut self, step_budget: u64) -> Self {
-        self.satisfiability.step_budget = step_budget;
+    pub(crate) fn with_satisfiability_work_budget(mut self, work_budget: u64) -> Self {
+        self.satisfiability.work_budget = work_budget;
         self
     }
 }
@@ -88,7 +88,7 @@ pub(crate) struct ReferenceLimits {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SatisfiabilityLimits {
     pub(crate) automaton_max_depth: u32,
-    pub(crate) step_budget: u64,
+    pub(crate) work_budget: u64,
 }
 
 #[cfg(test)]

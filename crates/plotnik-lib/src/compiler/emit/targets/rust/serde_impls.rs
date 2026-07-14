@@ -1,20 +1,20 @@
 //! Generated `SerializeWithSource` impls.
 //!
-//! Mirrors the VM's materialized-value JSON exactly — struct fields in
+//! Mirrors the VM's materialized-value JSON exactly — record fields in
 //! declaration order, `None` as one flat null, nodes as
-//! `{kind, text, span}`, enums as `{"$tag": ...}` / `{"$tag", "$data"}` —
+//! `{kind, text, span}`, variants as `{"$tag": ...}` / `{"$tag", "$data"}` —
 //! so serialized generated output can be diffed against VM output verbatim.
 //! Serialized keys and tags always use the original query-side names, even
 //! when the Rust identifier had to be keyword-renamed.
 //!
-//! Enum variant payloads are anonymous structs, so each payload arm defines a
+//! Rust enum variant payloads are anonymous records, so each payload arm defines a
 //! local `Data` adapter borrowing the matched fields; bindings are positional
 //! (`v0`, `v1`, ...) to keep a capture literally named `source` from
 //! shadowing the source parameter.
 
 use std::fmt::Write as _;
 
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 
 use super::type_model::TypeContext;
@@ -39,7 +39,7 @@ impl Emitter<'_, '_> {
     pub(super) fn serde_impl(&mut self, item: &Item) -> String {
         let rt = self.config.rt_crate.clone();
         let ident = self.item_ident(item.name).to_string();
-        let usage = self.lifetime_usage(item.ty);
+        let usage = self.lifetime_usage(item.value_type());
         let args = match (usage.tree, usage.source) {
             (false, false) => "",
             (true, false) | (false, true) => "<'_>",
@@ -47,12 +47,12 @@ impl Emitter<'_, '_> {
         };
 
         let body = match item.kind {
-            ItemKind::Struct => self.struct_body(item),
-            ItemKind::Enum => self.enum_body(item, &ident),
+            ItemKind::Record => self.struct_body(item),
+            ItemKind::Variant => self.enum_body(item, &ident),
             _ => unreachable!("serde impls are generated for structs and enums only"),
         };
 
-        // Only payload fields thread the source through; a tags-only enum
+        // Only payload fields thread the source through; a no-payload enum
         // never touches it and must not bind it, or the impl warns.
         let source = body.source_param();
         let body = body.code;
@@ -78,8 +78,8 @@ impl Emitter<'_, '_> {
         let types = self.schema.types;
         let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
-        let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
-            unreachable!("struct item must have a struct shape");
+        let TypeShape::Record(fields) = types.expect_type_shape(item.value_type()) else {
+            unreachable!("struct item must have a record shape");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
 
@@ -105,8 +105,8 @@ impl Emitter<'_, '_> {
     fn enum_body(&mut self, item: &Item, ident: &str) -> SerdeBody {
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
-            unreachable!("enum item must have an enum shape");
+        let TypeShape::Variant(variants) = types.expect_type_shape(item.value_type()) else {
+            unreachable!("Rust enum item must have a variant shape");
         };
         let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
 
@@ -114,7 +114,7 @@ impl Emitter<'_, '_> {
         let mut uses_source = false;
         for ((&label_sym, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
             let label = interner.resolve(label_sym);
-            let arm = if payload != TYPE_VOID {
+            let arm = if let Some(payload) = payload.type_id() {
                 uses_source = true;
                 self.payload_arm(item, payload, variant_ident, label)
             } else {
@@ -140,14 +140,14 @@ impl Emitter<'_, '_> {
         let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
         let ident = self.item_ident(item.name).to_string();
-        let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
-            unreachable!("enum variant payload is void or an anonymous struct");
+        let TypeShape::Record(fields) = types.expect_type_shape(payload) else {
+            unreachable!("enum variant has no payload or an anonymous record payload");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let usage = fields
             .values()
             .fold((false, false), |(tree, source), info| {
-                let field = self.lifetime_usage(info.type_id);
+                let field = self.lifetime_usage(info.final_type);
                 (tree || field.tree, source || field.source)
             });
         let (decl_generics, impl_generics) = match usage {
@@ -166,7 +166,7 @@ impl Emitter<'_, '_> {
         {
             // The helper borrows the enum's actual field, so its type must be
             // spelled with the declaration's own cut context.
-            let field_ty = self.field_type(TypeContext::item(item.ty), info);
+            let field_ty = self.field_type(TypeContext::item(item.value_type()), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);

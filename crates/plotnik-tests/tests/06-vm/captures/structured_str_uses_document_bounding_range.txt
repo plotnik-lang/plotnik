@@ -1,0 +1,90 @@
+Q = (program
+  {
+    (comment) @comment
+    (expression_statement (identifier) @id)
+  } @chunk :: str
+)
+--------------------- INPUT ----------------------
+// doc
+value;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  chunk: string;
+}
+------------------ DIAGNOSTICS -------------------
+warning: capture type `str` replaces structured data with source text
+ --> query.ptk:5:12
+  |
+5 |   } @chunk :: str
+  |            ^^^^^^
+  |
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+--------------------- OUTPUT ---------------------
+{
+  "chunk": "// doc\nvalue;"
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "chunk"
+S2 "Q"
+S3 "program"
+S4 "comment"
+S5 "expression_statement"
+S6 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Record  M0:1  ; { chunk }
+
+[type_members]
+M0: S1 → T0  ; chunk: <Text>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entry_points]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  -ε-  [StrClose RecordSet(M0)]         08
+  08  ─‣┘  _                                12
+  09  └‣─  (identifier) [ScalarMark]        11
+  11  ─‣┘  _                                06
+  12                                        ▶
+  13  ─‣─  (expression_statement) [ScalarMark]  09
+  15  ...
+  16  └‣─  (comment) [ScalarMark]           13
+  18  -ε-  [ScalarOpen]                     16
+  20   !   (program)                        18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
+
+@20:
+  20       (program)                        18
+       ●   program
+  18  -ε-  [ScalarOpen]                     16
+  16       (comment) [ScalarMark]           13
+       ●   comment
+  13       (expression_statement) [ScalarMark]  09
+       ●   expression_statement
+  09       (identifier) [ScalarMark]        11
+       ●   identifier
+  11       _                                06
+       ●   expression_statement
+  06  -ε-  [StrClose RecordSet(M0)]         08
+  08       _                                12
+       ●   program
+  12   ◀   (@20)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

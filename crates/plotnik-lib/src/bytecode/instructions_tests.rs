@@ -9,7 +9,7 @@ use crate::core::{NodeFieldId, NodeKindId};
 use super::effects::{Effect, EffectKind};
 use super::instructions::{
     Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, RoutedCall, SplitCall,
-    SplitCallReturns, StepId, align_to_section, select_match_opcode,
+    SplitCallReturns, SuccessorAddr, align_to_section, select_match_opcode,
 };
 use super::node_kind_constraint::NodeKindConstraint;
 use plotnik_rt::Nav;
@@ -52,11 +52,11 @@ fn opcode_sizes() {
 }
 
 #[test]
-fn opcode_step_counts() {
-    assert_eq!(Opcode::Match8.step_count(), 1);
-    assert_eq!(Opcode::Match16.step_count(), 2);
-    assert_eq!(Opcode::Match32.step_count(), 4);
-    assert_eq!(Opcode::Match64.step_count(), 8);
+fn opcode_word_counts() {
+    assert_eq!(Opcode::Match8.word_count(), 1);
+    assert_eq!(Opcode::Match16.word_count(), 2);
+    assert_eq!(Opcode::Match32.word_count(), 4);
+    assert_eq!(Opcode::Match64.word_count(), 8);
 }
 
 #[test]
@@ -95,8 +95,8 @@ fn call_roundtrip() {
     let c = Call::new(
         Nav::Down,
         NonZeroU16::new(42).map(NodeFieldId::from),
-        StepId::try_from(100).expect("step id must be non-zero"),
-        StepId::try_from(500).expect("step id must be non-zero"),
+        SuccessorAddr::try_from(100).expect("successor address must be non-zero"),
+        SuccessorAddr::try_from(500).expect("successor address must be non-zero"),
     );
 
     let bytes = c.to_bytes();
@@ -109,7 +109,7 @@ fn return_roundtrip() {
     for r in [
         Return::matched(),
         Return::routed_matched(),
-        Return::routed_zero(),
+        Return::routed_empty(),
     ] {
         let bytes = r.to_bytes();
         let decoded = Return::from_bytes(bytes);
@@ -122,10 +122,10 @@ fn split_call_roundtrip() {
     let call = SplitCall::new(
         Nav::Next,
         SplitCallReturns {
-            matched: StepId::try_from(100).expect("step id must be non-zero"),
-            zero: StepId::try_from(200).expect("step id must be non-zero"),
+            matched: SuccessorAddr::try_from(100).expect("successor address must be non-zero"),
+            empty: SuccessorAddr::try_from(200).expect("successor address must be non-zero"),
         },
-        StepId::try_from(500).expect("step id must be non-zero"),
+        SuccessorAddr::try_from(500).expect("successor address must be non-zero"),
     );
 
     assert_eq!(SplitCall::from_bytes(call.to_bytes()), call);
@@ -135,8 +135,8 @@ fn split_call_roundtrip() {
 fn routed_call_roundtrip() {
     let call = RoutedCall::new(
         Nav::Next,
-        StepId::try_from(100).expect("step id must be non-zero"),
-        StepId::try_from(500).expect("step id must be non-zero"),
+        SuccessorAddr::try_from(100).expect("successor address must be non-zero"),
+        SuccessorAddr::try_from(500).expect("successor address must be non-zero"),
     );
 
     assert_eq!(RoutedCall::from_bytes(call.to_bytes()), call);
@@ -145,8 +145,8 @@ fn routed_call_roundtrip() {
 #[test]
 fn encode_rejects_effect_payload_overflow() {
     let instr = MatchInstr {
-        effects: vec![Effect::new(EffectKind::Set, 0x400)],
-        successors: vec![StepId::try_from(1).expect("step id must be non-zero")],
+        effects: vec![Effect::new(EffectKind::RecordSet, 0x400)],
+        successors: vec![SuccessorAddr::try_from(1).expect("successor address must be non-zero")],
         ..Default::default()
     };
 
@@ -159,7 +159,9 @@ fn encode_rejects_effect_payload_overflow() {
 #[test]
 fn encode_rejects_too_many_successors() {
     let instr = MatchInstr {
-        successors: (1u16..=32).map(|n| StepId::try_from(n).unwrap()).collect(),
+        successors: (1u16..=32)
+            .map(|n| SuccessorAddr::try_from(n).unwrap())
+            .collect(),
         ..Default::default()
     };
 
@@ -170,7 +172,9 @@ fn encode_rejects_too_many_successors() {
 fn encode_rejects_oversized_payload() {
     // 29 successors is under the 31 cap, but 29 slots exceeds Match64's 28.
     let instr = MatchInstr {
-        successors: (1u16..=29).map(|n| StepId::try_from(n).unwrap()).collect(),
+        successors: (1u16..=29)
+            .map(|n| SuccessorAddr::try_from(n).unwrap())
+            .collect(),
         ..Default::default()
     };
 
@@ -212,15 +216,15 @@ fn arb_node_type() -> impl Strategy<Value = NodeKindConstraint> {
 fn arb_effect() -> impl Strategy<Value = Effect> {
     let kind = prop::sample::select(vec![
         EffectKind::Node,
-        EffectKind::ArrayOpen,
-        EffectKind::Push,
-        EffectKind::ArrayClose,
-        EffectKind::StructOpen,
-        EffectKind::StructClose,
-        EffectKind::Set,
-        EffectKind::EnumOpen,
-        EffectKind::EnumClose,
-        EffectKind::Null,
+        EffectKind::ListOpen,
+        EffectKind::ArrayPush,
+        EffectKind::ListClose,
+        EffectKind::RecordOpen,
+        EffectKind::RecordClose,
+        EffectKind::RecordSet,
+        EffectKind::VariantOpen,
+        EffectKind::VariantClose,
+        EffectKind::Absent,
         EffectKind::SuppressBegin,
         EffectKind::SuppressEnd,
         EffectKind::SpanStartAt,
@@ -253,7 +257,7 @@ fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
         ),
         prop::option::of(arb_predicate()),
         prop::collection::vec(
-            (1u16..=u16::MAX).prop_map(|n| StepId::try_from(n).unwrap()),
+            (1u16..=u16::MAX).prop_map(|n| SuccessorAddr::try_from(n).unwrap()),
             0..=4,
         ),
     )

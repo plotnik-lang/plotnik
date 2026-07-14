@@ -1,8 +1,8 @@
-//! Sequence, anchor, and arity satisfiability.
+//! Sequence, anchor, and grammar-arity satisfiability.
 //!
 //! The structural check (`../check.rs`) validates each query position in isolation —
 //! kind exists, field is on the node, child kind is admissible. It is order-,
-//! adjacency-, and arity-blind, so `(function_declaration .! (identifier))` and
+//! adjacency- and grammar-arity-blind, so `(function_declaration .! (identifier))` and
 //! `(array (statement))` slip through. This pass closes that gap: it threads the
 //! grammar's productions through a per-query-node child automaton (`automaton.rs`)
 //! under a least fixed point (`engine.rs`), and rejects a query node exactly when no
@@ -20,8 +20,8 @@
 //! grammar *can* match. A false rejection blocks legitimate work, so it is the single
 //! failure we must prevent — when a verdict is genuinely undecidable, accept. That is
 //! why the walk only reports at `Required` positions: a concrete-kind node not under an
-//! alternation branch or quantified body, where a failure cannot be excused by a
-//! sibling branch or zero repetitions.
+//! alternation alternative or quantified body, where a failure cannot be excused by a
+//! sibling alternative or zero repetitions.
 
 mod automaton;
 mod diagnose;
@@ -29,7 +29,7 @@ mod engine;
 mod facts;
 mod state_set;
 
-pub use engine::DEFAULT_SATISFIABILITY_STEP_BUDGET;
+pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
 
 #[cfg(test)]
 mod state_set_tests;
@@ -41,7 +41,7 @@ use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::limits::SatisfiabilityLimits;
-use crate::compiler::parse::ast::{self, NodePattern, Pattern, Root, token_src};
+use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern, Root, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
@@ -74,7 +74,7 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
     };
 
     let mut solver = SatisfiabilitySolver::checking(ctx, input.limits);
-    let anchor_probes = diagnose::AnchorProbes::new(&solver, input.limits.step_budget);
+    let anchor_probes = diagnose::AnchorProbes::new(&solver, input.limits.work_budget);
     let mut reporter = Reporter {
         solver: &mut solver,
         diag,
@@ -110,8 +110,8 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 }
 
 /// Walks definition bodies reporting impossible patterns: a concrete-kind node at a
-/// required position the grammar can never build, and — when *no* branch of a required
-/// alternation can match — each of those branches with its own reason. Holds the solver
+/// required position the grammar can never build, and — when *no* alternative of a required
+/// alternation can match — each of those alternatives with its own reason. Holds the solver
 /// and the diagnostic sink, so the recursion threads only the position and its
 /// participation.
 struct Reporter<'a, 'q> {
@@ -145,14 +145,14 @@ impl From<diagnose::ReportOutcome> for WalkOutcome {
 
 impl Reporter<'_, '_> {
     /// Report what is impossible under `located` at `participation`. The descent
-    /// crosses always-present wrappers, lowers into disjunctive branches and `?`/`*`
+    /// crosses always-present wrappers, lowers into parallel alternatives and `?`/`*`
     /// bodies as `Deferred`, and stops at each node pattern, whose interior the
     /// engine judges whole.
     /// Returns `Stop` when reporting already emitted a terminal diagnostic; callers
     /// must then stop rather than spending fresh probe budgets on later nodes.
     fn walk(&mut self, located: &Located<Pattern>, participation: Participation) -> WalkOutcome {
         match located.node() {
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 let node = located.wrap(node.clone());
                 if !participation.is_required() {
                     return WalkOutcome::Continue;
@@ -175,17 +175,17 @@ impl Reporter<'_, '_> {
                 )
                 .into()
             }
-            Pattern::Union(_) | Pattern::Enum(_) => {
-                // A branch failing is normally excused by its siblings; but when every
-                // branch is impossible the alternation is too, so promote them — each is
+            Pattern::Alternation(_) => {
+                // An alternative failing is normally excused by its siblings; but when every
+                // alternative is impossible the alternation is too, so promote them — each is
                 // then reported with the reason it cannot match.
-                let dead = participation.is_required() && self.all_branches_impossible(located);
-                let branch_participation = if dead {
+                let dead = participation.is_required() && self.all_alternatives_impossible(located);
+                let alternative_participation = if dead {
                     Participation::Required
                 } else {
-                    participation.inside_disjunction_branch()
+                    participation.inside_alternative()
                 };
-                self.walk_children(located, branch_participation)
+                self.walk_children(located, alternative_participation)
             }
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
@@ -207,8 +207,10 @@ impl Reporter<'_, '_> {
                 }
                 WalkOutcome::Continue
             }
-            // A token always matches; a reference is walked at its own definition.
-            Pattern::TokenPattern(_) | Pattern::DefRef(_) => WalkOutcome::Continue,
+            // Leaf patterns are checked by grammar binding; a reference is walked at its definition.
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) | Pattern::DefRef(_) => {
+                WalkOutcome::Continue
+            }
         }
     }
 
@@ -228,7 +230,7 @@ impl Reporter<'_, '_> {
 
     fn report_dead_child_alternation(
         &mut self,
-        node: &Located<NodePattern>,
+        node: &Located<NamedNodePattern>,
     ) -> Option<WalkOutcome> {
         for child in node.node().children() {
             let located = node.wrap(child);
@@ -241,8 +243,10 @@ impl Reporter<'_, '_> {
     }
 
     fn dead_alternation_child(&mut self, located: Located<Pattern>) -> Option<Located<Pattern>> {
-        if matches!(located.node(), Pattern::Union(_) | Pattern::Enum(_)) {
-            return self.all_branches_impossible(&located).then_some(located);
+        if matches!(located.node(), Pattern::Alternation(_)) {
+            return self
+                .all_alternatives_impossible(&located)
+                .then_some(located);
         }
         match located.node() {
             Pattern::CapturedPattern(cap) => cap
@@ -261,16 +265,16 @@ impl Reporter<'_, '_> {
     /// Whether `located` provably cannot match any grammar tree — the cautious counterpart
     /// to satisfiability, used to decide an alternation is dead. It answers `true` only when
     /// impossibility is certain, never on doubt. An alternation is impossible only when every
-    /// branch is; a sequence when any item is; a node when the solver says so; tokens,
+    /// alternative is; a sequence when any item is; a node when the solver says so; leaf patterns,
     /// references, and optional bodies stay matchable.
     fn impossible(&mut self, located: &Located<Pattern>) -> bool {
         match located.node() {
-            Pattern::NodePattern(node) => {
+            Pattern::NamedNodePattern(node) => {
                 let node = located.wrap(node.clone());
                 Goal::from_node(self.solver.context(), node)
                     .is_some_and(|goal| goal.is_impossible(self.solver))
             }
-            Pattern::Union(_) | Pattern::Enum(_) => self.all_branches_impossible(located),
+            Pattern::Alternation(_) => self.all_alternatives_impossible(located),
             Pattern::CapturedPattern(cap) => cap
                 .inner()
                 .is_some_and(|inner| self.impossible(&located.wrap(inner))),
@@ -287,35 +291,35 @@ impl Reporter<'_, '_> {
             }
             Pattern::DefRef(def_ref) => Goal::from_def_ref(self.solver.context(), def_ref)
                 .is_some_and(|goal| goal.is_impossible(self.solver)),
-            Pattern::TokenPattern(_) => false,
+            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => false,
         }
     }
 
-    fn all_branches_impossible(&mut self, located: &Located<Pattern>) -> bool {
-        let mut saw_branch = false;
-        for branch in located.node().children() {
-            saw_branch = true;
-            if !self.impossible(&located.wrap(branch)) {
+    fn all_alternatives_impossible(&mut self, located: &Located<Pattern>) -> bool {
+        let mut saw_alternative = false;
+        for alternative in located.node().children() {
+            saw_alternative = true;
+            if !self.impossible(&located.wrap(alternative)) {
                 return false;
             }
         }
-        saw_branch
+        saw_alternative
     }
 }
 
 /// A required node-position satisfiability goal.
 enum Goal {
     Concrete {
-        node: Located<NodePattern>,
+        node: Located<NamedNodePattern>,
         kind: NodeKindId,
     },
     Wildcard {
-        node: Located<NodePattern>,
+        node: Located<NamedNodePattern>,
     },
 }
 
 impl Goal {
-    fn from_node(ctx: AutomatonContext<'_>, node: Located<NodePattern>) -> Option<Self> {
+    fn from_node(ctx: AutomatonContext<'_>, node: Located<NamedNodePattern>) -> Option<Self> {
         if let Some(kind) = root_kind(ctx, &node) {
             return Some(Self::Concrete { node, kind });
         }
@@ -325,13 +329,13 @@ impl Goal {
     fn from_def_ref(ctx: AutomatonContext<'_>, def_ref: &ast::DefRef) -> Option<Self> {
         let name = def_ref.name()?;
         let target = ctx.symbol_table.located_definition(name.text())?;
-        let Pattern::NodePattern(node) = target.node() else {
+        let Pattern::NamedNodePattern(node) = target.node() else {
             return None;
         };
         Self::from_node(ctx, target.wrap(node.clone()))
     }
 
-    fn node(&self) -> &Located<NodePattern> {
+    fn node(&self) -> &Located<NamedNodePattern> {
         match self {
             Self::Concrete { node, .. } | Self::Wildcard { node } => node,
         }
@@ -358,7 +362,7 @@ fn collect_goals(
     out: &mut Vec<Goal>,
 ) {
     match located.node() {
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             if !participation.is_required() {
                 return;
             }
@@ -367,8 +371,8 @@ fn collect_goals(
                 out.push(goal);
             }
         }
-        // An anonymous literal at a goal position matches some token of the grammar.
-        Pattern::TokenPattern(_) => {}
+        // A leaf pattern at a goal position is handled by grammar binding.
+        Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => {}
         Pattern::CapturedPattern(cap) => {
             if let Some(inner) = cap.inner() {
                 collect_goals(&located.wrap(inner), participation, ctx, out);
@@ -389,11 +393,11 @@ fn collect_goals(
             let inner_participation = participation.inside_quantifier_body(q);
             collect_goals(&located.wrap(inner), inner_participation, ctx, out);
         }
-        Pattern::Union(_) | Pattern::Enum(_) => {
-            for branch in located.node().children() {
+        Pattern::Alternation(_) => {
+            for alternative in located.node().children() {
                 collect_goals(
-                    &located.wrap(branch),
-                    participation.inside_disjunction_branch(),
+                    &located.wrap(alternative),
+                    participation.inside_alternative(),
                     ctx,
                     out,
                 );
@@ -411,7 +415,7 @@ fn collect_goals(
 
 /// The concrete named kind a node pattern roots a goal at, or `None` when the
 /// position should be skipped (wildcard, supertype, error keyword, unresolved).
-fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Option<NodeKindId> {
+fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NamedNodePattern>) -> Option<NodeKindId> {
     let node = located.node();
     if node.is_any() {
         return None;
@@ -437,11 +441,11 @@ fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Optio
 /// make it possibly impossible: satisfiability then asks whether *any* node kind can
 /// realize them. A bare `(_)` constrains nothing and is always matchable, so it is
 /// excluded.
-fn is_wildcard_parent(node: &Located<NodePattern>) -> bool {
+fn is_wildcard_parent(node: &Located<NamedNodePattern>) -> bool {
     node.node().is_any() && node_constrains_children(node.node())
 }
 
-fn node_constrains_children(node: &NodePattern) -> bool {
+fn node_constrains_children(node: &NamedNodePattern) -> bool {
     node.items().next().is_some()
         || node
             .syntax()

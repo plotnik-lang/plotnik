@@ -9,7 +9,7 @@
 
 use std::fmt::Write;
 
-use super::{NodeRef, Shape};
+use super::{GrammarNodeRef, Shape};
 
 const INDENT: &str = "  ";
 
@@ -103,7 +103,7 @@ fn expand_group(open: char, close: char, members: &[Shape], indent: usize, width
 }
 
 /// The single-line form of a category's members: `a | b | c#`.
-pub(super) fn flat_category(members: &[NodeRef]) -> String {
+pub(super) fn flat_category(members: &[GrammarNodeRef]) -> String {
     members
         .iter()
         .map(category_member)
@@ -112,7 +112,7 @@ pub(super) fn flat_category(members: &[NodeRef]) -> String {
 }
 
 /// The broken form of a category: one member per line with a leading `|`.
-pub(super) fn expand_category(members: &[NodeRef]) -> String {
+pub(super) fn expand_category(members: &[GrammarNodeRef]) -> String {
     let mut out = String::new();
     for member in members {
         let _ = write!(out, "\n{INDENT}| {}", category_member(member));
@@ -121,7 +121,7 @@ pub(super) fn expand_category(members: &[NodeRef]) -> String {
 }
 
 /// A category member is written bare (no parens); a nested category keeps its `#`.
-fn category_member(node_ref: &NodeRef) -> String {
+fn category_member(node_ref: &GrammarNodeRef) -> String {
     if node_ref.category {
         format!("{}#", node_ref.name)
     } else {

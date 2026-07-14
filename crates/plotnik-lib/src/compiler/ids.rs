@@ -1,8 +1,9 @@
 //! Compiler-internal identity newtypes shared across stages.
 //!
-//! `DefId` indexes a named definition; `TypeId` indexes the analysis-time type
-//! registry. Both are assigned during analysis and read forward by lower and
-//! emit, so they live at the compiler root rather than in any single stage.
+//! `DefId` indexes a named definition, `TypeId` indexes the analysis-time type
+//! registry, and `TypeDeclId` indexes a named type declaration. They are
+//! assigned during analysis and read forward by lower and emit, so they live at
+//! the compiler root rather than in any single stage.
 
 /// A lightweight handle to a named query definition.
 ///
@@ -13,6 +14,26 @@
 pub struct DefId(u32);
 
 impl DefId {
+    #[inline]
+    pub fn from_raw(index: u32) -> Self {
+        Self(index)
+    }
+
+    #[inline]
+    pub fn index(self) -> usize {
+        self.0 as usize
+    }
+}
+
+/// A named type declaration whose body is a structural [`TypeId`].
+///
+/// Kept distinct from `DefId`: definitions describe matching, while type
+/// declarations describe result names. A value-producing definition owns one
+/// type declaration, and an explicit capture type may introduce another.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct TypeDeclId(u32);
+
+impl TypeDeclId {
     #[inline]
     pub fn from_raw(index: u32) -> Self {
         Self(index)

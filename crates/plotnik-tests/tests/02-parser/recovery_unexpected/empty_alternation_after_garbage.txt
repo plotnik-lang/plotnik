@@ -1,6 +1,6 @@
 Q = [^^^ @name]
 ------------------ DIAGNOSTICS -------------------
-error: expected a branch, or `]` to close
+error: expected an alternative, or `]` to close
  --> query.ptk:1:6
   |
 1 | Q = [^^^ @name]

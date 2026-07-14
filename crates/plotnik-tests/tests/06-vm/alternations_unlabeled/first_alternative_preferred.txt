@@ -1,0 +1,85 @@
+Q = (program
+  (expression_statement
+    [
+      (_) @any
+      (identifier) @id
+    ]
+  )
+)
+--------------------- INPUT ----------------------
+x;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  any: Node | null;
+  id: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "id": null,
+  "any": {
+    "kind": "identifier",
+    "text": "x",
+    "span": [0, 1]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "any"
+S2 "id"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { any, id }
+
+[type_members]
+M0: S1 → T1  ; any: T1
+M1: S2 → T1  ; id: T1
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@19)                            19 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘² _                                06
+  08   !   (_) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  11   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  14  ──!  _                                08, 11, 14
+  16  └─!  _                                08, 11, 14
+  18  └‣─  (expression_statement)           16
+  19   !   (program)                        18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@19)                            19 : 03
+       ▶   (@19)
+
+@19:
+  19       (program)                        18
+       ●   program
+  18       (expression_statement)           16
+       ●   expression_statement
+  16       _                                08, 11, 14
+       ●   identifier
+  08       (_) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+       ●   identifier
+  07       _                                06
+       ●   program
+  06   ◀   (@19)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

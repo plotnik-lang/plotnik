@@ -6,5 +6,5 @@ error: empty `[]` matches nothing
 1 | Q = []
   |     ^^
   |
-help: alternations must contain at least one branch
+help: alternations must contain at least one alternative
 -------------------- SYMBOLS ---------------------

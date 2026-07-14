@@ -1,0 +1,24 @@
+Expr = [
+  Lit: (number) @n
+  Rec: (parenthesized_expression
+    (Expr) @inner :: Foo
+  )
+]
+------------------ DIAGNOSTICS -------------------
+warning: this capture already has type `Expr`; naming it `Foo` won't have an effect
+ --> query.ptk:4:22
+  |
+4 |     (Expr) @inner :: Foo
+  |                      ^^^
+------------------- TYPESCRIPT -------------------
+export type Expr =
+  | { $tag: "Lit"; $data: { n: Node } }
+  | { $tag: "Rec"; $data: { inner: Expr } };
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr<'t> {
+    Lit { n: Node<'t> },
+    Rec { inner: ::std::boxed::Box<Expr<'t>> },
+}

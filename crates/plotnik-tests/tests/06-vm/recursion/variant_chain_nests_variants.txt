@@ -1,0 +1,161 @@
+Chain = [
+  Base: (identifier) @name
+  Step: (call_expression
+    function: (Chain) @inner
+  )
+]
+
+Q = (program
+  (expression_statement (Chain) @top)
+)
+--------------------- INPUT ----------------------
+a()();
+------------------- TYPESCRIPT -------------------
+export type Chain =
+  | { $tag: "Base"; $data: { name: Node } }
+  | { $tag: "Step"; $data: { inner: Chain } };
+
+export interface Q {
+  top: Chain;
+}
+--------------------- OUTPUT ---------------------
+{
+  "top": {
+    "$tag": "Step",
+    "$data": {
+      "inner": {
+        "$tag": "Step",
+        "$data": {
+          "inner": {
+            "$tag": "Base",
+            "$data": {
+              "name": {
+                "kind": "identifier",
+                "text": "a",
+                "span": [0, 1]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "inner"
+S03 "Base"
+S04 "Step"
+S05 "top"
+S06 "Chain"
+S07 "Q"
+S08 "identifier"
+S09 "call_expression"
+S10 "program"
+S11 "expression_statement"
+S12 "function"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:1  ; { inner }
+T3 = Variant M2:2  ; Base | Step
+T4 = Record  M4:1  ; { top }
+
+[type_members]
+M0: S01 → T0  ; name: <Node>
+M1: S02 → T3  ; inner: Chain
+M2: S03 → T1  ; Base: T1
+M3: S04 → T2  ; Step: T2
+M4: S05 → T3  ; top: Chain
+
+[type_names]
+N0: S06 → T3  ; Chain
+N1: S07 → T4  ; Q
+
+[entry_points]
+Chain = 00 :: T3
+Q     = 02 :: T4
+
+[instructions]
+Chain:
+  00       (@21)                            21 : 01
+  01                                        ▶
+
+Q:
+  02  -ε-  [RecordOpen]                     04
+  04       (@25)                            25 : 05
+  05  -ε-  [RecordClose]                    07
+  07                                        ▶
+  08  └‣─  function: (@21)                  21 : 09
+  09  ─‣┘  _ [RecordSet(M1) VariantClose]   14
+  11  └‣─  (@21)                            21 : 12
+  12  ─‣┘² _ [RecordSet(M4)]                15
+  14                                        ▶
+  15                                        ▶
+  16   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
+  19   !   (call_expression) [VariantOpen(M3)]  08
+  21  -ε-                                   16, 19
+  23  ...
+  24  └‣─  (expression_statement)           11
+  25   !   (program)                        24
+--------------------- TRACE ----------------------
+Q:
+  02  -ε-  [RecordOpen]                     04
+  04       (@25)                            25 : 05
+       ▶   (@25)
+
+@25:
+  25       (program)                        24
+       ●   program
+  24       (expression_statement)           11
+       ●   expression_statement
+  11       (@21)                            21 : 12
+       ▶   (@21)
+
+@21:
+  21  -ε-                                   16, 19
+  16       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
+       ○   call_expression
+  21  ❮❮❮ 
+  19       (call_expression) [VariantOpen(M3)]  08
+       ●   call_expression
+  08       (@21)                            21 : 09
+       ▶   (@21)
+
+@21:
+  21  -ε-                                   16, 19
+  16       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
+       ○   call_expression
+  21  ❮❮❮ 
+  19       (call_expression) [VariantOpen(M3)]  08
+       ●   call_expression
+  08       (@21)                            21 : 09
+       ▶   (@21)
+
+@21:
+  21  -ε-                                   16, 19
+  16       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
+       ●   identifier
+  14   ◀   (@21)                            
+
+@21:
+  09       _ [RecordSet(M1) VariantClose]   14
+       ●   call_expression
+  14   ◀   (@21)                            
+
+@21:
+  09       _ [RecordSet(M1) VariantClose]   14
+       ●   call_expression
+  14   ◀   (@21)                            
+
+@25:
+  12       _ [RecordSet(M4)]                15
+       ●   program
+  15   ◀   (@25)                            
+
+Q:
+  05  -ε-  [RecordClose]                    07
+  07   ◀   (Q)                              ◼

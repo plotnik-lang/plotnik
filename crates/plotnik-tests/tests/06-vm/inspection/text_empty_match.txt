@@ -1,0 +1,165 @@
+Q = (program
+  {
+    (comment)? @comment
+  } @value :: str
+)
+--------------------- INPUT ----------------------
+value;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  value: string | null;
+}
+------------------ DIAGNOSTICS -------------------
+warning: capture type `str` replaces structured data with source text
+ --> query.ptk:4:12
+  |
+4 |   } @value :: str
+  |            ^^^^^^
+  |
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+--------------------- OUTPUT ---------------------
+{
+  "value": null
+}
+------------------- INSPECTION -------------------
+{
+  "version": 1,
+  "entries": [
+    {
+      "query_span_id": 0,
+      "parent": null,
+      "source_span": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "range": [
+        1,
+        14
+      ]
+    },
+    {
+      "query_span_id": 1,
+      "parent": 0,
+      "source_span": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "range": [
+        2,
+        13
+      ]
+    },
+    {
+      "query_span_id": 2,
+      "parent": 1,
+      "source_span": null,
+      "bindings": [
+        {
+          "path": "/value",
+          "event_index": 10
+        }
+      ],
+      "range": [
+        3,
+        12
+      ]
+    },
+    {
+      "query_span_id": 4,
+      "parent": 2,
+      "source_span": null,
+      "bindings": [],
+      "range": [
+        5,
+        9
+      ]
+    },
+    {
+      "query_span_id": 6,
+      "parent": 3,
+      "source_span": null,
+      "bindings": [],
+      "range": [
+        6,
+        8
+      ]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "value"
+S2 "Q"
+S3 "program"
+S4 "comment"
+
+[type_defs]
+T0 = <Text>
+T1 = Option(T0)  ; <Text>?
+T2 = Record  M0:1  ; { value }
+
+[type_members]
+M0: S1 → T1  ; value: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[spans]
+P0 def        0..60  source_id=0  T2
+P1 pattern    4..60  source_id=0
+P2 capture    45..51  source_id=0  T2.M0
+P3 capture_type 52..58  source_id=0  T0
+P4 sequence   15..44  source_id=0
+P5 capture    32..40  source_id=0
+P6 quantifier 30..31  source_id=0
+P7 pattern    21..30  source_id=0
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  -ε-  [StrClose RecordSet(M0) SpanEnd#2]  08
+  08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
+  10                                        ▶
+  11  -ε-  [StrClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
+  16   !   (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
+  19  ──!  _                                16, 19
+  21  └─!  _                                16, 19
+  23  ...
+  24  -ε-  [SpanStart#6]                    21, 14
+  26  -ε-  [ScalarOpen SpanStart#4]         24
+  28   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+       ▶   (@28)
+
+@28:
+  28       (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
+       ●   program
+  26  -ε-  [ScalarOpen SpanStart#4]         24
+  24  -ε-  [SpanStart#6]                    21, 14
+  21       _                                16, 19
+       ●   expression_statement
+  16       (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
+       ○   expression_statement
+  21  ❮❮❮ 
+  19       _                                16, 19
+  24  ❮❮❮ 
+  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
+  11  -ε-  [StrClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  10   ◀   (@28)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

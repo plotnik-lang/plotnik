@@ -19,8 +19,8 @@ S4 "lexical_declaration"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayPlus(T0)  ; <Node>+
-T2 = Struct  M0:1  ; { decls }
+T1 = ListOneOrMore(T0)  ; <Node>+
+T2 = Record  M0:1  ; { decls }
 
 [type_members]
 M0: S1 → T1  ; decls: T1
@@ -28,34 +28,34 @@ M0: S1 → T1  ; decls: T1
 [type_names]
 N0: S2 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (lexical_declaration) [Node Push]  10, 14
+  08   !   (lexical_declaration) [Node ArrayPush]  10, 14
   10  ──!  _                                08, 10
-  12  └─!  _ [ArrayOpen]                    08, 10
-  14  ─‣┘  _ [ArrayClose Set(M0)]           06
+  12  └─!  _ [ListOpen]                     08, 10
+  14  ─‣┘  _ [ListClose RecordSet(M0)]      06
   16   !   (program)                        12
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
        ▶   (@16)
 
 @16:
   16       (program)                        12
        ●   program
-  12       _ [ArrayOpen]                    08, 10
+  12       _ [ListOpen]                     08, 10
        ●   expression_statement
-  08       (lexical_declaration) [Node Push]  10, 14
+  08       (lexical_declaration) [Node ArrayPush]  10, 14
        ○   expression_statement
   12  ❮❮❮ 
   10       _                                08, 10

@@ -1,7 +1,7 @@
 #![allow(clippy::module_inception)]
 
 //! Instruction-encoding emission phase: resolve each instruction into its
-//! transition bytes.
+//! instruction bytes.
 
 mod instructions;
 

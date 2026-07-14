@@ -27,7 +27,7 @@ pub enum DumpChunkKind {
     Kind,
     /// A field name.
     Field,
-    /// A quoted string: predicate values and raw-mode anonymous tokens.
+    /// A quoted string: predicate values and anonymous tokens.
     String,
     /// Trailing `; "…"` comment carrying text a pattern can't express (ERROR).
     Comment,
@@ -47,7 +47,7 @@ pub struct DumpChunk {
 /// in pre-order, so ranges of a node's descendants nest inside its own.
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct DumpNode {
-    /// Byte range in the source text.
+    /// Document byte range in the source text.
     pub src_start: usize,
     pub src_end: usize,
     /// Byte range in the concatenated dump text.
@@ -76,11 +76,16 @@ enum Step<'t> {
 }
 
 /// Dump a parsed tree as chunks of Plotnik pattern syntax, plus a node table
-/// mapping each rendered node back to its source range.
+/// mapping each rendered node back to its document byte range.
 ///
 /// The source tree is untrusted and can nest past any native-stack budget, so
 /// the walk uses an explicit work stack rather than native recursion.
-pub fn dump_tree(tree: &tree_sitter::Tree, source: &str, grammar: &Grammar, raw: bool) -> TreeDump {
+pub fn dump_tree(
+    tree: &tree_sitter::Tree,
+    source: &str,
+    grammar: &Grammar,
+    include_anonymous: bool,
+) -> TreeDump {
     let mut out = ChunkWriter::default();
     let mut nodes: Vec<DumpNode> = Vec::new();
     let mut stack = vec![Step::Node {
@@ -103,9 +108,9 @@ pub fn dump_tree(tree: &tree_sitter::Tree, source: &str, grammar: &Grammar, raw:
             Step::Node { node, field, depth } => (node, field, depth),
         };
 
-        // Anonymous nodes are dropped unless `raw`. Children are pre-filtered
-        // below, so this only guards a (hypothetical) anonymous root.
-        if !raw && !node.is_named() {
+        // Children are pre-filtered below, so this only guards a
+        // (hypothetical) anonymous root.
+        if !include_anonymous && !node.is_named() {
             continue;
         }
 
@@ -124,7 +129,7 @@ pub fn dump_tree(tree: &tree_sitter::Tree, source: &str, grammar: &Grammar, raw:
             out.push(DumpChunkKind::Punct, ": ");
         }
 
-        let children = collect_children(node, raw);
+        let children = collect_children(node, include_anonymous);
         if children.is_empty() {
             dump_leaf(&mut out, node, source, grammar);
             nodes[index].dump_end = out.len();
@@ -159,9 +164,9 @@ pub fn dump_tree_text(
     tree: &tree_sitter::Tree,
     source: &str,
     grammar: &Grammar,
-    raw: bool,
+    include_anonymous: bool,
 ) -> String {
-    dump_tree(tree, source, grammar, raw)
+    dump_tree(tree, source, grammar, include_anonymous)
         .chunks
         .into_iter()
         .map(|chunk| chunk.text)
@@ -174,8 +179,8 @@ fn dump_leaf(out: &mut ChunkWriter, node: tree_sitter::Node<'_>, source: &str, g
         .utf8_text(source.as_bytes())
         .unwrap_or("<invalid utf8>");
 
-    // Raw mode surfaces anonymous nodes; as a pattern those are bare string
-    // tokens (`"("`), matched by kind.
+    // Anonymous nodes are bare string tokens (`"("`) in a pattern, matched
+    // by kind.
     if !node.is_named() {
         out.push(DumpChunkKind::String, quoted(kind));
         return;
@@ -263,18 +268,17 @@ impl ChunkWriter {
     }
 }
 
-/// Collect a node's children, keeping anonymous ones only in `raw` mode,
-/// paired with their field names.
+/// Collect a node's children, paired with their field names.
 fn collect_children<'t>(
     node: tree_sitter::Node<'t>,
-    raw: bool,
+    include_anonymous: bool,
 ) -> Vec<(tree_sitter::Node<'t>, Option<&'t str>)> {
     let mut cursor = node.walk();
     let mut result = Vec::new();
     if cursor.goto_first_child() {
         loop {
             let child = cursor.node();
-            if raw || child.is_named() {
+            if include_anonymous || child.is_named() {
                 result.push((child, cursor.field_name()));
             }
             if !cursor.goto_next_sibling() {

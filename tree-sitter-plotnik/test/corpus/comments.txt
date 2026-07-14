@@ -39,7 +39,7 @@ Q = (p ; after kind
       (comment)
       (alternation
         (comment)
-        (branch
+        (alternative
           (named_node
             (identifier)))))))
 

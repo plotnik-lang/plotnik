@@ -1,4 +1,4 @@
-//! Plotnik: Query language for tree-sitter AST with type inference.
+//! Plotnik: a typed query language for Tree-sitter syntax trees.
 //!
 //! # Example
 //!
@@ -43,8 +43,8 @@ pub mod diagnostics {
     };
 }
 
-pub use crate::compiler::entry_fn_name as matcher_entry_fn_name;
-pub use crate::compiler::{DtsRange, TypeScriptVoidType};
+pub use crate::compiler::journal_fn_name as matcher_journal_fn_name;
+pub use crate::compiler::{TypeScriptBinding, TypeScriptMatchOnlyType};
 
 pub use crate::core::Colors;
 pub use crate::core::grammar::GrammarIdentity;
@@ -56,15 +56,15 @@ pub use crate::compiler::{
     Span, TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
 };
 pub use crate::compiler::{
-    CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap, SourcePath,
-    TokenSpan, format_query, tokenize,
+    CompiledQuery, Query, QueryBuilder, QueryToken, Source, SourceId, SourceKind, SourceMap,
+    SourcePath, format_query, tokenize,
 };
 
 #[cfg(feature = "vm")]
 pub use crate::vm::{
-    Binding, EffectLog, Inspection, InspectionEntry, Limit, NodeHandle, NodeRef, NoopTracer,
-    PrintTracer, PrintTracerBuilder, Recording, RecordingTracer, ResolvedRuntimeLimits, RunStats,
-    RuntimeEffect, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord, Tracer, VM, VMBuilder,
-    Value, ValueMaterializer, Verbosity, debug_verify_type, extract_inspection,
-    materialize_verified,
+    ExecutionTrace, JournalEvent, Limit, MatchJournal, NodeValue, NoopTracer, OutputEvents,
+    PrintTracer, PrintTracerBuilder, ProvenanceBinding, ResolvedRuntimeLimits, ResultProvenance,
+    ResultProvenanceEntry, RunStats, RuntimeError, RuntimeLimitSpec, TraceEvent, TraceNode,
+    TraceRecord, TraceRecorder, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity,
+    debug_verify_type, extract_result_provenance, materialize_verified,
 };

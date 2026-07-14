@@ -2,7 +2,7 @@ Q = (pair
   key: _ @key
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 8
 
 [transitions]
@@ -10,13 +10,13 @@ Q:
   1                                         ▶
   2   !   (pair)                            4
   3  ─‣┘  _                                 1
-  4  └‣─  key: _ [Node Set(key)]            3
+  4  └‣─  key: _ [Node RecordSet(key)]      3
 
-Q (entrypoint):
+Q (entry point):
   5                                         ▶
-  6  -ε-  [StructClose]                     5
+  6  -ε-  [RecordClose]                     5
   7       (Q)                               2 : 6
-  8  -ε-  [StructOpen]                      7
+  8  -ε-  [RecordOpen]                      7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -26,7 +26,7 @@ S3 "pair"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { key }
+T1 = Record  M0:1  ; { key }
 
 [type_members]
 M0: S1 → T0  ; key: <Node>
@@ -34,16 +34,16 @@ M0: S1 → T0  ; key: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@10)                            10 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  key: _ [Node Set(M0)]            08
+  06  └‣─  key: _ [Node RecordSet(M0)]      08
   08  ─‣┘  _                                09
   09                                        ▶
   10   !   (pair)                           06

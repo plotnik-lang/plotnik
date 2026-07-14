@@ -1,6 +1,6 @@
 Q = (call -)
 ------------------ DIAGNOSTICS -------------------
-error: expected a field name
+error: expected a grammar field name
  --> query.ptk:1:12
   |
 1 | Q = (call -)

@@ -1,4 +1,4 @@
-use plotnik_lib::{FormatError, TokenSpan, format_query, tokenize};
+use plotnik_lib::{FormatError, QueryToken, format_query, tokenize};
 use similar::TextDiff;
 
 pub enum Assessment {
@@ -75,7 +75,7 @@ fn assert_contract(input: &str, output: &str, name: &str) -> Result<(), String> 
     );
     let mut captures_per_line = vec![0; output.lines().count()];
     for token in output_tokens.iter().filter(|token| token.kind == "capture") {
-        let line_index = line_starts.partition_point(|start| *start <= token.start as usize) - 1;
+        let line_index = line_starts.partition_point(|start| *start <= token.span.0 as usize) - 1;
         captures_per_line[line_index] += 1;
     }
     for (line_index, captures) in captures_per_line.into_iter().enumerate() {
@@ -91,12 +91,12 @@ fn assert_contract(input: &str, output: &str, name: &str) -> Result<(), String> 
     Ok(())
 }
 
-fn significant_token_signature(source: &str, tokens: &[TokenSpan]) -> Vec<(String, String)> {
+fn significant_token_signature(source: &str, tokens: &[QueryToken]) -> Vec<(String, String)> {
     tokens
         .iter()
         .filter(|token| !matches!(token.kind, "whitespace" | "comment"))
         .map(|token| {
-            let text = &source[token.start as usize..token.end as usize];
+            let text = &source[token.span.0 as usize..token.span.1 as usize];
             let normalized = match text {
                 "/" => "#",
                 "'" => "\"",
@@ -107,12 +107,12 @@ fn significant_token_signature(source: &str, tokens: &[TokenSpan]) -> Vec<(Strin
         .collect()
 }
 
-fn comment_signature(source: &str, tokens: &[TokenSpan]) -> Vec<String> {
+fn comment_signature(source: &str, tokens: &[QueryToken]) -> Vec<String> {
     tokens
         .iter()
         .filter(|token| token.kind == "comment")
         .map(|token| {
-            let text = &source[token.start as usize..token.end as usize];
+            let text = &source[token.span.0 as usize..token.span.1 as usize];
             if text.starts_with("//") || text.starts_with(';') {
                 return text.trim_end_matches([' ', '\t']).to_owned();
             }

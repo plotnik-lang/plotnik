@@ -12,7 +12,7 @@ use crate::compiler::ids::TypeId;
 use crate::core::Symbol;
 
 use super::CaptureKind;
-use super::type_shape::FieldInfo;
+use super::type_shape::RecordField;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BuiltInCaptureType {
@@ -43,24 +43,24 @@ impl TerminalData {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum OptionalCaptureTypeMode {
+pub enum OptionMode {
     Preserve,
     Bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum CaptureTypePlanKind {
-    StrTerminal {
+    TextTerminal {
         data: TerminalData,
     },
     BoolTerminal {
         data: TerminalData,
     },
-    Optional {
-        mode: OptionalCaptureTypeMode,
+    Option {
+        mode: OptionMode,
         inner: Box<CaptureTypePlan>,
     },
-    Array {
+    List {
         element: Box<CaptureTypePlan>,
     },
 }
@@ -72,10 +72,10 @@ pub struct CaptureTypePlan {
 }
 
 impl CaptureTypePlan {
-    pub fn str_terminal(final_type: TypeId, data: TerminalData) -> Self {
+    pub fn text_terminal(final_type: TypeId, data: TerminalData) -> Self {
         Self {
             final_type,
-            kind: CaptureTypePlanKind::StrTerminal { data },
+            kind: CaptureTypePlanKind::TextTerminal { data },
         }
     }
 
@@ -86,24 +86,20 @@ impl CaptureTypePlan {
         }
     }
 
-    pub fn optional(
-        final_type: TypeId,
-        mode: OptionalCaptureTypeMode,
-        inner: CaptureTypePlan,
-    ) -> Self {
+    pub fn option(final_type: TypeId, mode: OptionMode, inner: CaptureTypePlan) -> Self {
         Self {
             final_type,
-            kind: CaptureTypePlanKind::Optional {
+            kind: CaptureTypePlanKind::Option {
                 mode,
                 inner: Box::new(inner),
             },
         }
     }
 
-    pub fn array(final_type: TypeId, element: CaptureTypePlan) -> Self {
+    pub fn list(final_type: TypeId, element: CaptureTypePlan) -> Self {
         Self {
             final_type,
-            kind: CaptureTypePlanKind::Array {
+            kind: CaptureTypePlanKind::List {
                 element: Box::new(element),
             },
         }
@@ -119,10 +115,10 @@ impl CaptureTypePlan {
 
     pub fn suppresses_semantic_data(&self) -> bool {
         match &self.kind {
-            CaptureTypePlanKind::StrTerminal { data }
+            CaptureTypePlanKind::TextTerminal { data }
             | CaptureTypePlanKind::BoolTerminal { data } => data.suppresses_semantic_data(),
-            CaptureTypePlanKind::Optional { inner, .. } => inner.suppresses_semantic_data(),
-            CaptureTypePlanKind::Array { element } => element.suppresses_semantic_data(),
+            CaptureTypePlanKind::Option { inner, .. } => inner.suppresses_semantic_data(),
+            CaptureTypePlanKind::List { element } => element.suppresses_semantic_data(),
         }
     }
 }
@@ -130,12 +126,12 @@ impl CaptureTypePlan {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RawCaptureFact {
     kind: CaptureKind,
-    field: FieldInfo,
+    field: RecordField,
     valid: bool,
 }
 
 impl RawCaptureFact {
-    pub fn admitted(kind: CaptureKind, field: FieldInfo) -> Self {
+    pub fn admitted(kind: CaptureKind, field: RecordField) -> Self {
         Self {
             kind,
             field,
@@ -143,7 +139,7 @@ impl RawCaptureFact {
         }
     }
 
-    pub fn rejected(kind: CaptureKind, field: FieldInfo) -> Self {
+    pub fn rejected(kind: CaptureKind, field: RecordField) -> Self {
         Self {
             kind,
             field,
@@ -155,7 +151,7 @@ impl RawCaptureFact {
         self.kind
     }
 
-    pub fn field(&self) -> FieldInfo {
+    pub fn field(&self) -> RecordField {
         self.field
     }
 
@@ -211,23 +207,36 @@ impl CaptureFact {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FieldFallback {
-    Null,
-    EmptyArray,
+pub enum FieldCompletion {
+    /// Every alternative produces the field, so lowering owes no value.
+    AlwaysPresent,
+    /// A non-producing alternative materializes semantic absence (`null` in JSON).
+    Absent,
+    /// A non-producing alternative materializes an empty list.
+    EmptyList,
+    /// A non-producing alternative materializes a false presence value.
     False,
 }
 
+/// Total completion behavior for the fields merged by one alternation.
 #[derive(Clone, Debug, Default)]
-pub struct UnionFlowPlan {
-    omissions: BTreeMap<Symbol, FieldFallback>,
+pub struct FieldCompletions {
+    by_field: BTreeMap<Symbol, FieldCompletion>,
 }
 
-impl UnionFlowPlan {
-    pub fn new(omissions: BTreeMap<Symbol, FieldFallback>) -> Self {
-        Self { omissions }
+impl FieldCompletions {
+    pub fn new(by_field: BTreeMap<Symbol, FieldCompletion>) -> Self {
+        Self { by_field }
     }
 
-    pub fn fallback(&self, field: Symbol) -> Option<FieldFallback> {
-        self.omissions.get(&field).copied()
+    pub fn completion(&self, field: Symbol) -> FieldCompletion {
+        self.by_field
+            .get(&field)
+            .copied()
+            .expect("every merged field must have an explicit completion")
+    }
+
+    pub(crate) fn fields(&self) -> impl Iterator<Item = Symbol> + '_ {
+        self.by_field.keys().copied()
     }
 }

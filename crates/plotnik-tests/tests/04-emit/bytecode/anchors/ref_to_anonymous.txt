@@ -6,7 +6,7 @@ Test = (array
   (string) @next
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Comma = 13
 Test  = 17
 
@@ -19,20 +19,20 @@ Test:
   04                                        ▶
   05   !   (array)                          11
   06  ─‣┘  _                                04
-  07  ─◦─  (string) [Node Set(next)]        06
+  07  ─◦─  (string) [Node RecordSet(next)]  06
   08   !   (Comma)                          02 : 07
   10  ──!  _                                08, 10
   11  └─!  _                                08, 10
 
-Comma (entrypoint):
+Comma (entry point):
   12                                        ▶
   13       (Comma)                          02 : 12
 
-Test (entrypoint):
+Test (entry point):
   14                                        ▶
-  15  -ε-  [StructClose]                    14
+  15  -ε-  [RecordClose]                    14
   16       (Test)                           05 : 15
-  17  -ε-  [StructOpen]                     16
+  17  -ε-  [RecordOpen]                     16
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -44,9 +44,9 @@ S5 "string"
 S6 "Comma"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
-T2 = Struct  M0:1  ; { next }
+T2 = Record  M0:1  ; { next }
 
 [type_members]
 M0: S1 → T1  ; next: <Node>
@@ -54,21 +54,21 @@ M0: S1 → T1  ; next: <Node>
 [type_names]
 N0: S2 → T2  ; Test
 
-[entrypoints]
+[entry_points]
 Comma = 00 :: T0
 Test  = 02 :: T2
 
-[transitions]
+[instructions]
 Comma:
   00       (@12)                            12 : 01
   01                                        ▶
 
 Test:
-  02  -ε-  [StructOpen]                     04
+  02  -ε-  [RecordOpen]                     04
   04       (@20)                            20 : 05
-  05  -ε-  [StructClose]                    07
+  05  -ε-  [RecordClose]                    07
   07                                        ▶
-  08  ─◦─  (string) [Node Set(M0)]          10
+  08  ─◦─  (string) [Node RecordSet(M0)]    10
   10  ─‣┘  _                                13
   11                                        ▶
   12   !   ","                              11

@@ -5,10 +5,10 @@
 
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
+use crate::compiler::analyze::result::{CaptureLayout, CaptureScopeKind, ResultSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeShape,
+    DefinitionOutput, ListMinimum, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeShape,
 };
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
@@ -19,7 +19,7 @@ use crate::core::Interner;
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
 pub fn build_type_table(
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
     mut strings: StringTableBuilder,
 ) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
     let mut types = TypeTableBuilder::new();
@@ -27,24 +27,24 @@ pub fn build_type_table(
     Ok((types, strings))
 }
 
-/// Build the type table, remapping query TypeIds to bytecode ids.
+/// Build the type table, remapping analysis type IDs to bytecode type IDs.
 ///
-/// Types reachable from callable definition outputs are emitted. This keeps
+/// Types reachable from selectable definition outputs are emitted. This keeps
 /// demanded fragment capture scopes available to matcher bodies without
-/// shipping unused fragments. Dead inference intermediates — a union
-/// alternation's per-branch merge structs, for instance — are also pruned.
-/// Used builtins lead, then custom types follow in definition order,
+/// shipping unused fragments. Dead inference intermediates — an unlabeled
+/// alternation's per-alternative merged records, for instance — are also pruned.
+/// Used built-ins lead, then value types follow in definition order,
 /// depth-first.
 fn build(
     types: &mut TypeTableBuilder,
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
     let type_analysis = schema.types;
     let type_layout = schema.type_layout();
-    let ordered_types = type_layout.custom_types();
+    let ordered_types = type_layout.value_types();
 
-    emit_builtins(types, type_layout.builtins())?;
+    emit_builtins(types, type_layout)?;
     reserve_slots(types, ordered_types)?;
 
     let mut ctx = TypeEmitCtx {
@@ -63,14 +63,19 @@ fn build(
     Ok(())
 }
 
-fn emit_builtins(types: &mut TypeTableBuilder, builtins: &[TypeId]) -> Result<(), EmitError> {
-    for &builtin in builtins {
+fn emit_builtins(
+    types: &mut TypeTableBuilder,
+    layout: &crate::compiler::analyze::result::ResultTypeLayout,
+) -> Result<(), EmitError> {
+    if layout.has_no_value() {
+        types.push_no_value()?;
+    }
+    for &builtin in layout.builtins() {
         let kind = match builtin {
-            TYPE_VOID => TypeKind::Void,
             TYPE_NODE => TypeKind::Node,
-            TYPE_STR => TypeKind::Str,
+            TYPE_TEXT => TypeKind::Text,
             TYPE_BOOL => TypeKind::Bool,
-            _ => unreachable!("output type layout exposes only primitive built-ins"),
+            _ => unreachable!("result type layout exposes only primitive built-ins"),
         };
         types.push_mapped(builtin, TypeDef::builtin(kind))?;
     }
@@ -98,20 +103,17 @@ fn fill_slots(
 
 fn emit_type_names(
     types: &mut TypeTableBuilder,
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    // The naming pass is the single source of names: definition results,
-    // path-generated composites, and custom `:: TypeName` capture types, in `TypeId`
-    // (deterministic) order. Naming covers the whole analyzed query; output
-    // layout deliberately keeps only names whose types survive callable-root
-    // reachability.
-    for (type_id, name_sym) in schema.iter_type_names() {
-        if !schema.type_layout().contains(type_id) {
+    for binding in schema.iter_type_name_bindings() {
+        if !schema.type_layout().contains(binding.type_id) {
             continue;
         }
-        let bc_type_id = types.lookup(type_id).expect("named type must be mapped");
-        let name = ctx.strings.intern(name_sym, ctx.interner)?;
+        let bc_type_id = types
+            .lookup(binding.type_id)
+            .expect("named result type must be mapped");
+        let name = ctx.strings.intern(binding.name, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
 
@@ -126,44 +128,32 @@ fn emit_type_at_slot(
 ) -> Result<(), EmitError> {
     let wire_type = types
         .lookup(type_id)
-        .expect("reserved output type has a wire slot");
+        .expect("reserved result type has a wire slot");
     let slot_index = usize::from(u16::from(wire_type));
     let type_shape = ctx.type_analysis.expect_type_shape(type_id);
     match type_shape {
-        TypeShape::Void | TypeShape::Node | TypeShape::Str | TypeShape::Bool => {
+        TypeShape::Node | TypeShape::Text | TypeShape::Bool => {
             unreachable!("builtins should be handled separately")
         }
 
-        TypeShape::Custom(_) => {
-            // A custom capture type is a nominal alias for Node.
-            // The name entry comes from the naming pass via `emit_type_names`;
-            // here only the alias shape is emitted.
-            let node = types
-                .lookup(TYPE_NODE)
-                .expect("Node is mapped before aliases are emitted");
-            types.fill_slot(slot_index, TypeDef::alias(node));
-            Ok(())
-        }
-
-        TypeShape::Optional(inner) => {
+        TypeShape::Option(inner) => {
             let inner_bc = types.resolve_type(*inner, ctx.type_analysis)?;
-            types.fill_slot(slot_index, TypeDef::optional(inner_bc));
+            types.fill_slot(slot_index, TypeDef::option(inner_bc));
             Ok(())
         }
 
-        TypeShape::Array { element, non_empty } => {
+        TypeShape::List { element, minimum } => {
             let element_bc = types.resolve_type(*element, ctx.type_analysis)?;
-            let def = if *non_empty {
-                TypeDef::array_plus(element_bc)
-            } else {
-                TypeDef::array_star(element_bc)
+            let def = match minimum {
+                ListMinimum::Zero => TypeDef::list_zero_or_more(element_bc),
+                ListMinimum::One => TypeDef::list_one_or_more(element_bc),
             };
             types.fill_slot(slot_index, def);
             Ok(())
         }
 
-        TypeShape::Struct(fields) => {
-            // Resolve field types (this may create Optional wrappers at later indices)
+        TypeShape::Record(fields) => {
+            // Resolve field types (this may create Option wrappers at later indices)
             let mut resolved_fields = Vec::with_capacity(fields.len());
             for (field_sym, field_info) in fields {
                 let field_name = ctx.strings.intern(*field_sym, ctx.interner)?;
@@ -173,8 +163,8 @@ fn emit_type_at_slot(
 
             let scope = layout
                 .scope(type_id)
-                .expect("every emitted struct has a capture scope");
-            assert_eq!(scope.kind(), CaptureScopeKind::Struct);
+                .expect("every emitted record has a capture scope");
+            assert_eq!(scope.kind(), CaptureScopeKind::Record);
             let member_start = scope.base();
             assert_eq!(
                 types.members_len(),
@@ -187,50 +177,48 @@ fn emit_type_at_slot(
 
             let member_count = u8::try_from(scope.members().len())
                 .map_err(|_| EmitError::TooManyFields(scope.members().len()))?;
-            types.fill_slot(slot_index, TypeDef::for_struct(member_start, member_count));
+            types.fill_slot(slot_index, TypeDef::for_record(member_start, member_count));
             Ok(())
         }
 
-        TypeShape::Enum(variants) => {
-            // Resolve variant types (this may create types at later indices)
-            let mut resolved_variants = Vec::with_capacity(variants.len());
-            for (variant_sym, variant_type_id) in variants {
-                let variant_name = ctx.strings.intern(*variant_sym, ctx.interner)?;
-                let variant_type = types.resolve_type(*variant_type_id, ctx.type_analysis)?;
-                resolved_variants.push((variant_name, variant_type));
+        TypeShape::Variant(cases) => {
+            // Resolve case types (this may create types at later indices).
+            let mut resolved_cases = Vec::with_capacity(cases.len());
+            for (case_sym, payload) in cases {
+                let case_name = ctx.strings.intern(*case_sym, ctx.interner)?;
+                let case_type = match payload.type_id() {
+                    Some(type_id) => types.resolve_type(type_id, ctx.type_analysis)?,
+                    None => types.resolve_output(DefinitionOutput::MatchOnly, ctx.type_analysis)?,
+                };
+                resolved_cases.push((case_name, case_type));
             }
 
             let scope = layout
                 .scope(type_id)
-                .expect("every emitted enum has a capture scope");
-            assert_eq!(scope.kind(), CaptureScopeKind::Enum);
+                .expect("every emitted variant type has a capture scope");
+            assert_eq!(scope.kind(), CaptureScopeKind::Variant);
             let member_start = scope.base();
             assert_eq!(
                 types.members_len(),
                 member_start,
                 "wire members consume the shared capture layout in order"
             );
-            for (variant_name, variant_type) in resolved_variants {
-                types.push_member(TypeMember::new(variant_name, variant_type));
+            for (case_name, case_type) in resolved_cases {
+                types.push_member(TypeMember::new(case_name, case_type));
             }
 
             let member_count = u8::try_from(scope.members().len())
-                .map_err(|_| EmitError::TooManyVariants(scope.members().len()))?;
-            types.fill_slot(slot_index, TypeDef::for_enum(member_start, member_count));
+                .map_err(|_| EmitError::TooManyCases(scope.members().len()))?;
+            types.fill_slot(slot_index, TypeDef::for_variant(member_start, member_count));
             Ok(())
         }
 
-        TypeShape::Ref(def_id) => {
-            // A recursive reference to a definition that ended up void (its
-            // captures all suppressed) leaves no pending value at runtime: the
-            // capture takes the matched node, so the alias targets Node.
-            let target = ctx.type_analysis.expect_def_output(*def_id);
-            let alias = if target == TYPE_VOID {
-                types
+        TypeShape::Ref(declaration) => {
+            let alias = match ctx.type_analysis.declaration_body(*declaration) {
+                None => types
                     .lookup(TYPE_NODE)
-                    .expect("Node is mapped before a Ref alias that targets it is emitted")
-            } else {
-                types.resolve_type(target, ctx.type_analysis)?
+                    .expect("Node is mapped before a Ref alias that targets it is emitted"),
+                Some(type_id) => types.resolve_type(type_id, ctx.type_analysis)?,
             };
             types.fill_slot(slot_index, TypeDef::alias(alias));
             Ok(())
@@ -240,22 +228,10 @@ fn emit_type_at_slot(
 
 fn resolve_field_type(
     types: &mut TypeTableBuilder,
-    field_info: &FieldInfo,
+    field_info: &RecordField,
     type_ctx: &TypeAnalysis,
 ) -> Result<WireTypeId, EmitError> {
-    let base_type = types.resolve_type(field_info.type_id, type_ctx)?;
-
-    if field_info.optional {
-        // Wrappers compose: a base that is itself `Optional` (a reference to
-        // an optional-rooted definition under a call-site `?`) legitimately
-        // nests — the two nulls come from two distinct syntax sites, the
-        // definition's `?` and the capture's. For everything else inference
-        // keeps field optionality single-sourced (the captured `?`'s null
-        // lives on the capture field alone, never on the base type too).
-        types.intern_optional(base_type)
-    } else {
-        Ok(base_type)
-    }
+    types.resolve_type(field_info.final_type, type_ctx)
 }
 
 struct TypeEmitCtx<'a> {

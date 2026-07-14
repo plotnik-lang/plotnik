@@ -37,7 +37,7 @@ warning: capture type `str` replaces structured data with source text
 16 |     (B) @x :: str
    |            ^^^^^^
    |
-help: the replaced fields, variants, or scalar payload will not be returned
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
 {
   "x": "//a\n//b",
@@ -63,40 +63,40 @@ S14 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = <Str>
-T2 = Struct  M0:1  ; { c }
-T3 = Struct  M1:1  ; { c }
-T4 = Enum    M2:2  ; Rec | Base
-T5 = Struct  M4:2  ; { first, second }
-T6 = Optional(T1)  ; <Str>?
-T7 = Struct  M6:2  ; { x, rest }
-T8 = Optional(T4)  ; Body?
+T1 = <Text>
+T2 = Record  M0:1  ; { c }
+T3 = Record  M1:1  ; { c }
+T4 = Variant M2:2  ; Rec | Base
+T5 = Option(T4)  ; Body?
+T6 = Record  M4:2  ; { first, second }
+T7 = Option(T1)  ; <Text>?
+T8 = Record  M6:2  ; { x, rest }
 
 [type_members]
 M0: S03 → T0  ; c: <Node>
 M1: S03 → T0  ; c: <Node>
 M2: S04 → T2  ; Rec: T2
 M3: S05 → T3  ; Base: T3
-M4: S06 → T8  ; first: T8
-M5: S07 → T8  ; second: T8
-M6: S08 → T6  ; x: T6
-M7: S09 → T1  ; rest: <Str>
+M4: S06 → T5  ; first: T5
+M5: S07 → T5  ; second: T5
+M6: S08 → T7  ; x: T7
+M7: S09 → T1  ; rest: <Text>
 
 [type_names]
-N0: S10 → T5  ; B
+N0: S10 → T6  ; B
 N1: S11 → T4  ; Body
-N2: S12 → T7  ; Q
+N2: S12 → T8  ; Q
 
-[entrypoints]
-Q = 00 :: T7
+[entry_points]
+Q = 00 :: T8
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@76)                            76 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  -ε-  [StrClose Set(M7)]               08
+  06  -ε-  [StrClose RecordSet(M7)]         08
   08  ─‣┘  _                                09
   09                                        ▶
   10  └─!  (comment) [ScalarMark] == "//b"  06
@@ -105,11 +105,11 @@ Q:
   16  ──!  (comment) [ScalarMark] == "//b"  06
   18  ──!  (comment) [ScalarMark] == "//stop"  06
   20  -ε-  [ScalarOpen]                     16, 18
-  22  -ε-  [StrClose Set(M6)]               20
-  24  -ε-  [StrClose Set(M6)]               14
+  22  -ε-  [StrClose RecordSet(M6)]         20
+  24  -ε-  [StrClose RecordSet(M6)]         14
   26                                        ▶
   27                                        ▶
-  28                                        ▶ zero
+  28                                        ▶ empty
   29  -ε-  [SuppressEnd]                    27
   31   !   (@52)                            52 : 29
   32  -ε-  [SuppressBegin]                  31
@@ -141,7 +141,7 @@ Q:
   76   !   (program)                        74
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@76)                            76 : 03
        ▶   (@76)
 
@@ -196,7 +196,7 @@ Q:
   44  -ε-                                   34, 28, 42
   34       _                                32, 34
   44  ❮❮❮ 
-  28   ◀   (@44)                            zero
+  28   ◀   (@44)                            empty
 
 @52:
   26   ◀   (@52)                            
@@ -217,7 +217,7 @@ Q:
 
 @76:
   54  -ε-  [SuppressEnd]                    22
-  22  -ε-  [StrClose Set(M6)]               20
+  22  -ε-  [StrClose RecordSet(M6)]         20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
@@ -245,7 +245,7 @@ Q:
 
 @76:
   54  -ε-  [SuppressEnd]                    22
-  22  -ε-  [StrClose Set(M6)]               20
+  22  -ε-  [StrClose RecordSet(M6)]         20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
@@ -253,7 +253,7 @@ Q:
   34  ❮❮❮ 
   34       _                                32, 34
   44  ❮❮❮ 
-  28   ◀   (@44)                            zero
+  28   ◀   (@44)                            empty
 
 @52:
   26   ◀   (@52)                            
@@ -267,17 +267,17 @@ Q:
 
 @76:
   54  -ε-  [SuppressEnd]                    22
-  22  -ε-  [StrClose Set(M6)]               20
+  22  -ε-  [StrClose RecordSet(M6)]         20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
   18       (comment) [ScalarMark] == "//stop"  06
        ●   comment
-  06  -ε-  [StrClose Set(M7)]               08
+  06  -ε-  [StrClose RecordSet(M7)]         08
   08       _                                09
        ●   program
   09   ◀   (@76)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

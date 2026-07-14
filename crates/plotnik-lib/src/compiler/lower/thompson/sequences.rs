@@ -15,7 +15,7 @@ use super::scope::SkipExit;
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
 /// last pattern as anchor-followed.
 ///
-/// A trailing anchor (`{… .}`) enforces last-child adjacency via the parent
+/// A trailing anchor (`{… .}`) constrains the last-child boundary via the parent
 /// node's `Up*` nav. That check can still fail — the matched child is not the
 /// last one — and must then retry at a later sibling. Treating the last item as
 /// "followed by an anchor" routes its child search through the resumable
@@ -23,7 +23,7 @@ use super::scope::SkipExit;
 /// the retry can happen. Returns `None` when the sequence has no trailing anchor.
 fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
     match items.last()? {
-        SeqItem::Anchor(a) if a.is_strict() => Some(Nav::NextExact),
+        SeqItem::Anchor(a) if a.is_exact() => Some(Nav::NextExact),
         SeqItem::Anchor(_) => Some(Nav::NextSkip),
         SeqItem::Pattern(_) => None,
     }
@@ -66,7 +66,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         let items: Vec<_> = seq.items().collect();
         if items.is_empty() {
@@ -133,7 +133,7 @@ impl NfaBuilder<'_> {
         // The skip path makes the follower the new "first" item, so it must re-derive
         // first-position navigation rather than the sibling `Next` the match path uses.
         // This is required whenever the first item navigates to a position (`Down*` into
-        // a child, `Stay*` at an alternation branch's search candidate) instead of
+        // a child, `Stay*` at an alternative's search candidate) instead of
         // advancing to a sibling — otherwise the skip path over-advances and never binds.
         let first_positions = is_down_nav(first_pattern_nav)
             || matches!(first_pattern_nav, Some(Nav::Stay | Nav::StayExact));
@@ -159,9 +159,9 @@ impl NfaBuilder<'_> {
 
         // Scope open/close effects merge onto the boundary items to avoid extra epsilons.
         // That merge is unsound when the boundary item is skippable: its skip path drops
-        // the merged effect, unbalancing the path (e.g. EndEnum with no Enum). So a
+        // the merged effect, unbalancing the path (e.g. VariantClose without VariantOpen). So a
         // skippable boundary's *scope* effects move to a dominating epsilon every path
-        // crosses. Value effects (Node/Set/…) stay on the matched item — they need its
+        // crosses. Value effects (`Node`/`RecordSet`/…) stay on the matched item — they need its
         // cursor position and its skip-path null injection — so only scope effects move.
         let last_is_skippable = nav_modes
             .last()
@@ -209,7 +209,7 @@ impl NfaBuilder<'_> {
                 },
             };
 
-            // An anchored follower checks adjacency at its exact position, so this
+            // An anchored follower checks the gap at its exact position, so this
             // item must own a resumable search: the in-instruction candidate search
             // commits to its first match without a checkpoint and could never retry
             // at a later sibling when the anchored follower fails. Wrap it in a
@@ -226,7 +226,7 @@ impl NfaBuilder<'_> {
                     exit: current_exit,
                     nav: Some(Nav::StayExact),
                     capture: item_capture,
-                    value: false,
+                    observe_value: false,
                 };
                 let body = self.dispatch_pattern(pattern, pattern_ctx);
                 self.emit_position_search(nav, body)
@@ -235,7 +235,7 @@ impl NfaBuilder<'_> {
                     exit: current_exit,
                     nav: nav_override,
                     capture: item_capture,
-                    value: false,
+                    observe_value: false,
                 };
                 self.dispatch_pattern(pattern, pattern_ctx)
             };
@@ -248,14 +248,14 @@ impl NfaBuilder<'_> {
     }
 
     /// Compile sequence items where the first item is skippable and navigates to a
-    /// position (`Down*` into a child, or `Stay*` at an alternation branch's candidate).
+    /// position (`Down*` into a child, or `Stay*` at an alternative's candidate).
     ///
-    /// When the first item (optional/star) is skipped, the next item becomes the "first"
+    /// When the first item (`?`/`*`) is skipped, the next item becomes the "first"
     /// and must re-derive first-position navigation instead of the sibling `Next` the
     /// match path uses. This requires compiling the continuation twice.
     ///
-    /// Sequence-level scope effects (`capture`: e.g. `Enum`/`EndEnum` for an enum
-    /// variant) wrap the whole body on single dominating epsilons — open before the
+    /// Sequence-level scope effects (`capture`: e.g. `VariantOpen`/`VariantClose` for a variant
+    /// value) wrap the whole body on single dominating epsilons — open before the
     /// skippable item, close after the continuation — so they execute exactly once on
     /// both the skip and match paths. Merging them onto items instead would drop the
     /// open on the skip path (skippable first item) and leave the path unbalanced.
@@ -285,7 +285,7 @@ impl NfaBuilder<'_> {
         // prefix (`post_keep`) instead rides the sequence's last matched item — it needs
         // that item's cursor position and skip null injection, so an epsilon would capture
         // the wrong node or miss null on the skip path. Split positionally so a
-        // close and its consumer (e.g. `[EndEnum, Push]`) stay together and in order.
+        // close and its consumer (e.g. `[VariantClose, ArrayPush]`) stay together and in order.
         let tail_effects = split_sequence_tail_effects(capture.post);
         let exit_post = tail_effects.exit_post;
         let exit = self.emit_effects_if_nonempty(exit, exit_post.clone());
@@ -301,7 +301,7 @@ impl NfaBuilder<'_> {
         // path (this allows skip to bypass the Up instruction in the parent node).
         //
         // The two paths must slice `items` differently so that any anchor between the
-        // optional first item and its follower survives into `compute_nav_modes`:
+        // first `?`/`*` item and its follower survives into `compute_nav_modes`:
         //
         // - Skip path (first item absent): the anchor degrades to a leading anchor
         //   relative to the parent. Slicing *after* the first pattern keeps the
@@ -309,7 +309,7 @@ impl NfaBuilder<'_> {
         // - Match path (first item present): the follower is the first item's sibling.
         //   Slice *from* the follower (dropping the now-consumed leading anchor) and
         //   reuse the sibling navigation `compute_nav_modes` already derived for it,
-        //   which carries the anchor's adjacency (`Next*`).
+        //   which carries the anchor's gap policy (`Next*`).
         let (skip_exit, match_exit, first_post) = if nav_modes.len() < 2 {
             // The skippable item is the only (and last) item, so it carries `post_keep`.
             (
@@ -347,7 +347,7 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: first_nav,
             capture: first_post,
-            value: false,
+            observe_value: false,
         };
         let entry = self.compile_nullable_pattern(first_pattern, pattern_ctx, skip_exit);
 

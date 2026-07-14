@@ -81,7 +81,7 @@ pub enum Body {
     /// Pattern register: a node/hidden shape in query-flavored notation.
     Pattern(Shape),
     /// Type register: the visible subtype closure of a category.
-    Category(Vec<NodeRef>),
+    Category(Vec<GrammarNodeRef>),
     /// Text register: a synthesized token.
     Token(TokenText),
     /// No body (external scanner token).
@@ -95,7 +95,7 @@ pub enum Body {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Shape {
     /// A queryable position: `(identifier)`, `"+"`, or `(value#)`.
-    Node(NodeRef),
+    Node(GrammarNodeRef),
     /// An inline anonymous token with no queryable name — an extras separator or
     /// an auxiliary regex token spliced into a shape. Rendered as `/regex/`.
     Token(TokenText),
@@ -104,7 +104,7 @@ pub enum Shape {
     Splice(String),
     /// An ordered sibling sequence: `{...}`.
     Seq(Vec<Shape>),
-    /// An alternation, first match wins: `[...]`.
+    /// An alternation with source-order preference and backtracking: `[...]`.
     Choice(Vec<Shape>),
     /// A quantified shape: `?`, `*`, `+`.
     Quantified(Box<Shape>, Quant),
@@ -133,14 +133,14 @@ impl Quant {
 
 /// A reference to a node kind in a pattern: named node, anonymous node, or category.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NodeRef {
+pub struct GrammarNodeRef {
     pub name: String,
     pub named: bool,
     /// A category reference (tree-sitter supertype) — renders with a trailing `#`.
     pub category: bool,
 }
 
-impl fmt::Display for NodeRef {
+impl fmt::Display for GrammarNodeRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.category {
             write!(f, "({}#)", self.name)

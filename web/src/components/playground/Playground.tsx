@@ -33,8 +33,8 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import type { Range16 } from "./ast-index";
-import { AstView } from "./ast-view";
+import type { Range16 } from "./tree-index";
+import { TreeView } from "./tree-view";
 import { setSpotlight, spotlightExtension } from "./cm-spotlight";
 import { CodeEditor } from "./code-editor";
 import { OutputPanel, type OutputTab } from "./output-panel";
@@ -43,7 +43,7 @@ import { pushQueryFeedback } from "./query-feedback";
 import { usePlaygroundSession } from "./use-session";
 
 /* The playground shell: owns the user's inputs (query / source / lang /
-   entrypoint choice), feeds them to the session hook, and lays the panes
+   entry point choice), feeds them to the session hook, and lays the panes
    out. All engine orchestration lives in use-session.ts; all wire types in
    protocol.ts.
 
@@ -51,7 +51,7 @@ import { usePlaygroundSession } from "./use-session";
    - editor feedback: pushing each compile's diagnostics/tokens into the
      query editor;
    - cross-pane highlighting: panes report hovers upward, Playground routes
-     them to their targets (today: AST hover → source spotlight). New hover
+     them to their targets (today: tree hover → source spotlight). New hover
      edges belong here, never wired pane-to-pane — this is the seed of the
      N-way fan-out in docs/wip/playground-design.md §3. */
 
@@ -90,7 +90,7 @@ export default function Playground() {
   const [query, setQuery] = useState(initial?.q ?? DEFAULT_QUERY);
   const [source, setSource] = useState(initial?.s ?? DEFAULT_SOURCE);
   const [entryChoice, setEntryChoice] = useState<string | null>(null);
-  const [astOpen, setAstOpen] = useState(false);
+  const [treeOpen, setTreeOpen] = useState(false);
   const [outputTab, setOutputTab] = useState<OutputTab>("output");
   const {
     copied: shareCopied,
@@ -122,7 +122,7 @@ export default function Playground() {
         view,
         compiled.query,
         compiled.info.diagnostics,
-        compiled.info.tokens,
+        compiled.info.query_tokens,
       );
     }
   }, [compiled]);
@@ -150,7 +150,7 @@ export default function Playground() {
       (d) => d.severity.toLowerCase() !== "warning",
     ).length ?? 0;
   const warningCount = (compiled?.info.diagnostics.length ?? 0) - errorCount;
-  const bytecodeSize = compiled?.info.bytecode_size ?? null;
+  const bytecodeSize = compiled?.info.bytecode_size_bytes ?? null;
 
   const sourceExtensions = useMemo(
     () => [
@@ -160,10 +160,10 @@ export default function Playground() {
     [lang],
   );
 
-  /* Hovering an AST node spotlights its source range in the editor. The
+  /* Hovering a tree node spotlights its document range in the editor. The
      range is in the snapshot's coordinates; the spotlight field maps it
      through any edits made since. */
-  const handleAstHover = useCallback((src: Range16 | null) => {
+  const handleTreeHover = useCallback((src: Range16 | null) => {
     sourceViewRef.current?.dispatch({
       effects: setSpotlight.of(src === null ? null : [src]),
     });
@@ -207,17 +207,21 @@ export default function Playground() {
               </SelectGroup>
             </SelectContent>
           </Select>
-          {session.entrypoints.length > 1 && (
+          {session.entry_points.length > 1 && (
             <Select
               value={session.entry ?? ""}
               onValueChange={(v) => v && setEntryChoice(v)}
             >
-              <SelectTrigger size="sm" className="w-32" aria-label="entrypoint">
+              <SelectTrigger
+                size="sm"
+                className="w-32"
+                aria-label="entry point"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {session.entrypoints.map((name) => (
+                  {session.entry_points.map((name) => (
                     <SelectItem key={name} value={name}>
                       {name}
                     </SelectItem>
@@ -260,24 +264,27 @@ export default function Playground() {
                   </div>
                 </div>
               </ResizablePanel>
-              {astOpen && (
+              {treeOpen && (
                 <>
                   <ResizableHandle withHandle />
-                  <ResizablePanel id="ast" defaultSize="40%" minSize="15%">
+                  <ResizablePanel id="tree" defaultSize="40%" minSize="15%">
                     <div className="flex h-full min-h-0 flex-col">
-                      <AstToggle open onToggle={() => setAstOpen(false)} />
+                      <TreeToggle open onToggle={() => setTreeOpen(false)} />
                       <div className="min-h-0 flex-1 overflow-auto">
-                        <AstView ast={session.ast} onHover={handleAstHover} />
+                        <TreeView
+                          tree={session.tree}
+                          onHover={handleTreeHover}
+                        />
                       </div>
                     </div>
                   </ResizablePanel>
                 </>
               )}
             </ResizablePanelGroup>
-            {!astOpen && (
-              <AstToggle
+            {!treeOpen && (
+              <TreeToggle
                 open={false}
-                onToggle={() => setAstOpen(true)}
+                onToggle={() => setTreeOpen(true)}
                 className="border-t"
               />
             )}
@@ -378,9 +385,9 @@ function PaneLabel({ children }: { children: ReactNode }) {
   );
 }
 
-/* The same bar renders in two homes: as the AST panel's header when open,
+/* The same bar renders in two homes: as the tree panel's header when open,
    and as the last row of the source column when collapsed. */
-function AstToggle({
+function TreeToggle({
   open,
   onToggle,
   className,
@@ -405,7 +412,7 @@ function AstToggle({
       ) : (
         <ChevronRightIcon className="size-3.5" />
       )}
-      ast
+      tree
     </button>
   );
 }

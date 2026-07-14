@@ -1,0 +1,117 @@
+A = (expression_statement
+  (identifier) @id
+)? @x
+
+Q = (program
+  (A) @a
+  (debugger_statement) @d
+)
+--------------------- INPUT ----------------------
+debugger;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: A;
+  d: Node;
+}
+
+export interface A {
+  x: AX | null;
+}
+
+export interface AX {
+  id: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "a": {
+    "x": null
+  },
+  "d": {
+    "kind": "debugger_statement",
+    "text": "debugger;",
+    "span": [0, 9]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "id"
+S02 "x"
+S03 "a"
+S04 "d"
+S05 "AX"
+S06 "A"
+S07 "Q"
+S08 "expression_statement"
+S09 "identifier"
+S10 "program"
+S11 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { id }
+T2 = Option(T1)  ; AX?
+T3 = Record  M1:1  ; { x }
+T4 = Record  M2:2  ; { a, d }
+
+[type_members]
+M0: S01 → T0  ; id: <Node>
+M1: S02 → T2  ; x: T2
+M2: S03 → T3  ; a: A
+M3: S04 → T0  ; d: <Node>
+
+[type_names]
+N0: S05 → T1  ; AX
+N1: S06 → T3  ; A
+N2: S07 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@30)                            30 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  └‣─  (identifier) [Node RecordSet(M0)]  08
+  08  ─‣┘  _ [RecordClose RecordSet(M1)]    16
+  10                                        ▶
+  11  └‣─  (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  14
+  14  ─‣┘  _                                10
+  15  ...
+  16  ─‣─  (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  14
+  19  -ε-  [Absent RecordSet(M1)]           11
+  21   !   (expression_statement) [RecordOpen]  06
+  23  ...
+  24  ──!  _                                21, 24
+  26  └─!  _                                21, 24
+  28  -ε-  [RecordOpen]                     26, 19
+  30   !   (program)                        28
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@30)                            30 : 03
+       ▶   (@30)
+
+@30:
+  30       (program)                        28
+       ●   program
+  28  -ε-  [RecordOpen]                     26, 19
+  26       _                                21, 24
+       ●   debugger_statement
+  21       (expression_statement) [RecordOpen]  06
+       ○   debugger_statement
+  26  ❮❮❮ 
+  24       _                                21, 24
+  28  ❮❮❮ 
+  19  -ε-  [Absent RecordSet(M1)]           11
+  11       (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  14
+       ●   debugger_statement
+  14       _                                10
+       ●   program
+  10   ◀   (@30)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

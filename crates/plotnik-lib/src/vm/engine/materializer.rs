@@ -1,16 +1,16 @@
-//! Materializes VM effect logs into output values.
+//! Materializes committed match journals into result values.
 
-use crate::bytecode::{Entrypoint, Module};
+use crate::bytecode::{EntryPoint, Module};
 use crate::core::Colors;
 
-use super::value::{NodeHandle, Value};
+use super::value::{NodeValue, Value};
 use super::verify::debug_verify_type;
-use plotnik_rt::RuntimeEffect;
+use plotnik_rt::{JournalEvent, OutputEvents};
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
-    /// Member names resolved once, indexed by the Set/EnumOpen payload.
-    /// Kills the two-table lookup and the string-table UTF-8 walk per effect.
+    /// Member names resolved once, indexed by the `RecordSet`/`VariantOpen` payload.
+    /// Kills the two-table lookup and the string-table UTF-8 walk per event.
     member_names: Box<[&'a str]>,
 }
 
@@ -26,14 +26,14 @@ impl<'a> ValueMaterializer<'a> {
     }
 
     fn resolve_member_name(&self, idx: u16) -> &'a str {
-        // Effect payloads are validated at module load; out of bounds here is
+        // Journal event payloads are validated at module load; out of bounds here is
         // a loader bug, and the slice-index panic is the assertion.
         self.member_names[idx as usize]
     }
 }
 
-/// Materialize the effect log into a [`Value`], then check it against the
-/// entrypoint's declared type.
+/// Materialize the journal events into a [`Value`], then check it against the
+/// entry point's declared type.
 ///
 /// The type check is the trailing half of materialization, not an optional
 /// follow-up: it catches materializer/typegen drift and compiles to a no-op in
@@ -42,72 +42,72 @@ impl<'a> ValueMaterializer<'a> {
 pub fn materialize_verified<'s>(
     source: &'s str,
     module: &'s Module,
-    entrypoint: &Entrypoint,
-    effects: &[RuntimeEffect<'_>],
+    entry_point: &EntryPoint,
+    events: OutputEvents<'_, '_>,
     colors: Colors,
 ) -> Value<'s> {
     let materializer = ValueMaterializer::new(source, module);
-    let value = materializer.materialize(effects);
-    debug_verify_type(&value, entrypoint.result_type(), module, colors);
+    let value = materializer.materialize(events);
+    debug_verify_type(&value, entry_point.result_type(), module, colors);
     value
 }
 
 /// Value accumulator for stack-based materialization.
 enum ValueAccumulator<'s> {
-    Array(Vec<Value<'s>>),
-    Struct(Vec<(&'s str, Value<'s>)>),
-    Enum {
-        tag: &'s str,
+    List(Vec<Value<'s>>),
+    Record(Vec<(&'s str, Value<'s>)>),
+    Variant {
+        case: &'s str,
         fields: Vec<(&'s str, Value<'s>)>,
     },
     /// Marker into the scalar-only range stack. Keeping the marker here
     /// preserves heterogeneous frame nesting checks without making ScalarMark
-    /// scan arrays, structs, and enums.
+    /// scan lists, records, and variants.
     Scalar(usize),
 }
 
 impl ValueAccumulator<'_> {
     fn kind(&self) -> &'static str {
         match self {
-            ValueAccumulator::Array(_) => "Array",
-            ValueAccumulator::Struct(_) => "Struct",
-            ValueAccumulator::Enum { .. } => "Enum",
+            ValueAccumulator::List(_) => "List",
+            ValueAccumulator::Record(_) => "Record",
+            ValueAccumulator::Variant { .. } => "Variant",
             ValueAccumulator::Scalar(_) => "Scalar",
         }
     }
 }
 
 impl<'a> ValueMaterializer<'a> {
-    pub fn materialize(&self, effects: &[RuntimeEffect<'_>]) -> Value<'a> {
+    pub fn materialize(&self, events: OutputEvents<'_, '_>) -> Value<'a> {
         let mut stack: Vec<ValueAccumulator<'a>> = vec![];
         let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
 
-        // Pending value from Node/Null (consumed by Set/Push)
+        // Pending result value attached by `RecordSet` or `ArrayPush`.
         let mut pending: Option<Value<'a>> = None;
 
-        for (effect_idx, effect) in effects.iter().enumerate() {
-            match effect {
-                RuntimeEffect::Node(n) => {
-                    pending = Some(Value::Node(NodeHandle::from_node(*n, self.source)));
+        for (event_idx, event) in events.iter().enumerate() {
+            match event {
+                JournalEvent::Node(n) => {
+                    pending = Some(Value::Node(NodeValue::from_node(*n, self.source)));
                 }
-                RuntimeEffect::Null => {
-                    pending = Some(Value::Null);
+                JournalEvent::Absent => {
+                    pending = Some(Value::Absent);
                 }
-                RuntimeEffect::NodeStr(node) => {
-                    pending = Some(Value::Str(plotnik_rt::node_text(self.source, node)));
+                JournalEvent::NodeStr(node) => {
+                    pending = Some(Value::Text(plotnik_rt::node_text(self.source, node)));
                 }
-                RuntimeEffect::NodeBool(_) => {
+                JournalEvent::NodeBool(_) => {
                     pending = Some(Value::Bool(true));
                 }
-                RuntimeEffect::BoolValue(value) => {
+                JournalEvent::BoolValue(value) => {
                     pending = Some(Value::Bool(*value));
                 }
-                RuntimeEffect::ScalarOpen => {
+                JournalEvent::ScalarOpen => {
                     let scalar = scalar_ranges.len();
                     scalar_ranges.push(None);
                     stack.push(ValueAccumulator::Scalar(scalar));
                 }
-                RuntimeEffect::ScalarMark(node) => {
+                JournalEvent::ScalarMark(node) => {
                     let mark = node.start_byte()..node.end_byte();
                     for range in &mut scalar_ranges {
                         *range = Some(match range.take() {
@@ -118,126 +118,126 @@ impl<'a> ValueMaterializer<'a> {
                         });
                     }
                 }
-                RuntimeEffect::StrClose => {
+                JournalEvent::StrClose => {
                     let top = stack.pop();
                     let Some(ValueAccumulator::Scalar(scalar)) = top else {
                         panic!(
-                            "effect {effect_idx}: StrClose expects Scalar on stack, found {:?}",
+                            "event {event_idx}: StrClose expects Scalar on stack, found {:?}",
                             top.as_ref().map(|frame| frame.kind())
                         );
                     };
                     assert_eq!(
                         scalar + 1,
                         scalar_ranges.len(),
-                        "effect {effect_idx}: StrClose violates scalar frame nesting"
+                        "event {event_idx}: StrClose violates scalar frame nesting"
                     );
                     let range = scalar_ranges
                         .pop()
                         .expect("Scalar marker owns a range frame");
                     pending = Some(match range {
-                        Some(range) => Value::Str(plotnik_rt::source_text(self.source, range)),
-                        None => Value::Null,
+                        Some(range) => Value::Text(plotnik_rt::source_text(self.source, range)),
+                        None => Value::Absent,
                     });
                 }
-                RuntimeEffect::BoolClose(value) => {
+                JournalEvent::BoolClose(value) => {
                     let top = stack.pop();
                     let Some(ValueAccumulator::Scalar(scalar)) = top else {
                         panic!(
-                            "effect {effect_idx}: BoolClose expects Scalar on stack, found {:?}",
+                            "event {event_idx}: BoolClose expects Scalar on stack, found {:?}",
                             top.as_ref().map(|frame| frame.kind())
                         );
                     };
                     assert_eq!(
                         scalar + 1,
                         scalar_ranges.len(),
-                        "effect {effect_idx}: BoolClose violates scalar frame nesting"
+                        "event {event_idx}: BoolClose violates scalar frame nesting"
                     );
                     scalar_ranges
                         .pop()
                         .expect("Scalar marker owns a range frame");
                     pending = Some(Value::Bool(*value));
                 }
-                RuntimeEffect::SpanStart { .. } | RuntimeEffect::SpanEnd(_) => {}
-                RuntimeEffect::ArrayOpen => {
-                    stack.push(ValueAccumulator::Array(vec![]));
+                JournalEvent::SpanStart { .. } | JournalEvent::SpanEnd(_) => {}
+                JournalEvent::ListOpen => {
+                    stack.push(ValueAccumulator::List(vec![]));
                 }
-                RuntimeEffect::Push => {
+                JournalEvent::ArrayPush => {
                     let val = pending
                         .take()
-                        .expect("Push requires a produced value (verified at load)");
-                    let Some(ValueAccumulator::Array(arr)) = stack.last_mut() else {
+                        .expect("ArrayPush requires a produced value (verified at load)");
+                    let Some(ValueAccumulator::List(items)) = stack.last_mut() else {
                         panic!(
-                            "effect {effect_idx}: Push expects Array on stack, found {:?}",
+                            "event {event_idx}: ArrayPush expects List on stack, found {:?}",
                             stack.last().map(|b| b.kind())
                         );
                     };
-                    arr.push(val);
+                    items.push(val);
                 }
-                RuntimeEffect::ArrayClose => {
+                JournalEvent::ListClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Array(arr)) = top else {
+                    let Some(ValueAccumulator::List(items)) = top else {
                         panic!(
-                            "effect {effect_idx}: ArrayClose expects Array on stack, found {:?}",
+                            "event {event_idx}: ListClose expects List on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    pending = Some(Value::Array(arr));
+                    pending = Some(Value::List(items));
                 }
-                RuntimeEffect::StructOpen => {
-                    stack.push(ValueAccumulator::Struct(vec![]));
+                JournalEvent::RecordOpen => {
+                    stack.push(ValueAccumulator::Record(vec![]));
                 }
-                RuntimeEffect::Set(idx) => {
+                JournalEvent::RecordSet(idx) => {
                     let field_name = self.resolve_member_name(*idx);
                     let val = pending
                         .take()
-                        .expect("Set requires a produced value (verified at load)");
+                        .expect("RecordSet requires a produced value (verified at load)");
                     match stack.last_mut() {
-                        Some(ValueAccumulator::Struct(fields)) => fields.push((field_name, val)),
-                        Some(ValueAccumulator::Enum { fields, .. }) => {
+                        Some(ValueAccumulator::Record(fields)) => fields.push((field_name, val)),
+                        Some(ValueAccumulator::Variant { fields, .. }) => {
                             fields.push((field_name, val))
                         }
                         other => panic!(
-                            "effect {effect_idx}: Set expects Struct/Enum on stack, found {:?}",
+                            "event {event_idx}: RecordSet expects Record/Variant on stack, found {:?}",
                             other.map(|b| b.kind())
                         ),
                     }
                 }
-                RuntimeEffect::StructClose => {
+                JournalEvent::RecordClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Struct(fields)) = top else {
+                    let Some(ValueAccumulator::Record(fields)) = top else {
                         panic!(
-                            "effect {effect_idx}: StructClose expects Struct on stack, found {:?}",
+                            "event {event_idx}: RecordClose expects Record on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    pending = Some(Value::Struct(fields));
+                    pending = Some(Value::Record(fields));
                 }
-                RuntimeEffect::EnumOpen(idx) => {
-                    let tag = self.resolve_member_name(*idx);
-                    stack.push(ValueAccumulator::Enum {
-                        tag,
+                JournalEvent::VariantOpen(idx) => {
+                    let case = self.resolve_member_name(*idx);
+                    stack.push(ValueAccumulator::Variant {
+                        case,
                         fields: vec![],
                     });
                 }
-                RuntimeEffect::EnumClose => {
+                JournalEvent::VariantClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Enum { tag, fields }) = top else {
+                    let Some(ValueAccumulator::Variant { case, fields }) = top else {
                         panic!(
-                            "effect {effect_idx}: EnumClose expects Enum on stack, found {:?}",
+                            "event {event_idx}: VariantClose expects Variant on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    let data = match (pending.take(), fields.is_empty()) {
+                    let payload = match (pending.take(), fields.is_empty()) {
                         (Some(v), true) => Some(Box::new(v)),
-                        (None, false) => Some(Box::new(Value::Struct(fields))),
+                        (None, false) => Some(Box::new(Value::Record(fields))),
                         (None, true) => None,
                         (Some(_), false) => {
                             panic!(
-                                "enum payload arrived both as pending value and as direct fields"
+                                "variant payload arrived both as pending value and as direct fields"
                             )
                         }
                     };
-                    pending = Some(Value::Enum { tag, data });
+                    pending = Some(Value::Variant { case, payload });
                 }
             }
         }
@@ -250,6 +250,6 @@ impl<'a> ValueMaterializer<'a> {
             scalar_ranges.is_empty(),
             "unclosed scalar frames after materialization"
         );
-        pending.unwrap_or(Value::Null)
+        pending.unwrap_or(Value::Absent)
     }
 }

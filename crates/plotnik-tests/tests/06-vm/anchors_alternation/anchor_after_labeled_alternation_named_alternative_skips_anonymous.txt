@@ -1,0 +1,104 @@
+Q = (program
+  (expression_statement
+    (binary_expression
+      [
+        A: (number)
+        B: "+"
+      ] @t
+      .
+      (identifier)
+    )
+  )
+)
+--------------------- INPUT ----------------------
+5 * x
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  t: QT;
+}
+
+export type QT =
+  | { $tag: "A" }
+  | { $tag: "B" };
+--------------------- OUTPUT ---------------------
+{
+  "t": {
+    "$tag": "A"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "A"
+S02 "B"
+S03 "t"
+S04 "QT"
+S05 "Q"
+S06 "program"
+S07 "expression_statement"
+S08 "binary_expression"
+S09 "number"
+S10 "+"
+S11 "identifier"
+
+[type_defs]
+T0 = <NoValue>
+T1 = Variant M0:2  ; A | B
+T2 = Record  M2:1  ; { t }
+
+[type_members]
+M0: S01 → T0  ; A: <NoValue>
+M1: S02 → T0  ; B: <NoValue>
+M2: S03 → T1  ; t: QT
+
+[type_names]
+N0: S04 → T1  ; QT
+N1: S05 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─◦─  (identifier) [RecordSet(M2)]     07
+  10  ─•─  (identifier) [RecordSet(M2)]     07
+  12   !   (number) [VariantOpen(M0) VariantClose]  10
+  14   !   "+" [VariantOpen(M1) VariantClose]  08
+  16  ──!  _                                12, 14, 16
+  18  └─!  _                                12, 14, 16
+  20  └‣─  (binary_expression)              18
+  21  └‣─  (expression_statement)           20
+  22   !   (program)                        21
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@22)                            22 : 03
+       ▶   (@22)
+
+@22:
+  22       (program)                        21
+       ●   program
+  21       (expression_statement)           20
+       ●   expression_statement
+  20       (binary_expression)              18
+       ●   binary_expression
+  18       _                                12, 14, 16
+       ●   number
+  12       (number) [VariantOpen(M0) VariantClose]  10
+       ●   number
+  10       (identifier) [RecordSet(M2)]     07
+       ○   *
+       ●   identifier
+  07       _                                06
+       ●   program
+  06   ◀   (@22)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

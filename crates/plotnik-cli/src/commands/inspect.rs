@@ -2,10 +2,10 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::bytecode::{Module, SPAN_NO_BINDING};
+use plotnik_lib::bytecode::{Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
-    BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RecordingTracer,
-    RuntimeError, RuntimeLimitSpec, TypeScriptCodegenConfig, VM, extract_inspection,
+    BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RuntimeError,
+    RuntimeLimitSpec, TraceRecorder, TypeScriptCodegenConfig, VM, extract_result_provenance,
     materialize_verified, tokenize,
 };
 use serde_json::{Map, Value, json};
@@ -60,7 +60,7 @@ pub fn run(args: InspectArgs) -> CliResult {
         .iter()
         .next()
         .expect("non-empty query has a source");
-    let tokens = tokenize(source.content);
+    let query_tokens = tokenize(source.content);
     let declared_lang = loaded.shebang.lang.clone();
     let shebang_entry = loaded.shebang.entry.clone();
 
@@ -83,7 +83,7 @@ pub fn run(args: InspectArgs) -> CliResult {
         .emit_types(TypeScriptCodegenConfig::new().colored(false))
         .map_err(|error| CliError::fatal(error.to_string()))?;
     let type_diagnostics = types.diagnostics().clone();
-    let (dts, dts_map) = types
+    let (typescript_declarations, typescript_bindings) = types
         .into_artifact()
         .map(|output| output.into_parts())
         .unwrap_or_else(|| (String::new(), Vec::new()));
@@ -96,20 +96,20 @@ pub fn run(args: InspectArgs) -> CliResult {
     let diagnostics_have_errors = diagnostics.has_errors();
     let diagnostics = diagnostics.to_wire(compiled.source_map());
     let module = bytecode.into_artifact();
-    let spans = module
+    let query_spans = module
         .as_ref()
-        .map(spans_json)
+        .map(query_spans_json)
         .unwrap_or_else(|| Value::Array(Vec::new()));
-    let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
+    let entry_points = module.as_ref().map(entry_point_names).unwrap_or_default();
 
     let run = if let Some(module) = module.as_ref() {
-        let default_entry = module.entrypoint_names().last().map(str::to_owned);
+        let default_entry = module.entry_point_names().last().map(str::to_owned);
         let entry = args.entry.clone().or(shebang_entry).or(default_entry);
-        let entrypoint = run_common::resolve_entrypoint(module, entry.as_deref())?;
+        let entry_point = run_common::resolve_entry_point(module, entry.as_deref())?;
         let tree = lang.parse_source(&source_code);
         run_module(
             module,
-            &entrypoint,
+            &entry_point,
             &source_code,
             &tree,
             args.limits,
@@ -120,12 +120,12 @@ pub fn run(args: InspectArgs) -> CliResult {
     };
 
     let bundle = bundle_json(BundleParts {
-        spans,
-        tokens: json_value!(tokens),
+        query_spans,
+        query_tokens: json_value!(query_tokens),
         diagnostics: json_value!(diagnostics),
-        dts,
-        dts_map: json_value!(dts_map),
-        entrypoints: json_value!(entrypoints),
+        typescript_declarations,
+        typescript_bindings: json_value!(typescript_bindings),
+        entry_points: json_value!(entry_points),
         run: &run,
     });
 
@@ -146,28 +146,37 @@ pub fn run(args: InspectArgs) -> CliResult {
 }
 
 struct BundleParts<'a> {
-    spans: Value,
-    tokens: Value,
+    query_spans: Value,
+    query_tokens: Value,
     diagnostics: Value,
-    dts: String,
-    dts_map: Value,
-    entrypoints: Value,
+    typescript_declarations: String,
+    typescript_bindings: Value,
+    entry_points: Value,
     run: &'a RunPayload,
 }
 
 fn bundle_json(parts: BundleParts<'_>) -> Value {
     let mut object = Map::new();
-    object.insert("v".to_string(), json!(1));
-    object.insert("spans".to_string(), parts.spans);
-    object.insert("tokens".to_string(), parts.tokens);
+    object.insert("version".to_string(), json!(1));
+    object.insert("query_spans".to_string(), parts.query_spans);
+    object.insert("query_tokens".to_string(), parts.query_tokens);
     object.insert("diagnostics".to_string(), parts.diagnostics);
-    object.insert("dts".to_string(), Value::String(parts.dts));
-    object.insert("dts_map".to_string(), parts.dts_map);
-    object.insert("entrypoints".to_string(), parts.entrypoints);
-    object.insert("value".to_string(), parts.run.value.clone());
-    object.insert("inspection".to_string(), parts.run.inspection.clone());
-    object.insert("stats".to_string(), parts.run.stats.clone());
-    object.insert("trace".to_string(), parts.run.trace.clone());
+    object.insert(
+        "typescript_declarations".to_string(),
+        Value::String(parts.typescript_declarations),
+    );
+    object.insert("typescript_bindings".to_string(), parts.typescript_bindings);
+    object.insert("entry_points".to_string(), parts.entry_points);
+    object.insert("result".to_string(), parts.run.result.clone());
+    object.insert(
+        "result_provenance".to_string(),
+        parts.run.result_provenance.clone(),
+    );
+    object.insert("run_stats".to_string(), parts.run.run_stats.clone());
+    object.insert(
+        "execution_trace".to_string(),
+        parts.run.execution_trace.clone(),
+    );
     if let Some(error) = &parts.run.error {
         object.insert("error".to_string(), error.clone());
     }
@@ -176,7 +185,7 @@ fn bundle_json(parts: BundleParts<'_>) -> Value {
 
 fn run_module(
     module: &Module,
-    entrypoint: &plotnik_lib::bytecode::Entrypoint,
+    entry_point: &plotnik_lib::bytecode::EntryPoint,
     source_code: &str,
     tree: &tree_sitter::Tree,
     limits: RuntimeLimitSpec,
@@ -184,63 +193,68 @@ fn run_module(
 ) -> RunPayload {
     let vm = VM::builder(source_code, tree).limits(limits).build();
     if trace {
-        let mut tracer = RecordingTracer::new(module, DEFAULT_MAX_RECORDS);
-        let (result, stats) = vm.execute_with_stats(module, entrypoint, &mut tracer);
-        let recording = tracer.finish();
+        let mut tracer = TraceRecorder::new(module, DEFAULT_MAX_RECORDS);
+        let (result, stats) = vm.execute_with_stats(module, entry_point, &mut tracer);
+        let execution_trace = tracer.finish();
         return run_payload_from_result(
             module,
-            entrypoint,
+            entry_point,
             source_code,
             (result, stats),
-            Some(json_value!(recording)),
+            Some(json_value!(execution_trace)),
         );
     }
 
     let mut tracer = NoopTracer;
-    let (result, stats) = vm.execute_with_stats(module, entrypoint, &mut tracer);
-    run_payload_from_result(module, entrypoint, source_code, (result, stats), None)
+    let (result, stats) = vm.execute_with_stats(module, entry_point, &mut tracer);
+    run_payload_from_result(module, entry_point, source_code, (result, stats), None)
 }
 
 fn run_payload_from_result(
     module: &Module,
-    entrypoint: &plotnik_lib::bytecode::Entrypoint,
+    entry_point: &plotnik_lib::bytecode::EntryPoint,
     source_code: &str,
     result: (
-        Result<plotnik_lib::EffectLog<'_>, RuntimeError>,
+        Result<plotnik_lib::MatchJournal<'_>, RuntimeError>,
         plotnik_lib::RunStats,
     ),
-    trace: Option<Value>,
+    execution_trace: Option<Value>,
 ) -> RunPayload {
     let (result, stats) = result;
     match result {
-        Ok(effects) => {
+        Ok(journal) => {
             let colors = Colors::new(false);
-            let value =
-                materialize_verified(source_code, module, entrypoint, effects.as_slice(), colors);
-            let inspection = (!module.spans().is_empty())
-                .then(|| extract_inspection(effects.as_slice(), module));
+            let result = materialize_verified(
+                source_code,
+                module,
+                entry_point,
+                journal.output_events(),
+                colors,
+            );
+            let result_provenance =
+                (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, module));
             RunPayload {
-                value: json_value!(value),
-                inspection: json_value!(inspection),
-                stats: json_value!(stats),
-                trace: trace.unwrap_or(Value::Null),
+                result: json_value!(result),
+                result_provenance: json_value!(result_provenance),
+                run_stats: json_value!(stats),
+                execution_trace: execution_trace.unwrap_or(Value::Null),
                 error: None,
                 exit: InspectExit::Ok,
             }
         }
         Err(RuntimeError::NoMatch) => RunPayload {
-            value: Value::Null,
-            inspection: Value::Null,
-            stats: Value::Null,
-            trace: trace.unwrap_or(Value::Null),
+            result: Value::Null,
+            result_provenance: Value::Null,
+            run_stats: Value::Null,
+            execution_trace: execution_trace.unwrap_or(Value::Null),
             error: Some(Value::String("no match".to_string())),
             exit: InspectExit::NoMatch,
         },
         Err(error) => RunPayload {
-            value: Value::Null,
-            inspection: Value::Null,
-            stats: Value::Null,
-            trace: trace.unwrap_or(Value::Null),
+            result: Value::Null,
+            result_provenance: Value::Null,
+            run_stats: Value::Null,
+            execution_trace: execution_trace.unwrap_or(Value::Null),
             error: Some(runtime_error_value(&error)),
             exit: InspectExit::RuntimeError,
         },
@@ -248,10 +262,10 @@ fn run_payload_from_result(
 }
 
 struct RunPayload {
-    value: Value,
-    inspection: Value,
-    stats: Value,
-    trace: Value,
+    result: Value,
+    result_provenance: Value,
+    run_stats: Value,
+    execution_trace: Value,
     error: Option<Value>,
     exit: InspectExit,
 }
@@ -259,10 +273,10 @@ struct RunPayload {
 impl RunPayload {
     fn not_run() -> Self {
         Self {
-            value: Value::Null,
-            inspection: Value::Null,
-            stats: Value::Null,
-            trace: Value::Null,
+            result: Value::Null,
+            result_provenance: Value::Null,
+            run_stats: Value::Null,
+            execution_trace: Value::Null,
             error: None,
             exit: InspectExit::Ok,
         }
@@ -276,36 +290,57 @@ enum InspectExit {
     RuntimeError,
 }
 
-fn spans_json(module: &Module) -> Value {
+fn query_spans_json(module: &Module) -> Value {
     let spans = module
         .spans()
         .iter()
         .enumerate()
-        .map(|(id, span)| {
-            json!({
-                "id": id,
-                "source": span.source,
-                "kind": span.kind.name(),
-                "start": span.start,
-                "end": span.end,
-                "type": binding_value(span.type_id),
-                "member": binding_value(span.member),
-            })
-        })
+        .map(|(id, span)| query_span_json(id, span))
         .collect::<Vec<_>>();
     Value::Array(spans)
 }
 
-fn binding_value(value: u16) -> Value {
-    if value == SPAN_NO_BINDING {
-        Value::Null
-    } else {
-        json!(value)
+fn query_span_json(id: usize, span: SpanEntry) -> Value {
+    let (kind, labeling) = query_span_kind(span.kind);
+    let mut object = Map::new();
+    object.insert("id".to_string(), json!(id));
+    object.insert("source_id".to_string(), json!(span.source_id));
+    object.insert("kind".to_string(), json!(kind));
+    if let Some(labeling) = labeling {
+        object.insert("labeling".to_string(), json!(labeling));
+    }
+    object.insert("span".to_string(), json!([span.start, span.end]));
+    if span.type_id != SPAN_NO_BINDING {
+        let mut binding = Map::new();
+        binding.insert("type_id".to_string(), json!(span.type_id));
+        if span.member != SPAN_NO_BINDING {
+            binding.insert("member_id".to_string(), json!(span.member));
+        }
+        object.insert("binding".to_string(), Value::Object(binding));
+    }
+    Value::Object(object)
+}
+
+fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
+    match kind {
+        SpanKind::Def => ("definition", None),
+        SpanKind::Ref => ("reference", None),
+        SpanKind::Pattern => ("pattern", None),
+        SpanKind::Capture => ("capture", None),
+        SpanKind::GrammarField => ("grammar_field", None),
+        SpanKind::NegatedGrammarField => ("negated_grammar_field", None),
+        SpanKind::Predicate => ("predicate", None),
+        SpanKind::Quantifier => ("quantifier", None),
+        SpanKind::Sequence => ("sequence", None),
+        SpanKind::Alternation(Labeling::Unlabeled) => ("alternation", Some("unlabeled")),
+        SpanKind::Alternation(Labeling::Labeled) => ("alternation", Some("labeled")),
+        SpanKind::Alternative => ("alternative", None),
+        SpanKind::CaptureType => ("capture_type", None),
     }
 }
 
-fn entrypoint_names(module: &Module) -> Vec<String> {
-    module.entrypoint_names().map(str::to_string).collect()
+fn entry_point_names(module: &Module) -> Vec<String> {
+    module.entry_point_names().map(str::to_string).collect()
 }
 
 fn runtime_error_value(error: &RuntimeError) -> Value {
@@ -316,22 +351,22 @@ fn runtime_error_value(error: &RuntimeError) -> Value {
 fn print_summary(bundle: &Value, color: bool) {
     let colors = Colors::new(color);
     let span_count = bundle
-        .get("spans")
+        .get("query_spans")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
-    let entrypoints = bundle
-        .get("entrypoints")
+    let entry_points = bundle
+        .get("entry_points")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
-    println!("spans: {span_count}");
-    println!("entrypoints: {entrypoints}");
+    println!("query spans: {span_count}");
+    println!("entry points: {entry_points}");
     if let Some(error) = bundle.get("error") {
         eprintln!("error: {error}");
     }
-    if let Some(value) = bundle.get("value")
-        && !value.is_null()
+    if let Some(result) = bundle.get("result")
+        && !result.is_null()
     {
-        println!("value: {}", value);
+        println!("result: {}", result);
     }
     if let Some(diagnostics) = bundle.get("diagnostics").and_then(Value::as_array)
         && !diagnostics.is_empty()

@@ -1,0 +1,15 @@
+Q = (array
+  .!
+  (identifier)*
+)
+------------------ DIAGNOSTICS -------------------
+error: with the exact anchor (`.!`), no `array` places this child first; an `array` begins with `"["`
+ --> query.ptk:1:6
+  |
+1 | Q = (array
+  |      ^^^^^
+  |
+help: `.!` allows no syntax-tree node in its gap — not even an anonymous token or comment; the soft anchor `.` skips those: `(array
+        .
+        (identifier)*
+      )`

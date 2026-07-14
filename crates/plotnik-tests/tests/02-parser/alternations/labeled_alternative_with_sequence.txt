@@ -1,0 +1,48 @@
+Q = [
+  Pair: {
+    (key)
+    (value)
+  }
+  Single: (value)
+]
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alternation
+      BracketOpen "["
+      Alternative
+        Id "Pair"
+        Colon ":"
+        Sequence
+          BraceOpen "{"
+          NamedNode
+            ParenOpen "("
+            Id "key"
+            ParenClose ")"
+          NamedNode
+            ParenOpen "("
+            Id "value"
+            ParenClose ")"
+          BraceClose "}"
+      Alternative
+        Id "Single"
+        Colon ":"
+        NamedNode
+          ParenOpen "("
+          Id "value"
+          ParenClose ")"
+      BracketClose "]"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    Alternation
+      Alternative Pair:
+        Seq
+          NamedNode key
+          NamedNode value
+      Alternative Single:
+        NamedNode value

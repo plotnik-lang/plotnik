@@ -12,39 +12,41 @@ teaching commands such as `plotnik dump`.
 - **Alignment**: Sections start on 64-byte boundaries; internal structures align to natural size (2/4/8 bytes)
 - **Sequential**: Fixed order for single-pass writing
 - **Endianness**: Little-endian throughout
-- **Limits**: All indices u16 (max 65,535). Transitions: 512 KB max. Use `Call` to share patterns.
+- **Limits**: All indices are `u16` (max 65,535). Instructions occupy at most
+  65,535 bytecode words, just under 512 KiB. Use `Call` to share patterns.
 
 ### Addressing
 
-| Type                | Description                      |
-| ------------------- | -------------------------------- |
-| `StepId` (u16)      | 8-byte step index in Transitions |
-| `StringId` (u16)    | String Table index               |
-| `TypeId` (u16)      | Type Definition index            |
-| `NodeKindId` (u16)  | Tree-sitter node kind ID         |
-| `NodeFieldId` (u16) | Tree-sitter field ID             |
-| `RegexId` (u16)     | Regex Table index                |
-| `SpanId` (u16)      | Spans section index              |
+| Type                  | Description                                               |
+| --------------------- | --------------------------------------------------------- |
+| `CodeAddr` (u16)      | Bytecode-word address; zero is a valid address            |
+| `SuccessorAddr` (u16) | Encoded non-terminal successor; zero is not representable |
+| `StringId` (u16)      | String Table index                                        |
+| `TypeId` (u16)        | Type Definition index                                     |
+| `NodeKindId` (u16)    | Tree-sitter node kind ID                                  |
+| `NodeFieldId` (u16)   | Tree-sitter field ID                                      |
+| `RegexId` (u16)       | Regex Table index                                         |
+| `SpanId` (u16)        | Spans section index                                       |
 
 ## Section Layout
 
 Sections appear in fixed order, each starting on a 64-byte boundary:
 
-| #   | Section       | Record Size | Count Source            |
-| --- | ------------- | ----------- | ----------------------- |
-| 0   | Header        | 64 bytes    | (fixed)                 |
-| 1   | [StringBlob]  | 1           | `str_blob_size`         |
-| 2   | [RegexBlob]   | 1           | `regex_blob_size`       |
-| 3   | [StringTable] | 4           | `str_table_count + 1`   |
-| 4   | [RegexTable]  | 8           | `regex_table_count + 1` |
-| 5   | [NodeKinds]   | 4           | `node_kinds_count`      |
-| 6   | [NodeFields]  | 4           | `node_fields_count`     |
-| 7   | [TypeDefs]    | 4           | `type_defs_count`       |
-| 8   | [TypeMembers] | 4           | `type_members_count`    |
-| 9   | [TypeNames]   | 4           | `type_names_count`      |
-| 10  | [Entrypoints] | 8           | `entrypoints_count`     |
-| 11  | [Transitions] | 8           | `transitions_count`     |
-| 12  | [Spans]       | 16          | `spans_count`           |
+| #   | Section        | Record Size | Count Source             |
+| --- | -------------- | ----------- | ------------------------ |
+| 0   | Header         | 64 bytes    | (fixed)                  |
+| 1   | [StringBlob]   | 1           | `str_blob_size`          |
+| 2   | [RegexBlob]    | 1           | `regex_blob_size`        |
+| 3   | [StringTable]  | 4           | `str_table_count + 1`    |
+| 4   | [RegexTable]   | 8           | `regex_table_count + 1`  |
+| 5   | [NodeKinds]    | 4           | `node_kinds_count`       |
+| 6   | [NodeFields]   | 4           | `node_fields_count`      |
+| 7   | [TypeDefs]     | 4           | `type_defs_count`        |
+| 8   | [TypeMembers]  | 4           | `type_members_count`     |
+| 9   | [TypeNames]    | 4           | `type_names_count`       |
+| 10  | [Entry points] | 8           | `entry_points_count`     |
+| 11  | [Instructions] | 8           | `instruction_word_count` |
+| 12  | [Spans]        | 16          | `spans_count`            |
 
 [StringBlob]: 02-strings.md
 [StringTable]: 02-strings.md
@@ -55,8 +57,8 @@ Sections appear in fixed order, each starting on a 64-byte boundary:
 [TypeDefs]: 04-types.md
 [TypeMembers]: 04-types.md
 [TypeNames]: 04-types.md
-[Entrypoints]: 05-entrypoints.md
-[Transitions]: 06-transitions.md
+[Entry points]: 05-entry-points.md
+[Instructions]: 06-instructions.md
 [Spans]: 07-spans.md
 
 ### Sentinel Pattern
@@ -98,8 +100,8 @@ struct Header {
     type_defs_count: u16,
     type_members_count: u16,
     type_names_count: u16,
-    entrypoints_count: u16,
-    transitions_count: u16,
+    entry_points_count: u16,
+    instruction_word_count: u16,
 
     // Bytes 42-43: spans_count
     spans_count: u16,
@@ -130,30 +132,30 @@ checks uphold the no-panic guarantee. Validation runs in this order:
    end exactly at their blob length; string slices must be valid UTF-8.
 6. **Regex DFAs** — every real regex entry's serialized sparse DFA must
    deserialize, so the VM's per-evaluation deserialize is a sound invariant.
-7. **TypeDefs** — each kind byte must be known, and every Struct/Enum member range
+7. **TypeDefs** — each kind byte must be known, and every Record/Variant member range
    (`data + count`) must stay within `type_members_count`.
 8. **Spans** — each span entry has a known kind, zero flags, `start <= end`, and
    type/member bindings that are either `0xFFFF` or in range (a live member with
-   no type is rejected). Span effect payloads in transitions must address this
+   no type is rejected). Span effect payloads in the instruction stream must address this
    table.
-9. **String IDs** — every _required_ embedded `StringId` (entrypoint, node/field
+9. **String IDs** — every _required_ embedded `StringId` (entry point, node/field
    symbol, type, member, and regex pattern names) must address a real string-table
    entry (`1..str_table_count`), so the `NonZeroU16` accessors never panic.
-10. **Transitions** — the instruction stream is walked twice. Pass 1 decodes each
+10. **Instructions** — the instruction stream is walked twice. Pass 1 decodes each
     instruction's fixed-size slot, validating opcode, segment, nav, node kind,
-    effect opcodes, `Set`/`EnumOpen` member operands, and predicate operands, and
+    effect opcodes, `RecordSet`/`VariantOpen` member operands, and predicate operands, and
     rejecting any zero successor; it records each instruction start and must tile
     the section exactly. Pass 2 requires every jump target (successor, call
     next/target) to land on a recorded instruction start. This
-    makes every lazy `decode_step` / view / materializer access panic-free.
-11. **Entrypoints** — each `target` must land on a recorded instruction start
-    (not merely in range — an entrypoint into the interior of a multi-step
+    makes every lazy `decode_instruction` / view / materializer access panic-free.
+11. **Entry points** — each `target` must land on a recorded instruction start
+    (not merely in range — an entry point into the interior of a multi-word
     instruction would start decoding mid-instruction) and `result_type` must
     address a real TypeDef.
 12. **Effect stack** — an interprocedural walk of the committed-effect order
     (across `Call`/`Return`, under the suppression filter) proves no path can
-    drive the materializer's builder stack (`Push`/`Set`/`ArrayClose`/
-    `StructClose`/`EnumClose`), the VM's suppression counter, or the inspection
+    drive the materializer's builder stack (`ArrayPush`/`RecordSet`/`ListClose`/
+    `RecordClose`/`VariantClose`), the VM's suppression counter, or the inspection
     span bracket stack into a panic.
     This closes the last malformed-representation panic class — the materializer's
     builder-stack panics and the VM's `SuppressEnd` underflow — that

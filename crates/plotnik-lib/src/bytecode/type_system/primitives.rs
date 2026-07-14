@@ -3,14 +3,14 @@
 //! These are the fundamental types that exist in every query,
 //! with fixed indices 0 through 3 reserved across analysis and bytecode.
 
-/// Index for the Void type (produces nothing).
-pub const TYPE_VOID: u16 = 0;
+/// Index for the no-value sentinel.
+pub const TYPE_NO_VALUE: u16 = 0;
 
-/// Index for the Node type (tree-sitter AST node reference).
+/// Index for the Node type (Tree-sitter node reference).
 pub const TYPE_NODE: u16 = 1;
 
 /// Index for borrowed source text.
-pub const TYPE_STR: u16 = 2;
+pub const TYPE_TEXT: u16 = 2;
 
 /// Index for boolean values.
 pub const TYPE_BOOL: u16 = 3;
@@ -18,16 +18,16 @@ pub const TYPE_BOOL: u16 = 3;
 /// First index available for user-defined/composite types.
 pub const TYPE_CUSTOM_START: u16 = 4;
 
-/// Builtin scalar types; no additional metadata in the type table.
+/// Builtin primitive types; no additional metadata in the type table.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]
 pub enum PrimitiveType {
-    /// Produces nothing, transparent to parent scope.
-    Void = TYPE_VOID,
-    /// A tree-sitter AST node reference.
+    /// Successful matching that produces no value.
+    NoValue = TYPE_NO_VALUE,
+    /// A Tree-sitter node reference.
     Node = TYPE_NODE,
     /// Borrowed source text.
-    Str = TYPE_STR,
+    Text = TYPE_TEXT,
     /// Boolean value.
     Bool = TYPE_BOOL,
 }
@@ -37,9 +37,9 @@ impl PrimitiveType {
     #[inline]
     pub fn from_index(index: u16) -> Option<Self> {
         match index {
-            TYPE_VOID => Some(Self::Void),
+            TYPE_NO_VALUE => Some(Self::NoValue),
             TYPE_NODE => Some(Self::Node),
-            TYPE_STR => Some(Self::Str),
+            TYPE_TEXT => Some(Self::Text),
             TYPE_BOOL => Some(Self::Bool),
             _ => None,
         }
@@ -60,9 +60,9 @@ impl PrimitiveType {
     /// Get the display name for this primitive (for bytecode dumps).
     pub const fn name(self) -> &'static str {
         match self {
-            Self::Void => "Void",
+            Self::NoValue => "NoValue",
             Self::Node => "Node",
-            Self::Str => "Str",
+            Self::Text => "Text",
             Self::Bool => "Bool",
         }
     }

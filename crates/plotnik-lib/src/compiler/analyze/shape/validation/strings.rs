@@ -8,11 +8,11 @@ use rowan::{TextRange, TextSize};
 
 use super::ValidationInput;
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern};
+use crate::compiler::analyze::visitor::{Visitor, walk_named_node_pattern};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast::{NodePattern, TokenPattern};
+use crate::compiler::parse::ast::{AnonymousNodePattern, NamedNodePattern};
 use crate::compiler::parse::cst::SyntaxToken;
 use crate::compiler::parse::strings::{EscapeIssueKind, unescape};
 
@@ -32,16 +32,16 @@ struct StringValidator<'d> {
 }
 
 impl Visitor for StringValidator<'_> {
-    fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
+    fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
         if let Some(pred) = node.node().predicate()
             && let Some(value) = pred.string_value()
         {
             self.check_token(&value);
         }
-        walk_node_pattern(self, node);
+        walk_named_node_pattern(self, node);
     }
 
-    fn visit_token_pattern(&mut self, node: &Located<TokenPattern>) {
+    fn visit_anonymous_node_pattern(&mut self, node: &Located<AnonymousNodePattern>) {
         if let Some(value) = node.node().value() {
             self.check_token(&value);
         }

@@ -1,0 +1,57 @@
+Q = (function_declaration
+  (decorator)?? @dec
+)
+---------------------- NFA -----------------------
+[entry_points]
+Q = 13
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (function_declaration)           04, 08
+  03  ─‣┘  _                                01
+  04  -ε-  [Absent RecordSet(dec)]          01
+  05   !   (decorator) [Node RecordSet(dec)]  03
+  07  ──!  _                                05, 07
+  08  └─!  _                                05, 07
+
+Q (entry point):
+  10                                        ▶
+  11  -ε-  [RecordClose]                    10
+  12       (Q)                              02 : 11
+  13  -ε-  [RecordOpen]                     12
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "dec"
+S2 "Q"
+S3 "function_declaration"
+S4 "decorator"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { dec }
+
+[type_members]
+M0: S1 → T1  ; dec: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06   !   (decorator) [Node RecordSet(M0)]  08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10  -ε-  [Absent RecordSet(M0)]           09
+  12  ──!  _                                06, 12
+  14  └─!  _                                06, 12
+  16   !   (function_declaration)           10, 14

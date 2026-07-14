@@ -2,18 +2,15 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use crate::compiler::parse::ast::Branch;
+use crate::compiler::parse::ast::Alternative;
 
 #[inline]
-pub fn ensure_both_branch_kinds<'a>(
-    first_enum: Option<&'a Branch>,
-    first_union: Option<&'a Branch>,
-) -> (&'a Branch, &'a Branch) {
-    match (first_enum, first_union) {
+pub fn ensure_both_labeling_kinds<'a>(
+    first_labeled: Option<&'a Alternative>,
+    first_unlabeled: Option<&'a Alternative>,
+) -> (&'a Alternative, &'a Alternative) {
+    match (first_labeled, first_unlabeled) {
         (Some(t), Some(u)) => (t, u),
-        _ => panic!(
-            "alt_kind: Mixed alternation without both enum and union branches \
-             (classify_alt returns Mixed only when both are present)"
-        ),
+        _ => panic!("mixed labeling without both labeled and unlabeled alternatives"),
     }
 }

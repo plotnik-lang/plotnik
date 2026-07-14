@@ -1,6 +1,6 @@
 //! Bytecode module with unified storage.
 //!
-//! [`Module`] holds compiled bytecode plus a pre-decoded transition stream.
+//! [`Module`] holds compiled bytecode plus a pre-decoded instruction stream.
 //! Construction remains crate-private so only compiler output can cross the
 //! checked loader boundary.
 
@@ -14,7 +14,8 @@ use super::sections::SymbolNameEntry;
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    BYTECODE_WORD_SIZE, CodeAddr, EntryPoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE,
+    STRING_TABLE_ENTRY_SIZE,
 };
 use plotnik_rt::RegexDfas;
 
@@ -79,7 +80,7 @@ pub enum Instruction<'a> {
 impl<'a> Instruction<'a> {
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        debug_assert!(bytes.len() >= STEP_SIZE, "instruction too short");
+        debug_assert!(bytes.len() >= BYTECODE_WORD_SIZE, "instruction too short");
 
         let opcode = header_byte::opcode(bytes[0]).expect("invalid opcode");
         match opcode {
@@ -106,7 +107,7 @@ impl<'a> Instruction<'a> {
 
 /// A compiled bytecode module.
 ///
-/// Instructions are decoded lazily via [`decode_step`](Self::decode_step).
+/// Instructions are decoded lazily via [`decode_instruction`](Self::decode_instruction).
 /// Cold data (strings, symbols, types) is accessed through view methods.
 #[derive(Debug)]
 pub struct Module {
@@ -118,12 +119,12 @@ pub struct Module {
     /// VM on every evaluation instead of being rebuilt from the blob each time
     /// (issue #426).
     regex_dfas: RegexDfas,
-    /// Pre-decoded transitions, built at module load after validation (the hot loop
+    /// Pre-decoded instructions, built at module load after validation (the hot loop
     /// indexes this instead of re-parsing bytes; see `decoded`).
     decoded: DecodedProgram,
-    /// Per-step "is an instruction start" bitmap from load validation
-    /// ([`validate_transitions`](Self::validate_transitions)), retained only in
-    /// debug builds to back the VM's pre-`decode_step` IP assertion. It does not
+    /// Per-word "is an instruction start" bitmap from load validation
+    /// ([`validate_instructions`](Self::validate_instructions)), retained only in
+    /// debug builds to back the VM's pre-decode IP assertion. It does not
     /// exist in release, so the steady-state module carries no extra memory.
     #[cfg(debug_assertions)]
     instr_start_bitmap: Vec<bool>,
@@ -157,8 +158,8 @@ impl Module {
     }
 
     #[inline]
-    pub(crate) fn decode_step(&self, step: u16) -> Instruction<'_> {
-        let offset = self.offsets.transitions as usize + (step as usize) * STEP_SIZE;
+    pub(crate) fn decode_instruction(&self, addr: CodeAddr) -> Instruction<'_> {
+        let offset = self.offsets.instructions as usize + addr.as_usize() * BYTECODE_WORD_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
     }
 
@@ -167,16 +168,16 @@ impl Module {
         &self.decoded
     }
 
-    /// Whether `step` is a validated instruction start.
+    /// Whether `addr` is a validated instruction start.
     ///
-    /// Backs the VM's pre-decode IP assertion, localizing a bad jump to the step
-    /// that wrote `ip` rather than letting [`decode_step`](Self::decode_step)
+    /// Backs the VM's pre-decode IP assertion, localizing a bad jump to the address
+    /// that wrote `ip` rather than letting [`decode_instruction`](Self::decode_instruction)
     /// begin mid-instruction. Debug-only: the backing bitmap is retained at load
     /// under `debug_assertions` and does not exist in release.
     #[cfg(debug_assertions)]
-    pub fn is_validated_step_start(&self, step: u16) -> bool {
+    pub fn is_validated_instruction_start(&self, addr: CodeAddr) -> bool {
         self.instr_start_bitmap
-            .get(step as usize)
+            .get(addr.as_usize())
             .copied()
             .unwrap_or(false)
     }
@@ -241,11 +242,11 @@ impl Module {
         }
     }
 
-    pub fn entrypoints(&self) -> EntrypointsView<'_> {
-        let offset = self.offsets.entrypoints as usize;
-        let count = self.header.entrypoints_count as usize;
-        EntrypointsView {
-            bytes: &self.storage[offset..offset + count * Entrypoint::SIZE],
+    pub fn entry_points(&self) -> EntryPointsView<'_> {
+        let offset = self.offsets.entry_points as usize;
+        let count = self.header.entry_points_count as usize;
+        EntryPointsView {
+            bytes: &self.storage[offset..offset + count * EntryPoint::SIZE],
             count,
         }
     }
@@ -254,23 +255,23 @@ impl Module {
         SpansView::new(self.spans_slice(), self.header.spans_count as usize)
     }
 
-    pub fn entrypoint_count(&self) -> usize {
-        self.header.entrypoints_count as usize
+    pub fn entry_point_count(&self) -> usize {
+        self.header.entry_points_count as usize
     }
 
-    pub fn entrypoint_at(&self, idx: usize) -> Option<Entrypoint> {
-        (idx < self.entrypoint_count()).then(|| self.entrypoints().get(idx))
+    pub fn entry_point_at(&self, idx: usize) -> Option<EntryPoint> {
+        (idx < self.entry_point_count()).then(|| self.entry_points().get(idx))
     }
 
-    pub fn entrypoint(&self, name: &str) -> Option<Entrypoint> {
-        self.entrypoints().find_by_name(name, &self.strings())
+    pub fn entry_point(&self, name: &str) -> Option<EntryPoint> {
+        self.entry_points().find_by_name(name, &self.strings())
     }
 
-    /// Names of all entrypoints, in table order.
-    pub fn entrypoint_names(&self) -> impl Iterator<Item = &str> {
+    /// Names of all entry points, in table order.
+    pub fn entry_point_names(&self) -> impl Iterator<Item = &str> {
         let strings = self.strings();
-        let entrypoints = self.entrypoints();
-        (0..self.entrypoint_count()).map(move |i| strings.get(entrypoints.get(i).name()))
+        let entry_points = self.entry_points();
+        (0..self.entry_point_count()).map(move |i| strings.get(entry_points.get(i).name()))
     }
 
     /// `count + 1` entries: the extra sentinel offset gives the final string's end.
@@ -287,9 +288,9 @@ impl Module {
         &self.storage[offset..offset + (count + 1) * REGEX_TABLE_ENTRY_SIZE]
     }
 
-    fn transitions_slice(&self) -> &[u8] {
-        let offset = self.offsets.transitions as usize;
-        let len = self.header.transitions_count as usize * STEP_SIZE;
+    fn instructions_slice(&self) -> &[u8] {
+        let offset = self.offsets.instructions as usize;
+        let len = self.header.instruction_word_count as usize * BYTECODE_WORD_SIZE;
         &self.storage[offset..offset + len]
     }
 
@@ -376,7 +377,7 @@ impl<'a> RegexView<'a> {
 ///
 /// Types are stored in three sub-sections:
 /// - TypeDefs: structural topology (4 bytes each)
-/// - TypeMembers: fields and variants (4 bytes each)
+/// - TypeMembers: record fields and variant cases (4 bytes each)
 /// - TypeNames: name → TypeId mapping (4 bytes each)
 pub struct TypesView<'a> {
     defs_bytes: &'a [u8],
@@ -465,14 +466,14 @@ impl<'a> TypesView<'a> {
         self.names_count
     }
 
-    /// Iterate over members of a struct or enum type.
+    /// Iterate over members of a record or variant type.
     pub fn members_of(&self, def: &TypeDef) -> impl Iterator<Item = TypeMember> + '_ {
         let (start, count) = match def.decode() {
-            TypeDefKind::Struct {
+            TypeDefKind::Record {
                 member_start,
                 member_count,
             }
-            | TypeDefKind::Enum {
+            | TypeDefKind::Variant {
                 member_start,
                 member_count,
             } => (member_start as usize, member_count as usize),
@@ -481,35 +482,32 @@ impl<'a> TypesView<'a> {
         (0..count).map(move |i| self.get_member(start + i))
     }
 
-    /// Unwrap Optional wrapper and return (inner_type, is_optional).
-    /// If not Optional, returns (type_id, false).
-    pub fn unwrap_optional(&self, type_id: TypeId) -> (TypeId, bool) {
-        let Some(type_def) = self.get(type_id) else {
-            return (type_id, false);
-        };
+    /// Return the inner type when `type_id` names an Option.
+    pub fn option_inner(&self, type_id: TypeId) -> Option<TypeId> {
+        let type_def = self.get(type_id)?;
         match type_def.decode() {
             TypeDefKind::Wrapper {
-                kind: TypeKind::Optional,
+                kind: TypeKind::Option,
                 inner,
-            } => (inner, true),
-            _ => (type_id, false),
+            } => Some(inner),
+            _ => None,
         }
     }
 }
 
-pub struct EntrypointsView<'a> {
+pub struct EntryPointsView<'a> {
     bytes: &'a [u8],
     count: usize,
 }
 
-impl<'a> EntrypointsView<'a> {
-    pub fn get(&self, idx: usize) -> Entrypoint {
-        assert!(idx < self.count, "entrypoint index out of bounds");
-        let offset = idx * Entrypoint::SIZE;
-        Entrypoint::from_bytes(&self.bytes[offset..])
+impl<'a> EntryPointsView<'a> {
+    pub fn get(&self, idx: usize) -> EntryPoint {
+        assert!(idx < self.count, "entry point index out of bounds");
+        let offset = idx * EntryPoint::SIZE;
+        EntryPoint::from_bytes(&self.bytes[offset..])
     }
 
-    /// Number of entrypoints.
+    /// Number of entry points.
     pub fn len(&self) -> usize {
         self.count
     }
@@ -518,12 +516,12 @@ impl<'a> EntrypointsView<'a> {
         self.count == 0
     }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = Entrypoint> + '_ {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = EntryPoint> + '_ {
         (0..self.count).map(|idx| self.get(idx))
     }
 
-    /// Find an entrypoint by name (requires StringsView for comparison).
-    pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<Entrypoint> {
+    /// Find an entry point by name (requires StringsView for comparison).
+    pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<EntryPoint> {
         self.iter().find(|e| strings.get(e.name()) == name)
     }
 }

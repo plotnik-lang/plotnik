@@ -1,9 +1,9 @@
 //! Target-neutral emission planning and target implementations.
 
 mod ansi;
+mod decode;
 mod matcher;
 mod plan;
-mod replay;
 pub(crate) mod sink;
 mod target;
 pub(crate) mod targets;
@@ -20,5 +20,5 @@ pub use target::{
 };
 
 pub(crate) use plan::CodegenPlan;
-pub use targets::rust::entry_fn_name;
-pub use targets::typescript::{DtsRange, VoidType as TypeScriptVoidType};
+pub use targets::rust::journal_fn_name;
+pub use targets::typescript::{MatchOnlyType as TypeScriptMatchOnlyType, TypeScriptBinding};

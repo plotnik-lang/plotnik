@@ -32,7 +32,7 @@ impl<'q> Parser<'q, '_> {
         ident
     }
 
-    /// Capture names are strictly snake_case: they become Rust struct fields.
+    /// Capture names are strictly snake_case: they become result fields.
     pub(crate) fn validate_capture_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if name.contains(['.', '-']) || name.chars().any(|c| c.is_ascii_uppercase()) {
@@ -45,7 +45,7 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Definition names are PascalCase (they become types in the output).
+    /// Definition names are PascalCase because they name result types.
     pub(crate) fn validate_def_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if !starts_uppercase(name) || name.contains(['_', '-', '.']) {
@@ -56,13 +56,15 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Branch labels are PascalCase (they become enum variants).
+    /// Alternative labels are PascalCase (they become variant cases).
     /// Lowercase labels take a separate parse path; this only checks separators.
-    pub(crate) fn validate_branch_label(&mut self, ident: Ident<'_>) {
+    pub(crate) fn validate_alternative_label(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if name.contains(['_', '-', '.']) {
             let suggested = to_pascal_case(name);
-            if let Some(report) = self.report_at(DiagnosticKind::BranchLabelInvalid, ident.span()) {
+            if let Some(report) =
+                self.report_at(DiagnosticKind::AlternativeLabelInvalid, ident.span())
+            {
                 report.fix(format!("use `{suggested}`"), suggested).emit();
             }
         }
@@ -73,7 +75,9 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if name.contains(['.', '-']) || starts_uppercase(name) {
             let suggested = to_snake_case(&name.replace(['.', '-'], "_"));
-            if let Some(report) = self.report_at(DiagnosticKind::FieldNameInvalid, ident.span()) {
+            if let Some(report) =
+                self.report_at(DiagnosticKind::GrammarFieldNameInvalid, ident.span())
+            {
                 report.fix(format!("use `{suggested}`"), suggested).emit();
             }
         }

@@ -1,7 +1,7 @@
 //! WebAssembly bindings for playground and editor integrations.
 //!
 //! A thin shim over `plotnik_lib`, in three modules:
-//! - `lib.rs` — the `#[wasm_bindgen]` surface (`Session`, `ast`, `tokenize`)
+//! - `lib.rs` — the `#[wasm_bindgen]` surface (`Session`, `tree`, `tokenize`)
 //!   and query execution
 //! - `langs` — the feature-gated language registry
 //! - `wire` — every JSON payload that crosses to JS, mirrored by the
@@ -21,13 +21,16 @@ mod libc_shims;
 mod langs;
 mod wire;
 
+#[cfg(test)]
+mod wire_tests;
+
 use std::cell::OnceCell;
 
 use langs::Lang;
-use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::bytecode::{EntryPoint, Module};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
-    RecordingTracer, RuntimeLimitSpec, RustCodegenConfig, TypeScriptCodegenConfig, VM, dump_tree,
+    RuntimeLimitSpec, RustCodegenConfig, TraceRecorder, TypeScriptCodegenConfig, VM, dump_tree,
     tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
@@ -42,7 +45,7 @@ pub struct Session {
     lang: &'static Lang,
     compiled: CompiledQuery,
     module: Option<Module>,
-    entrypoints: Vec<String>,
+    entry_points: Vec<String>,
     info: JsonValue,
     generated_rust: OnceCell<Option<String>>,
 }
@@ -66,33 +69,33 @@ impl Session {
         let bytecode_diagnostics = bytecode.diagnostics().clone();
         let mut diagnostics = compiled.diagnostics().clone();
         let module = bytecode.into_artifact();
-        let bytecode_size = module.as_ref().map(Module::bytecode_size);
+        let bytecode_size_bytes = module.as_ref().map(Module::bytecode_size);
         let types = compiled
             .emit_types(TypeScriptCodegenConfig::new().colored(false))
             .map_err(|error| JsValue::from_str(&error.to_string()))?;
         diagnostics.extend(types.diagnostics().clone());
         diagnostics.extend(bytecode_diagnostics);
         let diagnostics = json_value!(diagnostics.to_wire(compiled.source_map()));
-        let (dts, dts_map) = types
+        let (typescript_declarations, typescript_bindings) = types
             .into_artifact()
             .map(|output| output.into_parts())
             .unwrap_or_else(|| (String::new(), Vec::new()));
-        let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
+        let entry_points = module.as_ref().map(entry_point_names).unwrap_or_default();
         let info = info_json(InfoParts {
             module: module.as_ref(),
-            tokens: json_value!(tokens),
+            query_tokens: json_value!(tokens),
             diagnostics,
-            dts,
-            dts_map: json_value!(dts_map),
-            entrypoints: &entrypoints,
-            bytecode_size,
+            typescript_declarations,
+            typescript_bindings: json_value!(typescript_bindings),
+            entry_points: &entry_points,
+            bytecode_size_bytes,
         });
 
         Ok(Session {
             lang,
             compiled,
             module,
-            entrypoints,
+            entry_points,
             info,
             generated_rust: OnceCell::new(),
         })
@@ -104,7 +107,7 @@ impl Session {
 
     /// Generate the production Rust matcher for this query. Ordinary query
     /// diagnostics return `code: null`; the accompanying identity always says
-    /// which exact embedded grammar a successful module links against.
+    /// which exact embedded grammar a successful module is bound to.
     pub fn generate(&self, target: &str) -> Result<JsValue, JsValue> {
         if target != "rust" {
             return Err(JsValue::from_str("generation target must be 'rust'"));
@@ -134,22 +137,22 @@ impl Session {
         to_js(&value)
     }
 
-    /// Run with a bounded execution recording.
+    /// Run with a bounded execution trace.
     pub fn trace(&self, source: &str, entry: Option<String>, max_records: u32) -> JsValue {
         let max_records = usize::try_from(max_records).expect("u32 fits usize");
-        let value = self.execute(source, entry.as_deref(), TraceMode::Recording(max_records));
+        let value = self.execute(source, entry.as_deref(), TraceMode::Structured(max_records));
         to_js(&value)
     }
 }
 
 /// Render `source`'s tree as a query-shaped dump plus the node table mapping
-/// the dump back to source ranges (`AstResult` in protocol.ts).
+/// the dump back to source ranges (`TreeResult` in protocol.ts).
 #[wasm_bindgen]
-pub fn ast(source: &str, lang: &str, raw: bool) -> JsValue {
+pub fn tree(source: &str, lang: &str, include_anonymous: bool) -> JsValue {
     let value = match langs::resolve(lang) {
         Ok(lang) => {
             let tree = lang.parse_source(source);
-            let dump = dump_tree(&tree, source, lang.grammar(), raw);
+            let dump = dump_tree(&tree, source, lang.grammar(), include_anonymous);
             json!({ "chunks": json_value!(dump.chunks), "nodes": json_value!(dump.nodes) })
         }
         Err(error) => error_json(error),
@@ -169,8 +172,8 @@ impl Session {
             return error_json("query did not compile");
         };
 
-        let entrypoint = match resolve_entrypoint(module, entry, &self.entrypoints) {
-            Ok(entrypoint) => entrypoint,
+        let entry_point = match resolve_entry_point(module, entry, &self.entry_points) {
+            Ok(entry_point) => entry_point,
             Err(error) => return error_json(error),
         };
 
@@ -181,19 +184,19 @@ impl Session {
         match trace {
             TraceMode::None => {
                 let mut tracer = NoopTracer;
-                let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
-                result_json(module, &entrypoint, source, result, None)
+                let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
+                result_json(module, &entry_point, source, result, None)
             }
-            TraceMode::Recording(max_records) => {
-                let mut tracer = RecordingTracer::new(module, max_records);
-                let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
-                let recording = tracer.finish();
+            TraceMode::Structured(max_records) => {
+                let mut tracer = TraceRecorder::new(module, max_records);
+                let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
+                let execution_trace = tracer.finish();
                 result_json(
                     module,
-                    &entrypoint,
+                    &entry_point,
                     source,
                     result,
-                    Some(json_value!(recording)),
+                    Some(json_value!(execution_trace)),
                 )
             }
         }
@@ -202,32 +205,32 @@ impl Session {
 
 enum TraceMode {
     None,
-    Recording(usize),
+    Structured(usize),
 }
 
-fn resolve_entrypoint(
+fn resolve_entry_point(
     module: &Module,
     requested: Option<&str>,
-    entrypoints: &[String],
-) -> Result<Entrypoint, String> {
+    entry_points: &[String],
+) -> Result<EntryPoint, String> {
     let selected = match requested {
         Some(name) => name.to_string(),
-        None => entrypoints
+        None => entry_points
             .last()
             .cloned()
-            .ok_or_else(|| "no entrypoints in module".to_string())?,
+            .ok_or_else(|| "bytecode module exports no entry points".to_string())?,
     };
 
-    let Some(entrypoint) = module.entrypoint(&selected) else {
+    let Some(entry_point) = module.entry_point(&selected) else {
         return Err(format!(
-            "invalid entrypoint: {}; available entrypoints: {}",
+            "invalid entry point: {}; available entry points: {}",
             selected,
-            entrypoints.join(", ")
+            entry_points.join(", ")
         ));
     };
-    Ok(entrypoint)
+    Ok(entry_point)
 }
 
-fn entrypoint_names(module: &Module) -> Vec<String> {
-    module.entrypoint_names().map(str::to_string).collect()
+fn entry_point_names(module: &Module) -> Vec<String> {
+    module.entry_point_names().map(str::to_string).collect()
 }

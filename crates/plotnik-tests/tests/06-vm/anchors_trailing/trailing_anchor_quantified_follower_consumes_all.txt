@@ -41,42 +41,42 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:2  ; { a, b }
-T3 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = ListZeroOrMore(T0)  ; <Node>*
+T3 = Record  M0:2  ; { a, b }
 
 [type_members]
-M0: S1 → T3  ; a: T3
-M1: S2 → T1  ; b: T1
+M0: S1 → T1  ; a: T1
+M1: S2 → T2  ; b: T2
 
 [type_names]
-N0: S3 → T2  ; Q
+N0: S3 → T3  ; Q
 
-[entrypoints]
-Q = 00 :: T2
+[entry_points]
+Q = 00 :: T3
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  -ε-  [ArrayClose Set(M1)]             08
+  06  -ε-  [ListClose RecordSet(M1)]        08
   08  ─•┘  _                                09
   09                                        ▶
-  10  └•┘  _ [ArrayClose Set(M1)]           09
-  12  └•─  (debugger_statement) [Node Push]  14, 06
-  14  ─•─  (debugger_statement) [Node Push]  14, 06
-  16  -ε-  [ArrayOpen]                      12, 10
-  18  -ε-  [ArrayOpen]                      14, 06
-  20  -ε-  [Null Set(M0)]                   16
-  22   !   (lexical_declaration) [Node Set(M0)]  18
+  10  └•┘  _ [ListClose RecordSet(M1)]      09
+  12  └•─  (debugger_statement) [Node ArrayPush]  14, 06
+  14  ─•─  (debugger_statement) [Node ArrayPush]  14, 06
+  16  -ε-  [ListOpen]                       12, 10
+  18  -ε-  [ListOpen]                       14, 06
+  20  -ε-  [Absent RecordSet(M0)]           16
+  22   !   (lexical_declaration) [Node RecordSet(M0)]  18
   24  ──!  _                                22, 24
   26  └─!  _                                22, 24
   28   !   (program)                        26, 20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
        ▶   (@28)
 
@@ -85,29 +85,29 @@ Q:
        ●   program
   26       _                                22, 24
        ●   debugger_statement
-  22       (lexical_declaration) [Node Set(M0)]  18
+  22       (lexical_declaration) [Node RecordSet(M0)]  18
        ○   debugger_statement
   26  ❮❮❮ 
   24       _                                22, 24
        ●   debugger_statement
-  22       (lexical_declaration) [Node Set(M0)]  18
+  22       (lexical_declaration) [Node RecordSet(M0)]  18
        ○   debugger_statement
   24  ❮❮❮ 
   24       _                                22, 24
   28  ❮❮❮ 
-  20  -ε-  [Null Set(M0)]                   16
-  16  -ε-  [ArrayOpen]                      12, 10
-  12       (debugger_statement) [Node Push]  14, 06
+  20  -ε-  [Absent RecordSet(M0)]           16
+  16  -ε-  [ListOpen]                       12, 10
+  12       (debugger_statement) [Node ArrayPush]  14, 06
        ●   debugger_statement
-  14       (debugger_statement) [Node Push]  14, 06
+  14       (debugger_statement) [Node ArrayPush]  14, 06
        ●   debugger_statement
-  14       (debugger_statement) [Node Push]  14, 06
+  14       (debugger_statement) [Node ArrayPush]  14, 06
   14  ❮❮❮ 
-  06  -ε-  [ArrayClose Set(M1)]             08
+  06  -ε-  [ListClose RecordSet(M1)]        08
   08       _                                09
        ●   program
   09   ◀   (@28)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

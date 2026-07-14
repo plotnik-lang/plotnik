@@ -1,6 +1,6 @@
 Q = (node name=(identifier))
 ------------------ DIAGNOSTICS -------------------
-error: fields use `:`, not `=`
+error: grammar fields use `:`, not `=`
  --> query.ptk:1:15
   |
 1 | Q = (node name=(identifier))

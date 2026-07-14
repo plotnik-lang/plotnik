@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPlotnikClient, type PlotnikClient } from "./client";
 import type {
-  AstResult,
   GeneratedCode,
   RunResult,
   SessionInfo,
+  TreeResult,
 } from "./protocol";
 
 /* The playground's orchestration layer — and the only module that talks to
@@ -13,7 +13,7 @@ import type {
    and never call the client themselves.
 
    Policy encoded here, in one place:
-   - one debounced latest-wins pipeline per engine call (compile / run / ast);
+   - one debounced latest-wins pipeline per engine call (compile / run / tree);
    - run re-fires only after a successful compile actually swapped the worker
      session (`compiled` object identity is the generation marker);
    - stale-while-error: a query that stops producing bytecode keeps the last
@@ -24,9 +24,9 @@ export interface SessionInput {
   query: string;
   source: string;
   lang: string;
-  /** The user's entrypoint pick; null means "default" (last entrypoint).
+  /** The user's entry point pick; null means "default" (last entry point).
       A pick absent from the compiled query falls back, and comes back when
-      the entrypoint reappears. */
+      the entry point reappears. */
   entry: string | null;
   /** Generated-code tab is visible and may request its lazy artifact. */
   generatedOpen: boolean;
@@ -40,9 +40,9 @@ export interface CompileOutcome {
 }
 
 /** A dump paired with the exact source it describes (same pairing rule). */
-export interface AstSnapshot {
+export interface TreeSnapshot {
   source: string;
-  result: AstResult;
+  result: TreeResult;
 }
 
 export interface PlaygroundSession {
@@ -56,13 +56,13 @@ export interface PlaygroundSession {
   compiled: CompileOutcome | null;
   generated: GeneratedCode | null;
   generating: boolean;
-  entrypoints: string[];
-  /** Effective entrypoint after fallback; feed it back into the selector. */
+  entry_points: string[];
+  /** Effective entry point after fallback; feed it back into the selector. */
   entry: string | null;
   runResult: RunResult | null;
   /** `runResult` came from a query that no longer compiles to a module. */
   stale: boolean;
-  ast: AstSnapshot | null;
+  tree: TreeSnapshot | null;
 }
 
 const COMPILE_DEBOUNCE_MS = 250;
@@ -77,7 +77,7 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
   const [compiled, setCompiled] = useState<CompileOutcome | null>(null);
   const [generated, setGenerated] = useState<GeneratedCode | null>(null);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
-  const [ast, setAst] = useState<AstSnapshot | null>(null);
+  const [tree, setTree] = useState<TreeSnapshot | null>(null);
 
   useEffect(() => {
     const handle = createPlotnikClient();
@@ -110,12 +110,13 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     },
   );
 
-  const entrypoints = compiled?.info.entrypoints ?? [];
+  const entry_points = compiled?.info.entry_points ?? [];
   const effectiveEntry =
-    entry !== null && entrypoints.includes(entry)
+    entry !== null && entry_points.includes(entry)
       ? entry
-      : (entrypoints[entrypoints.length - 1] ?? null);
-  const hasModule = compiled !== null && compiled.info.bytecode_size !== null;
+      : (entry_points[entry_points.length - 1] ?? null);
+  const hasModule =
+    compiled !== null && compiled.info.bytecode_size_bytes !== null;
 
   const generating = useDebouncedTask(
     ready && generatedOpen && hasModule && generated === null,
@@ -150,8 +151,8 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     RUN_DEBOUNCE_MS,
     [source, lang],
     async (stillCurrent) => {
-      const result = await clientRef.current?.ast(source, lang, false);
-      if (result && stillCurrent()) setAst({ source, result });
+      const result = await clientRef.current?.tree(source, lang, false);
+      if (result && stillCurrent()) setTree({ source, result });
     },
   );
 
@@ -162,11 +163,11 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     compiled,
     generated,
     generating,
-    entrypoints,
+    entry_points,
     entry: effectiveEntry,
     runResult,
     stale: runResult !== null && compiled !== null && !hasModule,
-    ast,
+    tree,
   };
 }
 

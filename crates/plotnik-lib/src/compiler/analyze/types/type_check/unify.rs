@@ -1,20 +1,20 @@
-//! Unification logic for alternation branches.
+//! Unification logic for alternation alternatives.
 //!
-//! Handles merging PatternFlow from different branches of union alternations.
-//! Consumed enum alternations don't unify — they produce Enum types directly.
+//! Handles merging `PatternFlow` from different alternatives.
+//! Value-producing labeled alternations don't unify — they produce variant types directly.
 
 use std::collections::BTreeMap;
 
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, PatternFlow, TYPE_VOID, TypeId, TypeShape,
+    ListMinimum, PatternFlow, RecordField, TypeId, TypeShape,
 };
 use crate::core::Symbol;
 
 /// Error during type unification.
 #[derive(Clone, Debug)]
 pub enum UnifyError {
-    /// Capture has incompatible types across branches
+    /// Capture has incompatible types across alternatives.
     IncompatibleTypes { field: Symbol },
 }
 
@@ -32,20 +32,20 @@ pub fn unify_flows(
 ) -> Result<PatternFlow, UnifyError> {
     let mut iter = flows.into_iter();
     let Some(first) = iter.next() else {
-        return Ok(PatternFlow::Void);
+        return Ok(PatternFlow::NoValue);
     };
 
     iter.try_fold(first, |acc, flow| unify_flow_in(ctx, acc, flow))
 }
 
-/// Unify two PatternFlows from alternation branches.
+/// Unify two `PatternFlow`s from alternation alternatives.
 ///
 /// Rules:
-/// - Void ∪ Void → Void
-/// - Void ∪ Fields(s) → Fields(make_all_optional(s))
+/// - NoValue ∪ NoValue → NoValue
+/// - NoValue ∪ Fields(s) → Fields(relax_all_for_absence(s))
 /// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
-/// - Value is an uncaptured pending value (a bare reference); it is suppressed
-///   like any uncaptured match, so it unifies as Void.
+/// - Value is an uncaptured pending value (a bare reference); it is dropped
+///   like any uncaptured match, so it unifies as NoValue.
 #[cfg(test)]
 pub fn unify_flow(
     ctx: &mut TypeAnalysisBuilder,
@@ -60,69 +60,66 @@ fn unify_flow_in(
     a: PatternFlow,
     b: PatternFlow,
 ) -> Result<PatternFlow, UnifyError> {
-    let a = suppress_value(a);
-    let b = suppress_value(b);
+    let a = drop_pending_value(a);
+    let b = drop_pending_value(b);
 
     match (a, b) {
-        (PatternFlow::Void, PatternFlow::Void) => Ok(PatternFlow::Void),
+        (PatternFlow::NoValue, PatternFlow::NoValue) => Ok(PatternFlow::NoValue),
 
-        // Void ∪ Fields -> Fields (every field is absent in the Void branch)
-        (PatternFlow::Void, PatternFlow::Fields(id))
-        | (PatternFlow::Fields(id), PatternFlow::Void) => {
-            let fields = ctx.in_progress().expect_struct_fields(id).clone();
+        // NoValue ∪ Fields -> Fields (every field is absent in the no-value alternative)
+        (PatternFlow::NoValue, PatternFlow::Fields(id))
+        | (PatternFlow::Fields(id), PatternFlow::NoValue) => {
+            let fields = ctx.in_progress().expect_record_fields(id).clone();
             let relaxed = relax_all_for_absence(ctx, fields);
-            Ok(PatternFlow::Fields(ctx.intern_struct(relaxed)))
+            Ok(PatternFlow::Fields(ctx.intern_record(relaxed)))
         }
 
         (PatternFlow::Fields(a_id), PatternFlow::Fields(b_id)) => {
-            let a_fields = ctx.in_progress().expect_struct_fields(a_id).clone();
-            let b_fields = ctx.in_progress().expect_struct_fields(b_id).clone();
+            let a_fields = ctx.in_progress().expect_record_fields(a_id).clone();
+            let b_fields = ctx.in_progress().expect_record_fields(b_id).clone();
 
             let merged = merge_fields(ctx, a_fields, b_fields)?;
-            Ok(PatternFlow::Fields(ctx.intern_struct(merged)))
+            Ok(PatternFlow::Fields(ctx.intern_record(merged)))
         }
 
-        // `suppress_value` above rewrites every Value to Void; the remaining
-        // variants (Void, Fields) are matched exhaustively.
-        _ => unreachable!("unify_flow: unexpected PatternFlow variant after value suppression"),
+        // `drop_pending_value` rewrites every Value to NoValue; the remaining
+        // variants (NoValue, Fields) are matched exhaustively.
+        _ => unreachable!("unify_flow: unexpected PatternFlow variant after dropping values"),
     }
 }
 
-fn suppress_value(flow: PatternFlow) -> PatternFlow {
+fn drop_pending_value(flow: PatternFlow) -> PatternFlow {
     match flow {
-        PatternFlow::Value(_) => PatternFlow::Void,
+        PatternFlow::Value(_) => PatternFlow::NoValue,
         other => other,
     }
 }
 
-/// Relax a field that is absent from some branch, keeping the output shape stable
+/// Relax a field that is absent from some alternative, keeping the result shape stable
 /// (every key present).
 ///
-/// A *required* list stays present as a (possibly empty) array — the absent branch
-/// emits `[]`, never null — so it relaxes to zero-or-more. Everything else becomes
-/// nullable, including an already-optional list: `((x)+ @a)?` emits null when its
-/// `?` is skipped, so forcing it to a non-null `[]` here would make the declared
-/// type lie. Nullability (`optional`), not the array shape, decides the default,
-/// which keeps inference in lockstep with what the emitter writes.
-fn relax_for_absence(ctx: &mut TypeAnalysisBuilder, info: FieldInfo) -> FieldInfo {
-    if !info.optional
-        && let Some(TypeShape::Array { element, .. }) = ctx.in_progress().type_shape(info.type_id)
-    {
+/// A list stays present as a (possibly empty) list when the list itself is the
+/// field type: the absent alternative emits `[]`, never null, so it relaxes to
+/// zero-or-more. Everything else becomes an option. In particular,
+/// `Option<List<T>>` remains an option: `((x)+ @a)?` emits null when its `?` is
+/// skipped, so forcing it to a non-null `[]` would make the declared type lie.
+fn relax_for_absence(ctx: &mut TypeAnalysisBuilder, info: RecordField) -> RecordField {
+    if let Some(TypeShape::List { element, .. }) = ctx.in_progress().type_shape(info.final_type) {
         let element = *element;
-        let array = ctx.intern_type(TypeShape::Array {
+        let list = ctx.intern_type(TypeShape::List {
             element,
-            non_empty: false,
+            minimum: ListMinimum::Zero,
         });
-        return FieldInfo::required(array);
+        return RecordField::new(list);
     }
-    info.make_optional()
+    RecordField::new(ctx.intern_option(info.final_type))
 }
 
 /// Relax every field in a map for absence (see [`relax_for_absence`]).
 fn relax_all_for_absence(
     ctx: &mut TypeAnalysisBuilder,
-    fields: BTreeMap<Symbol, FieldInfo>,
-) -> BTreeMap<Symbol, FieldInfo> {
+    fields: BTreeMap<Symbol, RecordField>,
+) -> BTreeMap<Symbol, RecordField> {
     fields
         .into_iter()
         .map(|(k, v)| (k, relax_for_absence(ctx, v)))
@@ -132,21 +129,20 @@ fn relax_all_for_absence(
 /// Merge two field maps.
 ///
 /// Rules:
-/// - Keys in both: types must be compatible, field is required iff required in both.
-/// - Keys in only one: relaxed for absence (nullable, or an empty-able list).
+/// - Keys in both: types must be compatible.
+/// - Keys in only one: relaxed for absence (an option, or an empty-able list).
 fn merge_fields(
     ctx: &mut TypeAnalysisBuilder,
-    a: BTreeMap<Symbol, FieldInfo>,
-    mut b: BTreeMap<Symbol, FieldInfo>,
-) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {
+    a: BTreeMap<Symbol, RecordField>,
+    mut b: BTreeMap<Symbol, RecordField>,
+) -> Result<BTreeMap<Symbol, RecordField>, UnifyError> {
     let mut result = BTreeMap::new();
     let mut absent_fields = Vec::new();
 
     for (key, a_info) in a {
         if let Some(b_info) = b.remove(&key) {
-            let type_id = unify_type_ids(ctx, a_info.type_id, b_info.type_id, key)?;
-            let optional = a_info.optional || b_info.optional;
-            result.insert(key, FieldInfo::with_optional(type_id, optional));
+            let final_type = unify_type_ids(ctx, a_info.final_type, b_info.final_type, key)?;
+            result.insert(key, RecordField::new(final_type));
         } else {
             absent_fields.push((key, a_info));
         }
@@ -162,23 +158,16 @@ fn merge_fields(
 
 /// Unify two type IDs.
 ///
-/// Structs and enums mint a fresh id per occurrence (nominal typing), so two
-/// branches capturing structurally identical anonymous composites carry
+/// Records and variant types mint a fresh id per occurrence (nominal typing), so two
+/// alternatives capturing structurally identical anonymous composites carry
 /// different ids for the same shape — compare structurally, keeping the first
-/// branch's id. `Void` is the identity element (compatible with any type).
+/// alternative's id.
 fn unify_type_ids(
     ctx: &mut TypeAnalysisBuilder,
     a: TypeId,
     b: TypeId,
     field: Symbol,
 ) -> Result<TypeId, UnifyError> {
-    if a == TYPE_VOID {
-        return Ok(b);
-    }
-    if b == TYPE_VOID {
-        return Ok(a);
-    }
-
     if ctx.types_structurally_equal(a, b) {
         return Ok(a);
     }
@@ -194,23 +183,39 @@ fn unify_type_ids(
         .cloned()
         .expect("unified field type is registered");
 
-    // Arrays that differ only in cardinality relax to zero-or-more: only one
-    // branch matches, so the merged list is non-empty only when the `+` branch
-    // did — `T[]+ ∪ T[]* = T[]*`.
+    match (&a_shape, &b_shape) {
+        (TypeShape::Option(a_inner), TypeShape::Option(b_inner)) => {
+            let inner = unify_type_ids(ctx, *a_inner, *b_inner, field)?;
+            return Ok(ctx.intern_option(inner));
+        }
+        (TypeShape::Option(inner), _) => {
+            let inner = unify_type_ids(ctx, *inner, b, field)?;
+            return Ok(ctx.intern_option(inner));
+        }
+        (_, TypeShape::Option(inner)) => {
+            let inner = unify_type_ids(ctx, a, *inner, field)?;
+            return Ok(ctx.intern_option(inner));
+        }
+        _ => {}
+    }
+
+    // Lists that differ only in minimum length relax to zero-or-more: only one
+    // alternative matches, so the merged list is non-empty only when the `+`
+    // alternative did — `T[]+ ∪ T[]* = T[]*`.
     if let (
-        TypeShape::Array {
+        TypeShape::List {
             element: ea,
-            non_empty: na,
+            minimum: ma,
         },
-        TypeShape::Array {
+        TypeShape::List {
             element: eb,
-            non_empty: nb,
+            minimum: mb,
         },
     ) = (&a_shape, &b_shape)
-        && na != nb
+        && ma != mb
         && ctx.types_structurally_equal(*ea, *eb)
     {
-        return Ok(if *na { b } else { a });
+        return Ok(if *ma == ListMinimum::One { b } else { a });
     }
 
     Err(UnifyError::IncompatibleTypes { field })

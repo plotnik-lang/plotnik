@@ -1,0 +1,27 @@
+Ids = (identifier)+
+
+Q = (program
+  (expression_statement
+    (array
+      (Ids) @ids
+      (Ids)* @runs
+    )
+  )
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  ids: Ids;
+  runs: Ids[];
+}
+
+export type Ids = [Node, ...Node[]];
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub ids: Ids<'t>,
+    pub runs: ::std::vec::Vec<Ids<'t>>,
+}
+
+pub type Ids<'t> = ::std::vec::Vec<Node<'t>>;

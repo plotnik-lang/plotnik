@@ -1,0 +1,226 @@
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
+Rows = (Row)*
+
+Q = (program
+  (expression_statement
+    (parenthesized_expression
+      (object (Rows) @rows)
+    )
+  )
+)
+--------------------- INPUT ----------------------
+({a: 1, b: 2});
+------------------- TYPESCRIPT -------------------
+export interface Row {
+  key: Node;
+  val: Node;
+}
+
+export interface Q {
+  rows: Rows;
+}
+
+export type Rows = Row[];
+--------------------- OUTPUT ---------------------
+{
+  "rows": [
+    {
+      "key": {
+        "kind": "property_identifier",
+        "text": "a",
+        "span": [2, 3]
+      },
+      "val": {
+        "kind": "number",
+        "text": "1",
+        "span": [5, 6]
+      }
+    },
+    {
+      "key": {
+        "kind": "property_identifier",
+        "text": "b",
+        "span": [8, 9]
+      },
+      "val": {
+        "kind": "number",
+        "text": "2",
+        "span": [11, 12]
+      }
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "key"
+S02 "val"
+S03 "rows"
+S04 "Row"
+S05 "Rows"
+S06 "Q"
+S07 "pair"
+S08 "program"
+S09 "expression_statement"
+S10 "parenthesized_expression"
+S11 "object"
+S12 "value"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { key, val }
+T2 = ListZeroOrMore(T1)  ; Row*
+T3 = Record  M2:1  ; { rows }
+
+[type_members]
+M0: S01 → T0  ; key: <Node>
+M1: S02 → T0  ; val: <Node>
+M2: S03 → T2  ; rows: Rows
+
+[type_names]
+N0: S04 → T1  ; Row
+N1: S05 → T2  ; Rows
+N2: S06 → T3  ; Q
+
+[entry_points]
+Q   = 06 :: T3
+Row = 00 :: T1
+
+[instructions]
+Row:
+  00  -ε-  [RecordOpen]                     02
+  02       (@23)                            23 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@43)                            43 : 09
+  09  -ε-  [RecordClose]                    11
+  11                                        ▶
+  12  ─‣─  value: (_) [Node RecordSet(M1)]  14
+  14  ─‣┘  _                                20
+  15  ─‣┘³ _                                24
+  16  -ε-  [ListClose]                      18
+  18  ─‣┘  _ [RecordSet(M2)]                15
+  20                                        ▶
+  21  └‣─  key: (_) [Node RecordSet(M0)]    12
+  23   !   (pair)                           21
+  24                                        ▶
+  25  -ε-  [ListClose RecordSet(M2)]        15
+  27  -ε-  [ArrayPush]                      34, 16
+  29  -ε-  [RecordClose]                    27
+  31   !   (@23)                            23 : 29
+  32  -ε-  [RecordOpen]                     31
+  34  ──!  _                                32, 34
+  36  └─!  _                                32, 34
+  38  -ε-  [ListOpen]                       36, 25
+  40  └‣─  (object)                         38
+  41  └‣─  (parenthesized_expression)       40
+  42  └‣─  (expression_statement)           41
+  43   !   (program)                        42
+--------------------- TRACE ----------------------
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@43)                            43 : 09
+       ▶   (@43)
+
+@43:
+  43       (program)                        42
+       ●   program
+  42       (expression_statement)           41
+       ●   expression_statement
+  41       (parenthesized_expression)       40
+       ●   parenthesized_expression
+  40       (object)                         38
+       ○   (
+       ●   object
+  38  -ε-  [ListOpen]                       36, 25
+  36       _                                32, 34
+       ●   {
+  32  -ε-  [RecordOpen]                     31
+  31       (@23)                            23 : 29
+       ▶   (@23)
+
+@23:
+  23       (pair)                           21
+       ○   {
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   pair
+  32  -ε-  [RecordOpen]                     31
+  31       (@23)                            23 : 29
+       ▶   (@23)
+
+@23:
+  23       (pair)                           21
+       ●   pair
+  21       key: (_) [Node RecordSet(M0)]    12
+       ●   property_identifier
+  12       value: (_) [Node RecordSet(M1)]  14
+       ○   :
+       ●   number
+  14       _                                20
+       ●   pair
+  20   ◀   (@23)                            
+
+@43:
+  29  -ε-  [RecordClose]                    27
+  27  -ε-  [ArrayPush]                      34, 16
+  34       _                                32, 34
+       ●   ,
+  32  -ε-  [RecordOpen]                     31
+  31       (@23)                            23 : 29
+       ▶   (@23)
+
+@23:
+  23       (pair)                           21
+       ○   ,
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   pair
+  32  -ε-  [RecordOpen]                     31
+  31       (@23)                            23 : 29
+       ▶   (@23)
+
+@23:
+  23       (pair)                           21
+       ●   pair
+  21       key: (_) [Node RecordSet(M0)]    12
+       ●   property_identifier
+  12       value: (_) [Node RecordSet(M1)]  14
+       ○   :
+       ●   number
+  14       _                                20
+       ●   pair
+  20   ◀   (@23)                            
+
+@43:
+  29  -ε-  [RecordClose]                    27
+  27  -ε-  [ArrayPush]                      34, 16
+  34       _                                32, 34
+       ●   }
+  32  -ε-  [RecordOpen]                     31
+  31       (@23)                            23 : 29
+       ▶   (@23)
+
+@23:
+  23       (pair)                           21
+       ○   }
+  34  ❮❮❮ 
+  34       _                                32, 34
+  27  ❮❮❮ 
+  16  -ε-  [ListClose]                      18
+  18       _ [RecordSet(M2)]                15
+       ●   object
+  15       _                                24
+       ●   program
+  24   ◀   (@43)                            
+
+Q:
+  09  -ε-  [RecordClose]                    11
+  11   ◀   (Q)                              ◼

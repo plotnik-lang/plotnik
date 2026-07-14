@@ -38,69 +38,69 @@ S9 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { x }
-T3 = ArrayStar(T2)  ; A*
-T4 = Struct  M2:1  ; { xs }
-T5 = Optional(T1)  ; AX?
+T1 = Record  M0:1  ; { id }
+T2 = Option(T1)  ; AX?
+T3 = Record  M1:1  ; { x }
+T4 = ListZeroOrMore(T3)  ; A*
+T5 = Record  M2:1  ; { xs }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
-M1: S2 → T5  ; x: T5
-M2: S3 → T3  ; xs: T3
+M1: S2 → T2  ; x: T2
+M2: S3 → T4  ; xs: T4
 
 [type_names]
 N0: S4 → T1  ; AX
-N1: S5 → T2  ; A
-N2: S6 → T4  ; Q
+N1: S5 → T3  ; A
+N2: S6 → T5  ; Q
 
-[entrypoints]
-Q = 00 :: T4
+[entry_points]
+Q = 00 :: T5
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [Node Set(M0)]      08
-  08  ─‣┘  _ [StructClose Set(M1)]          13
+  06  └‣─  (identifier) [Node RecordSet(M0)]  08
+  08  ─‣┘  _ [RecordClose RecordSet(M1)]    13
   10                                        ▶
-  11  -ε-  [ArrayClose Set(M2)]             10
-  13  -ε-  [StructClose Push]               22, 28
+  11  -ε-  [ListClose RecordSet(M2)]        10
+  13  -ε-  [RecordClose ArrayPush]          22, 28
   15  ...
-  16   !   (expression_statement) [StructOpen]  06
+  16   !   (expression_statement) [RecordOpen]  06
   18  ──!  _                                16, 18
-  20   !   _ [StructOpen]                   16, 18
+  20   !   _ [RecordOpen]                   16, 18
   22  ──!  _                                20, 22
   24  └─!  _                                20, 22
-  26  -ε-  [ArrayOpen]                      24, 11
-  28  ─‣┘  _ [ArrayClose Set(M2)]           10
+  26  -ε-  [ListOpen]                       24, 11
+  28  ─‣┘  _ [ListClose RecordSet(M2)]      10
   30   !   (program)                        26
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
        ▶   (@30)
 
 @30:
   30       (program)                        26
        ●   program
-  26  -ε-  [ArrayOpen]                      24, 11
+  26  -ε-  [ListOpen]                       24, 11
   24       _                                20, 22
        ●   debugger_statement
-  20       _ [StructOpen]                   16, 18
+  20       _ [RecordOpen]                   16, 18
        ●   debugger_statement
-  16       (expression_statement) [StructOpen]  06
+  16       (expression_statement) [RecordOpen]  06
        ○   debugger_statement
   20  ❮❮❮ 
   18       _                                16, 18
   24  ❮❮❮ 
   22       _                                20, 22
   26  ❮❮❮ 
-  11  -ε-  [ArrayClose Set(M2)]             10
+  11  -ε-  [ListClose RecordSet(M2)]        10
   10   ◀   (@30)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

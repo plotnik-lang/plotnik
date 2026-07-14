@@ -2,8 +2,8 @@
 //!
 //! Hosts the pieces of query execution that are independent of *how* the query
 //! program is delivered: tree navigation ([`CursorWrapper`]), backtracking
-//! state ([`CheckpointStack`], [`FrameArena`]), the capture effect log
-//! ([`EffectLog`]), regex-predicate automata ([`RegexDfas`]), execution limits,
+//! state ([`CheckpointStack`], [`FrameArena`]), the match journal
+//! ([`MatchJournal`]), regex-predicate automata ([`RegexDfas`]), execution limits,
 //! and the type vocabulary shared with the compiler ([`Nav`], [`NodeKindId`],
 //! ...). The bytecode VM in `plotnik-lib` interprets query programs on top of
 //! these primitives; generated Rust matchers (the proc-macro backend) compile
@@ -17,7 +17,7 @@
 //! tree-sitter's C runtime.
 
 /// ABI implemented by this runtime build and required by generated modules.
-pub const RUNTIME_ABI: u32 = 2;
+pub const RUNTIME_ABI: u32 = 3;
 
 mod dfa;
 mod frame;
@@ -31,15 +31,15 @@ mod checkpoint;
 #[cfg(feature = "tree-sitter")]
 mod cursor;
 #[cfg(feature = "tree-sitter")]
-mod effect;
-#[cfg(feature = "tree-sitter")]
 mod engine;
+#[cfg(feature = "tree-sitter")]
+mod journal;
+#[cfg(feature = "tree-sitter")]
+mod result_decoder;
 #[cfg(feature = "serde")]
 mod serialize;
 #[cfg(feature = "tree-sitter")]
 mod surface;
-#[cfg(feature = "tree-sitter")]
-mod trace;
 
 #[cfg(test)]
 #[cfg(feature = "tree-sitter")]
@@ -47,24 +47,23 @@ mod checkpoint_tests;
 #[cfg(test)]
 mod dfa_tests;
 #[cfg(test)]
-#[cfg(feature = "tree-sitter")]
-mod effect_tests;
-#[cfg(test)]
 mod frame_tests;
+#[cfg(test)]
+#[cfg(feature = "tree-sitter")]
+mod journal_tests;
 #[cfg(test)]
 mod limits_tests;
 #[cfg(test)]
 mod nav_tests;
 #[cfg(test)]
 #[cfg(feature = "tree-sitter")]
-mod trace_tests;
+mod result_decoder_tests;
 
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{Frame, FrameArena, FrameReturns, ReturnOutcome};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
-    Limit, LimitError, LimitExceeded, REPLAY_DEPTH_AUTO, ReplayDepth, ResolvedRuntimeLimits,
-    RuntimeLimitSpec, replay_depth_auto,
+    DecodeDepth, Limit, LimitExceeded, ResolvedRuntimeLimits, RuntimeLimitSpec, decode_depth_auto,
 };
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
@@ -76,15 +75,15 @@ pub use checkpoint::{
 #[cfg(feature = "tree-sitter")]
 pub use cursor::CursorWrapper;
 #[cfg(feature = "tree-sitter")]
-pub use effect::{EffectLog, RuntimeEffect, node_text, source_text};
-#[cfg(feature = "tree-sitter")]
 pub use engine::Engine;
+#[cfg(feature = "tree-sitter")]
+pub use journal::{JournalEvent, MatchJournal, OutputEvents, node_text, source_text};
+#[cfg(feature = "tree-sitter")]
+pub use result_decoder::ResultDecoder;
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
 #[cfg(feature = "tree-sitter")]
 pub use surface::{Matches, Parse, matches, parse};
-#[cfg(feature = "tree-sitter")]
-pub use trace::TraceReader;
 
 /// The node handle generated query outputs are built from (plus the parse
 /// tree it borrows from). Re-exported so generated code and user code can

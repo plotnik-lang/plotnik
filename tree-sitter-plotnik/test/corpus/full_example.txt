@@ -25,7 +25,7 @@ Root = (program (Statement)+ @statements)
   (definition
     (type_identifier)
     (alternation
-      (branch
+      (alternative
         (type_identifier)
         (named_node
           (identifier)
@@ -41,7 +41,7 @@ Root = (program (Statement)+ @statements)
               (def_ref
                 (type_identifier)))
             (capture))))
-      (branch
+      (alternative
         (type_identifier)
         (named_node
           (identifier)
@@ -61,7 +61,7 @@ Root = (program (Statement)+ @statements)
                     (type_identifier))
                   (quantifier))
                 (capture))))))
-      (branch
+      (alternative
         (type_identifier)
         (named_node
           (identifier)
@@ -74,19 +74,19 @@ Root = (program (Statement)+ @statements)
   (definition
     (type_identifier)
     (alternation
-      (branch
+      (alternative
         (type_identifier)
         (captured_pattern
           (named_node
             (identifier))
           (capture)))
-      (branch
+      (alternative
         (type_identifier)
         (captured_pattern
           (named_node
             (identifier))
           (capture)))
-      (branch
+      (alternative
         (type_identifier)
         (captured_pattern
           (named_node

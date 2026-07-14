@@ -53,30 +53,30 @@ pub enum ModuleError {
     InvalidTypeDef(usize),
     #[error("invalid type name at index {0}")]
     InvalidTypeName(usize),
-    #[error("invalid entrypoint at index {0}")]
-    InvalidEntrypoint(usize),
-    #[error("invalid opcode {opcode:#x} at step {step}")]
-    InvalidOpcode { step: u16, opcode: u8 },
+    #[error("invalid entry point at index {0}")]
+    InvalidEntryPoint(usize),
+    #[error("invalid opcode {opcode:#x} at instruction address {addr}")]
+    InvalidOpcode { addr: CodeAddr, opcode: u8 },
     #[error("string id out of range at index {0}")]
     InvalidStringId(usize),
     #[error("invalid node symbol at index {0}")]
     InvalidNodeSymbol(usize),
-    #[error("predicate operand out of range at step {0}")]
-    InvalidPredicateOperand(usize),
-    #[error("malformed transitions section")]
-    MalformedTransitions,
-    #[error("effect stack imbalance at step {0}")]
-    EffectStackImbalance(u16),
-    #[error("effect stack analysis budget exceeded at step {0}")]
-    EffectStackBudget(u16),
-    #[error("cursor depth imbalance at step {0}")]
-    DepthImbalance(u16),
+    #[error("predicate operand out of range at instruction address {0}")]
+    InvalidPredicateOperand(CodeAddr),
+    #[error("malformed instruction stream")]
+    MalformedInstructionStream,
+    #[error("effect stack imbalance at instruction address {0}")]
+    EffectStackImbalance(CodeAddr),
+    #[error("effect stack analysis budget exceeded at instruction address {0}")]
+    EffectStackBudget(CodeAddr),
+    #[error("cursor depth imbalance at instruction address {0}")]
+    DepthImbalance(CodeAddr),
     #[error("invalid span entry at index {0}")]
     InvalidSpanEntry(usize),
-    #[error("span effect payload out of range at step {0}")]
-    InvalidSpanPayload(u16),
-    #[error("span bracket imbalance at step {0}")]
-    SpanImbalance(u16),
+    #[error("span effect payload out of range at instruction address {0}")]
+    InvalidSpanPayload(CodeAddr),
+    #[error("span bracket imbalance at instruction address {0}")]
+    SpanImbalance(CodeAddr),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -90,7 +90,7 @@ impl ReturnOutcomes {
     fn insert(&mut self, outcome: plotnik_rt::ReturnOutcome) {
         self.0 |= match outcome {
             plotnik_rt::ReturnOutcome::Matched => Self::MATCHED.0,
-            plotnik_rt::ReturnOutcome::Zero => 2,
+            plotnik_rt::ReturnOutcome::Empty => 2,
         };
     }
 }
@@ -136,8 +136,8 @@ impl DepthRoute {
             (Self::Caller, plotnik_rt::ReturnOutcome::Matched) => Some(0),
             (Self::RoutedMatchOnly(depth), plotnik_rt::ReturnOutcome::Matched)
             | (Self::RoutedSplit(depth), plotnik_rt::ReturnOutcome::Matched) => Some(depth),
-            (Self::RoutedSplit(_), plotnik_rt::ReturnOutcome::Zero) => Some(0),
-            (Self::Caller | Self::RoutedMatchOnly(_), plotnik_rt::ReturnOutcome::Zero) => None,
+            (Self::RoutedSplit(_), plotnik_rt::ReturnOutcome::Empty) => Some(0),
+            (Self::Caller | Self::RoutedMatchOnly(_), plotnik_rt::ReturnOutcome::Empty) => None,
         }
     }
 
@@ -166,11 +166,11 @@ fn align_up_u64(value: u64, align: u64) -> u64 {
     (value + align - 1) & !(align - 1)
 }
 
-fn read_transition_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
+fn read_operand_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
     storage
         .get(off..off + 2)
         .map(|b| u16::from_le_bytes([b[0], b[1]]))
-        .ok_or(ModuleError::MalformedTransitions)
+        .ok_or(ModuleError::MalformedInstructionStream)
 }
 
 impl Module {
@@ -225,7 +225,7 @@ impl Module {
         }
         #[cfg(not(debug_assertions))]
         let _ = is_start;
-        module.decoded = decoded::build(module.transitions_slice());
+        module.decoded = decoded::build(module.instructions_slice());
         Ok(module)
     }
 
@@ -238,12 +238,12 @@ impl Module {
     /// out-of-bounds slicing: the reserved bytes are zero, the CRC32 over the
     /// post-header body matches, the string/regex table sentinels are
     /// well-formed, the documented TypeDef member ranges stay in bounds, and
-    /// entrypoint targets address real steps.
+    /// entry point targets address real instructions.
     ///
     /// The CRC32 detects accidental corruption between emission and
     /// construction. It is not a substitute for structural validation, so a
     /// test buffer with a recomputed checksum must still fail the checks below;
-    /// [`Self::validate_transitions`] therefore re-verifies the lazily-decoded
+    /// [`Self::validate_instructions`] therefore re-verifies the lazily-decoded
     /// instruction stream structurally, and
     /// [`validate_effect_stack`](super::effect_stack::validate_effect_stack)
     /// proves no path can panic the materializer's builder stack or the VM's
@@ -271,15 +271,15 @@ impl Module {
         self.validate_type_names()?;
         self.validate_spans()?;
         // Bound every embedded `StringId` before any later check constructs a
-        // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
-        // `Entrypoint`, which would otherwise panic on a malformed zero name.
+        // (`NonZero`) `StringId` from one — e.g. `validate_entry_points` builds an
+        // `EntryPoint`, which would otherwise panic on a malformed zero name.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
-        let is_start = self.validate_transitions()?;
-        self.validate_entrypoints(&is_start)?;
+        let is_start = self.validate_instructions()?;
+        self.validate_entry_points(&is_start)?;
         self.validate_return_routes()?;
         self.validate_depth_neutrality()?;
-        // Structural validity (every step decodes, every jump lands on a start)
+        // Structural validity (every instruction decodes, every jump lands on a start)
         // is now established, so the effect-stack walk can use the safe typed
         // instruction API. This closes the last malformed-representation panic
         // class: the materializer's builder-stack panics and the VM's
@@ -430,7 +430,7 @@ impl Module {
 
     /// Validate every TypeDef: a known kind, member runs that stay inside the
     /// TypeMembers section, and every referenced TypeId — a wrapper/alias inner
-    /// type or a struct/enum member type — addressing a real def, so the
+    /// type or a record/variant member type — addressing a real def, so the
     /// materializer never resolves a type out of range
     /// (`docs/binary-format/04-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
@@ -459,15 +459,15 @@ impl Module {
                         return Err(invalid());
                     }
                 }
-                TypeDefKind::Struct {
+                TypeDefKind::Record {
                     member_start,
                     member_count,
                 }
-                | TypeDefKind::Enum {
+                | TypeDefKind::Variant {
                     member_start,
                     member_count,
                 } => {
-                    // Member-run bounds are identical for struct and enum.
+                    // Member-run bounds are identical for record and variant types.
                     if member_start as u32 + member_count as u32 > members {
                         return Err(invalid());
                     }
@@ -534,28 +534,28 @@ impl Module {
         Ok(())
     }
 
-    /// Entrypoint targets must address a real step so the VM's first
-    /// [`decode_step`](Self::decode_step) cannot read out of bounds.
+    /// Entry-point targets must address a real instruction so the VM's first
+    /// [`decode_instruction`](Self::decode_instruction) cannot read out of bounds.
     /// `is_start` is the instruction-start bitmap from
-    /// [`Self::validate_transitions`]: a `target` that lands inside a multi-step
+    /// [`Self::validate_instructions`]: a `target` that lands inside a multi-word
     /// instruction would make the VM start decoding mid-instruction, so it must
     /// be an instruction start, not merely in range.
-    fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
-        let entrypoints = self.entrypoints();
-        let steps = self.header.transitions_count;
+    fn validate_entry_points(&self, is_start: &[bool]) -> Result<(), ModuleError> {
+        let entry_points = self.entry_points();
+        let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
         let storage: &[u8] = &self.storage;
-        let base = self.offsets.entrypoints as usize;
-        for i in 0..entrypoints.len() {
-            let invalid = || ModuleError::InvalidEntrypoint(i);
-            let ep = entrypoints.get(i);
-            let target = u16::from(ep.target());
+        let base = self.offsets.entry_points as usize;
+        for i in 0..entry_points.len() {
+            let invalid = || ModuleError::InvalidEntryPoint(i);
+            let ep = entry_points.get(i);
+            let target = ep.target();
 
-            if target >= steps {
+            if target.get() >= word_count {
                 return Err(invalid());
             }
 
-            if !is_start[target as usize] {
+            if !is_start[target.as_usize()] {
                 return Err(invalid());
             }
 
@@ -563,7 +563,7 @@ impl Module {
                 return Err(invalid());
             }
 
-            // Bytes 6-7 are the reserved `_pad`; `Entrypoint::from_bytes` discards
+            // Bytes 6-7 are the reserved `_pad`; `EntryPoint::from_bytes` discards
             // them, so a malformed non-zero pad would otherwise pass unnoticed.
             if read_u16_le(storage, base + i * 8 + 6) != 0 {
                 return Err(invalid());
@@ -581,56 +581,55 @@ impl Module {
     fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
         let mut roots = HashMap::new();
 
-        for entrypoint in self.entrypoints().iter() {
-            let target = u16::from(entrypoint.target());
+        for entry_point in self.entry_points().iter() {
+            let target = entry_point.target();
             let route = DepthRoute::Caller;
             if let Some(expected) = roots.insert(target, route)
                 && expected != route
             {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
 
-        let mut step = 0u16;
-        while step < self.header.transitions_count {
-            match self.decode_step(step) {
-                Instruction::Match(m) => {
-                    step += m.step_count();
-                }
+        let mut addr = CodeAddr::ZERO;
+        while addr.get() < self.header.instruction_word_count {
+            let words = match self.decode_instruction(addr) {
+                Instruction::Match(m) => m.word_count(),
                 Instruction::Call(c) => {
-                    let target = u16::from(c.target);
+                    let target = CodeAddr::from(u16::from(c.target));
                     let route = DepthRoute::Caller;
                     if let Some(expected) = roots.insert(target, route)
                         && expected != route
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    step += 1;
+                    1
                 }
                 Instruction::RoutedCall(c) => {
-                    let target = u16::from(c.target);
+                    let target = CodeAddr::from(u16::from(c.target));
                     let route = DepthRoute::RoutedMatchOnly(c.entry_nav.depth_delta());
                     if let Some(previous) = roots.insert(target, route)
                         && previous != route
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    step += 1;
+                    1
                 }
                 Instruction::SplitCall(c) => {
-                    let target = u16::from(c.target);
+                    let target = CodeAddr::from(u16::from(c.target));
                     let route = DepthRoute::RoutedSplit(c.entry_nav.depth_delta());
                     if let Some(previous) = roots.insert(target, route)
                         && previous != route
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    step += 1;
+                    1
                 }
-                Instruction::Return(_) => {
-                    step += 1;
-                }
-            }
+                Instruction::Return(_) => 1,
+            };
+            addr = addr
+                .checked_add(words)
+                .expect("validated instruction stream fits in u16 address space");
         }
 
         for (root, route) in roots {
@@ -641,65 +640,68 @@ impl Module {
 
     /// Calls and callees must agree on the return outcomes carried by their
     /// frames. This keeps malformed bytecode from selecting a continuation an
-    /// ordinary frame does not own, or from encoding a split call whose zero
+    /// ordinary frame does not own, or from encoding a split call whose empty
     /// route can never be taken.
     fn validate_return_routes(&self) -> Result<(), ModuleError> {
         let mut cache = HashMap::new();
 
-        for entrypoint in self.entrypoints().iter() {
-            let target = u16::from(entrypoint.target());
+        for entry_point in self.entry_points().iter() {
+            let target = entry_point.target();
             if !self
                 .return_contract(target, &mut cache)
                 .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
             {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
 
-        let mut step = 0;
-        while step < self.header.transitions_count {
-            match self.decode_step(step) {
-                Instruction::Match(matched) => step += matched.step_count(),
+        let mut addr = CodeAddr::ZERO;
+        while addr.get() < self.header.instruction_word_count {
+            let words = match self.decode_instruction(addr) {
+                Instruction::Match(matched) => matched.word_count(),
                 Instruction::Call(call) => {
-                    let target = u16::from(call.target);
+                    let target = CodeAddr::from(u16::from(call.target));
                     if !self
                         .return_contract(target, &mut cache)
                         .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    step += 1;
+                    1
                 }
                 Instruction::RoutedCall(call) => {
-                    let target = u16::from(call.target);
+                    let target = CodeAddr::from(u16::from(call.target));
                     if !self
                         .return_contract(target, &mut cache)
                         .is(ReturnOutcomes::MATCHED, ReturnEntry::Routed)
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    step += 1;
+                    1
                 }
                 Instruction::SplitCall(call) => {
-                    let target = u16::from(call.target);
+                    let target = CodeAddr::from(u16::from(call.target));
                     if !self
                         .return_contract(target, &mut cache)
                         .is(ReturnOutcomes::BOTH, ReturnEntry::Routed)
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    step += 1;
+                    1
                 }
-                Instruction::Return(_) => step += 1,
-            }
+                Instruction::Return(_) => 1,
+            };
+            addr = addr
+                .checked_add(words)
+                .expect("validated instruction stream fits in u16 address space");
         }
         Ok(())
     }
 
     fn return_contract(
         &self,
-        entry: u16,
-        cache: &mut HashMap<u16, ReturnContract>,
+        entry: CodeAddr,
+        cache: &mut HashMap<CodeAddr, ReturnContract>,
     ) -> ReturnContract {
         if let Some(&contract) = cache.get(&entry) {
             return contract;
@@ -708,19 +710,25 @@ impl Module {
         let mut contract = ReturnContract::NONE;
         let mut seen = HashSet::new();
         let mut work = vec![entry];
-        while let Some(step) = work.pop() {
-            if !seen.insert(step) {
+        while let Some(addr) = work.pop() {
+            if !seen.insert(addr) {
                 continue;
             }
-            match self.decode_step(step) {
+            match self.decode_instruction(addr) {
                 Instruction::Match(matched) => {
-                    work.extend(matched.successors().map(u16::from));
+                    work.extend(
+                        matched
+                            .successors()
+                            .map(|next| CodeAddr::from(u16::from(next))),
+                    );
                 }
-                Instruction::Call(call) => work.push(u16::from(call.next)),
-                Instruction::RoutedCall(call) => work.push(u16::from(call.next)),
+                Instruction::Call(call) => work.push(CodeAddr::from(u16::from(call.next))),
+                Instruction::RoutedCall(call) => {
+                    work.push(CodeAddr::from(u16::from(call.next)));
+                }
                 Instruction::SplitCall(call) => {
-                    work.push(u16::from(call.returns.zero));
-                    work.push(u16::from(call.returns.matched));
+                    work.push(CodeAddr::from(u16::from(call.returns.empty)));
+                    work.push(CodeAddr::from(u16::from(call.returns.matched)));
                 }
                 Instruction::Return(return_) => contract.insert(return_),
             }
@@ -729,29 +737,29 @@ impl Module {
         contract
     }
 
-    fn validate_depth_root(&self, entry: u16, route: DepthRoute) -> Result<(), ModuleError> {
-        let mut memo: HashMap<u16, i32> = HashMap::new();
+    fn validate_depth_root(&self, entry: CodeAddr, route: DepthRoute) -> Result<(), ModuleError> {
+        let mut memo: HashMap<CodeAddr, i32> = HashMap::new();
         let mut work = vec![(entry, 0i32)];
 
-        while let Some((step, net)) = work.pop() {
-            if let Some(&seen) = memo.get(&step) {
+        while let Some((addr, net)) = work.pop() {
+            if let Some(&seen) = memo.get(&addr) {
                 if seen == net {
                     continue;
                 }
-                return Err(ModuleError::DepthImbalance(step));
+                return Err(ModuleError::DepthImbalance(addr));
             }
-            memo.insert(step, net);
+            memo.insert(addr, net);
 
-            match self.decode_step(step) {
+            match self.decode_instruction(addr) {
                 Instruction::Return(return_) => {
                     if return_.mode.entry() != route.return_entry() {
-                        return Err(ModuleError::DepthImbalance(step));
+                        return Err(ModuleError::DepthImbalance(addr));
                     }
                     let Some(expected_exit) = route.expected(return_.mode.outcome()) else {
-                        return Err(ModuleError::DepthImbalance(step));
+                        return Err(ModuleError::DepthImbalance(addr));
                     };
                     if net != expected_exit {
-                        return Err(ModuleError::DepthImbalance(step));
+                        return Err(ModuleError::DepthImbalance(addr));
                     }
                 }
                 Instruction::Match(m) => {
@@ -759,26 +767,29 @@ impl Module {
                     if m.succ_count() == 0 {
                         let expected_exit = route.matched_depth();
                         if next_net != expected_exit {
-                            return Err(ModuleError::DepthImbalance(step));
+                            return Err(ModuleError::DepthImbalance(addr));
                         }
                     } else {
                         for succ in m.successors() {
-                            work.push((u16::from(succ), next_net));
+                            work.push((CodeAddr::from(u16::from(succ)), next_net));
                         }
                     }
                 }
                 Instruction::Call(c) => {
-                    work.push((u16::from(c.next), net + c.nav.depth_delta()));
+                    work.push((CodeAddr::from(u16::from(c.next)), net + c.nav.depth_delta()));
                 }
                 Instruction::RoutedCall(c) => {
-                    work.push((u16::from(c.next), net + c.entry_nav.depth_delta()));
+                    work.push((
+                        CodeAddr::from(u16::from(c.next)),
+                        net + c.entry_nav.depth_delta(),
+                    ));
                 }
                 Instruction::SplitCall(c) => {
                     work.push((
-                        u16::from(c.returns.matched),
+                        CodeAddr::from(u16::from(c.returns.matched)),
                         net + c.entry_nav.depth_delta(),
                     ));
-                    work.push((u16::from(c.returns.zero), net));
+                    work.push((CodeAddr::from(u16::from(c.returns.empty)), net));
                 }
             }
         }
@@ -786,10 +797,10 @@ impl Module {
         Ok(())
     }
 
-    /// Every *required* `StringId` held in a section — entrypoint names,
+    /// Every *required* `StringId` held in a section — entry point names,
     /// node/field symbol names, type names, type member names, and regex pattern
     /// names — must address a real string-table entry, so the view accessors that
-    /// resolve them (and `find_by_name`, the materializer's struct-field keys,
+    /// resolve them (and `find_by_name`, the materializer's record-field keys,
     /// etc.) never slice out of bounds. The table holds `str_table_count + 1`
     /// offsets, so the valid id range is `0..str_table_count`. This upholds the
     /// representation's guarantee that validated bytecode never panics on view access
@@ -814,13 +825,13 @@ impl Module {
             Ok(())
         };
 
-        // entrypoint name: u16 at entry+0
+        // Entry-point name: u16 at entry+0
         check(
-            self.offsets.entrypoints,
-            Entrypoint::SIZE,
+            self.offsets.entry_points,
+            EntryPoint::SIZE,
             0,
             0,
-            self.header.entrypoints_count as usize,
+            self.header.entry_points_count as usize,
         )?;
         // node/field symbol name: u16 at entry+2
         check(
@@ -897,11 +908,11 @@ impl Module {
     /// for every compiler buffer whose header and CRC check out, including the
     /// deliberately mutated buffers used by validation tests.
     ///
-    /// A module is decoded lazily: [`decode_step`](Self::decode_step) and the
+    /// A module is decoded lazily: [`decode_instruction`](Self::decode_instruction) and the
     /// per-opcode decoders, the effect/predicate iterators, and the materializer
     /// all build `NonZero`/enum values and index tables straight from
     /// instruction bytes. Each is a panic site on malformed compiler output — `Opcode`,
-    /// `Nav`, `NodeKindConstraint`, `EffectKind`, and `StepId` decoding, plus
+    /// `Nav`, `NodeKindConstraint`, `EffectKind`, and `SuccessorAddr` decoding, plus
     /// `get_member` / `at` table lookups. This walk rejects every such
     /// input up front, reading only through checked slicing so it never panics
     /// itself.
@@ -909,58 +920,58 @@ impl Module {
     /// Two passes over the stream:
     /// 1. Decode each instruction's fixed-size slot (the slot size is fixed by
     ///    the opcode, so the walk is unambiguous), validating opcode, segment,
-    ///    nav, node kind, effect opcodes, `Set`/`Enum` member operands, and
+    ///    nav, node kind, effect opcodes, `RecordSet`/`Variant` member operands, and
     ///    predicate operands, and rejecting any zero successor address. Record
     ///    each instruction start and collect every jump target.
     /// 2. Every collected jump target — successor or call next/target — must land
     ///    on a recorded instruction start.
     ///
-    /// Returns the instruction-start bitmap so [`Self::validate_entrypoints`] can
-    /// hold entrypoint targets to the same rule: an entrypoint pointing into the
-    /// interior of a multi-step instruction would otherwise begin decoding
+    /// Returns the instruction-start bitmap so [`Self::validate_entry_points`] can
+    /// hold entry point targets to the same rule: an entry point pointing into the
+    /// interior of a multi-word instruction would otherwise begin decoding
     /// mid-instruction.
     ///
     /// Out of scope (not a decode/view panic): node-kind/field ids, which are
     /// resolved against the tree-sitter grammar at match time, and member
     /// `type_id`s, which the materializer reads through the checked `Types::get`
     /// that returns `Option`.
-    fn validate_transitions(&self) -> Result<Vec<bool>, ModuleError> {
+    fn validate_instructions(&self) -> Result<Vec<bool>, ModuleError> {
         let storage: &[u8] = &self.storage;
-        let base = self.offsets.transitions as usize;
-        let steps = self.header.transitions_count;
+        let base = self.offsets.instructions as usize;
+        let word_count = self.header.instruction_word_count;
 
         let read_u8 = |off: usize| {
             storage
                 .get(off)
                 .copied()
-                .ok_or(ModuleError::MalformedTransitions)
+                .ok_or(ModuleError::MalformedInstructionStream)
         };
         // A reserved padding run inside an instruction slot must be all zero.
         let check_zero = |off: usize, len: usize| match storage.get(off..off + len) {
             Some(run) if run.iter().all(|&b| b == 0) => Ok(()),
-            _ => Err(ModuleError::MalformedTransitions),
+            _ => Err(ModuleError::MalformedInstructionStream),
         };
 
-        let mut is_start = vec![false; steps as usize];
-        let mut targets: Vec<u16> = Vec::new();
+        let mut is_start = vec![false; word_count as usize];
+        let mut targets: Vec<CodeAddr> = Vec::new();
 
-        let mut step: u16 = 0;
-        while step < steps {
-            is_start[step as usize] = true;
-            let instr_off = base + step as usize * STEP_SIZE;
+        let mut addr = CodeAddr::ZERO;
+        while addr.get() < word_count {
+            is_start[addr.as_usize()] = true;
+            let instr_off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
             let header = read_u8(instr_off)?;
 
             let nibble = header_byte::opcode_nibble(header);
             let Some(opcode) = Opcode::from_u8(nibble) else {
                 return Err(ModuleError::InvalidOpcode {
-                    step,
+                    addr,
                     opcode: nibble,
                 });
             };
             // Every opcode reserves the segment bits; the call/return
             // decoders `assert!` segment == 0, and a non-zero segment is unused.
             if header_byte::segment(header) != 0 {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
             // node_class_bits (header bits 4-5) is meaningful only for Match
             // variants; Call/Return ignore it, so the format pins those bits to
@@ -970,100 +981,104 @@ impl Module {
                 Opcode::Call | Opcode::RoutedCall | Opcode::Return | Opcode::SplitCall
             ) && header_byte::node_class_bits(header) != 0
             {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
 
             match opcode {
                 Opcode::Return => {
                     if plotnik_rt::ReturnOutcome::from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     if ReturnEntry::from_byte(read_u8(instr_off + 2)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     check_zero(instr_off + 3, 5)?;
                 }
                 Opcode::Call => {
-                    // `Call::from_bytes` decodes a nav and two non-zero `StepId`s.
+                    // `Call::from_bytes` decodes a nav and two non-zero successor addresses.
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    let next = read_transition_u16(storage, instr_off + 4)?;
-                    let target = read_transition_u16(storage, instr_off + 6)?;
+                    let next = read_operand_u16(storage, instr_off + 4)?;
+                    let target = read_operand_u16(storage, instr_off + 6)?;
                     if next == 0 || target == 0 {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    targets.push(next);
-                    targets.push(target);
+                    targets.push(CodeAddr::from(next));
+                    targets.push(CodeAddr::from(target));
                 }
                 Opcode::RoutedCall => {
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     check_zero(instr_off + 2, 2)?;
-                    let next = read_transition_u16(storage, instr_off + 4)?;
-                    let target = read_transition_u16(storage, instr_off + 6)?;
+                    let next = read_operand_u16(storage, instr_off + 4)?;
+                    let target = read_operand_u16(storage, instr_off + 6)?;
                     if next == 0 || target == 0 {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    targets.push(next);
-                    targets.push(target);
+                    targets.push(CodeAddr::from(next));
+                    targets.push(CodeAddr::from(target));
                 }
                 Opcode::SplitCall => {
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    let matched = read_transition_u16(storage, instr_off + 2)?;
-                    let zero = read_transition_u16(storage, instr_off + 4)?;
-                    let target = read_transition_u16(storage, instr_off + 6)?;
-                    if matched == 0 || zero == 0 || target == 0 {
-                        return Err(ModuleError::MalformedTransitions);
+                    let matched = read_operand_u16(storage, instr_off + 2)?;
+                    let empty = read_operand_u16(storage, instr_off + 4)?;
+                    let target = read_operand_u16(storage, instr_off + 6)?;
+                    if matched == 0 || empty == 0 || target == 0 {
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    targets.extend([matched, zero, target]);
+                    targets.extend([
+                        CodeAddr::from(matched),
+                        CodeAddr::from(empty),
+                        CodeAddr::from(target),
+                    ]);
                 }
                 opcode if opcode.is_match() => {
                     // A Match variant (`Match8` or extended).
                     let node_kind = header_byte::node_class_bits(header);
                     if NodeKindConstraint::try_from_bytes(
                         node_kind,
-                        read_transition_u16(storage, instr_off + 2)?,
+                        read_operand_u16(storage, instr_off + 2)?,
                     )
                     .is_none()
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
 
                     if opcode == Opcode::Match8 {
                         // bytes 6-7 hold the single successor; `0` means terminal.
-                        let next = read_transition_u16(storage, instr_off + 6)?;
+                        let next = read_operand_u16(storage, instr_off + 6)?;
                         if next != 0 {
-                            targets.push(next);
+                            targets.push(CodeAddr::from(next));
                         }
                     } else {
-                        self.validate_extended_match(opcode, instr_off, step, &mut targets)?;
+                        self.validate_extended_match(opcode, instr_off, addr, &mut targets)?;
                     }
                 }
                 _ => unreachable!("all non-match opcodes handled above"),
             }
 
-            step = step
-                .checked_add(opcode.step_count())
-                .ok_or(ModuleError::MalformedTransitions)?;
+            addr = addr
+                .checked_add(opcode.word_count())
+                .ok_or(ModuleError::MalformedInstructionStream)?;
         }
 
         // A well-formed stream tiles the section in whole instructions. An
         // overrun means a trailing instruction's slot crosses the section end,
         // so a successor pointing into it could later decode past the buffer.
-        if step != steps {
-            return Err(ModuleError::MalformedTransitions);
+        if addr.get() != word_count {
+            return Err(ModuleError::MalformedInstructionStream);
         }
 
-        for t in targets {
-            if t >= steps || !is_start[t as usize] {
-                return Err(ModuleError::MalformedTransitions);
+        for target in targets {
+            if target.get() >= word_count || !is_start[target.as_usize()] {
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
         Ok(is_start)
@@ -1071,22 +1086,22 @@ impl Module {
 
     /// Validate the payload of one extended `Match` (`Match16`..`Match64`):
     /// effects, predicate, and successors. Appends each successor to `targets`
-    /// for the pass-2 jump-target check in [`Self::validate_transitions`].
+    /// for the pass-2 jump-target check in [`Self::validate_instructions`].
     fn validate_extended_match(
         &self,
         opcode: Opcode,
         instr_off: usize,
-        step: u16,
-        targets: &mut Vec<u16>,
+        addr: CodeAddr,
+        targets: &mut Vec<CodeAddr>,
     ) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
 
-        let counts = read_transition_u16(storage, instr_off + 6)?;
+        let counts = read_operand_u16(storage, instr_off + 6)?;
         // Bits 1-0 of the counts word are reserved (bit 2 is the `missing` flag,
         // which the decoder does read); the decoder never reads the reserved bits,
         // so a malformed set bit would pass validation unnoticed.
         if MatchCounts::reserved_bits_set(counts) {
-            return Err(ModuleError::MalformedTransitions);
+            return Err(ModuleError::MalformedInstructionStream);
         }
         let c = MatchCounts::unpack(counts);
         let effects = c.effects as usize;
@@ -1099,7 +1114,7 @@ impl Module {
         // read into the next instruction (or past the buffer at the stream end).
         let used = effects + neg + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
         if used > opcode.payload_slots() {
-            return Err(ModuleError::MalformedTransitions);
+            return Err(ModuleError::MalformedInstructionStream);
         }
 
         // Every decoded effect validates its payload through `EffectKind`'s
@@ -1110,9 +1125,9 @@ impl Module {
             let off = instr_off + MATCH_PAYLOAD_START + slot * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(off..off + PAYLOAD_SLOT_SIZE)
-                .ok_or(ModuleError::MalformedTransitions)?;
-            let op =
-                Effect::try_from_bytes([b[0], b[1]]).ok_or(ModuleError::MalformedTransitions)?;
+                .ok_or(ModuleError::MalformedInstructionStream)?;
+            let op = Effect::try_from_bytes([b[0], b[1]])
+                .ok_or(ModuleError::MalformedInstructionStream)?;
             if op.kind.accepts_payload(op.payload, members, spans) {
                 return Ok(());
             }
@@ -1120,9 +1135,9 @@ impl Module {
                 op.kind,
                 EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd
             ) {
-                return Err(ModuleError::InvalidSpanPayload(step));
+                return Err(ModuleError::InvalidSpanPayload(addr));
             }
-            Err(ModuleError::MalformedTransitions)
+            Err(ModuleError::MalformedInstructionStream)
         };
         for i in 0..effects {
             check_effect(i)?;
@@ -1135,9 +1150,9 @@ impl Module {
             let off = instr_off + MATCH_PAYLOAD_START + (effects + i) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(off..off + PAYLOAD_SLOT_SIZE)
-                .ok_or(ModuleError::MalformedTransitions)?;
+                .ok_or(ModuleError::MalformedInstructionStream)?;
             if u16::from_le_bytes([b[0], b[1]]) == 0 {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
 
@@ -1145,16 +1160,16 @@ impl Module {
             let pred_off = instr_off + MATCH_PAYLOAD_START + (effects + neg) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(pred_off..pred_off + PREDICATE_SIZE)
-                .ok_or(ModuleError::MalformedTransitions)?;
+                .ok_or(ModuleError::MalformedInstructionStream)?;
             let op_and_flags = u16::from_le_bytes([b[0], b[1]]);
             let (op, is_regex) = MatchPredicate::unpack_op_flags(op_and_flags);
             let value_ref = u16::from_le_bytes([b[2], b[3]]);
 
             // Bits above the operator and regex flag are reserved-zero
-            // (docs/binary-format/06-transitions.md), so a malformed set bit must
+            // (docs/binary-format/06-instructions.md), so a malformed set bit must
             // not pass validation.
             if MatchPredicate::reserved_bits_set(op_and_flags) {
-                return Err(ModuleError::InvalidPredicateOperand(step as usize));
+                return Err(ModuleError::InvalidPredicateOperand(addr));
             }
 
             // The operator must be a known predicate op, the regex flag must agree
@@ -1167,7 +1182,7 @@ impl Module {
             // A string operand of 0 is benign — the validated easter-egg entry,
             // never asserted non-empty.
             let Some(pred_op) = PredicateOp::try_from_byte(op) else {
-                return Err(ModuleError::InvalidPredicateOperand(step as usize));
+                return Err(ModuleError::InvalidPredicateOperand(addr));
             };
             let operand_ok = if is_regex {
                 (1..self.header.regex_table_count).contains(&value_ref)
@@ -1175,7 +1190,7 @@ impl Module {
                 value_ref < self.header.str_table_count
             };
             if pred_op.is_regex_op() != is_regex || !operand_ok {
-                return Err(ModuleError::InvalidPredicateOperand(step as usize));
+                return Err(ModuleError::InvalidPredicateOperand(addr));
             }
         }
 
@@ -1184,13 +1199,13 @@ impl Module {
             + (effects + neg) * PAYLOAD_SLOT_SIZE
             + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
-            let next = read_transition_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;
-            // An extended successor decodes through `StepId`, which panics
+            let next = read_operand_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;
+            // An extended successor decodes through `SuccessorAddr`, which panics
             // on zero; `0` is the terminal marker only for the `Match8` slot.
             if next == 0 {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
-            targets.push(next);
+            targets.push(CodeAddr::from(next));
         }
         Ok(())
     }

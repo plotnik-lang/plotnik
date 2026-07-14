@@ -4,7 +4,7 @@
  * Mirrors the reference implementation in
  * `crates/plotnik-lib/src/compiler/parse/` at the syntax level: what the
  * reference parser accepts without error-level diagnostics parses cleanly
- * here, while analyze/link-stage rejections (unknown node kinds, empty
+ * here, while analyze/bind-stage rejections (unknown node kinds, empty
  * trees, dimensionality, ...) are out of scope, as is usual for editor
  * grammars. See README.md for the exact contract and known divergences.
  */
@@ -60,7 +60,7 @@ module.exports = grammar({
         field("pattern", choice($._suffixable, $.quantified_pattern)),
         choice(
           seq(field("capture", $.capture), optional($.capture_type)),
-          field("capture", $.suppressive_capture),
+          field("capture", $.discard),
         ),
       ),
 
@@ -83,7 +83,7 @@ module.exports = grammar({
 
     // What may appear among a node's children. Anchors and negated fields
     // are positional assertions, not patterns: they never take suffixes and
-    // are not valid as definition bodies, field values, or branches. A
+    // are not valid as definition bodies, field values, or alternatives. A
     // sequence additionally admits anchors but not negated fields — those
     // constrain the enclosing node and must be its direct children.
     _child: ($) => choice($._pattern, $.anchor, $.negated_field),
@@ -139,7 +139,7 @@ module.exports = grammar({
     error_node: (_) => seq("(", "ERROR", ")"),
 
     // `(MISSING)`, `(MISSING kind)`, or `(MISSING ";")`. A missing node is
-    // a zero-width token inserted by error recovery, so the reference
+    // a zero-byte node inserted by error recovery, so the reference
     // parser rejects children — only the optional kind argument is legal.
     missing_node: ($) =>
       seq(
@@ -152,32 +152,32 @@ module.exports = grammar({
       ),
 
     // `{...}`: siblings in order. Grouping only; never a field value's
-    // shape requirement or an output scope unless captured.
+    // shape requirement or a result scope unless captured.
     sequence: ($) => seq("{", repeat($._sequence_item), "}"),
 
-    // `[...]`: ordered choice. Branches are either all-effectively-union
-    // or labeled (enum); that distinction is semantic, not syntactic.
-    alternation: ($) => seq("[", repeat($.branch), "]"),
+    // `[...]`: alternatives tried in source order with backtracking. They are
+    // either all labeled or all unlabeled; that distinction is semantic.
+    alternation: ($) => seq("[", repeat($.alternative), "]"),
 
-    // A branch body is a pattern; anchors and negated fields cannot form
-    // branches (labeled or not). An unlabeled branch must not start with
+    // An alternative body is a pattern; anchors and negated fields cannot form
+    // alternatives (labeled or not). An unlabeled alternative must not start with
     // `name:` — a lowercase label is how the reference parser reads that,
     // and it rejects it — so the unlabeled arm uses a field-free copy of
     // the pattern rules.
-    branch: ($) =>
+    alternative: ($) =>
       choice(
         seq(field("label", $.type_identifier), ":", field("body", $._pattern)),
         field(
           "body",
           choice(
-            $._branch_suffixable,
-            alias($._branch_quantified, $.quantified_pattern),
-            alias($._branch_captured, $.captured_pattern),
+            $._alternative_suffixable,
+            alias($._alternative_quantified, $.quantified_pattern),
+            alias($._alternative_captured, $.captured_pattern),
           ),
         ),
       ),
 
-    _branch_suffixable: ($) =>
+    _alternative_suffixable: ($) =>
       choice(
         $.named_node,
         $.def_ref,
@@ -189,24 +189,24 @@ module.exports = grammar({
         $.alternation,
       ),
 
-    _branch_quantified: ($) =>
+    _alternative_quantified: ($) =>
       seq(
-        field("pattern", $._branch_suffixable),
+        field("pattern", $._alternative_suffixable),
         field("quantifier", $.quantifier),
       ),
 
-    _branch_captured: ($) =>
+    _alternative_captured: ($) =>
       seq(
         field(
           "pattern",
           choice(
-            $._branch_suffixable,
-            alias($._branch_quantified, $.quantified_pattern),
+            $._alternative_suffixable,
+            alias($._alternative_quantified, $.quantified_pattern),
           ),
         ),
         choice(
           seq(field("capture", $.capture), optional($.capture_type)),
-          field("capture", $.suppressive_capture),
+          field("capture", $.discard),
         ),
       ),
 
@@ -233,7 +233,7 @@ module.exports = grammar({
     // `-field`: assert the field is absent.
     negated_field: ($) => seq("-", field("name", $.identifier)),
 
-    // `.` is soft adjacency, `.!` is exact adjacency.
+    // `.` is the soft anchor; `.!` is the exact anchor.
     anchor: (_) => choice(".", ".!"),
 
     // `_` matches any node; `(_)` any named node. The same token serves as
@@ -272,14 +272,14 @@ module.exports = grammar({
     // reference lexer for tree-sitter compatibility.
     identifier: (_) => /[a-z][a-zA-Z0-9_.\-]*/,
 
-    // Definition names, references, branch labels, and type names. The
+    // Definition names, references, alternative labels, and type names. The
     // leading uppercase letter alone decides identifier intent.
     type_identifier: (_) => /[A-Z][a-zA-Z0-9_]*/,
 
     capture: (_) => /@[a-z][a-z0-9_]*/,
 
-    // `@_` or `@_name`: match, then discard the output.
-    suppressive_capture: (_) => /@_[a-z0-9_]*/,
+    // `@_` or `@_name`: match, then discard the result.
+    discard: (_) => /@_[a-z0-9_]*/,
 
     // `; line`, `// line`, and non-nesting `/* block */`. The block form
     // mirrors the reference regex exactly, quirks included: a body `*`

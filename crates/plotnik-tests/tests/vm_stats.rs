@@ -1,6 +1,6 @@
 mod support;
 
-use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::bytecode::{EntryPoint, Module};
 use plotnik_lib::{
     BytecodeConfig, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM,
 };
@@ -21,9 +21,9 @@ fn compile(src: &str) -> Module {
         .expect("valid query emits module")
 }
 
-fn module_and_entry() -> (Module, Entrypoint) {
+fn module_and_entry() -> (Module, EntryPoint) {
     let module = compile("Q = (program (expression_statement (identifier) @id))");
-    let entry = module.entrypoint("Q").expect("Q entrypoint exists");
+    let entry = module.entry_point("Q").expect("Q entry point exists");
     (module, entry)
 }
 
@@ -38,18 +38,18 @@ fn execute_with_stats_reports_success_usage() {
     let (result, stats) = vm.execute_with_stats(&module, &entry, &mut tracer);
 
     assert!(result.is_ok(), "run should match");
-    assert!(stats.steps_used > 0);
-    assert!(stats.heap_high_water > 0);
+    assert!(stats.fuel_used > 0);
+    assert!(stats.peak_live_heap_bytes > 0);
 }
 
 #[test]
-fn execute_with_stats_reports_step_limit_usage() {
+fn execute_with_stats_reports_fuel_usage() {
     let (module, entry) = module_and_entry();
     let source = "x";
     let tree = support::parse_javascript(source);
     let vm = VM::builder(source, &tree)
         .limits(RuntimeLimitSpec {
-            steps: Limit::Of(1),
+            fuel_limit: Limit::Of(1),
             memory: Limit::Unbounded,
         })
         .build();
@@ -57,7 +57,7 @@ fn execute_with_stats_reports_step_limit_usage() {
 
     let (result, stats) = vm.execute_with_stats(&module, &entry, &mut tracer);
 
-    assert!(matches!(result, Err(RuntimeError::StepLimitExceeded(1))));
-    assert_eq!(stats.steps_used, 1);
-    assert!(stats.heap_high_water > 0);
+    assert!(matches!(result, Err(RuntimeError::OutOfFuel(1))));
+    assert_eq!(stats.fuel_used, 1);
+    assert!(stats.peak_live_heap_bytes > 0);
 }

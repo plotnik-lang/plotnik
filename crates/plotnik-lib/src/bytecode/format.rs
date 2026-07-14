@@ -2,7 +2,7 @@
 //!
 //! Both dump and trace use the same column layout:
 //! ```text
-//! | 2 | step | 1 |   5   | 1 | content              | 1 | succ |
+//! | 2 | addr | 1 |   5   | 1 | content              | 1 | succ |
 //! |   | pad  |   | (sym) |   |                      |   |      |
 //! ```
 
@@ -64,7 +64,7 @@ impl Symbol {
     /// Empty symbol (5 spaces).
     pub const EMPTY: Symbol = Symbol::new("  ", " ", "  ");
 
-    /// Epsilon symbol for unconditional transitions.
+    /// Epsilon symbol for unconditional instructions.
     pub const EPSILON: Symbol = Symbol::new(" ", "-ε-", " ");
 
     /// Padding indicator (centered "..." in 5-char column).
@@ -194,26 +194,26 @@ pub fn truncate_text(s: &str, max_len: usize) -> String {
 /// Builder for formatted output lines.
 ///
 /// Constructs lines following the column layout:
-/// `<indent><step><gap><symbol><gap><content>...<successors>`
+/// `<indent><addr><gap><symbol><gap><content>...<successors>`
 pub struct LineBuilder {
-    step_width: usize,
+    addr_width: usize,
 }
 
 impl LineBuilder {
-    /// Create a new line builder with the given step width.
-    pub fn new(step_width: usize) -> Self {
-        Self { step_width }
+    /// Create a new line builder with the given address width.
+    pub fn new(addr_width: usize) -> Self {
+        Self { addr_width }
     }
 
-    /// Build an instruction line prefix: `  <step> <symbol> `
-    pub fn instruction_prefix(&self, step: u16, symbol: Symbol) -> String {
+    /// Build an instruction line prefix: `  <addr> <symbol> `
+    pub fn instruction_prefix(&self, addr: u16, symbol: Symbol) -> String {
         format!(
-            "{:indent$}{:0sw$} {} ",
+            "{:indent$}{:0aw$} {} ",
             "",
-            step,
+            addr,
             symbol.format(),
             indent = cols::INDENT,
-            sw = self.step_width,
+            aw = self.addr_width,
         )
     }
 
@@ -253,15 +253,15 @@ fn display_width(s: &str) -> usize {
 pub fn format_effect(effect: &Effect) -> String {
     match effect.kind {
         EffectKind::Node => "Node".to_string(),
-        EffectKind::ArrayOpen => "ArrayOpen".to_string(),
-        EffectKind::Push => "Push".to_string(),
-        EffectKind::ArrayClose => "ArrayClose".to_string(),
-        EffectKind::StructOpen => "StructOpen".to_string(),
-        EffectKind::StructClose => "StructClose".to_string(),
-        EffectKind::Set => format!("Set(M{})", effect.payload),
-        EffectKind::EnumOpen => format!("EnumOpen(M{})", effect.payload),
-        EffectKind::EnumClose => "EnumClose".to_string(),
-        EffectKind::Null => "Null".to_string(),
+        EffectKind::ListOpen => "ListOpen".to_string(),
+        EffectKind::ArrayPush => "ArrayPush".to_string(),
+        EffectKind::ListClose => "ListClose".to_string(),
+        EffectKind::RecordOpen => "RecordOpen".to_string(),
+        EffectKind::RecordClose => "RecordClose".to_string(),
+        EffectKind::RecordSet => format!("RecordSet(M{})", effect.payload),
+        EffectKind::VariantOpen => format!("VariantOpen(M{})", effect.payload),
+        EffectKind::VariantClose => "VariantClose".to_string(),
+        EffectKind::Absent => "Absent".to_string(),
         EffectKind::SuppressBegin => "SuppressBegin".to_string(),
         EffectKind::SuppressEnd => "SuppressEnd".to_string(),
         EffectKind::SpanStartAt => format!("SpanStartAt#{}", effect.payload),

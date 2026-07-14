@@ -18,16 +18,16 @@ S4 "identifier"
 S5 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
-[transitions]
+[instructions]
 Q:
   00       (@12)                            12 : 01
   01                                        ▶

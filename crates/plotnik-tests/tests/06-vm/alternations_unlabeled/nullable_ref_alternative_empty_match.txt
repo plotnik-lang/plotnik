@@ -1,0 +1,75 @@
+A = (expression_statement)?
+
+Q = (program
+  [
+    (A)
+    (debugger_statement) @d
+  ]
+)
+--------------------- INPUT ----------------------
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  d: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "d": null
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "d"
+S2 "A"
+S3 "Q"
+S4 "expression_statement"
+S5 "program"
+S6 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { d }
+
+[type_members]
+M0: S1 → T1  ; d: A
+
+[type_names]
+N0: S2 → T1  ; A
+N1: S3 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@21)                            21 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07   !   (expression_statement)           20
+  08  ──!  _                                07, 08
+  10   !   _ [Absent RecordSet(M0)]         07, 08
+  12  -ε-  [Absent RecordSet(M0)]           06
+  14   !   (debugger_statement) [Node RecordSet(M0)]  20
+  16  ──!  _                                10, 14, 16
+  18  └─!  _                                10, 14, 16
+  20  ─‣┘  _                                06
+  21   !   (program)                        18, 12
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@21)                            21 : 03
+       ▶   (@21)
+
+@21:
+  21       (program)                        18, 12
+       ●   program
+  18       _                                10, 14, 16
+  21  ❮❮❮ 
+  12  -ε-  [Absent RecordSet(M0)]           06
+  06   ◀   (@21)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

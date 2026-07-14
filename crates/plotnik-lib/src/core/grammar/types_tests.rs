@@ -194,7 +194,7 @@ fn terminal_kind_without_children_is_a_leaf_token() {
 #[test]
 fn constraint_lookup_on_shapeless_kind_is_empty_not_panic() {
     // A token-like kind can have a symbol but no node shape (e.g. typescript `jsx_text`). Constraint
-    // lookups for it must return empty instead of panicking, so the linker never crashes on a query
+    // lookups for it must return empty instead of panicking, so the binder never crashes on a query
     // such as `(jsx_text (comment))`.
     let metadata = GrammarTables {
         node_shapes: vec![NodeShape::root("root")],

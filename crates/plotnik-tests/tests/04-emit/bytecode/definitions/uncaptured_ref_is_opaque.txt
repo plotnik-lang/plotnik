@@ -1,0 +1,68 @@
+Inner = (identifier) @name
+Q = (expression_statement (Inner))
+---------------------- NFA -----------------------
+[entry_points]
+Inner = 13
+Q     = 15
+
+[transitions]
+Inner:
+  01                                        ▶
+  02   !   (identifier) [Node RecordSet(name)]  01
+
+Q:
+  04                                        ▶
+  05   !   (expression_statement) [SuppressBegin]  08
+  06  ─‣┘  _ [SuppressEnd]                  04
+  08  └‣─  (Inner)                          02 : 06
+
+Inner (entry point):
+  10                                        ▶
+  11  -ε-  [RecordClose]                    10
+  12       (Inner)                          02 : 11
+  13  -ε-  [RecordOpen]                     12
+
+Q (entry point):
+  14                                        ▶
+  15       (Q)                              05 : 14
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "Inner"
+S3 "identifier"
+S4 "expression_statement"
+S5 "Q"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Record  M0:1  ; { name }
+
+[type_members]
+M0: S1 → T1  ; name: <Node>
+
+[type_names]
+N0: S2 → T2  ; Inner
+
+[entry_points]
+Inner = 00 :: T2
+Q     = 06 :: T0
+
+[instructions]
+Inner:
+  00  -ε-  [RecordOpen]                     02
+  02       (@12)                            12 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+
+Q:
+  06       (@16)                            16 : 07
+  07                                        ▶
+  08  └‣─  (@12)                            12 : 09
+  09  ─‣┘  _ [SuppressEnd]                  14
+  11                                        ▶
+  12   !   (identifier) [Node RecordSet(M0)]  11
+  14                                        ▶
+  15  ...
+  16   !   (expression_statement) [SuppressBegin]  08

@@ -1,0 +1,57 @@
+Q = [
+  A: (identifier) @a
+  B: (number) @b
+]
+---------------------- NFA -----------------------
+[entry_points]
+Q = 6
+
+[transitions]
+Q:
+  0  -ε-                                    2, 3
+  1                                         ▶
+  2   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  1
+  3   !   (number) [VariantOpen(B) Node RecordSet(b) VariantClose]  1
+
+Q (entry point):
+  5                                         ▶
+  6       (Q)                               0 : 5
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "A"
+S4 "B"
+S5 "Q"
+S6 "identifier"
+S7 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { b }
+T3 = Variant M2:2  ; A | B
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T1  ; A: T1
+M3: S4 → T2  ; B: T2
+
+[type_names]
+N0: S5 → T3  ; Q
+
+[entry_points]
+Q = 00 :: T3
+
+[instructions]
+Q:
+  00       (@11)                            11 : 01
+  01                                        ▶
+  02                                        ▶
+  03   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  02
+  06  ...
+  07  ...
+  08   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  02
+  11  -ε-                                   03, 08

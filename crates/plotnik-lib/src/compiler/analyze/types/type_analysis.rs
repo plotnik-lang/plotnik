@@ -1,29 +1,26 @@
 //! `TypeAnalysis`: the frozen result of type inference.
 //!
-//! Holds the interned type registry, each definition's output type and arity,
-//! the per-pattern inference results, and explicit type aliases. It is built
+//! Holds the interned type registry, named type declarations, each definition's
+//! output and root extent, and the per-pattern inference results. It is built
 //! incrementally by [`TypeAnalysisBuilder`] and frozen with
 //! [`TypeAnalysisBuilder::finish`]; past that boundary it is immutable and its
 //! accessors are trusted (a structural miss is a compiler bug, not a query
 //! condition).
 //!
-//! Definition *identity* (names, `DefId`s, recursion) is not stored here — it is
-//! owned by `DependencyAnalysis` and read from there. This artifact only maps the
-//! `DefId`s that analysis already assigned to the types it inferred for them.
+//! Definition matching identity remains owned by `DependencyAnalysis`. This
+//! artifact records the separate type declaration owned by each definition.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::compiler::analyze::types::raw_output::{
-    RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
-};
+use crate::compiler::analyze::types::raw_output::{RawCaptureObservation, RawOutputGraphBuilder};
 use crate::compiler::analyze::types::type_shape::{
-    Arity, FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId,
-    TypeShape,
+    DefinitionOutput, PatternFlow, PatternShape, RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL,
+    TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
-use crate::compiler::analyze::types::{CaptureFact, UnionFlowPlan};
+use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::ids::DefId;
+use crate::compiler::ids::{DefId, TypeDeclId};
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
@@ -36,6 +33,21 @@ pub struct CustomCaptureTypeOccurrence {
     pub type_id: TypeId,
 }
 
+/// A named result type whose identity is independent of its structural body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TypeDeclaration {
+    pub id: TypeDeclId,
+    pub name: Symbol,
+    pub body: TypeId,
+}
+
+#[derive(Clone, Debug)]
+struct TypeDeclarationEntry {
+    name: Symbol,
+    body: Option<TypeId>,
+    definition: Option<DefId>,
+}
+
 /// Frozen registry of inferred types and per-definition / per-pattern results.
 ///
 /// Constructed only via [`TypeAnalysisBuilder`]; the private fields and
@@ -43,20 +55,18 @@ pub struct CustomCaptureTypeOccurrence {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct TypeAnalysis {
-    pub(super) types: Vec<TypeShape>,
+    types: Vec<TypeEntry>,
+    declarations: Vec<TypeDeclarationEntry>,
+    definition_declarations: BTreeMap<DefId, TypeDeclId>,
 
-    /// Each definition's output type, keyed by `DefId`. `BTreeMap` so iteration
-    /// is in `DefId` order — the SCC/emission order entrypoints rely on. Total
-    /// over every scheduled definition: a captureless structural body maps to
-    /// `TYPE_VOID`, so a lookup for any admitted `DefId` hits. `finish` admits
-    /// the map only after checking its type ids and every `Ref` target are
-    /// consistent.
-    pub(super) def_output: BTreeMap<DefId, TypeId>,
+    /// Each definition's output, keyed by `DefId`. `BTreeMap` so iteration
+    /// is in `DefId` order — the SCC/emission order entry points rely on. Total
+    /// over every scheduled definition, including match-only definitions.
+    pub(super) def_output: BTreeMap<DefId, DefinitionOutput>,
 
-    /// Each definition's structural arity. `Arity::One` definitions are
-    /// callable entrypoints; `Arity::Many` definitions are fragments that can be
-    /// referenced or nested but get no top-level entry surface.
-    def_arity: BTreeMap<DefId, Arity>,
+    /// Each definition's static top-level extent. `SingleNode` definitions are
+    /// selectable as entry points; all others remain reusable fragments.
+    def_root_extent: BTreeMap<DefId, RootExtent>,
 
     pub(super) pattern_result: HashMap<Pattern, PatternShape>,
 
@@ -64,21 +74,28 @@ pub struct TypeAnalysis {
     /// every admitted regular capture occurrence.
     pub(super) capture_facts: HashMap<Pattern, CaptureFact>,
 
-    /// Concrete missing-field behavior for each union-like alternation.
-    pub(super) union_flow: HashMap<Pattern, UnionFlowPlan>,
+    /// Final completion behavior for every merged field of each alternation.
+    pub(super) field_completions: HashMap<Pattern, FieldCompletions>,
 
-    /// Every named type, assigned by the naming pass: definition results carry
-    /// their definition's name, nested composites carry path-derived names
-    /// (`FooItems`), and custom `:: TypeName` capture types override. Complete: every
-    /// struct/enum reachable from a definition output outside an enum-variant
-    /// payload position has exactly one name. `BTreeMap` for deterministic
-    /// emission order.
-    type_names: BTreeMap<TypeId, Symbol>,
+    /// Structural bodies that are referenced by a generated or explicit type
+    /// name. Definition declarations are keyed by `DefId` instead: their names
+    /// must not attach to structurally interned bodies shared with unrelated
+    /// positions. `BTreeMap` preserves deterministic body order.
+    named_types: BTreeMap<TypeId, Symbol>,
+}
+
+#[derive(Clone, Debug)]
+enum TypeEntry {
+    ReservedNoValue,
+    Shape(TypeShape),
 }
 
 impl TypeAnalysis {
     pub fn type_shape(&self, id: TypeId) -> Option<&TypeShape> {
-        self.types.get(id.0 as usize)
+        match self.types.get(id.0 as usize)? {
+            TypeEntry::ReservedNoValue => None,
+            TypeEntry::Shape(shape) => Some(shape),
+        }
     }
 
     pub fn expect_type_shape(&self, id: TypeId) -> &TypeShape {
@@ -86,43 +103,96 @@ impl TypeAnalysis {
             .expect("admitted type id must reference a registered type")
     }
 
-    pub fn struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
+    pub fn declaration(&self, id: TypeDeclId) -> Option<TypeDeclaration> {
+        let entry = self.declarations.get(id.index())?;
+        Some(TypeDeclaration {
+            id,
+            name: entry.name,
+            body: entry.body?,
+        })
+    }
+
+    pub fn declaration_body(&self, id: TypeDeclId) -> Option<TypeId> {
+        self.declarations
+            .get(id.index())
+            .and_then(|entry| entry.body)
+    }
+
+    pub fn declaration_name(&self, id: TypeDeclId) -> Symbol {
+        self.declarations
+            .get(id.index())
+            .expect("type declaration id must be registered")
+            .name
+    }
+
+    pub fn declaration_definition(&self, id: TypeDeclId) -> Option<DefId> {
+        self.declarations
+            .get(id.index())
+            .expect("type declaration id must be registered")
+            .definition
+    }
+
+    pub fn definition_declaration(&self, def_id: DefId) -> TypeDeclId {
+        *self
+            .definition_declarations
+            .get(&def_id)
+            .expect("every definition must own a type declaration slot")
+    }
+
+    fn type_is_option(&self, mut type_id: TypeId) -> bool {
+        let mut seen = HashSet::new();
+        while seen.insert(type_id) {
+            match self.type_shape(type_id) {
+                Some(TypeShape::Option(_)) => return true,
+                Some(TypeShape::Ref(declaration)) => {
+                    let Some(target) = self.declaration_body(*declaration) else {
+                        return false;
+                    };
+                    type_id = target;
+                }
+                _ => return false,
+            }
+        }
+        false
+    }
+
+    pub fn record_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, RecordField>> {
         match self.type_shape(id)? {
-            TypeShape::Struct(fields) => Some(fields),
+            TypeShape::Record(fields) => Some(fields),
             _ => None,
         }
     }
 
-    /// Fields of the struct a `Fields` flow points to.
+    /// Fields of the record a `Fields` flow points to.
     ///
-    /// Every `PatternFlow::Fields` is constructed by interning a `Struct` (see the
-    /// `intern_struct`/`intern_single_field` calls at every `Fields` construction
-    /// site), so a non-`Struct` id here is a broken type-system invariant, not a
+    /// Every `PatternFlow::Fields` is constructed by interning a `Record` (see the
+    /// `intern_record`/`intern_single_field_record` calls at every `Fields` construction
+    /// site), so a non-`Record` id here is a broken type-system invariant, not a
     /// runtime condition the query can trigger. We surface it loudly instead of
-    /// fabricating an empty struct that would silently mistype the output.
-    pub fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
+    /// fabricating an empty record that would silently mistype the output.
+    pub fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, RecordField> {
         match self.expect_type_shape(id) {
-            TypeShape::Struct(fields) => fields,
-            _ => panic!("Fields flow must point to a Struct type"),
+            TypeShape::Record(fields) => fields,
+            _ => panic!("Fields flow must point to a Record type"),
         }
     }
 
-    /// Whether a type is a meaningful structured output (enum/struct, or an
-    /// array/optional thereof). Plain `Node` is not — it is the matched node,
+    /// Whether a type is a meaningful structured output (variant/record, or a
+    /// list/option thereof). Plain `Node` is not — it is the matched node,
     /// captured directly.
     ///
-    /// A `Ref` resolves through its target: a reference to a void definition
+    /// A `Ref` resolves through its target: a reference to a match-only definition
     /// leaves no pending value at runtime (the capture takes the matched node),
     /// so it must not classify as structured. Mid-inference a same-SCC target
-    /// has no output yet; assume structured — the admitted classification that
+    /// has no inferred output flow yet; assume structured — the admitted classification that
     /// lowering reads always resolves.
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
-            Some(TypeShape::Enum(_) | TypeShape::Struct(_)) => true,
-            Some(TypeShape::Ref(def_id)) => self
-                .def_output(*def_id)
+            Some(TypeShape::Variant(_) | TypeShape::Record(_)) => true,
+            Some(TypeShape::Ref(declaration)) => self
+                .declaration_body(*declaration)
                 .is_none_or(|t| self.is_structured_output(t)),
-            Some(shape @ (TypeShape::Array { .. } | TypeShape::Optional(_))) => shape
+            Some(shape @ (TypeShape::List { .. } | TypeShape::Option(_))) => shape
                 .child_type_ids()
                 .any(|id| id != TYPE_NODE && self.is_structured_output(id)),
             _ => false,
@@ -147,74 +217,77 @@ impl TypeAnalysis {
             .expect("admitted regular capture must have frozen capture facts")
     }
 
-    pub fn union_flow_plan(&self, pattern: &Pattern) -> Option<&UnionFlowPlan> {
-        self.union_flow.get(pattern)
+    pub fn field_completions(&self, pattern: &Pattern) -> Option<&FieldCompletions> {
+        self.field_completions.get(pattern)
     }
 
-    pub fn expect_union_flow_plan(&self, pattern: &Pattern) -> &UnionFlowPlan {
-        self.union_flow_plan(pattern)
-            .expect("admitted union flow must have an explicit fallback plan")
+    pub fn expect_field_completions(&self, pattern: &Pattern) -> &FieldCompletions {
+        self.field_completions(pattern)
+            .expect("every field-producing alternation must have explicit field completions")
     }
 
-    pub fn arity(&self, pattern: &Pattern) -> Option<Arity> {
-        self.pattern_result.get(pattern).map(|info| info.arity)
+    pub fn root_extent(&self, pattern: &Pattern) -> Option<RootExtent> {
+        self.pattern_result
+            .get(pattern)
+            .map(|info| info.root_extent)
     }
 
-    pub fn def_output(&self, def_id: DefId) -> Option<TypeId> {
+    pub fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
         self.def_output.get(&def_id).copied()
     }
 
-    pub fn expect_def_output(&self, def_id: DefId) -> TypeId {
+    pub fn expect_def_output(&self, def_id: DefId) -> DefinitionOutput {
         self.def_output(def_id)
-            .expect("admitted definition must have an inferred output type")
+            .expect("admitted definition must have an inferred output")
     }
 
-    pub fn def_arity(&self, def_id: DefId) -> Option<Arity> {
-        self.def_arity.get(&def_id).copied()
+    pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
+        self.def_root_extent.get(&def_id).copied()
     }
 
-    pub fn expect_def_arity(&self, def_id: DefId) -> Arity {
-        self.def_arity(def_id)
-            .expect("admitted definition must have an inferred arity")
+    pub fn expect_def_root_extent(&self, def_id: DefId) -> RootExtent {
+        self.def_root_extent(def_id)
+            .expect("admitted definition must have an inferred root extent")
     }
 
-    pub fn is_entrypoint_def(&self, def_id: DefId) -> bool {
-        self.expect_def_arity(def_id) == Arity::One
+    pub fn is_selectable_definition(&self, def_id: DefId) -> bool {
+        self.expect_def_root_extent(def_id) == RootExtent::SingleNode
     }
 
     /// Follow a `Ref` chain to the underlying materialized type; non-ref types
     /// resolve to themselves. The accessor type-table emission uses to map a
     /// query type to the concrete shape it stands for.
     ///
-    /// A `Ref` whose definition ended up void resolves to `Node`: the runtime
+    /// A `Ref` whose definition is match-only resolves to `Node`: the runtime
     /// capture of such a reference takes the matched node (the callee leaves no
     /// pending value), so `Node` is the shape the reference stands for.
     pub fn resolve_underlying_type_id(&self, type_id: TypeId) -> TypeId {
-        let Some(TypeShape::Ref(def_id)) = self.type_shape(type_id) else {
+        let Some(TypeShape::Ref(declaration)) = self.type_shape(type_id) else {
             return type_id;
         };
-        let target = self.expect_def_output(*def_id);
-        if target == TYPE_VOID {
+        let Some(target) = self.declaration_body(*declaration) else {
             return TYPE_NODE;
-        }
+        };
         self.resolve_underlying_type_id(target)
     }
 
-    /// Iterate over all definition output types as `(DefId, TypeId)` in `DefId`
+    /// Iterate over all definition result types as `(DefId, TypeId)` in `DefId`
     /// order, which corresponds to SCC processing order (leaves first).
-    pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
-        self.def_output.iter().map(|(&id, &type_id)| (id, type_id))
+    pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
+        self.def_output.iter().map(|(&id, &output)| (id, output))
     }
 
-    /// Iterate over callable definition outputs in definition order.
-    pub fn iter_entrypoint_output(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
+    /// Iterate over selectable definition outputs in definition order.
+    pub fn iter_entry_point_outputs(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
         self.iter_def_output()
-            .filter(|&(def_id, _)| self.is_entrypoint_def(def_id))
+            .filter(|&(def_id, _)| self.is_selectable_definition(def_id))
     }
 
-    /// Iterate all named types in `TypeId` order (deterministic).
-    pub fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
-        self.type_names.iter().map(|(&id, &sym)| (id, sym))
+    /// Iterate generated and explicitly named structural bodies in `TypeId`
+    /// order. Definition declarations are exposed separately through their
+    /// `DefId` and output body.
+    pub fn iter_named_types(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
+        self.named_types.iter().map(|(&id, &sym)| (id, sym))
     }
 
     /// Admission check for [`TypeAnalysisBuilder::finish`]: the frozen result must
@@ -223,54 +296,75 @@ impl TypeAnalysis {
     /// loudly — the same discipline `DependencyAnalysis::new` follows.
     fn assert_well_formed(&self) {
         assert!(
-            matches!(self.type_shape(TYPE_VOID), Some(TypeShape::Void)),
-            "TYPE_VOID must be interned at its canonical id",
+            matches!(
+                self.types.get(RESERVED_NO_VALUE_TYPE_ID.0 as usize),
+                Some(TypeEntry::ReservedNoValue)
+            ),
+            "the bytecode no-value slot must remain reserved",
         );
         assert!(
             matches!(self.type_shape(TYPE_NODE), Some(TypeShape::Node)),
             "TYPE_NODE must be interned at its canonical id",
         );
         assert!(
-            matches!(self.type_shape(TYPE_STR), Some(TypeShape::Str)),
-            "TYPE_STR must be interned at its canonical id",
+            matches!(self.type_shape(TYPE_TEXT), Some(TypeShape::Text)),
+            "TYPE_TEXT must be interned at its canonical id",
         );
         assert!(
             matches!(self.type_shape(TYPE_BOOL), Some(TypeShape::Bool)),
             "TYPE_BOOL must be interned at its canonical id",
         );
 
-        for shape in &self.types {
+        for entry in &self.types {
+            let TypeEntry::Shape(shape) = entry else {
+                continue;
+            };
             for child_id in shape.child_type_ids() {
                 self.assert_type_id_registered(child_id, "child type id out of range");
             }
 
-            if let TypeShape::Ref(def_id) = shape {
+            if let TypeShape::Option(inner) = shape {
+                assert!(!self.type_is_option(*inner), "Option must be idempotent",);
+            }
+
+            if let TypeShape::Ref(declaration) = shape {
                 assert!(
-                    self.def_output.contains_key(def_id),
-                    "every Ref target must have an inferred output type",
+                    self.declarations.get(declaration.index()).is_some(),
+                    "every Ref target must be a registered type declaration",
                 );
             }
         }
 
-        for &type_id in self.def_output.values() {
-            self.assert_type_id_registered(type_id, "def output type id out of range");
+        for output in self.def_output.values() {
+            if let DefinitionOutput::Value(type_id) = output {
+                self.assert_type_id_registered(*type_id, "definition result type id out of range");
+            }
+        }
+
+        for (&def_id, &declaration) in &self.definition_declarations {
+            let entry = self
+                .declarations
+                .get(declaration.index())
+                .expect("definition declaration id must be registered");
+            assert_eq!(entry.definition, Some(def_id));
+            assert_eq!(entry.body, self.expect_def_output(def_id).value());
         }
 
         assert_eq!(
             self.def_output.len(),
-            self.def_arity.len(),
-            "definition output and arity tables must cover the same definitions",
+            self.def_root_extent.len(),
+            "definition output and root-extent tables must cover the same definitions",
         );
         for def_id in self.def_output.keys() {
             assert!(
-                self.def_arity.contains_key(def_id),
-                "every definition output must have an inferred arity",
+                self.def_root_extent.contains_key(def_id),
+                "every definition output must have an inferred root extent",
             );
         }
-        for def_id in self.def_arity.keys() {
+        for def_id in self.def_root_extent.keys() {
             assert!(
                 self.def_output.contains_key(def_id),
-                "every definition arity must have an inferred output",
+                "every definition root extent must have an inferred output",
             );
         }
 
@@ -278,22 +372,62 @@ impl TypeAnalysis {
             self.assert_flow_well_formed(&info.flow);
         }
 
-        for &type_id in self.type_names.keys() {
+        let field_alternations = self
+            .pattern_result
+            .iter()
+            .filter(|(pattern, shape)| {
+                matches!(pattern, Pattern::Alternation(_))
+                    && matches!(&shape.flow, PatternFlow::Fields(_))
+            })
+            .count();
+        assert_eq!(
+            self.field_completions.len(),
+            field_alternations,
+            "field-completion tables must cover exactly the field-producing alternations",
+        );
+        for (pattern, completions) in &self.field_completions {
+            assert!(
+                matches!(pattern, Pattern::Alternation(_)),
+                "field completions must belong to an alternation",
+            );
+            let PatternFlow::Fields(type_id) = &self
+                .pattern_result
+                .get(pattern)
+                .expect("field completions must belong to an admitted pattern")
+                .flow
+            else {
+                panic!("field completions must belong to a field-producing alternation")
+            };
+            let fields = self.expect_record_fields(*type_id);
+            assert_eq!(
+                completions.fields().count(),
+                fields.len(),
+                "every merged field must have exactly one completion",
+            );
+            for field in completions.fields() {
+                assert!(
+                    fields.contains_key(&field),
+                    "field completions cannot name a field outside the merged record",
+                );
+            }
+        }
+
+        for &type_id in self.named_types.keys() {
             self.assert_type_id_registered(type_id, "named type id out of range");
         }
     }
 
     fn assert_flow_well_formed(&self, flow: &PatternFlow) {
         match flow {
-            PatternFlow::Void => {}
+            PatternFlow::NoValue => {}
             PatternFlow::Value(type_id) => {
                 self.assert_type_id_registered(*type_id, "value flow type id out of range");
             }
             PatternFlow::Fields(type_id) => {
                 self.assert_type_id_registered(*type_id, "fields flow type id out of range");
                 assert!(
-                    matches!(self.type_shape(*type_id), Some(TypeShape::Struct(_))),
-                    "Fields flow must point to a Struct type",
+                    matches!(self.type_shape(*type_id), Some(TypeShape::Record(_))),
+                    "Fields flow must point to a Record type",
                 );
             }
         }
@@ -314,19 +448,22 @@ pub struct TypeAnalysisBuilder {
     pub(super) analysis: TypeAnalysis,
 
     /// Reverse index for `intern_type` deduplication of leaf and wrapper shapes.
-    /// Structs and enums are deliberately NOT deduplicated: they are nominal —
+    /// Records and variant types are deliberately NOT deduplicated: they are nominal —
     /// two definitions with identical capture profiles are two distinct types,
     /// each carrying its own name. Scratch: the frozen result looks types up by
     /// `TypeId`, never by shape.
     intern_index: HashMap<TypeShape, TypeId>,
 
-    /// Creation site of every fresh struct/enum, for naming-pass diagnostics.
+    /// Creation site of every fresh record/variant type, for naming-pass diagnostics.
     /// Scratch: only the naming pass consults it.
     type_provenance: HashMap<TypeId, Span>,
 
     /// Custom `:: TypeName` capture-type occurrences in source order.
     /// Scratch: only the naming pass consults it.
     custom_capture_types: Vec<CustomCaptureTypeOccurrence>,
+
+    /// Explicit capture-type declarations deduplicated by name and body.
+    capture_type_declarations: HashMap<(Symbol, TypeId), TypeDeclId>,
 
     /// Present only when the builtin pre-scan requests producer provenance.
     /// Keeping the recorder on the builder prevents normalization details from
@@ -347,16 +484,28 @@ impl TypeAnalysisView<'_> {
         self.analysis.type_shape(id)
     }
 
-    pub(crate) fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
-        self.analysis.expect_struct_fields(id)
+    pub(crate) fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, RecordField> {
+        self.analysis.expect_record_fields(id)
     }
 
     pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
         self.analysis.pattern_result(pattern)
     }
 
-    pub(crate) fn def_output(&self, def_id: DefId) -> Option<TypeId> {
+    pub(crate) fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
         self.analysis.def_output(def_id)
+    }
+
+    pub(crate) fn declaration_body(&self, declaration: TypeDeclId) -> Option<TypeId> {
+        self.analysis.declaration_body(declaration)
+    }
+
+    pub(crate) fn declaration_definition(&self, declaration: TypeDeclId) -> Option<DefId> {
+        self.analysis.declaration_definition(declaration)
+    }
+
+    pub(crate) fn declaration_name(&self, declaration: TypeDeclId) -> Symbol {
+        self.analysis.declaration_name(declaration)
     }
 }
 
@@ -371,29 +520,32 @@ impl TypeAnalysisBuilder {
         let mut builder = Self {
             analysis: TypeAnalysis {
                 types: Vec::new(),
+                declarations: Vec::new(),
+                definition_declarations: BTreeMap::new(),
                 def_output: BTreeMap::new(),
-                def_arity: BTreeMap::new(),
+                def_root_extent: BTreeMap::new(),
                 pattern_result: HashMap::new(),
                 capture_facts: HashMap::new(),
-                union_flow: HashMap::new(),
-                type_names: BTreeMap::new(),
+                field_completions: HashMap::new(),
+                named_types: BTreeMap::new(),
             },
             intern_index: HashMap::new(),
             type_provenance: HashMap::new(),
             custom_capture_types: Vec::new(),
+            capture_type_declarations: HashMap::new(),
             raw_output_graph: None,
             invalid_types: HashSet::new(),
         };
 
-        // Pre-register builtin types at their expected IDs.
-        let void_id = builder.intern_type(TypeShape::Void);
-        debug_assert_eq!(void_id, TYPE_VOID);
+        // Preserve bytecode primitive numbering without treating no-value flow as a type.
+        builder.analysis.types.push(TypeEntry::ReservedNoValue);
+        debug_assert_eq!(builder.analysis.types.len(), TYPE_NODE.0 as usize);
 
         let node_id = builder.intern_type(TypeShape::Node);
         debug_assert_eq!(node_id, TYPE_NODE);
 
-        let str_id = builder.intern_type(TypeShape::Str);
-        debug_assert_eq!(str_id, TYPE_STR);
+        let text_id = builder.intern_type(TypeShape::Text);
+        debug_assert_eq!(text_id, TYPE_TEXT);
 
         let bool_id = builder.intern_type(TypeShape::Bool);
         debug_assert_eq!(bool_id, TYPE_BOOL);
@@ -427,12 +579,18 @@ impl TypeAnalysisBuilder {
     }
 
     /// Intern a type shape. Leaf and wrapper shapes deduplicate structurally;
-    /// structs and enums always mint a fresh id (they are nominal — see the
+    /// records and variant types always mint a fresh id (they are nominal — see the
     /// `intern_index` field docs).
     pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
-        if matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)) {
+        if let TypeShape::Option(inner) = &shape
+            && self.type_is_option(*inner)
+        {
+            return *inner;
+        }
+
+        if matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)) {
             let id = TypeId(self.analysis.types.len() as u32);
-            self.analysis.types.push(shape);
+            self.analysis.types.push(TypeEntry::Shape(shape));
             return id;
         }
 
@@ -441,24 +599,94 @@ impl TypeAnalysisBuilder {
         }
 
         let id = TypeId(self.analysis.types.len() as u32);
-        self.analysis.types.push(shape.clone());
+        self.analysis.types.push(TypeEntry::Shape(shape.clone()));
         self.intern_index.insert(shape, id);
         id
     }
 
-    pub fn intern_struct(&mut self, fields: BTreeMap<Symbol, FieldInfo>) -> TypeId {
-        self.intern_type(TypeShape::Struct(fields))
+    pub(super) fn type_shapes_snapshot(&self) -> Vec<Option<TypeShape>> {
+        self.analysis
+            .types
+            .iter()
+            .map(|entry| match entry {
+                TypeEntry::ReservedNoValue => None,
+                TypeEntry::Shape(shape) => Some(shape.clone()),
+            })
+            .collect()
     }
 
-    pub fn intern_single_field(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
-        self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
+    fn type_is_option(&self, type_id: TypeId) -> bool {
+        self.analysis.type_is_option(type_id)
     }
 
-    pub fn intern_custom(&mut self, name: Symbol) -> TypeId {
-        self.intern_type(TypeShape::Custom(name))
+    pub fn intern_option(&mut self, inner: TypeId) -> TypeId {
+        self.intern_type(TypeShape::Option(inner))
     }
 
-    /// Record where a fresh struct/enum came from, for naming-pass diagnostics.
+    pub fn intern_record(&mut self, fields: BTreeMap<Symbol, RecordField>) -> TypeId {
+        self.intern_type(TypeShape::Record(fields))
+    }
+
+    pub fn intern_single_field_record(&mut self, name: Symbol, info: RecordField) -> TypeId {
+        self.intern_type(TypeShape::Record(BTreeMap::from([(name, info)])))
+    }
+
+    pub(super) fn replace_record_fields(
+        &mut self,
+        type_id: TypeId,
+        fields: BTreeMap<Symbol, RecordField>,
+    ) {
+        let Some(TypeEntry::Shape(TypeShape::Record(current))) =
+            self.analysis.types.get_mut(type_id.0 as usize)
+        else {
+            unreachable!("record field replacement requires a registered record")
+        };
+        *current = fields;
+    }
+
+    pub fn declare_definitions(&mut self, definitions: impl IntoIterator<Item = (DefId, Symbol)>) {
+        for (def_id, name) in definitions {
+            assert!(
+                !self.analysis.definition_declarations.contains_key(&def_id),
+                "definition declaration slots are reserved once",
+            );
+            let id = TypeDeclId::from_raw(
+                u32::try_from(self.analysis.declarations.len())
+                    .expect("type declaration count fits u32"),
+            );
+            self.analysis.declarations.push(TypeDeclarationEntry {
+                name,
+                body: None,
+                definition: Some(def_id),
+            });
+            self.analysis.definition_declarations.insert(def_id, id);
+        }
+    }
+
+    pub fn definition_ref(&mut self, def_id: DefId) -> TypeId {
+        let declaration = self.analysis.definition_declaration(def_id);
+        self.intern_type(TypeShape::Ref(declaration))
+    }
+
+    pub fn declare_capture_type(&mut self, name: Symbol, body: TypeId) -> TypeId {
+        if let Some(&declaration) = self.capture_type_declarations.get(&(name, body)) {
+            return self.intern_type(TypeShape::Ref(declaration));
+        }
+        let declaration = TypeDeclId::from_raw(
+            u32::try_from(self.analysis.declarations.len())
+                .expect("type declaration count fits u32"),
+        );
+        self.analysis.declarations.push(TypeDeclarationEntry {
+            name,
+            body: Some(body),
+            definition: None,
+        });
+        self.capture_type_declarations
+            .insert((name, body), declaration);
+        self.intern_type(TypeShape::Ref(declaration))
+    }
+
+    /// Record where a fresh record/variant type came from, for naming-pass diagnostics.
     pub fn record_type_provenance(&mut self, type_id: TypeId, span: Span) {
         self.type_provenance.entry(type_id).or_insert(span);
     }
@@ -507,8 +735,8 @@ impl TypeAnalysisBuilder {
         self.analysis.capture_facts.insert(pattern, fact);
     }
 
-    pub fn record_union_flow(&mut self, pattern: Pattern, plan: UnionFlowPlan) {
-        self.analysis.union_flow.insert(pattern, plan);
+    pub fn record_field_completions(&mut self, pattern: Pattern, completions: FieldCompletions) {
+        self.analysis.field_completions.insert(pattern, completions);
     }
 
     pub(crate) fn record_invalid_type(&mut self, type_id: TypeId) {
@@ -522,15 +750,15 @@ impl TypeAnalysisBuilder {
         graph.record_alternation_incompatibility(pattern, field);
     }
 
-    /// Snapshot only the alternation outputs needed to freeze omission plans.
-    /// The snapshot breaks the immutable borrow before plans are inserted
+    /// Snapshot the alternation outputs that need field-completion tables.
+    /// The snapshot breaks the immutable borrow before tables are inserted
     /// without cloning every inferred pattern and shape in the query.
     pub(crate) fn alternation_field_results(&self) -> Vec<(Pattern, TypeId)> {
         self.analysis
             .pattern_result
             .iter()
             .filter_map(|(pattern, shape)| {
-                if !matches!(pattern, Pattern::Union(_) | Pattern::Enum(_)) {
+                if !matches!(pattern, Pattern::Alternation(_)) {
                     return None;
                 }
                 let PatternFlow::Fields(type_id) = shape.flow else {
@@ -541,20 +769,10 @@ impl TypeAnalysisBuilder {
             .collect()
     }
 
-    pub fn record_def_output(&mut self, def_id: DefId, type_id: TypeId) {
-        self.analysis.def_output.insert(def_id, type_id);
-    }
-
-    pub(crate) fn record_raw_definition(
-        &mut self,
-        def_id: DefId,
-        body: &Pattern,
-        value_role: RawDefinitionValueRole,
-    ) {
-        let Some(graph) = &mut self.raw_output_graph else {
-            return;
-        };
-        graph.record_definition(def_id, body, value_role);
+    pub fn record_def_output(&mut self, def_id: DefId, output: DefinitionOutput) {
+        self.analysis.def_output.insert(def_id, output);
+        let declaration = self.analysis.definition_declaration(def_id);
+        self.analysis.declarations[declaration.index()].body = output.value();
     }
 
     pub(crate) fn normalize_capture_types(
@@ -569,27 +787,30 @@ impl TypeAnalysisBuilder {
         graph.finish().normalize(self, interner, diagnostics);
     }
 
-    pub fn record_def_arity(&mut self, def_id: DefId, arity: Arity) {
-        self.analysis.def_arity.insert(def_id, arity);
+    pub fn record_def_root_extent(&mut self, def_id: DefId, extent: RootExtent) {
+        self.analysis.def_root_extent.insert(def_id, extent);
     }
 
-    pub fn def_arity(&self, def_id: DefId) -> Option<Arity> {
-        self.analysis.def_arity(def_id)
+    pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
+        self.analysis.def_root_extent(def_id)
     }
 
     /// Install the naming pass's result. Names must be complete and validated
     /// before the analysis is frozen.
-    pub fn set_type_names(&mut self, names: BTreeMap<TypeId, Symbol>) {
-        self.analysis.type_names = names;
+    pub fn set_named_types(&mut self, names: BTreeMap<TypeId, Symbol>) {
+        self.analysis.named_types = names;
     }
 
     /// Deep structural equality over the in-progress type registry.
     ///
-    /// Structs and enums mint a fresh id per occurrence (nominal typing), so
-    /// two structurally identical composites can carry different ids; interned
-    /// shapes (Node, Custom, Ref, and wrappers over shared ids) compare by id.
-    /// `Ref` cuts recursion, so the walk terminates on recursive types.
+    /// Record and variant bodies mint a fresh id per occurrence, so two
+    /// structurally identical bodies can carry different ids. References to
+    /// declarations with record or variant bodies remain nominal; transparent
+    /// aliases compare through their bodies. `Ref` cuts recursion, so the walk
+    /// terminates on recursive types.
     pub(crate) fn types_structurally_equal(&self, a: TypeId, b: TypeId) -> bool {
+        let a = self.transparent_alias_body(a);
+        let b = self.transparent_alias_body(b);
         if a == b {
             return true;
         }
@@ -601,34 +822,56 @@ impl TypeAnalysisBuilder {
         };
 
         match (shape_a, shape_b) {
-            (TypeShape::Struct(fa), TypeShape::Struct(fb)) => {
+            (TypeShape::Record(fa), TypeShape::Record(fb)) => {
                 fa.len() == fb.len()
                     && fa.iter().zip(fb.iter()).all(|((ka, ia), (kb, ib))| {
-                        ka == kb
-                            && ia.optional == ib.optional
-                            && self.types_structurally_equal(ia.type_id, ib.type_id)
+                        ka == kb && self.types_structurally_equal(ia.final_type, ib.final_type)
                     })
             }
-            (TypeShape::Enum(va), TypeShape::Enum(vb)) => {
+            (TypeShape::Variant(va), TypeShape::Variant(vb)) => {
                 va.len() == vb.len()
                     && va.iter().zip(vb.iter()).all(|((ka, pa), (kb, pb))| {
-                        ka == kb && self.types_structurally_equal(*pa, *pb)
+                        ka == kb
+                            && match (pa.type_id(), pb.type_id()) {
+                                (None, None) => true,
+                                (Some(a), Some(b)) => self.types_structurally_equal(a, b),
+                                _ => false,
+                            }
                     })
             }
             (
-                TypeShape::Array {
+                TypeShape::List {
                     element: ea,
-                    non_empty: na,
+                    minimum: ma,
                 },
-                TypeShape::Array {
+                TypeShape::List {
                     element: eb,
-                    non_empty: nb,
+                    minimum: mb,
                 },
-            ) => na == nb && self.types_structurally_equal(*ea, *eb),
-            (TypeShape::Optional(ia), TypeShape::Optional(ib)) => {
+            ) => ma == mb && self.types_structurally_equal(*ea, *eb),
+            (TypeShape::Option(ia), TypeShape::Option(ib)) => {
                 self.types_structurally_equal(*ia, *ib)
             }
             _ => false,
         }
+    }
+
+    fn transparent_alias_body(&self, mut type_id: TypeId) -> TypeId {
+        let mut seen = HashSet::new();
+        while let Some(TypeShape::Ref(declaration)) = self.analysis.type_shape(type_id) {
+            if !seen.insert(*declaration) {
+                return type_id;
+            }
+            let Some(body) = self.analysis.declaration_body(*declaration) else {
+                return type_id;
+            };
+            match self.analysis.type_shape(body) {
+                Some(TypeShape::Record(_) | TypeShape::Variant(_)) => return type_id,
+                Some(TypeShape::Ref(_)) => type_id = body,
+                Some(_) => return body,
+                None => return type_id,
+            }
+        }
+        type_id
     }
 }

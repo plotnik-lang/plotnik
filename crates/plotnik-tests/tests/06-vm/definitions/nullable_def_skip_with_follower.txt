@@ -30,8 +30,8 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Optional(T0)  ; <Node>?
-T2 = Struct  M0:1  ; { d }
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { d }
 
 [type_members]
 M0: S1 → T0  ; d: <Node>
@@ -40,19 +40,19 @@ M0: S1 → T0  ; d: <Node>
 N0: S2 → T1  ; A
 N1: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [Node Set(M0)]  07
-  10  ─‣─  (debugger_statement) [Node Set(M0)]  07
+  08  └‣─  (debugger_statement) [Node RecordSet(M0)]  07
+  10  ─‣─  (debugger_statement) [Node RecordSet(M0)]  07
   12   !   (expression_statement)           10
   13  ──!  _                                12, 13
   15  ...
@@ -60,19 +60,19 @@ Q:
   18   !   (program)                        08, 16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
        ▶   (@18)
 
 @18:
   18       (program)                        08, 16
        ●   program
-  08       (debugger_statement) [Node Set(M0)]  07
+  08       (debugger_statement) [Node RecordSet(M0)]  07
        ●   debugger_statement
   07       _                                06
        ●   program
   06   ◀   (@18)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

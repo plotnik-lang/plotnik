@@ -1,0 +1,12 @@
+Q = [
+  Foo: -key
+  Bar: (pair)
+]
+------------------ DIAGNOSTICS -------------------
+error: negated grammar fields cannot appear directly in alternations
+ --> query.ptk:2:8
+  |
+2 |   Foo: -key
+  |        ^^^^
+  |
+help: negate the grammar field inside a node alternative: `[(a -field) (b)]`

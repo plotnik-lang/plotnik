@@ -1,10 +1,10 @@
-//! Transition instruction emission.
+//! Bytecode instruction emission.
 
 use std::collections::BTreeMap;
 
 use crate::bytecode::{
-    Call, Effect, MatchInstr, MatchPredicate, Return, RoutedCall, STEP_SIZE, SplitCall,
-    SplitCallReturns, StepAddr, StepId,
+    BYTECODE_WORD_SIZE, Call, CodeAddr, Effect, MatchInstr, MatchPredicate, Return, RoutedCall,
+    SplitCall, SplitCallReturns, SuccessorAddr,
 };
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{ConstantPool, EmitError};
@@ -17,16 +17,16 @@ pub fn emit_instructions(
     layout: &LayoutMap,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
-    let mut bytes = vec![0u8; layout.total_steps() as usize * STEP_SIZE];
+    let mut bytes = vec![0u8; layout.total_words() as usize * BYTECODE_WORD_SIZE];
 
     for instr in instructions {
         let label = instr.label();
-        let Some(&step_id) = layout.step_addrs().get(&label) else {
+        let Some(&code_addr) = layout.code_addrs().get(&label) else {
             continue;
         };
 
-        let offset = u16::from(step_id) as usize * STEP_SIZE;
-        let resolved = resolve_instruction(instr, layout.step_addrs(), pool)?;
+        let offset = u16::from(code_addr) as usize * BYTECODE_WORD_SIZE;
+        let resolved = resolve_instruction(instr, layout.code_addrs(), pool)?;
 
         let end = offset + resolved.len();
         if end <= bytes.len() {
@@ -39,7 +39,7 @@ pub fn emit_instructions(
 
 fn resolve_instruction(
     instr: &InstructionIR,
-    map: &BTreeMap<Label, StepAddr>,
+    map: &BTreeMap<Label, CodeAddr>,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
     match instr {
@@ -49,7 +49,7 @@ fn resolve_instruction(
             let encoded = match return_.mode {
                 crate::bytecode::ReturnMode::CallerMatched => Return::matched(),
                 crate::bytecode::ReturnMode::RoutedMatched => Return::routed_matched(),
-                crate::bytecode::ReturnMode::RoutedZero => Return::routed_zero(),
+                crate::bytecode::ReturnMode::RoutedEmpty => Return::routed_empty(),
             };
             Ok(encoded.to_bytes().to_vec())
         }
@@ -58,14 +58,14 @@ fn resolve_instruction(
 
 fn resolve_match(
     m: &MatchIR,
-    map: &BTreeMap<Label, StepAddr>,
+    map: &BTreeMap<Label, CodeAddr>,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
     let effects = m.effects.iter().map(|e| resolve_effect(e, pool)).collect();
     let predicate = m.predicate.as_ref().map(|pred| {
         let string_id = pool
             .lookup_str(pred.value.text())
-            .expect("predicate string must be interned before transition emission");
+            .expect("predicate string must be interned before instruction emission");
         let value_ref = if pred.value.is_regex() {
             u16::from(
                 pool.lookup_regex(string_id)
@@ -83,7 +83,9 @@ fn resolve_match(
     let successors = m
         .successors
         .iter()
-        .map(|&l| StepId::try_from(l.resolve(map)).expect("step id must be non-zero"))
+        .map(|&label| {
+            SuccessorAddr::try_from(label.resolve(map)).expect("successor address must be non-zero")
+        })
         .collect();
 
     let instr = MatchInstr {
@@ -99,24 +101,25 @@ fn resolve_match(
     instr.encode().map_err(EmitError::Encode)
 }
 
-fn resolve_call(c: &CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-    let step =
-        |label: Label| StepId::try_from(label.resolve(map)).expect("step id must be non-zero");
-    let target = step(c.target);
+fn resolve_call(c: &CallIR, map: &BTreeMap<Label, CodeAddr>) -> [u8; 8] {
+    let successor_addr = |label: Label| {
+        SuccessorAddr::try_from(label.resolve(map)).expect("successor address must be non-zero")
+    };
+    let target = successor_addr(c.target);
     match c.protocol {
         CallProtocol::Ordinary {
             nav,
             node_field,
             next,
-        } => Call::new(nav, node_field, step(next), target).to_bytes(),
+        } => Call::new(nav, node_field, successor_addr(next), target).to_bytes(),
         CallProtocol::Routed { entry_nav, next } => {
-            RoutedCall::new(entry_nav, step(next), target).to_bytes()
+            RoutedCall::new(entry_nav, successor_addr(next), target).to_bytes()
         }
         CallProtocol::Split { entry_nav, returns } => SplitCall::new(
             entry_nav,
             SplitCallReturns {
-                matched: step(returns[0]),
-                zero: step(returns[1]),
+                matched: successor_addr(returns[0]),
+                empty: successor_addr(returns[1]),
             },
             target,
         )

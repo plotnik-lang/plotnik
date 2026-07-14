@@ -1,0 +1,114 @@
+Q = (program
+  [
+    A: (comment)? @c
+  ]* @items
+)
+--------------------- INPUT ----------------------
+// c
+x;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  items: QItems[];
+}
+
+export type QItems =
+  | { $tag: "A"; $data: { c: Node | null } };
+--------------------- OUTPUT ---------------------
+{
+  "items": [
+    {
+      "$tag": "A",
+      "$data": {
+        "c": {
+          "kind": "comment",
+          "text": "// c",
+          "span": [0, 4]
+        }
+      }
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "c"
+S2 "A"
+S3 "items"
+S4 "QItems"
+S5 "Q"
+S6 "program"
+S7 "comment"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { c }
+T3 = Variant M1:1  ; A
+T4 = ListZeroOrMore(T3)  ; QItems*
+T5 = Record  M2:1  ; { items }
+
+[type_members]
+M0: S1 → T1  ; c: T1
+M1: S2 → T2  ; A: T2
+M2: S3 → T4  ; items: T4
+
+[type_names]
+N0: S4 → T3  ; QItems
+N1: S5 → T5  ; Q
+
+[entry_points]
+Q = 00 :: T5
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@26)                            26 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ListClose RecordSet(M2)]        06
+  10  -ε-  [VariantClose ArrayPush]         18, 24
+  12   !   (comment) [Node RecordSet(M0)]   10
+  14  ──!  _                                12, 14
+  16   !   _ [VariantOpen(M1)]              12, 14
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
+  22  -ε-  [ListOpen]                       20, 08
+  24  ─‣┘  _ [ListClose RecordSet(M2)]      06
+  26   !   (program)                        22
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@26)                            26 : 03
+       ▶   (@26)
+
+@26:
+  26       (program)                        22
+       ●   program
+  22  -ε-  [ListOpen]                       20, 08
+  20       _                                16, 18
+       ●   comment
+  16       _ [VariantOpen(M1)]              12, 14
+       ●   comment
+  12       (comment) [Node RecordSet(M0)]   10
+       ●   comment
+  10  -ε-  [VariantClose ArrayPush]         18, 24
+  18       _                                16, 18
+       ●   expression_statement
+  16       _ [VariantOpen(M1)]              12, 14
+       ●   expression_statement
+  12       (comment) [Node RecordSet(M0)]   10
+       ○   expression_statement
+  16  ❮❮❮ 
+  14       _                                12, 14
+  18  ❮❮❮ 
+  18       _                                16, 18
+  10  ❮❮❮ 
+  24       _ [ListClose RecordSet(M2)]      06
+       ●   program
+  06   ◀   (@26)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

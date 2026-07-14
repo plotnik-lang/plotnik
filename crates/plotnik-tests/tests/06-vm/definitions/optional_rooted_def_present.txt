@@ -45,8 +45,8 @@ S9 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Optional(T0)  ; <Node>?
-T2 = Struct  M0:2  ; { first, n }
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { first, n }
 
 [type_members]
 M0: S1 → T1  ; first: MaybeId
@@ -56,20 +56,20 @@ M1: S2 → T0  ; n: <Node>
 N0: S3 → T1  ; MaybeId
 N1: S4 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘³ _                                06
-  08  └‣─  (number) [Set(M0) Node Set(M1)]  07
-  10  ─‣─  (number) [Set(M0) Node Set(M1)]  07
-  12  -ε-  [Null]                           08
+  08  └‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  07
+  10  ─‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  07
+  12  -ε-  [Absent]                         08
   14   !   (identifier) [Node]              10
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
@@ -79,7 +79,7 @@ Q:
   24   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
        ▶   (@24)
 
@@ -99,7 +99,7 @@ Q:
        ●   identifier
   14       (identifier) [Node]              10
        ●   identifier
-  10       (number) [Set(M0) Node Set(M1)]  07
+  10       (number) [RecordSet(M0) Node RecordSet(M1)]  07
        ○   ,
        ●   number
   07       _                                06
@@ -107,5 +107,5 @@ Q:
   06   ◀   (@24)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

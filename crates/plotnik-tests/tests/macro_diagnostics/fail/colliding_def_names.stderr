@@ -1,4 +1,4 @@
-error: definitions `HTTPServer` and `HttpServer` collide in generated code: both would be spelled `http_server_trace`; rename one so their snake_case forms differ
+error: definitions `HTTPServer` and `HttpServer` collide in generated code: both would be spelled `http_server_journal`; rename one so their snake_case forms differ
   --> tests/macro_diagnostics/fail/colliding_def_names.rs:7:5
    |
  7 | /     r#"

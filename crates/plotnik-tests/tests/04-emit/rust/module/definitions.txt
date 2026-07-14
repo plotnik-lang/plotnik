@@ -5,15 +5,15 @@ Q = (program
   (Inner) @second
 )
 -------------------- MATCHER ---------------------
-// Generated Plotnik query module: typed output types, `parse`/`matches` entry
-// points, per-type trace readers, and the compiled matcher (`mod matcher`).
+// Generated Plotnik query module: typed result types, `parse`/`matches` entry
+// points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
 // (docs/binary-format/08-dump-format.md).
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 2;
+pub const REQUIRED_RUNTIME_ABI: u32 = 3;
 
 use ::plotnik_rt::Node;
 
@@ -28,20 +28,20 @@ pub struct Q<'t> {
 }
 
 impl<'t> Inner<'t> {
-    /// Match `Inner` against `tree` and replay the committed trace into
-    /// the typed output. `None` is the no-match outcome.
+    /// Match `Inner` against `tree` and decode its output events into
+    /// the typed result. `None` is the no-match outcome.
     /// The module's compiled-in limits bound total work, live
-    /// backtracking state, and typed replay depth.
+    /// backtracking state, and typed decode depth.
     pub fn parse(
         tree: &'t rt::Tree,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let Some(log) = matcher::inner_safe(tree, source)? else {
+        let Some(journal) = matcher::inner_journal_limited(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log, source);
-        let value = read_inner(&mut t);
-        t.finish();
+        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);
+        let value = decode_inner(&mut decoder);
+        decoder.finish();
         Ok(Some(value))
     }
 
@@ -50,7 +50,7 @@ impl<'t> Inner<'t> {
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        matcher::inner_accepts(tree, source)
+        matcher::inner_matches(tree, source)
     }
 }
 
@@ -70,20 +70,20 @@ impl<'t, 's> rt::Parse<'t, 's> for Inner<'t> {
 }
 
 impl<'t> Q<'t> {
-    /// Match `Q` against `tree` and replay the committed trace into
-    /// the typed output. `None` is the no-match outcome.
+    /// Match `Q` against `tree` and decode its output events into
+    /// the typed result. `None` is the no-match outcome.
     /// The module's compiled-in limits bound total work, live
-    /// backtracking state, and typed replay depth.
+    /// backtracking state, and typed decode depth.
     pub fn parse(
         tree: &'t rt::Tree,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let Some(log) = matcher::q_safe(tree, source)? else {
+        let Some(journal) = matcher::q_journal_limited(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log, source);
-        let value = read_q(&mut t);
-        t.finish();
+        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);
+        let value = decode_q(&mut decoder);
+        decoder.finish();
         Ok(Some(value))
     }
 
@@ -92,7 +92,7 @@ impl<'t> Q<'t> {
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        matcher::q_accepts(tree, source)
+        matcher::q_matches(tree, source)
     }
 }
 
@@ -111,43 +111,43 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
     }
 }
 
-/// Replay one committed `Inner` value.
-fn read_inner<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Inner<'t> {
-    t.expect_struct_open();
+/// Decode one committed `Inner` value.
+fn decode_inner<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Inner<'t> {
+    decoder.expect_record_open();
     let mut v0 = None; // id
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !decoder.at_record_close() {
+        match decoder.peek_record_set() {
             // id
-            0 => v0 = Some(t.expect_node()),
-            other => unreachable!("trace shape proven at emit: `Inner` has no member index {other}"),
+            0 => v0 = Some(decoder.expect_node()),
+            other => unreachable!("journal shape proven at emit: `Inner` has no member index {other}"),
         }
-        t.expect_set();
+        decoder.expect_record_set();
     }
-    t.expect_struct_close();
+    decoder.expect_record_close();
     Inner {
         id: v0.expect("field-stability: every accepting path sets `id`"),
     }
 }
 
-/// Replay one committed `Q` value.
-fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
-    t.expect_struct_open();
+/// Decode one committed `Q` value.
+fn decode_q<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Q<'t> {
+    decoder.expect_record_open();
     let mut v0 = None; // second
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !decoder.at_record_close() {
+        match decoder.peek_record_set() {
             // second
-            1 => v0 = Some(read_inner(t)),
-            other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
+            1 => v0 = Some(decode_inner(decoder)),
+            other => unreachable!("journal shape proven at emit: `Q` has no member index {other}"),
         }
-        t.expect_set();
+        decoder.expect_record_set();
     }
-    t.expect_struct_close();
+    decoder.expect_record_close();
     Q {
         second: v0.expect("field-stability: every accepting path sets `second`"),
     }
 }
 
-pub use self::matcher::{inner_trace, q_trace};
+pub use self::matcher::{inner_journal, q_journal};
 
 /// The compiled matcher: engine machinery shielded from the query's
 /// type namespace.
@@ -158,27 +158,27 @@ mod matcher {
     /// each input's node count. Chosen at generation time, never at the call
     /// site: the query is trusted, the input is not.
     const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
-        steps: rt::Limit::Auto,
+        fuel_limit: rt::Limit::Auto,
         memory: rt::Limit::Auto,
     };
 
-    /// No ceilings — what the unmetered trace entry points run under.
+    /// No ceilings — what the unmetered journal entry points run under.
     const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
-        max_steps: None,
+        fuel_limit: None,
         max_memory: None,
     };
 
-    /// Bitmask selecting the dispatch steps on which the memory ceiling is
+    /// Bitmask selecting the matcher dispatches on which the memory ceiling is
     /// sampled; must be a power of two minus one. Twin of the VM's constant.
     const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
-    /// Conservative maximum native-stack bytes used by one typed replay reader
+    /// Conservative maximum native-stack bytes used by one typed decoder
     /// frame before runtime padding.
-    pub(super) const MAX_READER_FRAME_BYTES: u64 = 232;
+    pub(super) const MAX_DECODER_FRAME_BYTES: u64 = 232;
 
-    /// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
-    /// matcher itself is iterative; only reader recursion enters this guard.
-    pub(super) const MAX_REPLAY_DEPTH: Option<u64> = Some(rt::replay_depth_auto(232));
+    /// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
+    /// matcher itself is iterative; only decoder recursion enters this guard.
+    pub(super) const MAX_DECODE_DEPTH: Option<u64> = Some(rt::decode_depth_auto(232));
 
     /// Resolve [`LIMITS`] against this input's node count, exactly like
     /// `VM::builder(...).build()` resolves the VM's.
@@ -258,43 +258,43 @@ mod matcher {
     const S22_Q_EP: u16 = 17;
     const S23_Q_EP: u16 = 18;
 
-    /// Match the `Inner` entrypoint against `tree`. `Some` carries the committed
-    /// capture trace — the same effect stream the VM commits for this query.
-    pub fn inner_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+    /// Match the `Inner` entry point against `tree`. `Some` carries the committed
+    /// match journal — the same event sequence the VM commits for this query.
+    pub fn inner_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
         let outcome = run::<false, false, true>(tree, source, S19_INNER_EP, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
-    /// [`inner_trace`] under the module's compiled-in limits ([`LIMITS`]).
-    pub(super) fn inner_safe<'t>(
+    /// [`inner_journal`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn inner_journal_limited<'t>(
         tree: &'t rt::Tree,
         source: &str,
-    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         run::<true, true, true>(tree, source, S19_INNER_EP, resolved_limits(tree))
     }
 
-    /// Whether `Inner` accepts, under [`LIMITS`], with data effects suppressed.
-    pub(super) fn inner_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+    /// Whether `Inner` accepts under [`LIMITS`] without recording output events.
+    pub(super) fn inner_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
         Ok(run::<true, true, false>(tree, source, S19_INNER_EP, resolved_limits(tree))?.is_some())
     }
 
-    /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
-    /// capture trace — the same effect stream the VM commits for this query.
-    pub fn q_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+    /// Match the `Q` entry point against `tree`. `Some` carries the committed
+    /// match journal — the same event sequence the VM commits for this query.
+    pub fn q_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
         let outcome = run::<false, false, true>(tree, source, S23_Q_EP, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
-    /// [`q_trace`] under the module's compiled-in limits ([`LIMITS`]).
-    pub(super) fn q_safe<'t>(
+    /// [`q_journal`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn q_journal_limited<'t>(
         tree: &'t rt::Tree,
         source: &str,
-    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         run::<true, true, true>(tree, source, S23_Q_EP, resolved_limits(tree))
     }
 
-    /// Whether `Q` accepts, under [`LIMITS`], with data effects suppressed.
-    pub(super) fn q_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+    /// Whether `Q` accepts under [`LIMITS`] without recording output events.
+    pub(super) fn q_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
         Ok(run::<true, true, false>(tree, source, S23_Q_EP, resolved_limits(tree))?.is_some())
     }
 
@@ -302,7 +302,7 @@ mod matcher {
     enum Flow {
         /// Continue at this state.
         Jump(u16),
-        /// The entrypoint accepted; the effect log is the committed trace.
+        /// The entry point accepted; the match journal is committed.
         Accept,
         /// The state failed; unwind the checkpoint stack.
         Backtrack,
@@ -315,46 +315,46 @@ mod matcher {
         NoMatch,
     }
 
-    /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
-    /// `METERED_STEPS` and `METERED_MEMORY` gate the two budget checks
+    /// One dispatch loop serves every entry point; `entry` selects the wrapper.
+    /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-    /// `TRACE` controls whether data effects are recorded; `matches` disables it to
-    /// avoid output allocation and replay-depth failures. (No let-chains: generated
-    /// code targets the embedding crate's edition.)
-    fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+    /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
+    /// disables it to avoid output allocation and decode-depth failures. (No
+    /// let-chains: generated code targets the embedding crate's edition.)
+    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT_EVENTS: bool>(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
         limits: rt::ResolvedRuntimeLimits,
-    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         verify_language(tree);
-        let mut eng = if TRACE {
+        let mut eng = if RECORD_OUTPUT_EVENTS {
             rt::Engine::new(tree.walk())
         } else {
-            rt::Engine::new_data_suppressed(tree.walk())
+            rt::Engine::new_match_only(tree.walk())
         };
-        let mut steps: u64 = 0;
+        let mut fuel_used: u64 = 0;
         let mut ip = entry;
         loop {
-            if METERED_STEPS || METERED_MEMORY {
-                // Step ceiling: bound total work. Folded out when steps are
-                // unbounded; the counter still advances under a memory-only
-                // policy because the sample cadence below rides on it.
-                if METERED_STEPS {
-                    if let Some(max) = limits.max_steps {
-                        if steps >= max {
-                            return Err(rt::LimitExceeded::Steps(max));
+            if METERED_FUEL || METERED_MEMORY {
+                // One matcher dispatch currently consumes one fuel unit. The check
+                // folds out when fuel is unbounded; the counter still advances under
+                // a memory-only policy because the sample cadence below rides on it.
+                if METERED_FUEL {
+                    if let Some(limit) = limits.fuel_limit {
+                        if fuel_used >= limit {
+                            return Err(rt::LimitExceeded::OutOfFuel(limit));
                         }
                     }
                 }
-                steps += 1;
+                fuel_used += 1;
                 // Memory ceiling: the live runtime heap, sampled every
-                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
+                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-dispatch growth is bounded,
                 // so the unobserved overshoot is noise (see the VM loop). Folded
                 // out when memory is unbounded, so no `heap_bytes` read survives.
-                if METERED_MEMORY && steps & MEMORY_SAMPLE_MASK == 0 {
+                if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
                     let used = eng.heap_bytes();
                     if let Some(max) = limits.max_memory {
                         if used > max {
@@ -363,24 +363,24 @@ mod matcher {
                     }
                 }
             }
-            match step(&mut eng, source, ip) {
+            match dispatch(&mut eng, source, ip) {
                 Flow::Jump(next) => ip = next,
-                Flow::Accept => return Ok(Some(eng.into_effects())),
+                Flow::Accept => return Ok(Some(eng.into_journal())),
                 Flow::Backtrack => match backtrack(&mut eng, source) {
                     Unwound::Resumed(next) => ip = next,
-                    Unwound::Accepted => return Ok(Some(eng.into_effects())),
+                    Unwound::Accepted => return Ok(Some(eng.into_journal())),
                     Unwound::NoMatch => return Ok(None),
                 },
             }
         }
     }
 
-    fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
             //   01                                        ▶
             S01_INNER => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -400,7 +400,7 @@ mod matcher {
                 }
                 Flow::Jump(S01_INNER)
             }
-            //   04  └‣─  (identifier) [Node Set(id)]      03
+            //   04  └‣─  (identifier) [Node RecordSet(id)]  03
             S04_INNER => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -421,7 +421,7 @@ mod matcher {
             //   06                                        ▶
             S06_Q => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -435,17 +435,17 @@ mod matcher {
                 eng.suppress_begin();
                 Flow::Jump(S14_Q)
             }
-            //   08  ─‣┘  _ [Set(second)]                  06
+            //   08  ─‣┘  _ [RecordSet(second)]            06
             S08_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(second)
+                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(second)
                 Flow::Jump(S06_Q)
             }
-            //   10  -ε-  [StructClose]                    08
+            //   10  -ε-  [RecordClose]                    08
             S10_Q => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
                 Flow::Jump(S08_Q)
             }
             //   11  ─‣─  (Inner)                          02 : 10
@@ -461,10 +461,10 @@ mod matcher {
                 eng.enter_frame(S10_Q);
                 Flow::Jump(S02_INNER)
             }
-            //   13  -ε-  [SuppressEnd StructOpen]         11
+            //   13  -ε-  [SuppressEnd RecordOpen]         11
             S13_Q => {
                 eng.suppress_end();
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
                 Flow::Jump(S11_Q)
             }
             //   14  └‣─  (Inner)                          02 : 13
@@ -483,15 +483,15 @@ mod matcher {
             //   16                                        ▶
             S16_INNER_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   17  -ε-  [StructClose]                    16
+            //   17  -ε-  [RecordClose]                    16
             S17_INNER_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
                 Flow::Jump(S16_INNER_EP)
             }
             //   18       (Inner)                          02 : 17
@@ -499,23 +499,23 @@ mod matcher {
                 eng.enter_frame(S17_INNER_EP);
                 Flow::Jump(S02_INNER)
             }
-            //   19  -ε-  [StructOpen]                     18
+            //   19  -ε-  [RecordOpen]                     18
             S19_INNER_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
                 Flow::Jump(S18_INNER_EP)
             }
             //   20                                        ▶
             S20_Q_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   21  -ε-  [StructClose]                    20
+            //   21  -ε-  [RecordClose]                    20
             S21_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
                 Flow::Jump(S20_Q_EP)
             }
             //   22       (Q)                              07 : 21
@@ -523,9 +523,9 @@ mod matcher {
                 eng.enter_frame(S21_Q_EP);
                 Flow::Jump(S07_Q)
             }
-            //   23  -ε-  [StructOpen]                     22
+            //   23  -ε-  [RecordOpen]                     22
             S23_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
                 Flow::Jump(S22_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
@@ -565,17 +565,17 @@ mod matcher {
         true
     }
 
-    /// `S04_INNER` post-acceptance: effects, then branch. Shared by the dispatch
-    /// path and the match-retry resume, so a retried candidate replays exactly
-    /// what the original acceptance would have.
+    /// `S04_INNER` post-acceptance: effects, then successor dispatch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate emits exactly
+    /// what the original acceptance would have emitted.
     #[inline]
     fn finish_s04_inner(eng: &mut rt::Engine<'_>) -> Flow {
-        eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-        eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
+        eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(id)
         Flow::Jump(S03_INNER)
     }
 
-    /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+    /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
     /// Match checkpoints advance their sibling search and re-enter. Loops, never
     /// recurses — a run of exhausted retries unwinds in one call.
     fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
@@ -586,7 +586,7 @@ mod matcher {
             eng.restore_checkpoint_state(cp.state, snapshot);
 
             match cp.resume {
-                rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+                rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
                 // Call retry: advance to the next candidate satisfying the field
                 // constraint, then re-enter the callee. Exhausted siblings keep
@@ -614,7 +614,7 @@ mod matcher {
                     return Unwound::Resumed(resume.target);
                 }
 
-                // Match retry: step past the accepted-but-failed candidate and
+                // Match retry: advance past the accepted-but-failed candidate and
                 // re-run that state's sibling search from there.
                 rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
                     Some(Flow::Jump(next)) => return Unwound::Resumed(next),

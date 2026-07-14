@@ -10,7 +10,7 @@
 //! - a `Ref` occurrence is boxed iff it closes a by-value cycle through the
 //!   item declaration it is rendered in: its target reaches that *item* back
 //!   through edges that stay on the stack. `Vec` already heap-indirects, so
-//!   array elements are not by-value edges (and a ref under an array is
+//!   list elements are not by-value edges (and a ref under a list is
 //!   never boxed); `Option` stores inline, so it is one. Keying on the
 //!   enclosing item rather than the ref node keeps an off-cycle use of a
 //!   recursive type unboxed (`Q { expr: Expr }`) while every declaration a
@@ -21,7 +21,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 
 pub(super) struct TypeFacts {
     lifetimes: HashMap<TypeId, LifetimeUsage>,
@@ -62,7 +62,7 @@ impl TypeFacts {
     }
 
     /// Whether this `Ref` occurrence, rendered by value inside `item_ty`'s
-    /// declaration, renders as `Box<...>`. Occurrences under an array never
+    /// declaration, renders as `Box<...>`. Occurrences under a list never
     /// ask — `Vec` already indirects, so no cycle through them is by-value.
     pub(super) fn is_boxed_in(&self, item_ty: TypeId, ref_ty: TypeId) -> bool {
         self.by_value_closures
@@ -78,8 +78,7 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
     let mut out = Vec::new();
     let mut stack: Vec<TypeId> = types
         .iter_def_output()
-        .filter(|&(_, ty)| ty != TYPE_VOID)
-        .map(|(_, ty)| ty)
+        .filter_map(|(_, output)| output.value())
         .collect();
 
     while let Some(ty) = stack.pop() {
@@ -88,11 +87,10 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
         }
         out.push(ty);
         stack.extend(types.expect_type_shape(ty).child_type_ids());
-        if let TypeShape::Ref(def_id) = types.expect_type_shape(ty) {
-            let target = types.expect_def_output(*def_id);
-            if target != TYPE_VOID {
-                stack.push(target);
-            }
+        if let TypeShape::Ref(declaration) = types.expect_type_shape(ty)
+            && let Some(target) = types.declaration_body(*declaration)
+        {
+            stack.push(target);
         }
     }
 
@@ -109,25 +107,21 @@ fn lifetime_fixpoint(types: &TypeAnalysis, reachable: &[TypeId]) -> HashMap<Type
         let mut changed = false;
         for &ty in reachable {
             let mut usage = match types.expect_type_shape(ty) {
-                TypeShape::Node | TypeShape::Custom(_) => LifetimeUsage {
+                TypeShape::Node => LifetimeUsage {
                     tree: true,
                     source: false,
                 },
-                TypeShape::Str => LifetimeUsage {
+                TypeShape::Text => LifetimeUsage {
                     tree: false,
                     source: true,
                 },
-                TypeShape::Ref(def_id) => {
-                    let target = types.expect_def_output(*def_id);
-                    if target == TYPE_VOID {
-                        LifetimeUsage {
-                            tree: true,
-                            source: false,
-                        }
-                    } else {
-                        facts[&target]
-                    }
-                }
+                TypeShape::Ref(declaration) => match types.declaration_body(*declaration) {
+                    None => LifetimeUsage {
+                        tree: true,
+                        source: false,
+                    },
+                    Some(target) => facts[&target],
+                },
                 _ => LifetimeUsage::default(),
             };
             for child in types.expect_type_shape(ty).child_type_ids() {
@@ -151,10 +145,9 @@ fn ref_target_closures(
     reachable
         .iter()
         .filter_map(|&ty| match types.expect_type_shape(ty) {
-            TypeShape::Ref(def_id) => {
-                let target = types.expect_def_output(*def_id);
-                (target != TYPE_VOID).then(|| (ty, by_value_closure(types, target)))
-            }
+            TypeShape::Ref(declaration) => types
+                .declaration_body(*declaration)
+                .map(|target| (ty, by_value_closure(types, target))),
             _ => None,
         })
         .collect()
@@ -171,11 +164,10 @@ fn by_value_closure(types: &TypeAnalysis, from: TypeId) -> HashSet<TypeId> {
             continue;
         }
         match types.expect_type_shape(ty) {
-            // An array stores its elements on the heap: not a by-value edge.
-            TypeShape::Array { .. } => {}
-            TypeShape::Ref(def_id) => {
-                let target = types.expect_def_output(*def_id);
-                if target != TYPE_VOID {
+            // A list stores its elements on the heap: not a by-value edge.
+            TypeShape::List { .. } => {}
+            TypeShape::Ref(declaration) => {
+                if let Some(target) = types.declaration_body(*declaration) {
                     stack.push(target);
                 }
             }

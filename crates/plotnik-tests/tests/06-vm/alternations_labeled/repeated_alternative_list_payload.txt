@@ -1,0 +1,122 @@
+Q = (program
+  [
+    A: (expression_statement)* @stmts
+    B: (debugger_statement)
+  ] @x
+)
+--------------------- INPUT ----------------------
+a; b;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  x: QX;
+}
+
+export type QX =
+  | { $tag: "A"; $data: { stmts: Node[] } }
+  | { $tag: "B" };
+--------------------- OUTPUT ---------------------
+{
+  "x": {
+    "$tag": "A",
+    "$data": {
+      "stmts": [
+        {
+          "kind": "expression_statement",
+          "text": "a;",
+          "span": [0, 2]
+        },
+        {
+          "kind": "expression_statement",
+          "text": "b;",
+          "span": [3, 5]
+        }
+      ]
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "stmts"
+S2 "A"
+S3 "B"
+S4 "x"
+S5 "QX"
+S6 "Q"
+S7 "program"
+S8 "expression_statement"
+S9 "debugger_statement"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = ListZeroOrMore(T1)  ; <Node>*
+T3 = Record  M0:1  ; { stmts }
+T4 = Variant M1:2  ; A | B
+T5 = Record  M3:1  ; { x }
+
+[type_members]
+M0: S1 → T2  ; stmts: T2
+M1: S2 → T3  ; A: T3
+M2: S3 → T0  ; B: <NoValue>
+M3: S4 → T4  ; x: QX
+
+[type_names]
+N0: S5 → T4  ; QX
+N1: S6 → T5  ; Q
+
+[entry_points]
+Q = 00 :: T5
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@32)                            32 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ListClose RecordSet(M0) VariantClose RecordSet(M3)]  23
+  11   !   (expression_statement) [Node ArrayPush]  13, 08
+  13  ──!  _                                11, 13
+  15  ...
+  16   !   _ [ListOpen]                     11, 13
+  18  -ε-  [VariantOpen(M1)]                16
+  20  -ε-  [VariantOpen(M1) ListOpen ListClose RecordSet(M0) VariantClose RecordSet(M3)]  06
+  23  ─‣┘  _                                06
+  24   !   (debugger_statement) [VariantOpen(M2) VariantClose RecordSet(M3)]  23
+  26  ──!  _                                18, 24, 26
+  28  └─!  _                                18, 24, 26
+  30  ...
+  31  ...
+  32   !   (program)                        28, 20
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@32)                            32 : 03
+       ▶   (@32)
+
+@32:
+  32       (program)                        28, 20
+       ●   program
+  28       _                                18, 24, 26
+       ●   expression_statement
+  18  -ε-  [VariantOpen(M1)]                16
+  16       _ [ListOpen]                     11, 13
+       ●   expression_statement
+  11       (expression_statement) [Node ArrayPush]  13, 08
+       ●   expression_statement
+  13       _                                11, 13
+       ●   expression_statement
+  11       (expression_statement) [Node ArrayPush]  13, 08
+       ●   expression_statement
+  13       _                                11, 13
+  11  ❮❮❮ 
+  08  -ε-  [ListClose RecordSet(M0) VariantClose RecordSet(M3)]  23
+  23       _                                06
+       ●   program
+  06   ◀   (@32)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

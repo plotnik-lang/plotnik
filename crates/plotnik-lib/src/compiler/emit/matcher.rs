@@ -13,7 +13,7 @@ use regex_syntax::hir::Hir;
 
 use crate::bytecode::{EffectKind, NodeKindConstraint, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::CaptureLayout;
+use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::dump::NfaDumper;
 use crate::compiler::lower::ir::{
@@ -47,7 +47,7 @@ impl RegexId {
 pub(crate) enum StateOrigin {
     Definition,
     ConsumingDefinition,
-    Entrypoint,
+    EntryPoint,
 }
 
 #[derive(Clone, Debug)]
@@ -142,7 +142,7 @@ impl OrdinaryCallPlan {
 pub(crate) struct SplitCallPlan {
     pub(crate) target: StateId,
     pub(crate) matched: StateId,
-    pub(crate) zero: StateId,
+    pub(crate) empty: StateId,
 }
 
 #[derive(Clone, Debug)]
@@ -155,18 +155,18 @@ pub(crate) struct RoutedCallPlan {
 pub(crate) enum FlowPlan {
     Accept,
     Jump(StateId),
-    Branch {
+    Fork {
         next: StateId,
         /// Checkpoints in the NFA's declared order. The runtime pushes this
         /// slice with its established reverse/LIFO discipline.
-        alternatives: Vec<StateId>,
+        successors: Vec<StateId>,
     },
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct EffectPlan {
     pub(crate) kind: EffectKind,
-    /// Absolute capture-member slot for `Set`/`EnumOpen`; literal payload for
+    /// Absolute capture-member slot for `RecordSet`/`VariantOpen`; literal payload for
     /// the other effect kinds.
     pub(crate) payload: u16,
     pub(crate) display: String,
@@ -248,7 +248,7 @@ pub(crate) struct EntryPlan {
 #[derive(Clone, Debug)]
 pub(crate) struct MatcherPlan {
     states: Vec<StatePlan>,
-    entrypoints: Vec<EntryPlan>,
+    entry_points: Vec<EntryPlan>,
     expected_kinds: Vec<ExpectedKind>,
     expected_fields: Vec<ExpectedField>,
     /// Fields in first-appearance order. Target representation passes use
@@ -282,8 +282,8 @@ impl MatcherPlan {
                 (instruction.label(), StateId(raw))
             })
             .collect::<BTreeMap<_, _>>();
-        let entrypoints = graph
-            .entrypoint_wrappers()
+        let entry_points = graph
+            .entry_point_wrappers()
             .iter()
             .map(|(&definition, &label)| {
                 let symbol = artifacts.dependency_analysis.def_name_sym(definition);
@@ -304,7 +304,7 @@ impl MatcherPlan {
 
         Self {
             states,
-            entrypoints,
+            entry_points,
             expected_kinds: builder.expected_kinds.into_values().collect(),
             expected_fields: builder.expected_fields.into_values().collect(),
             fields: builder.fields,
@@ -319,8 +319,8 @@ impl MatcherPlan {
         &self.states
     }
 
-    pub(crate) fn entrypoints(&self) -> &[EntryPlan] {
-        &self.entrypoints
+    pub(crate) fn entry_points(&self) -> &[EntryPlan] {
+        &self.entry_points
     }
 
     pub(crate) fn expected_kinds(&self) -> &[ExpectedKind] {
@@ -395,14 +395,14 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             .expect("every pre-pack label carries an origin")
         {
             LabelOrigin::Def(_) => StateOrigin::Definition,
-            LabelOrigin::DefVariant { route, .. } => {
+            LabelOrigin::DefSpecialization { route, .. } => {
                 if route.requires_consumption() {
                     StateOrigin::ConsumingDefinition
                 } else {
                     StateOrigin::Definition
                 }
             }
-            LabelOrigin::Wrapper(_) => StateOrigin::Entrypoint,
+            LabelOrigin::Wrapper(_) => StateOrigin::EntryPoint,
         };
         let kind = match instruction {
             InstructionIR::Match(instruction) => self.match_state(instruction),
@@ -455,7 +455,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             CallProtocol::Split { returns, .. } => CallPlan::Split(SplitCallPlan {
                 target,
                 matched,
-                zero: resolve_state(self.ids, returns[1]),
+                empty: resolve_state(self.ids, returns[1]),
             }),
             CallProtocol::Routed { .. } => CallPlan::Routed(RoutedCallPlan {
                 target,
@@ -556,14 +556,14 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         self.artifacts
             .grammar
             .kind_name(id, self.artifacts.interner)
-            .expect("linked query binds every referenced node kind")
+            .expect("grammar-bound query binds every referenced node kind")
     }
 
     fn field_name(&self, id: NodeFieldId) -> String {
         self.artifacts
             .grammar
             .field_name(id, self.artifacts.interner)
-            .expect("linked query binds every referenced field")
+            .expect("grammar-bound query binds every referenced field")
     }
 
     fn predicate(&mut self, predicate: &PredicateIR) -> PredicatePlan {
@@ -624,9 +624,9 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         match successors {
             [] => FlowPlan::Accept,
             [next] => FlowPlan::Jump(resolve_state(self.ids, *next)),
-            [next, alternatives @ ..] => FlowPlan::Branch {
+            [next, successors @ ..] => FlowPlan::Fork {
                 next: resolve_state(self.ids, *next),
-                alternatives: alternatives
+                successors: successors
                     .iter()
                     .map(|&label| resolve_state(self.ids, label))
                     .collect(),

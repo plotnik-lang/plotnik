@@ -4,13 +4,13 @@ use std::collections::HashSet;
 
 use indexmap::IndexMap;
 
-use crate::bytecode::{Nav, SpanKind};
+use crate::bytecode::{Labeling as SpanLabeling, Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{
-    CalleeEntry, DefBodyMode, DefOutputMode, DefVariant, EffectIR, InstructionIR, Label,
+    CalleeEntry, DefBodyMode, DefOutputMode, DefSpecialization, EffectIR, InstructionIR, Label,
     LabelOrigin, NfaGraph, ReturnAddr, ReturnIR,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
@@ -20,9 +20,9 @@ use crate::compiler::parse::cst::SyntaxNode;
 
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
-use super::scope::{CaptureExits, SkipExit, Struct};
+use super::scope::{CaptureExits, RecordScope, SkipExit};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
-use crate::compiler::analyze::types::type_check::consumable_value_root;
+use crate::compiler::analyze::types::type_check::definition_value_root;
 
 /// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {
@@ -34,13 +34,13 @@ pub struct NfaBuilder<'a> {
     current_origin: Option<LabelOrigin>,
     /// Origin per allocated label id (index = `Label.0`), moved into the graph.
     label_origins: Vec<Option<LabelOrigin>>,
-    pub(super) def_entries: IndexMap<DefVariant, Label>,
-    compiled_def_variants: HashSet<DefVariant>,
-    active_def_variants: HashSet<DefVariant>,
-    /// Stack of active struct scopes for capture lookup.
+    pub(super) def_entries: IndexMap<DefSpecialization, Label>,
+    compiled_def_specializations: HashSet<DefSpecialization>,
+    active_def_specializations: HashSet<DefSpecialization>,
+    /// Stack of active record scopes for capture lookup.
     /// Innermost scope is at the end.
-    pub(super) scope_stack: Vec<Struct>,
-    /// Non-zero while compiling under a suppressive capture (`@_`). The whole
+    pub(super) scope_stack: Vec<RecordScope>,
+    /// Non-zero while compiling under a discard (`@_`). The whole
     /// region compiles structurally: captures are inert, alternations emit no
     /// variant tags or null defaults. Only definition calls still produce
     /// output — shared code emits unconditionally — and the call site brackets
@@ -69,8 +69,8 @@ impl<'a> NfaBuilder<'a> {
             current_origin: None,
             label_origins: Vec::new(),
             def_entries: IndexMap::new(),
-            compiled_def_variants: HashSet::new(),
-            active_def_variants: HashSet::new(),
+            compiled_def_specializations: HashSet::new(),
+            active_def_specializations: HashSet::new(),
             scope_stack: Vec::new(),
             suppress_depth: 0,
             source_mark_depth: 0,
@@ -130,15 +130,15 @@ impl<'a> NfaBuilder<'a> {
         let mut compiler = NfaBuilder::new(ctx);
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
-        for (def_id, _) in ctx.analysis.type_analysis.iter_entrypoint_output() {
-            compiler.ensure_def_variant(DefVariant::ordinary(def_id));
+        for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
+            compiler.ensure_def_specialization(DefSpecialization::ordinary(def_id));
         }
 
-        let mut entrypoint_wrappers = IndexMap::new();
-        for (def_id, _) in ctx.analysis.type_analysis.iter_entrypoint_output() {
+        let mut entry_point_wrappers = IndexMap::new();
+        for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
             compiler.current_origin = Some(LabelOrigin::Wrapper(def_id));
-            let wrapper = compiler.emit_entrypoint_wrapper(def_id);
-            entrypoint_wrappers.insert(def_id, wrapper);
+            let wrapper = compiler.emit_entry_point_wrapper(def_id);
+            entry_point_wrappers.insert(def_id, wrapper);
         }
 
         verify_fresh_build(&compiler.instructions);
@@ -151,23 +151,25 @@ impl<'a> NfaBuilder<'a> {
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
-            entrypoint_wrappers,
+            entry_point_wrappers,
             spans: compiler.spans,
             label_origins: compiler.label_origins,
         }
     }
 
-    fn emit_entrypoint_wrapper(&mut self, def_id: DefId) -> Label {
+    fn emit_entry_point_wrapper(&mut self, def_id: DefId) -> Label {
         let return_label = self.fresh_label();
         self.instructions.push(ReturnIR::new(return_label).into());
 
         let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let output_shape = self.ctx.analysis.type_analysis.expect_type_shape(output);
-        let wraps_struct = matches!(output_shape, TypeShape::Struct(_));
+        let output_shape = output
+            .value()
+            .map(|type_id| self.ctx.analysis.type_analysis.expect_type_shape(type_id));
+        let wraps_record = matches!(output_shape, Some(TypeShape::Record(_)));
 
-        let after_body = if wraps_struct {
-            self.emit_struct_close_step(return_label)
-        } else if matches!(output_shape, TypeShape::Node) {
+        let after_body = if wraps_record {
+            self.emit_record_close(return_label)
+        } else if matches!(output_shape, Some(TypeShape::Node)) {
             self.emit_effects_epsilon(
                 return_label,
                 vec![EffectIR::node()],
@@ -180,11 +182,11 @@ impl<'a> NfaBuilder<'a> {
             Nav::Stay,
             None,
             ReturnAddr(after_body),
-            CalleeEntry(self.def_entries[&DefVariant::ordinary(def_id)]),
+            CalleeEntry(self.def_entries[&DefSpecialization::ordinary(def_id)]),
         );
 
-        if wraps_struct {
-            self.emit_struct_step(call)
+        if wraps_record {
+            self.emit_record_open(call)
         } else {
             call
         }
@@ -198,54 +200,64 @@ impl<'a> NfaBuilder<'a> {
         l
     }
 
-    /// Return the entry for one semantic definition-body variant, compiling it
+    /// Return the entry for one semantic definition specialization, compiling it
     /// once when first requested. The entry is registered before the body so a
-    /// recursive component can call back into an active variant safely.
-    pub(super) fn ensure_def_variant(&mut self, variant: DefVariant) -> Label {
-        let entry = self.reserve_def_variant(&variant);
-        if self.compiled_def_variants.contains(&variant)
-            || !self.active_def_variants.insert(variant.clone())
+    /// recursive component can call back into an active specialization safely.
+    pub(super) fn ensure_def_specialization(&mut self, specialization: DefSpecialization) -> Label {
+        let entry = self.reserve_def_specialization(&specialization);
+        if self.compiled_def_specializations.contains(&specialization)
+            || !self
+                .active_def_specializations
+                .insert(specialization.clone())
         {
             return entry;
         }
 
-        let previous_origin = self.current_origin.replace(Self::variant_origin(&variant));
-        self.compile_def_variant_body(&variant, entry);
+        let previous_origin = self
+            .current_origin
+            .replace(Self::specialization_origin(&specialization));
+        self.compile_def_specialization_body(&specialization, entry);
         self.current_origin = previous_origin;
 
-        let removed = self.active_def_variants.remove(&variant);
-        assert!(removed, "compiled definition variant was active");
-        self.compiled_def_variants.insert(variant);
+        let removed = self.active_def_specializations.remove(&specialization);
+        assert!(removed, "compiled definition specialization was active");
+        self.compiled_def_specializations.insert(specialization);
         entry
     }
 
-    fn reserve_def_variant(&mut self, variant: &DefVariant) -> Label {
-        if let Some(&entry) = self.def_entries.get(variant) {
+    fn reserve_def_specialization(&mut self, specialization: &DefSpecialization) -> Label {
+        if let Some(&entry) = self.def_entries.get(specialization) {
             return entry;
         }
 
-        let previous_origin = self.current_origin.replace(Self::variant_origin(variant));
+        let previous_origin = self
+            .current_origin
+            .replace(Self::specialization_origin(specialization));
         let entry = self.fresh_label();
         self.current_origin = previous_origin;
-        self.def_entries.insert(variant.clone(), entry);
+        self.def_entries.insert(specialization.clone(), entry);
         entry
     }
 
-    fn variant_origin(variant: &DefVariant) -> LabelOrigin {
-        if variant.is_ordinary() {
-            return LabelOrigin::Def(variant.def_id());
+    fn specialization_origin(specialization: &DefSpecialization) -> LabelOrigin {
+        if specialization.is_ordinary() {
+            return LabelOrigin::Def(specialization.def_id());
         }
 
-        LabelOrigin::DefVariant {
-            def_id: variant.def_id(),
-            output: variant.mode().output().origin(),
-            source: variant.mode().source(),
-            route: variant.route(),
+        LabelOrigin::DefSpecialization {
+            def_id: specialization.def_id(),
+            output: specialization.mode().output().origin(),
+            source: specialization.mode().source(),
+            route: specialization.route(),
         }
     }
 
-    fn compile_def_variant_body(&mut self, variant: &DefVariant, entry_label: Label) {
-        let def_id = variant.def_id();
+    fn compile_def_specialization_body(
+        &mut self,
+        specialization: &DefSpecialization,
+        entry_label: Label,
+    ) {
+        let def_id = specialization.def_id();
         let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
         let name = self.ctx.analysis.interner.resolve(name_sym);
 
@@ -256,22 +268,22 @@ impl<'a> NfaBuilder<'a> {
             .expect("analyzed definition has a body");
 
         let matched_return = self.fresh_label();
-        let matched_return_instr = match variant.route() {
+        let matched_return_instr = match specialization.route() {
             crate::compiler::lower::ir::DefRoute::Caller => ReturnIR::matched(matched_return),
             crate::compiler::lower::ir::DefRoute::Routed { .. } => {
                 ReturnIR::routed_matched(matched_return)
             }
         };
         self.instructions.push(matched_return_instr.into());
-        let exits = if variant.route().splits() {
-            let zero_return = self.fresh_label();
+        let exits = if specialization.route().splits() {
+            let empty_return = self.fresh_label();
             self.instructions
-                .push(ReturnIR::routed_zero(zero_return).into());
+                .push(ReturnIR::routed_empty(empty_return).into());
             CaptureExits::Split {
                 match_exit: matched_return,
-                skip_exit: SkipExit::To(zero_return),
+                skip_exit: SkipExit::To(empty_return),
             }
-        } else if variant.route().requires_consumption() {
+        } else if specialization.route().requires_consumption() {
             CaptureExits::Split {
                 match_exit: matched_return,
                 skip_exit: SkipExit::Fail,
@@ -280,22 +292,27 @@ impl<'a> NfaBuilder<'a> {
             CaptureExits::Single(matched_return)
         };
 
-        // Ordinary variants are exact because their caller owns navigation.
-        // Routed recursive variants own the original call-site navigation so
-        // their authored nullable branch order stays above candidate retries.
-        let body_nav = Some(variant.route().body_nav());
+        // Ordinary specializations are exact because their caller owns navigation.
+        // Routed recursive specializations own the original call-site navigation so
+        // their authored nullable alternative order stays above candidate retries.
+        let body_nav = Some(specialization.route().body_nav());
 
         // Definitions are compiled in normalized form: body -> Return
-        // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
+        // No record wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
         // The inline-stack entry keeps a nullable self-reference inside this
         // body (`A = (x (A) (y))?`) from inlining itself endlessly.
-        let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let type_id = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_def_output(def_id)
+            .value();
         let (body_exits, def_span) = self.bracket_def_body_exits(body, exits);
 
         self.inline_stack.push(def_id);
-        let mode = variant.mode().clone();
-        let body_entry = self.with_scope(type_id, |this| {
+        let mode = specialization.mode().clone();
+        let body_entry = self.with_scope_if_present(type_id, |this| {
             this.compile_def_body(body, &mode, body_exits, body_nav)
         });
         self.inline_stack.pop();
@@ -355,7 +372,7 @@ impl<'a> NfaBuilder<'a> {
                 exit: match_exit,
                 nav,
                 capture: CaptureEffects::default(),
-                value: consumable_value_root(body),
+                observe_value: definition_value_root(body),
             };
             return self.compile_nullable_pattern(body, pattern_ctx, skip_exit);
         }
@@ -364,8 +381,8 @@ impl<'a> NfaBuilder<'a> {
             unreachable!("split definition exits returned above")
         };
 
-        let ctx = if consumable_value_root(body) {
-            PatternCtx::with_value(exit, nav)
+        let ctx = if definition_value_root(body) {
+            PatternCtx::observing_value(exit, nav)
         } else {
             PatternCtx::with_nav(exit, nav)
         };
@@ -416,34 +433,33 @@ impl<'a> NfaBuilder<'a> {
     /// Capture effects are propagated to the innermost match instruction:
     /// - Named/Anonymous nodes: effects go on the match
     /// - Sequences: effects go on last item
-    /// - Alternations: effects go on each branch
+    /// - Alternations: effects go on each alternative
     /// - Other wrappers: effects propagate through
     pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
         let ctx = self.bracket_pattern_ctx(pattern, ctx);
         match pattern {
-            Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
-            Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
+            Pattern::NamedNodePattern(n) => self.compile_named_node_pattern(n, ctx),
+            Pattern::AnonymousNodePattern(n) => self.compile_anonymous_node_pattern(n, ctx),
+            Pattern::NodeWildcard(n) => self.compile_node_wildcard(n, ctx),
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
-            Pattern::Union(u) => self.compile_union(u, ctx),
-            Pattern::Enum(e) => {
-                // Inference decides tagging by consumption: a consumed enum
-                // flows `Value(enum)`; an unconsumed one degraded to a union
-                // (fields or void) and compiles without variant scopes. A
-                // suppressed region discards the value, so even a consumed
-                // enum compiles structurally there.
+            Pattern::Alternation(alternation) => {
+                // Inference decides tagging from output context. A labeled
+                // alternation has `Value(variant)` flow where its value is
+                // materialized; in a fields context, its captures merge. A
+                // discarded region compiles structurally without variant scopes.
                 let flow = &self
                     .ctx
                     .analysis
                     .type_analysis
                     .expect_pattern_result(pattern)
                     .flow;
-                if ctx.consumes_value()
+                if ctx.needs_value()
                     && matches!(flow, PatternFlow::Value(_))
                     && !self.is_suppressed()
                 {
-                    self.compile_enum(e, ctx)
+                    self.compile_labeled_alternation(alternation, ctx)
                 } else {
-                    self.compile_degraded_enum(e, ctx)
+                    self.compile_unlabeled_alternation(alternation, ctx)
                 }
             }
             Pattern::CapturedPattern(c) => {
@@ -451,7 +467,7 @@ impl<'a> NfaBuilder<'a> {
                     exit,
                     nav,
                     capture,
-                    value: _,
+                    observe_value: _,
                 } = ctx;
                 self.compile_captured(c, nav, capture, CaptureExits::Single(exit))
             }
@@ -463,15 +479,22 @@ impl<'a> NfaBuilder<'a> {
 
     /// Wrap this pattern's capture channel in inspection span brackets.
     ///
-    /// Node and token patterns use `SpanStartAt` because their `pre` effects land
+    /// Node-matching patterns use `SpanStartAt` because their `pre` effects land
     /// on the consuming match instruction; epsilon-entered constructs use pure
     /// marker starts.
     pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
         let (kind, start_at) = match pattern {
-            Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),
+            Pattern::NamedNodePattern(_)
+            | Pattern::AnonymousNodePattern(_)
+            | Pattern::NodeWildcard(_) => (SpanKind::Pattern, true),
             Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
-            Pattern::Union(_) => (SpanKind::Union, false),
-            Pattern::Enum(_) => (SpanKind::Enum, false),
+            Pattern::Alternation(alternation) => (
+                SpanKind::Alternation(match alternation.labeling() {
+                    ast::Labeling::Labeled => SpanLabeling::Labeled,
+                    ast::Labeling::Unlabeled | ast::Labeling::Mixed => SpanLabeling::Unlabeled,
+                }),
+                false,
+            ),
             Pattern::DefRef(_) => (SpanKind::Ref, false),
             _ => return ctx,
         };
@@ -488,13 +511,13 @@ impl<'a> NfaBuilder<'a> {
             exit,
             nav,
             capture,
-            value,
+            observe_value,
         } = ctx;
         PatternCtx {
             exit,
             nav,
             capture: capture.nest_span(start, EffectIR::span_end(id.0)),
-            value,
+            observe_value,
         }
     }
 

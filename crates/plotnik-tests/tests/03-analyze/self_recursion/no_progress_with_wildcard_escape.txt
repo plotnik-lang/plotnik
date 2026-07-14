@@ -1,0 +1,17 @@
+A = [
+  (A)
+  _
+]
+------------------ DIAGNOSTICS -------------------
+error: infinite recursion: cycle makes no progress
+ --> query.ptk:2:4
+  |
+2 |   (A)
+  |    ^
+  |    |
+  |    references itself
+  |
+help: match at least one syntax-tree node before recursing
+-------------------- SYMBOLS ---------------------
+A
+  A (cycle)

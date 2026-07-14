@@ -44,7 +44,7 @@ S10 "body"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { name, prop }
+T1 = Record  M0:2  ; { name, prop }
 
 [type_members]
 M0: S01 → T0  ; name: <Node>
@@ -53,26 +53,26 @@ M1: S02 → T0  ; prop: <Node>
 [type_names]
 N0: S03 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@15)                            15 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  name: (property_identifier) [Node Set(M1)]  08
+  06  └‣─  name: (property_identifier) [Node RecordSet(M1)]  08
   08  ─‣┘⁴ _                                09
   09                                        ▶
   10  └‣─  (property_signature)             06
   11  ─‣─  body: (interface_body)           10
-  12  └‣─  name: (type_identifier) [Node Set(M0)]  11
+  12  └‣─  name: (type_identifier) [Node RecordSet(M0)]  11
   14  └‣─  (interface_declaration)          12
   15   !   (program)                        14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@15)                            15 : 03
        ▶   (@15)
 
@@ -81,7 +81,7 @@ Q:
        ●   program
   14       (interface_declaration)          12
        ●   interface_declaration
-  12       name: (type_identifier) [Node Set(M0)]  11
+  12       name: (type_identifier) [Node RecordSet(M0)]  11
        ○   interface
        ●   type_identifier
   11       body: (interface_body)           10
@@ -89,12 +89,12 @@ Q:
   10       (property_signature)             06
        ○   {
        ●   property_signature
-  06       name: (property_identifier) [Node Set(M1)]  08
+  06       name: (property_identifier) [Node RecordSet(M1)]  08
        ●   property_identifier
   08       _                                09
        ●   program
   09   ◀   (@15)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

@@ -1,7 +1,7 @@
 use crate::bytecode::Nav;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
-    DefVariant, EffectIR, InstructionIR, Label, MatchIR, NfaGraph, ReturnIR,
+    DefSpecialization, EffectIR, InstructionIR, Label, MatchIR, NfaGraph, ReturnIR,
 };
 use indexmap::IndexMap;
 
@@ -15,10 +15,10 @@ fn unbalanced_body_depth_panics() {
         ],
         def_entries: {
             let mut entries = IndexMap::new();
-            entries.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            entries.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             entries
         },
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -27,8 +27,8 @@ fn unbalanced_body_depth_panics() {
 }
 
 #[test]
-#[should_panic(expected = "zero-width Node effect")]
-fn zero_width_node_effect_panics() {
+#[should_panic(expected = "empty-match Node effect")]
+fn empty_match_node_effect_panics() {
     let nfa = NfaGraph {
         instructions: vec![
             InstructionIR::from(
@@ -38,13 +38,13 @@ fn zero_width_node_effect_panics() {
         ],
         def_entries: {
             let mut entries = IndexMap::new();
-            entries.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            entries.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             entries
         },
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
 
-    super::debug_impl::assert_no_node_on_zero_width_paths(&nfa, "test");
+    super::debug_impl::assert_no_node_on_empty_paths(&nfa, "test");
 }

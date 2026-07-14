@@ -1,0 +1,99 @@
+Q = (program
+  {
+    (expression_statement) @a
+    (debugger_statement) @b
+  }? @x
+)
+--------------------- INPUT ----------------------
+f(); debugger;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  x: QX | null;
+}
+
+export interface QX {
+  a: Node;
+  b: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "x": {
+    "a": {
+      "kind": "expression_statement",
+      "text": "f();",
+      "span": [0, 4]
+    },
+    "b": {
+      "kind": "debugger_statement",
+      "text": "debugger;",
+      "span": [5, 14]
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "x"
+S4 "QX"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+S8 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { a, b }
+T2 = Option(T1)  ; QX?
+T3 = Record  M2:1  ; { x }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T2  ; x: T2
+
+[type_names]
+N0: S4 → T1  ; QX
+N1: S5 → T3  ; Q
+
+[entry_points]
+Q = 00 :: T3
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  ─‣─  (debugger_statement) [Node RecordSet(M1)]  08
+  08  ─‣┘  _ [RecordClose RecordSet(M2)]    10
+  10                                        ▶
+  11  -ε-  [Absent RecordSet(M2)]           10
+  13   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  06
+  15  ...
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
+  20   !   (program)                        18, 11
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
+
+@20:
+  20       (program)                        18, 11
+       ●   program
+  18       _                                13, 16
+       ●   expression_statement
+  13       (expression_statement) [RecordOpen Node RecordSet(M0)]  06
+       ●   expression_statement
+  06       (debugger_statement) [Node RecordSet(M1)]  08
+       ●   debugger_statement
+  08       _ [RecordClose RecordSet(M2)]    10
+       ●   program
+  10   ◀   (@20)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

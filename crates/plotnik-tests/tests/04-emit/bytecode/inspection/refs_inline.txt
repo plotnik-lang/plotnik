@@ -8,7 +8,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 29
 
 [transitions]
@@ -17,25 +17,25 @@ Q:
   02   !   (program)                        15
   03  ─‣┘  _                                01
   04  ─‣─  (expression_statement)           14
-  05  ─‣┘  _ [StructClose Set(second)]      03
-  08  -ε-  [Null Set(name) StructClose Set(second)]  03
-  09   !   (identifier) [Node Set(name)]    05
+  05  ─‣┘  _ [RecordClose RecordSet(second)]  03
+  08  -ε-  [Absent RecordSet(name) RecordClose RecordSet(second)]  03
+  09   !   (identifier) [Node RecordSet(name)]  05
   11  ──!  _                                09, 11
   12  └─!  _                                09, 11
-  14  -ε-  [StructOpen]                     12, 08
+  14  -ε-  [RecordOpen]                     12, 08
   15  └‣─  (expression_statement)           25
-  16  ─‣┘  _ [StructClose Set(first)]       04
-  19  -ε-  [Null Set(name) StructClose Set(first)]  04
-  20   !   (identifier) [Node Set(name)]    16
+  16  ─‣┘  _ [RecordClose RecordSet(first)]  04
+  19  -ε-  [Absent RecordSet(name) RecordClose RecordSet(first)]  04
+  20   !   (identifier) [Node RecordSet(name)]  16
   22  ──!  _                                20, 22
   23  └─!  _                                20, 22
-  25  -ε-  [StructOpen]                     23, 19
+  25  -ε-  [RecordOpen]                     23, 19
 
-Q (entrypoint):
+Q (entry point):
   26                                        ▶
-  27  -ε-  [StructClose]                    26
+  27  -ε-  [RecordClose]                    26
   28       (Q)                              02 : 27
-  29  -ε-  [StructOpen]                     28
+  29  -ε-  [RecordOpen]                     28
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -50,62 +50,62 @@ S8 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:2  ; { first, second }
-T3 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { name }
+T3 = Record  M1:2  ; { first, second }
 
 [type_members]
-M0: S1 → T3  ; name: T3
-M1: S2 → T1  ; first: MaybeName
-M2: S3 → T1  ; second: MaybeName
+M0: S1 → T1  ; name: T1
+M1: S2 → T2  ; first: MaybeName
+M2: S3 → T2  ; second: MaybeName
 
 [type_names]
-N0: S4 → T1  ; MaybeName
-N1: S5 → T2  ; Q
+N0: S4 → T2  ; MaybeName
+N1: S5 → T3  ; Q
 
-[entrypoints]
-Q = 00 :: T2
+[entry_points]
+Q = 00 :: T3
 
 [spans]
-P00 def        0..31  src0  T1
-P01 capture    26..31  src0  T1.M0
-P02 quantifier 24..25  src0
-P03 pattern    12..24  src0
-P04 def        33..148  src0  T2
-P05 pattern    37..148  src0
-P06 sequence   48..146  src0
-P07 pattern    54..95  src0
-P08 capture    88..94  src0  T2.M1
-P09 ref        76..87  src0  T1
-P10 pattern    100..142  src0
-P11 capture    134..141  src0  T2.M2
-P12 ref        122..133  src0  T1
+P00 def        0..31  source_id=0  T2
+P01 capture    26..31  source_id=0  T2.M0
+P02 quantifier 24..25  source_id=0
+P03 pattern    12..24  source_id=0
+P04 def        33..148  source_id=0  T3
+P05 pattern    37..148  source_id=0
+P06 sequence   48..146  source_id=0
+P07 pattern    54..95  source_id=0
+P08 capture    88..94  source_id=0  T3.M1
+P09 ref        76..87  source_id=0  T2
+P10 pattern    100..142  source_id=0
+P11 capture    134..141  source_id=0  T3.M2
+P12 ref        122..133  source_id=0  T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@56)                            56 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  12
-  12  ─‣┘  _ [StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  37
+  08   !   (identifier) [SpanStartAt#3 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  12
+  12  ─‣┘  _ [RecordClose SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  37
   15  ...
-  16   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  20
-  20  ─‣┘  _ [StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  34
+  16   !   (identifier) [SpanStartAt#3 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  20
+  20  ─‣┘  _ [RecordClose SpanStart#8 RecordSet(M1) SpanEnd#8 SpanEnd#9]  34
   23                                        ▶
-  24  -ε-  [SpanStart#1 Null Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  37
+  24  -ε-  [SpanStart#1 Absent RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 RecordClose SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  37
   28  ──!  _                                08, 28
   30  └─!  _                                08, 28
   32  -ε-  [SpanStart#2]                    30, 24
-  34  ─‣─  (expression_statement) [SpanEnd#7 SpanStartAt#10 SpanStart#12 StructOpen SpanStart#0]  32
+  34  ─‣─  (expression_statement) [SpanEnd#7 SpanStartAt#10 SpanStart#12 RecordOpen SpanStart#0]  32
   37  ─‣┘  _ [SpanEnd#10 SpanEnd#6 SpanEnd#5 SpanEnd#4]  23
-  40  -ε-  [SpanStart#1 Null Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  34
+  40  -ε-  [SpanStart#1 Absent RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 RecordClose SpanStart#8 RecordSet(M1) SpanEnd#8 SpanEnd#9]  34
   44  ──!  _                                16, 44
   46  └─!  _                                16, 44
   48  -ε-  [SpanStart#2]                    46, 40
-  50  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 StructOpen SpanStart#0]  48
+  50  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 RecordOpen SpanStart#0]  48
   53  ...
   54  ...
   55  ...

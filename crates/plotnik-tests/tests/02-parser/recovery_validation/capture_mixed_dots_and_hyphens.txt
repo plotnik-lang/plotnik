@@ -11,4 +11,4 @@ help: use `@foo_bar_baz`
 1 - Q = (identifier) @foo.bar-baz
 1 + Q = (identifier) @foo_bar_baz
   |
-help: captures become fields in the output
+help: capture names become result field names

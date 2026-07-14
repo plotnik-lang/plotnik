@@ -8,6 +8,6 @@ error: capture `@x` already defined in this scope
 3 | ) @x
   |   ^^
   |
-help: rename one capture, or use an enum if they are mutually exclusive branches
+help: rename one capture, or use labeled alternatives to preserve which alternative matched
 -------------------- SYMBOLS ---------------------
 Q

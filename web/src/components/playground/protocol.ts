@@ -7,8 +7,8 @@
    column is a Unicode-scalar count — a third unit; the playground only ever
    reads `offset`.) */
 
-/** `tokenize()` output — crates/plotnik-lib/src/compiler/parse/mod.rs `TokenSpan`. */
-export interface TokenSpan {
+/** `tokenize()` output — crates/plotnik-lib/src/compiler/parse/mod.rs `QueryToken`. */
+export interface QueryToken {
   kind:
     | "whitespace"
     | "comment"
@@ -18,8 +18,7 @@ export interface TokenSpan {
     | "ident"
     | "error"
     | "punct";
-  start: number;
-  end: number;
+  span: [number, number];
 }
 
 /** Diagnostics — crates/plotnik-lib/src/compiler/diagnostics/report/json.rs. */
@@ -47,34 +46,35 @@ export interface WireDiagnostic {
 
 /** The static span table: the hub every future cross-view highlight joins
     through (docs/wip/playground-design.md §2). The array index is the SpanId. */
-export interface InspectionSpan {
+export interface QuerySpan {
   id: number;
-  source: number;
+  source_id: number;
   kind: string;
-  start: number;
-  end: number;
-  type: number | null;
-  member: number | null;
+  labeling?: "unlabeled" | "labeled";
+  span: [number, number];
+  binding?: {
+    type_id: number;
+    member_id?: number;
+  };
 }
 
-/** `.d.ts` source map — typegen `DtsRange`. */
-export interface DtsRange {
-  start: number;
-  end: number;
+/** TypeScript declaration binding — typegen `TypeScriptBinding`. */
+export interface TypeScriptBinding {
+  span: [number, number];
   type_id: number;
-  member: number | null;
+  member_id: number | null;
 }
 
 /** `Session::info()`. */
 export interface SessionInfo {
-  v: number;
-  spans: InspectionSpan[];
-  tokens: TokenSpan[];
+  version: number;
+  query_spans: QuerySpan[];
+  query_tokens: QueryToken[];
   diagnostics: WireDiagnostic[];
-  dts: string;
-  dts_map: DtsRange[];
-  entrypoints: string[];
-  bytecode_size: number | null;
+  typescript_declarations: string;
+  typescript_bindings: TypeScriptBinding[];
+  entry_points: string[];
+  bytecode_size_bytes: number | null;
 }
 
 /** `Session::generate()` — production generated-code artifact. */
@@ -89,25 +89,25 @@ export interface GeneratedCode {
 }
 
 export interface RunStats {
-  steps_used: number;
-  heap_high_water: number;
+  fuel_used: number;
+  peak_live_heap_bytes: number;
 }
 
 /** `Session::run()`/`trace()` — either a result or a runtime error ("no
-    match" included); `trace` is attached to both when recording. */
+    match" included); `execution_trace` is attached to both when recording. */
 export type RunResult =
   | {
-      value: unknown;
-      inspection: unknown;
-      stats: RunStats;
-      trace?: unknown;
+      result: unknown;
+      result_provenance: unknown;
+      run_stats: RunStats;
+      execution_trace?: unknown;
       error?: undefined;
     }
-  | { error: string; trace?: unknown };
+  | { error: string; execution_trace?: unknown };
 
-/** `ast()` output — crates/plotnik-lib/src/core/tree_dump.rs.
+/** `tree()` output — crates/plotnik-lib/src/core/tree_dump.rs.
     A pre-rendered dump of the source tree in Plotnik pattern syntax;
-    concatenating chunk `text` yields exactly the CLI's `plotnik ast` output. */
+    concatenating chunk `text` yields exactly the CLI's `plotnik tree` output. */
 export interface DumpChunk {
   kind: "text" | "punct" | "kind" | "field" | "string" | "comment";
   text: string;
@@ -122,7 +122,7 @@ export interface DumpNode {
   dump_end: number;
 }
 
-export type AstResult =
+export type TreeResult =
   { error: string } | { chunks: DumpChunk[]; nodes: DumpNode[] };
 
 /** Worker API exposed via comlink: the full wasm surface, nothing more.
@@ -150,7 +150,11 @@ export interface PlotnikApi {
     entry: string | undefined,
     maxRecords: number,
   ): Promise<RunResult>;
-  /** Dump `source`'s tree; `raw` includes anonymous nodes. */
-  ast(source: string, lang: string, raw: boolean): Promise<AstResult>;
-  tokenize(query: string): Promise<TokenSpan[]>;
+  /** Dump `source`'s tree, optionally including anonymous nodes. */
+  tree(
+    source: string,
+    lang: string,
+    includeAnonymous: boolean,
+  ): Promise<TreeResult>;
+  tokenize(query: string): Promise<QueryToken[]>;
 }

@@ -58,12 +58,12 @@ mod limited {
     plotnik::query! {
         "Q = (program (expression_statement (identifier) @id))",
         grammar = "arborium-javascript",
-        steps = 1,
+        fuel = 1,
     }
 }
 
-// Recursive output nests `Expr` values through native reader calls, so a depth
-// policy of 1 must trip `parse`; `matches` suppresses output and never replays.
+// Recursive output nests `Expr` values through native decoder calls, so a depth
+// policy of 1 must trip `parse`; `matches` suppresses output and never decodes.
 mod depth_limited {
     plotnik::query! {
         r#"
@@ -217,17 +217,17 @@ fn file_form_reads_next_to_the_invoking_file() {
 }
 
 #[test]
-fn compiled_in_step_limit_trips_safe_surfaces() {
+fn compiled_in_fuel_limit_trips_safe_surfaces() {
     let source = "x;";
     let tree = parse(&js(), source);
 
     assert!(matches!(
         limited::Q::parse(&tree, source),
-        Err(LimitExceeded::Steps(1))
+        Err(LimitExceeded::OutOfFuel(1))
     ));
     assert!(matches!(
         limited::Q::matches(&tree, source),
-        Err(LimitExceeded::Steps(1))
+        Err(LimitExceeded::OutOfFuel(1))
     ));
 }
 
@@ -238,9 +238,9 @@ fn compiled_in_depth_limit_trips_parse_only() {
 
     assert!(matches!(
         depth_limited::Q::parse(&tree, source),
-        Err(LimitExceeded::Depth(1))
+        Err(LimitExceeded::DecodeDepth(1))
     ));
-    assert!(depth_limited::Q::matches(&tree, source).expect("matches ignores replay depth"));
+    assert!(depth_limited::Q::matches(&tree, source).expect("matches ignores decode depth"));
 }
 
 #[test]

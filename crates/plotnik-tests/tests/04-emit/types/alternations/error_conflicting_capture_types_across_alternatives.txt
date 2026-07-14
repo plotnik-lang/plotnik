@@ -1,0 +1,14 @@
+Q = [
+  (identifier) @x
+  (number)* @x
+]
+------------------ DIAGNOSTICS -------------------
+error: capture `@x` has incompatible types across alternatives
+ --> query.ptk:2:16
+  |
+2 |   (identifier) @x
+  |                ^^
+3 |   (number)* @x
+  |             -- and a different type here
+  |
+help: make every alternative produce the same type, or label the alternatives for a variant type

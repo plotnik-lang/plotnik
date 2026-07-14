@@ -12,8 +12,8 @@ use plotnik_lib::Limit;
 
 use super::*;
 use crate::cli::commands::{
-    ast_command, check_command, dump_command, generate_command, infer_command, inspect_command,
-    run_command, trace_command,
+    check_command, dump_command, generate_command, infer_command, inspect_command, run_command,
+    trace_command, tree_command,
 };
 use crate::commands::generate::GenerateTarget;
 
@@ -59,7 +59,7 @@ fn generate_rejects_registry_and_external_grammar_together() {
 #[test]
 fn dump_accepts_trace_flags() {
     let cmd = dump_command();
-    let result = cmd.try_get_matches_from(["dump", "query.ptk", "--max-steps", "500", "-vv"]);
+    let result = cmd.try_get_matches_from(["dump", "query.ptk", "--fuel", "500", "-vv"]);
     assert!(
         result.is_ok(),
         "dump should accept trace flags: {:?}",
@@ -79,7 +79,7 @@ fn dump_accepts_run_flags() {
         "dump",
         "query.ptk",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
         "--entry",
         "Foo",
     ]);
@@ -127,7 +127,7 @@ fn run_accepts_trace_flags() {
         "run",
         "query.ptk",
         "app.js",
-        "--max-steps",
+        "--fuel",
         "500",
         "-vv",
         "--no-result",
@@ -153,7 +153,7 @@ fn trace_accepts_run_flags() {
         "query.ptk",
         "app.js",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
     ]);
     assert!(
         result.is_ok(),
@@ -186,7 +186,7 @@ fn check_accepts_run_flags() {
         "check",
         "query.ptk",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
         "--entry",
         "Foo",
     ]);
@@ -200,14 +200,8 @@ fn check_accepts_run_flags() {
 #[test]
 fn check_accepts_trace_flags() {
     let cmd = check_command();
-    let result = cmd.try_get_matches_from([
-        "check",
-        "query.ptk",
-        "--max-steps",
-        "500",
-        "-vv",
-        "--no-result",
-    ]);
+    let result =
+        cmd.try_get_matches_from(["check", "query.ptk", "--fuel", "500", "-vv", "--no-result"]);
     assert!(
         result.is_ok(),
         "check should accept trace flags: {:?}",
@@ -240,14 +234,8 @@ fn infer_accepts_run_flags() {
 #[test]
 fn infer_accepts_trace_flags() {
     let cmd = infer_command();
-    let result = cmd.try_get_matches_from([
-        "infer",
-        "query.ptk",
-        "--max-steps",
-        "500",
-        "-vv",
-        "--no-result",
-    ]);
+    let result =
+        cmd.try_get_matches_from(["infer", "query.ptk", "--fuel", "500", "-vv", "--no-result"]);
     assert!(
         result.is_ok(),
         "infer should accept trace flags: {:?}",
@@ -260,10 +248,7 @@ fn dump_help_hides_trace_flags() {
     let mut cmd = dump_command();
     let help = cmd.render_help().to_string();
 
-    assert!(
-        !help.contains("--max-steps"),
-        "dump help should not show --max-steps"
-    );
+    assert!(!help.contains("--fuel"), "dump help should not show --fuel");
     assert!(
         !help.contains("--no-result"),
         "dump help should not show --no-result"
@@ -284,8 +269,8 @@ fn dump_help_hides_run_flags() {
         "dump help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "dump help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "dump help should not show --include-points"
     );
     assert!(
         !help.contains("--entry"),
@@ -324,10 +309,7 @@ fn run_help_shows_limit_flags() {
     let mut cmd = run_command();
     let help = cmd.render_help().to_string();
 
-    assert!(
-        help.contains("--max-steps"),
-        "run help SHOULD show --max-steps"
-    );
+    assert!(help.contains("--fuel"), "run help SHOULD show --fuel");
     assert!(
         help.contains("--max-memory"),
         "run help SHOULD show --max-memory"
@@ -344,8 +326,8 @@ fn trace_help_hides_run_output_flags() {
         "trace help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "trace help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "trace help should not show --include-points"
     );
 }
 
@@ -367,16 +349,16 @@ fn check_help_hides_unified_flags() {
         "check help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "check help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "check help should not show --include-points"
     );
     assert!(
         !help.contains("--entry"),
         "check help should not show --entry"
     );
     assert!(
-        !help.contains("--max-steps"),
-        "check help should not show --max-steps"
+        !help.contains("--fuel"),
+        "check help should not show --fuel"
     );
     assert!(
         !help.contains("--no-result"),
@@ -406,16 +388,16 @@ fn infer_help_hides_unified_flags() {
         "infer help should not show --entry"
     );
     assert!(
-        !help.contains("--max-steps"),
-        "infer help should not show --max-steps"
+        !help.contains("--fuel"),
+        "infer help should not show --fuel"
     );
     assert!(
         !help.contains("--no-result"),
         "infer help should not show --no-result"
     );
     assert!(
-        help.contains("--verbose-nodes"),
-        "infer help SHOULD show --verbose-nodes"
+        help.contains("--include-points"),
+        "infer help SHOULD show --include-points"
     );
 }
 
@@ -473,7 +455,7 @@ fn trace_params_extracts_all_fields() {
         "Main",
         "-vv",
         "--no-result",
-        "--max-steps",
+        "--fuel",
         "500",
         "--color",
         "always",
@@ -489,7 +471,7 @@ fn trace_params_extracts_all_fields() {
     assert_eq!(params.entry, Some("Main".to_string()));
     assert_eq!(params.verbose, 2);
     assert!(params.no_result);
-    assert_eq!(params.limits.steps, Limit::Of(500));
+    assert_eq!(params.limits.fuel_limit, Limit::Of(500));
     assert!(matches!(params.color, ColorChoice::Always));
 }
 
@@ -507,7 +489,7 @@ fn run_params_extracts_all_fields() {
         "Query",
         "--color",
         "never",
-        "--verbose-nodes",
+        "--include-points",
     ]);
     assert!(result.is_ok());
 
@@ -533,7 +515,7 @@ fn dump_params_extracts_only_relevant_fields() {
         "--color",
         "auto",
         "app.rs",
-        "--max-steps",
+        "--fuel",
         "100",
         "--compact",
     ]);
@@ -548,61 +530,61 @@ fn dump_params_extracts_only_relevant_fields() {
 }
 
 #[test]
-fn ast_accepts_run_flags() {
-    let cmd = ast_command();
+fn tree_accepts_run_flags() {
+    let cmd = tree_command();
     let result = cmd.try_get_matches_from([
-        "ast",
+        "tree",
         "query.ptk",
         "app.js",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
         "--entry",
         "Foo",
     ]);
     assert!(
         result.is_ok(),
-        "ast should accept run flags: {:?}",
+        "tree should accept run flags: {:?}",
         result.err()
     );
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
 
 #[test]
-fn ast_accepts_trace_flags() {
-    let cmd = ast_command();
+fn tree_accepts_trace_flags() {
+    let cmd = tree_command();
     let result = cmd.try_get_matches_from([
-        "ast",
+        "tree",
         "query.ptk",
         "app.js",
-        "--max-steps",
+        "--fuel",
         "500",
         "-vv",
         "--no-result",
     ]);
     assert!(
         result.is_ok(),
-        "ast should accept trace flags: {:?}",
+        "tree should accept trace flags: {:?}",
         result.err()
     );
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
 
 #[test]
-fn ast_shifts_positional_with_inline_query() {
-    let cmd = ast_command();
-    let result = cmd.try_get_matches_from(["ast", "-q", "(identifier) @id", "app.js"]);
+fn tree_shifts_positional_with_inline_query() {
+    let cmd = tree_command();
+    let result = cmd.try_get_matches_from(["tree", "-q", "(identifier) @id", "app.js"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(identifier) @id".to_string()));
@@ -610,75 +592,75 @@ fn ast_shifts_positional_with_inline_query() {
 }
 
 #[test]
-fn ast_no_shift_with_both_positionals() {
-    let cmd = ast_command();
-    let result = cmd.try_get_matches_from(["ast", "query.ptk", "app.js"]);
+fn tree_no_shift_with_both_positionals() {
+    let cmd = tree_command();
+    let result = cmd.try_get_matches_from(["tree", "query.ptk", "app.js"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
 
 #[test]
-fn ast_help_shows_raw_flag() {
-    let mut cmd = ast_command();
+fn tree_help_shows_precise_tree_flags() {
+    let mut cmd = tree_command();
     let help = cmd.render_help().to_string();
 
-    assert!(help.contains("--raw"), "ast help should show --raw");
+    assert!(help.contains("--query-view"));
+    assert!(help.contains("--include-anonymous"));
 }
 
 #[test]
-fn ast_help_shows_json_flag() {
-    let mut cmd = ast_command();
+fn tree_help_shows_json_flag() {
+    let mut cmd = tree_command();
     let help = cmd.render_help().to_string();
 
-    assert!(help.contains("--json"), "ast help should show --json");
+    assert!(help.contains("--json"), "tree help should show --json");
 }
 
 #[test]
-fn ast_help_hides_unified_flags() {
-    let mut cmd = ast_command();
+fn tree_help_hides_unified_flags() {
+    let mut cmd = tree_command();
     let help = cmd.render_help().to_string();
 
     assert!(
         !help.contains("--compact"),
-        "ast help should not show --compact"
+        "tree help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "ast help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "tree help should not show --include-points"
     );
     assert!(
         !help.contains("--entry"),
-        "ast help should not show --entry"
+        "tree help should not show --entry"
     );
-    assert!(
-        !help.contains("--max-steps"),
-        "ast help should not show --max-steps"
-    );
+    assert!(!help.contains("--fuel"), "tree help should not show --fuel");
     assert!(
         !help.contains("--no-result"),
-        "ast help should not show --no-result"
+        "tree help should not show --no-result"
     );
     assert!(
         !help.contains("Verbosity level"),
-        "ast help should not show -v description"
+        "tree help should not show -v description"
     );
 }
 
 #[test]
-fn ast_params_extracts_all_fields() {
-    let cmd = ast_command();
+fn tree_params_extracts_all_fields() {
+    let cmd = tree_command();
     let result = cmd.try_get_matches_from([
-        "ast",
+        "tree",
         "query.ptk",
         "app.js",
         "-l",
         "typescript",
-        "--raw",
+        "--query-view",
+        "cst",
+        "--include-anonymous",
         "--json",
         "--color",
         "always",
@@ -686,107 +668,64 @@ fn ast_params_extracts_all_fields() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
     assert_eq!(params.lang, Some("typescript".to_string()));
-    assert!(params.raw);
+    assert_eq!(params.query_view, crate::commands::tree::QueryView::Cst);
+    assert!(params.include_anonymous);
     assert!(params.json);
     assert!(matches!(params.color, ColorChoice::Always));
 }
 
 #[test]
-fn dump_accepts_raw_flag() {
-    let cmd = dump_command();
-    let result = cmd.try_get_matches_from(["dump", "query.ptk", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "dump should accept --raw flag: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn run_accepts_raw_flag() {
-    let cmd = run_command();
-    let result = cmd.try_get_matches_from(["run", "query.ptk", "app.js", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "run should accept --raw flag: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn trace_accepts_raw_flag() {
-    let cmd = trace_command();
-    let result = cmd.try_get_matches_from(["trace", "query.ptk", "app.js", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "trace should accept --raw flag: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn check_accepts_raw_flag() {
-    let cmd = check_command();
-    let result = cmd.try_get_matches_from(["check", "query.ptk", "--raw"]);
-    assert!(
-        result.is_ok(),
-        "check should accept --raw flag: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn ast_detects_ptk_as_query() {
-    let cmd = ast_command();
-    let result = cmd.try_get_matches_from(["ast", "query.ptk"]);
+fn tree_detects_ptk_as_query() {
+    let cmd = tree_command();
+    let result = cmd.try_get_matches_from(["tree", "query.ptk"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, None);
 }
 
 #[test]
-fn ast_detects_non_ptk_as_source() {
-    let cmd = ast_command();
-    let result = cmd.try_get_matches_from(["ast", "app.js"]);
+fn tree_detects_non_ptk_as_source() {
+    let cmd = tree_command();
+    let result = cmd.try_get_matches_from(["tree", "app.js"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
 
 #[test]
-fn ast_no_extension_detection_with_two_positionals() {
-    let cmd = ast_command();
-    let result = cmd.try_get_matches_from(["ast", "query.ptk", "app.js"]);
+fn tree_no_extension_detection_with_two_positionals() {
+    let cmd = tree_command();
+    let result = cmd.try_get_matches_from(["tree", "query.ptk", "app.js"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
 
 #[test]
-fn ast_no_extension_detection_with_inline_query() {
-    let cmd = ast_command();
-    let result = cmd.try_get_matches_from(["ast", "-q", "(id) @x", "app.js"]);
+fn tree_no_extension_detection_with_inline_query() {
+    let cmd = tree_command();
+    let result = cmd.try_get_matches_from(["tree", "-q", "(id) @x", "app.js"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstOpts::from_matches(&m);
+    let params = TreeOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(id) @x".to_string()));
@@ -868,7 +807,7 @@ fn inspect_params_extracts_all_fields() {
         "Q",
         "--json",
         "-v",
-        "--max-steps",
+        "--fuel",
         "500",
         "--color",
         "never",
@@ -884,7 +823,7 @@ fn inspect_params_extracts_all_fields() {
     assert_eq!(params.entry, Some("Q".to_string()));
     assert!(params.json);
     assert_eq!(params.verbose, 1);
-    assert!(matches!(params.limits.steps, Limit::Of(500)));
+    assert!(matches!(params.limits.fuel_limit, Limit::Of(500)));
     assert!(matches!(params.color, ColorChoice::Never));
 }
 

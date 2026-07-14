@@ -1,0 +1,28 @@
+Q = {
+  (identifier)
+  .
+  [
+    (number)
+    "+"
+  ]
+}
+---------------------- NFA -----------------------
+[entry_points]
+
+[transitions]
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "identifier"
+S2 "number"
+S3 "+"
+
+[type_defs]
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+
+[instructions]

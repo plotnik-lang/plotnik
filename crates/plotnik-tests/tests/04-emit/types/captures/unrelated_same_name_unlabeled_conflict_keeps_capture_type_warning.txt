@@ -1,0 +1,32 @@
+Q = [
+  {
+    {
+      {
+        (identifier) @id
+      } @x :: str
+    } @row
+    (identifier) @x
+  }
+  {
+    (identifier) @other
+  } @x
+]
+------------------ DIAGNOSTICS -------------------
+warning: capture type `str` replaces structured data with source text
+ --> query.ptk:6:12
+  |
+6 |       } @x :: str
+  |            ^^^^^^
+  |
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+
+error: capture `@x` has incompatible types across alternatives
+  --> query.ptk:8:18
+   |
+ 8 |     (identifier) @x
+   |                  ^^
+...
+12 |   } @x
+   |     -- and a different type here
+   |
+help: make every alternative produce the same type, or label the alternatives for a variant type

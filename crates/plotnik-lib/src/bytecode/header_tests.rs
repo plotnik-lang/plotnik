@@ -29,8 +29,8 @@ fn header_roundtrip() {
         type_defs_count: 8,
         type_members_count: 12,
         type_names_count: 4,
-        entrypoints_count: 1,
-        transitions_count: 15,
+        entry_points_count: 1,
+        instruction_word_count: 15,
         spans_count: 2,
         _reserved: [0; 20],
     };
@@ -57,24 +57,24 @@ fn compute_offsets_empty() {
     assert_eq!(offsets.type_defs, 192);
     assert_eq!(offsets.type_members, 192);
     assert_eq!(offsets.type_names, 192);
-    assert_eq!(offsets.entrypoints, 192);
-    assert_eq!(offsets.transitions, 192);
+    assert_eq!(offsets.entry_points, 192);
+    assert_eq!(offsets.instructions, 192);
     assert_eq!(offsets.spans, 192);
 }
 
 #[test]
 fn compute_offsets_with_data() {
     let h = Header {
-        str_table_count: 5,     // (5+1)*4 = 24 bytes
-        regex_table_count: 2,   // (2+1)*8 = 24 bytes
-        node_kinds_count: 10,   // 10*4 = 40 bytes
-        node_fields_count: 5,   // 5*4 = 20 bytes
-        type_defs_count: 8,     // 8*4 = 32 bytes
-        type_members_count: 12, // 12*4 = 48 bytes
-        type_names_count: 4,    // 4*4 = 16 bytes
-        entrypoints_count: 2,   // 2*8 = 16 bytes
-        transitions_count: 20,  // 20*8 = 160 bytes
-        spans_count: 3,         // 3*16 = 48 bytes
+        str_table_count: 5,         // (5+1)*4 = 24 bytes
+        regex_table_count: 2,       // (2+1)*8 = 24 bytes
+        node_kinds_count: 10,       // 10*4 = 40 bytes
+        node_fields_count: 5,       // 5*4 = 20 bytes
+        type_defs_count: 8,         // 8*4 = 32 bytes
+        type_members_count: 12,     // 12*4 = 48 bytes
+        type_names_count: 4,        // 4*4 = 16 bytes
+        entry_points_count: 2,      // 2*8 = 16 bytes
+        instruction_word_count: 20, // 20*8 = 160 bytes
+        spans_count: 3,             // 3*16 = 48 bytes
         str_blob_size: 100,
         regex_blob_size: 128,
         ..Default::default()
@@ -92,7 +92,7 @@ fn compute_offsets_with_data() {
     assert_eq!(offsets.type_defs, 576); // 512 + 20 = 532 → 576
     assert_eq!(offsets.type_members, 640); // 576 + 32 = 608 → 640
     assert_eq!(offsets.type_names, 704); // 640 + 48 = 688 → 704
-    assert_eq!(offsets.entrypoints, 768); // 704 + 16 = 720 → 768
-    assert_eq!(offsets.transitions, 832); // 768 + 16 = 784 → 832
+    assert_eq!(offsets.entry_points, 768); // 704 + 16 = 720 → 768
+    assert_eq!(offsets.instructions, 832); // 768 + 16 = 784 → 832
     assert_eq!(offsets.spans, 1024); // 832 + 160 = 992 → 1024
 }

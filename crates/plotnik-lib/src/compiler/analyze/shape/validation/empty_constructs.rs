@@ -5,10 +5,10 @@
 use super::ValidationInput;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{
-    Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
+    Visitor, walk_alternation_pattern, walk_named_node_pattern, walk_seq_pattern,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
-use crate::compiler::parse::ast::{NodePattern, SeqPattern, UnionPattern};
+use crate::compiler::parse::ast::{AlternationPattern, NamedNodePattern, SeqPattern};
 use crate::compiler::parse::cst::SyntaxNode;
 
 pub fn validate_empty_constructs(input: ValidationInput) {
@@ -26,7 +26,7 @@ struct EmptyConstructsValidator<'d> {
 }
 
 impl Visitor for EmptyConstructsValidator<'_> {
-    fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
+    fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
         if is_construct_empty(node.node().syntax()) && node.node().kind_token().is_none() {
             self.diag
                 .report(
@@ -35,7 +35,7 @@ impl Visitor for EmptyConstructsValidator<'_> {
                 )
                 .emit();
         }
-        walk_node_pattern(self, node);
+        walk_named_node_pattern(self, node);
     }
 
     fn visit_seq_pattern(&mut self, seq: &Located<SeqPattern>) {
@@ -50,16 +50,16 @@ impl Visitor for EmptyConstructsValidator<'_> {
         walk_seq_pattern(self, seq);
     }
 
-    fn visit_union_pattern(&mut self, union: &Located<UnionPattern>) {
-        if is_construct_empty(union.node().syntax()) {
+    fn visit_alternation_pattern(&mut self, alternation: &Located<AlternationPattern>) {
+        if is_construct_empty(alternation.node().syntax()) {
             self.diag
                 .report(
                     DiagnosticKind::EmptyAlternation,
-                    union.span_of(union.node().text_range()),
+                    alternation.span_of(alternation.node().text_range()),
                 )
                 .emit();
         }
-        walk_union_pattern(self, union);
+        walk_alternation_pattern(self, alternation);
     }
 }
 

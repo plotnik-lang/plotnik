@@ -13,9 +13,9 @@ warning: capture type `bool` replaces the captured value with a boolean
 5 |     } @seen :: bool
   |             ^^^^^^^
   |
-help: the replaced fields, variants, or scalar payload will not be returned
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 14
 
 [transitions]
@@ -23,16 +23,16 @@ Q:
   01                                        ▶
   02   !   (program)                        10
   03  ─‣┘  _                                01
-  05   !   (expression_statement) [BoolValue(1) Set(seen)]  03
-  06   !   (comment) [BoolValue(0) Set(seen)]  03
+  05   !   (expression_statement) [BoolValue(1) RecordSet(seen)]  03
+  06   !   (comment) [BoolValue(0) RecordSet(seen)]  03
   09  ──!  _                                05, 06, 09
   10  └─!  _                                05, 06, 09
 
-Q (entrypoint):
+Q (entry point):
   11                                        ▶
-  12  -ε-  [StructClose]                    11
+  12  -ε-  [RecordClose]                    11
   13       (Q)                              02 : 12
-  14  -ε-  [StructOpen]                     13
+  14  -ε-  [RecordOpen]                     13
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -44,7 +44,7 @@ S5 "comment"
 
 [type_defs]
 T0 = <Bool>
-T1 = Struct  M0:1  ; { seen }
+T1 = Record  M0:1  ; { seen }
 
 [type_members]
 M0: S1 → T0  ; seen: <Bool>
@@ -52,19 +52,19 @@ M0: S1 → T0  ; seen: <Bool>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08   !   (expression_statement) [BoolValue(1) Set(M0)]  07
-  10   !   (comment) [BoolValue(0) Set(M0)]  07
+  08   !   (expression_statement) [BoolValue(1) RecordSet(M0)]  07
+  10   !   (comment) [BoolValue(0) RecordSet(M0)]  07
   12  ──!  _                                08, 10, 12
   14  └─!  _                                08, 10, 12
   16   !   (program)                        14

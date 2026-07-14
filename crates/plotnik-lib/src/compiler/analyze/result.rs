@@ -1,0 +1,595 @@
+//! Target-neutral result schema and capture-member layout.
+//!
+//! Analysis assigns types and names; this view turns them into the one ordered
+//! result model every downstream consumer shares. In particular, absolute
+//! composite member slots are assigned here, before bytecode or any
+//! source backend chooses a representation.
+
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::OnceLock;
+
+use thiserror::Error;
+
+use crate::compiler::analyze::AnalysisArtifacts;
+use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::types::TypeAnalysis;
+use crate::compiler::analyze::types::type_shape::{
+    CasePayload, DefinitionOutput, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
+};
+use crate::compiler::ids::{DefId, TypeDeclId};
+use crate::core::{Interner, Symbol};
+
+const MAX_MEMBERS: usize = u16::MAX as usize;
+
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub(crate) enum ResultSchemaError {
+    #[error("too many type members: {0} (max {MAX_MEMBERS})")]
+    Members(usize),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ResultItemKind {
+    Record,
+    Variant,
+    Alias,
+    /// A selectable match-only definition has a nominal marker and a `matches` API,
+    /// but no decoded value.
+    MatchOnlyDef,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ResultItem {
+    pub(crate) name: Symbol,
+    pub(crate) output: DefinitionOutput,
+    pub(crate) kind: ResultItemKind,
+}
+
+impl ResultItem {
+    fn for_result(name: Symbol, ty: TypeId, shape: &TypeShape) -> Self {
+        let kind = match shape {
+            TypeShape::Record(_) => ResultItemKind::Record,
+            TypeShape::Variant(_) => ResultItemKind::Variant,
+            _ => ResultItemKind::Alias,
+        };
+        Self {
+            name,
+            output: DefinitionOutput::Value(ty),
+            kind,
+        }
+    }
+
+    fn match_only_definition(name: Symbol) -> Self {
+        Self {
+            name,
+            output: DefinitionOutput::MatchOnly,
+            kind: ResultItemKind::MatchOnlyDef,
+        }
+    }
+
+    pub(crate) fn is_composite(self) -> bool {
+        matches!(self.kind, ResultItemKind::Record | ResultItemKind::Variant)
+    }
+
+    pub(crate) fn is_record(self) -> bool {
+        self.kind == ResultItemKind::Record
+    }
+
+    pub(crate) fn value_type(self) -> TypeId {
+        self.output
+            .value()
+            .expect("value-bearing result item must have a value type")
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CaptureScopeKind {
+    Record,
+    Variant,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CaptureMemberKind {
+    Field(RecordField),
+    Case(CasePayload),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CaptureMember {
+    pub(crate) name: Symbol,
+    pub(crate) kind: CaptureMemberKind,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CaptureScope {
+    kind: CaptureScopeKind,
+    base: u16,
+    members: Vec<CaptureMember>,
+}
+
+impl CaptureScope {
+    pub(crate) fn kind(&self) -> CaptureScopeKind {
+        self.kind
+    }
+
+    pub(crate) fn base(&self) -> u16 {
+        self.base
+    }
+
+    pub(crate) fn members(&self) -> &[CaptureMember] {
+        &self.members
+    }
+
+    pub(crate) fn absolute_index(&self, relative: u16) -> u16 {
+        assert!(
+            usize::from(relative) < self.members.len(),
+            "capture member reference was validated against its parent scope"
+        );
+        self.base
+            .checked_add(relative)
+            .expect("capture layout validates the u16 member space")
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CaptureLayout {
+    scopes: BTreeMap<TypeId, CaptureScope>,
+    member_count: usize,
+}
+
+/// Stable analysis-type to emitted-type numbering shared by every output
+/// backend. Built-ins lead in canonical order, followed by value types in
+/// dependency order.
+#[derive(Clone, Debug)]
+pub(crate) struct ResultTypeLayout {
+    no_value: bool,
+    builtins: Vec<TypeId>,
+    value_types: Vec<TypeId>,
+    output_ids: HashMap<TypeId, u32>,
+}
+
+impl ResultTypeLayout {
+    fn build(no_value: bool, used_builtins: &HashSet<TypeId>, value_types: Vec<TypeId>) -> Self {
+        let builtins = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
+            .into_iter()
+            .filter(|builtin| used_builtins.contains(builtin))
+            .collect::<Vec<_>>();
+
+        let output_ids = builtins
+            .iter()
+            .chain(&value_types)
+            .enumerate()
+            .map(|(index, &type_id)| {
+                (
+                    type_id,
+                    u32::try_from(index + usize::from(no_value))
+                        .expect("result type count fits the wire type space"),
+                )
+            })
+            .collect();
+        Self {
+            no_value,
+            builtins,
+            value_types,
+            output_ids,
+        }
+    }
+
+    pub(crate) fn builtins(&self) -> &[TypeId] {
+        &self.builtins
+    }
+
+    pub(crate) fn has_no_value(&self) -> bool {
+        self.no_value
+    }
+
+    pub(crate) fn no_value_output_id(&self) -> u32 {
+        assert!(
+            self.no_value,
+            "result layout must include the no-value wire type"
+        );
+        0
+    }
+
+    pub(crate) fn value_types(&self) -> &[TypeId] {
+        &self.value_types
+    }
+
+    pub(crate) fn output_id(&self, type_id: TypeId) -> u32 {
+        *self
+            .output_ids
+            .get(&type_id)
+            .expect("reachable result type has a projected identity")
+    }
+
+    pub(crate) fn contains(&self, type_id: TypeId) -> bool {
+        self.output_ids.contains_key(&type_id)
+    }
+}
+
+impl CaptureLayout {
+    pub(super) fn build(
+        types: &TypeAnalysis,
+        ordered_types: &[TypeId],
+    ) -> Result<Self, ResultSchemaError> {
+        let mut scopes = BTreeMap::new();
+        let mut member_count = 0;
+        for &type_id in ordered_types {
+            let (kind, members): (CaptureScopeKind, Vec<CaptureMember>) =
+                match types.expect_type_shape(type_id) {
+                    TypeShape::Record(fields) => (
+                        CaptureScopeKind::Record,
+                        fields
+                            .iter()
+                            .map(|(&name, &info)| CaptureMember {
+                                name,
+                                kind: CaptureMemberKind::Field(info),
+                            })
+                            .collect(),
+                    ),
+                    TypeShape::Variant(cases) => (
+                        CaptureScopeKind::Variant,
+                        cases
+                            .iter()
+                            .map(|(&name, &payload)| CaptureMember {
+                                name,
+                                kind: CaptureMemberKind::Case(payload),
+                            })
+                            .collect(),
+                    ),
+                    _ => continue,
+                };
+
+            let next_member_count = member_count + members.len();
+            if next_member_count > MAX_MEMBERS {
+                return Err(ResultSchemaError::Members(next_member_count));
+            }
+            let base = u16::try_from(member_count)
+                .expect("member count was checked against the u16 format limit");
+            member_count = next_member_count;
+            scopes.insert(
+                type_id,
+                CaptureScope {
+                    kind,
+                    base,
+                    members,
+                },
+            );
+        }
+
+        Ok(Self {
+            scopes,
+            member_count,
+        })
+    }
+
+    pub(crate) fn scope(&self, type_id: TypeId) -> Option<&CaptureScope> {
+        self.scopes.get(&type_id)
+    }
+
+    pub(crate) fn member_base(&self, type_id: TypeId) -> Option<u16> {
+        self.scope(type_id).map(CaptureScope::base)
+    }
+
+    pub(crate) fn member_count(&self) -> usize {
+        self.member_count
+    }
+}
+
+/// The name-assigned, reachable result model shared by bytecode and generated
+/// source backends. It contains semantic shapes and capture slots only; target
+/// representation choices such as Rust `Box` placement live downstream.
+#[derive(Clone)]
+pub(crate) struct ResultSchema<'a> {
+    pub(crate) types: &'a TypeAnalysis,
+    pub(crate) deps: &'a DependencyAnalysis,
+    pub(crate) interner: &'a Interner,
+    collected_types: CollectedTypes,
+    type_layout: OnceLock<ResultTypeLayout>,
+    named_types: BTreeMap<TypeId, Symbol>,
+    type_name_bindings: Vec<TypeNameBinding>,
+    entry_point_items: Vec<ResultItem>,
+    capture_layout: CaptureLayout,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TypeNameBinding {
+    pub(crate) name: Symbol,
+    pub(crate) type_id: TypeId,
+}
+
+impl<'a> ResultSchema<'a> {
+    pub(crate) fn from_artifacts(
+        artifacts: AnalysisArtifacts<'a>,
+    ) -> Result<Self, ResultSchemaError> {
+        Self::new(
+            artifacts.type_analysis,
+            artifacts.dependency_analysis,
+            artifacts.interner,
+        )
+    }
+
+    pub(crate) fn new(
+        types: &'a TypeAnalysis,
+        deps: &'a DependencyAnalysis,
+        interner: &'a Interner,
+    ) -> Result<Self, ResultSchemaError> {
+        let reachable_defs =
+            deps.reachable_from(types.iter_entry_point_outputs().map(|(def_id, _)| def_id));
+        let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
+        let capture_layout = CaptureLayout::build(types, &collected_types.value_types)?;
+        let named_types: BTreeMap<TypeId, Symbol> = types.iter_named_types().collect();
+        let mut type_name_bindings = named_types
+            .iter()
+            .map(|(&type_id, &name)| TypeNameBinding { name, type_id })
+            .collect::<Vec<_>>();
+        for def_id in reachable_defs.iter() {
+            let Some(body) = types.expect_def_output(def_id).value() else {
+                continue;
+            };
+            type_name_bindings.push(TypeNameBinding {
+                name: deps.def_name_sym(def_id),
+                type_id: body,
+            });
+        }
+        type_name_bindings.sort_by_key(|binding| (binding.type_id, binding.name));
+        type_name_bindings.dedup();
+        let entry_point_items = ItemCollector::new(types, deps, &named_types).collect();
+        Ok(Self {
+            types,
+            deps,
+            interner,
+            collected_types,
+            type_layout: OnceLock::new(),
+            named_types,
+            type_name_bindings,
+            entry_point_items,
+            capture_layout,
+        })
+    }
+
+    pub(crate) fn type_layout(&self) -> &ResultTypeLayout {
+        self.type_layout.get_or_init(|| {
+            ResultTypeLayout::build(
+                self.collected_types.no_value,
+                &self.collected_types.builtins,
+                self.collected_types.value_types.clone(),
+            )
+        })
+    }
+
+    pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
+        self.named_types.get(&type_id).copied()
+    }
+
+    pub(crate) fn iter_type_name_bindings(&self) -> impl Iterator<Item = TypeNameBinding> + '_ {
+        self.type_name_bindings.iter().copied()
+    }
+
+    /// Public result items reachable from selectable definition outputs.
+    ///
+    /// Reachable fragment definitions still need capture slots and wire types
+    /// for matching. A source-code target, however, must not publish an
+    /// unspecialized fragment type merely because a capture-type-specialized call
+    /// uses the same matcher body.
+    pub(crate) fn entry_point_items(&self) -> &[ResultItem] {
+        &self.entry_point_items
+    }
+
+    pub(crate) fn layout(&self) -> &CaptureLayout {
+        &self.capture_layout
+    }
+
+    pub(crate) fn dependency_analysis(&self) -> &DependencyAnalysis {
+        self.deps
+    }
+
+    pub(crate) fn interner(&self) -> &Interner {
+        self.interner
+    }
+}
+
+struct ItemCollector<'a> {
+    types: &'a TypeAnalysis,
+    deps: &'a DependencyAnalysis,
+    named_types: &'a BTreeMap<TypeId, Symbol>,
+    declared_names: HashSet<Symbol>,
+    walked_types: HashSet<TypeId>,
+    items: Vec<ResultItem>,
+}
+
+impl<'a> ItemCollector<'a> {
+    fn new(
+        types: &'a TypeAnalysis,
+        deps: &'a DependencyAnalysis,
+        named_types: &'a BTreeMap<TypeId, Symbol>,
+    ) -> Self {
+        Self {
+            types,
+            deps,
+            named_types,
+            declared_names: HashSet::new(),
+            walked_types: HashSet::new(),
+            items: Vec::new(),
+        }
+    }
+
+    fn collect(mut self) -> Vec<ResultItem> {
+        for (def_id, output) in self.types.iter_entry_point_outputs() {
+            let name = self.deps.def_name_sym(def_id);
+            match output {
+                DefinitionOutput::MatchOnly => {
+                    self.items.push(ResultItem::match_only_definition(name));
+                }
+                DefinitionOutput::Value(type_id) => self.add_item(name, type_id),
+            }
+        }
+        self.items
+    }
+
+    fn add_item(&mut self, name: Symbol, ty: TypeId) {
+        if !self.declared_names.insert(name) {
+            return;
+        }
+
+        let item = ResultItem::for_result(name, ty, self.types.expect_type_shape(ty));
+        self.items.push(item);
+        self.walk(ty);
+    }
+
+    fn walk(&mut self, ty: TypeId) {
+        if !self.walked_types.insert(ty) {
+            return;
+        }
+
+        match self.types.expect_type_shape(ty) {
+            TypeShape::Record(fields) => {
+                for info in fields.values() {
+                    self.collect_position(info.final_type);
+                }
+            }
+            TypeShape::Variant(cases) => {
+                for payload in cases.values() {
+                    let Some(payload) = payload.type_id() else {
+                        continue;
+                    };
+                    let TypeShape::Record(fields) = self.types.expect_type_shape(payload) else {
+                        unreachable!("variant case has no payload or an anonymous record payload");
+                    };
+                    for info in fields.values() {
+                        self.collect_position(info.final_type);
+                    }
+                }
+            }
+            TypeShape::List { element, .. } | TypeShape::Option(element) => {
+                self.collect_position(*element)
+            }
+            TypeShape::Ref(declaration) => self.collect_reference(*declaration),
+            TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
+        }
+    }
+
+    fn collect_position(&mut self, ty: TypeId) {
+        match self.types.expect_type_shape(ty) {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
+                let name = *self
+                    .named_types
+                    .get(&ty)
+                    .expect("naming pass names every non-payload composite");
+                self.add_item(name, ty);
+            }
+            TypeShape::List { .. } | TypeShape::Option(_) => {
+                let Some(&name) = self.named_types.get(&ty) else {
+                    self.walk(ty);
+                    return;
+                };
+                self.add_item(name, ty);
+            }
+            TypeShape::Ref(declaration) => self.collect_reference(*declaration),
+            TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
+        }
+    }
+
+    fn collect_reference(&mut self, declaration: TypeDeclId) {
+        let Some(declaration) = self.types.declaration(declaration) else {
+            return;
+        };
+        self.add_item(declaration.name, declaration.body);
+    }
+}
+
+/// Value types in dependency order for wire-table emission.
+#[cfg(test)]
+pub(super) fn collect_ordered_types(types: &TypeAnalysis) -> Vec<TypeId> {
+    CollectedTypes::collect(types, types.iter_def_output().map(|(def_id, _)| def_id)).value_types
+}
+
+#[derive(Clone, Debug)]
+struct CollectedTypes {
+    value_types: Vec<TypeId>,
+    builtins: HashSet<TypeId>,
+    no_value: bool,
+}
+
+impl CollectedTypes {
+    fn collect(types: &TypeAnalysis, definitions: impl IntoIterator<Item = DefId>) -> Self {
+        let mut collector = TypeCollector::new();
+        let mut no_value = false;
+        for def_id in definitions {
+            let Some(type_id) = types.expect_def_output(def_id).value() else {
+                no_value = true;
+                continue;
+            };
+            collector.collect(type_id, types);
+            if !matches!(types.expect_type_shape(type_id), TypeShape::Ref(_)) {
+                continue;
+            }
+            if collector.seen.insert(type_id) {
+                collector.out.push(type_id);
+            }
+        }
+        Self {
+            value_types: collector.out,
+            builtins: collector.builtins,
+            no_value: no_value || collector.no_value,
+        }
+    }
+}
+
+struct TypeCollector {
+    out: Vec<TypeId>,
+    seen: HashSet<TypeId>,
+    builtins: HashSet<TypeId>,
+    no_value: bool,
+}
+
+impl TypeCollector {
+    fn new() -> Self {
+        Self {
+            out: Vec::new(),
+            seen: HashSet::new(),
+            builtins: HashSet::new(),
+            no_value: false,
+        }
+    }
+
+    fn collect(&mut self, type_id: TypeId, types: &TypeAnalysis) {
+        if type_id.is_builtin() {
+            self.builtins.insert(type_id);
+            return;
+        }
+        if self.seen.contains(&type_id) {
+            return;
+        }
+        let shape = types.expect_type_shape(type_id);
+        if let TypeShape::Variant(cases) = shape
+            && cases.values().any(|payload| payload.type_id().is_none())
+        {
+            self.no_value = true;
+        }
+        if let TypeShape::Ref(declaration) = shape {
+            let Some(declaration) = types.declaration(*declaration) else {
+                self.builtins.insert(TYPE_NODE);
+                return;
+            };
+            self.collect(declaration.body, types);
+            if types.declaration_definition(declaration.id).is_none() && self.seen.insert(type_id) {
+                self.out.push(type_id);
+            }
+            return;
+        }
+
+        self.seen.insert(type_id);
+        for child in shape.child_type_ids() {
+            self.collect(child, types);
+        }
+        if matches!(
+            shape,
+            TypeShape::Record(_)
+                | TypeShape::Variant(_)
+                | TypeShape::List { .. }
+                | TypeShape::Option(_)
+        ) {
+            self.out.push(type_id);
+        }
+    }
+}

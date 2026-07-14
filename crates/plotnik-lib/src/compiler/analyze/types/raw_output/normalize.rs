@@ -2,6 +2,7 @@
 
 use super::planner::CaptureTypePlanner;
 use super::*;
+use crate::compiler::ids::TypeDeclId;
 
 #[cfg(test)]
 #[path = "normalize_tests.rs"]
@@ -24,7 +25,7 @@ impl RawOutputGraph {
             .enumerate()
             .filter_map(|(index, capture)| {
                 let fact = capture.observation.contract.fact;
-                (!fact.is_valid() || raw_types.type_contains_invalid(fact.field().type_id))
+                (!fact.is_valid() || raw_types.type_contains_invalid(fact.field().final_type))
                     .then_some(RawCaptureId(index as u32))
             })
             .collect::<HashSet<_>>();
@@ -46,9 +47,9 @@ impl RawOutputGraph {
         for alternation in self.alternations.values() {
             for (&name, field) in &alternation.fields {
                 if !alternation
-                    .branches
+                    .alternatives
                     .iter()
-                    .any(|branch| branch.omissions.contains(&name))
+                    .any(|alternative| alternative.omissions.contains(&name))
                 {
                     continue;
                 }
@@ -76,7 +77,7 @@ impl<'a, 'd> NormalizationSession<'a, 'd> {
     ) -> Self {
         Self {
             graph,
-            raw_types: RawTypeSnapshot::new(types, graph),
+            raw_types: RawTypeSnapshot::new(types),
             types,
             interner,
             diagnostics,
@@ -85,7 +86,7 @@ impl<'a, 'd> NormalizationSession<'a, 'd> {
 
     fn run(mut self) {
         let captures = CaptureNormalizer::new(&mut self).run();
-        self.types.analysis.union_flow.clear();
+        self.types.analysis.field_completions.clear();
         let flow_count = self.graph.flows.len();
         let mut flows = FlowNormalizer::new(&mut self, &captures);
         for index in 0..flow_count {
@@ -156,7 +157,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
         if planned.plan.suppresses_semantic_data() {
             self.session
                 .diagnostics
-                .report(DiagnosticKind::CaptureTypeSuppressesData, span)
+                .report(DiagnosticKind::CaptureTypeReplacesData, span)
                 .detail(match capture_type {
                     BuiltInCaptureType::Str => {
                         "capture type `str` replaces structured data with source text"
@@ -165,7 +166,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
                         "capture type `bool` replaces the captured value with a boolean"
                     }
                 })
-                .hint("the replaced fields, variants, or scalar payload will not be returned")
+                .hint("result fields, cases, text, or boolean values produced inside the capture will not be returned")
                 .emit();
         }
 
@@ -183,27 +184,35 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
 
 #[derive(Clone)]
 pub(super) struct RawTypeSnapshot {
-    types: Vec<TypeShape>,
-    definitions: BTreeMap<DefId, TypeId>,
+    types: Vec<Option<TypeShape>>,
+    declarations: BTreeMap<TypeDeclId, TypeId>,
     invalid_containment: HashSet<TypeId>,
 }
 
 impl RawTypeSnapshot {
-    fn new(
-        types: &crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
-        graph: &RawOutputGraph,
-    ) -> Self {
-        let type_shapes = types.analysis.types.clone();
-        let definitions = graph
-            .definitions
+    fn new(types: &crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder) -> Self {
+        let type_shapes = types.type_shapes_snapshot();
+        let declarations = type_shapes
             .iter()
-            .map(|(&def_id, &output)| (def_id, output.type_id(graph)))
+            .filter_map(|shape| match shape {
+                Some(TypeShape::Ref(declaration)) => Some(*declaration),
+                _ => None,
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .map(|declaration| {
+                let body = types
+                    .in_progress()
+                    .declaration_body(declaration)
+                    .unwrap_or(TYPE_NODE);
+                (declaration, body)
+            })
             .collect();
         let invalid_containment =
-            compute_invalid_containment(&type_shapes, &definitions, &types.invalid_types);
+            compute_invalid_containment(&type_shapes, &declarations, &types.invalid_types);
         Self {
             types: type_shapes,
-            definitions,
+            declarations,
             invalid_containment,
         }
     }
@@ -211,14 +220,15 @@ impl RawTypeSnapshot {
     pub(super) fn shape(&self, type_id: TypeId) -> &TypeShape {
         self.types
             .get(type_id.0 as usize)
+            .and_then(Option::as_ref)
             .expect("raw capture type must be registered")
     }
 
-    pub(super) fn definition(&self, def_id: DefId) -> TypeId {
+    pub(super) fn declaration(&self, declaration: TypeDeclId) -> TypeId {
         *self
-            .definitions
-            .get(&def_id)
-            .expect("raw referenced definition must have an output")
+            .declarations
+            .get(&declaration)
+            .expect("raw referenced declaration must have a body")
     }
 
     fn type_contains_invalid(&self, type_id: TypeId) -> bool {
@@ -227,8 +237,8 @@ impl RawTypeSnapshot {
 }
 
 fn compute_invalid_containment(
-    types: &[TypeShape],
-    definitions: &BTreeMap<DefId, TypeId>,
+    types: &[Option<TypeShape>],
+    declarations: &BTreeMap<TypeDeclId, TypeId>,
     invalid: &HashSet<TypeId>,
 ) -> HashSet<TypeId> {
     // Work backwards from invalid types. Unlike recursive DFS memoization,
@@ -236,11 +246,14 @@ fn compute_invalid_containment(
     // containing type is visited once, after any invalid descendant reaches it.
     let mut containers = vec![Vec::new(); types.len()];
     for (index, shape) in types.iter().enumerate() {
+        let Some(shape) = shape else {
+            continue;
+        };
         let container = TypeId(index as u32);
-        if let TypeShape::Ref(def_id) = shape {
-            let child = *definitions
-                .get(def_id)
-                .expect("raw referenced definition has an output");
+        if let TypeShape::Ref(declaration) = shape {
+            let child = *declarations
+                .get(declaration)
+                .expect("raw referenced declaration has a body");
             containers
                 .get_mut(child.0 as usize)
                 .expect("raw child type must be registered")
@@ -271,58 +284,60 @@ fn compute_invalid_containment(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum OmissionPolicy {
-    FieldOptional,
-    Value(FieldFallback),
+pub(super) enum AbsencePolicy {
+    MakeOption,
+    CompleteWith(FieldCompletion),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct NormalizedField {
-    pub(super) info: FieldInfo,
-    pub(super) omission: OmissionPolicy,
+    pub(super) info: RecordField,
+    pub(super) on_absence: AbsencePolicy,
 }
 
 impl NormalizedField {
-    fn ordinary(info: FieldInfo, raw_types: &RawTypeSnapshot) -> Self {
-        let omission =
-            if !info.optional && matches!(raw_types.shape(info.type_id), TypeShape::Array { .. }) {
-                OmissionPolicy::Value(FieldFallback::EmptyArray)
-            } else {
-                OmissionPolicy::FieldOptional
-            };
-        Self { info, omission }
+    fn ordinary(info: RecordField, raw_types: &RawTypeSnapshot) -> Self {
+        let on_absence = if matches!(raw_types.shape(info.final_type), TypeShape::List { .. }) {
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
+        } else {
+            AbsencePolicy::MakeOption
+        };
+        Self { info, on_absence }
     }
 
-    fn omitted(
+    fn complete_absence(
         mut self,
         types: &mut crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
-    ) -> (Self, FieldFallback) {
-        let fallback = match self.omission {
-            OmissionPolicy::FieldOptional => {
-                self.info = self.info.make_optional();
-                FieldFallback::Null
+    ) -> (Self, FieldCompletion) {
+        let completion = match self.on_absence {
+            AbsencePolicy::MakeOption => {
+                self.info = RecordField::new(types.intern_option(self.info.final_type));
+                FieldCompletion::Absent
             }
-            OmissionPolicy::Value(FieldFallback::EmptyArray) => {
-                let TypeShape::Array { element, .. } = types
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList) => {
+                let TypeShape::List { element, .. } = types
                     .in_progress()
-                    .type_shape(self.info.type_id)
+                    .type_shape(self.info.final_type)
                     .cloned()
-                    .expect("empty-array omission requires a registered array")
+                    .expect("empty-list completion requires a registered list")
                 else {
-                    unreachable!("empty-array omission belongs to an array field")
+                    unreachable!("empty-list completion belongs to a list field")
                 };
-                let array = types.intern_type(TypeShape::Array {
+                let list = types.intern_type(TypeShape::List {
                     element,
-                    non_empty: false,
+                    minimum: ListMinimum::Zero,
                 });
-                self.info = FieldInfo::required(array);
-                FieldFallback::EmptyArray
+                self.info = RecordField::new(list);
+                FieldCompletion::EmptyList
             }
-            OmissionPolicy::Value(fallback @ (FieldFallback::Null | FieldFallback::False)) => {
-                fallback
+            AbsencePolicy::CompleteWith(
+                completion @ (FieldCompletion::Absent | FieldCompletion::False),
+            ) => completion,
+            AbsencePolicy::CompleteWith(FieldCompletion::AlwaysPresent) => {
+                unreachable!("always-present fields have no absence policy")
             }
         };
-        (self, fallback)
+        (self, completion)
     }
 }
 
@@ -357,7 +372,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         let output = self.session.graph.flow(id).clone();
         let raw_fields = match &output.flow {
             RawPatternFlow::Fields(fields) => fields.clone(),
-            RawPatternFlow::Void | RawPatternFlow::Value(_) => {
+            RawPatternFlow::NoValue | RawPatternFlow::Value => {
                 self.visiting.remove(&id);
                 return None;
             }
@@ -369,20 +384,23 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             .get(&output.occurrence)
             .cloned();
         let mut normalized = BTreeMap::new();
-        let mut fallbacks = BTreeMap::new();
+        let mut completions = BTreeMap::new();
 
         for (&name, raw_field) in &raw_fields.fields {
             let mut field = self.normalize_sources(&output, name, raw_field);
             if let Some(alternation) = &alternation {
                 let omitted = alternation
-                    .branches
+                    .alternatives
                     .iter()
-                    .any(|branch| branch.omissions.contains(&name));
-                if omitted {
-                    let (omitted, fallback) = field.omitted(self.session.types);
-                    field = omitted;
-                    fallbacks.insert(name, fallback);
-                }
+                    .any(|alternative| alternative.omissions.contains(&name));
+                let completion = if omitted {
+                    let (completed, completion) = field.complete_absence(self.session.types);
+                    field = completed;
+                    completion
+                } else {
+                    FieldCompletion::AlwaysPresent
+                };
+                completions.insert(name, completion);
             } else {
                 field = self.adapt_to_raw_output(raw_field, field);
             }
@@ -393,24 +411,15 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             .iter()
             .map(|(&name, field)| (name, field.info))
             .collect();
-        let shape = self
-            .session
+        self.session
             .types
-            .analysis
-            .types
-            .get_mut(raw_fields.type_id.0 as usize)
-            .expect("raw fields flow type must be registered");
-        let TypeShape::Struct(current) = shape else {
-            unreachable!("raw fields flow must reference a struct")
-        };
-        *current = fields;
+            .replace_record_fields(raw_fields.type_id, fields);
 
         if alternation.is_some() {
-            self.session
-                .types
-                .analysis
-                .union_flow
-                .insert(output.occurrence.clone(), UnionFlowPlan::new(fallbacks));
+            self.session.types.analysis.field_completions.insert(
+                output.occurrence.clone(),
+                FieldCompletions::new(completions),
+            );
         }
         self.normalized.insert(id, normalized);
         self.visiting.remove(&id);
@@ -487,35 +496,63 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             return field;
         }
 
-        if raw_source.type_id == raw_output.info.type_id {
-            if raw_output.info.optional && field.omission == OmissionPolicy::FieldOptional {
-                field.info = field.info.make_optional();
-            }
+        if matches!(
+            field.on_absence,
+            AbsencePolicy::CompleteWith(FieldCompletion::Absent | FieldCompletion::False)
+        ) && matches!(
+            self.session.raw_types.shape(raw_output.info.final_type),
+            TypeShape::Option(inner) if *inner == raw_source.final_type
+        ) {
             return field;
         }
 
-        let TypeShape::Array { element, non_empty } =
-            self.session.raw_types.shape(raw_output.info.type_id)
-        else {
+        let Some(final_type) = self.adapt_final_type(
+            raw_source.final_type,
+            raw_output.info.final_type,
+            field.info.final_type,
+        ) else {
             return field;
         };
-        if *element != raw_source.type_id {
-            return field;
-        }
-        let array = self.session.types.intern_type(TypeShape::Array {
-            element: field.info.type_id,
-            non_empty: *non_empty,
-        });
-        field.info = FieldInfo::with_optional(array, raw_output.info.optional);
-        field.omission = if field.info.optional {
-            OmissionPolicy::FieldOptional
+        field.info = RecordField::new(final_type);
+        field.on_absence = if matches!(
+            self.session.types.in_progress().type_shape(final_type),
+            Some(TypeShape::List { .. })
+        ) {
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {
-            OmissionPolicy::Value(FieldFallback::EmptyArray)
+            AbsencePolicy::MakeOption
         };
         field
     }
 
-    fn raw_source_info(&self, source: RawFieldSource) -> FieldInfo {
+    fn adapt_final_type(
+        &mut self,
+        raw_source: TypeId,
+        raw_output: TypeId,
+        normalized: TypeId,
+    ) -> Option<TypeId> {
+        if raw_source == raw_output {
+            return Some(normalized);
+        }
+
+        match self.session.raw_types.shape(raw_output).clone() {
+            TypeShape::Option(inner) => {
+                let inner = self.adapt_final_type(raw_source, inner, normalized)?;
+                Some(self.session.types.intern_option(inner))
+            }
+            TypeShape::List { element, minimum } => {
+                let element = self.adapt_final_type(raw_source, element, normalized)?;
+                Some(
+                    self.session
+                        .types
+                        .intern_type(TypeShape::List { element, minimum }),
+                )
+            }
+            _ => None,
+        }
+    }
+
+    fn raw_source_info(&self, source: RawFieldSource) -> RecordField {
         match source {
             RawFieldSource::Capture(capture) => self
                 .session
@@ -542,25 +579,25 @@ fn unify_normalized_fields(
     a: NormalizedField,
     b: NormalizedField,
 ) -> Result<NormalizedField, ()> {
-    let type_id = unify_normalized_types(types, a.info.type_id, b.info.type_id)?;
-    let omission = match (a.omission, b.omission) {
+    let final_type = unify_normalized_types(types, a.info.final_type, b.info.final_type)?;
+    let on_absence = match (a.on_absence, b.on_absence) {
         (
-            OmissionPolicy::Value(FieldFallback::False),
-            OmissionPolicy::Value(FieldFallback::False),
-        ) => OmissionPolicy::Value(FieldFallback::False),
-        (OmissionPolicy::Value(FieldFallback::Null), _)
-        | (_, OmissionPolicy::Value(FieldFallback::Null)) => {
-            OmissionPolicy::Value(FieldFallback::Null)
+            AbsencePolicy::CompleteWith(FieldCompletion::False),
+            AbsencePolicy::CompleteWith(FieldCompletion::False),
+        ) => AbsencePolicy::CompleteWith(FieldCompletion::False),
+        (AbsencePolicy::CompleteWith(FieldCompletion::Absent), _)
+        | (_, AbsencePolicy::CompleteWith(FieldCompletion::Absent)) => {
+            AbsencePolicy::CompleteWith(FieldCompletion::Absent)
         }
         (
-            OmissionPolicy::Value(FieldFallback::EmptyArray),
-            OmissionPolicy::Value(FieldFallback::EmptyArray),
-        ) => OmissionPolicy::Value(FieldFallback::EmptyArray),
-        _ => OmissionPolicy::FieldOptional,
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList),
+            AbsencePolicy::CompleteWith(FieldCompletion::EmptyList),
+        ) => AbsencePolicy::CompleteWith(FieldCompletion::EmptyList),
+        _ => AbsencePolicy::MakeOption,
     };
     Ok(NormalizedField {
-        info: FieldInfo::with_optional(type_id, a.info.optional || b.info.optional),
-        omission,
+        info: RecordField::new(final_type),
+        on_absence,
     })
 }
 
@@ -583,32 +620,32 @@ fn unify_normalized_types(
         .cloned()
         .expect("normalized type must be registered");
     match (a_shape, b_shape) {
-        (TypeShape::Optional(a), TypeShape::Optional(b)) => {
+        (TypeShape::Option(a), TypeShape::Option(b)) => {
             let inner = unify_normalized_types(types, a, b)?;
-            Ok(types.intern_type(TypeShape::Optional(inner)))
+            Ok(types.intern_option(inner))
         }
-        (TypeShape::Optional(inner), _) => {
+        (TypeShape::Option(inner), _) => {
             let inner = unify_normalized_types(types, inner, b)?;
-            Ok(types.intern_type(TypeShape::Optional(inner)))
+            Ok(types.intern_option(inner))
         }
-        (_, TypeShape::Optional(inner)) => {
+        (_, TypeShape::Option(inner)) => {
             let inner = unify_normalized_types(types, a, inner)?;
-            Ok(types.intern_type(TypeShape::Optional(inner)))
+            Ok(types.intern_option(inner))
         }
         (
-            TypeShape::Array {
+            TypeShape::List {
                 element: a,
-                non_empty: a_non_empty,
+                minimum: a_minimum,
             },
-            TypeShape::Array {
+            TypeShape::List {
                 element: b,
-                non_empty: b_non_empty,
+                minimum: b_minimum,
             },
         ) => {
             let element = unify_normalized_types(types, a, b)?;
-            Ok(types.intern_type(TypeShape::Array {
+            Ok(types.intern_type(TypeShape::List {
                 element,
-                non_empty: a_non_empty && b_non_empty,
+                minimum: std::cmp::min(a_minimum, b_minimum),
             }))
         }
         _ => Err(()),

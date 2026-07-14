@@ -3,7 +3,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 10
 
 [transitions]
@@ -12,13 +12,13 @@ Q:
   02   !   (program)                        04
   04  └‣─  (expression_statement)           06
   05  ─‣┘² _                                01
-  06  └‣─  (identifier) [Node Set(id)]      05
+  06  └‣─  (identifier) [Node RecordSet(id)]  05
 
-Q (entrypoint):
+Q (entry point):
   07                                        ▶
-  08  -ε-  [StructClose]                    07
+  08  -ε-  [RecordClose]                    07
   09       (Q)                              02 : 08
-  10  -ε-  [StructOpen]                     09
+  10  -ε-  [RecordOpen]                     09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -30,7 +30,7 @@ S5 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
+T1 = Record  M0:1  ; { id }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
@@ -38,25 +38,25 @@ M0: S1 → T0  ; id: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [spans]
-P0 def        0..56  src0  T1
-P1 pattern    4..56  src0
-P2 pattern    15..54  src0
-P3 capture    50..53  src0  T1.M0
-P4 pattern    37..49  src0
+P0 def        0..56  source_id=0  T1
+P1 pattern    4..56  source_id=0
+P2 pattern    15..54  source_id=0
+P3 capture    50..53  source_id=0  T1.M0
+P4 pattern    37..49  source_id=0
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4]  11
+  08  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4]  11
   11  ─‣┘  _                                12
   12  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
   14                                        ▶

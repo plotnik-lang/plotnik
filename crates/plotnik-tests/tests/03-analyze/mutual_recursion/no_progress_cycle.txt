@@ -1,0 +1,27 @@
+A = [
+  (B)
+  (x)
+]
+
+B = (A)
+------------------ DIAGNOSTICS -------------------
+error: infinite recursion: cycle makes no progress
+ --> query.ptk:6:6
+  |
+2 |   (B)
+  |    - references B (completing cycle)
+...
+6 | B = (A)
+  | -    ^
+  | |    |
+  | |    references A
+  | B is defined here
+  |
+help: match at least one syntax-tree node before recursing
+-------------------- SYMBOLS ---------------------
+A
+  B
+    A (cycle)
+B
+  A
+    B (cycle)

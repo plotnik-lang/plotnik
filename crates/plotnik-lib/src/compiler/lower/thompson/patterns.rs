@@ -11,11 +11,11 @@ use crate::bytecode::{EffectKind, Nav, PredicateOp, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
-    CalleeEntry, DefBodyMode, DefRoute, DefVariant, EffectArg, EffectIR, InstructionIR, Label,
-    MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,
+    CalleeEntry, DefBodyMode, DefRoute, DefSpecialization, EffectArg, EffectIR, InstructionIR,
+    Label, MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,
 };
 use crate::compiler::parse::ast::{self, MissingArg, Pattern};
-use crate::compiler::parse::cst::SyntaxKind;
+use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode};
 use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeFieldId, NodeKindId};
 
@@ -29,8 +29,8 @@ use super::sequences::SeqItemsCtx;
 
 #[derive(Clone, Copy)]
 enum RefLowering {
-    ScopedCapture,
-    CapturedValue,
+    ScopedValue,
+    PendingValue,
     SuppressedCall,
     PlainCall,
 }
@@ -71,9 +71,9 @@ impl CaptureRequest {
 }
 
 impl NfaBuilder<'_> {
-    pub(super) fn compile_node_pattern(
+    pub(super) fn compile_named_node_pattern(
         &mut self,
-        node: &ast::NodePattern,
+        node: &ast::NamedNodePattern,
         ctx: PatternCtx,
     ) -> Label {
         let pattern_span = self
@@ -83,12 +83,12 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         let entry = self.fresh_label();
-        let node_kind = self.resolve_node_kind(node);
+        let node_kind = self.resolve_named_node_kind(node);
         // MISSING nodes take no children, so the flag only ever rides the empty-items
-        // (leaf) branch below; the with-items branch never sees a missing node.
+        // (leaf) path below; the with-items path never sees a missing node.
         let missing = node.is_missing();
         let nav = nav_override.unwrap_or(Nav::Stay);
 
@@ -138,7 +138,7 @@ impl NfaBuilder<'_> {
             Nav::Up(1)
         };
 
-        // Split capture.post: Node effects (and their Set) go on entry so
+        // Split capture.post: `Node` effects (and their `RecordSet`) go on entry so
         // they read the cursor immediately after this node matched. Other
         // effects run after child constraints have completed.
         let mut post = capture.post;
@@ -148,16 +148,19 @@ impl NfaBuilder<'_> {
         let mut iter = post.into_iter().peekable();
         while let Some(eff) = iter.next() {
             match eff.kind() {
-                // A capture unit `[SpanStart, Node, Set, SpanEnd]` moves to
-                // the entry as a whole: the Set must stay adjacent to its
-                // pending Node, and the markers must keep hugging the Set.
+                // A capture unit `[SpanStart, Node, RecordSet, SpanEnd]` moves to
+                // the entry as a whole: `RecordSet` must stay adjacent to its
+                // pending `Node`, and the markers must keep hugging `RecordSet`.
                 EffectKind::SpanStart
                     if iter.peek().is_some_and(|e| e.kind() == EffectKind::Node) =>
                 {
                     entry_effects.push(eff);
                     entry_effects.push(iter.next().expect("peeked Node"));
-                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
-                        entry_effects.push(iter.next().expect("peeked Set"));
+                    if iter
+                        .peek()
+                        .is_some_and(|e| e.kind() == EffectKind::RecordSet)
+                    {
+                        entry_effects.push(iter.next().expect("peeked RecordSet"));
                     }
                     if iter.peek().is_some_and(|e| e.kind() == EffectKind::SpanEnd) {
                         entry_effects.push(iter.next().expect("peeked SpanEnd"));
@@ -165,8 +168,11 @@ impl NfaBuilder<'_> {
                 }
                 EffectKind::Node => {
                     entry_effects.push(eff);
-                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
-                        entry_effects.push(iter.next().expect("peeked Set"));
+                    if iter
+                        .peek()
+                        .is_some_and(|e| e.kind() == EffectKind::RecordSet)
+                    {
+                        entry_effects.push(iter.next().expect("peeked RecordSet"));
                     }
                 }
                 _ => exit_effects.push(eff),
@@ -177,7 +183,7 @@ impl NfaBuilder<'_> {
         let final_exit = self.emit_trailing_effects_exit(exit, exit_effects);
 
         // The skip exit bypasses Up when the whole child list matches
-        // zero-width: nothing was consumed, so the cursor never descended and
+        // Empty match: nothing was consumed, so the cursor never descended and
         // there is no child to ascend from. Anchors lose their carrier on that
         // path — a trailing anchor's "nothing may follow the last match" and a
         // leading anchor's "the first match comes first" both degrade to "this
@@ -201,7 +207,7 @@ impl NfaBuilder<'_> {
         } else {
             final_exit
         };
-        // A body of anchors alone consumes no child, so it is the zero-width
+        // A body of anchors alone consumes no child, so it is the empty-match
         // path and nothing else: the childless assertion is the whole
         // constraint. Compiling the descend/ascend pair around an empty
         // match would emit a bare ascent (`verify` rightly rejects it).
@@ -244,7 +250,7 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Post-effects (like `EndEnum`) must run after children complete, not right after
+    /// Post-effects (like `VariantClose`) must run after children complete, not right after
     /// matching the parent node. Returns `exit` unchanged when `post` is empty.
     fn emit_trailing_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
         if post.is_empty() {
@@ -256,7 +262,7 @@ impl NfaBuilder<'_> {
 }
 
 /// Whether any item — descending through sequence groups — is a pattern that
-/// consumes a child. A body failing this is anchors alone: one zero-width
+/// consumes a child. A body failing this is anchors alone: one empty-match
 /// match with no descent into the child list.
 fn items_have_patterns(items: &[ast::SeqItem]) -> bool {
     items.iter().any(|item| match item {
@@ -269,7 +275,7 @@ fn items_have_patterns(items: &[ast::SeqItem]) -> bool {
     })
 }
 
-/// The zero-width counterpart of an anchor's constrained nav: a trailing
+/// The empty-match counterpart of an anchor's constrained nav: a trailing
 /// anchor's `Up*` lastness mode or a leading anchor's `Down*` entry mode.
 fn childless_nav(anchor_nav: Nav) -> Nav {
     match anchor_nav {
@@ -324,10 +330,9 @@ fn take_scalar_close_prefix(
     }
 
     let consumer_index = close_index + 1;
-    let end = if effects
-        .get(consumer_index)
-        .is_some_and(|effect| matches!(effect.kind(), EffectKind::Set | EffectKind::Push))
-    {
+    let end = if effects.get(consumer_index).is_some_and(|effect| {
+        matches!(effect.kind(), EffectKind::RecordSet | EffectKind::ArrayPush)
+    }) {
         consumer_index + 1
     } else {
         consumer_index
@@ -336,27 +341,41 @@ fn take_scalar_close_prefix(
 }
 
 impl NfaBuilder<'_> {
-    pub(super) fn compile_token_pattern(
+    pub(super) fn compile_anonymous_node_pattern(
         &mut self,
-        node: &ast::TokenPattern,
+        node: &ast::AnonymousNodePattern,
         ctx: PatternCtx,
     ) -> Label {
-        let pattern_span = self
-            .span_id(node.syntax(), SpanKind::Pattern)
-            .map(|id| id.0);
+        let value = node
+            .value()
+            .expect("validated anonymous-node pattern has string content");
+        let node_kind = self.resolve_anonymous_node_kind(&unescape(value.text()).0);
+        self.compile_leaf_pattern(node.syntax(), node_kind, ctx)
+    }
+
+    pub(super) fn compile_node_wildcard(
+        &mut self,
+        wildcard: &ast::NodeWildcard,
+        ctx: PatternCtx,
+    ) -> Label {
+        self.compile_leaf_pattern(wildcard.syntax(), NodeKindConstraint::Any, ctx)
+    }
+
+    fn compile_leaf_pattern(
+        &mut self,
+        syntax: &SyntaxNode,
+        node_kind: NodeKindConstraint,
+        ctx: PatternCtx,
+    ) -> Label {
+        let pattern_span = self.span_id(syntax, SpanKind::Pattern).map(|id| id.0);
         let PatternCtx {
             exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
-
-        let node_kind = match node.value() {
-            Some(token) => self.resolve_anonymous_node_kind(&unescape(token.text()).0),
-            None => NodeKindConstraint::Any, // `_` wildcard matches any node
-        };
 
         let mut post = capture.post;
         let scalar_close = take_scalar_close_prefix(&mut post, pattern_span);
@@ -395,7 +414,7 @@ impl NfaBuilder<'_> {
 
     /// Whether this pattern is a reference (possibly captured) to a nullable
     /// definition — one whose body can match zero nodes. Such references are
-    /// skippable items: their bodies inline at the call site so the zero-width
+    /// skippable items: their bodies inline at the call site so the empty
     /// path exits like an inline `?` (see [`compile_ref_inline`](Self::compile_ref_inline)).
     pub(super) fn is_nullable_ref_item(&self, pattern: &Pattern) -> bool {
         let inner = match pattern {
@@ -425,7 +444,7 @@ impl NfaBuilder<'_> {
 
     /// A sequence item that may consume nothing: a skippable quantifier, a
     /// reference to a nullable definition, a group of such items, or an
-    /// alternation with a nullable branch.
+    /// alternation with a nullable alternative.
     pub(super) fn is_skippable_item(&self, pattern: &Pattern) -> bool {
         self.pattern_is_nullable(pattern)
     }
@@ -474,7 +493,7 @@ impl NfaBuilder<'_> {
     /// Compile a reference with capture effects.
     ///
     /// A reference to a nullable definition (body can match zero nodes) inlines
-    /// the body at the call site: a real call's zero-width return would resume
+    /// the body at the call site: a real call's empty return would resume
     /// at a return address whose navigation assumes the candidate was consumed,
     /// stepping over an unmatched node. Inlining lets the ordinary skip-path
     /// machinery (checkpoint cursor restore, split exits) apply unchanged, so a
@@ -489,8 +508,8 @@ impl NfaBuilder<'_> {
     ) -> Label {
         let def_id = self.resolve_ref_def_id(r);
         if self.nullable_defs.contains(&def_id) {
-            // A nullable body has arity Many, which field values reject
-            // upstream ("field cannot match a sequence").
+            // A nullable body has `RootExtent::Other`, which field values
+            // reject upstream ("field cannot match a sequence").
             assert!(
                 field_override.is_none(),
                 "field-constrained reference to a nullable definition must be rejected by analysis"
@@ -499,61 +518,56 @@ impl NfaBuilder<'_> {
             return self.compile_ref_inline(def_id, ctx, skip_exit);
         }
         let mode = self.propagate_source_mode(DefBodyMode::ordinary());
-        self.compile_ref_call(DefVariant::new(def_id, mode), ctx, field_override)
+        self.compile_ref_call(DefSpecialization::new(def_id, mode), ctx, field_override)
     }
 
     /// Compile a reference as a `Call` to the definition's standalone body.
     ///
-    /// Call-site scoping: the caller decides whether to wrap with Struct/EndStruct based on
-    /// whether the ref is captured and the called definition returns a struct.
+    /// Call-site scoping: the caller decides whether to wrap with a record scope based on
+    /// whether the ref is captured and the called definition returns a record.
     ///
-    /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
-    /// - Captured ref returning scalar: `Call → Set → exit`
+    /// - Captured ref returning a record: `RecordOpen → Call → RecordClose → RecordSet → exit`
+    /// - Captured ref returning another value: `Call → RecordSet → exit`
     /// - Bare ref returning output effects: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
-    /// - Bare ref to a void or node-scalar definition: `Call → exit`
+    /// - Bare ref to a match-only or node-valued definition: `Call → exit`
     ///   (nothing to discard)
     ///
-    /// `ctx.value` selects consumed lowering even with no consumer effect at
+    /// `ctx.observe_value` selects value-producing lowering even with no attaching effect at
     /// this site: the callee's pending value must survive the call because it
     /// is the caller's own return value (a quantifier at a definition's root).
     fn compile_ref_call(
         &mut self,
-        variant: DefVariant,
+        specialization: DefSpecialization,
         ctx: PatternCtx,
         field_override: Option<NodeFieldId>,
     ) -> Label {
-        let def_id = variant.def_id();
-        let is_captured = ctx.consumes_value();
+        let def_id = specialization.def_id();
+        let needs_value = ctx.needs_value();
         let PatternCtx {
             exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = ctx;
 
-        // Entrypoints are compiled eagerly; fragments arrive here through a
+        // Entry points are compiled eagerly; fragments arrive here through a
         // reference and are compiled on demand with the exact output protocol
         // this call site needs.
-        let compile_time_suppressed = variant.mode().suppresses_output();
+        let compile_time_suppressed = specialization.mode().suppresses_output();
         assert!(
-            !compile_time_suppressed || !is_captured,
-            "compile-time suppressed variants are only used for bare references"
+            !compile_time_suppressed || !needs_value,
+            "compile-time suppressed specializations are only used for bare references"
         );
-        let route = variant.route();
-        let target = self.ensure_def_variant(variant);
+        let route = specialization.route();
+        let target = self.ensure_def_specialization(specialization);
         let callee = CalleeEntry(target);
 
-        let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let def_output_shape = self
-            .ctx
-            .analysis
-            .type_analysis
-            .expect_type_shape(def_output_id);
+        let def_output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
         let lowering = if compile_time_suppressed {
             RefLowering::PlainCall
         } else {
-            self.ref_call_lowering(def_output_shape, is_captured)
+            self.ref_call_lowering(def_output, needs_value)
         };
 
         let nav = nav_override.unwrap_or(Nav::Stay);
@@ -570,25 +584,25 @@ impl NfaBuilder<'_> {
 
         // Call instructions cannot carry effects, so emit epsilon if needed.
         let call_entry = match lowering {
-            RefLowering::ScopedCapture => {
-                // Struct isolates the definition's internal captures before the Set.
-                let set_step =
+            RefLowering::ScopedValue => {
+                // A record scope isolates the definition's internal captures before `RecordSet`.
+                let capture_state =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
-                let struct_close_step = self.emit_struct_close_step(set_step);
-                let call_label = emit_call(self, ReturnAddr(struct_close_step));
-                self.emit_struct_step(call_label)
+                let record_close = self.emit_record_close(capture_state);
+                let call_label = emit_call(self, ReturnAddr(record_close));
+                self.emit_record_open(call_label)
             }
-            RefLowering::CapturedValue => {
+            RefLowering::PendingValue => {
                 let return_addr =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
                 emit_call(self, ReturnAddr(return_addr))
             }
             RefLowering::SuppressedCall => {
                 // Suppress bracket keeps the structural match but discards the
-                // definition's output effects, matching the void that inference
-                // assigns to a bare reference. Non-consuming post effects (an
-                // enclosing variant's EnumClose, a scope close) run after the
-                // bracket, outside the discarded region.
+                // definition's output events, matching the no-value flow that
+                // inference assigns to a bare reference. Post effects that do not attach
+                // the pending value (an enclosing variant type's VariantClose or a scope
+                // close) run after the bracket, outside the discarded region.
                 let mut close_effects = vec![EffectIR::suppress_end()];
                 close_effects.extend(capture.post);
                 let suppress_end =
@@ -601,7 +615,7 @@ impl NfaBuilder<'_> {
                 )
             }
             RefLowering::PlainCall => {
-                // Void and node-scalar definitions emit no output effects in
+                // Match-only and node-valued definitions emit no output events in
                 // their bodies; the call needs no bracket. Enclosing-scope post
                 // effects still run after it.
                 let return_addr = if capture.post.is_empty() {
@@ -617,24 +631,38 @@ impl NfaBuilder<'_> {
             return call_entry;
         }
 
-        // Wrap with pre-effects epsilon (e.g., Enum for enum alternations)
+        // Wrap with pre-effects epsilon (e.g., VariantOpen for labeled alternations).
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
-    fn ref_call_lowering(&self, def_output_shape: &TypeShape, is_captured: bool) -> RefLowering {
-        if is_captured {
-            if matches!(def_output_shape, TypeShape::Struct(_)) {
-                return RefLowering::ScopedCapture;
+    fn ref_call_lowering(
+        &self,
+        def_output: crate::compiler::analyze::types::type_shape::DefinitionOutput,
+        needs_value: bool,
+    ) -> RefLowering {
+        if needs_value {
+            if def_output.value().is_some_and(|type_id| {
+                matches!(
+                    self.ctx.analysis.type_analysis.expect_type_shape(type_id),
+                    TypeShape::Record(_)
+                )
+            }) {
+                return RefLowering::ScopedValue;
             }
 
-            return RefLowering::CapturedValue;
+            return RefLowering::PendingValue;
         }
 
         // References are opaque: a bare reference matches structurally and its
-        // output is suppressed (inference types it void). Void and node-scalar
-        // definitions emit no output effects in their bodies, so there is
+        // output is discarded (inference gives it no-value flow). Match-only
+        // and node-valued definitions emit no output events in their bodies, so there is
         // nothing to bracket.
-        if matches!(def_output_shape, TypeShape::Void | TypeShape::Node) {
+        if def_output.value().is_none_or(|type_id| {
+            matches!(
+                self.ctx.analysis.type_analysis.expect_type_shape(type_id),
+                TypeShape::Node
+            )
+        }) {
             return RefLowering::PlainCall;
         }
 
@@ -643,7 +671,7 @@ impl NfaBuilder<'_> {
 
     pub(super) fn propagate_source_mode(&self, mode: DefBodyMode) -> DefBodyMode {
         // A capture-type body owns its provenance transformation. Adding the
-        // ambient Mark axis would compile a duplicate variant without changing
+        // ambient Mark axis would compile a duplicate specialization without changing
         // its effects (source marking is depth-based, not additive).
         if self.marks_source() && !mode.has_capture_type() {
             return mode.mark_source();
@@ -656,13 +684,13 @@ impl NfaBuilder<'_> {
     /// The lowering mirrors [`ref_call_lowering`](Self::ref_call_lowering) with
     /// the body substituted for the `Call`:
     ///
-    /// - Captured ref returning struct: `Struct → body → EndStruct → Set → exit(s)`
-    /// - Captured ref returning scalar: `body → Set → exit(s)`
+    /// - Captured ref returning a record: `RecordOpen → body → RecordClose → RecordSet → exit(s)`
+    /// - Captured ref returning another value: `body → RecordSet → exit(s)`
     /// - Bare ref: body compiled under suppression (compile-time — no
     ///   `SuppressBegin`/`SuppressEnd` brackets needed)
     ///
     /// The body routes through [`compile_nullable_pattern`](Self::compile_nullable_pattern),
-    /// so its zero-width path exits to `skip_exit` with the checkpoint-restored
+    /// so its empty path exits to `skip_exit` with the checkpoint-restored
     /// cursor — exactly the inline `?` semantics. Single-exit callers pass the
     /// same label for both exits; the paths still differ in cursor state.
     pub(super) fn compile_ref_inline(
@@ -675,7 +703,7 @@ impl NfaBuilder<'_> {
     }
 
     /// [`compile_ref_inline`](Self::compile_ref_inline) with `keep_value`: the
-    /// body's pending value survives with no consumer effect at this site (see
+    /// body's pending value survives with no attaching effect at this site (see
     /// [`compile_ref_call`](Self::compile_ref_call)).
     pub(super) fn compile_ref_inline_keep_value(
         &mut self,
@@ -691,12 +719,12 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: nav_override,
             capture: CaptureEffects::default(),
-            value: true,
+            observe_value: true,
         };
         self.compile_ref_inline_in(def_id, pattern_ctx, skip_exit)
     }
 
-    /// Call a definition keeping its pending value alive (no consumer effect).
+    /// Call a definition keeping its pending value alive (no attaching effect).
     pub(super) fn compile_ref_call_keep_value(
         &mut self,
         def_id: DefId,
@@ -705,14 +733,14 @@ impl NfaBuilder<'_> {
         field_override: Option<NodeFieldId>,
     ) -> Label {
         let mode = self.propagate_source_mode(DefBodyMode::ordinary());
-        let variant = DefVariant::new(def_id, mode);
+        let specialization = DefSpecialization::new(def_id, mode);
         let pattern_ctx = PatternCtx {
             exit,
             nav: nav_override,
             capture: CaptureEffects::default(),
-            value: true,
+            observe_value: true,
         };
-        self.compile_ref_call(variant, pattern_ctx, field_override)
+        self.compile_ref_call(specialization, pattern_ctx, field_override)
     }
 
     fn compile_ref_inline_in(
@@ -721,19 +749,19 @@ impl NfaBuilder<'_> {
         matched: PatternCtx,
         skip_exit: SkipExit,
     ) -> Label {
-        let is_captured = matched.consumes_value();
+        let needs_value = matched.needs_value();
         let PatternCtx {
             exit: match_exit,
             nav: nav_override,
             capture,
-            value: _,
+            observe_value: _,
         } = matched;
         if self.inline_stack.contains(&def_id) {
             let pattern_ctx = PatternCtx {
                 exit: match_exit,
                 nav: nav_override,
                 capture,
-                value: is_captured,
+                observe_value: needs_value,
             };
             return self.compile_ref_guarded_call(def_id, pattern_ctx, skip_exit);
         }
@@ -749,31 +777,35 @@ impl NfaBuilder<'_> {
             .body(name)
             .expect("analyzed definition has a body");
 
-        let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let def_output_shape = self
+        let def_output_id = self
             .ctx
             .analysis
             .type_analysis
-            .expect_type_shape(def_output_id);
-        let inline_scoped_capture = is_captured && matches!(def_output_shape, TypeShape::Struct(_));
+            .expect_def_output(def_id)
+            .value();
+        let inline_scoped_value = needs_value
+            && def_output_id.is_some_and(|type_id| {
+                matches!(
+                    self.ctx.analysis.type_analysis.expect_type_shape(type_id),
+                    TypeShape::Record(_)
+                )
+            });
         let CaptureEffects { pre, post } = capture;
 
         self.inline_stack.push(def_id);
-        let entry = if inline_scoped_capture {
-            // Struct isolates the definition's internal captures before the
-            // Set; both continuations close it (a zero-width body still
-            // produced its row of skip-path values, e.g. `{x: null}`).
+        let entry = if inline_scoped_value {
+            // A record scope isolates the definition's internal captures before the
+            // `RecordSet`; both continuations close it (an empty body still
+            // produced its record of skip-path values, e.g. `{x: null}`).
             let end = ScopeCloseEffects {
                 leading: &[],
                 capture: &post,
                 outer: &[],
             };
-            let close_match = self.emit_struct_close_step_with_effects(end, match_exit);
+            let close_match = self.emit_record_close_with_effects(end, match_exit);
             let close_skip = match skip_exit {
                 SkipExit::To(skip) if skip == match_exit => SkipExit::To(close_match),
-                SkipExit::To(skip) => {
-                    SkipExit::To(self.emit_struct_close_step_with_effects(end, skip))
-                }
+                SkipExit::To(skip) => SkipExit::To(self.emit_record_close_with_effects(end, skip)),
                 SkipExit::Fail => SkipExit::Fail,
             };
             let (body_match_exit, def_span) = self.bracket_def_body_exit(body, close_match);
@@ -782,20 +814,20 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
                 SkipExit::Fail => SkipExit::Fail,
             };
-            let body_entry = self.with_scope(def_output_id, |this| {
+            let body_entry = self.with_scope_if_present(def_output_id, |this| {
                 let pattern_ctx = PatternCtx {
                     exit: body_match_exit,
                     nav: nav_override,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
             let body_entry = self.wrap_def_body_entry(body_entry, def_span);
-            self.emit_struct_step_with_pre(body_entry, pre)
-        } else if is_captured {
-            // Scalar-valued (enum) body: it leaves its value pending; the
-            // consumer chain runs after it on either continuation.
+            self.emit_record_open_with_pre(body_entry, pre)
+        } else if needs_value {
+            // Non-record body: it leaves its value pending; the
+            // attachment effects run after it on either continuation.
             let set_match = self.emit_effects_if_nonempty(match_exit, post.clone());
             let set_skip = match skip_exit {
                 SkipExit::To(skip) if skip == match_exit => SkipExit::To(set_match),
@@ -808,12 +840,12 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
                 SkipExit::Fail => SkipExit::Fail,
             };
-            let body_entry = self.with_scope(def_output_id, |this| {
+            let body_entry = self.with_scope_if_present(def_output_id, |this| {
                 let pattern_ctx = PatternCtx {
                     exit: body_match_exit,
                     nav: nav_override,
                     capture: CaptureEffects::default(),
-                    value: true,
+                    observe_value: true,
                 };
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
@@ -822,10 +854,10 @@ impl NfaBuilder<'_> {
         } else {
             // Bare reference: opaque, so the body compiles structurally.
             // Suppression is compile-time here — captures are inert and
-            // alternations tag nothing — which matches the void that
+            // alternations tag nothing — which matches the no-value flow that
             // inference assigns without any runtime discard brackets.
-            // Non-consuming post effects (an enclosing scope's close) run
-            // after the body, outside the suppressed region.
+            // Post effects that do not attach the pending value (an enclosing
+            // scope's close) run after the body, outside the suppressed region.
             let end_match = self.emit_effects_if_nonempty(match_exit, post.clone());
             let end_skip = match skip_exit {
                 SkipExit::To(skip) if skip == match_exit => SkipExit::To(end_match),
@@ -843,7 +875,7 @@ impl NfaBuilder<'_> {
                     exit: body_match_exit,
                     nav: nav_override,
                     capture: CaptureEffects::default(),
-                    value: false,
+                    observe_value: false,
                 };
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
@@ -858,7 +890,7 @@ impl NfaBuilder<'_> {
     /// A nullable reference back into a definition currently being compiled —
     /// a consuming-position cycle through the def's own body, e.g.
     /// `A = (x (A) (y))?`. Inlining would not terminate, so fall back to a
-    /// real call. A routed variant owns the call-site navigation, and its two
+    /// real call. A routed specialization owns the call-site navigation, and its two
     /// return outcomes preserve the body's authored consuming/empty ordering.
     fn compile_ref_guarded_call(
         &mut self,
@@ -870,10 +902,10 @@ impl NfaBuilder<'_> {
             exit: match_exit,
             nav: nav_override,
             capture,
-            value,
+            observe_value,
         } = matched;
         assert!(
-            !value,
+            !observe_value,
             "captured references inside recursive cycles are rejected by analysis"
         );
         let CaptureEffects { pre, post } = capture;
@@ -883,28 +915,29 @@ impl NfaBuilder<'_> {
         let SkipExit::To(zero_exit) = skip_exit else {
             let mode = output.specialize(DefBodyMode::ordinary());
             let mode = self.propagate_source_mode(mode);
-            let variant = DefVariant::routed_match(def_id, mode, entry_nav);
+            let specialization = DefSpecialization::routed_match(def_id, mode, entry_nav);
             let pattern_ctx = PatternCtx {
                 exit: match_exit,
                 nav: None,
                 capture: CaptureEffects { pre, post },
-                value: false,
+                observe_value: false,
             };
-            return self.compile_ref_call(variant, pattern_ctx, None);
+            return self.compile_ref_call(specialization, pattern_ctx, None);
         };
 
         let suppresses_output = output == GuardedRefOutput::RuntimeSuppressed;
 
         let matched_return = self.guarded_ref_return(match_exit, post.clone(), suppresses_output);
-        let zero_return = self.guarded_ref_return(zero_exit, post, suppresses_output);
+        let empty_return = self.guarded_ref_return(zero_exit, post, suppresses_output);
         let mode = output.specialize(DefBodyMode::ordinary());
         let mode = self.propagate_source_mode(mode);
-        let target = self.ensure_def_variant(DefVariant::routed_split(def_id, mode, entry_nav));
+        let target = self
+            .ensure_def_specialization(DefSpecialization::routed_split(def_id, mode, entry_nav));
         let call = self.emit_split_call(
             entry_nav,
             SplitReturnAddrs {
                 matched: ReturnAddr(matched_return),
-                zero: ReturnAddr(zero_return),
+                empty: ReturnAddr(empty_return),
             },
             CalleeEntry(target),
         );
@@ -936,15 +969,14 @@ impl NfaBuilder<'_> {
 
     fn guarded_ref_output(&self, def_id: DefId) -> GuardedRefOutput {
         let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let shape = self.ctx.analysis.type_analysis.expect_type_shape(output);
-        match self.ref_call_lowering(shape, false) {
+        match self.ref_call_lowering(output, false) {
             RefLowering::PlainCall => GuardedRefOutput::Plain,
             RefLowering::SuppressedCall if self.marks_source() => {
                 GuardedRefOutput::CompileTimeSuppressed
             }
             RefLowering::SuppressedCall => GuardedRefOutput::RuntimeSuppressed,
-            RefLowering::ScopedCapture | RefLowering::CapturedValue => {
-                unreachable!("recursive captured references are rejected by analysis")
+            RefLowering::ScopedValue | RefLowering::PendingValue => {
+                unreachable!("recursive value-producing references are rejected by analysis")
             }
         }
     }
@@ -955,7 +987,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: value_context,
+            observe_value,
         } = ctx;
         let value = field
             .value()
@@ -968,7 +1000,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
-                value: value_context,
+                observe_value,
             };
             let value_ctx = self.bracket_pattern_ctx(&value, value_ctx);
             return self.compile_ref(r, value_ctx, node_field);
@@ -976,7 +1008,7 @@ impl NfaBuilder<'_> {
 
         // Alternations, sequences, and quantified patterns emit an epsilon entry and
         // cannot carry a field constraint directly — the field must go on a wrapper
-        // that navigates first, then lets the epsilon branch under it.
+        // that navigates first, then lets the epsilon fork under it.
         if let Some(field_id) = node_field
             && Self::field_value_needs_wrapper(&value)
         {
@@ -984,7 +1016,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
-                value: value_context,
+                observe_value,
             };
             return self.compile_wrapped_field_value(&value, value_ctx, field_id);
         }
@@ -993,7 +1025,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
-            value: value_context,
+            observe_value,
         };
         let value_entry = self.dispatch_pattern(&value, value_ctx);
 
@@ -1001,7 +1033,7 @@ impl NfaBuilder<'_> {
     }
 
     fn bracket_field_ctx(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> PatternCtx {
-        let Some(id) = self.span_id(field.syntax(), SpanKind::Field) else {
+        let Some(id) = self.span_id(field.syntax(), SpanKind::GrammarField) else {
             return ctx;
         };
 
@@ -1009,23 +1041,20 @@ impl NfaBuilder<'_> {
             exit,
             nav,
             capture,
-            value,
+            observe_value,
         } = ctx;
         PatternCtx {
             exit,
             nav,
             capture: capture.nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0)),
-            value,
+            observe_value,
         }
     }
 
     fn field_value_needs_wrapper(value: &Pattern) -> bool {
         matches!(
             value,
-            Pattern::Union(_)
-                | Pattern::Enum(_)
-                | Pattern::SeqPattern(_)
-                | Pattern::QuantifiedPattern(_)
+            Pattern::Alternation(_) | Pattern::SeqPattern(_) | Pattern::QuantifiedPattern(_)
         )
     }
 
@@ -1039,13 +1068,13 @@ impl NfaBuilder<'_> {
             exit,
             nav,
             capture,
-            value: value_context,
+            observe_value,
         } = ctx;
         let value_ctx = PatternCtx {
             exit,
             nav: None,
             capture,
-            value: value_context,
+            observe_value,
         };
         let value_entry = self.dispatch_pattern(value, value_ctx);
 
@@ -1099,14 +1128,14 @@ impl NfaBuilder<'_> {
     /// the navigating-first-child skippable path
     /// ([`compile_nullable_pattern`](Self::compile_nullable_pattern)) both
     /// route here, so a mechanism can never be handled by one and dropped by the
-    /// other (the drift behind #470 and the suppressive `@_` panic).
+    /// other (the drift behind #470 and the `@_` discard panic).
     ///
     /// Capture effects land on the innermost match / scope-close instruction:
-    /// - Node:   inner_pattern[Node, Set] → exit
-    /// - Struct: Struct → inner[…] → EndStruct+capture → exit
-    /// - Array:  Arr → quantifier (with Push) → EndArr+capture → exit
-    /// - Ref:    Call → Set epsilon → exit
-    /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
+    /// - Node:   inner_pattern[Node, RecordSet] → exit
+    /// - Record: RecordOpen → inner[…] → RecordClose+capture → exit
+    /// - List: ListOpen → quantifier (with ArrayPush) → ListClose+capture → exit
+    /// - Ref:    Call → RecordSet epsilon → exit
+    /// - Suppressed region: SuppressBegin → inner → SuppressEnd → outer_effects → exit
     pub(super) fn compile_captured(
         &mut self,
         cap: &ast::CapturedPattern,
@@ -1115,13 +1144,13 @@ impl NfaBuilder<'_> {
         exits: CaptureExits,
     ) -> Label {
         let inner_opt = cap.inner();
-        // Must precede mechanism dispatch: suppressive captures ignore the mechanism
+        // Must precede mechanism dispatch: discards ignore the mechanism
         // entirely and must not build any capture effects for it. Inside an
         // already-suppressed region every capture is equally inert — inference
-        // dropped its field, so emitting a Set would resolve against the wrong
+        // dropped its field, so emitting `RecordSet` would resolve against the wrong
         // scope (the panic behind #470).
-        if cap.is_suppressive() || self.is_suppressed() {
-            return self.compile_suppressive(
+        if cap.is_discard() || self.is_suppressed() {
+            return self.compile_suppressed_region(
                 inner_opt.as_ref(),
                 nav_override,
                 outer_capture,
@@ -1152,19 +1181,19 @@ impl NfaBuilder<'_> {
         let req = CaptureRequest::for_capture(self, cap, nav_override, mechanism, outer_capture);
 
         match mechanism {
-            // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
-            CaptureKind::Array => self.compile_array_capture(req, exits),
+            // List: `ListOpen → quantifier (with ArrayPush) → ListClose+capture → exit(s)`.
+            CaptureKind::List => self.compile_list_capture(req, exits),
 
-            // Struct scope: Struct → inner → EndStruct+capture → exit(s) (also empty `{}`).
-            // Without the wrapper the Set lands on the raw inner node and both the
-            // struct scope and the inner Sets are lost (#470).
-            CaptureKind::Struct => self.compile_struct_capture(req, exits),
+            // Record scope: RecordOpen → inner → RecordClose+capture → exit(s) (also empty `{}`).
+            // Without the wrapper `RecordSet` lands on the raw inner node and both the
+            // record scope and the inner `RecordSet`s are lost (#470).
+            CaptureKind::Record => self.compile_record_capture(req, exits),
 
             // Node/Ref/PendingValue own no capture-site scope (their wrapper, if any, is
             // part of the inner). With split exits all three fold the capture onto the
-            // body and recurse, letting the inner optional/star own the skip/match
+            // body and recurse, letting the inner `?`/`*` own the skip/match
             // split; that context always enters with empty `pre`, so the per-mechanism
-            // single-exit handling (PendingValue's trailing Set, Node's bubble) is
+            // single-exit handling (PendingValue's trailing `RecordSet`, Node's bubble) is
             // unnecessary there.
             mechanism @ (CaptureKind::Node | CaptureKind::Ref | CaptureKind::PendingValue) => {
                 match exits {
@@ -1183,7 +1212,7 @@ impl NfaBuilder<'_> {
                             exit: match_exit,
                             nav,
                             capture: combined,
-                            value: false,
+                            observe_value: false,
                         };
                         self.compile_nullable_pattern(&inner, pattern_ctx, skip_exit)
                     }
@@ -1191,7 +1220,7 @@ impl NfaBuilder<'_> {
                         CaptureKind::PendingValue => self.compile_setafter_capture(req, exit),
                         CaptureKind::Ref => self.compile_ref_capture(req, exit),
                         CaptureKind::Node => self.compile_node_capture(req, exit),
-                        CaptureKind::Array | CaptureKind::Struct => {
+                        CaptureKind::List | CaptureKind::Record => {
                             unreachable!("scope mechanisms are handled above in compile_captured")
                         }
                     },
@@ -1201,7 +1230,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Single-exit lowering for a `PendingValue` capture: the inner leaves the value
-    /// pending (enum alternation or a named node forwarding a structured child).
+    /// pending (labeled alternation or a named node forwarding a structured child).
     fn compile_setafter_capture(&mut self, req: CaptureRequest, exit: Label) -> Label {
         let CaptureRequest {
             inner,
@@ -1210,19 +1239,21 @@ impl NfaBuilder<'_> {
             outer_capture,
         } = req;
         let CaptureEffects { pre, post } = outer_capture;
-        let set_step =
+        let capture_state =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
-        let inner_entry =
-            self.dispatch_pattern(&inner, PatternCtx::with_value(set_step, nav_override));
-        // The enclosing variant's `Enum`-open (in `pre`) must run before the
+        let inner_entry = self.dispatch_pattern(
+            &inner,
+            PatternCtx::observing_value(capture_state, nav_override),
+        );
+        // The enclosing variant type's `VariantOpen` (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
-        // `Set` step would drop it and unbalance the scope.
+        // `RecordSet` state would drop it and unbalance the scope.
         self.wrap_entry_pre(inner_entry, pre)
     }
 
     /// Single-exit lowering for a `Ref` capture: hand the capture to the call
-    /// site, which wraps Call/Return (and Struct/EndStruct for struct-returning
-    /// definitions) to isolate the definition's internal captures before the Set.
+    /// site, which wraps Call/Return (and RecordOpen/RecordClose for record-returning
+    /// definitions) to isolate the definition's internal captures before `RecordSet`.
     fn compile_ref_capture(&mut self, req: CaptureRequest, exit: Label) -> Label {
         let CaptureRequest {
             inner,
@@ -1235,7 +1266,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture: combined,
-            value: false,
+            observe_value: false,
         };
         self.dispatch_pattern(&inner, pattern_ctx)
     }
@@ -1265,22 +1296,22 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture: combined,
-            value: false,
+            observe_value: false,
         };
         self.dispatch_pattern(&inner, pattern_ctx)
     }
 
-    /// Compile a suppressive capture (`@_`/`@_name`), or any capture inside an
+    /// Compile a discard (`@_`/`@_name`), or any capture inside a
     /// already-suppressed region: compile the inner structurally, in suppress
     /// mode, so nothing in the region emits output effects — captures are
     /// inert, alternations tag nothing, skip paths inject no nulls. That
-    /// matches the `void` the type system infers without any runtime discard.
-    /// The one output source that survives is a definition call (shared code),
+    /// matches the no-value flow that type inference produces without any runtime discard.
+    /// The one result-producing source that survives is a definition call (shared code),
     /// which the call site brackets itself (`RefLowering::SuppressedCall`).
     ///
-    /// `outer.pre`/`outer.post` (e.g. an enum variant's `Enum`-open/`EndEnum`)
+    /// `outer.pre`/`outer.post` (e.g. a case's `VariantOpen`/`VariantClose`)
     /// belong to the enclosing scope and run outside the suppressed region.
-    fn compile_suppressive(
+    fn compile_suppressed_region(
         &mut self,
         inner: Option<&Pattern>,
         nav_override: Option<Nav>,
@@ -1337,7 +1368,7 @@ impl NfaBuilder<'_> {
                         exit: end_match,
                         nav: nav_override,
                         capture: CaptureEffects::default(),
-                        value: false,
+                        observe_value: false,
                     };
                     this.compile_nullable_pattern(inner, pattern_ctx, end_skip)
                 })
@@ -1353,16 +1384,19 @@ impl NfaBuilder<'_> {
             .analysis
             .interner
             .get(text)
-            .expect("linked anonymous token must be interned");
+            .expect("bound anonymous token must be interned");
         NodeKindConstraint::Anonymous(Some(self.ctx.analysis.grammar.expect_anonymous_kind(sym)))
     }
 
-    /// Resolve a NodePattern to its node kind constraint.
+    /// Resolve a named-node pattern to its node kind constraint.
     ///
     /// Returns `NodeKindConstraint::Named` with:
     /// - `None` for wildcard `(_)` (any named node)
     /// - `Some(id)` for specific types like `(identifier)`
-    pub(super) fn resolve_node_kind(&mut self, node: &ast::NodePattern) -> NodeKindConstraint {
+    pub(super) fn resolve_named_node_kind(
+        &mut self,
+        node: &ast::NamedNodePattern,
+    ) -> NodeKindConstraint {
         if node.is_any() {
             return NodeKindConstraint::Named(None);
         }
@@ -1375,7 +1409,7 @@ impl NfaBuilder<'_> {
         if type_token.kind() == SyntaxKind::KwError {
             return NodeKindConstraint::Named(Some(NodeKindId::ERROR));
         }
-        // `(MISSING …)` sets the orthogonal `missing` flag (see `compile_node_pattern`);
+        // `(MISSING …)` sets the orthogonal `missing` flag (see `compile_named_node_pattern`);
         // the kind here only narrows WHICH missing node. Bare `(MISSING)` matches any
         // missing node — named or anonymous — so it is a full wildcard (`Any`), not
         // `Named(None)` which would exclude a missing anonymous token like `(MISSING ";")`.
@@ -1388,7 +1422,7 @@ impl NfaBuilder<'_> {
                         .analysis
                         .interner
                         .get(id_tok.text())
-                        .expect("linked missing kind must be interned");
+                        .expect("bound missing kind must be interned");
                     NodeKindConstraint::Named(Some(
                         self.ctx.analysis.grammar.expect_named_kind(sym),
                     ))
@@ -1405,7 +1439,7 @@ impl NfaBuilder<'_> {
             .analysis
             .interner
             .get(type_name)
-            .expect("linked named node kind must be interned");
+            .expect("bound named node kind must be interned");
         NodeKindConstraint::Named(Some(self.ctx.analysis.grammar.expect_named_kind(sym)))
     }
 
@@ -1425,11 +1459,11 @@ impl NfaBuilder<'_> {
             .analysis
             .interner
             .get(field_name)
-            .expect("linked field name must be interned");
+            .expect("bound field name must be interned");
         self.ctx.analysis.grammar.expect_field(sym)
     }
 
-    pub(super) fn collect_neg_fields(&mut self, node: &ast::NodePattern) -> Vec<NodeFieldId> {
+    pub(super) fn collect_neg_fields(&mut self, node: &ast::NamedNodePattern) -> Vec<NodeFieldId> {
         node.syntax()
             .children()
             .filter_map(ast::NegatedField::cast)
@@ -1445,7 +1479,10 @@ impl NfaBuilder<'_> {
     /// Compile a predicate from AST to IR.
     ///
     /// Returns `Some(PredicateIR)` if the node has a valid predicate, `None` otherwise.
-    pub(super) fn compile_predicate(&mut self, node: &ast::NodePattern) -> Option<PredicateIR> {
+    pub(super) fn compile_predicate(
+        &mut self,
+        node: &ast::NamedNodePattern,
+    ) -> Option<PredicateIR> {
         let pred = node.predicate()?;
         let op = lower_predicate_op(pred.operator()?);
 

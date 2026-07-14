@@ -1,11 +1,12 @@
 use rowan::TextRange;
 
-use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape};
+use crate::compiler::analyze::types::RootExtent;
+use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape};
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{
-    CapturedPattern, EnumPattern, FieldPattern, Pattern, QuantifiedPattern,
+    AlternationPattern, CapturedPattern, FieldPattern, Pattern, QuantifiedPattern,
 };
 use crate::compiler::parse::cst::{SyntaxNode, SyntaxToken};
 
@@ -13,16 +14,23 @@ use super::super::unify::UnifyError;
 use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
-    pub(super) fn report_field_arity_error(&mut self, field: &FieldPattern, value: &Pattern) {
+    pub(super) fn report_field_requires_single_node(
+        &mut self,
+        field: &FieldPattern,
+        value: &Pattern,
+    ) {
         let field_name = field
             .name()
             .map(|t| t.text().to_string())
-            .unwrap_or_else(|| "field".to_string());
+            .unwrap_or_else(|| "grammar field".to_string());
 
         let related = self.referenced_definition_range(value);
 
         let mut builder = self
-            .report(DiagnosticKind::FieldSequenceValue, value.text_range())
+            .report(
+                DiagnosticKind::GrammarFieldSequenceValue,
+                value.text_range(),
+            )
             .detail(field_name);
         if let Some((src, range)) = related {
             builder = builder.related_to(Span::new(src, range), "defined here");
@@ -40,15 +48,16 @@ impl InferVisitor<'_, '_> {
         Some((source, body.text_range()))
     }
 
-    /// Report a captured quantifier whose void inner doesn't match exactly one
+    /// Report a captured quantifier whose no-value inner doesn't match exactly one
     /// node: there is no single node to bind (per element, for repeats).
-    pub(super) fn report_multi_element_scalar(
+    pub(super) fn report_quantified_capture_without_single_node(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
     ) {
-        let is_multi_element_scalar = inner_info.arity == Arity::Many && inner_info.flow.is_void();
-        if !is_multi_element_scalar {
+        let capture_has_no_single_node =
+            inner_info.root_extent == RootExtent::Other && inner_info.flow.is_no_value();
+        if !capture_has_no_single_node {
             return;
         }
 
@@ -68,25 +77,22 @@ impl InferVisitor<'_, '_> {
                 format!("add internal captures: `{{(a) @a (b) @b}}{op} @items`"),
             )
         };
-        self.report(
-            DiagnosticKind::MultiElementScalarCapture,
-            quant.text_range(),
-        )
-        .detail(detail)
-        .hint(hint)
-        .emit();
+        self.report(DiagnosticKind::CaptureWithoutSingleNode, quant.text_range())
+            .detail(detail)
+            .hint(hint)
+            .emit();
     }
 
-    /// Report a capture whose void inner doesn't match exactly one node —
+    /// Report a capture whose no-value inner doesn't match exactly one node —
     /// whether several or possibly none, there is no single node to bind.
     /// Without this, the capture would silently bind an arbitrary node (or one
-    /// per repeat), or dangle on a zero-width match.
-    pub(super) fn report_capture_on_multi_node_void(
+    /// per repeat), or dangle on an empty match.
+    pub(super) fn report_capture_without_single_node(
         &mut self,
         inner: &Pattern,
         inner_info: &PatternShape,
     ) {
-        if inner_info.arity != Arity::Many || !inner_info.flow.is_void() {
+        if inner_info.root_extent != RootExtent::Other || !inner_info.flow.is_no_value() {
             return;
         }
 
@@ -95,9 +101,9 @@ impl InferVisitor<'_, '_> {
                 "the referenced definition doesn't match exactly one node, so there is no single node to bind",
                 "capture nodes inside the definition, or drop this capture",
             ),
-            Pattern::Union(_) | Pattern::Enum(_) => (
+            Pattern::Alternation(_) => (
                 "this alternation doesn't match exactly one node, so there is no single node to bind",
-                "capture inside the branches, or drop this capture",
+                "capture inside the alternatives, or drop this capture",
             ),
             _ => (
                 "this group doesn't match exactly one node, so there is no single node to bind",
@@ -107,10 +113,7 @@ impl InferVisitor<'_, '_> {
 
         let related = self.referenced_definition_range(inner);
         let mut builder = self
-            .report(
-                DiagnosticKind::MultiElementScalarCapture,
-                inner.text_range(),
-            )
+            .report(DiagnosticKind::CaptureWithoutSingleNode, inner.text_range())
             .detail(detail)
             .hint(hint);
         if let Some((src, range)) = related {
@@ -120,12 +123,12 @@ impl InferVisitor<'_, '_> {
     }
 
     /// Report a captured reference whose definition has no value to capture.
-    pub(super) fn report_capture_on_void_ref(
+    pub(super) fn report_capture_on_match_only_ref(
         &mut self,
         inner: &Pattern,
         inner_info: &PatternShape,
     ) -> bool {
-        if !matches!(inner, Pattern::DefRef(_)) || !inner_info.flow.is_void() {
+        if !matches!(inner, Pattern::DefRef(_)) || !inner_info.flow.is_no_value() {
             return false;
         }
 
@@ -133,7 +136,10 @@ impl InferVisitor<'_, '_> {
             return false;
         };
         let mut builder = self
-            .report(DiagnosticKind::VoidReferenceCapture, inner.text_range())
+            .report(
+                DiagnosticKind::MatchOnlyReferenceCapture,
+                inner.text_range(),
+            )
             .detail(
                 "the referenced definition produces no value; add a capture inside it or capture a node pattern directly",
             );
@@ -143,11 +149,11 @@ impl InferVisitor<'_, '_> {
     }
 
     /// Report a repeat whose element is a reference that can match zero nodes.
-    pub(super) fn report_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
+    pub(super) fn report_nullable_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
         let op = self.quantifier_operator(quant);
         let related = self.referenced_definition_range(inner);
         let mut builder = self
-            .report(DiagnosticKind::ZeroWidthRepeat, quant.text_range())
+            .report(DiagnosticKind::NullableRepeat, quant.text_range())
             .detail(format!(
                 "the referenced definition can match zero nodes, but a `{op}` repeat must consume input on every iteration — its empty case could never occur here"
             ))
@@ -159,7 +165,7 @@ impl InferVisitor<'_, '_> {
     }
 
     /// Report a quantifier-rooted definition whose element shape has no name
-    /// source. The definition names the collection (the array/optional type);
+    /// source. The definition names the collection (the list/option type);
     /// naming the element takes its own definition.
     pub(super) fn report_unnamed_quantified_element(
         &mut self,
@@ -168,7 +174,7 @@ impl InferVisitor<'_, '_> {
     ) {
         let op = self.quantifier_operator(quant);
         let (collection, example_op) = if op.starts_with('?') {
-            ("optional", op.as_str())
+            ("option", op.as_str())
         } else {
             ("list", op.as_str())
         };
@@ -182,9 +188,9 @@ impl InferVisitor<'_, '_> {
             .emit();
     }
 
-    /// Report repeated bubbling captures that need an enclosing row capture:
-    /// each repeat produces captured fields with no list to collect them into.
-    pub(super) fn report_internal_capture_dimensionality(
+    /// Report bubbling captures that need a repetition or optional capture to
+    /// package one record value per quantifier occurrence.
+    pub(super) fn report_uncollected_quantified_captures(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
@@ -193,7 +199,7 @@ impl InferVisitor<'_, '_> {
             return;
         };
         let type_ctx = self.ctx.type_ctx.in_progress();
-        let fields = type_ctx.expect_struct_fields(*type_id);
+        let fields = type_ctx.expect_record_fields(*type_id);
         if fields.is_empty() {
             return;
         }
@@ -231,20 +237,20 @@ impl InferVisitor<'_, '_> {
                 .filter_map(|tok| tok.text().get(1..).map(str::to_owned)),
         );
         let placeholder = fresh_capture_name(&taken);
-        let brackets = row_capture_brackets(quant);
+        let brackets = capture_brackets(quant);
         let hint = if op.starts_with('?') {
             format!(
-                "capture the group so the skip is a single null: `{}{} @{}`",
+                "add an optional capture so the group becomes an option of one record: `{}{} @{}`",
                 brackets, op, placeholder
             )
         } else {
             format!(
-                "add a row capture so each repeat becomes one element: `{}{} @{}`",
+                "add a repetition capture so each repeat becomes one record in a list: `{}{} @{}`",
                 brackets, op, placeholder
             )
         };
         self.report(
-            DiagnosticKind::StrictDimensionalityViolation,
+            DiagnosticKind::UncollectedQuantifiedCaptures,
             quant.text_range(),
         )
         .detail(detail)
@@ -256,14 +262,22 @@ impl InferVisitor<'_, '_> {
         .emit();
     }
 
-    /// Warn about a labeled alternation whose value nothing consumes: the
-    /// labels are inert and the alternation behaves as a plain union.
-    pub(super) fn report_unused_branch_labels(&mut self, e: &EnumPattern) {
-        self.report(DiagnosticKind::UnusedBranchLabels, e.text_range())
-            .emit();
+    /// Warn when labels appear in a fields context: they have no output effect,
+    /// and captures from the alternatives merge into the enclosing result.
+    pub(super) fn report_unused_alternative_labels(&mut self, alternation: &AlternationPattern) {
+        self.report(
+            DiagnosticKind::UnusedAlternativeLabels,
+            alternation.text_range(),
+        )
+        .detail("captures from the alternatives merge into the enclosing result")
+        .emit();
     }
 
-    pub(super) fn report_branch_unify_error(&mut self, alternation: &SyntaxNode, err: &UnifyError) {
+    pub(super) fn report_alternative_unify_error(
+        &mut self,
+        alternation: &SyntaxNode,
+        err: &UnifyError,
+    ) {
         match err {
             UnifyError::IncompatibleTypes { field } => {
                 let field_name = self.ctx.interner.resolve(*field).to_string();
@@ -282,7 +296,7 @@ impl InferVisitor<'_, '_> {
                         builder.related_to(Span::new(source, site), "and a different type here");
                 }
                 builder
-                    .hint("make every branch produce the same type, or label the branches for an enum")
+                    .hint("make every alternative produce the same type, or label the alternatives for a variant type")
                     .emit();
             }
         }
@@ -296,19 +310,20 @@ impl InferVisitor<'_, '_> {
     }
 }
 
-/// The bracket shorthand for the row-capture hint, matching the shape the
-/// user actually wrote: `[...]` for alternations, `(...)` for nodes and refs,
-/// `{...}` for sequences (and anything else).
-fn row_capture_brackets(quant: &QuantifiedPattern) -> &'static str {
+/// The bracket shorthand for a capture hint, matching the shape the user wrote:
+/// `[...]` for alternations, `(...)` for nodes and references, and `{...}` for
+/// sequences and other groups.
+fn capture_brackets(quant: &QuantifiedPattern) -> &'static str {
     match quant.inner() {
-        Some(Pattern::Union(_) | Pattern::Enum(_)) => "[...]",
-        Some(Pattern::DefRef(_) | Pattern::NodePattern(_)) => "(...)",
+        Some(Pattern::Alternation(_)) => "[...]",
+        Some(Pattern::DefRef(_) | Pattern::NamedNodePattern(_)) => "(...)",
         _ => "{...}",
     }
 }
 
-/// Find same-named captures that belong to the alternation's output scope.
-/// Nested row scopes are excluded because their fields cannot conflict here.
+/// Find same-named captures that belong to the alternation's result scope.
+/// Nested structured-capture scopes are excluded because their result fields cannot
+/// conflict here.
 fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
     let mut tokens = Vec::new();
     direct_scope_capture_tokens(alternation, &mut tokens);
@@ -319,7 +334,7 @@ fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
         .collect()
 }
 
-/// Collect captures that contribute fields to one output scope.
+/// Collect captures that contribute result fields to one result scope.
 fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToken>) {
     for child in scope_root.children() {
         if let Some(cap) = CapturedPattern::cast(child.clone()) {
@@ -335,7 +350,7 @@ fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToke
     }
 }
 
-/// Find the output scope that would receive a row-capture suggestion.
+/// Find the result scope that would receive the suggested capture.
 fn enclosing_scope_root(node: &SyntaxNode) -> SyntaxNode {
     let mut root = node.clone();
     for ancestor in node.ancestors().skip(1) {
@@ -358,10 +373,10 @@ fn is_pattern_node(node: &SyntaxNode) -> bool {
     Pattern::cast(node.clone()).is_some()
 }
 
-/// Decide whether a capture exposes its inner fields to the surrounding output scope.
-/// Plain node captures do; structured, repeating, and suppressive captures contain them.
+/// Decide whether a capture exposes its inner result fields to the surrounding result scope.
+/// Plain node captures do; structured captures, repetition captures, and discards contain them.
 fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
-    if cap.is_suppressive() {
+    if cap.is_discard() {
         return false;
     }
     let mut inner = cap.inner();
@@ -375,7 +390,7 @@ fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
                 }
                 inner = q.inner();
             }
-            Some(Pattern::SeqPattern(_) | Pattern::Union(_) | Pattern::Enum(_)) => return false,
+            Some(Pattern::SeqPattern(_) | Pattern::Alternation(_)) => return false,
             _ => return true,
         }
     }
@@ -383,7 +398,7 @@ fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
 
 /// Pick a suggestion that will not collide with captures already in scope.
 fn fresh_capture_name(taken: &[String]) -> &'static str {
-    ["items", "rows", "matches", "entries", "elements"]
+    ["items", "matches", "entries", "elements", "records"]
         .into_iter()
         .find(|candidate| !taken.iter().any(|t| t == candidate))
         .unwrap_or("items")

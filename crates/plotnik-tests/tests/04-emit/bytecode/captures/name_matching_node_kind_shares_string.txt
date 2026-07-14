@@ -1,18 +1,18 @@
 Q = (identifier) @identifier
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 6
 
 [transitions]
 Q:
   1                                         ▶
-  2   !   (identifier) [Node Set(identifier)]  1
+  2   !   (identifier) [Node RecordSet(identifier)]  1
 
-Q (entrypoint):
+Q (entry point):
   3                                         ▶
-  4  -ε-  [StructClose]                     3
+  4  -ε-  [RecordClose]                     3
   5       (Q)                               2 : 4
-  6  -ε-  [StructOpen]                      5
+  6  -ε-  [RecordOpen]                      5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -21,7 +21,7 @@ S2 "Q"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { identifier }
+T1 = Record  M0:1  ; { identifier }
 
 [type_members]
 M0: S1 → T0  ; identifier: <Node>
@@ -29,15 +29,15 @@ M0: S1 → T0  ; identifier: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T1
 
-[transitions]
+[instructions]
 Q:
-  0  -ε-  [StructOpen]                      2
+  0  -ε-  [RecordOpen]                      2
   2       (@8)                              8 : 3
-  3  -ε-  [StructClose]                     5
+  3  -ε-  [RecordClose]                     5
   5                                         ▶
   6                                         ▶
   7  ...
-  8   !   (identifier) [Node Set(M0)]       6
+  8   !   (identifier) [Node RecordSet(M0)]  6

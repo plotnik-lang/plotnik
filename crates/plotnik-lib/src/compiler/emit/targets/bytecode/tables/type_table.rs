@@ -10,23 +10,23 @@ use std::collections::HashMap;
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::types::TypeAnalysis;
+use crate::compiler::analyze::types::type_shape::DefinitionOutput;
 use crate::compiler::ids::TypeId;
 
 use super::error::EmitError;
 
-/// Holds the type metadata, mapping query TypeIds to wire TypeIds.
+/// Holds type metadata, mapping analysis type IDs to wire type IDs.
 #[derive(Debug)]
 pub struct TypeTableBuilder {
-    /// Map from query TypeId to bytecode WireTypeId.
+    /// Map from analysis `TypeId` to bytecode `WireTypeId`.
     mapping: HashMap<TypeId, WireTypeId>,
     /// Type definitions (4 bytes each).
     type_defs: Vec<TypeDef>,
-    /// Type members for structs/enums (4 bytes each).
+    /// Type members for records/variants (4 bytes each).
     type_members: Vec<TypeMember>,
     /// Type names for named types (4 bytes each).
     type_names: Vec<TypeNameEntry>,
-    /// Cache for dynamically created Optional wrappers: base_type -> Optional(base_type)
-    optional_wrappers: HashMap<WireTypeId, WireTypeId>,
+    no_value: Option<WireTypeId>,
 }
 
 impl TypeTableBuilder {
@@ -36,12 +36,12 @@ impl TypeTableBuilder {
             type_defs: Vec::new(),
             type_members: Vec::new(),
             type_names: Vec::new(),
-            optional_wrappers: HashMap::new(),
+            no_value: None,
         }
     }
 
     /// Map `query_id` to the next bytecode slot and push `def`; returns the id.
-    /// Used to emit builtins and to reserve placeholder slots for custom types.
+    /// Used to emit built-ins and reserve slots for value types.
     pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> Result<WireTypeId, EmitError> {
         if self.type_defs.len() >= EmitError::MAX_TYPES {
             return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
@@ -53,12 +53,36 @@ impl TypeTableBuilder {
         Ok(bc_id)
     }
 
+    pub fn push_no_value(&mut self) -> Result<WireTypeId, EmitError> {
+        if self.type_defs.len() >= EmitError::MAX_TYPES {
+            return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
+        }
+        let wire_id = WireTypeId::from(self.type_defs.len() as u16);
+        self.type_defs
+            .push(TypeDef::builtin(crate::bytecode::TypeKind::NoValue));
+        self.no_value = Some(wire_id);
+        Ok(wire_id)
+    }
+
+    pub fn resolve_output(
+        &self,
+        output: DefinitionOutput,
+        type_ctx: &TypeAnalysis,
+    ) -> Result<WireTypeId, EmitError> {
+        match output {
+            DefinitionOutput::MatchOnly => Ok(self
+                .no_value
+                .expect("match-only output requires a bytecode no-value type")),
+            DefinitionOutput::Value(type_id) => self.resolve_type(type_id, type_ctx),
+        }
+    }
+
     /// Overwrite a previously reserved slot with its final definition.
     pub fn fill_slot(&mut self, slot_index: usize, def: TypeDef) {
         self.type_defs[slot_index] = def;
     }
 
-    /// Member-table length, i.e. the base index for the next struct/enum's members.
+    /// Member-table length: the base index for the next record or variant type's members.
     pub fn members_len(&self) -> u16 {
         u16::try_from(self.type_members.len())
             .expect("capture layout validates the type-member index space")
@@ -77,32 +101,22 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    /// Intern an `Optional(base_type)` wrapper, deduplicating by base type.
-    pub fn intern_optional(&mut self, base_type: WireTypeId) -> Result<WireTypeId, EmitError> {
-        if let Some(&optional_id) = self.optional_wrappers.get(&base_type) {
-            return Ok(optional_id);
-        }
-
-        if self.type_defs.len() >= EmitError::MAX_TYPES {
-            return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
-        }
-
-        let optional_id = WireTypeId::from(self.type_defs.len() as u16);
-        self.type_defs.push(TypeDef::optional(base_type));
-        self.optional_wrappers.insert(base_type, optional_id);
-        Ok(optional_id)
-    }
-
-    /// Resolve a query TypeId to its underlying bytecode WireTypeId.
-    ///
-    /// Ref types are emitted as aliases only when they are definition results. In
-    /// every materialized position, follow the reference chain to the actual shape.
+    /// Resolve a semantic type to the wire type used at a value position.
+    /// Definition references use their underlying body; an explicit capture-type
+    /// declaration preserves its alias identity.
     pub fn resolve_type(
         &self,
         type_id: TypeId,
         type_ctx: &TypeAnalysis,
     ) -> Result<WireTypeId, EmitError> {
-        let type_id = type_ctx.resolve_underlying_type_id(type_id);
+        let type_id = match type_ctx.type_shape(type_id) {
+            Some(crate::compiler::analyze::types::type_shape::TypeShape::Ref(declaration))
+                if type_ctx.declaration_definition(*declaration).is_none() =>
+            {
+                type_id
+            }
+            _ => type_ctx.resolve_underlying_type_id(type_id),
+        };
         let bc_id = self
             .mapping
             .get(&type_id)

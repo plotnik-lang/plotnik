@@ -22,7 +22,7 @@ S3 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { err }
+T1 = Record  M0:1  ; { err }
 
 [type_members]
 M0: S1 → T0  ; err: <Node>
@@ -30,34 +30,34 @@ M0: S1 → T0  ; err: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@10)                            10 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (ERROR) [Node Set(M0)]           08
+  06  └‣─  (ERROR) [Node RecordSet(M0)]     08
   08  ─‣┘  _                                09
   09                                        ▶
   10   !   (program)                        06
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@10)                            10 : 03
        ▶   (@10)
 
 @10:
   10       (program)                        06
        ●   program
-  06       (ERROR) [Node Set(M0)]           08
+  06       (ERROR) [Node RecordSet(M0)]     08
        ●   ERROR
   08       _                                09
        ●   program
   09   ◀   (@10)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

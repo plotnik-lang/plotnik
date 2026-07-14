@@ -28,7 +28,7 @@ S5 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
+T1 = Record  M0:1  ; { name }
 
 [type_members]
 M0: S1 → T0  ; name: <Node>
@@ -36,23 +36,23 @@ M0: S1 → T0  ; name: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@11)                            11 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  name: (identifier) [Node Set(M0)]  08
+  06  └‣─  name: (identifier) [Node RecordSet(M0)]  08
   08  ─‣┘² _                                09
   09                                        ▶
   10  └‣─  (function_signature)             06
   11   !   (program)                        10
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@11)                            11 : 03
        ▶   (@11)
 
@@ -61,7 +61,7 @@ Q:
        ●   program
   10       (function_signature)             06
        ●   function_signature
-  06       name: (identifier) [Node Set(M0)]  08
+  06       name: (identifier) [Node RecordSet(M0)]  08
        ○   void_type
        ●   identifier
   08       _                                09
@@ -69,5 +69,5 @@ Q:
   09   ◀   (@11)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

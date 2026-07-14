@@ -4,9 +4,9 @@ use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
-use crate::bytecode::{MAX_SPANS, SpanKind};
+use crate::bytecode::{Labeling as SpanLabeling, MAX_SPANS, SpanKind};
 use crate::compiler::analyze::types::BuiltInCaptureType;
-use crate::compiler::analyze::types::type_shape::{TYPE_BOOL, TYPE_STR};
+use crate::compiler::analyze::types::type_shape::{TYPE_BOOL, TYPE_TEXT};
 use crate::compiler::diagnostics::SourceId;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::LowerInput;
@@ -25,7 +25,7 @@ pub(crate) enum SpanBindingIR {
 
 #[derive(Clone, Debug)]
 pub(crate) struct SpanEntryIR {
-    pub(crate) source: SourceId,
+    pub(crate) source_id: SourceId,
     pub(crate) range: TextRange,
     pub(crate) kind: SpanKind,
     pub(crate) binding: Option<SpanBindingIR>,
@@ -60,13 +60,12 @@ pub(crate) fn tier(kind: SpanKind) -> u8 {
         SpanKind::Def => 0,
         SpanKind::Capture => 1,
         SpanKind::Pattern | SpanKind::Ref => 2,
-        SpanKind::Branch
+        SpanKind::Alternative
         | SpanKind::Quantifier
         | SpanKind::Sequence
-        | SpanKind::Union
-        | SpanKind::Enum => 3,
-        SpanKind::Field | SpanKind::CaptureType => 4,
-        SpanKind::NegField | SpanKind::Predicate => 5,
+        | SpanKind::Alternation(_) => 3,
+        SpanKind::GrammarField | SpanKind::CaptureType => 4,
+        SpanKind::NegatedGrammarField | SpanKind::Predicate => 5,
     }
 }
 
@@ -81,7 +80,7 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
         input
             .analysis
             .type_analysis
-            .iter_entrypoint_output()
+            .iter_entry_point_outputs()
             .map(|(def_id, _)| def_id),
     );
     let mut candidates = Vec::new();
@@ -108,9 +107,12 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
             source,
             range: def.text_range(),
             kind: SpanKind::Def,
-            binding: Some(SpanBindingIR::Type(
-                input.analysis.type_analysis.expect_def_output(def_id),
-            )),
+            binding: input
+                .analysis
+                .type_analysis
+                .expect_def_output(def_id)
+                .value()
+                .map(SpanBindingIR::Type),
         });
         collect_pattern(
             input,
@@ -155,7 +157,7 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
             SpanId(u16::try_from(table.entries.len()).expect("admitted span count fits in u16"));
         table.index.insert((candidate.node, candidate.kind), id);
         table.entries.push(SpanEntryIR {
-            source: candidate.source,
+            source_id: candidate.source,
             range: candidate.range,
             kind: candidate.kind,
             binding: candidate.binding,
@@ -205,14 +207,17 @@ fn collect_pattern(
     out: &mut Vec<Candidate>,
 ) {
     match pattern {
-        Pattern::NodePattern(node) => {
+        Pattern::NamedNodePattern(node) => {
             push_pattern(source, SpanKind::Pattern, node.syntax(), out);
             for child in node.children() {
                 collect_pattern(input, source, &child, visibility, out);
             }
         }
-        Pattern::TokenPattern(token) => {
-            push_pattern(source, SpanKind::Pattern, token.syntax(), out);
+        Pattern::AnonymousNodePattern(node) => {
+            push_pattern(source, SpanKind::Pattern, node.syntax(), out);
+        }
+        Pattern::NodeWildcard(wildcard) => {
+            push_pattern(source, SpanKind::Pattern, wildcard.syntax(), out);
         }
         Pattern::DefRef(reference) => {
             let name = reference
@@ -228,9 +233,12 @@ fn collect_pattern(
                 source,
                 range: reference.text_range(),
                 kind: SpanKind::Ref,
-                binding: visibility.bind(SpanBindingIR::Type(
-                    input.analysis.type_analysis.expect_def_output(target),
-                )),
+                binding: input
+                    .analysis
+                    .type_analysis
+                    .expect_def_output(target)
+                    .value()
+                    .and_then(|type_id| visibility.bind(SpanBindingIR::Type(type_id))),
             });
         }
         Pattern::SeqPattern(seq) => {
@@ -243,7 +251,7 @@ fn collect_pattern(
             }
         }
         Pattern::CapturedPattern(capture) => {
-            if !capture.is_suppressive() {
+            if !capture.is_discard() {
                 let name = capture.name().expect("capture must have a name token");
                 out.push(Candidate {
                     node: capture.syntax().clone(),
@@ -264,7 +272,7 @@ fn collect_pattern(
                     .built_in_plan()
                     .map(|(capture_type, _)| {
                         let primitive = match capture_type {
-                            BuiltInCaptureType::Str => TYPE_STR,
+                            BuiltInCaptureType::Str => TYPE_TEXT,
                             BuiltInCaptureType::Bool => TYPE_BOOL,
                         };
                         SpanBindingIR::Type(primitive)
@@ -274,7 +282,7 @@ fn collect_pattern(
                             input
                                 .analysis
                                 .type_analysis
-                                .iter_type_names()
+                                .iter_named_types()
                                 .find(|(_, sym)| {
                                     input.analysis.interner.resolve(*sym) == name.text()
                                 })
@@ -293,7 +301,7 @@ fn collect_pattern(
 
             if let Some(inner) = capture.inner() {
                 let capture_pattern = Pattern::CapturedPattern(capture.clone());
-                let suppresses_output = capture.is_suppressive()
+                let suppresses_output = capture.is_discard()
                     || input
                         .analysis
                         .type_analysis
@@ -328,27 +336,27 @@ fn collect_pattern(
                 node: field.syntax().clone(),
                 source,
                 range: name.text_range(),
-                kind: SpanKind::Field,
+                kind: SpanKind::GrammarField,
                 binding: None,
             });
             if let Some(value) = field.value() {
                 collect_pattern(input, source, &value, visibility, out);
             }
         }
-        Pattern::Union(union) => {
-            push_pattern(source, SpanKind::Union, union.syntax(), out);
-            for branch in union.branches() {
-                push_branch(source, &branch, out);
-                if let Some(body) = branch.body() {
-                    collect_pattern(input, source, &body, visibility, out);
-                }
-            }
-        }
-        Pattern::Enum(enumeration) => {
-            push_pattern(source, SpanKind::Enum, enumeration.syntax(), out);
-            for branch in enumeration.branches() {
-                push_branch(source, &branch, out);
-                if let Some(body) = branch.body() {
+        Pattern::Alternation(alternation) => {
+            let labeling = match alternation.labeling() {
+                ast::Labeling::Labeled => SpanLabeling::Labeled,
+                ast::Labeling::Unlabeled | ast::Labeling::Mixed => SpanLabeling::Unlabeled,
+            };
+            push_pattern(
+                source,
+                SpanKind::Alternation(labeling),
+                alternation.syntax(),
+                out,
+            );
+            for alternative in alternation.alternatives() {
+                push_alternative(source, &alternative, out);
+                if let Some(body) = alternative.body() {
                     collect_pattern(input, source, &body, visibility, out);
                 }
             }
@@ -366,12 +374,12 @@ fn push_pattern(source: SourceId, kind: SpanKind, node: &SyntaxNode, out: &mut V
     });
 }
 
-fn push_branch(source: SourceId, branch: &ast::Branch, out: &mut Vec<Candidate>) {
+fn push_alternative(source: SourceId, alternative: &ast::Alternative, out: &mut Vec<Candidate>) {
     out.push(Candidate {
-        node: branch.syntax().clone(),
+        node: alternative.syntax().clone(),
         source,
-        range: branch.text_range(),
-        kind: SpanKind::Branch,
+        range: alternative.text_range(),
+        kind: SpanKind::Alternative,
         binding: None,
     });
 }

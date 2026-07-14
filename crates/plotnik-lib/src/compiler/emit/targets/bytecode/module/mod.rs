@@ -1,16 +1,16 @@
-//! Module-assembly emission phase: build the node-kind/field/entrypoint wire
+//! Module-assembly emission phase: build the node-kind, grammar-field, and entry point wire
 //! tables, serialize every section, and frame the module with its header and
 //! checksum.
 
 use crate::core::NodeKind;
 
 use crate::bytecode::{
-    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SPAN_NO_BINDING,
+    EntryPoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SPAN_NO_BINDING,
     SpanEntry, SymbolNameEntry,
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::{CaptureLayout, OutputSchema};
+use crate::compiler::analyze::result::{CaptureLayout, ResultSchema};
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
@@ -22,12 +22,12 @@ use super::layout::compute_layout;
 use super::string_table::seed_string_table;
 use super::type_table::build_type_table;
 
-/// The node-kind, field, and entrypoint wire tables. Built together because all
+/// The node-kind, grammar-field, and entry point wire tables. Built together because all
 /// three intern their names into the one string table.
 pub struct ModuleTables {
     node_kinds: Vec<NodeKindEntry>,
     fields: Vec<FieldEntry>,
-    entrypoints: Vec<Entrypoint>,
+    entry_points: Vec<EntryPoint>,
 }
 
 pub(in crate::compiler::emit) struct EmitPipeline<'a> {
@@ -49,7 +49,7 @@ impl<'a> EmitPipeline<'a> {
     pub(in crate::compiler::emit) fn prepare(
         input: AnalysisArtifacts<'a>,
         ir: &'a NfaGraph,
-        schema: &'a OutputSchema<'a>,
+        schema: &'a ResultSchema<'a>,
     ) -> Result<Self, EmitError> {
         let strings = seed_string_table(ir)?;
         let (types, strings) = build_type_table(schema, strings)?;
@@ -76,7 +76,7 @@ impl<'a> EmitPipeline<'a> {
         &self.layout
     }
 
-    /// Assemble the node-kind, field, and entrypoint tables, interning the last
+    /// Assemble the node-kind, grammar-field, and entry point tables, interning the last
     /// names into the string table. As the final string-table writer, this is where
     /// the string, type, and table capacities are sealed.
     pub(in crate::compiler::emit) fn build_tables(&mut self) -> Result<ModuleTables, EmitError> {
@@ -95,21 +95,23 @@ impl<'a> EmitPipeline<'a> {
             fields.push(FieldEntry::new(u16::from(field_id), name));
         }
 
-        let mut entrypoints: Vec<Entrypoint> = Vec::new();
-        for (def_id, type_id) in self.input.type_analysis.iter_entrypoint_output() {
+        let mut entry_points: Vec<EntryPoint> = Vec::new();
+        for (def_id, output) in self.input.type_analysis.iter_entry_point_outputs() {
             let name_sym = self.input.dependency_analysis.def_name_sym(def_id);
             let name = self.strings.intern(name_sym, self.input.interner)?;
-            let result_type = self.types.resolve_type(type_id, self.input.type_analysis)?;
+            let result_type = self
+                .types
+                .resolve_output(output, self.input.type_analysis)?;
 
             let target = self
                 .ir
-                .entrypoint_wrappers()
+                .entry_point_wrappers()
                 .get(&def_id)
-                .and_then(|label| self.layout.step_addrs().get(label))
+                .and_then(|label| self.layout.code_addrs().get(label))
                 .copied()
-                .expect("entrypoint must have compiled target");
+                .expect("entry point must have compiled target");
 
-            entrypoints.push(Entrypoint::new(name, target, result_type));
+            entry_points.push(EntryPoint::new(name, target, result_type));
         }
 
         self.strings.validate()?;
@@ -120,14 +122,14 @@ impl<'a> EmitPipeline<'a> {
         if fields.len() > EmitError::MAX_NODE_FIELDS {
             return Err(EmitError::TooManyNodeFields(fields.len()));
         }
-        if entrypoints.len() > EmitError::MAX_ENTRYPOINTS {
-            return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
+        if entry_points.len() > EmitError::MAX_ENTRY_POINTS {
+            return Err(EmitError::TooManyEntryPoints(entry_points.len()));
         }
 
         Ok(ModuleTables {
             node_kinds,
             fields,
-            entrypoints,
+            entry_points,
         })
     }
 
@@ -136,7 +138,7 @@ impl<'a> EmitPipeline<'a> {
         &self,
         pool: ConstantPool<'_>,
         tables: &ModuleTables,
-        transitions: &[u8],
+        instructions: &[u8],
     ) -> Result<Vec<u8>, EmitError> {
         let (str_blob, str_table) = pool.emit_strings();
         let (regex_blob, regex_table) = pool.emit_regexes();
@@ -144,13 +146,13 @@ impl<'a> EmitPipeline<'a> {
 
         let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds);
         let node_fields_bytes = emit_symbol_name_table(&tables.fields);
-        let entrypoints_bytes = emit_entrypoints(&tables.entrypoints);
+        let entry_points_bytes = emit_entry_points(&tables.entry_points);
         let spans_bytes = self.emit_spans()?;
 
         // Section order matches the bytecode layout:
         // Header → StringBlob → RegexBlob → StringTable → RegexTable →
         // NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames →
-        // Entrypoints → Transitions → Spans
+        // EntryPoints → Instructions → Spans
         let mut writer = SectionWriter::new();
 
         writer.emit_section(&str_blob);
@@ -162,8 +164,8 @@ impl<'a> EmitPipeline<'a> {
         writer.emit_section(&type_defs_bytes);
         writer.emit_section(&type_members_bytes);
         writer.emit_section(&type_names_bytes);
-        writer.emit_section(&entrypoints_bytes);
-        writer.emit_section(transitions);
+        writer.emit_section(&entry_points_bytes);
+        writer.emit_section(instructions);
         writer.emit_section(&spans_bytes);
 
         writer.finish_sections();
@@ -203,15 +205,15 @@ impl<'a> EmitPipeline<'a> {
             EmitError::MAX_TYPE_NAMES,
             EmitError::TooManyTypeNames,
         )?;
-        let entrypoints_count = checked_count(
-            tables.entrypoints.len(),
-            EmitError::MAX_ENTRYPOINTS,
-            EmitError::TooManyEntrypoints,
+        let entry_points_count = checked_count(
+            tables.entry_points.len(),
+            EmitError::MAX_ENTRY_POINTS,
+            EmitError::TooManyEntryPoints,
         )?;
-        let transitions_count = checked_count(
-            self.layout.total_steps() as usize,
-            EmitError::MAX_TRANSITIONS,
-            EmitError::TooManyTransitions,
+        let instruction_word_count = checked_count(
+            self.layout.total_words() as usize,
+            EmitError::MAX_INSTRUCTION_WORDS,
+            EmitError::TooManyInstructionWords,
         )?;
         let spans_count = checked_count(
             spans_count(self.ir.spans()),
@@ -227,8 +229,8 @@ impl<'a> EmitPipeline<'a> {
             type_defs_count,
             type_members_count,
             type_names_count,
-            entrypoints_count,
-            transitions_count,
+            entry_points_count,
+            instruction_word_count,
             spans_count,
             str_blob_size: str_blob.len() as u32,
             regex_blob_size: regex_blob.len() as u32,
@@ -250,11 +252,7 @@ impl<'a> EmitPipeline<'a> {
         for entry in &spans.entries {
             let (type_id, member) = match entry.binding {
                 Some(SpanBindingIR::Type(type_id)) => {
-                    let type_id = self.input.type_analysis.resolve_underlying_type_id(type_id);
-                    let wire_type = self
-                        .types
-                        .lookup(type_id)
-                        .expect("validated span type binding must reference an emitted type");
+                    let wire_type = self.types.resolve_type(type_id, self.input.type_analysis)?;
                     (u16::from(wire_type), SPAN_NO_BINDING)
                 }
                 Some(SpanBindingIR::Member(member_ref)) => {
@@ -272,9 +270,10 @@ impl<'a> EmitPipeline<'a> {
                 None => (SPAN_NO_BINDING, SPAN_NO_BINDING),
             };
 
-            let source = u16::try_from(entry.source.0).expect("source id must fit in span entry");
+            let source_id =
+                u16::try_from(entry.source_id.0).expect("source id must fit in span entry");
             let span = SpanEntry {
-                source,
+                source_id,
                 kind: entry.kind,
                 start: u32::from(entry.range.start()),
                 end: u32::from(entry.range.end()),
@@ -360,9 +359,9 @@ fn emit_symbol_name_table(symbols: &[SymbolNameEntry]) -> Vec<u8> {
     bytes
 }
 
-fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(entrypoints.len() * Entrypoint::SIZE);
-    for ep in entrypoints {
+fn emit_entry_points(entry_points: &[EntryPoint]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(entry_points.len() * EntryPoint::SIZE);
+    for ep in entry_points {
         bytes.extend_from_slice(&u16::from(ep.name()).to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());
         bytes.extend_from_slice(&u16::from(ep.result_type()).to_le_bytes());

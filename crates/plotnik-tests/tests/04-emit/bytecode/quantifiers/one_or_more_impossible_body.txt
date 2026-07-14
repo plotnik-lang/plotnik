@@ -10,4 +10,4 @@ error: `program` cannot be a child of this node
 2 |   (program)
   |    ^^^^^^^
   |
-help: `function_declaration` has no unlabeled children — its children are fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`
+help: `function_declaration` has no unlabeled children — use its grammar fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`

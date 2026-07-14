@@ -1,0 +1,88 @@
+Q = (program
+  [
+    (expression_statement
+      (identifier) @seen :: bool
+    )
+    (expression_statement (number))
+  ]
+)
+--------------------- INPUT ----------------------
+1;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  seen: boolean;
+}
+--------------------- OUTPUT ---------------------
+{
+  "seen": false
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "seen"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "identifier"
+S6 "number"
+
+[type_defs]
+T0 = <Bool>
+T1 = Record  M0:1  ; { seen }
+
+[type_members]
+M0: S1 → T0  ; seen: <Bool>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entry_points]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  └‣─  (identifier)                     08
+  07  ─‣┘  _                                12
+  08  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   07
+  10  └‣─  (number)                         11
+  11  ─‣┘  _                                07
+  12                                        ▶
+  13   !   (expression_statement)           06
+  14   !   (expression_statement) [BoolValue(0) RecordSet(M0)]  10
+  16  ──!  _                                13, 14, 16
+  18  └─!  _                                13, 14, 16
+  20   !   (program)                        18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
+
+@20:
+  20       (program)                        18
+       ●   program
+  18       _                                13, 14, 16
+       ●   expression_statement
+  13       (expression_statement)           06
+       ●   expression_statement
+  06       (identifier)                     08
+       ○   number
+       ○   ;
+  18  ❮❮❮ 
+  14       (expression_statement) [BoolValue(0) RecordSet(M0)]  10
+       ●   expression_statement
+  10       (number)                         11
+       ●   number
+  11       _                                07
+       ●   expression_statement
+  07       _                                12
+       ●   program
+  12   ◀   (@20)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

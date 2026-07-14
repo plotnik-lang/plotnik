@@ -8,14 +8,14 @@
 #[repr(u8)]
 pub enum ReturnOutcome {
     Matched = 0,
-    Zero = 1,
+    Empty = 1,
 }
 
 impl ReturnOutcome {
     pub fn from_byte(byte: u8) -> Option<Self> {
         match byte {
             0 => Some(Self::Matched),
-            1 => Some(Self::Zero),
+            1 => Some(Self::Empty),
             _ => None,
         }
     }
@@ -29,25 +29,25 @@ impl ReturnOutcome {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameReturns {
     matched: u16,
-    zero: u16,
+    empty: u16,
 }
 
 impl FrameReturns {
     pub fn single(target: u16) -> Self {
         Self {
             matched: target,
-            zero: target,
+            empty: target,
         }
     }
 
-    pub fn split(matched: u16, zero: u16) -> Self {
-        Self { matched, zero }
+    pub fn split(matched: u16, empty: u16) -> Self {
+        Self { matched, empty }
     }
 
     fn target(self, outcome: ReturnOutcome) -> u16 {
         match outcome {
             ReturnOutcome::Matched => self.matched,
-            ReturnOutcome::Zero => self.zero,
+            ReturnOutcome::Empty => self.empty,
         }
     }
 }

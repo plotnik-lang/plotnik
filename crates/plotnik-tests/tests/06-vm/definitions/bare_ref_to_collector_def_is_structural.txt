@@ -36,8 +36,8 @@ S8 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:1  ; { n }
+T1 = ListZeroOrMore(T0)  ; <Node>*
+T2 = Record  M0:1  ; { n }
 
 [type_members]
 M0: S1 → T0  ; n: <Node>
@@ -46,19 +46,19 @@ M0: S1 → T0  ; n: <Node>
 N0: S2 → T1  ; Ids
 N1: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@21)                            21 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘³ _                                06
-  08  └‣─  (number) [Node Set(M0)]          07
-  10  ─‣─  (number) [Node Set(M0)]          07
+  08  └‣─  (number) [Node RecordSet(M0)]    07
+  10  ─‣─  (number) [Node RecordSet(M0)]    07
   12   !   (identifier)                     14, 10
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
@@ -67,7 +67,7 @@ Q:
   21   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@21)                            21 : 03
        ▶   (@21)
 
@@ -113,7 +113,7 @@ Q:
   14  ❮❮❮ 
   14       _                                12, 14
   12  ❮❮❮ 
-  10       (number) [Node Set(M0)]          07
+  10       (number) [Node RecordSet(M0)]    07
        ○   ,
        ●   number
   07       _                                06
@@ -121,5 +121,5 @@ Q:
   06   ◀   (@21)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

@@ -7,7 +7,7 @@ must be recomputed from the implementation before they are documented; the
 working draft no longer claims results from an unavailable reference tool.
 
 Terminology follows the parser's CST (`compiler/parse/cst.rs`): `Def`,
-`NamedNode`, `Sequence` (`{...}`), `Alternation` (`[...]`) with `Branch`es,
+`NamedNode`, `Sequence` (`{...}`), `Alternation` (`[...]`) with `Alternative`s,
 `Field`, `NegatedField`, `Anchor`, `NodePredicate`, `Capture`,
 `CaptureType`, `Quantifier`, `Str` (string literal), and `Wildcard` (`_`).
 
@@ -15,7 +15,7 @@ Terminology follows the parser's CST (`compiler/parse/cst.rs`): `Def`,
 
 - **Input must parse cleanly.** The formatter formats the CST, not text. A
   file with parse errors is left untouched (recovery CSTs are not formattable).
-  Parse- or analyze-level _warnings_ (e.g. tree-sitter-style `((a) (b))`) do
+  Parse- or analyze-level _warnings_ (e.g. Tree-sitter-style `((a) (b))`) do
   not block formatting. A parse failure returns its diagnostics together with
   the matching source map, so callers can render it without rebuilding context.
 - **Semantics-preserving.** Output differs from input only in whitespace,
@@ -66,11 +66,11 @@ that cannot be usefully split may exceed the limit.
 
 These force the broken mode even when the inline form would fit:
 
-| Construct     | Breaks when                                  |
-| ------------- | -------------------------------------------- |
-| `Alternation` | it has 2+ branches, or any branch is labeled |
-| `Sequence`    | it has 2+ items, **anchors included**        |
-| `NamedNode`   | it has 2+ items, **anchors excluded**        |
+| Construct     | Breaks when                                           |
+| ------------- | ----------------------------------------------------- |
+| `Alternation` | it has 2+ alternatives, or any alternative is labeled |
+| `Sequence`    | it has 2+ items, **anchors included**                 |
+| `NamedNode`   | it has 2+ items, **anchors excluded**                 |
 
 "Item" means a child pattern, a `Field`, or a `NegatedField`. The node kind,
 a `NodePredicate`, and trailing suffixes are part of the head/closer, never
@@ -106,22 +106,22 @@ Each of these CST constructs counts as one landmark:
 
 - pattern: named node, sequence, alternation, definition reference, string,
   wildcard;
-- navigation and structure: field, **labeled** branch, anchor, negated field;
-- modifier: node predicate, quantifier, capture, capture type.
+- navigation and structure: field, **labeled** alternative, anchor, negated field;
+- pattern detail: node predicate, quantifier, capture, capture type.
 
-Unlabeled branch wrappers do not count. Definitions, comments, punctuation,
+Unlabeled alternative wrappers do not count. Definitions, comments, punctuation,
 literal contents, regex internals, and category-refinement tokens do not count.
-Field and branch prefixes and quantifier, capture, and capture-type suffixes
+Field and alternative-label prefixes and quantifier, capture, and capture-type suffixes
 belong to the complete inline candidate even when the renderer flattens those
 wrappers around a group.
 
-Three match steps remain a concise path:
+Three nested match landmarks remain a concise path:
 
 ```
 Q = (foo (bar (baz)))
 ```
 
-A fourth step breaks the nearest useful container:
+A fourth nested match breaks the nearest useful container:
 
 ```
 Q = (foo
@@ -164,10 +164,10 @@ landmark; only the width rule applies to their physical length.
 
 Consequences of the table, spelled out:
 
-- A union of two or more branches is always vertical, even `[(a) (b)]`.
-- An enum is always vertical, even with one branch — labels read as variant
-  declarations. (Exception-free: `[A: (x)] @e` still breaks.)
-- A single-branch unlabeled alternation, a single-item sequence, and a
+- An alternation of two or more alternatives is always vertical, even `[(a) (b)]`.
+- A labeled alternation is always vertical, even with one alternative — labels
+  read as case declarations. (Exception-free: `[A: (x)] @e` still breaks.)
+- A single-alternative unlabeled alternation, a single-item sequence, and a
   single-child node stay inline while they fit: `[(identifier)] @arg`,
   `{(identifier) @id}`, `(program (E) @e)`.
 - Chains of single-child nodes stay inline while the complete candidate has at
@@ -202,7 +202,7 @@ When a group breaks:
    fields, and comments occupy lines of their own.
 3. The closing delimiter goes on its own line, at the indent of the line that
    opened the group, with the whole suffix chain attached:
-   `)`, `)* @funcs`, `]? @kind :: Kind`, `}+ @rows`.
+   `)`, `)* @funcs`, `]? @kind :: Kind`, `}+ @records`.
 4. An item that is itself a group repeats the procedure at its indent. A
    broken field value keeps `field: ` and the opener on the field's line:
 
@@ -251,7 +251,7 @@ Suffixes attach in fixed grammar order — quantifier, capture, capture type —
 and never migrate to their own line:
 
 ```
-}* @rows :: Row
+}* @entries :: Entry
 )+? @items
 ] @stmt :: Stmt
 ```
@@ -310,7 +310,7 @@ newline is never an inline-width fragment.
 - A comment between atomic parts such as a definition separator, field prefix,
   predicate, or suffix cannot force those tokens into an invalid half-broken
   shape. Keep a one-line inline block comment in that gap; hoist an own-line
-  comment before the smallest complete definition/branch/pattern unit, and
+  comment before the smallest complete definition/alternative/pattern unit, and
   attach a trailing comment after that unit.
 - A line comment inside a group forces a line boundary because nothing can
   follow it on the line.
@@ -350,11 +350,12 @@ are deliberately not part of the canonical style. The formatter rewrites them.
 - **Stacked closers** — `value: (template_string … @frag))))`. They may appear
   in authored fixtures; canonical output puts each broken group's closer on
   its own line.
-- **Grid/column alignment** — `enum_30_branch_cascade.txt` lays branches out
+- **Grid/column alignment** — `labeled_alternation_30_alternative_cascade.txt`
+  lays alternatives out
   in an aligned grid. Never produced: one item per line, single spaces.
-- **Compact inline enums** — `Entry = [Id: (identifier) @id  Num: (number) @num]`
-  (note the double space). Enums always break; multi-space separators never
-  survive.
+- **Compact labeled alternations** — `Entry = [Id: (identifier) @id  Num: (number) @num]`
+  (note the double space). Labeled alternations always break; multi-space
+  separators never survive.
 - **Emphasis fan-out** — fixtures often break a construct that fits inline
   because it is the construct under test (`(d\n  (C)\n  (A)\n)` at 11 chars,
   captured wrapper chains in `04-emit/bytecode/captures/`). A formatter
@@ -364,7 +365,7 @@ are deliberately not part of the canonical style. The formatter rewrites them.
 ## Corpus rollout
 
 The structural rules intentionally disagree with some authored fixture layout:
-hugged containers, stacked closers, compact enums, emphasis-only fan-out, and
+hugged containers, stacked closers, compact labeled alternations, emphasis-only fan-out, and
 capture-dense lines are all reflowed. Once the formatter exists, its dry-run
 report is the source of truth for rollout size. Do not carry old agreement
 percentages forward without a reproducible corpus test tied to the current

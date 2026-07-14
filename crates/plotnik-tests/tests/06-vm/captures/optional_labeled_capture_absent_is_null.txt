@@ -1,0 +1,85 @@
+Q = (program
+  [
+    A: (identifier) @a
+  ]? @e
+)
+--------------------- INPUT ----------------------
+let x
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  e: QE | null;
+}
+
+export type QE =
+  | { $tag: "A"; $data: { a: Node } };
+--------------------- OUTPUT ---------------------
+{
+  "e": null
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "A"
+S3 "e"
+S4 "QE"
+S5 "Q"
+S6 "program"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { a }
+T2 = Variant M1:1  ; A
+T3 = Option(T2)  ; QE?
+T4 = Record  M2:1  ; { e }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T1  ; A: T1
+M2: S3 → T3  ; e: T3
+
+[type_names]
+N0: S4 → T2  ; QE
+N1: S5 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
+  11  ─‣┘  _ [RecordSet(M2)]                13
+  13                                        ▶
+  14  -ε-  [Absent RecordSet(M2)]           13
+  16  ──!  _                                08, 16
+  18  └─!  _                                08, 16
+  20   !   (program)                        18, 14
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
+
+@20:
+  20       (program)                        18, 14
+       ●   program
+  18       _                                08, 16
+       ●   lexical_declaration
+  08       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
+       ○   lexical_declaration
+  18  ❮❮❮ 
+  16       _                                08, 16
+  20  ❮❮❮ 
+  14  -ε-  [Absent RecordSet(M2)]           13
+  13   ◀   (@20)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

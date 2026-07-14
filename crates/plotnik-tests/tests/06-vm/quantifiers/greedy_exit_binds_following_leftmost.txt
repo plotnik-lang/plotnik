@@ -37,8 +37,8 @@ S5 "lexical_declaration"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:2  ; { decls, x }
+T1 = ListZeroOrMore(T0)  ; <Node>*
+T2 = Record  M0:2  ; { decls, x }
 
 [type_members]
 M0: S1 → T1  ; decls: T1
@@ -47,56 +47,56 @@ M1: S2 → T0  ; x: <Node>
 [type_names]
 N0: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
-  11  ─‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
-  14   !   (lexical_declaration) [Node Push]  16, 11
+  08  └‣─  (_) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  11  ─‣─  (_) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  14   !   (lexical_declaration) [Node ArrayPush]  16, 11
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
-  20  -ε-  [ArrayOpen]                      18, 08
+  20  -ε-  [ListOpen]                       18, 08
   22   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
        ▶   (@22)
 
 @22:
   22       (program)                        20
        ●   program
-  20  -ε-  [ArrayOpen]                      18, 08
+  20  -ε-  [ListOpen]                       18, 08
   18       _                                14, 16
        ●   lexical_declaration
-  14       (lexical_declaration) [Node Push]  16, 11
+  14       (lexical_declaration) [Node ArrayPush]  16, 11
        ●   lexical_declaration
   16       _                                14, 16
        ●   expression_statement
-  14       (lexical_declaration) [Node Push]  16, 11
+  14       (lexical_declaration) [Node ArrayPush]  16, 11
        ○   expression_statement
   16  ❮❮❮ 
   16       _                                14, 16
        ●   expression_statement
-  14       (lexical_declaration) [Node Push]  16, 11
+  14       (lexical_declaration) [Node ArrayPush]  16, 11
        ○   expression_statement
   16  ❮❮❮ 
   16       _                                14, 16
   14  ❮❮❮ 
-  11       (_) [ArrayClose Set(M0) Node Set(M1)]  07
+  11       (_) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
        ●   expression_statement
   07       _                                06
        ●   program
   06   ◀   (@22)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

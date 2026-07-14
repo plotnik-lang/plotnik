@@ -2,10 +2,11 @@ use crate::compiler::test_utils::synthetic_grammar as grammar;
 use indoc::indoc;
 use std::fmt::Write as _;
 
+use crate::compiler::analyze::types::FieldCompletion;
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::{SourceMap, SourcePath};
 
-use super::{LinkOutcome, Query, QueryBuilder};
+use super::{BindOutcome, Query, QueryBuilder};
 
 macro_rules! expect_invalid {
     ($($name:literal: $content:literal),+ $(,)?) => {{
@@ -56,11 +57,11 @@ impl Query {
     }
 
     #[track_caller]
-    pub(crate) fn expect_valid_linking(src: &str) -> LinkOutcome {
-        let query = Self::parse_and_validate(src).link(grammar());
+    pub(crate) fn expect_valid_binding(src: &str) -> BindOutcome {
+        let query = Self::parse_and_validate(src).bind(grammar());
         if !query.is_valid() {
             panic!(
-                "Expected valid linking, got error:\n{}",
+                "Expected valid grammar binding, got error:\n{}",
                 query.dump_diagnostics()
             );
         }
@@ -76,6 +77,44 @@ impl Query {
         }
         query.dump_diagnostics()
     }
+}
+
+fn field_completion(src: &str, field: &str) -> FieldCompletion {
+    let query = Query::parse_and_validate(src);
+    let analysis = query.analysis().expect("valid query must have analysis");
+    let pattern = analysis
+        .symbol_table
+        .body("Q")
+        .expect("test query must define Q");
+    let field = analysis
+        .interner
+        .get(field)
+        .expect("test field must be interned");
+
+    analysis
+        .type_analysis
+        .expect_field_completions(pattern)
+        .completion(field)
+}
+
+#[test]
+fn analysis_records_every_field_completion() {
+    assert_eq!(
+        field_completion("Q = [(a) @value (b) @value]", "value"),
+        FieldCompletion::AlwaysPresent,
+    );
+    assert_eq!(
+        field_completion("Q = [(a) @value (b)]", "value"),
+        FieldCompletion::Absent,
+    );
+    assert_eq!(
+        field_completion("Q = [(a)* @items (b)]", "items"),
+        FieldCompletion::EmptyList,
+    );
+    assert_eq!(
+        field_completion("Q = [(a) @present :: bool (b)]", "present"),
+        FieldCompletion::False,
+    );
 }
 
 #[test]
@@ -104,7 +143,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
         "c.ptk": "C = (c (A))",
     };
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: infinite recursion: no escape path
      --> c.ptk:1:9
       |
@@ -124,14 +163,14 @@ fn invalid_three_way_mutual_recursion_across_files() {
     1 | B = (b (C))
       |         - references C (completing cycle)
       |
-    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+    help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
 #[test]
 fn analysis_rejects_byte_oriented_regex() {
-    let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(grammar());
-    let compiled = linked.compile().expect("compilation answers");
+    let bound = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").bind(grammar());
+    let compiled = bound.compile().expect("compilation answers");
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
@@ -142,20 +181,20 @@ fn analysis_rejects_byte_oriented_regex() {
 }
 
 #[test]
-fn compile_rejects_value_less_definition() {
-    let linked = Query::expect("Q = .").link(grammar());
-    let compiled = linked.compile().expect("compilation answers");
+fn compile_rejects_definition_with_positional_only_body() {
+    let bound = Query::expect("Q = .").bind(grammar());
+    let compiled = bound.compile().expect("compilation answers");
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no entrypoint"), "{rendered}");
+    assert!(rendered.contains("no selectable entry point"), "{rendered}");
 }
 
 #[test]
 fn compile_accepts_valid_query() {
-    let linked = Query::parse_and_validate("Q = (identifier) @id").link(grammar());
+    let bound = Query::parse_and_validate("Q = (identifier) @id").bind(grammar());
     assert!(
-        !linked
+        !bound
             .compile()
             .expect("compilation answers")
             .diagnostics()
@@ -164,26 +203,26 @@ fn compile_accepts_valid_query() {
 }
 
 #[test]
-fn compile_flags_dropped_value_less_def_among_valid() {
-    let linked = Query::expect(indoc!(
+fn compile_flags_positional_only_definition_among_valid_definitions() {
+    let bound = Query::expect(indoc!(
         "
         Bad = .
         Good = (identifier) @id
     "
     ))
-    .link(grammar());
-    let compiled = linked.compile().expect("compilation answers");
+    .bind(grammar());
+    let compiled = bound.compile().expect("compilation answers");
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no entrypoint"), "{rendered}");
+    assert!(rendered.contains("no selectable entry point"), "{rendered}");
 }
 
 #[test]
 fn compile_is_total_on_empty_source_map() {
-    let linked = QueryBuilder::new(SourceMap::new()).link(grammar()).unwrap();
+    let bound = QueryBuilder::new(SourceMap::new()).bind(grammar()).unwrap();
     assert!(
-        !linked
+        !bound
             .compile()
             .expect("compilation answers")
             .diagnostics()
@@ -192,7 +231,7 @@ fn compile_is_total_on_empty_source_map() {
 }
 
 #[test]
-fn multifile_link_field_error_in_referenced_body_spans_two_files() {
+fn multifile_bind_field_error_in_referenced_body_spans_two_files() {
     // `Foo`'s body is a bare field — valid on its own (no parent to validate it
     // against). Only when `Bar` places `(Foo)` under `call_expression` does the
     // field-on-node-kind check fire, while validation has crossed into a.ptk. The
@@ -208,12 +247,12 @@ fn multifile_link_field_error_in_referenced_body_spans_two_files() {
         "expected analysis to pass:\n{}",
         analyzed.dump_diagnostics()
     );
-    let linked = analyzed.link(grammar());
-    assert!(!linked.is_valid(), "expected linking to fail");
-    let res = linked.dump_diagnostics();
+    let bound = analyzed.bind(grammar());
+    assert!(!bound.is_valid(), "expected grammar binding to fail");
+    let res = bound.dump_diagnostics();
 
     insta::assert_snapshot!(res, @"
-    error: field `name` is not valid on this node kind
+    error: grammar field `name` is not valid on this node kind
      --> a.ptk:1:7
       |
     1 | Foo = name: (identifier)
@@ -224,7 +263,7 @@ fn multifile_link_field_error_in_referenced_body_spans_two_files() {
     1 | Bar = (call_expression (Foo))
       |        --------------- on `call_expression`
       |
-    help: valid fields for `call_expression`: `arguments`, `function`, `optional_chain`
+    help: valid grammar fields for `call_expression`: `arguments`, `function`, `optional_chain`
     ");
 }
 
@@ -246,7 +285,7 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
     1 | Foo = (program (identifier) @x (identifier) @x)
       |                                ^^^^^^^^^^^^^^^
       |
-    help: rename one capture, or use an enum if they are mutually exclusive branches
+    help: rename one capture, or use labeled alternatives to preserve which alternative matched
     ");
 }
 
@@ -277,7 +316,7 @@ fn deep_reference_chain_hits_recursion_limit() {
 fn deeply_referenced_alternation_compiles_in_linear_time() {
     // Each level is an alternation naming the previous definition twice, so the inlined
     // form doubles per level — 2^40 nodes. The anchor classifier (run during lowering)
-    // walks alternation branches, so without memoization it would never finish. Memoized,
+    // walks alternation alternatives, so without memoization it would never finish. Memoized,
     // each definition is classified once and the whole pipeline stays linear; this test
     // completing at all is the regression guard.
     let depth = 40;
@@ -288,10 +327,10 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
         writeln!(src, "A{i} = [(A{p}) (A{p})]", p = i - 1).unwrap();
     }
 
-    let linked = Query::parse_and_validate(&src).link(grammar());
-    assert!(linked.is_valid(), "{}", linked.dump_diagnostics());
+    let bound = Query::parse_and_validate(&src).bind(grammar());
+    assert!(bound.is_valid(), "{}", bound.dump_diagnostics());
     assert!(
-        !linked
+        !bound
             .compile()
             .expect("compilation answers")
             .diagnostics()
@@ -301,7 +340,7 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
 }
 
 #[test]
-fn satisfiability_step_budget_rejects_and_is_tunable() {
+fn satisfiability_work_budget_rejects_and_is_tunable() {
     // A wide child list drives satisfiability construction and the solve's quadratic fixed point.
     // Under a deliberately tiny budget it trips and the query is rejected as too complex; under
     // the default it compiles — so the knob fails closed yet stays out of the way.
@@ -316,13 +355,16 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
         source_map.add_file(SourcePath::new("q.ptk"), &src);
         let mut builder = QueryBuilder::new(source_map);
         if let Some(budget) = budget {
-            builder = builder.with_satisfiability_step_budget(budget);
+            builder = builder.with_satisfiability_work_budget(budget);
         }
-        builder.analyze().unwrap().link(grammar())
+        builder.analyze().unwrap().bind(grammar())
     };
 
     let tight = build(Some(100));
-    assert!(!tight.is_valid(), "a 100-step budget must reject this list");
+    assert!(
+        !tight.is_valid(),
+        "a 100-unit work budget must reject this list"
+    );
     assert!(
         tight
             .diagnostics()
@@ -342,22 +384,22 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
 
 #[test]
 fn satisfiability_budget_counts_automaton_construction() {
-    let linked = QueryBuilder::new(SourceMap::from_inline(
+    let bound = QueryBuilder::new(SourceMap::from_inline(
         "Q = (program (expression_statement))",
     ))
-    .with_satisfiability_step_budget(1)
+    .with_satisfiability_work_budget(1)
     .analyze()
     .unwrap()
-    .link(grammar());
+    .bind(grammar());
 
-    assert!(!linked.is_valid());
+    assert!(!bound.is_valid());
     assert!(
-        linked
+        bound
             .diagnostics()
             .kinds()
             .any(|kind| kind == DiagnosticKind::QueryTooComplex),
         "expected QueryTooComplex:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
 }
 
@@ -373,17 +415,17 @@ fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
         "},
     );
 
-    let linked = QueryBuilder::new(source_map)
-        .with_satisfiability_step_budget(2)
+    let bound = QueryBuilder::new(source_map)
+        .with_satisfiability_work_budget(2)
         .analyze()
         .unwrap()
-        .link(grammar());
+        .bind(grammar());
 
-    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    let kinds: Vec<_> = bound.diagnostics().kinds().collect();
     assert!(
         kinds.contains(&DiagnosticKind::QueryTooComplex),
         "expected QueryTooComplex:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
     assert_eq!(
         kinds
@@ -392,12 +434,12 @@ fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
             .count(),
         1,
         "primary budget exhaustion must stop the pass:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
     assert!(
         !kinds.contains(&DiagnosticKind::UnsatisfiablePattern),
         "resource exhaustion must not masquerade as unsatisfiable:\n{}",
-        linked.dump_diagnostics(),
+        bound.dump_diagnostics(),
     );
 }
 
@@ -413,22 +455,22 @@ fn exhausted_anchor_probe_budget_keeps_unsatisfiable_verdict() {
         "},
     );
 
-    let linked = QueryBuilder::new(source_map)
-        .with_satisfiability_step_budget(20)
+    let bound = QueryBuilder::new(source_map)
+        .with_satisfiability_work_budget(20)
         .analyze()
         .unwrap()
-        .link(grammar());
+        .bind(grammar());
 
-    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    let kinds: Vec<_> = bound.diagnostics().kinds().collect();
     assert!(
         !kinds.is_empty()
             && kinds
                 .iter()
                 .all(|&kind| kind == DiagnosticKind::UnsatisfiablePattern),
         "diagnostic probes must not replace a proven rejection:\n{}",
-        linked.dump_diagnostics()
+        bound.dump_diagnostics()
     );
-    let diagnostics = linked.dump_diagnostics();
+    let diagnostics = bound.dump_diagnostics();
     assert!(
         diagnostics.contains("matching this child structure"),
         "exhausted anchor probes should fall back to a generic unsatisfiable diagnostic:\n{diagnostics}",
@@ -447,7 +489,7 @@ fn multifile_field_with_ref_to_seq_error() {
     };
 
     insta::assert_snapshot!(res, @"
-    error: field `name` cannot match a sequence
+    error: grammar field `name` cannot match a sequence
      --> main.ptk:1:17
       |
     1 | Q = (call name: (X))
@@ -458,6 +500,6 @@ fn multifile_field_with_ref_to_seq_error() {
     1 | X = {(a) (b)}
       |     --------- defined here
       |
-    help: a field holds a single child node; match one pattern, or move the sequence outside the field
+    help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint
     ");
 }

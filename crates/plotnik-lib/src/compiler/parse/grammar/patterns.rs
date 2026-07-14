@@ -22,13 +22,12 @@ enum SuffixMode {
 /// written constraint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PatternSlot {
-    /// `Name = <here>`. Anchors/negated fields parse, and the definition
-    /// then fails analysis with `NoEntrypoints`, which explains that a
-    /// definition must produce a value — a better teaching moment than a
-    /// parse error.
+    /// `Name = <here>`. Anchors and negated grammar fields parse, then analysis
+    /// explains that a definition body must contain a pattern. This is more
+    /// useful than rejecting the positional syntax during parsing.
     DefBody,
     /// `[Label: <here> ...]`.
-    BranchBody,
+    AlternativeBody,
     /// `field: <here>`.
     FieldValue,
 }
@@ -40,10 +39,14 @@ impl PatternSlot {
 
         match self {
             Self::DefBody => None,
-            Self::BranchBody if is_anchor => Some(DiagnosticKind::AnchorInAlternation),
-            Self::BranchBody if is_negated_field => Some(DiagnosticKind::NegatedFieldInAlternation),
-            Self::FieldValue if is_anchor => Some(DiagnosticKind::AnchorAsFieldValue),
-            Self::FieldValue if is_negated_field => Some(DiagnosticKind::NegatedFieldAsFieldValue),
+            Self::AlternativeBody if is_anchor => Some(DiagnosticKind::AnchorInAlternation),
+            Self::AlternativeBody if is_negated_field => {
+                Some(DiagnosticKind::NegatedFieldInAlternation)
+            }
+            Self::FieldValue if is_anchor => Some(DiagnosticKind::AnchorAsGrammarFieldValue),
+            Self::FieldValue if is_negated_field => {
+                Some(DiagnosticKind::NegatedFieldAsGrammarFieldValue)
+            }
             _ => None,
         }
     }
@@ -86,7 +89,7 @@ impl Parser<'_, '_> {
         false
     }
 
-    /// Parse a pattern required after a prefix like `=`, `field:`, or a branch label.
+    /// Parse a pattern required after a prefix like `=`, `field:`, or an alternative label.
     ///
     /// On a non-pattern token this reports `ExpectedExpression` at the current position,
     /// except a misplaced tree-sitter predicate (`#eq?`), which gets its dedicated diagnostic
@@ -95,9 +98,9 @@ impl Parser<'_, '_> {
         self.parse_required_pattern_inner(SuffixMode::Apply, PatternSlot::DefBody)
     }
 
-    /// Like [`Self::parse_required_pattern`], for an alternation branch body.
-    pub(crate) fn parse_branch_body(&mut self) {
-        self.parse_required_pattern_inner(SuffixMode::Apply, PatternSlot::BranchBody)
+    /// Like [`Self::parse_required_pattern`], for an alternative body.
+    pub(crate) fn parse_alternative_body(&mut self) {
+        self.parse_required_pattern_inner(SuffixMode::Apply, PatternSlot::AlternativeBody)
     }
 
     /// Like [`Self::parse_required_pattern`], but without applying a quantifier/capture suffix —
@@ -162,7 +165,7 @@ impl Parser<'_, '_> {
     /// - `field: (x)*` parses as `(field: (x))*` — repeat the field (e.g., decorators)
     /// - `field: (x) @cap` parses as `(field: (x)) @cap` — capture the field pattern
     ///
-    /// For captures on structured values (enums/structs), the compilation handles this
+    /// For captures on structured values (variants/records), compilation handles this
     /// by looking through FieldPattern to determine the actual value type. See
     /// `build_capture_effects` in compile/capture.rs.
     pub(crate) fn parse_pattern_no_suffix(&mut self) {
@@ -207,7 +210,7 @@ impl Parser<'_, '_> {
         if matches!(kind, SyntaxKind::Dot | SyntaxKind::DotBang) {
             // Anchors constrain position and produce no value: `*` or `@x` after
             // one is always a mistake, never a suffix to wrap.
-            self.reject_zero_width_suffixes(
+            self.reject_constraint_suffixes(
                 DiagnosticKind::QuantifiedAnchor,
                 DiagnosticKind::CapturedAnchor,
             );
@@ -216,7 +219,7 @@ impl Parser<'_, '_> {
             // would hide the `NegatedField` node from every consumer (they all
             // look at direct node children) and lower the constraint into
             // nothing.
-            self.reject_zero_width_suffixes(
+            self.reject_constraint_suffixes(
                 DiagnosticKind::QuantifiedNegatedField,
                 DiagnosticKind::CapturedNegatedField,
             );
@@ -228,7 +231,7 @@ impl Parser<'_, '_> {
         self.exit_recursion();
     }
 
-    fn reject_zero_width_suffixes(&mut self, quantified: DiagnosticKind, captured: DiagnosticKind) {
+    fn reject_constraint_suffixes(&mut self, quantified: DiagnosticKind, captured: DiagnosticKind) {
         loop {
             if self.at_ts(QUANTIFIERS) {
                 self.report_current_and_bump(quantified, |report| {
@@ -236,7 +239,7 @@ impl Parser<'_, '_> {
                 });
             } else if matches!(
                 self.current(),
-                SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
+                SyntaxKind::CaptureToken | SyntaxKind::DiscardToken
             ) {
                 self.report_current_and_bump(captured, |report| {
                     report.fix("remove the capture", "")

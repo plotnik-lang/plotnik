@@ -1,0 +1,23 @@
+MatchOnly = {
+  (a)
+  (b)
+}
+
+Q = (call (MatchOnly) @v)
+------------------ DIAGNOSTICS -------------------
+error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+ --> query.ptk:6:11
+  |
+1 |   MatchOnly = {
+  |  _____________-
+2 | |   (a)
+3 | |   (b)
+4 | | }
+  | |_- defined here
+5 |
+6 |   Q = (call (MatchOnly) @v)
+  |             ^^^^^^^^^^^
+-------------------- SYMBOLS ---------------------
+MatchOnly
+Q
+  MatchOnly

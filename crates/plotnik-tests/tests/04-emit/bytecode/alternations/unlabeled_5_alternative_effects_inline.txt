@@ -1,0 +1,73 @@
+Q = [
+  (identifier) @a
+  (number) @b
+  (string) @c
+  (binary_expression) @d
+  (call_expression) @e
+]
+---------------------- NFA -----------------------
+[entry_points]
+Q = 11
+
+[transitions]
+Q:
+  00  -ε-                                   02, 03, 04, 05, 06
+  01                                        ▶
+  02   !   (identifier) [Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Node RecordSet(a)]  01
+  03   !   (number) [Absent RecordSet(a) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Node RecordSet(b)]  01
+  04   !   (string) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(d) Absent RecordSet(e) Node RecordSet(c)]  01
+  05   !   (binary_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(e) Node RecordSet(d)]  01
+  06   !   (call_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Node RecordSet(e)]  01
+
+Q (entry point):
+  08                                        ▶
+  09  -ε-  [RecordClose]                    08
+  10       (Q)                              00 : 09
+  11  -ε-  [RecordOpen]                     10
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "c"
+S04 "d"
+S05 "e"
+S06 "Q"
+S07 "identifier"
+S08 "number"
+S09 "string"
+S10 "binary_expression"
+S11 "call_expression"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:5  ; { a, b, c, d, e }
+
+[type_members]
+M0: S01 → T1  ; a: T1
+M1: S02 → T1  ; b: T1
+M2: S03 → T1  ; c: T1
+M3: S04 → T1  ; d: T1
+M4: S05 → T1  ; e: T1
+
+[type_names]
+N0: S06 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (identifier) [Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Node RecordSet(M0)]  06
+  12   !   (number) [Absent RecordSet(M0) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Node RecordSet(M1)]  06
+  16   !   (string) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M3) Absent RecordSet(M4) Node RecordSet(M2)]  06
+  20   !   (binary_expression) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M4) Node RecordSet(M3)]  06
+  24   !   (call_expression) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Node RecordSet(M4)]  06
+  28  -ε-                                   08, 12, 16, 20, 24

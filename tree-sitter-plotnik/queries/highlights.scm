@@ -5,14 +5,14 @@
 (field name: (identifier) @property)
 (negated_field name: (identifier) @property)
 
-; Definitions, references, branch labels, type names
+; Definitions, references, alternative labels, type names
 (type_identifier) @type
 (capture_type_identifier) @type
 (builtin_capture_type) @type.builtin
 
 ; Captures
 (capture) @label
-(suppressive_capture) @label
+(discard) @label
 
 ; Literals
 (string) @string

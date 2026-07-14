@@ -159,7 +159,7 @@ function OutputBody({
     <div className="flex h-full min-h-0 flex-col">
       <div className={stale ? "min-h-0 flex-1 opacity-50" : "min-h-0 flex-1"}>
         <CodeEditor
-          value={JSON.stringify(runResult.value, null, 2)}
+          value={JSON.stringify(runResult.result, null, 2)}
           readOnly
           extensions={JSON_EXTENSIONS}
           aria-label="query output"
@@ -168,10 +168,10 @@ function OutputBody({
       <div className="flex items-center gap-2 border-t px-3 py-1.5">
         {stale && <Badge variant="destructive">stale</Badge>}
         <Badge variant="secondary">
-          {runResult.stats.steps_used.toLocaleString()} steps
+          {runResult.run_stats.fuel_used.toLocaleString()} fuel
         </Badge>
         <Badge variant="secondary">
-          {formatBytes(runResult.stats.heap_high_water)} heap
+          {formatBytes(runResult.run_stats.peak_live_heap_bytes)} peak heap
         </Badge>
       </div>
     </div>
@@ -179,7 +179,7 @@ function OutputBody({
 }
 
 function TypesBody({ info }: { info: SessionInfo | null }) {
-  if (!info || info.dts.length === 0) {
+  if (!info || info.typescript_declarations.length === 0) {
     return (
       <Empty>
         <EmptyHeader>
@@ -193,7 +193,7 @@ function TypesBody({ info }: { info: SessionInfo | null }) {
   }
   return (
     <CodeEditor
-      value={info.dts}
+      value={info.typescript_declarations}
       readOnly
       extensions={DTS_EXTENSIONS}
       aria-label="inferred TypeScript types"

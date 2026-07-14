@@ -49,9 +49,9 @@ R1 /^\p{Lu}$/
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = ArrayStar(T1)  ; QRows*
-T3 = Struct  M1:1  ; { rows }
+T1 = Record  M0:1  ; { id }
+T2 = ListZeroOrMore(T1)  ; QRows*
+T3 = Record  M1:1  ; { rows }
 
 [type_members]
 M0: S2 → T0  ; id: <Node>
@@ -61,68 +61,68 @@ M1: S3 → T2  ; rows: T2
 N0: S4 → T1  ; QRows
 N1: S5 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─‣┘  _ [ArrayClose Set(M1)]           12
-  08  └‣─  (identifier) [Node Set(M0)] =~ /^\p{Lu}$/  11
+  06  ─‣┘  _ [ListClose RecordSet(M1)]      12
+  08  └‣─  (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
   11  ─‣┘  _                                16
   12                                        ▶
-  13  -ε-  [ArrayClose Set(M1)]             12
+  13  -ε-  [ListClose RecordSet(M1)]        12
   15  ...
-  16  -ε-  [StructClose Push]               20, 06
-  18   !   (expression_statement) [StructOpen]  08
+  16  -ε-  [RecordClose ArrayPush]          20, 06
+  18   !   (expression_statement) [RecordOpen]  08
   20  ──!  _                                18, 20
   22  └─!  _                                18, 20
-  24  -ε-  [ArrayOpen]                      22, 13
+  24  -ε-  [ListOpen]                       22, 13
   26   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
        ▶   (@26)
 
 @26:
   26       (program)                        24
        ●   program
-  24  -ε-  [ArrayOpen]                      22, 13
+  24  -ε-  [ListOpen]                       22, 13
   22       _                                18, 20
        ●   expression_statement
-  18       (expression_statement) [StructOpen]  08
+  18       (expression_statement) [RecordOpen]  08
        ●   expression_statement
-  08       (identifier) [Node Set(M0)] =~ /^\p{Lu}$/  11
+  08       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
        ●   identifier
   11       _                                16
        ●   expression_statement
-  16  -ε-  [StructClose Push]               20, 06
+  16  -ε-  [RecordClose ArrayPush]          20, 06
   20       _                                18, 20
        ●   expression_statement
-  18       (expression_statement) [StructOpen]  08
+  18       (expression_statement) [RecordOpen]  08
        ●   expression_statement
-  08       (identifier) [Node Set(M0)] =~ /^\p{Lu}$/  11
+  08       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
        ○   ;
   20  ❮❮❮ 
   20       _                                18, 20
        ●   expression_statement
-  18       (expression_statement) [StructOpen]  08
+  18       (expression_statement) [RecordOpen]  08
        ●   expression_statement
-  08       (identifier) [Node Set(M0)] =~ /^\p{Lu}$/  11
+  08       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
        ●   identifier
   11       _                                16
        ●   expression_statement
-  16  -ε-  [StructClose Push]               20, 06
+  16  -ε-  [RecordClose ArrayPush]          20, 06
   20       _                                18, 20
   16  ❮❮❮ 
-  06       _ [ArrayClose Set(M1)]           12
+  06       _ [ListClose RecordSet(M1)]      12
        ●   program
   12   ◀   (@26)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

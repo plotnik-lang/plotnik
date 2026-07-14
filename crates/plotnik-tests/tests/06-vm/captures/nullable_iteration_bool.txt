@@ -16,7 +16,7 @@ warning: capture type `bool` replaces the captured value with a boolean
 4 |   }? @present :: bool
   |               ^^^^^^^
   |
-help: the replaced fields, variants, or scalar payload will not be returned
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
 {
   "present": false
@@ -31,7 +31,7 @@ S4 "comment"
 
 [type_defs]
 T0 = <Bool>
-T1 = Struct  M0:1  ; { present }
+T1 = Record  M0:1  ; { present }
 
 [type_members]
 M0: S1 → T0  ; present: <Bool>
@@ -39,29 +39,29 @@ M0: S1 → T0  ; present: <Bool>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06   !   (comment)                        08
   07  ...
-  08  ─‣┘  _ [BoolValue(1) Set(M0)]         10
+  08  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   10
   10                                        ▶
   11  ──!  _                                06, 11
   13   !   _                                06, 11
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  -ε-  [BoolValue(0) Set(M0)]           10
+  20  -ε-  [BoolValue(0) RecordSet(M0)]     10
   22   !   (program)                        18, 20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
        ▶   (@22)
 
@@ -79,9 +79,9 @@ Q:
   18  ❮❮❮ 
   16       _                                13, 16
   22  ❮❮❮ 
-  20  -ε-  [BoolValue(0) Set(M0)]           10
+  20  -ε-  [BoolValue(0) RecordSet(M0)]     10
   10   ◀   (@22)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

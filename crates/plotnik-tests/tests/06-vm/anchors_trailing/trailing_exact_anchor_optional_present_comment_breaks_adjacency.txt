@@ -1,0 +1,87 @@
+Q = (program
+  {
+    (lexical_declaration)? @a
+    .!
+    (debugger_statement) @b
+    .!
+  }
+)
+--------------------- INPUT ----------------------
+let x; /* c */ debugger;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: Node | null;
+  b: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "Q"
+S4 "program"
+S5 "lexical_declaration"
+S6 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { a, b }
+
+[type_members]
+M0: S1 → T1  ; a: T1
+M1: S2 → T0  ; b: <Node>
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  !─┘  _                                06
+  08  └─!  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  11  ──!  (debugger_statement) [Node RecordSet(M1)]  07
+  13   !   (lexical_declaration) [Node RecordSet(M0)]  11
+  15  ...
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
+  20   !   (program)                        18, 08
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
+
+@20:
+  20       (program)                        18, 08
+       ●   program
+  18       _                                13, 16
+       ●   lexical_declaration
+  13       (lexical_declaration) [Node RecordSet(M0)]  11
+       ●   lexical_declaration
+  11       (debugger_statement) [Node RecordSet(M1)]  07
+       ○   comment
+  18  ❮❮❮ 
+  16       _                                13, 16
+       ●   comment
+  13       (lexical_declaration) [Node RecordSet(M0)]  11
+       ○   comment
+  16  ❮❮❮ 
+  16       _                                13, 16
+       ●   debugger_statement
+  13       (lexical_declaration) [Node RecordSet(M0)]  11
+       ○   debugger_statement
+  16  ❮❮❮ 
+  16       _                                13, 16
+  20  ❮❮❮ 
+  08       (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+       ○   lexical_declaration

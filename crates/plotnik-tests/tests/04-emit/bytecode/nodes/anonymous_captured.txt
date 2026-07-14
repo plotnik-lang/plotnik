@@ -1,6 +1,6 @@
 Q = (binary_expression "+" @op)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 8
 
 [transitions]
@@ -8,13 +8,13 @@ Q:
   1                                         ▶
   2   !   (binary_expression)               4
   3  ─‣┘  _                                 1
-  4  └‣─  "+" [Node Set(op)]                3
+  4  └‣─  "+" [Node RecordSet(op)]          3
 
-Q (entrypoint):
+Q (entry point):
   5                                         ▶
-  6  -ε-  [StructClose]                     5
+  6  -ε-  [RecordClose]                     5
   7       (Q)                               2 : 6
-  8  -ε-  [StructOpen]                      7
+  8  -ε-  [RecordOpen]                      7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -25,7 +25,7 @@ S4 "+"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { op }
+T1 = Record  M0:1  ; { op }
 
 [type_members]
 M0: S1 → T0  ; op: <Node>
@@ -33,16 +33,16 @@ M0: S1 → T0  ; op: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@10)                            10 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  "+" [Node Set(M0)]               08
+  06  └‣─  "+" [Node RecordSet(M0)]         08
   08  ─‣┘  _                                09
   09                                        ▶
   10   !   (binary_expression)              06

@@ -1,4 +1,4 @@
-//! Structural validation: anchors, predicates, alternation kinds, empty constructs.
+//! Structural validation: anchors, predicates, alternative labeling, empty constructs.
 
 mod invariants;
 pub mod validation;

@@ -1,0 +1,31 @@
+Foo = (expression_statement (call_expression) @call)
+
+Q = (program
+  (Foo) @val :: Foo
+)
+------------------ DIAGNOSTICS -------------------
+warning: this capture already has type `Foo`; naming it `Foo` won't have an effect
+ --> query.ptk:4:17
+  |
+4 |   (Foo) @val :: Foo
+  |                 ^^^
+------------------- TYPESCRIPT -------------------
+export interface Foo {
+  call: Node;
+}
+
+export interface Q {
+  val: Foo;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Foo<'t> {
+    pub call: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub val: Foo<'t>,
+}

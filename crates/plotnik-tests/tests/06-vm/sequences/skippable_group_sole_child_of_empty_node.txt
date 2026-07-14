@@ -26,31 +26,31 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { d }
-T2 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { d }
 
 [type_members]
-M0: S1 → T2  ; d: T2
+M0: S1 → T1  ; d: T1
 
 [type_names]
-N0: S2 → T1  ; Q
+N0: S2 → T2  ; Q
 
-[entrypoints]
-Q = 00 :: T1
+[entry_points]
+Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  -ε-  [Null Set(M0)]                   06
-  10   !   (debugger_statement) [Node Set(M0)]  07
+  08  -ε-  [Absent RecordSet(M0)]           06
+  10   !   (debugger_statement) [Node RecordSet(M0)]  07
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  -ε-  [Null Set(M0)]                   07
+  16  -ε-  [Absent RecordSet(M0)]           07
   18   !   (empty_statement)                12, 16
   20  ──!  _                                18, 20
   22  └─!  _                                18, 20
@@ -62,7 +62,7 @@ Q:
   32   !   (program)                        28, 22, 14, 08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03
        ▶   (@32)
 
@@ -75,9 +75,9 @@ Q:
   32  ❮❮❮ 
   14       _                                10, 12
   32  ❮❮❮ 
-  08  -ε-  [Null Set(M0)]                   06
+  08  -ε-  [Absent RecordSet(M0)]           06
   06   ◀   (@32)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

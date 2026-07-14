@@ -1,7 +1,9 @@
 use super::*;
 use crate::bytecode::Nav;
 use crate::compiler::ids::DefId;
-use crate::compiler::lower::ir::{CallIR, CalleeEntry, DefVariant, MatchIR, ReturnAddr, ReturnIR};
+use crate::compiler::lower::ir::{
+    CallIR, CalleeEntry, DefSpecialization, MatchIR, ReturnAddr, ReturnIR,
+};
 use indexmap::IndexMap;
 
 #[test]
@@ -20,10 +22,10 @@ fn removes_unreachable_instructions() {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
-            m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            m.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -55,10 +57,10 @@ fn keeps_all_when_all_reachable() {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
-            m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            m.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -69,8 +71,8 @@ fn keeps_all_when_all_reachable() {
 }
 
 #[test]
-fn handles_branching() {
-    // A -> [B, C] (all reachable via branch)
+fn handles_fork() {
+    // A -> [B, C] (all reachable through the fork)
     let instructions = vec![
         MatchIR::terminal(Label(0))
             .nav(Nav::Down)
@@ -84,10 +86,10 @@ fn handles_branching() {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
-            m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
+            m.insert(DefSpecialization::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -99,8 +101,8 @@ fn handles_branching() {
 
 #[test]
 fn follows_call_targets_and_prunes_unreachable_definition_entries() {
-    let used = DefVariant::ordinary(DefId::from_raw(0));
-    let unused = DefVariant::ordinary(DefId::from_raw(1));
+    let used = DefSpecialization::ordinary(DefId::from_raw(0));
+    let unused = DefSpecialization::ordinary(DefId::from_raw(1));
     let instructions = vec![
         MatchIR::epsilon(Label(0), Label(1)).into(),
         CallIR::new(Label(1), ReturnAddr(Label(2)), CalleeEntry(Label(3))).into(),
@@ -112,7 +114,7 @@ fn follows_call_targets_and_prunes_unreachable_definition_entries() {
     let mut result = NfaGraph {
         instructions,
         def_entries: IndexMap::from([(used.clone(), Label(3)), (unused, Label(5))]),
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(2), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(2), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -127,7 +129,7 @@ fn follows_call_targets_and_prunes_unreachable_definition_entries() {
 
 #[test]
 fn keeps_reachable_recursive_definition() {
-    let recursive = DefVariant::ordinary(DefId::from_raw(0));
+    let recursive = DefSpecialization::ordinary(DefId::from_raw(0));
     let instructions = vec![
         MatchIR::epsilon(Label(0), Label(1)).into(),
         CallIR::new(Label(1), ReturnAddr(Label(2)), CalleeEntry(Label(3))).into(),
@@ -142,7 +144,7 @@ fn keeps_reachable_recursive_definition() {
     let mut result = NfaGraph {
         instructions,
         def_entries: IndexMap::from([(recursive.clone(), Label(3))]),
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(1), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(1), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };

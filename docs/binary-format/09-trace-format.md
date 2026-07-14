@@ -9,7 +9,7 @@ and backtracking.
 ```sh
 plotnik trace query.ptk source.js
 plotnik trace -q 'Q = (program)' -s 'x;' -l javascript -v
-plotnik trace query.ptk source.js --max-steps 10000
+plotnik trace query.ptk source.js --fuel 10000
 ```
 
 ## Verbosity
@@ -35,7 +35,7 @@ name. Returns show `◀`; top-level return shows `◼`.
 
 ## Sub-Lines
 
-Sub-lines leave the step column blank and use the symbol column for the event:
+Sub-lines leave the address column blank and use the symbol column for the event:
 
 | Symbol | Meaning                   |
 | ------ | ------------------------- |
@@ -61,7 +61,7 @@ Scalar capture types use the same effect sub-lines. Their stable spellings are
 `BoolValue(false)` / `BoolValue(true)`. A scalar mark's node is available to structured trace and
 inspection output even though the concise text trace prints only the effect
 name. Backtracking truncates marks and restores scalar-frame depth with the
-rest of the checkpointed trace.
+rest of the checkpointed match journal.
 
 ## Example
 
@@ -81,8 +81,8 @@ Trace with `-v --no-result`:
 
 ```text
 Value:
-  00  -ε-  [StructOpen]                     02
-       ⬥   StructOpen
+  00  -ε-  [RecordOpen]                     02
+       ⬥   RecordOpen
   02       (?)                              18 : 03
        ▶   (?)
 
@@ -95,13 +95,13 @@ Value:
       └‣─  number
        ●   number 42
   --------------------------------------------
-  08       (number) [Null Set(M1) Node Set(M0)]  07
+  08       (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
        !   number
        ●   number 42
-       ⬥   Null
-       ⬥   Set "s"
+       ⬥   Absent
+       ⬥   RecordSet "s"
        ⬥   Node
-       ⬥   Set "n"
+       ⬥   RecordSet "n"
   --------------------------------------------
   07       _                                06
       ─‣┘  document
@@ -109,8 +109,8 @@ Value:
   06   ◀   (?)
 
 Value:
-  03  -ε-  [StructClose]                    05
-       ⬥   StructClose
+  03  -ε-  [RecordClose]                    05
+       ⬥   RecordClose
   05   ◀   (Value)                          ◼
 ```
 

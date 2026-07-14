@@ -19,14 +19,14 @@ Root
         Colon ":"
         Alternation
           BracketOpen "["
-          Branch
+          Alternative
             Capture
               NamedNode
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
               CaptureToken "@name"
-          Branch
+          Alternative
             Capture
               DefRef
                 ParenOpen "("
@@ -48,11 +48,11 @@ Root
   Def NestedCall
     NamedNode call_expression
       FieldPattern function:
-        Union
-          Branch
+        Alternation
+          Alternative
             CapturedPattern @name
               NamedNode identifier
-          Branch
+          Alternative
             CapturedPattern @inner
               Ref NestedCall
       FieldPattern arguments:

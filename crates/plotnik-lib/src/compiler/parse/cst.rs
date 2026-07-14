@@ -61,15 +61,15 @@ pub enum SyntaxKind {
     #[token("?")]
     Question,
 
-    /// Non-greedy `*?` quantifier
+    /// Lazy `*?` quantifier.
     #[token("*?")]
     StarQuestion,
 
-    /// Non-greedy `+?` quantifier
+    /// Lazy `+?` quantifier.
     #[token("+?")]
     PlusQuestion,
 
-    /// Non-greedy `??` quantifier
+    /// Lazy `??` quantifier.
     #[token("??")]
     QuestionQuestion,
 
@@ -128,9 +128,9 @@ pub enum SyntaxKind {
     #[regex(r"@[a-zA-Z][a-zA-Z0-9_]*")]
     CaptureToken,
 
-    /// Suppressive capture: @_ or @_name
+    /// Discard: @_ or @_name
     #[regex(r"@_[a-zA-Z0-9_]*")]
-    SuppressiveCapture,
+    DiscardToken,
 
     /// Bare @ (for error recovery: "capture without target")
     #[token("@")]
@@ -205,7 +205,7 @@ pub enum SyntaxKind {
     Quantifier,
     Sequence,
     Alternation,
-    Branch,
+    Alternative,
     Wildcard,
     Anchor,
     NegatedField,

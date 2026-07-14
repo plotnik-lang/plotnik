@@ -28,7 +28,7 @@ S7 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { n }
+T1 = Record  M0:1  ; { n }
 
 [type_members]
 M0: S1 → T0  ; n: <Node>
@@ -36,16 +36,16 @@ M0: S1 → T0  ; n: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@17)                            17 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─◦─  (number) [Node Set(M0)]          08
+  06  ─◦─  (number) [Node RecordSet(M0)]    08
   08  ─‣┘³ _                                09
   09                                        ▶
   10   !   ","                              06
@@ -56,7 +56,7 @@ Q:
   17   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@17)                            17 : 03
        ▶   (@17)
 
@@ -81,14 +81,14 @@ Q:
        ●   ,
   10       ","                              06
        ●   ,
-  06       (number) [Node Set(M0)]          08
+  06       (number) [Node RecordSet(M0)]    08
        ○   ,
   11  ❮❮❮ 
   11       _                                10, 11
        ●   ,
   10       ","                              06
        ●   ,
-  06       (number) [Node Set(M0)]          08
+  06       (number) [Node RecordSet(M0)]    08
        ○   ]
   11  ❮❮❮ 
   11       _                                10, 11

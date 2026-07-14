@@ -1,0 +1,312 @@
+Q = [
+  A0: (identifier) @x0
+  A1: (identifier) @x1
+  A2: (identifier) @x2
+  A3: (identifier) @x3
+  A4: (identifier) @x4
+  A5: (identifier) @x5
+  A6: (identifier) @x6
+  A7: (identifier) @x7
+  A8: (identifier) @x8
+  A9: (identifier) @x9
+  A10: (identifier) @x10
+  A11: (identifier) @x11
+  A12: (identifier) @x12
+  A13: (identifier) @x13
+  A14: (identifier) @x14
+  A15: (identifier) @x15
+  A16: (identifier) @x16
+  A17: (identifier) @x17
+  A18: (identifier) @x18
+  A19: (identifier) @x19
+  A20: (identifier) @x20
+  A21: (identifier) @x21
+  A22: (identifier) @x22
+  A23: (identifier) @x23
+  A24: (identifier) @x24
+  A25: (identifier) @x25
+  A26: (identifier) @x26
+  A27: (identifier) @x27
+  A28: (identifier) @x28
+  A29: (identifier) @x29
+]
+---------------------- NFA -----------------------
+[entry_points]
+Q = 34
+
+[transitions]
+Q:
+  00  -ε-                                   02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+  01                                        ▶
+  02   !   (identifier) [VariantOpen(A0) Node RecordSet(x0) VariantClose]  01
+  03   !   (identifier) [VariantOpen(A1) Node RecordSet(x1) VariantClose]  01
+  04   !   (identifier) [VariantOpen(A2) Node RecordSet(x2) VariantClose]  01
+  05   !   (identifier) [VariantOpen(A3) Node RecordSet(x3) VariantClose]  01
+  06   !   (identifier) [VariantOpen(A4) Node RecordSet(x4) VariantClose]  01
+  07   !   (identifier) [VariantOpen(A5) Node RecordSet(x5) VariantClose]  01
+  08   !   (identifier) [VariantOpen(A6) Node RecordSet(x6) VariantClose]  01
+  09   !   (identifier) [VariantOpen(A7) Node RecordSet(x7) VariantClose]  01
+  10   !   (identifier) [VariantOpen(A8) Node RecordSet(x8) VariantClose]  01
+  11   !   (identifier) [VariantOpen(A9) Node RecordSet(x9) VariantClose]  01
+  12   !   (identifier) [VariantOpen(A10) Node RecordSet(x10) VariantClose]  01
+  13   !   (identifier) [VariantOpen(A11) Node RecordSet(x11) VariantClose]  01
+  14   !   (identifier) [VariantOpen(A12) Node RecordSet(x12) VariantClose]  01
+  15   !   (identifier) [VariantOpen(A13) Node RecordSet(x13) VariantClose]  01
+  16   !   (identifier) [VariantOpen(A14) Node RecordSet(x14) VariantClose]  01
+  17   !   (identifier) [VariantOpen(A15) Node RecordSet(x15) VariantClose]  01
+  18   !   (identifier) [VariantOpen(A16) Node RecordSet(x16) VariantClose]  01
+  19   !   (identifier) [VariantOpen(A17) Node RecordSet(x17) VariantClose]  01
+  20   !   (identifier) [VariantOpen(A18) Node RecordSet(x18) VariantClose]  01
+  21   !   (identifier) [VariantOpen(A19) Node RecordSet(x19) VariantClose]  01
+  22   !   (identifier) [VariantOpen(A20) Node RecordSet(x20) VariantClose]  01
+  23   !   (identifier) [VariantOpen(A21) Node RecordSet(x21) VariantClose]  01
+  24   !   (identifier) [VariantOpen(A22) Node RecordSet(x22) VariantClose]  01
+  25   !   (identifier) [VariantOpen(A23) Node RecordSet(x23) VariantClose]  01
+  26   !   (identifier) [VariantOpen(A24) Node RecordSet(x24) VariantClose]  01
+  27   !   (identifier) [VariantOpen(A25) Node RecordSet(x25) VariantClose]  01
+  28   !   (identifier) [VariantOpen(A26) Node RecordSet(x26) VariantClose]  01
+  29   !   (identifier) [VariantOpen(A27) Node RecordSet(x27) VariantClose]  01
+  30   !   (identifier) [VariantOpen(A28) Node RecordSet(x28) VariantClose]  01
+  31   !   (identifier) [VariantOpen(A29) Node RecordSet(x29) VariantClose]  01
+
+Q (entry point):
+  33                                        ▶
+  34       (Q)                              00 : 33
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "x0"
+S02 "x1"
+S03 "x2"
+S04 "x3"
+S05 "x4"
+S06 "x5"
+S07 "x6"
+S08 "x7"
+S09 "x8"
+S10 "x9"
+S11 "x10"
+S12 "x11"
+S13 "x12"
+S14 "x13"
+S15 "x14"
+S16 "x15"
+S17 "x16"
+S18 "x17"
+S19 "x18"
+S20 "x19"
+S21 "x20"
+S22 "x21"
+S23 "x22"
+S24 "x23"
+S25 "x24"
+S26 "x25"
+S27 "x26"
+S28 "x27"
+S29 "x28"
+S30 "x29"
+S31 "A0"
+S32 "A1"
+S33 "A2"
+S34 "A3"
+S35 "A4"
+S36 "A5"
+S37 "A6"
+S38 "A7"
+S39 "A8"
+S40 "A9"
+S41 "A10"
+S42 "A11"
+S43 "A12"
+S44 "A13"
+S45 "A14"
+S46 "A15"
+S47 "A16"
+S48 "A17"
+S49 "A18"
+S50 "A19"
+S51 "A20"
+S52 "A21"
+S53 "A22"
+S54 "A23"
+S55 "A24"
+S56 "A25"
+S57 "A26"
+S58 "A27"
+S59 "A28"
+S60 "A29"
+S61 "Q"
+S62 "identifier"
+
+[type_defs]
+T00 = <Node>
+T01 = Record  M00:1  ; { x0 }
+T02 = Record  M01:1  ; { x1 }
+T03 = Record  M02:1  ; { x2 }
+T04 = Record  M03:1  ; { x3 }
+T05 = Record  M04:1  ; { x4 }
+T06 = Record  M05:1  ; { x5 }
+T07 = Record  M06:1  ; { x6 }
+T08 = Record  M07:1  ; { x7 }
+T09 = Record  M08:1  ; { x8 }
+T10 = Record  M09:1  ; { x9 }
+T11 = Record  M10:1  ; { x10 }
+T12 = Record  M11:1  ; { x11 }
+T13 = Record  M12:1  ; { x12 }
+T14 = Record  M13:1  ; { x13 }
+T15 = Record  M14:1  ; { x14 }
+T16 = Record  M15:1  ; { x15 }
+T17 = Record  M16:1  ; { x16 }
+T18 = Record  M17:1  ; { x17 }
+T19 = Record  M18:1  ; { x18 }
+T20 = Record  M19:1  ; { x19 }
+T21 = Record  M20:1  ; { x20 }
+T22 = Record  M21:1  ; { x21 }
+T23 = Record  M22:1  ; { x22 }
+T24 = Record  M23:1  ; { x23 }
+T25 = Record  M24:1  ; { x24 }
+T26 = Record  M25:1  ; { x25 }
+T27 = Record  M26:1  ; { x26 }
+T28 = Record  M27:1  ; { x27 }
+T29 = Record  M28:1  ; { x28 }
+T30 = Record  M29:1  ; { x29 }
+T31 = Variant M30:30  ; A0 | A1 | A2 | A3 | A4 | A5 | A6 | A7 | A8 | A9 | A10 | A11 | A12 | A13 | A14 | A15 | A16 | A17 | A18 | A19 | A20 | A21 | A22 | A23 | A24 | A25 | A26 | A27 | A28 | A29
+
+[type_members]
+M00: S01 → T00  ; x0: <Node>
+M01: S02 → T00  ; x1: <Node>
+M02: S03 → T00  ; x2: <Node>
+M03: S04 → T00  ; x3: <Node>
+M04: S05 → T00  ; x4: <Node>
+M05: S06 → T00  ; x5: <Node>
+M06: S07 → T00  ; x6: <Node>
+M07: S08 → T00  ; x7: <Node>
+M08: S09 → T00  ; x8: <Node>
+M09: S10 → T00  ; x9: <Node>
+M10: S11 → T00  ; x10: <Node>
+M11: S12 → T00  ; x11: <Node>
+M12: S13 → T00  ; x12: <Node>
+M13: S14 → T00  ; x13: <Node>
+M14: S15 → T00  ; x14: <Node>
+M15: S16 → T00  ; x15: <Node>
+M16: S17 → T00  ; x16: <Node>
+M17: S18 → T00  ; x17: <Node>
+M18: S19 → T00  ; x18: <Node>
+M19: S20 → T00  ; x19: <Node>
+M20: S21 → T00  ; x20: <Node>
+M21: S22 → T00  ; x21: <Node>
+M22: S23 → T00  ; x22: <Node>
+M23: S24 → T00  ; x23: <Node>
+M24: S25 → T00  ; x24: <Node>
+M25: S26 → T00  ; x25: <Node>
+M26: S27 → T00  ; x26: <Node>
+M27: S28 → T00  ; x27: <Node>
+M28: S29 → T00  ; x28: <Node>
+M29: S30 → T00  ; x29: <Node>
+M30: S31 → T01  ; A0: T01
+M31: S32 → T02  ; A1: T02
+M32: S33 → T03  ; A2: T03
+M33: S34 → T04  ; A3: T04
+M34: S35 → T05  ; A4: T05
+M35: S36 → T06  ; A5: T06
+M36: S37 → T07  ; A6: T07
+M37: S38 → T08  ; A7: T08
+M38: S39 → T09  ; A8: T09
+M39: S40 → T10  ; A9: T10
+M40: S41 → T11  ; A10: T11
+M41: S42 → T12  ; A11: T12
+M42: S43 → T13  ; A12: T13
+M43: S44 → T14  ; A13: T14
+M44: S45 → T15  ; A14: T15
+M45: S46 → T16  ; A15: T16
+M46: S47 → T17  ; A16: T17
+M47: S48 → T18  ; A17: T18
+M48: S49 → T19  ; A18: T19
+M49: S50 → T20  ; A19: T20
+M50: S51 → T21  ; A20: T21
+M51: S52 → T22  ; A21: T22
+M52: S53 → T23  ; A22: T23
+M53: S54 → T24  ; A23: T24
+M54: S55 → T25  ; A24: T25
+M55: S56 → T26  ; A25: T26
+M56: S57 → T27  ; A26: T27
+M57: S58 → T28  ; A27: T28
+M58: S59 → T29  ; A28: T29
+M59: S60 → T30  ; A29: T30
+
+[type_names]
+N0: S61 → T31  ; Q
+
+[entry_points]
+Q = 000 :: T31
+
+[instructions]
+Q:
+  000       (@128)                          128 : 001
+  001                                       ▶
+  002                                       ▶
+  003   !   (identifier) [VariantOpen(M30) Node RecordSet(M0) VariantClose]  002
+  006  ...
+  007  ...
+  008   !   (identifier) [VariantOpen(M31) Node RecordSet(M1) VariantClose]  002
+  011   !   (identifier) [VariantOpen(M32) Node RecordSet(M2) VariantClose]  002
+  014  ...
+  015  ...
+  016   !   (identifier) [VariantOpen(M33) Node RecordSet(M3) VariantClose]  002
+  019   !   (identifier) [VariantOpen(M34) Node RecordSet(M4) VariantClose]  002
+  022  ...
+  023  ...
+  024   !   (identifier) [VariantOpen(M35) Node RecordSet(M5) VariantClose]  002
+  027   !   (identifier) [VariantOpen(M36) Node RecordSet(M6) VariantClose]  002
+  030  ...
+  031  ...
+  032   !   (identifier) [VariantOpen(M37) Node RecordSet(M7) VariantClose]  002
+  035   !   (identifier) [VariantOpen(M38) Node RecordSet(M8) VariantClose]  002
+  038  ...
+  039  ...
+  040   !   (identifier) [VariantOpen(M39) Node RecordSet(M9) VariantClose]  002
+  043   !   (identifier) [VariantOpen(M40) Node RecordSet(M10) VariantClose]  002
+  046  ...
+  047  ...
+  048   !   (identifier) [VariantOpen(M41) Node RecordSet(M11) VariantClose]  002
+  051   !   (identifier) [VariantOpen(M42) Node RecordSet(M12) VariantClose]  002
+  054  ...
+  055  ...
+  056   !   (identifier) [VariantOpen(M43) Node RecordSet(M13) VariantClose]  002
+  059   !   (identifier) [VariantOpen(M44) Node RecordSet(M14) VariantClose]  002
+  062  ...
+  063  ...
+  064   !   (identifier) [VariantOpen(M45) Node RecordSet(M15) VariantClose]  002
+  067   !   (identifier) [VariantOpen(M46) Node RecordSet(M16) VariantClose]  002
+  070  ...
+  071  ...
+  072   !   (identifier) [VariantOpen(M47) Node RecordSet(M17) VariantClose]  002
+  075   !   (identifier) [VariantOpen(M48) Node RecordSet(M18) VariantClose]  002
+  078  ...
+  079  ...
+  080   !   (identifier) [VariantOpen(M49) Node RecordSet(M19) VariantClose]  002
+  083   !   (identifier) [VariantOpen(M50) Node RecordSet(M20) VariantClose]  002
+  086  ...
+  087  ...
+  088   !   (identifier) [VariantOpen(M51) Node RecordSet(M21) VariantClose]  002
+  091   !   (identifier) [VariantOpen(M52) Node RecordSet(M22) VariantClose]  002
+  094  ...
+  095  ...
+  096   !   (identifier) [VariantOpen(M53) Node RecordSet(M23) VariantClose]  002
+  099   !   (identifier) [VariantOpen(M54) Node RecordSet(M24) VariantClose]  002
+  102  ...
+  103  ...
+  104   !   (identifier) [VariantOpen(M55) Node RecordSet(M25) VariantClose]  002
+  107   !   (identifier) [VariantOpen(M56) Node RecordSet(M26) VariantClose]  002
+  110  ...
+  111  ...
+  112   !   (identifier) [VariantOpen(M57) Node RecordSet(M27) VariantClose]  002
+  115   !   (identifier) [VariantOpen(M58) Node RecordSet(M28) VariantClose]  002
+  118  ...
+  119  ...
+  120   !   (identifier) [VariantOpen(M59) Node RecordSet(M29) VariantClose]  002
+  123  -ε-                                  112, 115, 120
+  125  ...
+  126  ...
+  127  ...
+  128  -ε-                                  003, 008, 011, 016, 019, 024, 027, 032, 035, 040, 043, 048, 051, 056, 059, 064, 067, 072, 075, 080, 083, 088, 091, 096, 099, 104, 107, 123

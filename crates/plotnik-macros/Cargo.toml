@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Proc-macro backend for plotnik - compile tree-sitter queries to typed Rust"
 documentation = "https://docs.rs/plotnik-macros"
 readme = "../../README.md"
-keywords = ["tree-sitter", "query", "ast", "proc-macro"]
+keywords = ["tree-sitter", "query", "syntax-tree", "proc-macro"]
 categories = ["development-tools", "parsing"]
 include = ["src/**/*", "Cargo.toml"]
 
@@ -18,7 +18,7 @@ workspace = true
 proc-macro = true
 
 [features]
-# Emit `SerializeWithSource` impls for generated output types. Feature, not a
+# Emit `SerializeWithSource` impls for generated result types. Feature, not a
 # macro argument: it must be on iff the runtime's `serde` feature is on, and
 # the `plotnik` facade forwards both from one flag.
 serde = []

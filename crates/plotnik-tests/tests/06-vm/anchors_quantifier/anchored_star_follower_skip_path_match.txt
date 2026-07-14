@@ -54,48 +54,48 @@ S10 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:3  ; { a, b, c }
-T3 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = ListZeroOrMore(T0)  ; <Node>*
+T3 = Record  M0:3  ; { a, b, c }
 
 [type_members]
-M0: S02 → T3  ; a: T3
-M1: S03 → T1  ; b: T1
+M0: S02 → T1  ; a: T1
+M1: S03 → T2  ; b: T2
 M2: S04 → T0  ; c: <Node>
 
 [type_names]
-N0: S05 → T2  ; Q
+N0: S05 → T3  ; Q
 
-[entrypoints]
-Q = 00 :: T2
+[entry_points]
+Q = 00 :: T3
 
-[transitions]
+[instructions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@36)                            36 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  (identifier) == "foo"            08
   08  ─‣┘  _                                09
   09  ─‣┘  _                                10
   10                                        ▶
-  11  └•─  (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  06
+  11  └•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
   14  ...
   15  ...
-  16  ─•─  (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  06
-  19  └•─  (debugger_statement) [Node Push]  21, 16
-  21  ─•─  (debugger_statement) [Node Push]  21, 16
+  16  ─•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
+  19  └•─  (debugger_statement) [Node ArrayPush]  21, 16
+  21  ─•─  (debugger_statement) [Node ArrayPush]  21, 16
   23  ...
-  24  -ε-  [ArrayOpen]                      19, 11
-  26  -ε-  [ArrayOpen]                      21, 16
-  28  -ε-  [Null Set(M0)]                   24
-  30   !   (lexical_declaration) [Node Set(M0)]  26
+  24  -ε-  [ListOpen]                       19, 11
+  26  -ε-  [ListOpen]                       21, 16
+  28  -ε-  [Absent RecordSet(M0)]           24
+  30   !   (lexical_declaration) [Node RecordSet(M0)]  26
   32  ──!  _                                30, 32
   34  └─!  _                                30, 32
   36   !   (program)                        34, 28
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@36)                            36 : 03
        ▶   (@36)
 
@@ -104,31 +104,31 @@ Q:
        ●   program
   34       _                                30, 32
        ●   debugger_statement
-  30       (lexical_declaration) [Node Set(M0)]  26
+  30       (lexical_declaration) [Node RecordSet(M0)]  26
        ○   debugger_statement
   34  ❮❮❮ 
   32       _                                30, 32
        ●   debugger_statement
-  30       (lexical_declaration) [Node Set(M0)]  26
+  30       (lexical_declaration) [Node RecordSet(M0)]  26
        ○   debugger_statement
   32  ❮❮❮ 
   32       _                                30, 32
        ●   expression_statement
-  30       (lexical_declaration) [Node Set(M0)]  26
+  30       (lexical_declaration) [Node RecordSet(M0)]  26
        ○   expression_statement
   32  ❮❮❮ 
   32       _                                30, 32
   36  ❮❮❮ 
-  28  -ε-  [Null Set(M0)]                   24
-  24  -ε-  [ArrayOpen]                      19, 11
-  19       (debugger_statement) [Node Push]  21, 16
+  28  -ε-  [Absent RecordSet(M0)]           24
+  24  -ε-  [ListOpen]                       19, 11
+  19       (debugger_statement) [Node ArrayPush]  21, 16
        ●   debugger_statement
-  21       (debugger_statement) [Node Push]  21, 16
+  21       (debugger_statement) [Node ArrayPush]  21, 16
        ●   debugger_statement
-  21       (debugger_statement) [Node Push]  21, 16
+  21       (debugger_statement) [Node ArrayPush]  21, 16
        ○   expression_statement
   21  ❮❮❮ 
-  16       (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  06
+  16       (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
        ●   expression_statement
   06       (identifier) == "foo"            08
        ●   identifier
@@ -139,5 +139,5 @@ Q:
   10   ◀   (@36)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

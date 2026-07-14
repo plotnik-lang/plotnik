@@ -29,7 +29,7 @@ fn limit_expr_matches_debug() {
 fn depth_expr_resolves_at_generation_time() {
     assert_eq!(
         depth_expr(Limit::Auto, 512),
-        "Some(rt::replay_depth_auto(512))"
+        "Some(rt::decode_depth_auto(512))"
     );
     assert_eq!(depth_expr(Limit::Of(8), 512), "Some(8)");
     assert_eq!(depth_expr(Limit::Unbounded, 512), "None");

@@ -2,9 +2,10 @@
 //!
 //! Mirrors the bytecode dump's visual grammar (`docs/binary-format/08-dump-format.md`)
 //! in label space, keeping the resolution the wire format erases: symbolic labels
-//! instead of packed step addresses, definition-name section headers from label
+//! instead of packed code addresses, definition-name section headers from label
 //! provenance (`Name (consuming):` for the guarded-recursion body variant,
-//! `Name (entrypoint):` for wrappers), real member names on `Set`/`EnumOpen`,
+//! `Name (entry point):` for wrappers), real member names on
+//! `RecordSet`/`VariantOpen`,
 //! callee names on calls (`(Name+)` marks a consuming-body callee), and inline
 //! predicate text — the IR has no string table to index into.
 
@@ -31,7 +32,7 @@ pub(crate) fn dump_nfa(
     dumper.colors = colors;
 
     let mut out = String::new();
-    dumper.dump_entrypoints(&mut out);
+    dumper.dump_entry_points(&mut out);
     dumper.dump_transitions(&mut out);
     out
 }
@@ -79,7 +80,7 @@ impl<'a> NfaDumper<'a> {
     pub(crate) fn def_name_of(&self, label: Label) -> &str {
         match self.origin_of(label) {
             LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id),
-            LabelOrigin::DefVariant { def_id, .. } => self.def_name(def_id),
+            LabelOrigin::DefSpecialization { def_id, .. } => self.def_name(def_id),
         }
     }
 
@@ -93,14 +94,14 @@ impl<'a> NfaDumper<'a> {
 }
 
 impl NfaDumper<'_> {
-    fn dump_entrypoints(&self, out: &mut String) {
+    fn dump_entry_points(&self, out: &mut String) {
         let c = &self.colors;
-        writeln!(out, "{}[entrypoints]{}", c.blue, c.reset)
+        writeln!(out, "{}[entry_points]{}", c.blue, c.reset)
             .expect("writing to a String is infallible");
 
         let mut entries: Vec<(&str, Label)> = self
             .graph
-            .entrypoint_wrappers()
+            .entry_point_wrappers()
             .iter()
             .map(|(&def_id, &label)| (self.def_name(def_id), label))
             .collect();
@@ -160,10 +161,10 @@ impl NfaDumper<'_> {
     fn origin_header(&self, origin: LabelOrigin) -> String {
         match origin {
             LabelOrigin::Def(id) => format!("{}:", self.def_name(id)),
-            origin @ LabelOrigin::DefVariant { .. } => {
-                format!("{}:", self.variant_name(origin))
+            origin @ LabelOrigin::DefSpecialization { .. } => {
+                format!("{}:", self.specialization_name(origin))
             }
-            LabelOrigin::Wrapper(id) => format!("{} (entrypoint):", self.def_name(id)),
+            LabelOrigin::Wrapper(id) => format!("{} (entry point):", self.def_name(id)),
         }
     }
 
@@ -172,15 +173,15 @@ impl NfaDumper<'_> {
         self.artifacts.interner.resolve(sym)
     }
 
-    fn variant_name(&self, origin: LabelOrigin) -> String {
-        let LabelOrigin::DefVariant {
+    fn specialization_name(&self, origin: LabelOrigin) -> String {
+        let LabelOrigin::DefSpecialization {
             def_id,
             output,
             source,
             route,
         } = origin
         else {
-            unreachable!("variant names require variant provenance")
+            unreachable!("specialization names require specialization provenance")
         };
         let mut modes = Vec::new();
         if let DefOutputOrigin::CaptureType(output) = output {
@@ -297,17 +298,17 @@ impl NfaDumper<'_> {
     fn effect(&self, e: &EffectIR) -> String {
         match e.kind() {
             EffectKind::Node => "Node".to_string(),
-            EffectKind::ArrayOpen => "ArrayOpen".to_string(),
-            EffectKind::Push => "Push".to_string(),
-            EffectKind::ArrayClose => "ArrayClose".to_string(),
-            EffectKind::StructOpen => "StructOpen".to_string(),
-            EffectKind::StructClose => "StructClose".to_string(),
-            EffectKind::EnumClose => "EnumClose".to_string(),
-            EffectKind::Null => "Null".to_string(),
+            EffectKind::ListOpen => "ListOpen".to_string(),
+            EffectKind::ArrayPush => "ArrayPush".to_string(),
+            EffectKind::ListClose => "ListClose".to_string(),
+            EffectKind::RecordOpen => "RecordOpen".to_string(),
+            EffectKind::RecordClose => "RecordClose".to_string(),
+            EffectKind::VariantClose => "VariantClose".to_string(),
+            EffectKind::Absent => "Absent".to_string(),
             EffectKind::SuppressBegin => "SuppressBegin".to_string(),
             EffectKind::SuppressEnd => "SuppressEnd".to_string(),
-            EffectKind::Set => format!("Set({})", self.member_name(e.payload())),
-            EffectKind::EnumOpen => format!("EnumOpen({})", self.member_name(e.payload())),
+            EffectKind::RecordSet => format!("RecordSet({})", self.member_name(e.payload())),
+            EffectKind::VariantOpen => format!("VariantOpen({})", self.member_name(e.payload())),
             EffectKind::SpanStartAt => format!("SpanStartAt#{}", literal(e.payload())),
             EffectKind::SpanStart => format!("SpanStart#{}", literal(e.payload())),
             EffectKind::SpanEnd => format!("SpanEnd#{}", literal(e.payload())),
@@ -323,7 +324,7 @@ impl NfaDumper<'_> {
 
     fn member_name(&self, payload: &EffectArg) -> String {
         let EffectArg::Member(member) = payload else {
-            unreachable!("Set/EnumOpen effects are built with member refs");
+            unreachable!("RecordSet/VariantOpen effects are built with member refs");
         };
 
         let shape = self
@@ -331,11 +332,11 @@ impl NfaDumper<'_> {
             .type_analysis
             .expect_type_shape(member.parent_type);
         let sym = match shape {
-            TypeShape::Struct(fields) => fields.keys().nth(member.relative_index as usize),
-            TypeShape::Enum(variants) => variants.keys().nth(member.relative_index as usize),
+            TypeShape::Record(fields) => fields.keys().nth(member.relative_index as usize),
+            TypeShape::Variant(cases) => cases.keys().nth(member.relative_index as usize),
             _ => None,
         }
-        .expect("member ref parent must be a struct or enum containing the indexed member");
+        .expect("member ref parent must be a record or variant type containing the indexed member");
 
         self.artifacts.interner.resolve(*sym).to_string()
     }
@@ -363,14 +364,14 @@ impl NfaDumper<'_> {
         self.artifacts
             .grammar
             .kind_name(id, self.artifacts.interner)
-            .expect("linked query binds every referenced node kind")
+            .expect("grammar-bound query binds every referenced node kind")
     }
 
     fn field_name(&self, id: NodeFieldId) -> String {
         self.artifacts
             .grammar
             .field_name(id, self.artifacts.interner)
-            .expect("linked query binds every referenced field")
+            .expect("grammar-bound query binds every referenced field")
     }
 
     fn format_call(&self, call: &CallIR) -> String {
@@ -403,12 +404,12 @@ impl NfaDumper<'_> {
     }
 
     /// Callee display name, resolved through the target label's origin: calls
-    /// enter at a definition body (or its consuming variant), so the window that
+    /// enter at a definition body (or its consuming specialization), so the window that
     /// allocated the target label names the callee.
     fn callee_name(&self, target: Label) -> String {
         match self.origin_of(target) {
             LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id).to_string(),
-            origin @ LabelOrigin::DefVariant { .. } => self.variant_name(origin),
+            origin @ LabelOrigin::DefSpecialization { .. } => self.specialization_name(origin),
         }
     }
 
@@ -416,7 +417,7 @@ impl NfaDumper<'_> {
         let prefix = self.prefix(return_.label, Symbol::EMPTY);
         let outcome = match return_.outcome() {
             crate::compiler::lower::ir::ReturnOutcome::Matched => "▶",
-            crate::compiler::lower::ir::ReturnOutcome::Zero => "▶ zero",
+            crate::compiler::lower::ir::ReturnOutcome::Empty => "▶ empty",
         };
         LineBuilder::new(self.label_width).pad_successors(prefix, outcome)
     }

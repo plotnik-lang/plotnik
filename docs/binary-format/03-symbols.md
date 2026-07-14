@@ -1,6 +1,6 @@
 # Binary Format: Symbols
 
-Symbol tables map external tree-sitter IDs to internal string names.
+Symbol tables map external Tree-sitter IDs to internal string names.
 
 ## 1. Regex
 
@@ -43,7 +43,7 @@ To retrieve regex `i`:
 
 ## 2. Node Kinds
 
-Maps tree-sitter node kind IDs to their string names.
+Maps Tree-sitter node-kind IDs to their string names.
 
 - **Section Offset**: Computed (follows RegexTable)
 - **Record Size**: 4 bytes
@@ -61,7 +61,7 @@ This table enables name lookup for debugging and error messages.
 
 ## 3. Node Fields
 
-Maps tree-sitter field IDs to their string names.
+Maps Tree-sitter grammar-field IDs to their string names.
 
 - **Section Offset**: Computed (follows NodeKinds)
 - **Record Size**: 4 bytes

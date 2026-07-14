@@ -106,10 +106,10 @@ pub(super) fn analyze(kind: NodeKind, layout: &NodeLayout, elements: &[Element])
                     GroupPart::Item(index) => elements[*index].node(),
                     GroupPart::Comment(_) => None,
                 })
-                .fold((0, false), |(count, labeled), branch| {
+                .fold((0, false), |(count, labeled), alternative| {
                     (
                         count + 1,
-                        labeled || branch.direct_token(SyntaxKind::Id).is_some(),
+                        labeled || alternative.direct_token(SyntaxKind::Id).is_some(),
                     )
                 });
             count >= 2 || labeled

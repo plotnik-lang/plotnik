@@ -1,0 +1,92 @@
+Q = (program
+  {
+    (comment)? @comment
+  }* @comments :: str
+)
+--------------------- INPUT ----------------------
+value;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  comments: string[];
+}
+------------------ DIAGNOSTICS -------------------
+warning: capture type `str` replaces structured data with source text
+ --> query.ptk:4:16
+  |
+4 |   }* @comments :: str
+  |                ^^^^^^
+  |
+help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+--------------------- OUTPUT ---------------------
+{
+  "comments": []
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "comments"
+S2 "Q"
+S3 "program"
+S4 "comment"
+
+[type_defs]
+T0 = <Text>
+T1 = ListZeroOrMore(T0)  ; <Text>*
+T2 = Record  M0:1  ; { comments }
+
+[type_members]
+M0: S1 → T1  ; comments: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ListClose RecordSet(M0)]        06
+  10  -ε-  [StrClose ArrayPush]             20, 26
+  12   !   (comment) [ScalarMark]           10
+  14  ──!  _                                12, 14
+  16   !   _                                12, 14
+  18  -ε-  [ScalarOpen]                     16
+  20  ──!  _                                18, 20
+  22  └─!  _                                18, 20
+  24  -ε-  [ListOpen]                       22, 08
+  26  ─‣┘  _ [ListClose RecordSet(M0)]      06
+  28   !   (program)                        24
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+       ▶   (@28)
+
+@28:
+  28       (program)                        24
+       ●   program
+  24  -ε-  [ListOpen]                       22, 08
+  22       _                                18, 20
+       ●   expression_statement
+  18  -ε-  [ScalarOpen]                     16
+  16       _                                12, 14
+       ●   expression_statement
+  12       (comment) [ScalarMark]           10
+       ○   expression_statement
+  16  ❮❮❮ 
+  14       _                                12, 14
+  22  ❮❮❮ 
+  20       _                                18, 20
+  24  ❮❮❮ 
+  08  -ε-  [ListClose RecordSet(M0)]        06
+  06   ◀   (@28)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

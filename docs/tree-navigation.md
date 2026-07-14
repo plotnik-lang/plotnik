@@ -1,6 +1,6 @@
 # Tree Navigation
 
-How the VM navigates tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-transitions.md](binary-format/06-transitions.md).
+How the VM navigates Tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-instructions.md](binary-format/06-instructions.md).
 
 ## TreeCursor API
 
@@ -9,22 +9,22 @@ The VM uses `TreeCursor` exclusively, never the `Node` API for traversal.
 ```rust
 struct VM<'t> {
     cursor: TreeCursor<'t>,          // created at tree root, never reset
-    ip: StepId,                      // current step index
+    ip: CodeAddr,                    // current instruction address
     frames: Vec<Frame>,              // call stack
-    effects: EffectLog<'t>,          // side-effect log
-    suppress_depth: u64,             // suppressive capture depth
+    journal: MatchJournal<'t>,       // rollbackable match journal
+    suppress_depth: u64,             // output-suppression depth
 }
 
 struct Checkpoint {
     descendant_index: u32,             // cursor position (4 bytes)
-    effect_watermark: usize,           // effect log length
+    journal_watermark: usize,          // match journal length
     frame_index: Option<u32>,          // call stack state
-    ip: StepId,                        // branch target, or the owning Call/Match
-    resume: Resume,                    // Branch | Call(CallResume) | Match
+    ip: CodeAddr,                      // successor address, or the owning Call/Match
+    resume: Resume,                    // Successor | Call(CallResume) | Match
 }
 ```
 
-A `Branch` checkpoint resumes dispatch at `ip`. A `Call` resume carries everything needed to retry a `Call` at a later sibling — callee entry, return address, field constraint, and skip policy — so backtracking advances the cursor and re-enters the callee without re-running the `Call`'s navigation. A `Match` resume marks the accepted candidate of an in-pattern sibling search: backtracking advances past it (per the skip policy re-derived from the instruction at `ip`) and re-runs the same match's candidate search from there. Keeping resume state on the checkpoint, rather than in ambient VM state, is what gives every sibling search — Call-driven or in-pattern — the same backtracking power (see [Call Navigation](#call-navigation)).
+A `Successor` checkpoint resumes dispatch at `ip`. A `Call` resume carries everything needed to retry a `Call` at a later sibling — callee entry, return address, field constraint, and skip policy — so backtracking advances the cursor and re-enters the callee without re-running the `Call`'s navigation. A `Match` resume marks the accepted candidate of an in-pattern sibling search: backtracking advances past it (per the skip policy re-derived from the instruction at `ip`) and re-runs the same match's candidate search from there. Keeping resume state on the checkpoint, rather than in ambient VM state, is what gives every sibling search — Call-driven or in-pattern — the same backtracking power (see [Call Navigation](#call-navigation)).
 
 **Critical constraint**: The cursor must be created at the tree root and never call `reset()`. The `descendant_index` is relative to the cursor's root — `reset(node)` would invalidate all checkpoints.
 
@@ -45,7 +45,7 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 
 ## Nav Encoding
 
-`Nav` is a single byte encoding movement and skip policy. See [06-transitions.md § 3.1](binary-format/06-transitions.md) for bit layout.
+`Nav` is a single byte encoding movement and skip policy. See [06-instructions.md § 3.1](binary-format/06-instructions.md) for bit layout.
 
 | Nav                   | Dump Symbol | Movement                                |
 | --------------------- | ----------- | --------------------------------------- |
@@ -81,7 +81,7 @@ Navigation and matching are intertwined. The `Nav` mode determines initial movem
 3. EFFECTS On success: execute the match's effects list in order
 ```
 
-For `Up*` variants, step 2 becomes: for each of the n levels, validate the exit
+For `Up*` variants, the SEARCH phase becomes: for each of the n levels, validate the exit
 constraint on the node being left, then ascend one level. The constraint is
 checked at **every** level, which is what lets same-mode `Up*` instructions
 compose: `Up*(a)` followed by `Up*(b)` is exactly `Up*(a+b)`.
@@ -104,7 +104,7 @@ non-exact `Down*`/`Next*` search leaves a match-retry checkpoint whenever the
 policy would admit that node as a skipped gap filler (any node under `‣`, only
 trivia/extras under `•`/`◦`). A later failure — even deep inside the accepted
 candidate's subtree — then resumes the search at the next admissible sibling
-instead of silently committing. Steps internal to a compiled retry loop
+instead of silently committing. Instructions internal to a compiled retry loop
 (`emit_position_search` wrappers) are emitted with exact navs precisely to opt
 out of this: every search has exactly one retry owner, either the engine's
 in-instruction search or the NFA loop, never both.
@@ -118,9 +118,9 @@ in-instruction search or the NFA loop, never both.
 | `UpSkipExtras(n)` | Each node left must be its parent's last non-extra child  |
 | `UpExact(n)`      | Each node left must be its parent's last child            |
 
-**Childless variants** (zero-width anchors):
+**Childless variants** (empty-match anchors):
 
-When a node's whole child list matches zero-width, the cursor never descends,
+When a node's whole child list matches empty, the cursor never descends,
 so no `Down*` entry carries a leading anchor's first-child check and no `Up*`
 ascent carries a trailing anchor's lastness check. `Childless*` asserts the
 degenerate form of either: the node has no children the anchor's skip policy
@@ -155,7 +155,9 @@ With `Nav::DownExact`:
 
 ## Trivia
 
-**Trivia** = anonymous nodes + nodes tree-sitter marks as `extra` for that specific parse instance.
+**Trivia** is the low-level Plotnik navigation class containing anonymous nodes
+and nodes Tree-sitter marks as `extra` for that parse instance. The name describes
+skip behavior; it does not claim every member is semantically insignificant.
 
 The `*Skip` modes skip trivia automatically but fail if a non-trivia node must be skipped.
 
@@ -165,39 +167,41 @@ The VM reads the parser's `Node::is_extra()` bit at runtime; there is no bytecod
 
 ## Anchor Lowering
 
-Anchors compile to `Nav` variants by spelling and operand type:
+Anchors compile to `Nav` variants by spelling and path-specific namedness:
 
-| Position              | Named-only `.`    | Anonymous-involved `.` | `.!` strict anchor |
-| --------------------- | ----------------- | ---------------------- | ------------------ |
-| Start of children     | `DownSkip`        | `DownSkipExtras`       | `DownExact`        |
-| Between sibling items | `NextSkip`        | `NextSkipExtras`       | `NextExact`        |
-| End of children       | `UpSkipTrivia(1)` | `UpSkipExtras(1)`      | `UpExact(1)`       |
+| Position              | Both sides named `.` | Either side not definitely named `.` | `.!` exact anchor |
+| --------------------- | -------------------- | ------------------------------------ | ----------------- |
+| Start of children     | `DownSkip`           | `DownSkipExtras`                     | `DownExact`       |
+| Between sibling items | `NextSkip`           | `NextSkipExtras`                     | `NextExact`       |
+| End of children       | `UpSkipTrivia(1)`    | `UpSkipExtras(1)`                    | `UpExact(1)`      |
 
-`.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows literally nothing between operands.
+`.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows no child node in the constrained gap.
 
-Bare `_` is an anonymous wildcard, so `(a) . _` uses extras-only navigation. `(_)` is a named wildcard, so `(a) . (_)` uses trivia-skipping navigation.
+Bare `_` may match named or anonymous nodes, so it is not definitely named and
+`(a) . _` uses extras-only navigation. `(_)` matches only named nodes, so
+`(a) . (_)` uses trivia-skipping navigation.
 
-An anchor next to an alternation is classified per branch on both sides. Before: `(a) . [(b) ","]` uses `NextSkip` for `(b)` and `NextSkipExtras` for `","`. After a named follower: `[(b) ","] . (a)` emits two copies of the follower's entry instruction — `NextSkip` and `NextSkipExtras`, sharing successors — and routes the named `(b)` path to the `NextSkip` copy and the `","` path to the `NextSkipExtras` copy. Only one copy runs per match path, so duplicated capture effects fire exactly once.
+An anchor next to an alternation is classified per alternative on both sides. Before: `(a) . [(b) ","]` uses `NextSkip` for `(b)` and `NextSkipExtras` for `","`. After a named follower: `[(b) ","] . (a)` emits two copies of the follower's entry instruction — `NextSkip` and `NextSkipExtras`, sharing successors — and routes the named `(b)` path to the `NextSkip` copy and the `","` path to the `NextSkipExtras` copy. Only one copy runs per match path, so duplicated capture effects fire exactly once.
 
-The split fires when the alternation's exit is the follower's own single `Match` on a named node _and_ the matched branch ends on a named node. This covers the common forms — including inline-effect captures whose effects ride the branch instructions rather than wrapping the exit: a scalar `[(b) ","] @x . (a)` and an uncaptured enum `[A: (b) B: ","] . (a)` both split. It stays conservative (extras-only for every branch) — correct but not yet optimal — in these cases, pending follow-up:
+The split fires when the alternation's exit is the follower's own single `Match` on a named node _and_ the matched alternative ends on a named node. This covers the common forms — including inline-effect captures whose effects ride the alternative's instructions rather than wrapping the exit: a node capture `[(b) ","] @x . (a)` and an unmaterialized labeled alternation `[A: (b) B: ","] . (a)` both split. It stays conservative (extras-only for every alternative) — correct but not yet optimal — in these cases, pending follow-up:
 
 - The follower is itself anonymous (`. ","`) or `_`: both-sides-named never holds, so extras-only is in fact correct.
 - The follower is a ref (`. (Rule)`, a `Call`) or scope-wrapped (`. (a (b) @c) @x`, an epsilon entry): no single named `Match` to clone.
-- The alternation's value is materialized through a trailing effect epsilon rather than inline — a struct/array scope capture, or an enum alternation captured by name (`[A: (b) B: ","] @t . (a)`) — so its exit is that epsilon (the `Set`/`StructClose`), not the follower's `Match`.
-- A branch is quantified (`[(b)? ","] . (a)`): its zero-match path leaves no named node on the anchor's left, so the upgrade is unsound. The whole branch stays extras-only.
-- A branch is a sequence ending in a named node (`[{(b) "," (c)} ";"] . (a)`): branch namedness is classified over the whole branch (matching the before-anchor classifier), so a branch containing any anonymous token is treated as anonymous even when its tail is named. Conservative, not a wrong match. A trailing-position classifier would lift this.
+- The alternation's value is materialized through a trailing effect epsilon rather than inline — a record/list scope capture, or a variant alternation captured by name (`[A: (b) B: ","] @t . (a)`) — so its exit is that epsilon (the `RecordSet`/`RecordClose`), not the follower's `Match`.
+- An alternative is quantified (`[(b)? ","] . (a)`): its empty-match path leaves no named node on the anchor's left, so the upgrade is unsound. The whole alternative stays extras-only.
+- An alternative is a sequence ending in a named node (`[{(b) "," (c)} ";"] . (a)`): namedness is classified over the whole alternative (matching the before-anchor classifier), so an alternative containing any anonymous token is treated as anonymous even when its tail is named. Conservative, not a wrong match. A trailing-position classifier would lift this.
 
 ### Compilation Examples
 
 Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
 
-> These examples show the _logical_ anchor lowering — the nav mode each anchor produces. An item that must be located among its siblings (an unpinned first item, or any item reached past a skipping anchor) additionally compiles to a small search wrapper: a branch into the candidate plus an advance-and-retry edge, converging on the anchored continuation. The wrapper is uniform across alternations, anchors, and quantifiers (one `emit_position_search` combinator). Run `dump` for the exact instructions; the rows below omit the wrapper for readability.
+> These examples show the _logical_ anchor lowering — the nav mode each anchor produces. An item that must be located among its siblings (an unpinned first item, or any item reached past a skipping anchor) additionally compiles to a small search wrapper: a fork to the candidate plus an advance-and-retry edge, converging on the anchored continuation. The wrapper is uniform across alternations, anchors, and quantifiers (one `emit_position_search` combinator). Run `dump` for the exact instructions; the rows below omit the wrapper for readability.
 
 **Simple**: `(function (identifier) @name)`
 
 ```
   01       (function)                           02
-  02  └‣─  (identifier) [Node Set(M0)]          03
+  02  └‣─  (identifier) [Node RecordSet(name)]  03
   03  ─‣┘                                       ◼
 ```
 
@@ -209,7 +213,7 @@ Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
   03  ─‣┘                                       ◼
 ```
 
-**Strict first child anchor**: `(function .! (identifier))`
+**Exact first-child anchor**: `(function .! (identifier))`
 
 ```
   01       (function)                           02
@@ -225,7 +229,7 @@ Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
   03  ─•┘                                       ◼
 ```
 
-**Strict last child anchor**: `(function (identifier) .!)`
+**Exact last-child anchor**: `(function (identifier) .!)`
 
 ```
   01       (function)                           02
@@ -251,9 +255,9 @@ Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
   04  ─‣┘                                       ◼
 ```
 
-Anonymous operands make `.` skip extras only. Comments can appear between the operands; other anonymous tokens cannot. Use `.!` when byte-adjacency matters.
+Anonymous operands make `.` skip extras only. Comments can appear between the operands; other anonymous tokens cannot. Use `.!` when no syntax-tree node may intervene; it does not require adjacent source bytes.
 
-**Strict adjacency**: `(call (identifier) .! "(")`
+**Exact adjacency**: `(call (identifier) .! "(")`
 
 ```
   01       (call)                               02
@@ -272,7 +276,7 @@ Anonymous operands make `.` skip extras only. Comments can appear between the op
   05  ─‣┘³                                      ◼
 ```
 
-Multi-level ascent coalesces: the compiler merges consecutive effectless `Up*` steps of the same mode into one instruction, capped at the level field's encoding limit (31). This holds for the constraint-carrying modes too — `Up*` composes, so the merged instruction re-checks the constraint at every level it ascends (see [Search Loop](#search-loop)). A run deeper than the cap splits into several adjacent instructions whose per-level checks partition the levels with no gap.
+Multi-level ascent coalesces: the compiler merges consecutive effectless `Up*` instructions of the same mode into one instruction, capped at the level field's encoding limit (31). This holds for the constraint-carrying modes too — `Up*` composes, so the merged instruction re-checks the constraint at every level it ascends (see [Search Loop](#search-loop)). A run deeper than the cap splits into several adjacent instructions whose per-level checks partition the levels with no gap.
 
 **Mixed anchors**: `(a (b) . (c) .)`
 
@@ -296,7 +300,7 @@ The `.` before `(c)` → `NextSkip`; the `.` after `(c)` → `UpSkipTrivia`.
   07  ─‣┘                                       ◼
 ```
 
-The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Steps 05 and 07 are **not** adjacent — the `─‣─` sibling match sits between them — so they are never coalesced. (Were they adjacent, merging into `UpSkipTrivia(2)` would be sound: `Up*` composes, checking each level in turn.)
+The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Instructions 05 and 07 are **not** adjacent — the `─‣─` sibling match sits between them — so they are never coalesced. (Were they adjacent, merging into `UpSkipTrivia(2)` would be sound: `Up*` composes, checking each level in turn.)
 
 ## Field Handling
 
@@ -346,8 +350,8 @@ Both constraints participate in the skip policy — a mismatch triggers retry (f
 pub struct Call {
     pub nav: Nav,
     pub node_field: Option<NonZeroU16>,
-    pub next: StepId,      // return address
-    pub target: StepId,    // callee entry
+    pub next: SuccessorAddr,      // return address
+    pub target: SuccessorAddr,    // callee entry
 }
 ```
 
@@ -359,8 +363,8 @@ A `Call` navigates to its first candidate the same way a `Match` does. When the 
 
 This is the same forward-search-with-backtracking that in-pattern anchors and quantifiers use; the resume state lives on the checkpoint so there is exactly one notion of "advance to the next sibling and try again," shared by `Call` retry and pattern search alike.
 
-### Zero-width returns
+### Empty-match returns
 
 A `Call`'s return address carries the navigation the follower needs _after the callee consumed its candidate_ — there is no return path that says "nothing was consumed, stay put." So references to _nullable_ definitions (bodies that can match zero nodes, e.g. `A = (x)?`) are not compiled as calls at all: the body is inlined at the reference site, where the ordinary skip-path machinery (checkpoint cursor restore, split follower navigation) applies exactly as if the body were written inline.
 
-The one exception is a nullable reference back into a definition currently being compiled (`A = (x (A) (y))?`). It becomes a real call guarded by a zero-width bypass branch that is tried first. The call targets a consuming-only body, so the bypass covers the empty case and every actual call path consumes input.
+The one exception is a nullable reference back into a definition currently being compiled (`A = (x (A) (y))?`). It becomes a real call guarded by an empty-match bypass tried first. The call targets a consuming-only body, so the bypass covers the empty case and every actual call path consumes input.

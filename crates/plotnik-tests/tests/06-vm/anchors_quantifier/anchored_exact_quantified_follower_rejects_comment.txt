@@ -1,0 +1,110 @@
+Q = (program
+  {
+    (lexical_declaration)? @a
+    .!
+    (debugger_statement)* @b
+    .
+    (expression_statement
+      (identifier == "foo")
+    ) @c
+  }
+)
+--------------------- INPUT ----------------------
+/* c */ debugger; foo;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: Node | null;
+  b: Node[];
+  c: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "foo"
+S02 "a"
+S03 "b"
+S04 "c"
+S05 "Q"
+S06 "program"
+S07 "lexical_declaration"
+S08 "debugger_statement"
+S09 "expression_statement"
+S10 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = ListZeroOrMore(T0)  ; <Node>*
+T3 = Record  M0:3  ; { a, b, c }
+
+[type_members]
+M0: S02 → T1  ; a: T1
+M1: S03 → T2  ; b: T2
+M2: S04 → T0  ; c: <Node>
+
+[type_names]
+N0: S05 → T3  ; Q
+
+[entry_points]
+Q = 00 :: T3
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@36)                            36 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  └‣─  (identifier) == "foo"            08
+  08  ─‣┘  _                                09
+  09  ─‣┘  _                                10
+  10                                        ▶
+  11  └•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
+  14  ...
+  15  ...
+  16  ─•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
+  19  └─!  (debugger_statement) [Node ArrayPush]  21, 16
+  21  ──!  (debugger_statement) [Node ArrayPush]  21, 16
+  23  ...
+  24  -ε-  [ListOpen]                       19, 11
+  26  -ε-  [ListOpen]                       21, 16
+  28  -ε-  [Absent RecordSet(M0)]           24
+  30   !   (lexical_declaration) [Node RecordSet(M0)]  26
+  32  ──!  _                                30, 32
+  34  └─!  _                                30, 32
+  36   !   (program)                        34, 28
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@36)                            36 : 03
+       ▶   (@36)
+
+@36:
+  36       (program)                        34, 28
+       ●   program
+  34       _                                30, 32
+       ●   comment
+  30       (lexical_declaration) [Node RecordSet(M0)]  26
+       ○   comment
+  34  ❮❮❮ 
+  32       _                                30, 32
+       ●   debugger_statement
+  30       (lexical_declaration) [Node RecordSet(M0)]  26
+       ○   debugger_statement
+  32  ❮❮❮ 
+  32       _                                30, 32
+       ●   expression_statement
+  30       (lexical_declaration) [Node RecordSet(M0)]  26
+       ○   expression_statement
+  32  ❮❮❮ 
+  32       _                                30, 32
+  36  ❮❮❮ 
+  28  -ε-  [Absent RecordSet(M0)]           24
+  24  -ε-  [ListOpen]                       19, 11
+  19       (debugger_statement) [Node ArrayPush]  21, 16
+       ○   comment
+  24  ❮❮❮ 
+  11       (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
+       ○   comment
+       ○   debugger_statement

@@ -6,7 +6,7 @@ use plotnik_rt::{Limit, RuntimeLimitSpec};
 
 use crate::bytecode::Module;
 use crate::compiler::diagnostics::{Diagnostics, QueryResult};
-use crate::compiler::emit::targets::typescript::{DtsRange, VoidType};
+use crate::compiler::emit::targets::typescript::{MatchOnlyType, TypeScriptBinding};
 use crate::compiler::query::CompiledQuery;
 use crate::core::Colors;
 
@@ -64,7 +64,7 @@ pub trait EmitTarget: private::Sealed {
     fn emit(self, query: &CompiledQuery) -> QueryResult<Emission<Self::Output>>;
 }
 
-/// A source-target configuration capable of emitting output types.
+/// A source-target configuration capable of emitting result types.
 pub trait CodegenTarget: private::Sealed {
     type TypesOutput;
 
@@ -136,7 +136,7 @@ pub struct RustCodegenConfig {
     runtime_crate: Cow<'static, str>,
     serde: bool,
     limits: RuntimeLimitSpec,
-    depth: Limit,
+    decode_depth: Limit,
     provenance: CodegenProvenance,
 }
 
@@ -146,10 +146,10 @@ impl Default for RustCodegenConfig {
             runtime_crate: Cow::Borrowed("::plotnik_rt"),
             serde: false,
             limits: RuntimeLimitSpec {
-                steps: Limit::Auto,
+                fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
-            depth: Limit::Auto,
+            decode_depth: Limit::Auto,
             provenance: CodegenProvenance::Omit,
         }
     }
@@ -175,8 +175,8 @@ impl RustCodegenConfig {
         self
     }
 
-    pub fn depth(mut self, depth: Limit) -> Self {
-        self.depth = depth;
+    pub fn decode_depth(mut self, depth: Limit) -> Self {
+        self.decode_depth = depth;
         self
     }
 
@@ -207,7 +207,7 @@ impl RustCodegenConfig {
             .rt_crate(self.runtime_crate.clone())
             .serde(self.serde)
             .limits(self.limits)
-            .depth(self.depth)
+            .decode_depth(self.decode_depth)
     }
 
     pub(crate) fn provenance_mode(&self) -> CodegenProvenance {
@@ -255,8 +255,8 @@ pub enum TypeScriptNodeRepresentation {
 pub struct TypeScriptCodegenConfig {
     export: bool,
     emit_node_interface: bool,
-    verbose_nodes: bool,
-    void_type: VoidType,
+    include_points: bool,
+    match_only_type: MatchOnlyType,
     colors: Colors,
     node_representation: TypeScriptNodeRepresentation,
 }
@@ -266,8 +266,8 @@ impl Default for TypeScriptCodegenConfig {
         Self {
             export: true,
             emit_node_interface: true,
-            verbose_nodes: false,
-            void_type: VoidType::Undefined,
+            include_points: false,
+            match_only_type: MatchOnlyType::Undefined,
             colors: Colors::OFF,
             node_representation: TypeScriptNodeRepresentation::SerializedValue,
         }
@@ -289,13 +289,13 @@ impl TypeScriptCodegenConfig {
         self
     }
 
-    pub fn verbose_nodes(mut self, enabled: bool) -> Self {
-        self.verbose_nodes = enabled;
+    pub fn include_points(mut self, enabled: bool) -> Self {
+        self.include_points = enabled;
         self
     }
 
-    pub fn void_type(mut self, void_type: VoidType) -> Self {
-        self.void_type = void_type;
+    pub fn match_only_type(mut self, match_only_type: MatchOnlyType) -> Self {
+        self.match_only_type = match_only_type;
         self
     }
 
@@ -309,12 +309,12 @@ impl TypeScriptCodegenConfig {
         self
     }
 
-    pub(crate) fn legacy_config(&self) -> crate::compiler::emit::targets::typescript::Config {
+    pub(crate) fn emitter_config(&self) -> crate::compiler::emit::targets::typescript::Config {
         crate::compiler::emit::targets::typescript::Config::new()
             .export(self.export)
             .emit_node_interface(self.emit_node_interface)
-            .verbose_nodes(self.verbose_nodes)
-            .void_type(self.void_type)
+            .include_points(self.include_points)
+            .match_only_type(self.match_only_type)
             .colored(!self.colors.blue.is_empty())
     }
 
@@ -376,23 +376,23 @@ source_output!(RustTypesOutput);
 
 pub struct TypeScriptTypesOutput {
     source: String,
-    mappings: Vec<DtsRange>,
+    bindings: Vec<TypeScriptBinding>,
 }
 
 impl TypeScriptTypesOutput {
-    pub(crate) fn new(source: String, mappings: Vec<DtsRange>) -> Self {
-        Self { source, mappings }
+    pub(crate) fn new(source: String, bindings: Vec<TypeScriptBinding>) -> Self {
+        Self { source, bindings }
     }
 
     pub fn source(&self) -> &str {
         &self.source
     }
 
-    pub fn mappings(&self) -> &[DtsRange] {
-        &self.mappings
+    pub fn bindings(&self) -> &[TypeScriptBinding] {
+        &self.bindings
     }
 
-    pub fn into_parts(self) -> (String, Vec<DtsRange>) {
-        (self.source, self.mappings)
+    pub fn into_parts(self) -> (String, Vec<TypeScriptBinding>) {
+        (self.source, self.bindings)
     }
 }

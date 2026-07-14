@@ -1,0 +1,148 @@
+Nested = (call_expression
+  function: [
+    (identifier) @name
+    (Nested) @inner
+  ]
+)
+
+Q = (program
+  (expression_statement (Nested) @top)
+)
+--------------------- INPUT ----------------------
+a()();
+------------------- TYPESCRIPT -------------------
+export interface Nested {
+  inner: Nested | null;
+  name: Node | null;
+}
+
+export interface Q {
+  top: Nested;
+}
+--------------------- OUTPUT ---------------------
+{
+  "top": {
+    "name": null,
+    "inner": {
+      "inner": null,
+      "name": {
+        "kind": "identifier",
+        "text": "a",
+        "span": [0, 1]
+      }
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "inner"
+S03 "top"
+S04 "Nested"
+S05 "Q"
+S06 "call_expression"
+S07 "identifier"
+S08 "program"
+S09 "expression_statement"
+S10 "function"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Option(T3)  ; Nested?
+T3 = Record  M0:2  ; { name, inner }
+T4 = Record  M2:1  ; { top }
+
+[type_members]
+M0: S01 → T1  ; name: T1
+M1: S02 → T2  ; inner: T2
+M2: S03 → T3  ; top: Nested
+
+[type_names]
+N0: S04 → T3  ; Nested
+N1: S05 → T4  ; Q
+
+[entry_points]
+Nested = 00 :: T3
+Q      = 06 :: T4
+
+[instructions]
+Nested:
+  00  -ε-  [RecordOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@34)                            34 : 09
+  09  -ε-  [RecordClose]                    11
+  11                                        ▶
+  12  -ε-  [RecordClose]                    14
+  14  ─‣┘² _ [RecordSet(M2)]                29
+  16                                        ▶
+  17   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  23
+  20  -ε-  [RecordClose RecordSet(M1)]      23
+  22   !   (@28)                            28 : 20
+  23  ─‣┘  _                                16
+  24  -ε-  [Absent RecordSet(M0) RecordOpen]  22
+  26  └‣─  function: _                      17, 24
+  28   !   (call_expression)                26
+  29                                        ▶
+  30  └‣─  (@28)                            28 : 12
+  31  ...
+  32  └‣─  (expression_statement) [RecordOpen]  30
+  34   !   (program)                        32
+--------------------- TRACE ----------------------
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@34)                            34 : 09
+       ▶   (@34)
+
+@34:
+  34       (program)                        32
+       ●   program
+  32       (expression_statement) [RecordOpen]  30
+       ●   expression_statement
+  30       (@28)                            28 : 12
+       ▶   (@28)
+
+@28:
+  28       (call_expression)                26
+       ●   call_expression
+  26       function: _                      17, 24
+       ●   call_expression
+  17       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  23
+       ○   call_expression
+  26  ❮❮❮ 
+  24  -ε-  [Absent RecordSet(M0) RecordOpen]  22
+  22       (@28)                            28 : 20
+       ▶   (@28)
+
+@28:
+  28       (call_expression)                26
+       ●   call_expression
+  26       function: _                      17, 24
+       ●   identifier
+  17       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  23
+       ●   identifier
+  23       _                                16
+       ●   call_expression
+  16   ◀   (@28)                            
+
+@28:
+  20  -ε-  [RecordClose RecordSet(M1)]      23
+  23       _                                16
+       ●   call_expression
+  16   ◀   (@28)                            
+
+@34:
+  12  -ε-  [RecordClose]                    14
+  14       _ [RecordSet(M2)]                29
+       ●   program
+  29   ◀   (@34)                            
+
+Q:
+  09  -ε-  [RecordClose]                    11
+  11   ◀   (Q)                              ◼
