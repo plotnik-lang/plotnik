@@ -69,6 +69,12 @@ jobs:
           prefix-key: v0-rust-codegen
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
+      - name: Generate Rust fixtures
+        run: make codegen-rust
+
+      - name: Lint generated Rust
+        run: make lint-codegen-rust
+
       - name: Test generated Rust
         run: make test-codegen-rust
 

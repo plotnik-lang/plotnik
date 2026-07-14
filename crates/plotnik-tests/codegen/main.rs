@@ -60,8 +60,8 @@ fn run() -> Result<(), String> {
         return Err("codegen corpus selection contains no runnable fixtures".to_string());
     }
 
-    rust::run(manifest_dir, &plotnik, &corpus.cases)?;
-    eprintln!("codegen-rust completed in {:.2?}", started.elapsed());
+    rust::generate(manifest_dir, &plotnik, &corpus.cases)?;
+    eprintln!("generated Rust corpus in {:.2?}", started.elapsed());
     Ok(())
 }
 

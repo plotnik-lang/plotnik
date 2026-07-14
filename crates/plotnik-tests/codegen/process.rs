@@ -21,26 +21,6 @@ pub(crate) fn capture(command: &mut Command, context: &str) -> Result<Vec<u8>, S
     ))
 }
 
-pub(crate) fn run(command: &mut Command, context: &str) -> Result<(), String> {
-    let rendered = format!("{command:?}");
-    let output = command
-        .output()
-        .map_err(|error| format!("{context}: failed to start {rendered}: {error}"))?;
-    io::stdout()
-        .write_all(&output.stdout)
-        .map_err(|error| format!("write subprocess stdout: {error}"))?;
-    io::stderr()
-        .write_all(&output.stderr)
-        .map_err(|error| format!("write subprocess stderr: {error}"))?;
-    if output.status.success() {
-        return Ok(());
-    }
-    Err(format!(
-        "{context}\ncommand: {rendered}\nstatus: {}",
-        output.status
-    ))
-}
-
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;

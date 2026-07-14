@@ -44,12 +44,11 @@ struct CargoDependency {
     pkg: String,
 }
 
-pub(crate) fn run(manifest_dir: &Path, plotnik: &Path, cases: &[Case]) -> Result<(), String> {
+pub(crate) fn generate(manifest_dir: &Path, plotnik: &Path, cases: &[Case]) -> Result<(), String> {
     let cases = prepare_cases(cases)?;
     let project = manifest_dir.join("codegen/rust");
     verify_grammar_dependencies(&project, &cases)?;
-    generate_and_promote(&project, plotnik, &cases)?;
-    run_native(&project)
+    generate_and_promote(&project, plotnik, &cases)
 }
 
 fn generate_and_promote(
@@ -248,35 +247,6 @@ fn render_include(out: &mut String, binding: &str, path: &str) {
     let _ = writeln!(out, "    let {binding} = include_str!(");
     let _ = writeln!(out, "        {path:?}");
     let _ = writeln!(out, "    );");
-}
-
-fn run_native(project: &Path) -> Result<(), String> {
-    let commands: &[(&str, &[&str])] = &[
-        ("Rustfmt generated Rust", &["fmt", "--check"]),
-        (
-            "Clippy generated Rust",
-            &[
-                "clippy",
-                "--locked",
-                "--all-targets",
-                "--",
-                "-D",
-                "warnings",
-            ],
-        ),
-        (
-            "Test generated Rust",
-            &["test", "--locked", "--no-fail-fast"],
-        ),
-    ];
-    for (label, arguments) in commands {
-        let started = Instant::now();
-        let mut command = Command::new("cargo");
-        command.args(*arguments).current_dir(project);
-        process::run(&mut command, label)?;
-        eprintln!("{label} completed in {:.2?}", started.elapsed());
-    }
-    Ok(())
 }
 
 fn verify_grammar_dependencies(project: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
