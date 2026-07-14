@@ -47,12 +47,22 @@ struct CargoDependency {
 pub(crate) fn run(manifest_dir: &Path, plotnik: &Path, cases: &[Case]) -> Result<(), String> {
     let cases = prepare_cases(cases)?;
     let project = manifest_dir.join("codegen/rust");
+    verify_grammar_dependencies(&project, &cases)?;
+    generate_and_promote(&project, plotnik, &cases)?;
+    run_native(&project)
+}
+
+fn generate_and_promote(
+    project: &Path,
+    plotnik: &Path,
+    cases: &[RustCase<'_>],
+) -> Result<(), String> {
     let tests = project.join("tests");
     let pending = project.join(format!("tests.pending-{}", std::process::id()));
-    remove_stale_staging(&project)?;
+    remove_stale_staging(project)?;
 
     let generation_started = Instant::now();
-    let result = stage(&pending, plotnik, &cases);
+    let result = stage(&pending, plotnik, cases);
     if let Err(error) = result {
         let _ = fs::remove_dir_all(&pending);
         return Err(error);
@@ -68,9 +78,7 @@ pub(crate) fn run(manifest_dir: &Path, plotnik: &Path, cases: &[Case]) -> Result
         cases.len(),
         generation_started.elapsed()
     );
-
-    verify_grammar_dependencies(&project, &cases)?;
-    run_native(&project)
+    Ok(())
 }
 
 fn remove_stale_staging(project: &Path) -> Result<(), String> {
@@ -489,12 +497,10 @@ mod tests {
         fs::write(pending.join("stale"), "stale").unwrap();
         fs::write(interrupted.join("stale"), "stale").unwrap();
 
-        let error = run(
-            &root,
-            &root.join("missing-plotnik"),
-            &[case("captures/named_node.txt")],
-        )
-        .unwrap_err();
+        let cases = [case("captures/named_node.txt")];
+        let prepared = prepare_cases(&cases).unwrap();
+        let error =
+            generate_and_promote(&project, &root.join("missing-plotnik"), &prepared).unwrap_err();
 
         assert!(error.contains("failed to start"));
         assert_eq!(
