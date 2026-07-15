@@ -87,13 +87,10 @@ impl Emitter<'_, '_> {
             "        let mut map = serializer.serialize_map(Some({}))?;\n",
             fields.len()
         );
-        for ((&name_sym, _), field_ident) in fields.iter().zip(&field_idents) {
+        for (&name_sym, field_ident) in fields.keys().zip(&field_idents) {
             let key = interner.resolve(name_sym);
-            writeln!(
-                out,
-                "        map.serialize_entry({key:?}, &{rt}::WithSource::new(&self.{field_ident}, source))?;"
-            )
-            .expect("writing to a String is infallible");
+            let value = format!("&{rt}::WithSource::new(&self.{field_ident}, source)");
+            serialize_entry(&mut out, "        ", key, &value);
         }
         out.push_str("        map.end()\n");
         SerdeBody {
@@ -158,7 +155,7 @@ impl Emitter<'_, '_> {
         };
 
         let mut data_fields = String::new();
-        let mut data_entries = String::new();
+        let mut serialized_entries = Vec::new();
         let mut bindings = Vec::new();
         let mut data_inits = Vec::new();
         for (index, ((&name_sym, info), field_ident)) in
@@ -170,11 +167,8 @@ impl Emitter<'_, '_> {
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);
-            writeln!(
-                data_entries,
-                "                        map.serialize_entry({key:?}, &{rt}::WithSource::new(self.v{index}, self.source))?;"
-            )
-            .expect("writing to a String is infallible");
+            let value = format!("&{rt}::WithSource::new(self.v{index}, self.source)");
+            serialized_entries.push((key, value));
             bindings.push(format!("{field_ident}: v{index}"));
             data_inits.push(format!("v{index}"));
         }
@@ -182,16 +176,17 @@ impl Emitter<'_, '_> {
         let binding_list = bindings.join(", ");
         let data_inits = data_inits.join(", ");
         let field_count = fields.len();
+        let mut data_entries = String::new();
+        for (key, value) in serialized_entries {
+            serialize_entry(&mut data_entries, "                        ", key, &value);
+        }
         format!(
             "            {ident}::{variant_ident} {{ {binding_list} }} => {{
                 struct Data{} {{
 {data_fields}                    source: &'a str,
                 }}
                 impl {rt}::serde::Serialize for Data{} {{
-                    fn serialize<S>(
-                        &self,
-                        serializer: S,
-                    ) -> ::core::result::Result<S::Ok, S::Error>
+                    fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
                     where
                         S: {rt}::serde::Serializer,
                     {{
@@ -222,4 +217,17 @@ fn unit_arm(ident: &str, variant_ident: &str, label: &str) -> String {
             }}
 "
     )
+}
+
+fn serialize_entry(out: &mut String, indent: &str, key: &str, value: &str) {
+    let compact = format!("{indent}map.serialize_entry({key:?}, {value})?;");
+    if compact.len() <= 91 {
+        writeln!(out, "{compact}").expect("writing to a String is infallible");
+        return;
+    }
+    writeln!(
+        out,
+        "{indent}map.serialize_entry(\n{indent}    {key:?},\n{indent}    {value},\n{indent})?;"
+    )
+    .expect("writing to a String is infallible");
 }

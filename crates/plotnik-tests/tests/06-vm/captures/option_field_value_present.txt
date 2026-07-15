@@ -17,13 +17,13 @@ export interface Q {
 {
   "n": {
     "kind": "identifier",
-    "text": "x",
-    "span": [4, 5]
+    "span": [4, 5],
+    "text": "x"
   },
   "v": {
     "kind": "number",
-    "text": "1",
-    "span": [8, 9]
+    "span": [8, 9],
+    "text": "1"
   }
 }
 -------------------- BYTECODE --------------------

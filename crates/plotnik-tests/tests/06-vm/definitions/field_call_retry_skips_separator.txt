@@ -24,8 +24,8 @@ export interface Q {
   "m": {
     "name": {
       "kind": "property_identifier",
-      "text": "b",
-      "span": [17, 18]
+      "span": [17, 18],
+      "text": "b"
     }
   }
 }

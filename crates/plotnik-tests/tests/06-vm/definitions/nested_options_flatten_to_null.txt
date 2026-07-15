@@ -19,12 +19,12 @@ export interface Q {
 export type MaybeId = Node | null;
 --------------------- OUTPUT ---------------------
 {
-  "x": null,
   "n": {
     "kind": "number",
-    "text": "1",
-    "span": [1, 2]
-  }
+    "span": [1, 2],
+    "text": "1"
+  },
+  "x": null
 }
 -------------------- BYTECODE --------------------
 [strings]

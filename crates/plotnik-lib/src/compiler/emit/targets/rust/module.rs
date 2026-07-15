@@ -244,13 +244,17 @@ impl<'a> Generator<'a> {
                     .entry_points()
                     .iter()
                     .map(|entry| entry.definition),
+                self.config.debug,
             ),
         );
         out.push_str(&decoders.decoders());
         self.entry_reexports(&mut out);
 
         let mut machinery = String::new();
-        self.mod_header(&mut machinery, decoders.max_decoder_frame_bytes());
+        let decoder_frame_bytes = decoders
+            .uses_decode_depth()
+            .then(|| decoders.max_decoder_frame_bytes());
+        self.mod_header(&mut machinery, decoder_frame_bytes);
         self.language_check(&mut machinery);
         self.field_consts(&mut machinery);
         self.regex_statics(&mut machinery);
@@ -295,18 +299,23 @@ impl<'a> Generator<'a> {
     /// surface (`{def}_journal`, per [`journal_fn_name`]) doesn't move when the
     /// machinery does.
     fn entry_reexports(&self, out: &mut String) {
-        let names: Vec<String> = self
+        let mut names: Vec<String> = self
             .plan
             .matcher()
             .entry_points()
             .iter()
             .map(|entry| journal_fn_name(&entry.name))
             .collect();
+        names.sort();
         out.push('\n');
-        let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
+        if let [name] = names.as_slice() {
+            let _ = writeln!(out, "pub use self::matcher::{name};");
+        } else {
+            let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
+        }
     }
 
-    fn mod_header(&self, out: &mut String, max_decoder_frame_bytes: u64) {
+    fn mod_header(&self, out: &mut String, decoder_frame_bytes: Option<u64>) {
         let limits = self.limits;
         splice(
             out,
@@ -316,13 +325,16 @@ impl<'a> Generator<'a> {
                 ("RT", self.config.rt_crate_path()),
                 ("FUEL", &limit_expr(limits.fuel)),
                 ("MEMORY", &limit_expr(limits.memory)),
-                ("DECODER_FRAME", &max_decoder_frame_bytes.to_string()),
-                (
-                    "DEPTH",
-                    &depth_expr(limits.decode_depth, max_decoder_frame_bytes),
-                ),
             ],
         );
+        if let Some(frame_bytes) = decoder_frame_bytes {
+            splice(
+                out,
+                "",
+                DECODE_DEPTH_CONST,
+                &[("DEPTH", &depth_expr(limits.decode_depth, frame_bytes))],
+            );
+        }
     }
 
     /// The language-skew tables and their assert: every kind and field id in
@@ -353,31 +365,27 @@ impl<'a> Generator<'a> {
              /// as the generation-time grammar defines them.\n",
         );
         let matcher = self.plan.matcher();
-        if matcher.expected_kinds().is_empty() {
-            out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[];\n");
-        } else {
-            out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[\n");
-            for expected in matcher.expected_kinds() {
+        render_const_slice(
+            out,
+            "const EXPECTED_KINDS: &[(u16, &str, bool)]",
+            matcher.expected_kinds().iter().map(|expected| {
                 let id = expected.id;
                 let named = expected.named;
                 let name = rust_string(&expected.name);
-                let _ = writeln!(out, "    ({id}, {name}, {named}),");
-            }
-            out.push_str("];\n");
-        }
+                format!("({id}, {name}, {named})")
+            }),
+        );
         out.push('\n');
         out.push_str("/// Field ids baked into the field checks: `(id, name)`.\n");
-        if matcher.expected_fields().is_empty() {
-            out.push_str("const EXPECTED_FIELDS: &[(u16, &str)] = &[];\n");
-        } else {
-            out.push_str("const EXPECTED_FIELDS: &[(u16, &str)] = &[\n");
-            for field in matcher.expected_fields() {
+        render_const_slice(
+            out,
+            "const EXPECTED_FIELDS: &[(u16, &str)]",
+            matcher.expected_fields().iter().map(|field| {
                 let id = field.id;
                 let name = rust_string(&field.name);
-                let _ = writeln!(out, "    ({id}, {name}),");
-            }
-            out.push_str("];\n");
-        }
+                format!("({id}, {name})")
+            }),
+        );
         out.push('\n');
         let template = if self.config.grammar_identity.is_some() {
             VERIFY_LANGUAGE_WITH_IDENTITY
@@ -405,6 +413,7 @@ impl<'a> Generator<'a> {
             let pattern = &plan.pattern;
             out.push('\n');
             let _ = writeln!(out, "// /{pattern}/ — serialized sparse DFA");
+            out.push_str("#[rustfmt::skip]\n");
             let _ = writeln!(
                 out,
                 "static RE_{}: rt::StaticDfa = rt::StaticDfa::new(&[",
@@ -447,6 +456,12 @@ impl<'a> Generator<'a> {
         let memory_metered = if memory_metered { "true" } else { "false" };
         for entry in self.plan.matcher().entry_points() {
             let def = entry.name.as_str();
+            let name = self
+                .plan
+                .result()
+                .dependency_analysis()
+                .def_name_sym(entry.definition);
+            let has_decoder = self.plan.decode().item(name).has_decoder();
             let info = self.state(entry.entry);
             let subs = [
                 ("DEF", def),
@@ -460,8 +475,10 @@ impl<'a> Generator<'a> {
             ];
             out.push('\n');
             splice(out, "", JOURNAL_ENTRY_FN, &subs);
-            out.push('\n');
-            splice(out, "", LIMITED_JOURNAL_ENTRY_FN, &subs);
+            if has_decoder {
+                out.push('\n');
+                splice(out, "", LIMITED_JOURNAL_ENTRY_FN, &subs);
+            }
             out.push('\n');
             splice(out, "", LIMITED_MATCHES_ENTRY_FN, &subs);
         }
@@ -486,14 +503,15 @@ impl<'a> Generator<'a> {
                 StatePlanKind::Match(plan) => self.match_arm(out, state, plan),
                 StatePlanKind::Call(plan) => self.call_arm(out, state, plan),
                 StatePlanKind::Return(outcome) => {
+                    let template = match outcome {
+                        plotnik_rt::ReturnOutcome::Matched => RETURN_MATCHED_ARM,
+                        plotnik_rt::ReturnOutcome::Empty => RETURN_EMPTY_ARM,
+                    };
                     splice(
                         out,
                         "        ",
-                        RETURN_ARM,
-                        &[
-                            ("STATE", &self.state(state.id).const_name),
-                            ("OUTCOME", return_outcome_expr(*outcome)),
-                        ],
+                        template,
+                        &[("STATE", &self.state(state.id).const_name)],
                     );
                 }
             }
@@ -528,12 +546,7 @@ impl<'a> Generator<'a> {
         }
 
         if plan.navigates() {
-            splice(
-                out,
-                "            ",
-                NAVIGATE_OR_BACKTRACK,
-                &[("NAV", &nav_expr(plan.nav))],
-            );
+            self.navigate_or_backtrack(out, plan.nav);
         }
 
         self.candidate_search(out, state, plan, CandidateFailure::StateBacktrack);
@@ -597,15 +610,37 @@ impl<'a> Generator<'a> {
         let Some(policy) = plan.retry else {
             return;
         };
+        let policy = policy_expr(policy);
+        let state = &self.state(state.id).const_name;
+        // Machinery is rendered before the enclosing `mod matcher` adds its
+        // four-space indent, so include that final width in the layout choice.
+        let compact_len = format!(
+            "{indent}    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), {state}));"
+        )
+        .len()
+            + 4;
+        let template = if compact_len <= 100 {
+            RETRY_CHECKPOINT_COMPACT
+        } else {
+            RETRY_CHECKPOINT_EXPANDED
+        };
         splice(
             out,
             indent,
-            RETRY_CHECKPOINT,
-            &[
-                ("POLICY", &policy_expr(policy)),
-                ("STATE", &self.state(state.id).const_name),
-            ],
+            template,
+            &[("POLICY", &policy), ("STATE", state)],
         );
+    }
+
+    fn navigate_or_backtrack(&self, out: &mut String, nav: Nav) {
+        let nav = nav_expr(nav);
+        let chain = format!("eng.cursor_mut().navigate({nav}).is_none()");
+        let template = if chain.len() <= 60 {
+            NAVIGATE_OR_BACKTRACK
+        } else {
+            NAVIGATE_OR_BACKTRACK_EXPANDED
+        };
+        splice(out, "            ", template, &[("NAV", &nav)]);
     }
 
     fn cand_call(&self, state: &StatePlan, plan: &MatchPlan) -> String {
@@ -749,12 +784,7 @@ impl<'a> Generator<'a> {
                 );
             }
         } else {
-            splice(
-                out,
-                "            ",
-                NAVIGATE_OR_BACKTRACK,
-                &[("NAV", &nav_expr(plan.nav))],
-            );
+            self.navigate_or_backtrack(out, plan.nav);
             if let Some(field) = plan.field {
                 splice(
                     out,
@@ -1002,18 +1032,21 @@ impl<'a> Generator<'a> {
             })
             .collect();
 
-        let eng_param = if retryable.is_empty() { "_eng" } else { "eng" };
         let source_param = if self.plan.matcher().any_retry_predicate() {
             "source"
         } else {
             "_source"
         };
         out.push('\n');
+        if retryable.is_empty() {
+            splice(out, "", MATCH_RETRY_EMPTY, &[("SOURCE", source_param)]);
+            return;
+        }
         splice(
             out,
             "",
             MATCH_RETRY_OPEN,
-            &[("ENG", eng_param), ("SOURCE", source_param)],
+            &[("ENG", "eng"), ("SOURCE", source_param)],
         );
         for (state, plan) in retryable {
             let info = self.state(state.id);
@@ -1046,11 +1079,30 @@ fn policy_expr(policy: SkipPolicy) -> String {
     format!("rt::SkipPolicy::{policy:?}")
 }
 
-fn return_outcome_expr(outcome: plotnik_rt::ReturnOutcome) -> &'static str {
-    match outcome {
-        plotnik_rt::ReturnOutcome::Matched => "rt::ReturnOutcome::Matched",
-        plotnik_rt::ReturnOutcome::Empty => "rt::ReturnOutcome::Empty",
+fn render_const_slice(out: &mut String, declaration: &str, entries: impl Iterator<Item = String>) {
+    let entries = entries.collect::<Vec<_>>();
+    if entries.is_empty() {
+        let _ = writeln!(out, "{declaration} = &[];");
+        return;
     }
+
+    let joined = entries.join(", ");
+    let compact = format!("{declaration} = &[{joined}];");
+    if compact.len() + 4 <= 100 {
+        let _ = writeln!(out, "{compact}");
+        return;
+    }
+    if entries.len() <= 2 && joined.len() + 12 <= 100 {
+        let _ = writeln!(out, "{declaration} =");
+        let _ = writeln!(out, "    &[{joined}];");
+        return;
+    }
+
+    let _ = writeln!(out, "{declaration} = &[");
+    for entry in entries {
+        let _ = writeln!(out, "    {entry},");
+    }
+    out.push_str("];\n");
 }
 
 /// `Limit` as a generated-code expression; the `Debug` form matches the
@@ -1103,20 +1155,18 @@ const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
 /// sampled; must be a power of two minus one. Twin of the VM's constant.
 const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
-/// Conservative maximum native-stack bytes used by one typed decoder
-/// frame before runtime padding.
-pub(super) const MAX_DECODER_FRAME_BYTES: u64 = @DECODER_FRAME@;
-
-/// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
-/// matcher itself is iterative; only decoder recursion enters this guard.
-pub(super) const MAX_DECODE_DEPTH: Option<u64> = @DEPTH@;
-
 /// Resolve [`LIMITS`] against this input's node count, exactly like
 /// `VM::builder(...).build()` resolves the VM's.
 fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
     let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
     LIMITS.resolve(source_nodes)
 }
+"#;
+
+const DECODE_DEPTH_CONST: &str = r#"
+/// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
+/// matcher itself is iterative; only decoder recursion enters this guard.
+pub(super) const MAX_DECODE_DEPTH: Option<u64> = @DEPTH@;
 "#;
 
 const VERIFY_LANGUAGE: &str = r#"
@@ -1176,9 +1226,7 @@ fn verify_language(tree: &rt::Tree) {
                  ({}, grammar.json SHA-256 {}) where node kind {id} is {name:?}, \
                  but the tree's language says {found:?} — regenerate against the \
                  grammar.json belonging to the parser that produced the tree",
-                GRAMMAR_NAME,
-                GRAMMAR_SOURCE,
-                GRAMMAR_SHA256,
+                GRAMMAR_NAME, GRAMMAR_SOURCE, GRAMMAR_SHA256,
             );
         }
     }
@@ -1190,9 +1238,7 @@ fn verify_language(tree: &rt::Tree) {
                  ({}, grammar.json SHA-256 {}) where field {id} is {name:?}, but \
                  the tree's language says {found:?} — regenerate against the \
                  grammar.json belonging to the parser that produced the tree",
-                GRAMMAR_NAME,
-                GRAMMAR_SOURCE,
-                GRAMMAR_SHA256,
+                GRAMMAR_NAME, GRAMMAR_SOURCE, GRAMMAR_SHA256,
             );
         }
     }
@@ -1256,7 +1302,12 @@ enum Unwound {
 /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
 /// disables it to avoid output allocation and decode-depth failures. (No
 /// let-chains: generated code targets the embedding crate's edition.)
-fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT_EVENTS: bool>(
+fn run<
+    't,
+    const METERED_FUEL: bool,
+    const METERED_MEMORY: bool,
+    const RECORD_OUTPUT_EVENTS: bool,
+>(
     tree: &'t rt::Tree,
     source: &str,
     entry: u16,
@@ -1275,12 +1326,11 @@ fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OU
             // One matcher dispatch currently consumes one fuel unit. The check
             // folds out when fuel is unbounded; the counter still advances under
             // a memory-only policy because the sample cadence below rides on it.
-            if METERED_FUEL {
-                if let Some(limit) = limits.fuel_limit {
-                    if fuel_used >= limit {
-                        return Err(rt::LimitExceeded::OutOfFuel(limit));
-                    }
+            match limits.fuel_limit {
+                Some(limit) if METERED_FUEL && fuel_used >= limit => {
+                    return Err(rt::LimitExceeded::OutOfFuel(limit));
                 }
+                _ => {}
             }
             fuel_used += 1;
             // Memory ceiling: the live runtime heap, sampled every
@@ -1289,10 +1339,11 @@ fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OU
             // out when memory is unbounded, so no `heap_bytes` read survives.
             if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
                 let used = eng.heap_bytes();
-                if let Some(max) = limits.max_memory {
-                    if used > max {
+                match limits.max_memory {
+                    Some(max) if used > max => {
                         return Err(rt::LimitExceeded::Memory { used, limit: max });
                     }
+                    _ => {}
                 }
             }
         }
@@ -1325,6 +1376,16 @@ if eng.cursor_mut().navigate(@NAV@).is_none() {
 }
 "#;
 
+const NAVIGATE_OR_BACKTRACK_EXPANDED: &str = r#"
+if eng
+    .cursor_mut()
+    .navigate(@NAV@)
+    .is_none()
+{
+    break 'state Flow::Backtrack;
+}
+"#;
+
 const CANDIDATE_ONCE: &str = r#"
 if !@CAND@ {
     @FAIL@
@@ -1342,9 +1403,18 @@ loop {
 }
 "#;
 
-const RETRY_CHECKPOINT: &str = r#"
+const RETRY_CHECKPOINT_COMPACT: &str = r#"
 if @POLICY@.admits(eng.node_class()) {
     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), @STATE@));
+}
+"#;
+
+const RETRY_CHECKPOINT_EXPANDED: &str = r#"
+if @POLICY@.admits(eng.node_class()) {
+    eng.push_checkpoint(rt::Checkpoint::match_retry(
+        eng.checkpoint_state(),
+        @STATE@,
+    ));
 }
 "#;
 
@@ -1376,17 +1446,31 @@ const CALL_RETRY_PUSH: &str = r#"
 eng.push_checkpoint(rt::Checkpoint::call_retry(
     eng.checkpoint_state(),
     @STATE@,
-    rt::CallResume { target: @TARGET@, next: @NEXT@, field: @FIELD@, policy: @POLICY@ },
+    rt::CallResume {
+        target: @TARGET@,
+        next: @NEXT@,
+        field: @FIELD@,
+        policy: @POLICY@,
+    },
 ));
 "#;
 
-const RETURN_ARM: &str = r#"
+const RETURN_MATCHED_ARM: &str = r#"
 @STATE@ => {
     if eng.frames_empty() {
-        assert_eq!(@OUTCOME@, rt::ReturnOutcome::Matched, "entry point returned empty");
         Flow::Accept
     } else {
-        Flow::Jump(eng.exit_frame(@OUTCOME@))
+        Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+    }
+}
+"#;
+
+const RETURN_EMPTY_ARM: &str = r#"
+@STATE@ => {
+    if eng.frames_empty() {
+        panic!("entry point returned empty");
+    } else {
+        Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Empty))
     }
 }
 "#;
@@ -1461,6 +1545,12 @@ const MATCH_RETRY_CLOSE: &str = "        _ => unreachable!(\"match-retry checkpo
     }
 }
 ";
+
+const MATCH_RETRY_EMPTY: &str = r#"
+fn match_retry(_eng: &mut rt::Engine<'_>, @SOURCE@: &str, ip: u16) -> Option<Flow> {
+    unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match")
+}
+"#;
 
 const RETRY_ADVANCE: &str = r#"
 if !eng.cursor_mut().continue_search(@POLICY@) {

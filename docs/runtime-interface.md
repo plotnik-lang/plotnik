@@ -470,7 +470,7 @@ generated module.
 A mismatch is a grammar-skew error and includes the expected id/name, the live
 value, and the recorded `GrammarIdentity`. The remedy is to regenerate against
 the `grammar.json` belonging to the parser package used in production. A
-`generate --grammar <path>` flow must therefore accept that exact artifact;
+`gen --grammar <path>` flow must therefore accept that exact artifact;
 registry language names are a convenience, not a substitute for production
 provenance.
 

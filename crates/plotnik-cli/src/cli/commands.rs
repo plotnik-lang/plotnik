@@ -76,19 +76,20 @@ Run 'plotnik <command> --help' for examples."#,
 }
 
 pub fn generate_command() -> Command {
-    Command::new("generate")
+    Command::new("gen")
+        .visible_alias("generate")
         .about("Generate a compiled matcher module")
         .override_usage(
             "\
-  plotnik generate <QUERY> --target rust -l <LANG>
-  plotnik generate <QUERY> --target rust --grammar <grammar.json>
-  plotnik generate -q <TEXT> --target rust -l <LANG>",
+  plotnik gen <QUERY> --target rust -l <LANG>
+  plotnik gen <QUERY> --target rust --grammar <grammar.json>
+  plotnik gen -q <TEXT> --target rust -l <LANG>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik generate query.ptk --target rust -l typescript
-  plotnik generate query.ptk --target rust --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json
-  plotnik generate query.ptk --target rust -l javascript -o query.rs
+  plotnik gen query.ptk --target rust -l typescript
+  plotnik gen query.ptk --target rust --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json
+  plotnik gen query.ptk --target rust -l javascript -o query.rs
 
 The generated module imports `plotnik_rt`. Depend on `plotnik-rt` for
 Tree-sitter or `plotnik-rt-arborium` for Arborium; both packages expose that
@@ -102,6 +103,7 @@ during binding."#,
         .arg(grammar_arg())
         .next_help_heading("Generation options")
         .arg(target_arg())
+        .arg(debug_arg())
         .arg(output_file_arg())
         .next_help_heading("Global options")
         .arg(color_arg())

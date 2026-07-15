@@ -1,9 +1,13 @@
-.PHONY: check clippy test test-arborium bench coverage coverage-lines check-wasm wasm-web clean
+.PHONY: check clippy test test-arborium codegen-rust lint-codegen-rust test-codegen-rust bench coverage coverage-lines check-wasm wasm-web clean
 
 LLVM_PREFIX ?= /opt/homebrew/opt/llvm
 WASM_CC ?= $(LLVM_PREFIX)/bin/clang
 WASM_AR ?= $(LLVM_PREFIX)/bin/llvm-ar
 BENCH ?= vm
+CODEGEN_TARGET_DIR ?= $(if $(strip $(CARGO_TARGET_DIR)),$(abspath $(CARGO_TARGET_DIR)),$(CURDIR)/target)
+CODEGEN_RUST_DIR := $(CURDIR)/crates/plotnik-tests/codegen/rust
+CODEGEN_RUST_MANIFEST := $(CODEGEN_RUST_DIR)/Cargo.toml
+CODEGEN_RUST_TESTS := $(CODEGEN_RUST_DIR)/tests
 
 check:
 	@cargo check \
@@ -65,6 +69,65 @@ test-arborium:
 		--manifest-path examples/arborium/Cargo.toml \
 		--locked \
 		--quiet
+
+codegen-rust:
+	@cargo build \
+		--locked \
+		--package plotnik-cli \
+		--no-default-features \
+		--target-dir "$(CODEGEN_TARGET_DIR)"
+	@cargo build \
+		--locked \
+		--package plotnik-tests \
+		--bin plotnik-codegen-tests \
+		--features codegen-tests \
+		--target-dir "$(CODEGEN_TARGET_DIR)"
+	@CARGO_TARGET_DIR="$(CODEGEN_TARGET_DIR)" \
+		"$(CODEGEN_TARGET_DIR)/debug/plotnik-codegen-tests" rust \
+		--plotnik "$(CODEGEN_TARGET_DIR)/debug/plotnik" \
+		$(if $(strip $(FILTER)),--filter "$(FILTER)",)
+
+lint-codegen-rust:
+	@test -d "$(CODEGEN_RUST_TESTS)" || { \
+		echo "generated Rust tests are missing; run 'make codegen-rust' first" >&2; \
+		exit 1; \
+	}
+	@cargo clippy \
+		--locked \
+		--package plotnik-tests \
+		--bin plotnik-codegen-tests \
+		--features codegen-tests \
+		--target-dir "$(CODEGEN_TARGET_DIR)" \
+		-- \
+		-D warnings
+	@cargo fmt \
+		--manifest-path "$(CODEGEN_RUST_MANIFEST)" \
+		--check
+	@cargo clippy \
+		--locked \
+		--manifest-path "$(CODEGEN_RUST_MANIFEST)" \
+		--target-dir "$(CODEGEN_TARGET_DIR)" \
+		--all-targets \
+		-- \
+		-D warnings
+
+test-codegen-rust:
+	@test -d "$(CODEGEN_RUST_TESTS)" || { \
+		echo "generated Rust tests are missing; run 'make codegen-rust' first" >&2; \
+		exit 1; \
+	}
+	@cargo test \
+		--locked \
+		--package plotnik-tests \
+		--bin plotnik-codegen-tests \
+		--features codegen-tests \
+		--target-dir "$(CODEGEN_TARGET_DIR)" \
+		--quiet
+	@cargo test \
+		--locked \
+		--manifest-path "$(CODEGEN_RUST_MANIFEST)" \
+		--target-dir "$(CODEGEN_TARGET_DIR)" \
+		--no-fail-fast
 
 shot:
 	@# See AGENTS.md for diagnostic guidelines
@@ -138,3 +201,7 @@ fmt:
 
 clean:
 	@cargo clean
+	@cargo clean --manifest-path "$(CODEGEN_RUST_MANIFEST)"
+	@rm -rf \
+		"$(CODEGEN_RUST_TESTS)" \
+		"$(CODEGEN_RUST_DIR)"/tests.pending-*

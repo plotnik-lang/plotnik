@@ -21,8 +21,8 @@ export interface Q {
 {
   "s": {
     "kind": "string",
-    "text": "\"x\"",
-    "span": [7, 10]
+    "span": [7, 10],
+    "text": "\"x\""
   }
 }
 -------------------- BYTECODE --------------------

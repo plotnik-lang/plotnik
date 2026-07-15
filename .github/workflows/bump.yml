@@ -77,6 +77,7 @@ jobs:
         run: |
           cargo check --workspace
           cargo check --manifest-path examples/arborium/Cargo.toml
+          cargo check --manifest-path crates/plotnik-tests/codegen/rust/Cargo.toml
 
       - name: Create PR
         env:
@@ -86,7 +87,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "bump/v$next"
-          git add Cargo.toml Cargo.lock examples/arborium/Cargo.lock crates/plotnik-cli/Cargo.toml crates/plotnik-lib/Cargo.toml crates/plotnik-macros/Cargo.toml crates/plotnik/Cargo.toml crates/plotnik-rt-arborium/Cargo.toml crates/plotnik-arborium/Cargo.toml
+          git add \
+            Cargo.toml \
+            Cargo.lock \
+            examples/arborium/Cargo.lock \
+            crates/plotnik-cli/Cargo.toml \
+            crates/plotnik-lib/Cargo.toml \
+            crates/plotnik-macros/Cargo.toml \
+            crates/plotnik/Cargo.toml \
+            crates/plotnik-rt-arborium/Cargo.toml \
+            crates/plotnik-arborium/Cargo.toml \
+            crates/plotnik-tests/codegen/rust/Cargo.lock
           git commit -m "chore: Bump version to \`$next\`"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
           git push -u origin "bump/v$next"

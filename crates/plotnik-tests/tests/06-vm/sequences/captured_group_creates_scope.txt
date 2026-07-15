@@ -20,13 +20,13 @@ export interface QPair {
   "pair": {
     "a": {
       "kind": "lexical_declaration",
-      "text": "let x;",
-      "span": [0, 6]
+      "span": [0, 6],
+      "text": "let x;"
     },
     "b": {
       "kind": "expression_statement",
-      "text": "foo;",
-      "span": [7, 11]
+      "span": [7, 11],
+      "text": "foo;"
     }
   }
 }

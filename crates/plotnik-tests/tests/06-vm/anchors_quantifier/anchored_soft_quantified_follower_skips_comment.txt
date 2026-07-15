@@ -23,14 +23,14 @@ export interface Q {
   "b": [
     {
       "kind": "debugger_statement",
-      "text": "debugger;",
-      "span": [8, 17]
+      "span": [8, 17],
+      "text": "debugger;"
     }
   ],
   "c": {
     "kind": "expression_statement",
-    "text": "foo;",
-    "span": [18, 22]
+    "span": [18, 22],
+    "text": "foo;"
   }
 }
 -------------------- BYTECODE --------------------

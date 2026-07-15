@@ -18,8 +18,8 @@ export interface Q {
 {
   "arg": {
     "kind": "identifier",
-    "text": "x",
-    "span": [2, 3]
+    "span": [2, 3],
+    "text": "x"
   }
 }
 -------------------- BYTECODE --------------------

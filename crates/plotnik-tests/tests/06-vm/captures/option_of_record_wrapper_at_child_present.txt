@@ -20,8 +20,8 @@ export interface QOuter {
   "outer": {
     "id": {
       "kind": "identifier",
-      "text": "a",
-      "span": [0, 1]
+      "span": [0, 1],
+      "text": "a"
     }
   }
 }

@@ -68,7 +68,11 @@ fn decode_standalone<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Sta
         match decoder.peek_record_set() {
             // id
             0 => v0 = Some(decoder.expect_node()),
-            other => unreachable!("journal shape proven at emit: `Standalone` has no member index {other}"),
+            other => {
+                unreachable!(
+                    "journal shape proven at emit: `Standalone` has no member index {other}"
+                )
+            }
         }
         decoder.expect_record_set();
     }
@@ -78,7 +82,7 @@ fn decode_standalone<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Sta
     }
 }
 
-pub use self::matcher::{standalone_journal};
+pub use self::matcher::standalone_journal;
 
 /// The compiled matcher: engine machinery shielded from the query's
 /// type namespace.
@@ -102,14 +106,6 @@ mod matcher {
     /// Bitmask selecting the matcher dispatches on which the memory ceiling is
     /// sampled; must be a power of two minus one. Twin of the VM's constant.
     const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
-
-    /// Conservative maximum native-stack bytes used by one typed decoder
-    /// frame before runtime padding.
-    pub(super) const MAX_DECODER_FRAME_BYTES: u64 = 232;
-
-    /// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
-    /// matcher itself is iterative; only decoder recursion enters this guard.
-    pub(super) const MAX_DECODE_DEPTH: Option<u64> = Some(rt::decode_depth_auto(232));
 
     /// Resolve [`LIMITS`] against this input's node count, exactly like
     /// `VM::builder(...).build()` resolves the VM's.
@@ -152,9 +148,7 @@ mod matcher {
                      ({}, grammar.json SHA-256 {}) where node kind {id} is {name:?}, \
                      but the tree's language says {found:?} — regenerate against the \
                      grammar.json belonging to the parser that produced the tree",
-                    GRAMMAR_NAME,
-                    GRAMMAR_SOURCE,
-                    GRAMMAR_SHA256,
+                    GRAMMAR_NAME, GRAMMAR_SOURCE, GRAMMAR_SHA256,
                 );
             }
         }
@@ -166,9 +160,7 @@ mod matcher {
                      ({}, grammar.json SHA-256 {}) where field {id} is {name:?}, but \
                      the tree's language says {found:?} — regenerate against the \
                      grammar.json belonging to the parser that produced the tree",
-                    GRAMMAR_NAME,
-                    GRAMMAR_SOURCE,
-                    GRAMMAR_SHA256,
+                    GRAMMAR_NAME, GRAMMAR_SOURCE, GRAMMAR_SHA256,
                 );
             }
         }
@@ -231,7 +223,12 @@ mod matcher {
     /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
     /// disables it to avoid output allocation and decode-depth failures. (No
     /// let-chains: generated code targets the embedding crate's edition.)
-    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT_EVENTS: bool>(
+    fn run<
+        't,
+        const METERED_FUEL: bool,
+        const METERED_MEMORY: bool,
+        const RECORD_OUTPUT_EVENTS: bool,
+    >(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
@@ -250,12 +247,11 @@ mod matcher {
                 // One matcher dispatch currently consumes one fuel unit. The check
                 // folds out when fuel is unbounded; the counter still advances under
                 // a memory-only policy because the sample cadence below rides on it.
-                if METERED_FUEL {
-                    if let Some(limit) = limits.fuel_limit {
-                        if fuel_used >= limit {
-                            return Err(rt::LimitExceeded::OutOfFuel(limit));
-                        }
+                match limits.fuel_limit {
+                    Some(limit) if METERED_FUEL && fuel_used >= limit => {
+                        return Err(rt::LimitExceeded::OutOfFuel(limit));
                     }
+                    _ => {}
                 }
                 fuel_used += 1;
                 // Memory ceiling: the live runtime heap, sampled every
@@ -264,10 +260,11 @@ mod matcher {
                 // out when memory is unbounded, so no `heap_bytes` read survives.
                 if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
                     let used = eng.heap_bytes();
-                    if let Some(max) = limits.max_memory {
-                        if used > max {
+                    match limits.max_memory {
+                        Some(max) if used > max => {
                             return Err(rt::LimitExceeded::Memory { used, limit: max });
                         }
+                        _ => {}
                     }
                 }
             }
@@ -288,7 +285,6 @@ mod matcher {
             //   01                                        ▶
             S01_STANDALONE => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -315,7 +311,10 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_STANDALONE));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(
+                        eng.checkpoint_state(),
+                        S04_STANDALONE,
+                    ));
                 }
                 finish_s04_standalone(eng)
             }
@@ -340,14 +339,16 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_STANDALONE));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(
+                        eng.checkpoint_state(),
+                        S06_STANDALONE,
+                    ));
                 }
                 finish_s06_standalone(eng)
             }
             //   07                                        ▶
             S07_STANDALONE_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -489,7 +490,10 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_STANDALONE));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(
+                        eng.checkpoint_state(),
+                        S04_STANDALONE,
+                    ));
                 }
                 Some(finish_s04_standalone(eng))
             }
@@ -506,7 +510,10 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_STANDALONE));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(
+                        eng.checkpoint_state(),
+                        S06_STANDALONE,
+                    ));
                 }
                 Some(finish_s06_standalone(eng))
             }

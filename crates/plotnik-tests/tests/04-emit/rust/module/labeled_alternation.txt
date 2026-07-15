@@ -100,7 +100,11 @@ fn decode_q_expr<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> QExpr<'
                 match decoder.peek_record_set() {
                     // id
                     0 => v0 = Some(decoder.expect_node()),
-                    other => unreachable!("journal shape proven at emit: `QExpr` has no member index {other}"),
+                    other => {
+                        unreachable!(
+                            "journal shape proven at emit: `QExpr` has no member index {other}"
+                        )
+                    }
                 }
                 decoder.expect_record_set();
             }
@@ -116,7 +120,11 @@ fn decode_q_expr<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> QExpr<'
                 match decoder.peek_record_set() {
                     // num
                     1 => v0 = Some(decoder.expect_node()),
-                    other => unreachable!("journal shape proven at emit: `QExpr` has no member index {other}"),
+                    other => {
+                        unreachable!(
+                            "journal shape proven at emit: `QExpr` has no member index {other}"
+                        )
+                    }
                 }
                 decoder.expect_record_set();
             }
@@ -125,11 +133,15 @@ fn decode_q_expr<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> QExpr<'
                 num: v0.expect("field-stability: every accepting path sets `num`"),
             }
         }
-        other => unreachable!("journal shape proven at emit: `QExpr` has no variant case at member index {other}"),
+        other => {
+            unreachable!(
+                "journal shape proven at emit: `QExpr` has no variant case at member index {other}"
+            )
+        }
     }
 }
 
-pub use self::matcher::{q_journal};
+pub use self::matcher::q_journal;
 
 /// The compiled matcher: engine machinery shielded from the query's
 /// type namespace.
@@ -153,14 +165,6 @@ mod matcher {
     /// Bitmask selecting the matcher dispatches on which the memory ceiling is
     /// sampled; must be a power of two minus one. Twin of the VM's constant.
     const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
-
-    /// Conservative maximum native-stack bytes used by one typed decoder
-    /// frame before runtime padding.
-    pub(super) const MAX_DECODER_FRAME_BYTES: u64 = 248;
-
-    /// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
-    /// matcher itself is iterative; only decoder recursion enters this guard.
-    pub(super) const MAX_DECODE_DEPTH: Option<u64> = Some(rt::decode_depth_auto(248));
 
     /// Resolve [`LIMITS`] against this input's node count, exactly like
     /// `VM::builder(...).build()` resolves the VM's.
@@ -276,7 +280,12 @@ mod matcher {
     /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
     /// disables it to avoid output allocation and decode-depth failures. (No
     /// let-chains: generated code targets the embedding crate's edition.)
-    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT_EVENTS: bool>(
+    fn run<
+        't,
+        const METERED_FUEL: bool,
+        const METERED_MEMORY: bool,
+        const RECORD_OUTPUT_EVENTS: bool,
+    >(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
@@ -295,12 +304,11 @@ mod matcher {
                 // One matcher dispatch currently consumes one fuel unit. The check
                 // folds out when fuel is unbounded; the counter still advances under
                 // a memory-only policy because the sample cadence below rides on it.
-                if METERED_FUEL {
-                    if let Some(limit) = limits.fuel_limit {
-                        if fuel_used >= limit {
-                            return Err(rt::LimitExceeded::OutOfFuel(limit));
-                        }
+                match limits.fuel_limit {
+                    Some(limit) if METERED_FUEL && fuel_used >= limit => {
+                        return Err(rt::LimitExceeded::OutOfFuel(limit));
                     }
+                    _ => {}
                 }
                 fuel_used += 1;
                 // Memory ceiling: the live runtime heap, sampled every
@@ -309,10 +317,11 @@ mod matcher {
                 // out when memory is unbounded, so no `heap_bytes` read survives.
                 if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
                     let used = eng.heap_bytes();
-                    if let Some(max) = limits.max_memory {
-                        if used > max {
+                    match limits.max_memory {
+                        Some(max) if used > max => {
                             return Err(rt::LimitExceeded::Memory { used, limit: max });
                         }
+                        _ => {}
                     }
                 }
             }
@@ -333,7 +342,6 @@ mod matcher {
             //   01                                        ▶
             S01_Q => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -413,7 +421,6 @@ mod matcher {
             //   13                                        ▶
             S13_Q_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))

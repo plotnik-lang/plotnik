@@ -15,12 +15,12 @@ export interface Q {
 }
 --------------------- OUTPUT ---------------------
 {
-  "id": null,
   "any": {
     "kind": "identifier",
-    "text": "x",
-    "span": [0, 1]
-  }
+    "span": [0, 1],
+    "text": "x"
+  },
+  "id": null
 }
 -------------------- BYTECODE --------------------
 [strings]

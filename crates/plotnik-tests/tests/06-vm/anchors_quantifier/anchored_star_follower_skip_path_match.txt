@@ -23,19 +23,19 @@ export interface Q {
   "b": [
     {
       "kind": "debugger_statement",
-      "text": "debugger;",
-      "span": [0, 9]
+      "span": [0, 9],
+      "text": "debugger;"
     },
     {
       "kind": "debugger_statement",
-      "text": "debugger;",
-      "span": [10, 19]
+      "span": [10, 19],
+      "text": "debugger;"
     }
   ],
   "c": {
     "kind": "expression_statement",
-    "text": "foo;",
-    "span": [20, 24]
+    "span": [20, 24],
+    "text": "foo;"
   }
 }
 -------------------- BYTECODE --------------------

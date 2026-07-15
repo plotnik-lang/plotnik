@@ -19,8 +19,8 @@ export interface Q {
 {
   "p": {
     "kind": "pair",
-    "text": "a:1",
-    "span": [2, 5]
+    "span": [2, 5],
+    "text": "a:1"
   }
 }
 -------------------- BYTECODE --------------------

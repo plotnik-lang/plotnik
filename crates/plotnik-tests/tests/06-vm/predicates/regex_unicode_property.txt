@@ -19,15 +19,15 @@ export interface QRows {
     {
       "id": {
         "kind": "identifier",
-        "text": "A",
-        "span": [0, 1]
+        "span": [0, 1],
+        "text": "A"
       }
     },
     {
       "id": {
         "kind": "identifier",
-        "text": "K",
-        "span": [6, 9]
+        "span": [6, 9],
+        "text": "K"
       }
     }
   ]

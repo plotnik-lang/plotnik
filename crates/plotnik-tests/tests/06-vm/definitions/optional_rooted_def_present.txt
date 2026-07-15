@@ -21,13 +21,13 @@ export type MaybeId = Node | null;
 {
   "first": {
     "kind": "identifier",
-    "text": "a",
-    "span": [1, 2]
+    "span": [1, 2],
+    "text": "a"
   },
   "n": {
     "kind": "number",
-    "text": "1",
-    "span": [4, 5]
+    "span": [4, 5],
+    "text": "1"
   }
 }
 -------------------- BYTECODE --------------------

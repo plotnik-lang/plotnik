@@ -14,8 +14,8 @@ export interface Q {
 {
   "id": {
     "kind": "identifier",
-    "text": "value",
-    "span": [0, 5]
+    "span": [0, 5],
+    "text": "value"
   },
   "statement": "value;"
 }

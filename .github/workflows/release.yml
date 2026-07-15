@@ -35,8 +35,36 @@ jobs:
       - name: Arborium smoke test
         run: make test-arborium
 
+  codegen-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: stable
+          components: clippy,rustfmt
+
+      - name: Using Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          cache-all-crates: "true"
+          prefix-key: v0-rust-codegen-release
+
+      - name: Generate Rust fixtures
+        run: make codegen-rust
+
+      - name: Lint generated Rust
+        run: make lint-codegen-rust
+
+      - name: Test generated Rust
+        run: make test-codegen-rust
+
   publish:
-    needs: verify
+    needs: [verify, codegen-rust]
     runs-on: ubuntu-latest
     environment: crates-io
     steps:

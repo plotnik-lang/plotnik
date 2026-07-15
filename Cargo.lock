@@ -2190,6 +2190,7 @@ version = "0.4.0"
 dependencies = [
  "plotnik-rt-core",
  "serde",
+ "serde_json",
  "tree-sitter",
 ]
 

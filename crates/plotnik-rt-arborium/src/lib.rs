@@ -5,6 +5,9 @@
 //! backend-independent state and instruction vocabulary come from
 //! `plotnik-rt-core` and are re-exported here as one public runtime API.
 
+#[cfg(feature = "debug")]
+pub mod debug;
+
 mod cursor;
 mod engine;
 mod journal;
@@ -13,6 +16,9 @@ mod result_decoder;
 mod serialize;
 mod surface;
 
+#[cfg(test)]
+#[cfg(feature = "debug")]
+mod debug_tests;
 #[cfg(test)]
 mod journal_tests;
 #[cfg(test)]

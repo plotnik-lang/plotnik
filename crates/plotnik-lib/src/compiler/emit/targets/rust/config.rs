@@ -8,6 +8,8 @@ use plotnik_rt::{Limit, RuntimeLimitSpec};
 pub struct Config {
     /// Rust output-type configuration shared with the type renderer.
     pub(crate) rust_types: RustTypesConfig,
+    /// Whether to emit the JSON surface used by generated-code golden tests.
+    pub(crate) debug: bool,
     /// The limit policy compiled into the module's safe entry points.
     /// Chosen at generation time, never at the call site: the query is
     /// trusted, the input is not, and the query's author is the one who knows
@@ -28,6 +30,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             rust_types: RustTypesConfig::new(),
+            debug: false,
             limits: RuntimeLimitSpec {
                 fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
@@ -51,6 +54,11 @@ impl Config {
     /// Also emit `SerializeWithSource` impls for the result types.
     pub fn serde(mut self, enabled: bool) -> Self {
         self.rust_types = self.rust_types.serde(enabled);
+        self
+    }
+
+    pub fn debug(mut self, enabled: bool) -> Self {
+        self.debug = enabled;
         self
     }
 

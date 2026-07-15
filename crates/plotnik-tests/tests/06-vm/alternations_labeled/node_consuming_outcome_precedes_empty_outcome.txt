@@ -17,14 +17,14 @@ export type QX =
 --------------------- OUTPUT ---------------------
 {
   "x": {
-    "$tag": "B",
     "$data": {
       "d": {
         "kind": "debugger_statement",
-        "text": "debugger;",
-        "span": [0, 9]
+        "span": [0, 9],
+        "text": "debugger;"
       }
-    }
+    },
+    "$tag": "B"
   }
 }
 -------------------- BYTECODE --------------------

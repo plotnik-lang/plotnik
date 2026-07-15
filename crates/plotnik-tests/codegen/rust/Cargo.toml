@@ -1,0 +1,14 @@
+[package]
+name = "plotnik-codegen-rust-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+arborium-dart = "=2.18.1"
+arborium-javascript = "=2.18.1"
+arborium-typescript = "=2.18.1"
+plotnik-rt = { path = "../../../plotnik-rt", features = ["debug"] }
+tree-sitter = "=0.26.10"
+
+[workspace]

@@ -14,8 +14,13 @@ use ::plotnik_rt::Node;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr<'t> {
-    Lit { value: Node<'t> },
-    Binary { left: ::std::boxed::Box<Expr<'t>>, right: ::std::boxed::Box<Expr<'t>> },
+    Lit {
+        value: Node<'t>,
+    },
+    Binary {
+        left: ::std::boxed::Box<Expr<'t>>,
+        right: ::std::boxed::Box<Expr<'t>>,
+    },
 }
 
 impl ::plotnik_rt::SerializeWithSource for Expr<'_> {
@@ -36,17 +41,17 @@ impl ::plotnik_rt::SerializeWithSource for Expr<'_> {
                     source: &'a str,
                 }
                 impl ::plotnik_rt::serde::Serialize for Data<'_, '_> {
-                    fn serialize<S>(
-                        &self,
-                        serializer: S,
-                    ) -> ::core::result::Result<S::Ok, S::Error>
+                    fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
                     where
                         S: ::plotnik_rt::serde::Serializer,
                     {
                         use ::plotnik_rt::serde::ser::SerializeMap as _;
 
                         let mut map = serializer.serialize_map(Some(1))?;
-                        map.serialize_entry("value", &::plotnik_rt::WithSource::new(self.v0, self.source))?;
+                        map.serialize_entry(
+                            "value",
+                            &::plotnik_rt::WithSource::new(self.v0, self.source),
+                        )?;
                         map.end()
                     }
                 }
@@ -63,18 +68,21 @@ impl ::plotnik_rt::SerializeWithSource for Expr<'_> {
                     source: &'a str,
                 }
                 impl ::plotnik_rt::serde::Serialize for Data<'_, '_> {
-                    fn serialize<S>(
-                        &self,
-                        serializer: S,
-                    ) -> ::core::result::Result<S::Ok, S::Error>
+                    fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
                     where
                         S: ::plotnik_rt::serde::Serializer,
                     {
                         use ::plotnik_rt::serde::ser::SerializeMap as _;
 
                         let mut map = serializer.serialize_map(Some(2))?;
-                        map.serialize_entry("left", &::plotnik_rt::WithSource::new(self.v0, self.source))?;
-                        map.serialize_entry("right", &::plotnik_rt::WithSource::new(self.v1, self.source))?;
+                        map.serialize_entry(
+                            "left",
+                            &::plotnik_rt::WithSource::new(self.v0, self.source),
+                        )?;
+                        map.serialize_entry(
+                            "right",
+                            &::plotnik_rt::WithSource::new(self.v1, self.source),
+                        )?;
                         map.end()
                     }
                 }

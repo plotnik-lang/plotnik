@@ -24,10 +24,10 @@ export interface QRight {
 }
 --------------------- OUTPUT ---------------------
 {
-  "right": null,
   "left": {
     "comment": null
-  }
+  },
+  "right": null
 }
 -------------------- BYTECODE --------------------
 [strings]

@@ -27,6 +27,8 @@ target
 
 docs/tmp
 tmp/
+/crates/plotnik-tests/codegen/rust/tests/
+/crates/plotnik-tests/codegen/rust/tests.pending-*/
 
 # Code coverage
 lcov.info

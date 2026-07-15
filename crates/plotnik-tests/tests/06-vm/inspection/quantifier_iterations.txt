@@ -14,18 +14,18 @@ export interface Q {
   "stmts": [
     {
       "kind": "expression_statement",
-      "text": "a",
-      "span": [0, 1]
+      "span": [0, 1],
+      "text": "a"
     },
     {
       "kind": "expression_statement",
-      "text": "b",
-      "span": [2, 3]
+      "span": [2, 3],
+      "text": "b"
     },
     {
       "kind": "expression_statement",
-      "text": "c",
-      "span": [4, 5]
+      "span": [4, 5],
+      "text": "c"
     }
   ]
 }

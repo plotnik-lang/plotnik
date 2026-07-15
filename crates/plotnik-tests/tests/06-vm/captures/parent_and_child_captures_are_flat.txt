@@ -14,13 +14,13 @@ export interface Q {
 {
   "fn": {
     "kind": "function_declaration",
-    "text": "function foo() {}",
-    "span": [0, 17]
+    "span": [0, 17],
+    "text": "function foo() {}"
   },
   "name": {
     "kind": "identifier",
-    "text": "foo",
-    "span": [9, 12]
+    "span": [9, 12],
+    "text": "foo"
   }
 }
 -------------------- BYTECODE --------------------
