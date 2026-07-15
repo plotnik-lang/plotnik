@@ -30,7 +30,8 @@ Plotnik is the tool for working with Tree-sitter reliably:
 - Get structured results without walking the tree or assembling flat captures.
 - Bump grammar versions without fear: the static checker has your back.
 
----
+<br/>
+<br/>
 
 **Query**
 
@@ -64,7 +65,8 @@ async function fetchUser(userId, options) { ... }
 }
 ```
 
----
+<br/>
+<br/>
 
 ## Acknowledgments
 
