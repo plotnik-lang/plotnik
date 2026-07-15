@@ -22,6 +22,7 @@
 </p>
 
 <br/>
+<br/>
 
 Plotnik is the tool for working with Tree-sitter reliably:
 - Write queries with [familiar syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html).
