@@ -90,8 +90,10 @@ pub fn generate_command() -> Command {
   plotnik generate query.ptk --target rust --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json
   plotnik generate query.ptk --target rust -l javascript -o query.rs
 
-The generated module depends on the `plotnik-rt` crate and records the exact
-grammar name, SHA-256, and source used during binding."#,
+The generated module imports `plotnik_rt`. Depend on `plotnik-rt` for
+Tree-sitter or `plotnik-rt-arborium` for Arborium; both packages expose that
+crate name. The module records the exact grammar name, SHA-256, and source used
+during binding."#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")

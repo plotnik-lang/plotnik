@@ -1343,7 +1343,7 @@ loop {
 "#;
 
 const RETRY_CHECKPOINT: &str = r#"
-if @POLICY@.admits(&eng.node()) {
+if @POLICY@.admits(eng.node_class()) {
     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), @STATE@));
 }
 "#;

@@ -30,6 +30,12 @@ impl SkipPolicy {
             Self::Exact => SkipClass::Exact,
         }
     }
+
+    /// Whether this policy may skip a node with `class` while searching or
+    /// resuming past a failed candidate.
+    pub fn admits(self, class: crate::NodeClass) -> bool {
+        self.skip_class().admits(class)
+    }
 }
 
 /// Navigation command for VM execution.

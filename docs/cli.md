@@ -180,6 +180,10 @@ Generate a self-contained compiled matcher module. Rust is the first target;
 the generated file contains typed result types, `parse`/`matches` entry points,
 and the matcher that runs on `plotnik-rt`.
 
+Generated modules import `plotnik_rt`. Depend on `plotnik-rt` for Tree-sitter
+or `plotnik-rt-arborium` for Arborium; both packages expose that same Rust
+crate name and runtime API.
+
 ```sh
 # Bind using the bundled language registry
 plotnik generate query.ptk --target rust -l typescript -o query.rs

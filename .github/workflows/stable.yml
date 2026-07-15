@@ -48,6 +48,9 @@ jobs:
       - name: Test
         run: make test
 
+      - name: Arborium smoke test
+        run: make test-arborium
+
   feature-flags:
     runs-on: ubuntu-latest
     timeout-minutes: 15

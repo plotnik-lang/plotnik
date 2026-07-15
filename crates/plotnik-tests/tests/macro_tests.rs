@@ -1,7 +1,7 @@
 //! End-to-end tests of `query!` through the `plotnik` facade: grammar
-//! resolution against real dependency-graph packages (arborium and vanilla
-//! tree-sitter crates), the file form, compiled-in limits, the `crate`
-//! override, and the version-skew assert.
+//! resolution against real Arborium and Tree-sitter dependency-graph packages,
+//! the file form, compiled-in limits, and the version-skew
+//! assert.
 
 use plotnik::LimitExceeded;
 use plotnik::tree_sitter::{Language, Parser, Tree};
@@ -33,7 +33,7 @@ mod queries {
     }
 }
 
-mod vanilla {
+mod tree_sitter_package {
     plotnik::query! {
         "Q = (program (expression_statement (identifier) @id))",
         grammar = "tree-sitter-javascript",
@@ -75,14 +75,6 @@ mod depth_limited {
         "#,
         grammar = "arborium-javascript",
         depth = 1,
-    }
-}
-
-mod repointed {
-    plotnik::query! {
-        "Q = (program (expression_statement (identifier) @id))",
-        grammar = "arborium-javascript",
-        crate = ::plotnik::rt,
     }
 }
 
@@ -181,11 +173,11 @@ fn void_definition_exposes_matches() {
 }
 
 #[test]
-fn vanilla_tree_sitter_grammar_resolves() {
+fn tree_sitter_grammar_resolves() {
     let source = "x;";
     let tree = parse(&tree_sitter_javascript::LANGUAGE.into(), source);
 
-    let value = vanilla::Q::parse(&tree, source)
+    let value = tree_sitter_package::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -241,18 +233,6 @@ fn compiled_in_depth_limit_trips_parse_only() {
         Err(LimitExceeded::DecodeDepth(1))
     ));
     assert!(depth_limited::Q::matches(&tree, source).expect("matches ignores decode depth"));
-}
-
-#[test]
-fn crate_override_respells_the_runtime_path() {
-    let source = "x;";
-    let tree = parse(&js(), source);
-
-    assert!(
-        repointed::Q::parse(&tree, source)
-            .expect("auto limits fit")
-            .is_some()
-    );
 }
 
 #[test]

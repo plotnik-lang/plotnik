@@ -5,8 +5,7 @@
 //! All compilation logic lives in `plotnik-lib` (built compiler-only, no C);
 //! this crate only parses macro arguments, locates the grammar, and splices
 //! the generated module into the caller. Use it through the `plotnik` facade
-//! crate — generated code spells its runtime paths as `::plotnik::rt::...`
-//! unless re-pointed with the `crate` argument.
+//! crate — generated code spells its runtime paths as `::plotnik::rt::...`.
 
 use proc_macro::TokenStream;
 
@@ -40,8 +39,6 @@ mod grammar_source_tests;
 ///     `include_str!` — relative to the invoking file).
 /// - `file = "queries/q.ptk"` — read the query from a file (relative to the
 ///   invoking file) instead of an inline literal.
-/// - `crate = ::path::to::rt` — respell the runtime-crate path baked into
-///   generated code; defaults to `::plotnik::rt`.
 /// - `fuel = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`,
 ///   `depth = <n> | auto` — the limit policy compiled into the safe entry
 ///   points (default `auto`). `fuel` bounds matcher work,

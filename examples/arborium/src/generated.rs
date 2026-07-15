@@ -1,0 +1,516 @@
+// Grammar name: "javascript"
+// Grammar SHA-256: 8ed9a5635732be4c730a71625802082215e1c39a840212740d1869ed62237172
+// Grammar source: "arborium-javascript@2.18.1"
+// Generated Plotnik query module: typed result types, `parse`/`matches` entry
+// points, per-type result decoders, and the compiled matcher (`mod matcher`).
+// Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
+// dispatch arm carries its instruction in the dump format
+// (docs/binary-format/08-dump-format.md).
+
+use ::plotnik_rt as rt;
+
+pub const REQUIRED_RUNTIME_ABI: u32 = 4;
+
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Standalone<'t> {
+    pub id: Node<'t>,
+}
+
+impl<'t> Standalone<'t> {
+    /// Match `Standalone` against `tree` and decode its output events into
+    /// the typed result. `None` is the no-match outcome.
+    /// The module's compiled-in limits bound total work, live
+    /// backtracking state, and typed decode depth.
+    pub fn parse(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        let Some(journal) = matcher::standalone_journal_limited(tree, source)? else {
+            return Ok(None);
+        };
+        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);
+        let value = decode_standalone(&mut decoder);
+        decoder.finish();
+        Ok(Some(value))
+    }
+
+    /// Whether `Standalone` matches `tree` under the module's compiled-in limits.
+    pub fn matches(
+        tree: &rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        matcher::standalone_matches(tree, source)
+    }
+}
+
+impl<'t> rt::Matches for Standalone<'t> {
+    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        Standalone::matches(tree, source)
+    }
+}
+
+impl<'t, 's> rt::Parse<'t, 's> for Standalone<'t> {
+    fn parse(
+        tree: &'t rt::Tree,
+        source: &'s str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        Standalone::parse(tree, source)
+    }
+}
+
+/// Decode one committed `Standalone` value.
+fn decode_standalone<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Standalone<'t> {
+    decoder.expect_record_open();
+    let mut v0 = None; // id
+    while !decoder.at_record_close() {
+        match decoder.peek_record_set() {
+            // id
+            0 => v0 = Some(decoder.expect_node()),
+            other => unreachable!("journal shape proven at emit: `Standalone` has no member index {other}"),
+        }
+        decoder.expect_record_set();
+    }
+    decoder.expect_record_close();
+    Standalone {
+        id: v0.expect("field-stability: every accepting path sets `id`"),
+    }
+}
+
+pub use self::matcher::{standalone_journal};
+
+/// The compiled matcher: engine machinery shielded from the query's
+/// type namespace.
+mod matcher {
+    use ::plotnik_rt as rt;
+
+    /// The limit policy compiled into the safe entry points, resolved against
+    /// each input's node count. Chosen at generation time, never at the call
+    /// site: the query is trusted, the input is not.
+    const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
+        fuel_limit: rt::Limit::Auto,
+        memory: rt::Limit::Auto,
+    };
+
+    /// No ceilings — what the unmetered journal entry points run under.
+    const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
+        fuel_limit: None,
+        max_memory: None,
+    };
+
+    /// Bitmask selecting the matcher dispatches on which the memory ceiling is
+    /// sampled; must be a power of two minus one. Twin of the VM's constant.
+    const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
+
+    /// Conservative maximum native-stack bytes used by one typed decoder
+    /// frame before runtime padding.
+    pub(super) const MAX_DECODER_FRAME_BYTES: u64 = 232;
+
+    /// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
+    /// matcher itself is iterative; only decoder recursion enters this guard.
+    pub(super) const MAX_DECODE_DEPTH: Option<u64> = Some(rt::decode_depth_auto(232));
+
+    /// Resolve [`LIMITS`] against this input's node count, exactly like
+    /// `VM::builder(...).build()` resolves the VM's.
+    fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
+        let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
+        LIMITS.resolve(source_nodes)
+    }
+
+    const GRAMMAR_NAME: &str = "javascript";
+    const GRAMMAR_SHA256: &str = "8ed9a5635732be4c730a71625802082215e1c39a840212740d1869ed62237172";
+    const GRAMMAR_SOURCE: &str = "arborium-javascript@2.18.1";
+
+    /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
+    /// as the generation-time grammar defines them.
+    const EXPECTED_KINDS: &[(u16, &str, bool)] = &[
+        (1, "identifier", true),
+        (134, "program", true),
+        (150, "expression_statement", true),
+    ];
+
+    /// Field ids baked into the field checks: `(id, name)`.
+    const EXPECTED_FIELDS: &[(u16, &str)] = &[];
+
+    /// A parser built from any other grammar version could renumber the baked
+    /// kind/field ids and silently mis-match, so mismatches panic: version skew
+    /// between the generation-time grammar and the runtime parser is a build
+    /// mistake, not a runtime condition to recover from.
+    ///
+    /// Every `run` checks its own tree — the walk is a handful of id lookups,
+    /// noise next to a match — so the guarantee holds per call, not per process:
+    /// a process that mixes languages (or grammar versions of one language) must
+    /// fail on the wrong tree, not only on the first one it ever saw.
+    fn verify_language(tree: &rt::Tree) {
+        let language = tree.language();
+        for &(id, name, named) in EXPECTED_KINDS {
+            let found = language.node_kind_for_id(id);
+            if found != Some(name) || language.node_kind_is_named(id) != named {
+                panic!(
+                    "grammar version skew: this query module was generated against {} \
+                     ({}, grammar.json SHA-256 {}) where node kind {id} is {name:?}, \
+                     but the tree's language says {found:?} — regenerate against the \
+                     grammar.json belonging to the parser that produced the tree",
+                    GRAMMAR_NAME,
+                    GRAMMAR_SOURCE,
+                    GRAMMAR_SHA256,
+                );
+            }
+        }
+        for &(id, name) in EXPECTED_FIELDS {
+            let found = language.field_name_for_id(id);
+            if found != Some(name) {
+                panic!(
+                    "grammar version skew: this query module was generated against {} \
+                     ({}, grammar.json SHA-256 {}) where field {id} is {name:?}, but \
+                     the tree's language says {found:?} — regenerate against the \
+                     grammar.json belonging to the parser that produced the tree",
+                    GRAMMAR_NAME,
+                    GRAMMAR_SOURCE,
+                    GRAMMAR_SHA256,
+                );
+            }
+        }
+    }
+
+    // Dense runtime state ids, in NFA label order.
+    // Standalone:
+    const S01_STANDALONE: u16 = 0;
+    const S02_STANDALONE: u16 = 1;
+    const S04_STANDALONE: u16 = 2;
+    const S05_STANDALONE: u16 = 3;
+    const S06_STANDALONE: u16 = 4;
+    const S07_STANDALONE_EP: u16 = 5;
+    const S08_STANDALONE_EP: u16 = 6;
+    const S09_STANDALONE_EP: u16 = 7;
+    const S10_STANDALONE_EP: u16 = 8;
+
+    /// Match the `Standalone` entry point against `tree`. `Some` carries the committed
+    /// match journal — the same event sequence the VM commits for this query.
+    pub fn standalone_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
+        let outcome = run::<false, false, true>(tree, source, S10_STANDALONE_EP, NO_LIMITS);
+        outcome.expect("an unmetered run cannot exceed a limit")
+    }
+
+    /// [`standalone_journal`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn standalone_journal_limited<'t>(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        run::<true, true, true>(tree, source, S10_STANDALONE_EP, resolved_limits(tree))
+    }
+
+    /// Whether `Standalone` accepts under [`LIMITS`] without recording output events.
+    pub(super) fn standalone_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+        Ok(run::<true, true, false>(tree, source, S10_STANDALONE_EP, resolved_limits(tree))?.is_some())
+    }
+
+    /// What a dispatched state hands back to the driver loop.
+    enum Flow {
+        /// Continue at this state.
+        Jump(u16),
+        /// The entry point accepted; the match journal is committed.
+        Accept,
+        /// The state failed; unwind the checkpoint stack.
+        Backtrack,
+    }
+
+    /// How the backtrack unwind resumed execution.
+    enum Unwound {
+        Resumed(u16),
+        Accepted,
+        NoMatch,
+    }
+
+    /// One dispatch loop serves every entry point; `entry` selects the wrapper.
+    /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
+    /// independently: each folds away when its resource is unbounded, so a fully
+    /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
+    /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
+    /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
+    /// disables it to avoid output allocation and decode-depth failures. (No
+    /// let-chains: generated code targets the embedding crate's edition.)
+    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const RECORD_OUTPUT_EVENTS: bool>(
+        tree: &'t rt::Tree,
+        source: &str,
+        entry: u16,
+        limits: rt::ResolvedRuntimeLimits,
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        verify_language(tree);
+        let mut eng = if RECORD_OUTPUT_EVENTS {
+            rt::Engine::new(tree.walk())
+        } else {
+            rt::Engine::new_match_only(tree.walk())
+        };
+        let mut fuel_used: u64 = 0;
+        let mut ip = entry;
+        loop {
+            if METERED_FUEL || METERED_MEMORY {
+                // One matcher dispatch currently consumes one fuel unit. The check
+                // folds out when fuel is unbounded; the counter still advances under
+                // a memory-only policy because the sample cadence below rides on it.
+                if METERED_FUEL {
+                    if let Some(limit) = limits.fuel_limit {
+                        if fuel_used >= limit {
+                            return Err(rt::LimitExceeded::OutOfFuel(limit));
+                        }
+                    }
+                }
+                fuel_used += 1;
+                // Memory ceiling: the live runtime heap, sampled every
+                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-dispatch growth is bounded,
+                // so the unobserved overshoot is noise (see the VM loop). Folded
+                // out when memory is unbounded, so no `heap_bytes` read survives.
+                if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
+                    let used = eng.heap_bytes();
+                    if let Some(max) = limits.max_memory {
+                        if used > max {
+                            return Err(rt::LimitExceeded::Memory { used, limit: max });
+                        }
+                    }
+                }
+            }
+            match dispatch(&mut eng, source, ip) {
+                Flow::Jump(next) => ip = next,
+                Flow::Accept => return Ok(Some(eng.into_journal())),
+                Flow::Backtrack => match backtrack(&mut eng, source) {
+                    Unwound::Resumed(next) => ip = next,
+                    Unwound::Accepted => return Ok(Some(eng.into_journal())),
+                    Unwound::NoMatch => return Ok(None),
+                },
+            }
+        }
+    }
+
+    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+        match ip {
+            //   01                                        ▶
+            S01_STANDALONE => {
+                if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                }
+            }
+            //   02   !   (program)                        04
+            S02_STANDALONE => 'state: {
+                if !cand_s02_standalone(eng) {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S04_STANDALONE)
+            }
+            //   04  └‣─  (expression_statement)           06
+            S04_STANDALONE => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                loop {
+                    if cand_s04_standalone(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        break 'state Flow::Backtrack;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_STANDALONE));
+                }
+                finish_s04_standalone(eng)
+            }
+            //   05  ─‣┘² _                                01
+            S05_STANDALONE => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S01_STANDALONE)
+            }
+            //   06  └‣─  (identifier) [Node RecordSet(id)]  05
+            S06_STANDALONE => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                loop {
+                    if cand_s06_standalone(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        break 'state Flow::Backtrack;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_STANDALONE));
+                }
+                finish_s06_standalone(eng)
+            }
+            //   07                                        ▶
+            S07_STANDALONE_EP => {
+                if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned empty");
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                }
+            }
+            //   08  -ε-  [RecordClose]                    07
+            S08_STANDALONE_EP => {
+                eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
+                Flow::Jump(S07_STANDALONE_EP)
+            }
+            //   09       (Standalone)                     02 : 08
+            S09_STANDALONE_EP => {
+                eng.enter_frame(S08_STANDALONE_EP);
+                Flow::Jump(S02_STANDALONE)
+            }
+            //   10  -ε-  [RecordOpen]                     09
+            S10_STANDALONE_EP => {
+                eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
+                Flow::Jump(S09_STANDALONE_EP)
+            }
+            _ => unreachable!("ip {ip} is not a generated state"),
+        }
+    }
+
+    /// `S02_STANDALONE` candidate: `(program)`.
+    #[inline]
+    fn cand_s02_standalone(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (program)
+        if node.kind_id() != 134 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S04_STANDALONE` candidate: `(expression_statement)`.
+    #[inline]
+    fn cand_s04_standalone(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (expression_statement)
+        if node.kind_id() != 150 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S06_STANDALONE` candidate: `(identifier)`.
+    #[inline]
+    fn cand_s06_standalone(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (identifier)
+        if node.kind_id() != 1 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S04_STANDALONE` post-acceptance: effects, then successor dispatch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate emits exactly
+    /// what the original acceptance would have emitted.
+    #[inline]
+    fn finish_s04_standalone(_eng: &mut rt::Engine<'_>) -> Flow {
+        Flow::Jump(S06_STANDALONE)
+    }
+
+    /// `S06_STANDALONE` post-acceptance: effects, then successor dispatch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate emits exactly
+    /// what the original acceptance would have emitted.
+    #[inline]
+    fn finish_s06_standalone(eng: &mut rt::Engine<'_>) -> Flow {
+        eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(id)
+        Flow::Jump(S05_STANDALONE)
+    }
+
+    /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
+    /// Match checkpoints advance their sibling search and re-enter. Loops, never
+    /// recurses — a run of exhausted retries unwinds in one call.
+    fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
+        'unwind: loop {
+            let Some((cp, snapshot)) = eng.pop_checkpoint() else {
+                return Unwound::NoMatch;
+            };
+            eng.restore_checkpoint_state(cp.state, snapshot);
+
+            match cp.resume {
+                rt::Resume::Successor => return Unwound::Resumed(cp.ip),
+
+                // Call retry: advance to the next candidate satisfying the field
+                // constraint, then re-enter the callee. Exhausted siblings keep
+                // unwinding to an earlier checkpoint.
+                rt::Resume::Call(resume) => {
+                    if !eng.cursor_mut().continue_search(resume.policy) {
+                        continue 'unwind;
+                    }
+                    if let Some(field_id) = resume.field {
+                        loop {
+                            if eng.cursor().field_id() == Some(field_id) {
+                                break;
+                            }
+                            if !eng.cursor_mut().continue_search(resume.policy) {
+                                continue 'unwind;
+                            }
+                        }
+                    }
+                    eng.push_checkpoint(rt::Checkpoint::call_retry(
+                        eng.checkpoint_state(),
+                        cp.ip,
+                        resume,
+                    ));
+                    eng.enter_frame(resume.next);
+                    return Unwound::Resumed(resume.target);
+                }
+
+                // Match retry: advance past the accepted-but-failed candidate and
+                // re-run that state's sibling search from there.
+                rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
+                    Some(Flow::Jump(next)) => return Unwound::Resumed(next),
+                    Some(Flow::Accept) => return Unwound::Accepted,
+                    Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
+                    None => continue 'unwind,
+                },
+            }
+        }
+    }
+
+    fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
+        match ip {
+            S04_STANDALONE => {
+                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                    return None;
+                }
+                loop {
+                    if cand_s04_standalone(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        return None;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_STANDALONE));
+                }
+                Some(finish_s04_standalone(eng))
+            }
+            S06_STANDALONE => {
+                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                    return None;
+                }
+                loop {
+                    if cand_s06_standalone(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        return None;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_STANDALONE));
+                }
+                Some(finish_s06_standalone(eng))
+            }
+            _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
+        }
+    }
+}

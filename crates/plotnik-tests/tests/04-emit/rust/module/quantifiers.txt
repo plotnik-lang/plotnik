@@ -12,7 +12,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 3;
+pub const REQUIRED_RUNTIME_ABI: u32 = 4;
 
 use ::plotnik_rt::Node;
 
@@ -386,7 +386,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S10_Q));
                 }
                 finish_s10_q(eng)
@@ -553,7 +553,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S10_Q));
                 }
                 Some(finish_s10_q(eng))

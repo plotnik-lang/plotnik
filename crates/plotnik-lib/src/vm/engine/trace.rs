@@ -28,7 +28,7 @@ use crate::bytecode::{
 };
 use crate::core::{Colors, NodeFieldId};
 
-use plotnik_rt::{JournalEvent, ReturnOutcome};
+use plotnik_runtime::{JournalEvent, ReturnOutcome};
 
 /// Verbosity level for trace output.
 ///

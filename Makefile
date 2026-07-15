@@ -1,4 +1,4 @@
-.PHONY: check clippy test bench coverage coverage-lines check-wasm wasm-web clean
+.PHONY: check clippy test test-arborium bench coverage coverage-lines check-wasm wasm-web clean
 
 LLVM_PREFIX ?= /opt/homebrew/opt/llvm
 WASM_CC ?= $(LLVM_PREFIX)/bin/clang
@@ -30,6 +30,41 @@ test:
 		--quiet \
 		-- \
 		$(FILTER)
+
+test-arborium:
+	@diff -ru crates/plotnik-rt/src crates/plotnik-rt-arborium/src
+	@diff -ru crates/plotnik/src crates/plotnik-arborium/src
+	@cargo test \
+		--manifest-path crates/plotnik-rt-arborium/Cargo.toml \
+		--all-targets \
+		--all-features \
+		--quiet
+	@cargo clippy \
+		--manifest-path crates/plotnik-rt-arborium/Cargo.toml \
+		--all-targets \
+		--all-features \
+		-- \
+		-D warnings
+	@cargo clippy \
+		--manifest-path crates/plotnik-arborium/Cargo.toml \
+		--all-targets \
+		--all-features \
+		-- \
+		-D warnings
+	@mkdir -p target/arborium-smoke
+	@cargo run \
+		--package plotnik-cli \
+		--locked \
+		--quiet \
+		-- generate examples/arborium/query.ptk \
+		--target rust \
+		--lang javascript \
+		--output target/arborium-smoke/generated.rs
+	@cmp examples/arborium/src/generated.rs target/arborium-smoke/generated.rs
+	@cargo run \
+		--manifest-path examples/arborium/Cargo.toml \
+		--locked \
+		--quiet
 
 shot:
 	@# See AGENTS.md for diagnostic guidelines

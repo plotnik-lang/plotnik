@@ -2014,7 +2014,6 @@ version = "0.4.0"
 dependencies = [
  "plotnik-macros",
  "plotnik-rt",
- "tree-sitter",
 ]
 
 [[package]]
@@ -2158,6 +2157,7 @@ dependencies = [
  "log",
  "logos",
  "plotnik-rt",
+ "plotnik-rt-core",
  "proptest",
  "regex-automata",
  "regex-syntax",
@@ -2180,7 +2180,7 @@ dependencies = [
  "crc32fast",
  "litrs",
  "plotnik-lib",
- "plotnik-rt",
+ "plotnik-rt-core",
  "serde_json",
 ]
 
@@ -2188,9 +2188,16 @@ dependencies = [
 name = "plotnik-rt"
 version = "0.4.0"
 dependencies = [
- "regex-automata",
+ "plotnik-rt-core",
  "serde",
  "tree-sitter",
+]
+
+[[package]]
+name = "plotnik-rt-core"
+version = "0.4.0"
+dependencies = [
+ "regex-automata",
 ]
 
 [[package]]

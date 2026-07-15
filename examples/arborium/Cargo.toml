@@ -1,0 +1,13 @@
+[package]
+name = "plotnik-arborium-smoke"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+arborium-javascript = "2.18.0"
+arborium-tree-sitter = "2.18.0"
+plotnik-arborium = { path = "../../crates/plotnik-arborium", features = ["serde"] }
+plotnik-rt-arborium = { path = "../../crates/plotnik-rt-arborium" }
+
+[workspace]

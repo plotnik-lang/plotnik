@@ -56,16 +56,27 @@ jobs:
           tomato set workspace.package.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-lib.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-rt.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-rt-core.version "$next" Cargo.toml
           # explicit path+version dependencies (default-features / feature overrides
           # that can't inherit from the workspace) need local version bumps too
           tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
           tomato set build-dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
           tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-macros/Cargo.toml
+          tomato set dependencies.plotnik-rt.version "$next" crates/plotnik-macros/Cargo.toml
           tomato set dependencies.plotnik-macros.version "$next" crates/plotnik/Cargo.toml
           tomato set dependencies.plotnik-rt.version "$next" crates/plotnik/Cargo.toml
+          tomato set dependencies.plotnik-rt.version "$next" crates/plotnik-lib/Cargo.toml
+          tomato set dependencies.plotnik-runtime.version "$next" crates/plotnik-lib/Cargo.toml
+          tomato set package.version "$next" crates/plotnik-rt-arborium/Cargo.toml
+          tomato set dependencies.plotnik-rt-core.version "$next" crates/plotnik-rt-arborium/Cargo.toml
+          tomato set package.version "$next" crates/plotnik-arborium/Cargo.toml
+          tomato set dependencies.plotnik-macros.version "$next" crates/plotnik-arborium/Cargo.toml
+          tomato set dependencies.plotnik-rt.version "$next" crates/plotnik-arborium/Cargo.toml
 
       - name: Update lockfile
-        run: cargo check --workspace
+        run: |
+          cargo check --workspace
+          cargo check --manifest-path examples/arborium/Cargo.toml
 
       - name: Create PR
         env:
@@ -75,7 +86,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "bump/v$next"
-          git add Cargo.toml Cargo.lock crates/plotnik-cli/Cargo.toml crates/plotnik-macros/Cargo.toml crates/plotnik/Cargo.toml
+          git add Cargo.toml Cargo.lock examples/arborium/Cargo.lock crates/plotnik-cli/Cargo.toml crates/plotnik-lib/Cargo.toml crates/plotnik-macros/Cargo.toml crates/plotnik/Cargo.toml crates/plotnik-rt-arborium/Cargo.toml crates/plotnik-arborium/Cargo.toml
           git commit -m "chore: Bump version to \`$next\`"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
           git push -u origin "bump/v$next"

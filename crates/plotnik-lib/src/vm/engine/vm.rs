@@ -10,7 +10,7 @@ use crate::bytecode::{
 
 use crate::core::NodeFieldId;
 
-use plotnik_rt::{
+use plotnik_runtime::{
     CallResume, Checkpoint, Engine, JournalEvent, MatchJournal, ResolvedRuntimeLimits, Resume,
     ReturnOutcome, RuntimeLimitSpec, SkipPolicy,
 };
@@ -36,7 +36,7 @@ pub struct RunStats {
 /// Virtual machine state for query execution.
 ///
 /// The engine core — cursor, frames, checkpoints, match journal, suppression —
-/// lives in [`plotnik_rt::Engine`], shared with generated matchers so the
+/// lives in [`plotnik_runtime::Engine`], shared with generated matchers so the
 /// checkpoint contract stays single-sourced. The VM keeps only the
 /// interpretive layer: the instruction pointer into decoded bytecode and the
 /// fuel/memory budget.
@@ -302,7 +302,7 @@ impl<'t> VM<'t> {
         policy: SkipPolicy,
         tracer: &mut T,
     ) {
-        if !m.nav.is_sibling_search() || !policy.admits(&self.engine.node()) {
+        if !m.nav.is_sibling_search() || !policy.admits(self.engine.node_class()) {
             return;
         }
 

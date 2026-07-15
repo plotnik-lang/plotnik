@@ -7,7 +7,7 @@ use crate::bytecode::{CodeAddr, EffectKind, Instruction, Module, ModuleRenderCon
 use crate::core::NodeFieldId;
 
 use super::trace::Tracer;
-use plotnik_rt::JournalEvent;
+use plotnik_runtime::JournalEvent;
 
 #[derive(Debug, Serialize)]
 pub struct ExecutionTrace {
@@ -317,7 +317,7 @@ impl Tracer for TraceRecorder {
         );
     }
 
-    fn trace_return(&mut self, _outcome: plotnik_rt::ReturnOutcome) {
+    fn trace_return(&mut self, _outcome: plotnik_runtime::ReturnOutcome) {
         self.add_record(TraceEvent::Return, None);
     }
 

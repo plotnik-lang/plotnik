@@ -12,7 +12,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 3;
+pub const REQUIRED_RUNTIME_ABI: u32 = 4;
 
 use ::plotnik_rt::Node;
 
@@ -362,7 +362,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_Q));
                 }
                 finish_s04_q(eng)
@@ -387,7 +387,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_Q));
                 }
                 finish_s06_q(eng)
@@ -540,7 +540,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_Q));
                 }
                 Some(finish_s04_q(eng))
@@ -557,7 +557,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_Q));
                 }
                 Some(finish_s06_q(eng))
