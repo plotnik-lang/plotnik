@@ -70,7 +70,6 @@ Function = (program
 ```
 
 <br/>
-<br/>
 
 ## Acknowledgments
 
