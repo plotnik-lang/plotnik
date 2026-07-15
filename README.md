@@ -9,8 +9,7 @@
 <br/>
 
 <p align="center">
-  A type-safe query language for <a href="https://tree-sitter.github.io">Tree-sitter</a>.<br/>
-  Powered by the <a href="https://github.com/bearcove/arborium">arborium</a> grammar collection.
+  A type-safe query language for <a href="https://tree-sitter.github.io">Tree-sitter</a><br/>
 </p>
 
 <br/>
@@ -24,214 +23,47 @@
 
 <br/>
 
-<p align="center">
-    <sub>
-      <strong>
-        ⚠️ BETA: NOT FOR PRODUCTION USE ⚠️<br/>
-      </strong>
-    </sub>
-</p>
+Plotnik is the tool for working with Tree-sitter reliably:
+- Write queries with [familiar syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html).
+- Generate extractors in your language (Rust + more to come).
+- Get structured results without walking the tree or assembling flat captures.
+- Bump grammar versions without fear: the static checker has your back.
 
-<br/>
+---
 
-Tree-sitter gives you the syntax tree. Extracting structured data from it still means writing imperative navigation code, null checks, and maintaining type definitions by hand. Plotnik makes extraction declarative: write a pattern, get typed data. The query is the type definition.
-
-## Features
-
-- [x] Static type inference from query structure
-- [x] Named expressions for composition and reuse
-- [x] Recursion for nested structures
-- [x] Enums (discriminated unions)
-- [x] TypeScript type generation
-- [x] CLI: `exec` for matches, `infer` for types, `ast`/`trace`/`dump` for debug
-- [ ] Full validation against grammar (reject queries that can never match)
-- [x] Compile-time queries via proc-macro (the `plotnik` crate's `query!`)
-- [ ] WASM
-- [ ] LSP, editor extensions
-
-## Installation
-
-```sh
-cargo install plotnik-cli
-```
-
-By default, 15 common languages are included. To add specific languages:
-
-```sh
-cargo install plotnik-cli --features lang-ruby,lang-elixir
-```
-
-Or with all 80+ languages:
-
-```sh
-cargo install plotnik-cli --features all-languages
-```
-
-## In Rust: compile-time queries
-
-The `plotnik` crate compiles a query at build time into typed Rust — output
-structs and enums with `parse`/`matches` entry points, no bytecode, no
-dynamic values:
-
-```toml
-[dependencies]
-plotnik = "0.4"
-tree-sitter-javascript = "0.25"
-```
-
-```rust
-// `query!` defines types, so invoke it at module scope — not inside a function.
-plotnik::query! {
-    r#"
-    Q = (program (expression_statement (identifier) @id))
-    "#,
-    grammar = "tree-sitter-javascript",
-}
-
-fn main() {
-    let source = "x;";
-    let mut parser = plotnik::tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
-    let tree = parser.parse(source, None).unwrap();
-
-    // Safe entry points run under compiled-in step/memory/depth limits.
-    let q = Q::parse(&tree, source)
-        .expect("auto limits fit")
-        .expect("matches"); // q.id: Node
-}
-```
-
-There is no built-in language list: `grammar = "..."` names any dependency
-that ships a `grammar.json` (`tree-sitter-*`, `arborium-*`, or your own
-grammar crate), so the compiled query is pinned to the exact grammar version
-your lockfile resolves. Invalid queries fail the build with the compiler's
-own diagnostics; `parse` and `matches` run under compiled-in limits for
-untrusted inputs.
-
-## Example
-
-Extract function signatures from Rust. `Type` references itself to handle nested generics like `Option<Vec<String>>`.
-
-`query.ptk`:
+**Query**
 
 ```clojure
-Type = [
-  Simple: [(type_identifier) (primitive_type)] @name
-  Generic: (generic_type
-    type: (type_identifier) @name
-    type_arguments: (type_arguments (Type)* @args))
-]
-
-Func = (function_item
-  name: (identifier) @name
-  parameters: (parameters
-    (parameter
-      pattern: (identifier) @param
-      type: (Type) @type
-    )* @params))
-
-Funcs = (source_file (Func)* @funcs)
+Function = (program
+  (function_declaration
+    "async"? @async :: bool
+    name: (identifier) @name :: str
+    parameters: (formal_parameters
+      (identifier)* @args :: str
+    )
+    body: (statement_block) @body
+  )
+)
 ```
 
-`lib.rs`:
+**Input**
 
-```rust
-fn get(key: Option<Vec<String>>) {}
-
-fn set(key: String, val: i32) {}
+```javascript
+async function fetchUser(userId, options) { ... }
 ```
 
-Plotnik infers TypeScript types from the query structure. `Type` is recursive: `args: Type[]`.
+**Output**
 
-```sh
-❯ plotnik infer query.ptk --lang rust
-export interface Node {
-  kind: string;
-  text: string;
-  span: [number, number];
-}
-
-export interface TypeSimple {
-  $tag: "Simple";
-  $data: { name: Node };
-}
-
-export interface TypeGeneric {
-  $tag: "Generic";
-  $data: { args: Type[]; name: Node };
-}
-
-export type Type = TypeSimple | TypeGeneric;
-
-export interface FuncParams {
-  param: Node;
-  type: Type;
-}
-
-export interface Func {
-  name: Node;
-  params: FuncParams[];
-}
-
-export interface Funcs {
-  funcs: Func[];
-}
-```
-
-Run the query against `lib.rs` to extract structured JSON:
-
-```sh
-❯ plotnik exec query.ptk lib.rs --entry Funcs
+```ts
 {
-  "funcs": [
-    {
-      "name": { "kind": "identifier", "text": "get", "span": [3, 6] },
-      "params": [{
-        "param": { "kind": "identifier", "text": "key", "span": [7, 10] },
-        "type": {
-          "$tag": "Generic",
-          "$data": {
-            "name": { "kind": "type_identifier", "text": "Option", "span": [12, 18] },
-            "args": [{
-              "$tag": "Generic",
-              "$data": {
-                "name": { "kind": "type_identifier", "text": "Vec", "span": [19, 22] },
-                "args": [{
-                  "$tag": "Simple",
-                  "$data": { "name": { "kind": "type_identifier", "text": "String", "span": [23, 29] } }
-                }]
-              }
-            }]
-          }
-        }
-      }]
-    },
-    {
-      "name": { "kind": "identifier", "text": "set", "span": [40, 43] },
-      "params": [
-        {
-          "param": { "kind": "identifier", "text": "key", "span": [44, 47] },
-          "type": { "$tag": "Simple", "$data": { "name": { "kind": "type_identifier", "text": "String", "span": [49, 55] } } }
-        },
-        {
-          "param": { "kind": "identifier", "text": "val", "span": [57, 60] },
-          "type": { "$tag": "Simple", "$data": { "name": { "kind": "primitive_type", "text": "i32", "span": [62, 65] } } }
-        }
-      ]
-    }
-  ]
+  "async": true,
+  "name": "fetchUser",
+  "args": ["userId", "options"],
+  "body": <Node>
 }
 ```
 
-## Why
-
-Pattern matching over syntax trees is powerful, but tree-sitter queries produce flat capture lists. You still need to assemble the results, handle missing captures, and define types by hand. Plotnik closes this gap: the query describes structure, the engine guarantees it.
-
-## Documentation
-
-- [CLI Guide](docs/cli.md)
-- [Language Reference](docs/lang-reference.md)
-- [Type System](docs/type-system.md)
+---
 
 ## Acknowledgments
 
