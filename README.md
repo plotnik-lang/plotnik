@@ -52,7 +52,9 @@ Function = (program
 <p align="center"><b>Input</b></p>
 
 ```javascript
-async function fetchUser(userId, options) { ... }
+async function fetchUser(userId, options) {
+  ...
+}
 ```
 
 <br/>
