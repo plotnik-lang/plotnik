@@ -128,24 +128,47 @@ impl<'m, 'a> Emitter<'m, 'a> {
         let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
         let lt = self.lifetime_args(item_ty);
+        let payloads = variants
+            .values()
+            .map(|&payload| self.render_variant_payload(item_ty, payload))
+            .collect::<Vec<_>>();
+        let expand_payloads = payloads
+            .iter()
+            .flatten()
+            .any(|fields| fields.join(", ").len() > 35);
 
         let mut out = Sink::<()>::new();
         out.line(DERIVES);
         out.line(&format!("pub enum {ident}{lt} {{"));
         out.indented(|out| {
-            for ((_, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
-                let payload = self.render_variant_payload(item_ty, payload);
-                out.line(&format!("{variant_ident}{payload},"));
+            for (fields, variant_ident) in payloads.iter().zip(&variant_idents) {
+                let Some(fields) = fields else {
+                    out.line(&format!("{variant_ident},"));
+                    continue;
+                };
+                if !expand_payloads {
+                    out.line(&format!("{variant_ident} {{ {} }},", fields.join(", ")));
+                    continue;
+                }
+                out.line(&format!("{variant_ident} {{"));
+                out.indented(|out| {
+                    for field in fields {
+                        out.line(&format!("{field},"));
+                    }
+                });
+                out.line("},");
             }
         });
         out.push("}");
         out.plain().to_string()
     }
 
-    fn render_variant_payload(&mut self, item_ty: TypeId, payload: CasePayload) -> String {
-        let Some(payload) = payload.type_id() else {
-            return String::new();
-        };
+    fn render_variant_payload(
+        &mut self,
+        item_ty: TypeId,
+        payload: CasePayload,
+    ) -> Option<Vec<String>> {
+        let payload = payload.type_id()?;
 
         let types = self.schema.types;
         let interner = self.schema.interner;
@@ -153,17 +176,18 @@ impl<'m, 'a> Emitter<'m, 'a> {
             unreachable!("enum variant has no payload or an anonymous record payload");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
-        let rendered: Vec<String> = fields
-            .values()
-            .zip(&field_idents)
-            .map(|(info, field_ident)| {
-                format!(
-                    "{field_ident}: {}",
-                    self.field_type(TypeContext::item(item_ty), info)
-                )
-            })
-            .collect();
-        format!(" {{ {} }}", rendered.join(", "))
+        Some(
+            fields
+                .values()
+                .zip(&field_idents)
+                .map(|(info, field_ident)| {
+                    format!(
+                        "{field_ident}: {}",
+                        self.field_type(TypeContext::item(item_ty), info)
+                    )
+                })
+                .collect(),
+        )
     }
 
     fn render_alias(&mut self, item: &Item) -> String {

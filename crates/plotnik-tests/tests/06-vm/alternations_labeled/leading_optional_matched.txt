@@ -31,13 +31,13 @@ help: capture the alternation (`[...] @name`) to make its labels produce variant
 {
   "a": {
     "kind": "expression_statement",
-    "text": "a;",
-    "span": [8, 10]
+    "span": [8, 10],
+    "text": "a;"
   },
   "b": {
     "kind": "expression_statement",
-    "text": "b;",
-    "span": [11, 13]
+    "span": [11, 13],
+    "text": "b;"
   }
 }
 -------------------- BYTECODE --------------------

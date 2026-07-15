@@ -21,7 +21,7 @@ use crate::commands::generate::GenerateTarget;
 fn generate_extracts_rust_target_and_grammar_path() {
     let matches = generate_command()
         .try_get_matches_from([
-            "generate",
+            "gen",
             "query.ptk",
             "--target",
             "rust",
@@ -29,6 +29,7 @@ fn generate_extracts_rust_target_and_grammar_path() {
             "grammar.json",
             "-o",
             "query.rs",
+            "--debug",
         ])
         .unwrap();
 
@@ -38,12 +39,58 @@ fn generate_extracts_rust_target_and_grammar_path() {
     assert_eq!(options.target, GenerateTarget::Rust);
     assert_eq!(options.grammar, Some(PathBuf::from("grammar.json")));
     assert_eq!(options.output, Some(PathBuf::from("query.rs")));
+    assert!(options.debug);
+}
+
+#[test]
+fn gen_is_canonical_and_generate_is_a_visible_alias() {
+    let command = build_cli();
+    let gen_command = command
+        .get_subcommands()
+        .find(|subcommand| subcommand.get_name() == "gen")
+        .expect("gen command is registered");
+
+    assert_eq!(
+        gen_command.get_visible_aliases().collect::<Vec<_>>(),
+        ["generate"]
+    );
+    assert_eq!(
+        build_cli()
+            .try_get_matches_from([
+                "plotnik",
+                "generate",
+                "query.ptk",
+                "--target",
+                "rust",
+                "-l",
+                "javascript"
+            ])
+            .unwrap()
+            .subcommand_name(),
+        Some("gen")
+    );
+}
+
+#[test]
+fn shell_completions_include_gen_and_generate() {
+    let mut command = build_cli();
+    let mut output = Vec::new();
+    clap_complete::generate(
+        clap_complete::Shell::Bash,
+        &mut command,
+        "plotnik",
+        &mut output,
+    );
+    let completion = String::from_utf8(output).unwrap();
+
+    assert!(completion.contains("plotnik,gen)"));
+    assert!(completion.contains("plotnik,generate)"));
 }
 
 #[test]
 fn generate_rejects_registry_and_external_grammar_together() {
     let result = generate_command().try_get_matches_from([
-        "generate",
+        "gen",
         "query.ptk",
         "--target",
         "rust",

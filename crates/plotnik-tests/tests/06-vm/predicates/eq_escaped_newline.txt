@@ -18,8 +18,8 @@ export interface Q {
 {
   "frag": {
     "kind": "string_fragment",
-    "text": "a\nb",
-    "span": [11, 14]
+    "span": [11, 14],
+    "text": "a\nb"
   }
 }
 -------------------- BYTECODE --------------------

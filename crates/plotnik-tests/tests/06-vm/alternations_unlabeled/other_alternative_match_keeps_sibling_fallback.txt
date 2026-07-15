@@ -18,8 +18,8 @@ export interface Q {
   "a": null,
   "b": {
     "kind": "number",
-    "text": "42",
-    "span": [0, 2]
+    "span": [0, 2],
+    "text": "42"
   }
 }
 -------------------- BYTECODE --------------------

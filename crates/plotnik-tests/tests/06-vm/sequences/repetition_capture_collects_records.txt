@@ -24,25 +24,25 @@ export interface QRows {
     {
       "decl": {
         "kind": "lexical_declaration",
-        "text": "let a;",
-        "span": [0, 6]
+        "span": [0, 6],
+        "text": "let a;"
       },
       "n": {
         "kind": "identifier",
-        "text": "a",
-        "span": [4, 5]
+        "span": [4, 5],
+        "text": "a"
       }
     },
     {
       "decl": {
         "kind": "lexical_declaration",
-        "text": "let b;",
-        "span": [7, 13]
+        "span": [7, 13],
+        "text": "let b;"
       },
       "n": {
         "kind": "identifier",
-        "text": "b",
-        "span": [11, 12]
+        "span": [11, 12],
+        "text": "b"
       }
     }
   ]

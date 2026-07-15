@@ -36,17 +36,17 @@ warning: alternative labels have no output effect here: captures from the altern
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 --------------------- OUTPUT ---------------------
 {
-  "lead": null,
   "a": {
     "kind": "expression_statement",
-    "text": "a;",
-    "span": [0, 2]
+    "span": [0, 2],
+    "text": "a;"
   },
   "b": {
     "kind": "expression_statement",
-    "text": "b;",
-    "span": [3, 5]
-  }
+    "span": [3, 5],
+    "text": "b;"
+  },
+  "lead": null
 }
 -------------------- BYTECODE --------------------
 [strings]

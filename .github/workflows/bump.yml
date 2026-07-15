@@ -65,7 +65,9 @@ jobs:
           tomato set dependencies.plotnik-rt.version "$next" crates/plotnik/Cargo.toml
 
       - name: Update lockfile
-        run: cargo check --workspace
+        run: |
+          cargo check --workspace
+          cargo check --manifest-path crates/plotnik-tests/codegen/rust/Cargo.toml
 
       - name: Create PR
         env:
@@ -75,7 +77,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "bump/v$next"
-          git add Cargo.toml Cargo.lock crates/plotnik-cli/Cargo.toml crates/plotnik-macros/Cargo.toml crates/plotnik/Cargo.toml
+          git add \
+            Cargo.toml \
+            Cargo.lock \
+            crates/plotnik-cli/Cargo.toml \
+            crates/plotnik-macros/Cargo.toml \
+            crates/plotnik/Cargo.toml \
+            crates/plotnik-tests/codegen/rust/Cargo.lock
           git commit -m "chore: Bump version to \`$next\`"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
           git push -u origin "bump/v$next"

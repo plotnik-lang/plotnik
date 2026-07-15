@@ -14,8 +14,8 @@ export interface Q {
 {
   "e": {
     "kind": "expression_statement",
-    "text": "b;",
-    "span": [3, 5]
+    "span": [3, 5],
+    "text": "b;"
   }
 }
 -------------------- BYTECODE --------------------

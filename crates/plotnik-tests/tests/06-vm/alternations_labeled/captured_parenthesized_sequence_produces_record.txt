@@ -40,8 +40,8 @@ help: use `{(a) (b)}` to match a sequence of siblings
   "x": {
     "a": {
       "kind": "expression_statement",
-      "text": "a;",
-      "span": [0, 2]
+      "span": [0, 2],
+      "text": "a;"
     }
   }
 }

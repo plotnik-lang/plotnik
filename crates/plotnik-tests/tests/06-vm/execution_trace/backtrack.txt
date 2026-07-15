@@ -21,14 +21,14 @@ export type QExpr =
 --------------------- OUTPUT ---------------------
 {
   "expr": {
-    "$tag": "Good",
     "$data": {
       "good": {
         "kind": "identifier",
-        "text": "x",
-        "span": [0, 1]
+        "span": [0, 1],
+        "text": "x"
       }
-    }
+    },
+    "$tag": "Good"
   }
 }
 ---------------- EXECUTION_TRACE -----------------

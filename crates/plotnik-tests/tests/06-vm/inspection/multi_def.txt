@@ -23,15 +23,15 @@ export interface Q {
   "first": {
     "name": {
       "kind": "identifier",
-      "text": "a",
-      "span": [0, 1]
+      "span": [0, 1],
+      "text": "a"
     }
   },
   "second": {
     "name": {
       "kind": "identifier",
-      "text": "b",
-      "span": [2, 3]
+      "span": [2, 3],
+      "text": "b"
     }
   }
 }

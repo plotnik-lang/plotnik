@@ -15,8 +15,8 @@ export interface Q {
   "stmts": [
     {
       "kind": "expression_statement",
-      "text": "x;",
-      "span": [0, 2]
+      "span": [0, 2],
+      "text": "x;"
     }
   ]
 }

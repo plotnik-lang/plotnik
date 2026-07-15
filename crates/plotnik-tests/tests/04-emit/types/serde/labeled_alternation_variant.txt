@@ -33,17 +33,17 @@ impl ::plotnik_rt::SerializeWithSource for Q<'_> {
                     source: &'a str,
                 }
                 impl ::plotnik_rt::serde::Serialize for Data<'_, '_> {
-                    fn serialize<S>(
-                        &self,
-                        serializer: S,
-                    ) -> ::core::result::Result<S::Ok, S::Error>
+                    fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
                     where
                         S: ::plotnik_rt::serde::Serializer,
                     {
                         use ::plotnik_rt::serde::ser::SerializeMap as _;
 
                         let mut map = serializer.serialize_map(Some(1))?;
-                        map.serialize_entry("s", &::plotnik_rt::WithSource::new(self.v0, self.source))?;
+                        map.serialize_entry(
+                            "s",
+                            &::plotnik_rt::WithSource::new(self.v0, self.source),
+                        )?;
                         map.end()
                     }
                 }
@@ -59,17 +59,17 @@ impl ::plotnik_rt::SerializeWithSource for Q<'_> {
                     source: &'a str,
                 }
                 impl ::plotnik_rt::serde::Serialize for Data<'_, '_> {
-                    fn serialize<S>(
-                        &self,
-                        serializer: S,
-                    ) -> ::core::result::Result<S::Ok, S::Error>
+                    fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
                     where
                         S: ::plotnik_rt::serde::Serializer,
                     {
                         use ::plotnik_rt::serde::ser::SerializeMap as _;
 
                         let mut map = serializer.serialize_map(Some(1))?;
-                        map.serialize_entry("n", &::plotnik_rt::WithSource::new(self.v0, self.source))?;
+                        map.serialize_entry(
+                            "n",
+                            &::plotnik_rt::WithSource::new(self.v0, self.source),
+                        )?;
                         map.end()
                     }
                 }

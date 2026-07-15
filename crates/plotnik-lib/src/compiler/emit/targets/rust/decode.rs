@@ -152,9 +152,20 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         DecoderFrameEstimator::new(self.model, self.decode).max_bytes()
     }
 
+    pub(super) fn uses_decode_depth(&self) -> bool {
+        self.decode
+            .items()
+            .iter()
+            .any(|item| item.has_decoder() && item.fallible)
+    }
+
     /// The `parse`/`matches` surface, one block per selectable definition.
     /// Selectable definitions are nominal (`parse` + `matches`) or match-only (`matches`).
-    pub(super) fn parse_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
+    pub(super) fn parse_api(
+        &self,
+        entry_points: impl Iterator<Item = DefId>,
+        debug: bool,
+    ) -> String {
         let mut out = String::new();
         for def_id in entry_points {
             let name = self.deps.def_name_sym(def_id);
@@ -163,12 +174,14 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             let item = self.decode.item(name);
             match item.kind {
                 DecodeItemKind::Record(_) | DecodeItemKind::Variant(_) => {
-                    self.parse_impl(&mut out, &def, item);
+                    self.parse_impl(&mut out, &def, item, debug);
                 }
                 DecodeItemKind::Alias(_) => {
                     unreachable!("selectable definitions are nominal or match-only")
                 }
-                DecodeItemKind::MatchOnlyDefinition => self.matches_impl(&mut out, &def, item),
+                DecodeItemKind::MatchOnlyDefinition => {
+                    self.matches_impl(&mut out, &def, item, debug)
+                }
             }
         }
         out
@@ -176,17 +189,21 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
 
     /// `matches` for a match-only definition: it can only answer matched-or-not, and
     /// the public API is always metered.
-    fn matches_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
+    fn matches_impl(&self, out: &mut String, def: &str, item: &DecodeItem, debug: bool) {
         let ident = self.model.item_ident(item.name);
         let _ = writeln!(out, "impl {ident} {{");
         self.inherent_matches_method(out, def);
+        if debug {
+            let _ = writeln!(out);
+            self.match_only_debug_method(out);
+        }
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
         self.matches_trait_impl(out, item);
     }
 
     /// Inherent `parse`/`matches` on a nominal Rust result type (`struct` or `enum`).
-    fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
+    fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem, debug: bool) {
         let sig = InherentParseSignature::for_item(self.model, item);
         let decoder_fn = self.decoder_fn(item.name);
         let journal_fn = limited_journal_fn_name(def);
@@ -243,6 +260,10 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out);
         self.inherent_matches_method(out, def);
+        if debug {
+            let _ = writeln!(out);
+            self.result_debug_method(out, &sig);
+        }
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
         self.matches_trait_impl(out, item);
@@ -264,6 +285,60 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             "    ) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
         );
         let _ = writeln!(out, "        matcher::{matches_fn}(tree, source)");
+        let _ = writeln!(out, "    }}");
+    }
+
+    fn result_debug_method(&self, out: &mut String, sig: &InherentParseSignature) {
+        let _ = writeln!(
+            out,
+            "    /// Parse and render this result as canonical debug JSON."
+        );
+        let _ = writeln!(out, "    pub fn parse_to_json(");
+        let _ = writeln!(out, "        tree: {},", sig.tree_ref);
+        let _ = writeln!(out, "        source: {},", sig.source_ref);
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<::core::option::Option<::std::string::String>, rt::LimitExceeded>"
+        );
+        let _ = writeln!(out, "    {{");
+        let _ = writeln!(
+            out,
+            "        let Some(value) = Self::parse(tree, source)? else {{"
+        );
+        let _ = writeln!(out, "            return Ok(None);");
+        let _ = writeln!(out, "        }};");
+        let _ = writeln!(
+            out,
+            "        let json = rt::debug::to_json(&rt::WithSource::new(&value, source))"
+        );
+        let _ = writeln!(
+            out,
+            "            .expect(\"generated result must serialize to debug JSON\");"
+        );
+        let _ = writeln!(out, "        Ok(Some(json))");
+        let _ = writeln!(out, "    }}");
+    }
+
+    fn match_only_debug_method(&self, out: &mut String) {
+        let _ = writeln!(
+            out,
+            "    /// Match and render the match-only result as debug JSON null."
+        );
+        let _ = writeln!(out, "    pub fn parse_to_json(");
+        let _ = writeln!(out, "        tree: &rt::Tree,");
+        let _ = writeln!(out, "        source: &str,");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<::core::option::Option<::std::string::String>, rt::LimitExceeded>"
+        );
+        let _ = writeln!(out, "    {{");
+        let _ = writeln!(out, "        if !Self::matches(tree, source)? {{");
+        let _ = writeln!(out, "            return Ok(None);");
+        let _ = writeln!(out, "        }}");
+        let _ = writeln!(
+            out,
+            "        Ok(Some(::std::string::String::from(\"null\")))"
+        );
         let _ = writeln!(out, "    }}");
     }
 
@@ -330,21 +405,28 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let return_type = format!("{ident}{}", lifetime_args(self.model, item.value_type()));
         let decoder_fn = self.decoder_fn(item.name);
         let fallible = item.fallible;
-        let depth_param = if fallible {
-            ", depth: &rt::DecodeDepth"
-        } else {
-            ""
-        };
+        let depth_param = fallible.then_some("depth: &rt::DecodeDepth");
         let return_type = if fallible {
             format!("::core::result::Result<{return_type}, rt::LimitExceeded>")
         } else {
             return_type
         };
         let _ = writeln!(out, "/// Decode one committed `{ident}` value.");
-        let _ = writeln!(
-            out,
-            "fn {decoder_fn}{fn_generics}(decoder: &mut rt::ResultDecoder{decoder_generics}{depth_param}) -> {return_type} {{"
+        let mut params = vec![format!("decoder: &mut rt::ResultDecoder{decoder_generics}")];
+        params.extend(depth_param.map(str::to_string));
+        let compact = format!(
+            "fn {decoder_fn}{fn_generics}({}) -> {return_type} {{",
+            params.join(", ")
         );
+        if compact.len() <= 100 {
+            let _ = writeln!(out, "{compact}");
+        } else {
+            let _ = writeln!(out, "fn {decoder_fn}{fn_generics}(");
+            for param in params {
+                let _ = writeln!(out, "    {param},");
+            }
+            let _ = writeln!(out, ") -> {return_type} {{");
+        }
         if item.enters_depth {
             out.push_str("    let _depth = depth.enter()?;\n");
         }
@@ -394,9 +476,12 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             self.construct(out, &scope, payload, item.fallible);
             out.push_str("        }\n");
         }
-        let _ = writeln!(
+        unreachable_arm(
             out,
-            "        other => unreachable!(\"journal shape proven at emit: `{ident}` has no variant case at member index {{other}}\"),"
+            "        ",
+            &format!(
+                "journal shape proven at emit: `{ident}` has no variant case at member index {{other}}"
+            ),
         );
         out.push_str("    }\n");
         out.push_str("}\n");
@@ -432,14 +517,25 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "{p}    match decoder.peek_record_set() {{");
         for (index, field) in plan.fields.iter().enumerate() {
             let indices = arm_pattern(&field.indices);
-            let expr = self.value_expr(&field.value, scope.field_context());
+            let context = scope.field_context();
+            let mut expr = self.value_expr(&field.value, context);
             let _ = writeln!(out, "{p}        // {}", self.interner.resolve(field.name));
-            let _ = writeln!(out, "{p}        {indices} => v{index} = Some({expr}),");
+            if expr.contains('\n') {
+                expr = self.value_expr(&field.value, context.indented());
+                let _ = writeln!(out, "{p}        {indices} => {{");
+                let _ = writeln!(out, "{p}            v{index} = Some({expr})");
+                let _ = writeln!(out, "{p}        }}");
+            } else {
+                let _ = writeln!(out, "{p}        {indices} => v{index} = Some({expr}),");
+            }
         }
-        let _ = writeln!(
+        unreachable_arm(
             out,
-            "{p}        other => unreachable!(\"journal shape proven at emit: `{}` has no member index {{other}}\"),",
-            scope.name
+            &format!("{p}        "),
+            &format!(
+                "journal shape proven at emit: `{}` has no member index {{other}}",
+                scope.name
+            ),
         );
         let _ = writeln!(out, "{p}    }}");
         let _ = writeln!(out, "{p}    decoder.expect_record_set();");
@@ -464,10 +560,19 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         }
         for (index, (field, field_ident)) in plan.fields.iter().zip(&field_idents).enumerate() {
             let name = self.interner.resolve(field.name);
-            let _ = writeln!(
-                out,
+            let compact = format!(
                 "{p}    {field_ident}: v{index}.expect(\"field-stability: every accepting path sets `{name}`\"),"
             );
+            if compact.len() <= 100 {
+                let _ = writeln!(out, "{compact}");
+            } else {
+                let _ = writeln!(out, "{p}    {field_ident}: v{index}.expect(");
+                let _ = writeln!(
+                    out,
+                    "{p}        \"field-stability: every accepting path sets `{name}`\","
+                );
+                let _ = writeln!(out, "{p}    ),");
+            }
         }
         if fallible {
             let _ = writeln!(out, "{p}}})");
@@ -574,6 +679,13 @@ impl DecodeContext {
             list_depth: self.list_depth + 1,
         }
     }
+
+    fn indented(self) -> Self {
+        Self {
+            level: self.level + 1,
+            ..self
+        }
+    }
 }
 
 /// One struct-like scope from field collection through value construction.
@@ -651,4 +763,25 @@ fn lifetime_args(model: &TypeModel<'_>, ty: TypeId) -> &'static str {
         (false, true) => "<'s>",
         (true, true) => "<'t, 's>",
     }
+}
+
+fn unreachable_arm(out: &mut String, indent: &str, message: &str) {
+    let message = format!("{message:?}");
+    let compact = format!("{indent}other => unreachable!({message}),");
+    if compact.len() <= 100 {
+        let _ = writeln!(out, "{compact}");
+        return;
+    }
+
+    let _ = writeln!(out, "{indent}other => {{");
+    let call_indent = format!("{indent}    ");
+    let compact_call = format!("{call_indent}unreachable!({message})");
+    if compact_call.len() <= 100 {
+        let _ = writeln!(out, "{compact_call}");
+    } else {
+        let _ = writeln!(out, "{call_indent}unreachable!(");
+        let _ = writeln!(out, "{call_indent}    {message}");
+        let _ = writeln!(out, "{call_indent})");
+    }
+    let _ = writeln!(out, "{indent}}}");
 }

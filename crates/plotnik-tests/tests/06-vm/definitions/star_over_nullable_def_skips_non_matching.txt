@@ -26,8 +26,8 @@ export interface AX {
       "x": {
         "id": {
           "kind": "identifier",
-          "text": "a",
-          "span": [0, 1]
+          "span": [0, 1],
+          "text": "a"
         }
       }
     },
@@ -35,8 +35,8 @@ export interface AX {
       "x": {
         "id": {
           "kind": "identifier",
-          "text": "b",
-          "span": [13, 14]
+          "span": [13, 14],
+          "text": "b"
         }
       }
     }

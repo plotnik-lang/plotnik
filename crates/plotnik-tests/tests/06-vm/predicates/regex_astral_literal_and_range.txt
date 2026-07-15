@@ -11,8 +11,8 @@ export interface Q {
 {
   "comment": {
     "kind": "comment",
-    "text": "// 🦀🦀",
-    "span": [0, 11]
+    "span": [0, 11],
+    "text": "// 🦀🦀"
   }
 }
 -------------------- BYTECODE --------------------

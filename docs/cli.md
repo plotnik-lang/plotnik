@@ -15,7 +15,7 @@ plotnik check -q 'Func = (function_declaration) @fn' -l typescript
 plotnik infer -q 'Func = (function_declaration) @fn' -l typescript
 
 # Generate a compiled Rust matcher module
-plotnik generate query.ptk --target rust -l typescript -o query.rs
+plotnik gen query.ptk --target rust -l typescript -o query.rs
 
 # List supported languages
 plotnik lang list
@@ -34,7 +34,7 @@ plotnik lang dump typescript
 | `check`       | query | Validate query                  | Optional (enables grammar validation) |
 | `tree`        | both  | Show query and/or source trees  | Shebang or extension                  |
 | `infer`       | query | Generate type definitions       | Required                              |
-| `generate`    | query | Generate a compiled matcher     | Required unless `--grammar` is used   |
+| `gen`         | query | Generate a compiled matcher     | Required unless `--grammar` is used   |
 | `dump`        | query | Show bytecode                   | Optional (enables grammar binding)    |
 | `trace`       | both  | Trace query execution           | Shebang or extension                  |
 | `inspect`     | both  | Emit playground inspection JSON | Shebang or extension                  |
@@ -42,7 +42,8 @@ plotnik lang dump typescript
 | `lang dump`   | —     | Dump grammar for a language     | —                                     |
 | `completions` | —     | Generate shell completions      | —                                     |
 
-`exec` is kept as a hidden alias for `run`.
+`generate` is a visible alias for `gen`; `exec` is kept as a hidden alias for
+`run`.
 
 **Bare invocation**: when the first argument is a `.ptk` file, the `run`
 subcommand is implied — `plotnik query.ptk app.js` works. Combined with a
@@ -174,7 +175,7 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 | `--no-export`            | Don't add `export` keyword                          |
 | `--match-only-type TYPE` | Type for match-only results (`undefined` or `null`) |
 
-### generate
+### gen
 
 Generate a self-contained compiled matcher module. Rust is the first target;
 the generated file contains typed result types, `parse`/`matches` entry points,
@@ -182,15 +183,15 @@ and the matcher that runs on `plotnik-rt`.
 
 ```sh
 # Bind using the bundled language registry
-plotnik generate query.ptk --target rust -l typescript -o query.rs
+plotnik gen query.ptk --target rust -l typescript -o query.rs
 
 # Bind using the exact grammar shipped by the production parser package
-plotnik generate query.ptk --target rust \
+plotnik gen query.ptk --target rust \
   --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json \
   -o query.rs
 
 # Inline query to stdout
-plotnik generate -q 'Q = (program)' --target rust -l javascript
+plotnik gen -q 'Q = (program)' --target rust -l javascript
 ```
 
 The output records the grammar name, SHA-256 of the exact `grammar.json` bytes,
@@ -205,7 +206,12 @@ with `--grammar` pointing at the parser package used in production.
 | `--target rust`          | Generated-code target (currently Rust)             |
 | `-l, --lang LANG`        | Bind using the bundled registry grammar            |
 | `--grammar GRAMMAR_JSON` | Bypass the registry and bind using this exact file |
+| `--debug`                | Include target-specific debug support              |
 | `-o, --output FILE`      | Write the generated module instead of stdout       |
+
+For Rust, `--debug` adds `parse_to_json` to every callable definition and
+requires the generated module's `plotnik-rt` dependency to enable its `debug`
+feature. Normal generation does not expose the JSON helper.
 
 ### lang
 
@@ -404,7 +410,7 @@ already-bounded match journal.
 
 ## Input Modes
 
-### Query-Only Commands (check, dump, infer, generate)
+### Query-Only Commands (check, dump, infer, gen)
 
 These commands take a single input. Use either:
 

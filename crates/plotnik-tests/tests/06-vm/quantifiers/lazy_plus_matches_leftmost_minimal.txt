@@ -14,8 +14,8 @@ export interface Q {
   "d": [
     {
       "kind": "lexical_declaration",
-      "text": "let a;",
-      "span": [0, 6]
+      "span": [0, 6],
+      "text": "let a;"
     }
   ]
 }

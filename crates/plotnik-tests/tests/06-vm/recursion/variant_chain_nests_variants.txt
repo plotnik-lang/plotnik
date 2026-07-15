@@ -21,24 +21,24 @@ export interface Q {
 --------------------- OUTPUT ---------------------
 {
   "top": {
-    "$tag": "Step",
     "$data": {
       "inner": {
-        "$tag": "Step",
         "$data": {
           "inner": {
-            "$tag": "Base",
             "$data": {
               "name": {
                 "kind": "identifier",
-                "text": "a",
-                "span": [0, 1]
+                "span": [0, 1],
+                "text": "a"
               }
-            }
+            },
+            "$tag": "Base"
           }
-        }
+        },
+        "$tag": "Step"
       }
-    }
+    },
+    "$tag": "Step"
   }
 }
 -------------------- BYTECODE --------------------

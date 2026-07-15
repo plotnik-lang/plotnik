@@ -20,8 +20,8 @@ export interface Q {
   "fn": {
     "text": {
       "kind": "identifier",
-      "text": "foo",
-      "span": [9, 12]
+      "span": [9, 12],
+      "text": "foo"
     }
   }
 }

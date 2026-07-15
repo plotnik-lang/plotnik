@@ -15,13 +15,13 @@ export interface Q {
 {
   "a": {
     "kind": "identifier",
-    "text": "foo",
-    "span": [3, 6]
+    "span": [3, 6],
+    "text": "foo"
   },
   "d": {
     "kind": "debugger_statement",
-    "text": "debugger;",
-    "span": [8, 17]
+    "span": [8, 17],
+    "text": "debugger;"
   }
 }
 -------------------- BYTECODE --------------------

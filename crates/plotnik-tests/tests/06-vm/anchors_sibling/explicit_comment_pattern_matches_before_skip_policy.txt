@@ -17,13 +17,13 @@ export interface Q {
 {
   "doc": {
     "kind": "comment",
-    "text": "// doc",
-    "span": [0, 6]
+    "span": [0, 6],
+    "text": "// doc"
   },
   "fn": {
     "kind": "function_declaration",
-    "text": "function f() {}",
-    "span": [7, 22]
+    "span": [7, 22],
+    "text": "function f() {}"
   }
 }
 -------------------- BYTECODE --------------------

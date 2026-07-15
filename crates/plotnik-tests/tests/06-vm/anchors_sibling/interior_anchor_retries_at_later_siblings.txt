@@ -16,13 +16,13 @@ export interface Q {
 {
   "a": {
     "kind": "lexical_declaration",
-    "text": "let y;",
-    "span": [7, 13]
+    "span": [7, 13],
+    "text": "let y;"
   },
   "b": {
     "kind": "expression_statement",
-    "text": "foo;",
-    "span": [14, 18]
+    "span": [14, 18],
+    "text": "foo;"
   }
 }
 -------------------- BYTECODE --------------------

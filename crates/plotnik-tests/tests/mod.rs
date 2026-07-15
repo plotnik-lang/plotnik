@@ -67,7 +67,7 @@ use plotnik_lib::{
     RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TraceRecorder, TypeScriptBinding,
     TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
-use plotnik_tests::fixture::parse_section_header;
+use plotnik_tests::fixture::parse_document;
 use support::formatter::Assessment;
 use support::snapshots::{
     Fixture, FixtureKind, FixtureMode, GeneratedOutput, GeneratedSection, InspectionPolicy,
@@ -160,44 +160,22 @@ fn check(fx: &Fixture, mode: FixtureMode) -> Result<(), String> {
 }
 
 fn parse_fixture(raw: &str, kind: FixtureKind, name: &str) -> Result<Parsed, String> {
-    let normalized = raw.replace("\r\n", "\n");
-    let mut query_lines: Vec<&str> = Vec::new();
-    let mut sections: Vec<(String, Vec<&str>)> = Vec::new();
-    let mut current: Option<(String, Vec<&str>)> = None;
-
-    for line in normalized.lines() {
-        if let Some(name) = parse_section_header(line) {
-            if let Some(prev) = current.take() {
-                sections.push(prev);
-            }
-            current = Some((name, Vec::new()));
-        } else if let Some((_, body)) = current.as_mut() {
-            body.push(line);
-        } else {
-            query_lines.push(line);
-        }
-    }
-    if let Some(prev) = current.take() {
-        sections.push(prev);
-    }
-
-    let query = query_lines.join("\n");
-    if query.trim().is_empty() {
-        return Err("fixture has no query (text before the first `--- … ---` rule)".into());
-    }
+    let document = parse_document(raw)?;
+    let sections = document.sections;
 
     // Input is authored only as the first section; an `input`-looking header
     // anywhere later belongs to a regenerated artifact, not to the source.
     let (input, generated_start) = match sections.first() {
-        Some((name, body)) if name.as_str() == "input" || name.starts_with("input.") => {
-            let ext = name
+        Some(section) if section.name == "input" || section.name.starts_with("input.") => {
+            let ext = section
+                .name
                 .strip_prefix("input")
                 .and_then(|rest| rest.strip_prefix('.'))
                 .map(str::to_string);
             (
                 Some(Input {
                     ext,
-                    text: body.join("\n"),
+                    text: section.body.clone(),
                 }),
                 1,
             )
@@ -207,18 +185,22 @@ fn parse_fixture(raw: &str, kind: FixtureKind, name: &str) -> Result<Parsed, Str
 
     validate_generated_headers(kind, name, &sections[generated_start..])?;
 
-    Ok(Parsed { query, input })
+    Ok(Parsed {
+        query: document.query,
+        input,
+    })
 }
 
 fn validate_generated_headers(
     kind: FixtureKind,
     name: &str,
-    sections: &[(String, Vec<&str>)],
+    sections: &[plotnik_tests::fixture::Section],
 ) -> Result<(), String> {
     let legal = kind.legal_sections();
     let mut cursor = 0;
 
-    for (header, _) in sections {
+    for section in sections {
+        let header = &section.name;
         let Some(section_kind) = SectionKind::from_header(header) else {
             return Err(format!("unknown generated section `{header}` in `{name}`"));
         };
@@ -393,15 +375,14 @@ fn render_compile(
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit".to_string()
             })?;
-            let entry = module
-                .entry_point_names()
-                .last()
-                .ok_or_else(|| "06-vm fixture produced no selectable entry points".to_string())?
-                .to_string();
+            if module.entry_point("Q").is_none() {
+                return Err("06-vm fixtures require a callable definition named `Q`".to_string());
+            }
+            let entry = "Q";
             let run = run_vm(VmScenario {
                 lang: &lang,
                 module,
-                entry: &entry,
+                entry,
                 source: &input.text,
                 mode,
             })?;
@@ -551,7 +532,8 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                     journal.output_events(),
                     Colors::new(false),
                 );
-                value.format(true, Colors::new(false))
+                plotnik_rt::debug::to_json(&value)
+                    .expect("materialized result must serialize to debug JSON")
             }
             Err(RuntimeError::NoMatch) => "<no match>".to_string(),
             // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
@@ -595,7 +577,11 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 journal.output_events(),
                 Colors::new(false),
             );
-            (value.format(true, Colors::new(false)), inspection)
+            (
+                plotnik_rt::debug::to_json(&value)
+                    .expect("materialized result must serialize to debug JSON"),
+                inspection,
+            )
         }
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
         // A no-match is a real outcome worth pinning; fuel/memory exhaustion is

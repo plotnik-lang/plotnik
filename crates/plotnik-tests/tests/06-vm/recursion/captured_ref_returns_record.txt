@@ -22,15 +22,15 @@ export interface Q {
 --------------------- OUTPUT ---------------------
 {
   "top": {
-    "name": null,
     "inner": {
       "inner": null,
       "name": {
         "kind": "identifier",
-        "text": "a",
-        "span": [0, 1]
+        "span": [0, 1],
+        "text": "a"
       }
-    }
+    },
+    "name": null
   }
 }
 -------------------- BYTECODE --------------------

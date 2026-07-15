@@ -18,13 +18,13 @@ export interface Q {
 {
   "left": {
     "kind": "identifier",
-    "text": "a",
-    "span": [0, 1]
+    "span": [0, 1],
+    "text": "a"
   },
   "right": {
     "kind": "identifier",
-    "text": "b",
-    "span": [4, 5]
+    "span": [4, 5],
+    "text": "b"
   }
 }
 -------------------- BYTECODE --------------------

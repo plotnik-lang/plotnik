@@ -23,20 +23,20 @@ export interface QItems {
 {
   "items": [
     {
-      "b": null,
       "a": {
         "kind": "identifier",
-        "text": "x",
-        "span": [1, 2]
-      }
+        "span": [1, 2],
+        "text": "x"
+      },
+      "b": null
     },
     {
-      "b": null,
       "a": {
         "kind": "identifier",
-        "text": "y",
-        "span": [4, 5]
-      }
+        "span": [4, 5],
+        "text": "y"
+      },
+      "b": null
     }
   ]
 }

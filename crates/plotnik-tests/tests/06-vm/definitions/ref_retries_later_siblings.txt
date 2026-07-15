@@ -15,8 +15,8 @@ export interface Q {
   "e": {
     "n": {
       "kind": "number",
-      "text": "1",
-      "span": [3, 4]
+      "span": [3, 4],
+      "text": "1"
     }
   }
 }

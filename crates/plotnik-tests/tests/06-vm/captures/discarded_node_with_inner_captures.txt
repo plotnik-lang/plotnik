@@ -14,8 +14,8 @@ export interface Q {
 {
   "d": {
     "kind": "debugger_statement",
-    "text": "debugger;",
-    "span": [5, 14]
+    "span": [5, 14],
+    "text": "debugger;"
   }
 }
 -------------------- BYTECODE --------------------

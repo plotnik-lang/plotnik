@@ -151,6 +151,13 @@ pub fn grammar_arg() -> Arg {
         .help("Bind query names using this exact grammar.json instead of the registry")
 }
 
+pub fn debug_arg() -> Arg {
+    Arg::new("debug")
+        .long("debug")
+        .action(ArgAction::SetTrue)
+        .help("Include target-specific debug support in generated code")
+}
+
 pub fn compact_arg() -> Arg {
     Arg::new("compact")
         .long("compact")

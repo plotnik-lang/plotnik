@@ -48,6 +48,35 @@ jobs:
       - name: Test
         run: make test
 
+  codegen-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          components: clippy,rustfmt
+
+      - name: Using Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          cache-all-crates: "true"
+          cache-on-failure: "true"
+          prefix-key: v0-rust-codegen
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Generate Rust fixtures
+        run: make codegen-rust
+
+      - name: Lint generated Rust
+        run: make lint-codegen-rust
+
+      - name: Test generated Rust
+        run: make test-codegen-rust
+
   feature-flags:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -73,6 +102,11 @@ jobs:
 
       - name: No-default-features lib (C-free compiler)
         run: cargo clippy -p plotnik-lib --no-default-features --all-targets -- -D warnings
+
+      - name: Runtime without debug
+        run: |
+          cargo check -p plotnik-rt
+          cargo check -p plotnik-rt --no-default-features
 
       - name: Single non-default language
         run: cargo check -p plotnik-cli --no-default-features --features lang-styx

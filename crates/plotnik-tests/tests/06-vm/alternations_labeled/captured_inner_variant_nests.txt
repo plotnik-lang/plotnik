@@ -29,14 +29,14 @@ help: capture the alternation (`[...] @name`) to make its labels produce variant
 --------------------- OUTPUT ---------------------
 {
   "y": {
-    "$tag": "In",
     "$data": {
       "a": {
         "kind": "expression_statement",
-        "text": "a;",
-        "span": [0, 2]
+        "span": [0, 2],
+        "text": "a;"
       }
-    }
+    },
+    "$tag": "In"
   }
 }
 -------------------- BYTECODE --------------------

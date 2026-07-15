@@ -11,8 +11,8 @@ export interface Q {
 {
   "comment": {
     "kind": "comment",
-    "text": "/*\r */",
-    "span": [0, 8]
+    "span": [0, 8],
+    "text": "/*\r */"
   }
 }
 -------------------- BYTECODE --------------------
