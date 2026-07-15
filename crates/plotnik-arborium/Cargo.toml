@@ -1,0 +1,28 @@
+[package]
+name = "plotnik-arborium"
+version = "0.4.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/plotnik-lang/plotnik"
+description = "Typed Plotnik queries for Arborium syntax trees"
+documentation = "https://docs.rs/plotnik-arborium"
+readme = "../../README.md"
+keywords = ["tree-sitter", "query", "syntax-tree", "parser"]
+categories = ["development-tools", "parsing"]
+include = ["src/**/*", "Cargo.toml"]
+
+[lib]
+name = "plotnik"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+
+[lints.clippy]
+unwrap_used = "deny"
+
+[features]
+serde = ["plotnik-macros/serde", "plotnik-rt/serde"]
+
+[dependencies]
+plotnik-macros = { path = "../plotnik-macros", version = "0.4.0" }
+plotnik-rt = { package = "plotnik-rt-arborium", path = "../plotnik-rt-arborium", version = "0.4.0" }

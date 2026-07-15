@@ -16,7 +16,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 3;
+pub const REQUIRED_RUNTIME_ABI: u32 = 4;
 
 use ::plotnik_rt::Node;
 
@@ -416,7 +416,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
                         S04_ERR,
@@ -452,7 +452,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S09_Q));
                 }
                 finish_s09_q(eng)
@@ -470,7 +470,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S11_Q));
                 }
                 finish_s11_q(eng)
@@ -495,7 +495,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S13_Q));
                 }
                 finish_s13_q(eng)
@@ -725,7 +725,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
                         S04_ERR,
@@ -745,7 +745,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S09_Q));
                 }
                 Some(finish_s09_q(eng))
@@ -762,7 +762,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S11_Q));
                 }
                 Some(finish_s11_q(eng))
@@ -779,7 +779,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S13_Q));
                 }
                 Some(finish_s13_q(eng))

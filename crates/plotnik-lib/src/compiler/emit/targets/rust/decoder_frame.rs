@@ -13,18 +13,9 @@ use crate::compiler::emit::targets::rust::{TypeContext, TypeModel};
 use crate::core::Symbol;
 
 const WORD_BYTES: u64 = 8;
-const NODE_VALUE_BYTES: u64 = 48;
 const VEC_VALUE_BYTES: u64 = 24;
 const OPTION_TAG_BYTES: u64 = 8;
 const DECODER_FRAME_BASE_BYTES: u64 = 128;
-
-// Compiler-only builds deliberately omit tree-sitter. Workspace/VM builds
-// enable the runtime node type and turn representation drift into an error.
-#[cfg(feature = "vm")]
-const _: () = assert!(
-    NODE_VALUE_BYTES >= std::mem::size_of::<plotnik_rt::Node<'static>>() as u64,
-    "decoder-frame Node estimate must cover plotnik-rt::Node"
-);
 
 pub(super) struct DecoderFrameEstimator<'m, 'a> {
     model: &'m TypeModel<'a>,
@@ -130,7 +121,7 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
         }
 
         match self.types.expect_type_shape(ty) {
-            TypeShape::Node => NODE_VALUE_BYTES,
+            TypeShape::Node => plotnik_rt::GENERATED_NODE_VALUE_BYTES,
             TypeShape::Text => 2 * WORD_BYTES,
             TypeShape::Bool => 1,
             TypeShape::Option(inner) => {
@@ -162,7 +153,7 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
             }
             TypeShape::Ref(declaration) => {
                 let Some(target) = self.types.declaration_body(*declaration) else {
-                    return NODE_VALUE_BYTES;
+                    return plotnik_rt::GENERATED_NODE_VALUE_BYTES;
                 };
                 if self.model.is_boxed_ref(context, ty) {
                     return WORD_BYTES;

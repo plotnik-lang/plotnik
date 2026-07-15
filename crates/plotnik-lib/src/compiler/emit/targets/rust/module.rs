@@ -1404,13 +1404,13 @@ loop {
 "#;
 
 const RETRY_CHECKPOINT_COMPACT: &str = r#"
-if @POLICY@.admits(&eng.node()) {
+if @POLICY@.admits(eng.node_class()) {
     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), @STATE@));
 }
 "#;
 
 const RETRY_CHECKPOINT_EXPANDED: &str = r#"
-if @POLICY@.admits(&eng.node()) {
+if @POLICY@.admits(eng.node_class()) {
     eng.push_checkpoint(rt::Checkpoint::match_retry(
         eng.checkpoint_state(),
         @STATE@,

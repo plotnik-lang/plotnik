@@ -104,7 +104,7 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
     reject_colliding_entry_names(&compiled, query_span)?;
 
     let config = RustCodegenConfig::new()
-        .runtime_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
+        .runtime_crate("::plotnik::rt")
         .serde(cfg!(feature = "serde"))
         .limits(runtime_limits(&args.limits))
         .decode_depth(decode_depth(&args.limits));

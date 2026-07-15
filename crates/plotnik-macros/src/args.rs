@@ -55,9 +55,6 @@ pub enum LimitArg {
 pub struct MacroArgs {
     pub grammar: StringArg,
     pub query: QuerySource,
-    /// The `crate = ::path` override, stringified; `None` means the default
-    /// facade path.
-    pub rt_crate: Option<String>,
     pub limits: LimitArgs,
 }
 
@@ -119,7 +116,6 @@ impl LimitKey {
 struct ArgSlots {
     grammar: Option<StringArg>,
     query: Option<QuerySource>,
-    rt_crate: Option<String>,
     limits: LimitArgs,
 }
 
@@ -154,7 +150,6 @@ impl ArgSlots {
         Ok(MacroArgs {
             grammar,
             query,
-            rt_crate: self.rt_crate,
             limits: self.limits,
         })
     }
@@ -218,36 +213,6 @@ impl ArgCursor {
         string_value(&token)
     }
 
-    /// `crate = ::some::path` — collect tokens up to the next top-level comma
-    /// and splice them verbatim into generated code. Absolute paths only: the
-    /// text is spliced into several nested modules, where a relative path
-    /// would resolve differently in each.
-    fn take_path(&mut self, key_span: Span) -> Result<String, ExpandError> {
-        let mut path = String::new();
-        while let Some(token) = self.current() {
-            if let TokenTree::Punct(p) = token
-                && p.as_char() == ','
-            {
-                break;
-            }
-            path.push_str(&token.to_string());
-            self.advance();
-        }
-        if path.is_empty() {
-            return Err(ExpandError::new(key_span, "`crate` needs a path value"));
-        }
-        if !is_absolute_path(&path) {
-            return Err(ExpandError::new(
-                key_span,
-                format!(
-                    "`crate = {path}` must be an absolute module path like \
-                     `::my_facade::rt` or `::plotnik_rt`"
-                ),
-            ));
-        }
-        Ok(path)
-    }
-
     fn take_limit(&mut self, key_span: Span, key: LimitKey) -> Result<LimitArg, ExpandError> {
         let Some(token) = self.current().cloned() else {
             return Err(ExpandError::new(
@@ -303,18 +268,13 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                         let path = cursor.take_string(key_span, &key)?;
                         args.put_query(QuerySource::File { path })?;
                     }
-                    "crate" => {
-                        let value = cursor.take_path(key_span)?;
-                        put(&mut args.rt_crate, value, key_span, &key)?;
-                    }
                     other => {
                         let Some(limit_key) = LimitKey::parse(other) else {
                             return Err(ExpandError::new(
                                 key_span,
                                 format!(
                                     "unknown argument `{other}`; `query!` accepts `grammar`, \
-                                     `file`, `crate`, `fuel`, `memory`, `depth`, and the \
-                                     query string"
+                                     `file`, `fuel`, `memory`, `depth`, and the query string"
                                 ),
                             ));
                         };
@@ -360,36 +320,6 @@ fn string_value(token: &TokenTree) -> Result<StringArg, ExpandError> {
             "expected a string literal here",
         )),
     }
-}
-
-/// The collected `crate` text is spliced verbatim into generated code, so it
-/// must be exactly a `(::segment)+` path — nothing else lexes its way in.
-fn is_absolute_path(text: &str) -> bool {
-    let mut rest = text;
-    let mut any = false;
-    while let Some(after) = rest.strip_prefix("::") {
-        rest = strip_ident(after);
-        if rest.len() == after.len() {
-            return false;
-        }
-        any = true;
-    }
-    any && rest.is_empty()
-}
-
-/// Strip one leading identifier (optionally `r#`-raw); on no identifier,
-/// return the input unchanged so the caller sees zero progress.
-fn strip_ident(text: &str) -> &str {
-    let body = text.strip_prefix("r#").unwrap_or(text);
-    let mut chars = body.char_indices();
-    match chars.next() {
-        Some((_, c)) if c == '_' || c.is_alphabetic() => {}
-        _ => return text,
-    }
-    let end = chars
-        .find(|&(_, c)| !(c == '_' || c.is_alphanumeric()))
-        .map_or(body.len(), |(index, _)| index);
-    &body[end..]
 }
 
 fn take_integer_limit(token: &TokenTree, key: LimitKey) -> Result<LimitArg, ExpandError> {

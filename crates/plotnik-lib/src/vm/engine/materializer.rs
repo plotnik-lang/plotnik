@@ -5,7 +5,7 @@ use crate::core::Colors;
 
 use super::value::{NodeValue, Value};
 use super::verify::debug_verify_type;
-use plotnik_rt::{JournalEvent, OutputEvents};
+use plotnik_runtime::{JournalEvent, OutputEvents};
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
@@ -94,7 +94,7 @@ impl<'a> ValueMaterializer<'a> {
                     pending = Some(Value::Absent);
                 }
                 JournalEvent::NodeStr(node) => {
-                    pending = Some(Value::Text(plotnik_rt::node_text(self.source, node)));
+                    pending = Some(Value::Text(plotnik_runtime::node_text(self.source, node)));
                 }
                 JournalEvent::NodeBool(_) => {
                     pending = Some(Value::Bool(true));
@@ -135,7 +135,9 @@ impl<'a> ValueMaterializer<'a> {
                         .pop()
                         .expect("Scalar marker owns a range frame");
                     pending = Some(match range {
-                        Some(range) => Value::Text(plotnik_rt::source_text(self.source, range)),
+                        Some(range) => {
+                            Value::Text(plotnik_runtime::source_text(self.source, range))
+                        }
                         None => Value::Absent,
                     });
                 }

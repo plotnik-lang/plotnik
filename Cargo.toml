@@ -6,8 +6,14 @@ members = [
     "crates/plotnik-lib",
     "crates/plotnik-macros",
     "crates/plotnik-rt",
+    "crates/plotnik-rt-core",
     "crates/plotnik-tests",
     "crates/plotnik-wasm",
+]
+exclude = [
+    "crates/plotnik-arborium",
+    "crates/plotnik-rt-arborium",
+    "examples/arborium",
 ]
 
 [workspace.package]
@@ -18,7 +24,8 @@ edition = "2024"
 
 [workspace.dependencies]
 plotnik-lib = { path = "crates/plotnik-lib", version = "0.4.0" }
-plotnik-rt = { path = "crates/plotnik-rt", version = "0.4.0", default-features = false }
+plotnik-rt = { path = "crates/plotnik-rt", version = "0.4.0" }
+plotnik-rt-core = { path = "crates/plotnik-rt-core", version = "0.4.0" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }

@@ -1,0 +1,17 @@
+[package]
+name = "plotnik-rt-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Backend-independent runtime primitives for Plotnik queries"
+documentation = "https://docs.rs/plotnik-rt-core"
+readme = "../../README.md"
+keywords = ["tree-sitter", "query", "syntax-tree", "parser"]
+categories = ["parsing", "development-tools"]
+
+[lints]
+workspace = true
+
+[dependencies]
+regex-automata = { version = "0.4", features = ["dfa-search"] }

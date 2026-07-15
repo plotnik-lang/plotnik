@@ -24,7 +24,7 @@ RUNTIME_ABI_MAX
 ```
 
 A generated module records one `REQUIRED_RUNTIME_ABI` and refuses to initialize
-unless it lies in that range. The current contract is ABI `2`; ABI `1` was the
+unless it lies in that range. The current contract is ABI `4`; ABI `1` was the
 first cross-language runtime contract. The ABI changes when generated code and
 a runtime must change together, including changes to:
 

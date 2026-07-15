@@ -185,6 +185,13 @@ const DECODE_STACK_BUDGET_BYTES: u64 = 2 * 1024 * 1024;
 /// keeps the formula conservative without requiring backend-specific stack maps.
 const DECODE_FRAME_OVERHEAD_BYTES: u64 = 512;
 
+/// Space reserved for one native node handle in generated decoder frames.
+///
+/// Concrete runtime crates assert that their selected binding's `Node` fits
+/// this estimate, so the compiler can use one backend-independent model.
+#[doc(hidden)]
+pub const GENERATED_NODE_VALUE_BYTES: u64 = 48;
+
 /// Compute the default decode-depth ceiling for a generated matcher module.
 ///
 /// The emitter passes its conservative maximum decoder-frame estimate. The
