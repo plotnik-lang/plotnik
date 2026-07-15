@@ -33,6 +33,15 @@ Plotnik is the tool for working with Tree-sitter reliably:
 <br/>
 <br/>
 
+<p align="center"><b>Input</b></p>
+
+```javascript
+async function fetchUser(userId, options) {
+  ...
+}
+```
+
+<br/>
 <p align="center"><b>Query</b></p>
 
 ```clojure
@@ -46,15 +55,6 @@ Function = (program
     body: (statement_block) @body
   )
 )
-```
-
-<br/>
-<p align="center"><b>Input</b></p>
-
-```javascript
-async function fetchUser(userId, options) {
-  ...
-}
 ```
 
 <br/>
