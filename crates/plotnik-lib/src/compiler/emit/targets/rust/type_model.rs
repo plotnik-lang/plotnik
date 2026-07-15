@@ -14,7 +14,6 @@ use super::representation::{LifetimeUsage, TypeFacts};
 
 pub(crate) struct TypeModel<'a> {
     schema: ResultSchema<'a>,
-    items: Vec<ResultItem>,
     facts: TypeFacts,
     /// Hygienic module-scope identifier for every declared item name.
     item_idents: HashMap<Symbol, String>,
@@ -39,7 +38,7 @@ impl<'a> TypeModel<'a> {
     pub(crate) fn new(schema: ResultSchema<'a>) -> Self {
         let facts = TypeFacts::compute(schema.types);
         let interner = schema.interner;
-        let items = schema.entry_point_items().to_vec();
+        let items = schema.entry_point_items();
         let idents = rust_scope_idents(items.iter().map(|item| interner.resolve(item.name)));
         let item_idents = items
             .iter()
@@ -48,7 +47,6 @@ impl<'a> TypeModel<'a> {
             .collect();
         Self {
             schema,
-            items,
             facts,
             item_idents,
         }
@@ -59,7 +57,7 @@ impl<'a> TypeModel<'a> {
     }
 
     pub(crate) fn items(&self) -> &[ResultItem] {
-        &self.items
+        self.schema.entry_point_items()
     }
 
     pub(crate) fn item_ident(&self, name: Symbol) -> &str {

@@ -1,7 +1,7 @@
 use super::capture::CaptureEffects;
 use crate::bytecode::EffectKind;
-use crate::compiler::ids::TypeId;
-use crate::compiler::lower::ir::{EffectIR, MemberRef};
+use crate::compiler::ids::ResultMemberId;
+use crate::compiler::lower::ir::EffectIR;
 
 #[test]
 fn nest_scope_preserves_outer_and_nests_inner() {
@@ -11,7 +11,7 @@ fn nest_scope_preserves_outer_and_nests_inner() {
     );
 
     let result = outer.nest_scope(
-        EffectIR::with_member(EffectKind::VariantOpen, MemberRef::new(TypeId(0), 0)),
+        EffectIR::with_member(EffectKind::VariantOpen, ResultMemberId::from_raw(0)),
         EffectIR::end_variant(),
     );
 
@@ -30,7 +30,7 @@ fn with_pre_values_appends_after_scope_opens() {
 
     let result = outer.with_pre_values(vec![
         EffectIR::absent(),
-        EffectIR::with_member(EffectKind::RecordSet, MemberRef::new(TypeId(0), 0)),
+        EffectIR::with_member(EffectKind::RecordSet, ResultMemberId::from_raw(0)),
     ]);
 
     assert_eq!(result.pre.len(), 3);
@@ -45,7 +45,7 @@ fn with_post_values_prepends_before_scope_closes() {
 
     let result = outer.with_post_values(vec![
         EffectIR::node(),
-        EffectIR::with_member(EffectKind::RecordSet, MemberRef::new(TypeId(0), 0)),
+        EffectIR::with_member(EffectKind::RecordSet, ResultMemberId::from_raw(0)),
     ]);
 
     assert_eq!(result.post.len(), 3);

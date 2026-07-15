@@ -2,8 +2,8 @@
 //!
 //! Pre-layout instructions use `Label` for symbolic references.
 //! After layout, labels are resolved to bytecode-word addresses (u16) for serialization.
-//! A `MemberRef` stores a parent type plus a relative index, resolved to an
-//! absolute member index at emit time.
+//! Result-producing effects carry canonical member IDs assigned before
+//! lowering, so every later consumer observes the same identity.
 
 use std::collections::BTreeMap;
 
@@ -11,7 +11,7 @@ use crate::bytecode::{CodeAddr, EffectKind, Nav, PredicateOp, select_match_opcod
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::types::CaptureTypePlan;
-use crate::compiler::ids::{DefId, TypeId};
+use crate::compiler::ids::{DefId, ResultMemberId, TypeId};
 use crate::compiler::lower::spans::SpanTable;
 use crate::core::NodeFieldId;
 
@@ -287,43 +287,18 @@ impl DefSpecialization {
     }
 }
 
-/// Symbolic reference to a record field or variant case.
-///
-/// Resolved to an absolute member index at emit time: the parent type's member
-/// base (`member_base`) plus `relative_index`. The parent type is a scope or
-/// variant type that an entry point result reaches, so it is always present in the emitted
-/// type table.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct MemberRef {
-    /// The query type whose member table this indexes (record or variant type).
-    pub parent_type: TypeId,
-    /// Relative index within the parent type's members.
-    pub relative_index: u16,
-}
-
-impl MemberRef {
-    pub fn new(parent_type: TypeId, relative_index: u16) -> Self {
-        Self {
-            parent_type,
-            relative_index,
-        }
-    }
-}
-
-/// Effect operation with symbolic member references.
-/// Used during compilation; resolved to Effect during emission.
+/// Effect operation whose structured-result arguments use canonical member IDs.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EffectIR {
     kind: EffectKind,
     payload: EffectArg,
 }
 
-/// An effect's argument: a literal value, or a symbolic member reference — used by
-/// `RecordSet`/`VariantOpen` effects — resolved to a member index during emission.
+/// An effect's argument: a literal value, or a canonical field/case identity.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EffectArg {
     Literal(usize),
-    Member(MemberRef),
+    Member(ResultMemberId),
 }
 
 impl EffectIR {
@@ -345,10 +320,10 @@ impl EffectIR {
         }
     }
 
-    pub fn with_member(kind: EffectKind, member_ref: MemberRef) -> Self {
+    pub fn with_member(kind: EffectKind, member: ResultMemberId) -> Self {
         Self {
             kind,
-            payload: EffectArg::Member(member_ref),
+            payload: EffectArg::Member(member),
         }
     }
 

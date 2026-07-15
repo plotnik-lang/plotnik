@@ -5,12 +5,11 @@ use std::collections::{HashMap, HashSet};
 use rowan::TextRange;
 
 use crate::bytecode::{Labeling as SpanLabeling, MAX_SPANS, SpanKind};
-use crate::compiler::analyze::types::BuiltInCaptureType;
-use crate::compiler::analyze::types::type_shape::{TYPE_BOOL, TYPE_TEXT};
+use crate::compiler::analyze::types::type_shape::{PatternFlow, TYPE_BOOL, TYPE_TEXT};
+use crate::compiler::analyze::types::{BuiltInCaptureType, TypeShape};
 use crate::compiler::diagnostics::SourceId;
-use crate::compiler::ids::TypeId;
+use crate::compiler::ids::{ResultMemberId, TypeId};
 use crate::compiler::lower::LowerInput;
-use crate::compiler::lower::ir::MemberRef;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxNode;
 
@@ -20,7 +19,7 @@ pub(crate) struct SpanId(pub(crate) u16);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SpanBindingIR {
     Type(TypeId),
-    Member(MemberRef),
+    Member(ResultMemberId),
 }
 
 #[derive(Clone, Debug)]
@@ -76,13 +75,7 @@ pub(crate) struct SpanAssignment {
 }
 
 pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
-    let reachable_defs = input.analysis.dependency_analysis.reachable_from(
-        input
-            .analysis
-            .type_analysis
-            .iter_entry_point_outputs()
-            .map(|(def_id, _)| def_id),
-    );
+    let reachable_defs = input.result.reachable_defs();
     let mut candidates = Vec::new();
     for name in input.symbol_table.names() {
         let def_id = input
@@ -277,18 +270,7 @@ fn collect_pattern(
                         };
                         SpanBindingIR::Type(primitive)
                     })
-                    .or_else(|| {
-                        capture_type.name().and_then(|name| {
-                            input
-                                .analysis
-                                .type_analysis
-                                .iter_named_types()
-                                .find(|(_, sym)| {
-                                    input.analysis.interner.resolve(*sym) == name.text()
-                                })
-                                .map(|(type_id, _)| SpanBindingIR::Type(type_id))
-                        })
-                    })
+                    .or_else(|| custom_capture_type_binding(input, capture, &capture_pattern))
                     .and_then(|binding| visibility.bind(binding));
                 out.push(Candidate {
                     node: capture_type.syntax().clone(),
@@ -360,6 +342,42 @@ fn collect_pattern(
                     collect_pattern(input, source, &body, visibility, out);
                 }
             }
+        }
+    }
+}
+
+fn custom_capture_type_binding(
+    input: &LowerInput<'_>,
+    capture: &ast::CapturedPattern,
+    capture_pattern: &Pattern,
+) -> Option<SpanBindingIR> {
+    let name = capture.name()?;
+    let name = input.analysis.interner.get(&name.text()[1..])?;
+    let written_name = capture.capture_type()?.name()?;
+    let written_name = input.analysis.interner.get(written_name.text())?;
+    let shape = input
+        .analysis
+        .type_analysis
+        .expect_pattern_result(capture_pattern);
+    let PatternFlow::Fields(scope) = shape.flow else {
+        return None;
+    };
+    let mut type_id = input
+        .analysis
+        .type_analysis
+        .expect_record_fields(scope)
+        .get(&name)?
+        .final_type;
+
+    loop {
+        if input.result.type_name_of(type_id) == Some(written_name) {
+            return Some(SpanBindingIR::Type(type_id));
+        }
+        match input.analysis.type_analysis.type_shape(type_id) {
+            Some(TypeShape::List { element, .. } | TypeShape::Option(element)) => {
+                type_id = *element;
+            }
+            _ => return None,
         }
     }
 }

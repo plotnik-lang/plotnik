@@ -34,9 +34,9 @@ fn capture_layout_assigns_one_absolute_member_sequence() {
     let child_scope = layout.scope(child).expect("child is reachable");
     let parent_scope = layout.scope(parent).expect("parent is reachable");
     assert_eq!(child_scope.base(), 0);
-    assert_eq!(child_scope.absolute_index(0), 0);
+    assert_eq!(child_scope.member_id(0).expect("child member").raw(), 0);
     assert_eq!(parent_scope.base(), 1);
-    assert_eq!(parent_scope.absolute_index(1), 2);
+    assert_eq!(parent_scope.member_id(1).expect("parent member").raw(), 2);
     assert_eq!(layout.member_count(), 3);
 }
 

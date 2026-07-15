@@ -1,0 +1,139 @@
+Q = (program
+  (expression_statement
+    [
+      Id: (identifier) @id
+      Num: (number)
+    ] @a :: Choice
+  )
+  (expression_statement
+    [
+      Id: (identifier) @id
+      Num: (number)
+    ] @b :: Choice
+  )
+)
+--------------------- INPUT ----------------------
+x;
+1;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: Choice;
+  b: Choice;
+}
+
+export type Choice =
+  | { $tag: "Id"; $data: { id: Node } }
+  | { $tag: "Num" };
+--------------------- OUTPUT ---------------------
+{
+  "a": {
+    "$data": {
+      "id": {
+        "kind": "identifier",
+        "span": [0, 1],
+        "text": "x"
+      }
+    },
+    "$tag": "Id"
+  },
+  "b": {
+    "$tag": "Num"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "id"
+S02 "Id"
+S03 "Num"
+S04 "a"
+S05 "b"
+S06 "Choice"
+S07 "Q"
+S08 "program"
+S09 "expression_statement"
+S10 "identifier"
+S11 "number"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Record  M0:1  ; { id }
+T3 = Variant M1:2  ; Id | Num
+T4 = Record  M3:1  ; { id }
+T5 = Variant M4:2  ; Id | Num
+T6 = Record  M6:2  ; { a, b }
+
+[type_members]
+M0: S01 → T1  ; id: <Node>
+M1: S02 → T2  ; Id: T2
+M2: S03 → T0  ; Num: <NoValue>
+M3: S01 → T1  ; id: <Node>
+M4: S02 → T4  ; Id: T4
+M5: S03 → T0  ; Num: <NoValue>
+M6: S04 → T3  ; a: Choice
+M7: S05 → T5  ; b: Choice
+
+[type_names]
+N0: S06 → T3  ; Choice
+N1: S06 → T5  ; Choice
+N2: S07 → T6  ; Q
+
+[entry_points]
+Q = 00 :: T6
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@33)                            33 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  18
+  11   !   (number) [VariantOpen(M5) VariantClose]  18
+  13  ──!  _                                08, 11, 13
+  15  ...
+  16  └─!  _                                08, 11, 13
+  18  ─‣┘² _ [RecordSet(M7)]                06
+  20  ─‣─  (expression_statement)           16
+  21   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  30
+  24   !   (number) [VariantOpen(M2) VariantClose]  30
+  26  ──!  _                                21, 24, 26
+  28  └─!  _                                21, 24, 26
+  30  ─‣┘  _ [RecordSet(M6)]                20
+  32  └‣─  (expression_statement)           28
+  33   !   (program)                        32
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@33)                            33 : 03
+       ▶   (@33)
+
+@33:
+  33       (program)                        32
+       ●   program
+  32       (expression_statement)           28
+       ●   expression_statement
+  28       _                                21, 24, 26
+       ●   identifier
+  21       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  30
+       ●   identifier
+  30       _ [RecordSet(M6)]                20
+       ●   expression_statement
+  20       (expression_statement)           16
+       ●   expression_statement
+  16       _                                08, 11, 13
+       ●   number
+  08       (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  18
+       ○   number
+  16  ❮❮❮ 
+  11       (number) [VariantOpen(M5) VariantClose]  18
+       ●   number
+  18       _ [RecordSet(M7)]                06
+       ●   program
+  06   ◀   (@33)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

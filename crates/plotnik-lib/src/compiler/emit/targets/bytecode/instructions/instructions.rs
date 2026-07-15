@@ -9,7 +9,7 @@ use crate::bytecode::{
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{ConstantPool, EmitError};
 use crate::compiler::lower::ir::{
-    CallIR, CallProtocol, EffectArg, EffectIR, InstructionIR, Label, MatchIR, MemberRef,
+    CallIR, CallProtocol, EffectArg, EffectIR, InstructionIR, Label, MatchIR,
 };
 
 pub fn emit_instructions(
@@ -61,7 +61,7 @@ fn resolve_match(
     map: &BTreeMap<Label, CodeAddr>,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
-    let effects = m.effects.iter().map(|e| resolve_effect(e, pool)).collect();
+    let effects = m.effects.iter().map(resolve_effect).collect();
     let predicate = m.predicate.as_ref().map(|pred| {
         let string_id = pool
             .lookup_str(pred.value.text())
@@ -127,16 +127,10 @@ fn resolve_call(c: &CallIR, map: &BTreeMap<Label, CodeAddr>) -> [u8; 8] {
     }
 }
 
-fn resolve_effect(effect: &EffectIR, pool: ConstantPool<'_>) -> Effect {
+fn resolve_effect(effect: &EffectIR) -> Effect {
     let payload = match effect.payload() {
         EffectArg::Literal(payload) => *payload,
-        EffectArg::Member(member_ref) => resolve_member_ref(*member_ref, pool) as usize,
+        EffectArg::Member(member) => usize::from(member.raw()),
     };
     Effect::new(effect.kind(), payload)
-}
-
-fn resolve_member_ref(member_ref: MemberRef, pool: ConstantPool<'_>) -> u16 {
-    pool.member_base(member_ref.parent_type)
-        .expect("member base must resolve")
-        + member_ref.relative_index
 }

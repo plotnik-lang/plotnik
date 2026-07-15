@@ -266,7 +266,7 @@ impl MatcherPlan {
         artifacts: AnalysisArtifacts<'_>,
         layout: &CaptureLayout,
     ) -> Self {
-        let dumper = NfaDumper::new(graph, artifacts);
+        let dumper = NfaDumper::new(graph, artifacts, layout);
         let mut sorted: Vec<&InstructionIR> = graph.instructions().iter().collect();
         sorted.sort_by_key(|instruction| instruction.label());
         assert!(
@@ -295,7 +295,7 @@ impl MatcherPlan {
             })
             .collect();
 
-        let mut builder = MatcherPlanBuilder::new(&dumper, artifacts, layout, &ids);
+        let mut builder = MatcherPlanBuilder::new(&dumper, artifacts, &ids);
         let states = sorted
             .into_iter()
             .enumerate()
@@ -355,7 +355,6 @@ impl MatcherPlan {
 struct MatcherPlanBuilder<'p, 'a> {
     dumper: &'p NfaDumper<'a>,
     artifacts: AnalysisArtifacts<'a>,
-    layout: &'p CaptureLayout,
     ids: &'p BTreeMap<Label, StateId>,
     expected_kinds: BTreeMap<u16, ExpectedKind>,
     expected_fields: BTreeMap<u16, ExpectedField>,
@@ -370,13 +369,11 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
     fn new(
         dumper: &'p NfaDumper<'a>,
         artifacts: AnalysisArtifacts<'a>,
-        layout: &'p CaptureLayout,
         ids: &'p BTreeMap<Label, StateId>,
     ) -> Self {
         Self {
             dumper,
             artifacts,
-            layout,
             ids,
             expected_kinds: BTreeMap::new(),
             expected_fields: BTreeMap::new(),
@@ -612,11 +609,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             EffectArg::Literal(value) => {
                 u16::try_from(*value).expect("literal effect payload fits u16")
             }
-            EffectArg::Member(member) => self
-                .layout
-                .scope(member.parent_type)
-                .expect("effect member parent has a capture scope")
-                .absolute_index(member.relative_index),
+            EffectArg::Member(member) => member.raw(),
         }
     }
 

@@ -3,12 +3,14 @@
 //! string table. The table storage and its read accessors live in
 //! `emit::tables`; this module owns the walk.
 
-use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
+use crate::bytecode::{TypeDef, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::analyze::result::{CaptureLayout, CaptureScopeKind, ResultSchema};
+use crate::compiler::analyze::result::{
+    CaptureLayout, CaptureMemberKind, CaptureScopeKind, ResultSchema, ResultTypeLayout,
+};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    DefinitionOutput, ListMinimum, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeShape,
+    DefinitionOutput, ListMinimum, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeShape,
 };
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
@@ -27,7 +29,7 @@ pub fn build_type_table(
     Ok((types, strings))
 }
 
-/// Build the type table, remapping analysis type IDs to bytecode type IDs.
+/// Build the bytecode table in canonical result-type order.
 ///
 /// Types reachable from selectable definition outputs are emitted. This keeps
 /// demanded fragment capture scopes available to matcher bodies without
@@ -45,10 +47,11 @@ fn build(
     let ordered_types = type_layout.value_types();
 
     emit_builtins(types, type_layout)?;
-    reserve_slots(types, ordered_types)?;
+    reserve_slots(types, ordered_types, type_layout)?;
 
     let mut ctx = TypeEmitCtx {
         type_analysis,
+        type_layout,
         interner: schema.interner,
         strings,
     };
@@ -63,12 +66,12 @@ fn build(
     Ok(())
 }
 
-fn emit_builtins(
-    types: &mut TypeTableBuilder,
-    layout: &crate::compiler::analyze::result::ResultTypeLayout,
-) -> Result<(), EmitError> {
+fn emit_builtins(types: &mut TypeTableBuilder, layout: &ResultTypeLayout) -> Result<(), EmitError> {
     if layout.has_no_value() {
-        types.push_no_value()?;
+        types.push_result(
+            layout.no_value_output_id(),
+            TypeDef::builtin(TypeKind::NoValue),
+        )?;
     }
     for &builtin in layout.builtins() {
         let kind = match builtin {
@@ -77,14 +80,18 @@ fn emit_builtins(
             TYPE_BOOL => TypeKind::Bool,
             _ => unreachable!("result type layout exposes only primitive built-ins"),
         };
-        types.push_mapped(builtin, TypeDef::builtin(kind))?;
+        types.push_result(layout.output_id(builtin), TypeDef::builtin(kind))?;
     }
     Ok(())
 }
 
-fn reserve_slots(types: &mut TypeTableBuilder, ordered_types: &[TypeId]) -> Result<(), EmitError> {
+fn reserve_slots(
+    types: &mut TypeTableBuilder,
+    ordered_types: &[TypeId],
+    layout: &ResultTypeLayout,
+) -> Result<(), EmitError> {
     for &type_id in ordered_types {
-        types.push_mapped(type_id, TypeDef::placeholder())?;
+        types.push_result(layout.output_id(type_id), TypeDef::placeholder())?;
     }
     Ok(())
 }
@@ -110,9 +117,7 @@ fn emit_type_names(
         if !schema.type_layout().contains(binding.type_id) {
             continue;
         }
-        let bc_type_id = types
-            .lookup(binding.type_id)
-            .expect("named result type must be mapped");
+        let bc_type_id = types.wire_id(schema.type_layout().output_id(binding.type_id))?;
         let name = ctx.strings.intern(binding.name, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
@@ -126,9 +131,7 @@ fn emit_type_at_slot(
     layout: &CaptureLayout,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    let wire_type = types
-        .lookup(type_id)
-        .expect("reserved result type has a wire slot");
+    let wire_type = types.wire_id(ctx.type_layout.output_id(type_id))?;
     let slot_index = usize::from(u16::from(wire_type));
     let type_shape = ctx.type_analysis.expect_type_shape(type_id);
     match type_shape {
@@ -137,13 +140,13 @@ fn emit_type_at_slot(
         }
 
         TypeShape::Option(inner) => {
-            let inner_bc = types.resolve_type(*inner, ctx.type_analysis)?;
+            let inner_bc = types.resolve_type(*inner, ctx.type_analysis, ctx.type_layout)?;
             types.fill_slot(slot_index, TypeDef::option(inner_bc));
             Ok(())
         }
 
         TypeShape::List { element, minimum } => {
-            let element_bc = types.resolve_type(*element, ctx.type_analysis)?;
+            let element_bc = types.resolve_type(*element, ctx.type_analysis, ctx.type_layout)?;
             let def = match minimum {
                 ListMinimum::Zero => TypeDef::list_zero_or_more(element_bc),
                 ListMinimum::One => TypeDef::list_one_or_more(element_bc),
@@ -152,15 +155,7 @@ fn emit_type_at_slot(
             Ok(())
         }
 
-        TypeShape::Record(fields) => {
-            // Resolve field types (this may create Option wrappers at later indices)
-            let mut resolved_fields = Vec::with_capacity(fields.len());
-            for (field_sym, field_info) in fields {
-                let field_name = ctx.strings.intern(*field_sym, ctx.interner)?;
-                let field_type = resolve_field_type(types, field_info, ctx.type_analysis)?;
-                resolved_fields.push((field_name, field_type));
-            }
-
+        TypeShape::Record(_) => {
             let scope = layout
                 .scope(type_id)
                 .expect("every emitted record has a capture scope");
@@ -171,28 +166,24 @@ fn emit_type_at_slot(
                 member_start,
                 "wire members consume the shared capture layout in order"
             );
-            for (field_name, field_type) in resolved_fields {
+            let member_count = u8::try_from(scope.members().len())
+                .map_err(|_| EmitError::TooManyFields(scope.members().len()))?;
+            for &member_id in scope.members() {
+                let member = layout.expect_member(member_id);
+                let CaptureMemberKind::Field(field) = member.kind else {
+                    unreachable!("record scope contains only field descriptors")
+                };
+                let field_name = ctx.strings.intern(member.name, ctx.interner)?;
+                let field_type =
+                    types.resolve_type(field.final_type, ctx.type_analysis, ctx.type_layout)?;
                 types.push_member(TypeMember::new(field_name, field_type));
             }
 
-            let member_count = u8::try_from(scope.members().len())
-                .map_err(|_| EmitError::TooManyFields(scope.members().len()))?;
             types.fill_slot(slot_index, TypeDef::for_record(member_start, member_count));
             Ok(())
         }
 
-        TypeShape::Variant(cases) => {
-            // Resolve case types (this may create types at later indices).
-            let mut resolved_cases = Vec::with_capacity(cases.len());
-            for (case_sym, payload) in cases {
-                let case_name = ctx.strings.intern(*case_sym, ctx.interner)?;
-                let case_type = match payload.type_id() {
-                    Some(type_id) => types.resolve_type(type_id, ctx.type_analysis)?,
-                    None => types.resolve_output(DefinitionOutput::MatchOnly, ctx.type_analysis)?,
-                };
-                resolved_cases.push((case_name, case_type));
-            }
-
+        TypeShape::Variant(_) => {
             let scope = layout
                 .scope(type_id)
                 .expect("every emitted variant type has a capture scope");
@@ -203,22 +194,35 @@ fn emit_type_at_slot(
                 member_start,
                 "wire members consume the shared capture layout in order"
             );
-            for (case_name, case_type) in resolved_cases {
+            let member_count = u8::try_from(scope.members().len())
+                .map_err(|_| EmitError::TooManyCases(scope.members().len()))?;
+            for &member_id in scope.members() {
+                let member = layout.expect_member(member_id);
+                let CaptureMemberKind::Case(payload) = member.kind else {
+                    unreachable!("variant scope contains only case descriptors")
+                };
+                let case_name = ctx.strings.intern(member.name, ctx.interner)?;
+                let case_type = match payload.type_id() {
+                    Some(type_id) => {
+                        types.resolve_type(type_id, ctx.type_analysis, ctx.type_layout)?
+                    }
+                    None => types.resolve_output(
+                        DefinitionOutput::MatchOnly,
+                        ctx.type_analysis,
+                        ctx.type_layout,
+                    )?,
+                };
                 types.push_member(TypeMember::new(case_name, case_type));
             }
 
-            let member_count = u8::try_from(scope.members().len())
-                .map_err(|_| EmitError::TooManyCases(scope.members().len()))?;
             types.fill_slot(slot_index, TypeDef::for_variant(member_start, member_count));
             Ok(())
         }
 
         TypeShape::Ref(declaration) => {
             let alias = match ctx.type_analysis.declaration_body(*declaration) {
-                None => types
-                    .lookup(TYPE_NODE)
-                    .expect("Node is mapped before a Ref alias that targets it is emitted"),
-                Some(type_id) => types.resolve_type(type_id, ctx.type_analysis)?,
+                None => types.resolve_type(TYPE_NODE, ctx.type_analysis, ctx.type_layout)?,
+                Some(type_id) => types.resolve_type(type_id, ctx.type_analysis, ctx.type_layout)?,
             };
             types.fill_slot(slot_index, TypeDef::alias(alias));
             Ok(())
@@ -226,16 +230,9 @@ fn emit_type_at_slot(
     }
 }
 
-fn resolve_field_type(
-    types: &mut TypeTableBuilder,
-    field_info: &RecordField,
-    type_ctx: &TypeAnalysis,
-) -> Result<WireTypeId, EmitError> {
-    types.resolve_type(field_info.final_type, type_ctx)
-}
-
 struct TypeEmitCtx<'a> {
     type_analysis: &'a TypeAnalysis,
+    type_layout: &'a ResultTypeLayout,
     interner: &'a Interner,
     strings: &'a mut StringTableBuilder,
 }

@@ -35,7 +35,7 @@ use crate::compiler::emit::plan::{
 use crate::compiler::emit::sink::indentation;
 use crate::compiler::emit::targets::rust::ident::{rust_scope_idents, snake_ident};
 use crate::compiler::emit::targets::rust::{TypeContext, TypeModel};
-use crate::compiler::ids::DefId;
+use crate::compiler::ids::{DefId, ResultMemberId};
 use crate::core::{Interner, Symbol};
 
 use super::decoder_frame::DecoderFrameEstimator;
@@ -747,10 +747,10 @@ impl<'a> Scope<'a> {
 }
 
 /// `12` or `12 | 27` — the Rust match pattern for planned twin indices.
-fn arm_pattern(indices: &[u16]) -> String {
+fn arm_pattern(indices: &[ResultMemberId]) -> String {
     indices
         .iter()
-        .map(u16::to_string)
+        .map(|index| index.raw().to_string())
         .collect::<Vec<_>>()
         .join(" | ")
 }

@@ -31,18 +31,9 @@ pub(crate) use module::generate;
 pub(crate) use type_model::{TypeContext, TypeModel};
 pub(crate) use types_config::Config as TypesConfig;
 
-use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::types::TypeAnalysis;
-use crate::core::Interner;
+use crate::compiler::analyze::result::ResultSchema;
 
-pub(crate) fn emit_types(
-    types: &TypeAnalysis,
-    deps: &DependencyAnalysis,
-    interner: &Interner,
-    config: &TypesConfig,
-) -> String {
-    let schema = crate::compiler::analyze::result::ResultSchema::new(types, deps, interner)
-        .expect("target-neutral compilation validated the result schema");
+pub(crate) fn emit_types(schema: ResultSchema<'_>, config: &TypesConfig) -> String {
     let model = TypeModel::new(schema);
     emit_model(&model, config)
 }
