@@ -31,9 +31,8 @@ Plotnik is the tool for working with Tree-sitter reliably:
 - Bump grammar versions without fear: the static checker has your back.
 
 <br/>
-<br/>
 
-<p align="center"><b>Input</b></p>
+**Input:**
 
 ```javascript
 async function fetchUser(userId, options) {
@@ -42,7 +41,8 @@ async function fetchUser(userId, options) {
 ```
 
 <br/>
-<p align="center"><b>Query</b></p>
+
+**Query:**
 
 ```clojure
 Function = (program
@@ -58,7 +58,8 @@ Function = (program
 ```
 
 <br/>
-<p align="center"><b>Output</b></p>
+
+**Output:**
 
 ```ts
 {
