@@ -2,11 +2,14 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::compiler::analyze::result::{ResultItem, ResultItemKind, ResultSchema};
+use crate::compiler::analyze::result::{
+    CaptureMemberKind, CaptureScopeKind, ResultItem, ResultItemKind, ResultSchema,
+};
 use crate::compiler::analyze::types::type_shape::{
-    CasePayload, DefinitionOutput, ListMinimum, TypeId, TypeShape,
+    CasePayload, DefinitionOutput, ListMinimum, RecordField, TypeId, TypeShape,
 };
 use crate::compiler::emit::sink::{Sink, Style};
+use crate::compiler::ids::{ResultMemberId, ResultTypeId};
 use crate::core::Symbol;
 
 use super::TypeScriptBinding;
@@ -14,8 +17,8 @@ use super::config::{Config, MatchOnlyType};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct SemanticTag {
-    type_id: u32,
-    member: Option<u16>,
+    type_id: ResultTypeId,
+    member: Option<ResultMemberId>,
 }
 
 pub(crate) fn emit_schema(schema: &ResultSchema<'_>, config: Config) -> String {
@@ -98,8 +101,8 @@ impl<'a> SchemaEmitter<'a> {
                     u32::try_from(range.start).expect("TypeScript span start fits in u32"),
                     u32::try_from(range.end).expect("TypeScript span end fits in u32"),
                 ),
-                type_id: range.tag.type_id,
-                member_id: range.tag.member,
+                type_id: range.tag.type_id.raw(),
+                member_id: range.tag.member.map(ResultMemberId::raw),
             })
             .collect();
         (output, ranges)
@@ -171,23 +174,7 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.set_style(Style::Dim);
         self.sink.push("{\n");
 
-        let TypeShape::Record(fields) = self.schema.types.expect_type_shape(ty) else {
-            unreachable!("record result item has a record shape");
-        };
-        let scope = self
-            .schema
-            .layout()
-            .scope(ty)
-            .expect("record output has a capture scope");
-        let mut fields = fields
-            .iter()
-            .enumerate()
-            .map(|(index, (&symbol, info))| {
-                (self.name(symbol), *info, scope.absolute_index(index as u16))
-            })
-            .collect::<Vec<_>>();
-        fields.sort_by(|left, right| left.0.cmp(&right.0));
-        for (field, info, member) in fields {
+        for (field, info, member) in self.record_members(ty) {
             let value = self.render_ty(info.final_type);
             self.sink.reset_style();
             self.sink.push("  ");
@@ -217,19 +204,11 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.styled(Style::Dim, "=");
         self.sink.push("\n");
 
-        let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(ty) else {
-            unreachable!("variant result item has a variant shape");
-        };
-        let scope = self
-            .schema
-            .layout()
-            .scope(ty)
-            .expect("variant output has a capture scope");
+        let cases = self.variant_members(ty);
         let last = cases.len().saturating_sub(1);
-        for (position, (&symbol, &payload)) in cases.iter().enumerate() {
-            let member = scope.absolute_index(position as u16);
+        for (position, (case, payload, member)) in cases.into_iter().enumerate() {
             let rendered = self.render_variant(
-                &self.name(symbol),
+                &case,
                 payload,
                 self.map_enabled.then_some(SemanticTag {
                     type_id: self.wire_id(ty),
@@ -280,18 +259,7 @@ impl<'a> SchemaEmitter<'a> {
                 out
             }
             TypeShape::Record(_) => self.inline_record(ty, false),
-            TypeShape::Variant(cases) => {
-                let mut out = Sink::new();
-                for (position, (&name, &payload)) in cases.iter().enumerate() {
-                    if position > 0 {
-                        out.push(" ");
-                        out.styled(Style::Dim, "|");
-                        out.push(" ");
-                    }
-                    out.append(self.render_variant(&self.name(name), payload, None, false));
-                }
-                out
-            }
+            TypeShape::Variant(_) => self.inline_variant(ty),
         }
     }
 
@@ -319,27 +287,18 @@ impl<'a> SchemaEmitter<'a> {
     }
 
     fn inline_record(&self, ty: TypeId, tags: bool) -> Sink<SemanticTag> {
-        let TypeShape::Record(fields) = self.schema.types.expect_type_shape(ty) else {
+        let Some(scope) = self.schema.layout().scope(ty) else {
             return self.render_ty(ty);
         };
+        if scope.kind() != CaptureScopeKind::Record {
+            return self.render_ty(ty);
+        }
+        let fields = self.record_members(ty);
         if fields.is_empty() {
             let mut out = Sink::new();
             out.styled(Style::Dim, "{}");
             return out;
         }
-        let scope = self
-            .schema
-            .layout()
-            .scope(ty)
-            .expect("inline record has a capture scope");
-        let mut fields = fields
-            .iter()
-            .enumerate()
-            .map(|(index, (&symbol, info))| {
-                (self.name(symbol), *info, scope.absolute_index(index as u16))
-            })
-            .collect::<Vec<_>>();
-        fields.sort_by(|left, right| left.0.cmp(&right.0));
         let mut out = Sink::new();
         out.styled(Style::Dim, "{");
         out.push(" ");
@@ -369,6 +328,69 @@ impl<'a> SchemaEmitter<'a> {
         out.push(" ");
         out.styled(Style::Dim, "}");
         out
+    }
+
+    fn inline_variant(&self, ty: TypeId) -> Sink<SemanticTag> {
+        let mut out = Sink::new();
+        for (position, (name, payload, _)) in self.variant_members(ty).into_iter().enumerate() {
+            if position > 0 {
+                out.push(" ");
+                out.styled(Style::Dim, "|");
+                out.push(" ");
+            }
+            out.append(self.render_variant(&name, payload, None, false));
+        }
+        out
+    }
+
+    fn record_members(&self, ty: TypeId) -> Vec<(String, RecordField, ResultMemberId)> {
+        let scope = self
+            .schema
+            .layout()
+            .scope(ty)
+            .expect("record output has a capture scope");
+        assert_eq!(
+            scope.kind(),
+            CaptureScopeKind::Record,
+            "record output must have a record capture scope"
+        );
+        let mut fields = scope
+            .members()
+            .iter()
+            .map(|&member| {
+                let descriptor = self.schema.layout().expect_member(member);
+                let CaptureMemberKind::Field(info) = descriptor.kind else {
+                    unreachable!("record capture scope contains only field members");
+                };
+                (self.name(descriptor.name), info, member)
+            })
+            .collect::<Vec<_>>();
+        fields.sort_by(|left, right| left.0.cmp(&right.0));
+        fields
+    }
+
+    fn variant_members(&self, ty: TypeId) -> Vec<(String, CasePayload, ResultMemberId)> {
+        let scope = self
+            .schema
+            .layout()
+            .scope(ty)
+            .expect("variant output has a capture scope");
+        assert_eq!(
+            scope.kind(),
+            CaptureScopeKind::Variant,
+            "variant output must have a variant capture scope"
+        );
+        scope
+            .members()
+            .iter()
+            .map(|&member| {
+                let descriptor = self.schema.layout().expect_member(member);
+                let CaptureMemberKind::Case(payload) = descriptor.kind else {
+                    unreachable!("variant capture scope contains only case members");
+                };
+                (self.name(descriptor.name), payload, member)
+            })
+            .collect()
     }
 
     fn render_variant(
@@ -430,7 +452,7 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.push("\n\n");
     }
 
-    fn push_mapped(&mut self, value: &str, ty: TypeId, member: Option<u16>) {
+    fn push_mapped(&mut self, value: &str, ty: TypeId, member: Option<ResultMemberId>) {
         if !self.map_enabled {
             self.sink.push(value);
             return;
@@ -476,7 +498,7 @@ impl<'a> SchemaEmitter<'a> {
         out
     }
 
-    fn wire_id(&self, ty: TypeId) -> u32 {
+    fn wire_id(&self, ty: TypeId) -> ResultTypeId {
         self.schema.type_layout().output_id(ty)
     }
 

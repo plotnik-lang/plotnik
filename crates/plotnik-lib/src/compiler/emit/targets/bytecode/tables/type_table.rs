@@ -1,79 +1,70 @@
 //! Type table accumulator for bytecode emission.
 //!
-//! Owns the bytecode-level type tables (defs, members, names) and the query →
-//! bytecode id mapping, plus the primitive push/resolve operations the type-emit
-//! phase drives. The walk that decides reachability, ordering, and how each
-//! inferred shape lowers lives in `compiler::emit::type_table`.
-
-use std::collections::HashMap;
+//! Owns the bytecode-level type tables (defs, members, names) plus the primitive
+//! push/resolve operations the type-emit phase drives. The target-neutral result
+//! layout is the sole source of type IDs; this builder only validates and writes
+//! their compact wire representation. The walk that decides reachability,
+//! ordering, and how each inferred shape lowers lives in
+//! `compiler::emit::type_table`.
 
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeMember, TypeNameEntry};
 
+use crate::compiler::analyze::result::ResultTypeLayout;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::DefinitionOutput;
-use crate::compiler::ids::TypeId;
+use crate::compiler::ids::{ResultTypeId, TypeId};
 
 use super::error::EmitError;
 
-/// Holds type metadata, mapping analysis type IDs to wire type IDs.
+/// Holds bytecode type metadata in canonical result-type order.
 #[derive(Debug)]
 pub struct TypeTableBuilder {
-    /// Map from analysis `TypeId` to bytecode `WireTypeId`.
-    mapping: HashMap<TypeId, WireTypeId>,
     /// Type definitions (4 bytes each).
     type_defs: Vec<TypeDef>,
     /// Type members for records/variants (4 bytes each).
     type_members: Vec<TypeMember>,
     /// Type names for named types (4 bytes each).
     type_names: Vec<TypeNameEntry>,
-    no_value: Option<WireTypeId>,
 }
 
 impl TypeTableBuilder {
     pub fn new() -> Self {
         Self {
-            mapping: HashMap::new(),
             type_defs: Vec::new(),
             type_members: Vec::new(),
             type_names: Vec::new(),
-            no_value: None,
         }
     }
 
-    /// Map `query_id` to the next bytecode slot and push `def`; returns the id.
-    /// Used to emit built-ins and reserve slots for value types.
-    pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> Result<WireTypeId, EmitError> {
+    /// Push `def` at its canonical result-type slot and return the wire ID.
+    pub fn push_result(
+        &mut self,
+        result_id: ResultTypeId,
+        def: TypeDef,
+    ) -> Result<WireTypeId, EmitError> {
+        assert_eq!(
+            result_id.index(),
+            self.type_defs.len(),
+            "bytecode types are emitted in canonical result-type order"
+        );
         if self.type_defs.len() >= EmitError::MAX_TYPES {
             return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
         }
 
-        let bc_id = WireTypeId::from(self.type_defs.len() as u16);
-        self.mapping.insert(query_id, bc_id);
+        let bc_id = Self::encode_wire_id(result_id)?;
         self.type_defs.push(def);
         Ok(bc_id)
-    }
-
-    pub fn push_no_value(&mut self) -> Result<WireTypeId, EmitError> {
-        if self.type_defs.len() >= EmitError::MAX_TYPES {
-            return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
-        }
-        let wire_id = WireTypeId::from(self.type_defs.len() as u16);
-        self.type_defs
-            .push(TypeDef::builtin(crate::bytecode::TypeKind::NoValue));
-        self.no_value = Some(wire_id);
-        Ok(wire_id)
     }
 
     pub fn resolve_output(
         &self,
         output: DefinitionOutput,
         type_ctx: &TypeAnalysis,
+        layout: &ResultTypeLayout,
     ) -> Result<WireTypeId, EmitError> {
         match output {
-            DefinitionOutput::MatchOnly => Ok(self
-                .no_value
-                .expect("match-only output requires a bytecode no-value type")),
-            DefinitionOutput::Value(type_id) => self.resolve_type(type_id, type_ctx),
+            DefinitionOutput::MatchOnly => self.wire_id(layout.no_value_output_id()),
+            DefinitionOutput::Value(type_id) => self.resolve_type(type_id, type_ctx, layout),
         }
     }
 
@@ -108,6 +99,7 @@ impl TypeTableBuilder {
         &self,
         type_id: TypeId,
         type_ctx: &TypeAnalysis,
+        layout: &ResultTypeLayout,
     ) -> Result<WireTypeId, EmitError> {
         let type_id = match type_ctx.type_shape(type_id) {
             Some(crate::compiler::analyze::types::type_shape::TypeShape::Ref(declaration))
@@ -117,12 +109,7 @@ impl TypeTableBuilder {
             }
             _ => type_ctx.resolve_underlying_type_id(type_id),
         };
-        let bc_id = self
-            .mapping
-            .get(&type_id)
-            .copied()
-            .expect("resolved type must be mapped");
-        Ok(bc_id)
+        self.wire_id(layout.output_id(type_id))
     }
 
     /// Validate that counts fit in u16.
@@ -136,8 +123,22 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    pub fn lookup(&self, type_id: TypeId) -> Option<WireTypeId> {
-        self.mapping.get(&type_id).copied()
+    pub fn wire_id(&self, result_id: ResultTypeId) -> Result<WireTypeId, EmitError> {
+        assert!(
+            result_id.index() < self.type_defs.len(),
+            "canonical result type must have a reserved bytecode slot"
+        );
+        Self::encode_wire_id(result_id)
+    }
+
+    fn encode_wire_id(result_id: ResultTypeId) -> Result<WireTypeId, EmitError> {
+        let count = result_id.index() + 1;
+        if count > EmitError::MAX_TYPES {
+            return Err(EmitError::TooManyTypes(count));
+        }
+        let raw = u16::try_from(result_id.raw())
+            .expect("bytecode type count was checked against the u16 format limit");
+        Ok(WireTypeId::from(raw))
     }
 
     /// Returns `(type_defs_bytes, type_members_bytes, type_names_bytes)`.

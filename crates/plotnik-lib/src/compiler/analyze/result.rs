@@ -6,17 +6,17 @@
 //! source backend chooses a representation.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::OnceLock;
 
 use thiserror::Error;
 
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::refs::dependency_analysis::DefinitionReachability;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
-use crate::compiler::ids::{DefId, TypeDeclId};
+use crate::compiler::ids::{DefId, ResultMemberId, ResultTypeId, TypeDeclId};
 use crate::core::{Interner, Symbol};
 
 const MAX_MEMBERS: usize = u16::MAX as usize;
@@ -70,8 +70,12 @@ impl ResultItem {
         matches!(self.kind, ResultItemKind::Record | ResultItemKind::Variant)
     }
 
-    pub(crate) fn is_record(self) -> bool {
-        self.kind == ResultItemKind::Record
+    fn scope_kind(self) -> Option<CaptureScopeKind> {
+        match self.kind {
+            ResultItemKind::Record => Some(CaptureScopeKind::Record),
+            ResultItemKind::Variant => Some(CaptureScopeKind::Variant),
+            ResultItemKind::Alias | ResultItemKind::MatchOnlyDef => None,
+        }
     }
 
     pub(crate) fn value_type(self) -> TypeId {
@@ -81,10 +85,21 @@ impl ResultItem {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum CaptureScopeKind {
     Record,
     Variant,
+}
+
+/// One public composite declaration and every compatible nominal scope that
+/// can produce its value. Source targets render `representative`; decoders
+/// accept member slots from every `occurrence`.
+#[derive(Clone, Debug)]
+pub(crate) struct PublicResultGroup {
+    name: Symbol,
+    kind: CaptureScopeKind,
+    representative: TypeId,
+    occurrences: Vec<TypeId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,6 +110,8 @@ pub(crate) enum CaptureMemberKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CaptureMember {
+    pub(crate) parent_type: TypeId,
+    pub(crate) relative_index: u16,
     pub(crate) name: Symbol,
     pub(crate) kind: CaptureMemberKind,
 }
@@ -103,7 +120,8 @@ pub(crate) struct CaptureMember {
 pub(crate) struct CaptureScope {
     kind: CaptureScopeKind,
     base: u16,
-    members: Vec<CaptureMember>,
+    members: Vec<ResultMemberId>,
+    members_by_name: BTreeMap<Symbol, ResultMemberId>,
 }
 
 impl CaptureScope {
@@ -115,25 +133,23 @@ impl CaptureScope {
         self.base
     }
 
-    pub(crate) fn members(&self) -> &[CaptureMember] {
+    pub(crate) fn members(&self) -> &[ResultMemberId] {
         &self.members
     }
 
-    pub(crate) fn absolute_index(&self, relative: u16) -> u16 {
-        assert!(
-            usize::from(relative) < self.members.len(),
-            "capture member reference was validated against its parent scope"
-        );
-        self.base
-            .checked_add(relative)
-            .expect("capture layout validates the u16 member space")
+    pub(crate) fn member_id(&self, relative: u16) -> Option<ResultMemberId> {
+        self.members.get(usize::from(relative)).copied()
+    }
+
+    pub(crate) fn member_named(&self, name: Symbol) -> Option<ResultMemberId> {
+        self.members_by_name.get(&name).copied()
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct CaptureLayout {
     scopes: BTreeMap<TypeId, CaptureScope>,
-    member_count: usize,
+    members: Vec<CaptureMember>,
 }
 
 /// Stable analysis-type to emitted-type numbering shared by every output
@@ -144,7 +160,7 @@ pub(crate) struct ResultTypeLayout {
     no_value: bool,
     builtins: Vec<TypeId>,
     value_types: Vec<TypeId>,
-    output_ids: HashMap<TypeId, u32>,
+    output_ids: HashMap<TypeId, ResultTypeId>,
 }
 
 impl ResultTypeLayout {
@@ -161,8 +177,10 @@ impl ResultTypeLayout {
             .map(|(index, &type_id)| {
                 (
                     type_id,
-                    u32::try_from(index + usize::from(no_value))
-                        .expect("result type count fits the wire type space"),
+                    ResultTypeId::from_raw(
+                        u32::try_from(index + usize::from(no_value))
+                            .expect("result type count fits the result type space"),
+                    ),
                 )
             })
             .collect();
@@ -182,19 +200,19 @@ impl ResultTypeLayout {
         self.no_value
     }
 
-    pub(crate) fn no_value_output_id(&self) -> u32 {
+    pub(crate) fn no_value_output_id(&self) -> ResultTypeId {
         assert!(
             self.no_value,
             "result layout must include the no-value wire type"
         );
-        0
+        ResultTypeId::from_raw(0)
     }
 
     pub(crate) fn value_types(&self) -> &[TypeId] {
         &self.value_types
     }
 
-    pub(crate) fn output_id(&self, type_id: TypeId) -> u32 {
+    pub(crate) fn output_id(&self, type_id: TypeId) -> ResultTypeId {
         *self
             .output_ids
             .get(&type_id)
@@ -212,53 +230,66 @@ impl CaptureLayout {
         ordered_types: &[TypeId],
     ) -> Result<Self, ResultSchemaError> {
         let mut scopes = BTreeMap::new();
-        let mut member_count = 0;
+        let mut all_members = Vec::new();
         for &type_id in ordered_types {
-            let (kind, members): (CaptureScopeKind, Vec<CaptureMember>) =
+            let (kind, members): (CaptureScopeKind, Vec<(Symbol, CaptureMemberKind)>) =
                 match types.expect_type_shape(type_id) {
                     TypeShape::Record(fields) => (
                         CaptureScopeKind::Record,
                         fields
                             .iter()
-                            .map(|(&name, &info)| CaptureMember {
-                                name,
-                                kind: CaptureMemberKind::Field(info),
-                            })
+                            .map(|(&name, &info)| (name, CaptureMemberKind::Field(info)))
                             .collect(),
                     ),
                     TypeShape::Variant(cases) => (
                         CaptureScopeKind::Variant,
                         cases
                             .iter()
-                            .map(|(&name, &payload)| CaptureMember {
-                                name,
-                                kind: CaptureMemberKind::Case(payload),
-                            })
+                            .map(|(&name, &payload)| (name, CaptureMemberKind::Case(payload)))
                             .collect(),
                     ),
                     _ => continue,
                 };
 
+            let member_count = all_members.len();
             let next_member_count = member_count + members.len();
             if next_member_count > MAX_MEMBERS {
                 return Err(ResultSchemaError::Members(next_member_count));
             }
             let base = u16::try_from(member_count)
                 .expect("member count was checked against the u16 format limit");
-            member_count = next_member_count;
+            let mut member_ids = Vec::with_capacity(members.len());
+            let mut members_by_name = BTreeMap::new();
+            for (relative_index, (name, kind)) in members.into_iter().enumerate() {
+                let relative_index = u16::try_from(relative_index)
+                    .expect("capture scope member count fits the result member space");
+                let id = ResultMemberId::from_raw(
+                    base.checked_add(relative_index)
+                        .expect("capture layout validates the result member space"),
+                );
+                all_members.push(CaptureMember {
+                    parent_type: type_id,
+                    relative_index,
+                    name,
+                    kind,
+                });
+                member_ids.push(id);
+                members_by_name.insert(name, id);
+            }
             scopes.insert(
                 type_id,
                 CaptureScope {
                     kind,
                     base,
-                    members,
+                    members: member_ids,
+                    members_by_name,
                 },
             );
         }
 
         Ok(Self {
             scopes,
-            member_count,
+            members: all_members,
         })
     }
 
@@ -266,29 +297,105 @@ impl CaptureLayout {
         self.scopes.get(&type_id)
     }
 
-    pub(crate) fn member_base(&self, type_id: TypeId) -> Option<u16> {
-        self.scope(type_id).map(CaptureScope::base)
+    pub(crate) fn member_id(&self, parent_type: TypeId, name: Symbol) -> Option<ResultMemberId> {
+        self.scope(parent_type)?.member_named(name)
+    }
+
+    pub(crate) fn member(&self, id: ResultMemberId) -> Option<&CaptureMember> {
+        self.members.get(id.index())
+    }
+
+    pub(crate) fn expect_member(&self, id: ResultMemberId) -> &CaptureMember {
+        self.member(id)
+            .expect("result member id belongs to the compiled result model")
     }
 
     pub(crate) fn member_count(&self) -> usize {
-        self.member_count
+        self.members.len()
     }
 }
 
-/// The name-assigned, reachable result model shared by bytecode and generated
-/// source backends. It contains semantic shapes and capture slots only; target
-/// representation choices such as Rust `Box` placement live downstream.
+impl PublicResultGroup {
+    fn new(item: ResultItem, types: &TypeAnalysis, layout: &CaptureLayout) -> Self {
+        let representative = item.value_type();
+        let kind = layout
+            .scope(representative)
+            .expect("composite result item has a capture scope")
+            .kind();
+        let expected_kind = item
+            .scope_kind()
+            .expect("only composite result items form public groups");
+        assert_eq!(kind, expected_kind, "public item kind matches its scope");
+
+        let mut group = Self {
+            name: item.name,
+            kind,
+            representative,
+            occurrences: Vec::new(),
+        };
+        group.add_occurrence(types, layout, representative);
+        group
+    }
+
+    fn add_occurrence(&mut self, types: &TypeAnalysis, layout: &CaptureLayout, type_id: TypeId) {
+        let scope = layout
+            .scope(type_id)
+            .expect("public result occurrence has a capture scope");
+        assert_eq!(
+            scope.kind(),
+            self.kind,
+            "one public result name has one composite kind"
+        );
+        assert!(
+            types.types_structurally_equal(self.representative, type_id),
+            "one public result name has one structural shape"
+        );
+        self.occurrences.push(type_id);
+    }
+
+    fn finish(&mut self) {
+        self.occurrences.sort_unstable();
+        self.occurrences.dedup();
+        assert!(
+            self.occurrences.contains(&self.representative),
+            "public result occurrences include their representative"
+        );
+    }
+
+    pub(crate) fn representative(&self) -> TypeId {
+        self.representative
+    }
+
+    pub(crate) fn occurrences(&self) -> &[TypeId] {
+        &self.occurrences
+    }
+}
+
+/// Owned, name-assigned result data derived once for a compiled query.
+///
+/// Semantic analyses remain owned by the bound query. This model retains only
+/// the target-neutral projection every downstream consumer shares, so a
+/// [`ResultSchema`] can cheaply combine it with those analyses when needed.
 #[derive(Clone)]
-pub(crate) struct ResultSchema<'a> {
-    pub(crate) types: &'a TypeAnalysis,
-    pub(crate) deps: &'a DependencyAnalysis,
-    pub(crate) interner: &'a Interner,
-    collected_types: CollectedTypes,
-    type_layout: OnceLock<ResultTypeLayout>,
+pub(crate) struct ResultModel {
+    reachable_defs: DefinitionReachability,
+    type_layout: ResultTypeLayout,
     named_types: BTreeMap<TypeId, Symbol>,
     type_name_bindings: Vec<TypeNameBinding>,
     entry_point_items: Vec<ResultItem>,
     capture_layout: CaptureLayout,
+    public_result_groups: BTreeMap<Symbol, PublicResultGroup>,
+}
+
+/// A borrowed view of a compiled query's semantic analyses and retained result
+/// model. Target representation choices such as Rust `Box` placement live
+/// downstream.
+#[derive(Clone, Copy)]
+pub(crate) struct ResultSchema<'a> {
+    pub(crate) types: &'a TypeAnalysis,
+    pub(crate) deps: &'a DependencyAnalysis,
+    pub(crate) interner: &'a Interner,
+    model: &'a ResultModel,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -297,26 +404,26 @@ pub(crate) struct TypeNameBinding {
     pub(crate) type_id: TypeId,
 }
 
-impl<'a> ResultSchema<'a> {
+impl ResultModel {
     pub(crate) fn from_artifacts(
-        artifacts: AnalysisArtifacts<'a>,
+        artifacts: AnalysisArtifacts<'_>,
     ) -> Result<Self, ResultSchemaError> {
-        Self::new(
-            artifacts.type_analysis,
-            artifacts.dependency_analysis,
-            artifacts.interner,
-        )
+        Self::new(artifacts.type_analysis, artifacts.dependency_analysis)
     }
 
     pub(crate) fn new(
-        types: &'a TypeAnalysis,
-        deps: &'a DependencyAnalysis,
-        interner: &'a Interner,
+        types: &TypeAnalysis,
+        deps: &DependencyAnalysis,
     ) -> Result<Self, ResultSchemaError> {
         let reachable_defs =
             deps.reachable_from(types.iter_entry_point_outputs().map(|(def_id, _)| def_id));
         let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
         let capture_layout = CaptureLayout::build(types, &collected_types.value_types)?;
+        let type_layout = ResultTypeLayout::build(
+            collected_types.no_value,
+            &collected_types.builtins,
+            collected_types.value_types,
+        );
         let named_types: BTreeMap<TypeId, Symbol> = types.iter_named_types().collect();
         let mut type_name_bindings = named_types
             .iter()
@@ -334,35 +441,107 @@ impl<'a> ResultSchema<'a> {
         type_name_bindings.sort_by_key(|binding| (binding.type_id, binding.name));
         type_name_bindings.dedup();
         let entry_point_items = ItemCollector::new(types, deps, &named_types).collect();
+        let mut public_result_groups = BTreeMap::new();
+        for item in entry_point_items
+            .iter()
+            .copied()
+            .filter(|item| item.is_composite())
+        {
+            let previous = public_result_groups.insert(
+                item.name,
+                PublicResultGroup::new(item, types, &capture_layout),
+            );
+            assert!(previous.is_none(), "public result item names are unique");
+        }
+        for (&type_id, &name) in &named_types {
+            let Some(group) = public_result_groups.get_mut(&name) else {
+                continue;
+            };
+            if capture_layout.scope(type_id).is_none() {
+                continue;
+            }
+            group.add_occurrence(types, &capture_layout, type_id);
+        }
+        for group in public_result_groups.values_mut() {
+            group.finish();
+        }
         Ok(Self {
-            types,
-            deps,
-            interner,
-            collected_types,
-            type_layout: OnceLock::new(),
+            reachable_defs,
+            type_layout,
             named_types,
             type_name_bindings,
             entry_point_items,
             capture_layout,
+            public_result_groups,
         })
     }
 
-    pub(crate) fn type_layout(&self) -> &ResultTypeLayout {
-        self.type_layout.get_or_init(|| {
-            ResultTypeLayout::build(
-                self.collected_types.no_value,
-                &self.collected_types.builtins,
-                self.collected_types.value_types.clone(),
-            )
-        })
+    pub(crate) fn schema<'a>(&'a self, artifacts: AnalysisArtifacts<'a>) -> ResultSchema<'a> {
+        ResultSchema::new(
+            self,
+            artifacts.type_analysis,
+            artifacts.dependency_analysis,
+            artifacts.interner,
+        )
+    }
+
+    pub(crate) fn layout(&self) -> &CaptureLayout {
+        &self.capture_layout
+    }
+
+    pub(crate) fn reachable_defs(&self) -> &DefinitionReachability {
+        &self.reachable_defs
+    }
+
+    pub(crate) fn public_result_group(&self, item: ResultItem) -> &PublicResultGroup {
+        let group = self
+            .public_result_groups
+            .get(&item.name)
+            .expect("composite result item has a public group");
+        assert_eq!(group.name, item.name, "public group owns the item name");
+        assert_eq!(
+            group.representative,
+            item.value_type(),
+            "public group owns the item representative"
+        );
+        assert_eq!(
+            Some(group.kind),
+            item.scope_kind(),
+            "public group owns the item scope kind"
+        );
+        group
     }
 
     pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
         self.named_types.get(&type_id).copied()
     }
+}
+
+impl<'a> ResultSchema<'a> {
+    pub(crate) fn new(
+        model: &'a ResultModel,
+        types: &'a TypeAnalysis,
+        deps: &'a DependencyAnalysis,
+        interner: &'a Interner,
+    ) -> Self {
+        Self {
+            types,
+            deps,
+            interner,
+            model,
+        }
+    }
+
+    pub(crate) fn type_layout(&self) -> &ResultTypeLayout {
+        &self.model.type_layout
+    }
+
+    pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
+        self.model.type_name_of(type_id)
+    }
 
     pub(crate) fn iter_type_name_bindings(&self) -> impl Iterator<Item = TypeNameBinding> + '_ {
-        self.type_name_bindings.iter().copied()
+        self.model.type_name_bindings.iter().copied()
     }
 
     /// Public result items reachable from selectable definition outputs.
@@ -372,11 +551,15 @@ impl<'a> ResultSchema<'a> {
     /// unspecialized fragment type merely because a capture-type-specialized call
     /// uses the same matcher body.
     pub(crate) fn entry_point_items(&self) -> &[ResultItem] {
-        &self.entry_point_items
+        &self.model.entry_point_items
     }
 
     pub(crate) fn layout(&self) -> &CaptureLayout {
-        &self.capture_layout
+        &self.model.capture_layout
+    }
+
+    pub(crate) fn public_result_group(&self, item: ResultItem) -> &PublicResultGroup {
+        self.model.public_result_group(item)
     }
 
     pub(crate) fn dependency_analysis(&self) -> &DependencyAnalysis {

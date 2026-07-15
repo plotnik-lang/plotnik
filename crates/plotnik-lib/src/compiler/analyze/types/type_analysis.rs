@@ -103,6 +103,78 @@ impl TypeAnalysis {
             .expect("admitted type id must reference a registered type")
     }
 
+    /// Deep structural equality over the frozen type registry.
+    ///
+    /// Record and variant bodies mint a fresh id per occurrence, so two
+    /// structurally identical bodies can carry different ids. References to
+    /// declarations with record or variant bodies remain nominal; transparent
+    /// aliases compare through their bodies. `Ref` cuts recursion, so the walk
+    /// terminates on recursive types.
+    pub(crate) fn types_structurally_equal(&self, a: TypeId, b: TypeId) -> bool {
+        let a = self.transparent_alias_body(a);
+        let b = self.transparent_alias_body(b);
+        if a == b {
+            return true;
+        }
+
+        let (Some(shape_a), Some(shape_b)) = (self.type_shape(a), self.type_shape(b)) else {
+            return false;
+        };
+
+        match (shape_a, shape_b) {
+            (TypeShape::Record(fa), TypeShape::Record(fb)) => {
+                fa.len() == fb.len()
+                    && fa.iter().zip(fb.iter()).all(|((ka, ia), (kb, ib))| {
+                        ka == kb && self.types_structurally_equal(ia.final_type, ib.final_type)
+                    })
+            }
+            (TypeShape::Variant(va), TypeShape::Variant(vb)) => {
+                va.len() == vb.len()
+                    && va.iter().zip(vb.iter()).all(|((ka, pa), (kb, pb))| {
+                        ka == kb
+                            && match (pa.type_id(), pb.type_id()) {
+                                (None, None) => true,
+                                (Some(a), Some(b)) => self.types_structurally_equal(a, b),
+                                _ => false,
+                            }
+                    })
+            }
+            (
+                TypeShape::List {
+                    element: ea,
+                    minimum: ma,
+                },
+                TypeShape::List {
+                    element: eb,
+                    minimum: mb,
+                },
+            ) => ma == mb && self.types_structurally_equal(*ea, *eb),
+            (TypeShape::Option(ia), TypeShape::Option(ib)) => {
+                self.types_structurally_equal(*ia, *ib)
+            }
+            _ => false,
+        }
+    }
+
+    fn transparent_alias_body(&self, mut type_id: TypeId) -> TypeId {
+        let mut seen = HashSet::new();
+        while let Some(TypeShape::Ref(declaration)) = self.type_shape(type_id) {
+            if !seen.insert(*declaration) {
+                return type_id;
+            }
+            let Some(body) = self.declaration_body(*declaration) else {
+                return type_id;
+            };
+            match self.type_shape(body) {
+                Some(TypeShape::Record(_) | TypeShape::Variant(_)) => return type_id,
+                Some(TypeShape::Ref(_)) => type_id = body,
+                Some(_) => return body,
+                None => return type_id,
+            }
+        }
+        type_id
+    }
+
     pub fn declaration(&self, id: TypeDeclId) -> Option<TypeDeclaration> {
         let entry = self.declarations.get(id.index())?;
         Some(TypeDeclaration {
@@ -154,13 +226,6 @@ impl TypeAnalysis {
             }
         }
         false
-    }
-
-    pub fn record_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, RecordField>> {
-        match self.type_shape(id)? {
-            TypeShape::Record(fields) => Some(fields),
-            _ => None,
-        }
     }
 
     /// Fields of the record a `Fields` flow points to.
@@ -801,77 +866,7 @@ impl TypeAnalysisBuilder {
         self.analysis.named_types = names;
     }
 
-    /// Deep structural equality over the in-progress type registry.
-    ///
-    /// Record and variant bodies mint a fresh id per occurrence, so two
-    /// structurally identical bodies can carry different ids. References to
-    /// declarations with record or variant bodies remain nominal; transparent
-    /// aliases compare through their bodies. `Ref` cuts recursion, so the walk
-    /// terminates on recursive types.
     pub(crate) fn types_structurally_equal(&self, a: TypeId, b: TypeId) -> bool {
-        let a = self.transparent_alias_body(a);
-        let b = self.transparent_alias_body(b);
-        if a == b {
-            return true;
-        }
-
-        let (Some(shape_a), Some(shape_b)) =
-            (self.analysis.type_shape(a), self.analysis.type_shape(b))
-        else {
-            return false;
-        };
-
-        match (shape_a, shape_b) {
-            (TypeShape::Record(fa), TypeShape::Record(fb)) => {
-                fa.len() == fb.len()
-                    && fa.iter().zip(fb.iter()).all(|((ka, ia), (kb, ib))| {
-                        ka == kb && self.types_structurally_equal(ia.final_type, ib.final_type)
-                    })
-            }
-            (TypeShape::Variant(va), TypeShape::Variant(vb)) => {
-                va.len() == vb.len()
-                    && va.iter().zip(vb.iter()).all(|((ka, pa), (kb, pb))| {
-                        ka == kb
-                            && match (pa.type_id(), pb.type_id()) {
-                                (None, None) => true,
-                                (Some(a), Some(b)) => self.types_structurally_equal(a, b),
-                                _ => false,
-                            }
-                    })
-            }
-            (
-                TypeShape::List {
-                    element: ea,
-                    minimum: ma,
-                },
-                TypeShape::List {
-                    element: eb,
-                    minimum: mb,
-                },
-            ) => ma == mb && self.types_structurally_equal(*ea, *eb),
-            (TypeShape::Option(ia), TypeShape::Option(ib)) => {
-                self.types_structurally_equal(*ia, *ib)
-            }
-            _ => false,
-        }
-    }
-
-    fn transparent_alias_body(&self, mut type_id: TypeId) -> TypeId {
-        let mut seen = HashSet::new();
-        while let Some(TypeShape::Ref(declaration)) = self.analysis.type_shape(type_id) {
-            if !seen.insert(*declaration) {
-                return type_id;
-            }
-            let Some(body) = self.analysis.declaration_body(*declaration) else {
-                return type_id;
-            };
-            match self.analysis.type_shape(body) {
-                Some(TypeShape::Record(_) | TypeShape::Variant(_)) => return type_id,
-                Some(TypeShape::Ref(_)) => type_id = body,
-                Some(_) => return body,
-                None => return type_id,
-            }
-        }
-        type_id
+        self.analysis.types_structurally_equal(a, b)
     }
 }

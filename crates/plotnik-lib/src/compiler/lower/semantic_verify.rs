@@ -10,11 +10,12 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
-use crate::compiler::analyze::result::{CaptureMemberKind, CaptureScopeKind, ResultSchema};
+use crate::compiler::analyze::result::{CaptureMember, CaptureMemberKind, ResultSchema};
 use crate::compiler::analyze::types::type_shape::CasePayload;
+use crate::compiler::ids::ResultMemberId;
 use crate::compiler::lower::ir::{
-    CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, MemberRef, NfaGraph,
-    ReturnEntry, ReturnOutcome, SemanticNfa,
+    CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, NfaGraph, ReturnEntry,
+    ReturnOutcome, SemanticNfa,
 };
 
 const STATE_BUDGET: usize = 1 << 18;
@@ -321,8 +322,33 @@ impl<'a> Program<'a> {
             schema,
             instructions,
         };
+        program.verify_effect_arguments()?;
         program.verify_return_routes()?;
         Ok(program)
+    }
+
+    fn verify_effect_arguments(&self) -> Result<(), SemanticVerifyError> {
+        for instruction in self.graph.instructions() {
+            let InstructionIR::Match(matched) = instruction else {
+                continue;
+            };
+            for effect in &matched.effects {
+                match effect.kind() {
+                    EffectKind::RecordSet => self.validate_record_set_member(
+                        member(effect, matched.label)?,
+                        matched.label,
+                    )?,
+                    EffectKind::VariantOpen => {
+                        let _ = self
+                            .case_has_no_payload(member(effect, matched.label)?, matched.label)?;
+                    }
+                    _ => {
+                        let _ = literal(effect, matched.label)?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn verify_return_routes(&self) -> Result<(), SemanticVerifyError> {
@@ -794,18 +820,10 @@ impl<'a> Program<'a> {
 
     fn case_has_no_payload(
         &self,
-        member: MemberRef,
+        member: ResultMemberId,
         label: Label,
     ) -> Result<bool, SemanticVerifyError> {
-        let scope = self.member_scope(member, label)?;
-        if scope.kind() != CaptureScopeKind::Variant {
-            return Err(capture_error(
-                label,
-                "VariantOpen does not reference a variant case",
-            ));
-        }
-        let CaptureMemberKind::Case(payload) = scope.members()[member.relative_index as usize].kind
-        else {
+        let CaptureMemberKind::Case(payload) = self.member_descriptor(member, label)?.kind else {
             return Err(capture_error(
                 label,
                 "VariantOpen does not reference a variant case",
@@ -816,16 +834,13 @@ impl<'a> Program<'a> {
 
     fn validate_record_set_member(
         &self,
-        member: MemberRef,
+        member: ResultMemberId,
         label: Label,
     ) -> Result<(), SemanticVerifyError> {
-        let scope = self.member_scope(member, label)?;
-        if scope.kind() == CaptureScopeKind::Record
-            && !matches!(
-                scope.members()[member.relative_index as usize].kind,
-                CaptureMemberKind::Field(_)
-            )
-        {
+        if !matches!(
+            self.member_descriptor(member, label)?.kind,
+            CaptureMemberKind::Field(_)
+        ) {
             return Err(capture_error(
                 label,
                 "RecordSet references a non-field member",
@@ -834,22 +849,15 @@ impl<'a> Program<'a> {
         Ok(())
     }
 
-    fn member_scope(
+    fn member_descriptor(
         &self,
-        member: MemberRef,
+        member: ResultMemberId,
         label: Label,
-    ) -> Result<&crate::compiler::analyze::result::CaptureScope, SemanticVerifyError> {
-        let Some(scope) = self.schema.layout().scope(member.parent_type) else {
-            return Err(capture_error(label, "member parent has no capture scope"));
-        };
-        if usize::from(member.relative_index) >= scope.members().len() {
-            return Err(capture_error(
-                label,
-                "relative member index is out of bounds",
-            ));
-        }
-        let _ = scope.absolute_index(member.relative_index);
-        Ok(scope)
+    ) -> Result<&CaptureMember, SemanticVerifyError> {
+        self.schema
+            .layout()
+            .member(member)
+            .ok_or_else(|| capture_error(label, "member id is out of bounds"))
     }
 
     fn verify_cursor_depth(&self) -> Result<(), SemanticVerifyError> {
@@ -1095,7 +1103,7 @@ fn literal(effect: &EffectIR, label: Label) -> Result<usize, SemanticVerifyError
     }
 }
 
-fn member(effect: &EffectIR, label: Label) -> Result<MemberRef, SemanticVerifyError> {
+fn member(effect: &EffectIR, label: Label) -> Result<ResultMemberId, SemanticVerifyError> {
     match effect.argument() {
         EffectArg::Member(member) => Ok(*member),
         EffectArg::Literal(_) => Err(capture_error(

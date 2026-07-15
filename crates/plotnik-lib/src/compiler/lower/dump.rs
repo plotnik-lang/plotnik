@@ -13,7 +13,7 @@ use std::fmt::Write as _;
 
 use crate::bytecode::{EffectKind, LineBuilder, Nav, Symbol, nav_symbol, width_for_count};
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::types::TypeShape;
+use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
     CallIR, CallProtocol, DefOutputOrigin, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin,
@@ -25,10 +25,11 @@ use crate::core::{Colors, NodeFieldId, NodeKindId};
 pub(crate) fn dump_nfa(
     nfa: &SemanticNfa,
     artifacts: AnalysisArtifacts<'_>,
+    layout: &CaptureLayout,
     colors: Colors,
 ) -> String {
     let graph = nfa.raw();
-    let mut dumper = NfaDumper::new(graph, artifacts);
+    let mut dumper = NfaDumper::new(graph, artifacts, layout);
     dumper.colors = colors;
 
     let mut out = String::new();
@@ -44,12 +45,17 @@ pub(crate) fn dump_nfa(
 pub(crate) struct NfaDumper<'a> {
     graph: &'a NfaGraph,
     artifacts: AnalysisArtifacts<'a>,
+    layout: &'a CaptureLayout,
     colors: Colors,
     label_width: usize,
 }
 
 impl<'a> NfaDumper<'a> {
-    pub(crate) fn new(graph: &'a NfaGraph, artifacts: AnalysisArtifacts<'a>) -> Self {
+    pub(crate) fn new(
+        graph: &'a NfaGraph,
+        artifacts: AnalysisArtifacts<'a>,
+        layout: &'a CaptureLayout,
+    ) -> Self {
         let max_label = graph
             .instructions()
             .iter()
@@ -59,6 +65,7 @@ impl<'a> NfaDumper<'a> {
         Self {
             graph,
             artifacts,
+            layout,
             colors: Colors::new(false),
             label_width: width_for_count(max_label as usize + 1),
         }
@@ -327,18 +334,8 @@ impl NfaDumper<'_> {
             unreachable!("RecordSet/VariantOpen effects are built with member refs");
         };
 
-        let shape = self
-            .artifacts
-            .type_analysis
-            .expect_type_shape(member.parent_type);
-        let sym = match shape {
-            TypeShape::Record(fields) => fields.keys().nth(member.relative_index as usize),
-            TypeShape::Variant(cases) => cases.keys().nth(member.relative_index as usize),
-            _ => None,
-        }
-        .expect("member ref parent must be a record or variant type containing the indexed member");
-
-        self.artifacts.interner.resolve(*sym).to_string()
+        let descriptor = self.layout.expect_member(*member);
+        self.artifacts.interner.resolve(descriptor.name).to_string()
     }
 
     /// Render a `(MISSING …)` constraint. `Any` is bare `(MISSING)`; a named or

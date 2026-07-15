@@ -3,9 +3,10 @@
 //! Handles `RecordOpen`/`RecordClose` and `ListOpen`/`ListClose` wrappers for captures.
 
 use crate::bytecode::Nav;
-use crate::compiler::ids::TypeId;
-use crate::compiler::lower::ir::{EffectIR, Label, MatchIR, MemberRef};
+use crate::compiler::ids::{ResultMemberId, TypeId};
+use crate::compiler::lower::ir::{EffectIR, Label, MatchIR};
 use crate::compiler::parse::ast::Pattern;
+use crate::core::Symbol;
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
@@ -156,20 +157,31 @@ impl NfaBuilder<'_> {
         result
     }
 
-    /// Returns a `MemberRef` keyed by `(record_type, relative_index)`.
-    pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
-        let fields = self.ctx.analysis.type_analysis.record_fields(type_id)?;
-        for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
-            if self.ctx.analysis.interner.resolve(field_sym) == capture_name {
-                return Some(MemberRef::new(type_id, relative_index as u16));
-            }
-        }
-        None
+    pub(super) fn lookup_member(
+        &self,
+        capture_name: &str,
+        type_id: TypeId,
+    ) -> Option<ResultMemberId> {
+        let name = self.ctx.analysis.interner.get(capture_name)?;
+        self.lookup_member_symbol(name, type_id)
     }
 
-    pub(super) fn lookup_member_in_scope(&self, capture_name: &str) -> Option<MemberRef> {
+    pub(super) fn lookup_member_symbol(
+        &self,
+        name: Symbol,
+        type_id: TypeId,
+    ) -> Option<ResultMemberId> {
+        self.ctx.result.layout().member_id(type_id, name)
+    }
+
+    pub(super) fn lookup_member_in_scope(&self, capture_name: &str) -> Option<ResultMemberId> {
         let RecordScope(type_id) = *self.scope_stack.last()?;
         self.lookup_member(capture_name, type_id)
+    }
+
+    pub(super) fn lookup_member_symbol_in_scope(&self, name: Symbol) -> Option<ResultMemberId> {
+        let RecordScope(type_id) = *self.scope_stack.last()?;
+        self.lookup_member_symbol(name, type_id)
     }
 
     /// Compile a record-scope capture: `RecordOpen → inner → RecordClose+capture → exit(s)`.

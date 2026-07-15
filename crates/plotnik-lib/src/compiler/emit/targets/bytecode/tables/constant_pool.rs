@@ -1,8 +1,6 @@
 //! Read-only view over sealed bytecode constant tables.
 
 use crate::bytecode::StringId;
-use crate::compiler::analyze::result::CaptureLayout;
-use crate::compiler::ids::TypeId;
 
 use super::{RegexId, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 
@@ -11,7 +9,6 @@ pub(in crate::compiler::emit) struct ConstantPool<'a> {
     types: &'a TypeTableBuilder,
     strings: &'a StringTableBuilder,
     regexes: &'a RegexTableBuilder,
-    layout: &'a CaptureLayout,
 }
 
 impl<'a> ConstantPool<'a> {
@@ -19,13 +16,11 @@ impl<'a> ConstantPool<'a> {
         types: &'a TypeTableBuilder,
         strings: &'a StringTableBuilder,
         regexes: &'a RegexTableBuilder,
-        layout: &'a CaptureLayout,
     ) -> Self {
         Self {
             types,
             strings,
             regexes,
-            layout,
         }
     }
 
@@ -35,10 +30,6 @@ impl<'a> ConstantPool<'a> {
 
     pub(in crate::compiler::emit) fn lookup_regex(self, string_id: StringId) -> Option<RegexId> {
         self.regexes.lookup(string_id)
-    }
-
-    pub(in crate::compiler::emit) fn member_base(self, type_id: TypeId) -> Option<u16> {
-        self.layout.member_base(type_id)
     }
 
     pub(in crate::compiler::emit) fn emit_strings(self) -> (Vec<u8>, Vec<u8>) {

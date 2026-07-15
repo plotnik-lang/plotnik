@@ -2,8 +2,8 @@
 //!
 //! Compiles query AST patterns into bytecode IR with symbolic labels.
 //! Labels are resolved to concrete code addresses during the layout phase.
-//! A `MemberRef` carries a parent type plus relative index, resolved to an
-//! absolute member index at emit time.
+//! Structured-result effects carry canonical member IDs from the retained
+//! result model.
 //!
 //! # Module Organization
 //!

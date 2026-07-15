@@ -3,6 +3,7 @@ use indexmap::IndexMap;
 
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::GrammarBindingBuilder;
+use crate::compiler::analyze::result::ResultModel;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::NodeKindConstraint;
@@ -28,6 +29,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
     }
     let grammar = grammar_builder.finish();
     let dependency_analysis = empty_dependency_analysis();
+    let result = ResultModel::new(&type_ctx, &dependency_analysis).expect("empty result fits");
     let ctx = LowerInput {
         analysis: AnalysisArtifacts {
             interner: &interner,
@@ -35,6 +37,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
             dependency_analysis: &dependency_analysis,
             grammar: &grammar,
         },
+        result: &result,
         symbol_table: &symbol_table,
         inspection: false,
     };
@@ -55,6 +58,7 @@ fn resolve_anonymous_node_kind_requires_grammar_binding() {
     let symbol_table = empty_symbol_table();
     let grammar = GrammarBindingBuilder::new().finish();
     let dependency_analysis = empty_dependency_analysis();
+    let result = ResultModel::new(&type_ctx, &dependency_analysis).expect("empty result fits");
     let ctx = LowerInput {
         analysis: AnalysisArtifacts {
             interner: &interner,
@@ -62,6 +66,7 @@ fn resolve_anonymous_node_kind_requires_grammar_binding() {
             dependency_analysis: &dependency_analysis,
             grammar: &grammar,
         },
+        result: &result,
         symbol_table: &symbol_table,
         inspection: false,
     };
@@ -79,6 +84,7 @@ fn resolve_field_by_name_requires_grammar_binding() {
     let symbol_table = empty_symbol_table();
     let grammar = GrammarBindingBuilder::new().finish();
     let dependency_analysis = empty_dependency_analysis();
+    let result = ResultModel::new(&type_ctx, &dependency_analysis).expect("empty result fits");
     let ctx = LowerInput {
         analysis: AnalysisArtifacts {
             interner: &interner,
@@ -86,6 +92,7 @@ fn resolve_field_by_name_requires_grammar_binding() {
             dependency_analysis: &dependency_analysis,
             grammar: &grammar,
         },
+        result: &result,
         symbol_table: &symbol_table,
         inspection: false,
     };

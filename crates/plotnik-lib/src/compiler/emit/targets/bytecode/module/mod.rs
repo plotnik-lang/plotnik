@@ -10,7 +10,7 @@ use crate::bytecode::{
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::result::{CaptureLayout, ResultSchema};
+use crate::compiler::analyze::result::{CaptureLayout, ResultSchema, ResultTypeLayout};
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
@@ -36,6 +36,7 @@ pub(in crate::compiler::emit) struct EmitPipeline<'a> {
     strings: StringTableBuilder,
     types: TypeTableBuilder,
     layout: LayoutMap,
+    type_layout: &'a ResultTypeLayout,
     capture_layout: &'a CaptureLayout,
 }
 
@@ -60,6 +61,7 @@ impl<'a> EmitPipeline<'a> {
             strings,
             types,
             layout,
+            type_layout: schema.type_layout(),
             capture_layout: schema.layout(),
         })
     }
@@ -99,9 +101,9 @@ impl<'a> EmitPipeline<'a> {
         for (def_id, output) in self.input.type_analysis.iter_entry_point_outputs() {
             let name_sym = self.input.dependency_analysis.def_name_sym(def_id);
             let name = self.strings.intern(name_sym, self.input.interner)?;
-            let result_type = self
-                .types
-                .resolve_output(output, self.input.type_analysis)?;
+            let result_type =
+                self.types
+                    .resolve_output(output, self.input.type_analysis, self.type_layout)?;
 
             let target = self
                 .ir
@@ -252,20 +254,19 @@ impl<'a> EmitPipeline<'a> {
         for entry in &spans.entries {
             let (type_id, member) = match entry.binding {
                 Some(SpanBindingIR::Type(type_id)) => {
-                    let wire_type = self.types.resolve_type(type_id, self.input.type_analysis)?;
+                    let wire_type = self.types.resolve_type(
+                        type_id,
+                        self.input.type_analysis,
+                        self.type_layout,
+                    )?;
                     (u16::from(wire_type), SPAN_NO_BINDING)
                 }
-                Some(SpanBindingIR::Member(member_ref)) => {
+                Some(SpanBindingIR::Member(member)) => {
+                    let descriptor = self.capture_layout.expect_member(member);
                     let wire_type = self
                         .types
-                        .lookup(member_ref.parent_type)
-                        .expect("validated span member binding must reference an emitted type");
-                    let member = self
-                        .capture_layout
-                        .scope(member_ref.parent_type)
-                        .expect("validated span member binding must reference a capture scope")
-                        .absolute_index(member_ref.relative_index);
-                    (u16::from(wire_type), member)
+                        .wire_id(self.type_layout.output_id(descriptor.parent_type))?;
+                    (u16::from(wire_type), member.raw())
                 }
                 None => (SPAN_NO_BINDING, SPAN_NO_BINDING),
             };

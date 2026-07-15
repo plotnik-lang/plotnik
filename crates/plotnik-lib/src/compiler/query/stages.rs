@@ -6,7 +6,7 @@ use crate::compiler::analyze::grammar::bind;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
-use crate::compiler::analyze::result::ResultSchema;
+use crate::compiler::analyze::result::{ResultModel, ResultSchema};
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
 use crate::compiler::analyze::types::check_entry_points;
 use crate::compiler::analyze::types::type_check::{self, RootExtent, TypeAnalysis};
@@ -396,13 +396,14 @@ pub(crate) struct BoundQuery {
 
 pub struct CompiledQuery {
     bound: BindOutcome,
+    result: Option<ResultModel>,
     semantic_nfa: Option<SemanticNfa>,
     diagnostics: Diagnostics,
 }
 
 impl CompiledQuery {
     pub fn is_valid(&self) -> bool {
-        self.semantic_nfa.is_some() && !self.diagnostics.has_errors()
+        self.result.is_some() && self.semantic_nfa.is_some() && !self.diagnostics.has_errors()
     }
 
     pub fn emit<T: EmitTarget>(
@@ -430,8 +431,10 @@ impl CompiledQuery {
             .bound
             .bound()
             .expect("valid compiled query is grammar-bound");
+        let schema = self.result_schema();
         let input = LowerInput {
             analysis: bound.analysis_input(),
+            result: self.result_model(),
             symbol_table: bound.symbol_table(),
             inspection: config.inspection_enabled(),
         };
@@ -453,6 +456,7 @@ impl CompiledQuery {
         };
         let bytes = match crate::compiler::emit::targets::bytecode::emit(
             bound.analysis_input(),
+            &schema,
             &lowered,
         ) {
             Ok(bytes) => bytes,
@@ -481,16 +485,9 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
-        let bound = self
-            .bound
-            .bound()
-            .expect("valid compiled query is grammar-bound");
-        let source = crate::compiler::emit::targets::rust::emit_types(
-            bound.type_analysis(),
-            bound.dependency_analysis(),
-            bound.interner(),
-            &config.rust_types_config(),
-        );
+        let schema = self.result_schema();
+        let source =
+            crate::compiler::emit::targets::rust::emit_types(schema, &config.rust_types_config());
         Ok(Emission::success(
             RustTypesOutput::new(source),
             Diagnostics::new(),
@@ -508,6 +505,7 @@ impl CompiledQuery {
             .bound
             .bound()
             .expect("valid compiled query is grammar-bound");
+        let schema = self.result_schema();
         let mut matcher = config.matcher_config();
         if config.provenance_mode() == CodegenProvenance::Full {
             let identity = bound.grammar().identity().cloned().ok_or_else(|| {
@@ -521,6 +519,7 @@ impl CompiledQuery {
             self.semantic_nfa
                 .as_ref()
                 .expect("valid query retains semantic NFA"),
+            schema,
         );
         let source = crate::compiler::emit::targets::rust::generate(&plan, &matcher);
         Ok(Emission::success(
@@ -536,12 +535,7 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
-        let bound = self
-            .bound
-            .bound()
-            .expect("valid compiled query is grammar-bound");
-        let schema = ResultSchema::from_artifacts(bound.analysis_input())
-            .expect("target-neutral compilation validated the result schema");
+        let schema = self.result_schema();
         let emitter = config.emitter_config();
         let (source, bindings) = if config.colored_output() {
             (
@@ -583,15 +577,31 @@ impl CompiledQuery {
         })
     }
 
+    fn result_schema(&self) -> ResultSchema<'_> {
+        let bound = self
+            .bound
+            .bound()
+            .expect("valid compiled query is grammar-bound");
+        self.result_model().schema(bound.analysis_input())
+    }
+
+    fn result_model(&self) -> &ResultModel {
+        self.result
+            .as_ref()
+            .expect("valid compiled query retains its result model")
+    }
+
     /// Render the optimized pre-pack NFA — the IR every backend consumes — in
     /// the bytecode dump format (label space, with definition provenance).
     /// `None` when the query didn't compile, mirroring [`Self::module`].
     pub fn dump_nfa(&self, colors: Colors) -> Option<String> {
         let semantic = self.semantic_nfa.as_ref()?;
         let bound = self.bound.bound()?;
+        let schema = self.result_schema();
         Some(crate::compiler::lower::dump::dump_nfa(
             semantic,
             bound.analysis_input(),
+            schema.layout(),
             colors,
         ))
     }
@@ -636,13 +646,16 @@ impl BindOutcome {
         let bound = self
             .bound()
             .expect("test bytecode emission requires a grammar-bound query");
+        let result = ResultModel::from_artifacts(bound.analysis_input())?;
         let input = LowerInput {
             analysis: bound.analysis_input(),
+            result: &result,
             symbol_table: bound.symbol_table(),
             inspection: false,
         };
         let lowered = pack_lowered(lower_semantic(&input), &input);
-        crate::compiler::emit::targets::bytecode::emit(bound.analysis_input(), &lowered)
+        let schema = result.schema(bound.analysis_input());
+        crate::compiler::emit::targets::bytecode::emit(bound.analysis_input(), &schema, &lowered)
     }
 
     pub(crate) fn compile(self) -> crate::compiler::QueryResult<CompiledQuery> {
@@ -650,6 +663,7 @@ impl BindOutcome {
         let Some(bound) = self.bound() else {
             return Ok(CompiledQuery {
                 bound: self,
+                result: None,
                 semantic_nfa: None,
                 diagnostics,
             });
@@ -657,24 +671,28 @@ impl BindOutcome {
         if diagnostics.has_errors() {
             return Ok(CompiledQuery {
                 bound: self,
+                result: None,
                 semantic_nfa: None,
                 diagnostics,
             });
         }
 
-        let schema = match ResultSchema::from_artifacts(bound.analysis_input()) {
-            Ok(schema) => schema,
+        let result = match ResultModel::from_artifacts(bound.analysis_input()) {
+            Ok(result) => result,
             Err(error) => {
                 self.report_shared_limit_error(&mut diagnostics, error.to_string());
                 return Ok(CompiledQuery {
                     bound: self,
+                    result: None,
                     semantic_nfa: None,
                     diagnostics,
                 });
             }
         };
+        let schema = result.schema(bound.analysis_input());
         let input = LowerInput {
             analysis: bound.analysis_input(),
+            result: &result,
             symbol_table: bound.symbol_table(),
             inspection: false,
         };
@@ -687,6 +705,7 @@ impl BindOutcome {
         }
         Ok(CompiledQuery {
             bound: self,
+            result: Some(result),
             semantic_nfa: Some(semantic_nfa),
             diagnostics,
         })
@@ -816,8 +835,12 @@ impl BoundQuery {
         &self.grammar
     }
 
-    fn codegen_plan(&self, semantic: &SemanticNfa) -> crate::compiler::emit::CodegenPlan<'_> {
-        crate::compiler::emit::CodegenPlan::build(semantic.raw(), self.analysis_input())
+    fn codegen_plan<'a>(
+        &'a self,
+        semantic: &SemanticNfa,
+        result: ResultSchema<'a>,
+    ) -> crate::compiler::emit::CodegenPlan<'a> {
+        crate::compiler::emit::CodegenPlan::build(semantic.raw(), self.analysis_input(), result)
     }
 
     fn analysis_input(&self) -> AnalysisArtifacts<'_> {

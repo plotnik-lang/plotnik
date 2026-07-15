@@ -4,6 +4,7 @@
 //! through the compilation pipeline.
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
+use crate::compiler::analyze::result::CaptureScopeKind;
 use crate::compiler::analyze::types::{CaptureKind, TypeAnalysis, TypeShape};
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
@@ -223,10 +224,10 @@ impl NfaBuilder<'_> {
             if let Some(RecordScope(type_id)) = self.scope_stack.last().copied()
                 && self
                     .ctx
-                    .analysis
-                    .type_analysis
-                    .record_fields(type_id)
-                    .is_some()
+                    .result
+                    .layout()
+                    .scope(type_id)
+                    .is_some_and(|scope| scope.kind() == CaptureScopeKind::Record)
             {
                 let member = self
                     .lookup_member(capture_name, type_id)

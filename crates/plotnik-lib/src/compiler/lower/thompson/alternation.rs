@@ -1,12 +1,10 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
-use crate::compiler::analyze::types::TypeShape;
-use crate::compiler::analyze::types::type_shape::{CasePayload, PatternFlow, RecordField};
+use crate::compiler::analyze::result::CaptureMemberKind;
+use crate::compiler::analyze::types::type_shape::{PatternFlow, RecordField};
 use crate::compiler::analyze::types::{FieldCompletion, FieldCompletions};
-use crate::compiler::lower::ir::{
-    EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
-};
+use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint};
 use crate::compiler::lower::spans::SpanBindingIR;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::core::Symbol;
@@ -455,11 +453,10 @@ impl NfaBuilder<'_> {
             .filter(|(sym, _)| !provided.contains(*sym))
             .flat_map(|(sym, _)| {
                 let completion = completions.completion(*sym);
-                let name = self.ctx.analysis.interner.resolve(*sym);
-                let member_ref = self
-                    .lookup_member_in_scope(name)
+                let member = self
+                    .lookup_member_symbol_in_scope(*sym)
                     .expect("alternation field must resolve in enclosing scope");
-                let set = EffectIR::with_member(EffectKind::RecordSet, member_ref);
+                let set = EffectIR::with_member(EffectKind::RecordSet, member);
                 match completion {
                     FieldCompletion::AlwaysPresent => {
                         unreachable!("an always-present field cannot be absent from an alternative")
@@ -518,21 +515,6 @@ impl NfaBuilder<'_> {
             .type_id()
             .expect("an analyzed labeled alternation must produce a variant type");
 
-        // BTreeMap order gives stable variant-case member indices independent of AST iteration order.
-        let TypeShape::Variant(cases) = self
-            .ctx
-            .analysis
-            .type_analysis
-            .expect_type_shape(variant_type_id)
-        else {
-            panic!("an analyzed labeled alternation must produce a variant type");
-        };
-        let case_info: BTreeMap<Symbol, (u16, CasePayload)> = cases
-            .iter()
-            .enumerate()
-            .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
-            .collect();
-
         let search_nav = resumable_search_nav(first_nav);
         let alternative_search = AltSearchNav(search_nav);
         let alternative_routing = self.alternative_routing(&alternatives, exit);
@@ -552,25 +534,28 @@ impl NfaBuilder<'_> {
             let label = alternative
                 .label()
                 .expect("labeled alternative must have label");
-            let (case_idx, payload) = self
+            let case_name = self
                 .ctx
                 .analysis
                 .interner
                 .get(label.text())
-                .and_then(|sym| case_info.get(&sym))
-                .map(|&(idx, type_id)| (idx, type_id))
+                .expect("labeled alternative name is interned");
+            let case = self
+                .ctx
+                .result
+                .layout()
+                .member_id(variant_type_id, case_name)
                 .expect("case must exist for labeled alternative");
+            let CaptureMemberKind::Case(payload) =
+                self.ctx.result.layout().expect_member(case).kind
+            else {
+                unreachable!("a variant result scope contains only cases");
+            };
 
-            let e_effect = EffectIR::with_member(
-                EffectKind::VariantOpen,
-                MemberRef::new(variant_type_id, case_idx),
-            );
+            let e_effect = EffectIR::with_member(EffectKind::VariantOpen, case);
             let alternative_span = self.span_id(alternative.syntax(), SpanKind::Alternative);
             if let Some(id) = alternative_span {
-                self.bind_span(
-                    id,
-                    SpanBindingIR::Member(MemberRef::new(variant_type_id, case_idx)),
-                );
+                self.bind_span(id, SpanBindingIR::Member(case));
             }
             let alternative_start = alternative_span.map(|id| EffectIR::span_start(id.0));
             let alternative_end = alternative_span.map(|id| EffectIR::span_end(id.0));

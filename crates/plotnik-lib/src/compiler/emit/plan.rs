@@ -25,9 +25,11 @@ pub(crate) struct CodegenPlan<'a> {
 }
 
 impl<'a> CodegenPlan<'a> {
-    pub(crate) fn build(graph: &NfaGraph, artifacts: AnalysisArtifacts<'a>) -> Self {
-        let result = ResultSchema::from_artifacts(artifacts)
-            .expect("target-neutral compilation validated the result schema");
+    pub(crate) fn build(
+        graph: &NfaGraph,
+        artifacts: AnalysisArtifacts<'a>,
+        result: ResultSchema<'a>,
+    ) -> Self {
         let matcher = MatcherPlan::build(graph, artifacts, result.layout());
         let decode = ResultDecodePlan::build(&result);
         Self {

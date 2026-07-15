@@ -90,8 +90,8 @@ mod debug_impl {
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
-        DefRoute, DefSpecialization, InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint,
-        PredicateValueIR, ReturnOutcome,
+        DefRoute, DefSpecialization, EffectArg, InstructionIR, Label, MatchIR, NfaGraph,
+        NodeKindConstraint, PredicateValueIR, ReturnOutcome,
     };
 
     /// Max completed paths recorded per fingerprint. This counts root-to-leaf
@@ -220,10 +220,12 @@ mod debug_impl {
             ops.push(SemanticOp::Predicate(p.op.to_byte(), value));
         }
 
-        // Member names aren't resolved at the IR fingerprint stage (that needs the
-        // type table); the effect kind alone keys the fingerprint.
         for e in &m.effects {
-            ops.push(SemanticOp::Effect(e.kind(), None));
+            let argument = match e.argument() {
+                EffectArg::Literal(value) => value.to_string(),
+                EffectArg::Member(member) => format!("M{}", member.raw()),
+            };
+            ops.push(SemanticOp::Effect(e.kind(), Some(argument)));
         }
 
         ops
