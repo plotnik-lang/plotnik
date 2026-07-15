@@ -22,6 +22,7 @@
 </p>
 
 <br/>
+<br/>
 
 Plotnik is the tool for working with Tree-sitter reliably:
 - Write queries with [familiar syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html).
@@ -29,9 +30,19 @@ Plotnik is the tool for working with Tree-sitter reliably:
 - Get structured results without walking the tree or assembling flat captures.
 - Bump grammar versions without fear: the static checker has your back.
 
----
+<br/>
+<br/>
 
-**Query**
+<p align="center"><b>Input</b></p>
+
+```javascript
+async function fetchUser(userId, options) {
+  ...
+}
+```
+
+<br/>
+<p align="center"><b>Query</b></p>
 
 ```clojure
 Function = (program
@@ -46,13 +57,8 @@ Function = (program
 )
 ```
 
-**Input**
-
-```javascript
-async function fetchUser(userId, options) { ... }
-```
-
-**Output**
+<br/>
+<p align="center"><b>Output</b></p>
 
 ```ts
 {
@@ -63,7 +69,8 @@ async function fetchUser(userId, options) { ... }
 }
 ```
 
----
+<br/>
+<br/>
 
 ## Acknowledgments
 
