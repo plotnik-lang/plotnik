@@ -3,59 +3,82 @@
 //! Implements the cactus stack pattern: frames are append-only,
 //! with a current pointer that can be restored for backtracking.
 
-/// Which continuation a returning nullable definition selects.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[repr(u8)]
-pub enum ReturnOutcome {
-    Matched = 0,
-    Empty = 1,
-}
+/// Dense callee-local return port.
+///
+/// Generalized callees expose only the ports they can reach, numbered from
+/// zero. The semantic exit universe currently has eight members, so every
+/// runtime port fits in three bits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct PortId(u8);
 
-impl ReturnOutcome {
-    pub fn from_byte(byte: u8) -> Option<Self> {
-        match byte {
-            0 => Some(Self::Matched),
-            1 => Some(Self::Empty),
-            _ => None,
+impl PortId {
+    /// Maximum number of return ports exposed by one callee.
+    pub const COUNT: u8 = 8;
+    pub const ZERO: Self = Self(0);
+
+    /// Construct a port when `index` is in the runtime port universe.
+    pub const fn new(index: u8) -> Option<Self> {
+        if index < Self::COUNT {
+            Some(Self(index))
+        } else {
+            None
+        }
+    }
+
+    /// Decode a port from its byte representation.
+    pub const fn from_byte(byte: u8) -> Option<Self> {
+        Self::new(byte)
+    }
+
+    /// Construct a port for generated code, rejecting invalid constants during
+    /// const evaluation.
+    pub const fn from_raw(index: u8) -> Self {
+        match Self::new(index) {
+            Some(port) => port,
+            None => panic!("return port must be less than 8"),
         }
     }
 
     pub const fn to_byte(self) -> u8 {
-        self as u8
+        self.0
+    }
+
+    pub const fn index(self) -> usize {
+        self.0 as usize
+    }
+
+    /// This port's position in a per-port bit mask.
+    pub const fn bit(self) -> u8 {
+        1 << self.0
+    }
+
+    /// Mask containing every dense port from zero through `port_count - 1`.
+    pub const fn dense_mask(port_count: usize) -> u8 {
+        assert!(
+            port_count <= Self::COUNT as usize,
+            "port count must be at most 8"
+        );
+        ((1u16 << port_count) - 1) as u8
     }
 }
 
-/// Continuations owned by one call frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FrameReturns {
-    matched: u16,
-    empty: u16,
+impl From<PortId> for u8 {
+    fn from(port: PortId) -> Self {
+        port.to_byte()
+    }
 }
 
-impl FrameReturns {
-    pub fn single(target: u16) -> Self {
-        Self {
-            matched: target,
-            empty: target,
-        }
-    }
-
-    pub fn split(matched: u16, empty: u16) -> Self {
-        Self { matched, empty }
-    }
-
-    fn target(self, outcome: ReturnOutcome) -> u16 {
-        match outcome {
-            ReturnOutcome::Matched => self.matched,
-            ReturnOutcome::Empty => self.empty,
-        }
+impl From<PortId> for usize {
+    fn from(port: PortId) -> Self {
+        port.index()
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Frame {
-    /// Where to jump for each admitted return outcome.
-    pub returns: FrameReturns,
+    /// Immutable executor-owned token identifying the call's return map.
+    pub call_site: u16,
     /// Parent frame index (for cactus stack).
     pub parent: Option<u32>,
 }
@@ -81,24 +104,24 @@ impl FrameArena {
     }
 
     /// Push a new frame, returns its index.
-    pub fn push(&mut self, returns: FrameReturns) -> u32 {
+    pub fn push(&mut self, call_site: u16) -> u32 {
         let idx = self.frames.len() as u32;
         self.frames.push(Frame {
-            returns,
+            call_site,
             parent: self.current,
         });
         self.current = Some(idx);
         idx
     }
 
-    /// Pop the current frame, returning its return address.
+    /// Pop the current frame, returning its executor-owned call-site token.
     ///
     /// Panics if the stack is empty.
-    pub fn pop(&mut self, outcome: ReturnOutcome) -> u16 {
+    pub fn pop(&mut self) -> u16 {
         let current_idx = self.current.expect("pop on empty frame stack");
         let frame = self.frames[current_idx as usize];
         self.current = frame.parent;
-        frame.returns.target(outcome)
+        frame.call_site
     }
 
     /// Restore frame state for backtracking.

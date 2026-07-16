@@ -1,5 +1,6 @@
 pub mod anchors;
 mod artifacts;
+pub(crate) mod boundary;
 pub mod grammar;
 pub mod located;
 pub mod names;
@@ -15,5 +16,7 @@ pub use located::Located;
 
 #[cfg(test)]
 mod anchors_tests;
+#[cfg(test)]
+mod boundary_tests;
 #[cfg(test)]
 mod result_tests;

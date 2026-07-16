@@ -1,6 +1,7 @@
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::lower::ir::{
-    CallIR, CalleeEntry, EffectArg, EffectIR, Label, MatchIR, ReturnAddr, SplitReturnAddrs,
+    CallEntry, CallIR, CalleeEntry, EffectArg, EffectIR, Label, MatchIR, ReturnAddr,
+    SplitReturnAddrs,
 };
 use crate::compiler::lower::spans::SpanBindingIR;
 use crate::compiler::parse::ast::{self, Pattern, QuantifierOperator};
@@ -83,6 +84,18 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions
             .push(CallIR::routed(label, entry_nav, return_addr, callee).into());
+        label
+    }
+
+    pub(super) fn emit_generalized_call(
+        &mut self,
+        entry: CallEntry,
+        returns: Vec<Label>,
+        callee: CalleeEntry,
+    ) -> Label {
+        let label = self.fresh_label();
+        self.instructions
+            .push(CallIR::generalized(label, entry, returns, callee).into());
         label
     }
 
@@ -319,6 +332,45 @@ impl NfaBuilder<'_> {
         let navigate = self.fresh_label();
         self.emit_wildcard_nav(navigate, nav, try_label);
 
+        navigate
+    }
+
+    /// Position search whose candidate selection also discharges a grammar
+    /// field obligation. The exact body sees the selected node but never the
+    /// field again; retries reapply the field only while selecting a new
+    /// candidate.
+    pub(super) fn emit_position_search_with_field(
+        &mut self,
+        nav: Nav,
+        field: NodeFieldId,
+        body: Label,
+    ) -> Label {
+        let try_label = self.fresh_label();
+
+        let retry = self.fresh_label();
+        self.instructions.push(
+            MatchIR::epsilon(retry, try_label)
+                .nav(Nav::Next)
+                .node_field(field)
+                .into(),
+        );
+
+        self.emit_fork_epsilon_at(
+            try_label,
+            ForkTargets {
+                prefer: body,
+                other: retry,
+            },
+            Greediness::Greedy,
+        );
+
+        let navigate = self.fresh_label();
+        self.instructions.push(
+            MatchIR::epsilon(navigate, try_label)
+                .nav(nav)
+                .node_field(field)
+                .into(),
+        );
         navigate
     }
 }

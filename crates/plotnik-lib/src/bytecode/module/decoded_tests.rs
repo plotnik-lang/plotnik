@@ -83,31 +83,28 @@ fn decoded_program_matches_byte_decoder() {
                     .expect("decoded instruction address fits in u16");
             }
             (Instruction::Call(c), DecodedInstr::Call(decoded)) => {
+                assert_eq!(decoded.ownership, c.ownership);
                 assert_eq!(decoded.nav, c.nav);
                 assert_eq!(decoded.node_field, c.node_field);
-                assert_eq!(decoded.next, c.next);
                 assert_eq!(decoded.target, c.target);
+                let returns = c.returns().collect::<Vec<_>>();
+                assert_eq!(module.decoded().call_returns(&decoded), returns.as_slice());
+                let words = if c.arity() == 1 { 1 } else { 3 };
+                for interior in addr.get() + 1..addr.get() + words {
+                    assert!(
+                        matches!(
+                            module.decoded().instruction_at(CodeAddr::from(interior)),
+                            DecodedInstr::Return(_)
+                        ),
+                        "interior word {interior} should be a placeholder"
+                    );
+                }
                 addr = addr
-                    .checked_add(1)
+                    .checked_add(words)
                     .expect("instruction address fits in u16");
             }
-            (Instruction::RoutedCall(c), DecodedInstr::RoutedCall(decoded)) => {
-                assert_eq!(decoded.next, c.next);
-                assert_eq!(decoded.target, c.target);
-                addr = addr
-                    .checked_add(1)
-                    .expect("instruction address fits in u16");
-            }
-            (Instruction::SplitCall(c), DecodedInstr::SplitCall(decoded)) => {
-                assert_eq!(decoded.matched, c.returns.matched);
-                assert_eq!(decoded.empty, c.returns.empty);
-                assert_eq!(decoded.target, c.target);
-                addr = addr
-                    .checked_add(1)
-                    .expect("instruction address fits in u16");
-            }
-            (Instruction::Return(return_), DecodedInstr::Return(outcome)) => {
-                assert_eq!(outcome, return_.mode.outcome());
+            (Instruction::Return(return_), DecodedInstr::Return(port)) => {
+                assert_eq!(port, return_.port);
                 addr = addr
                     .checked_add(1)
                     .expect("instruction address fits in u16");

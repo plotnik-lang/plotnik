@@ -50,100 +50,104 @@ Q = 00 :: T2
 [instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
-  02       (@40)                            40 : 03
+  02       (@48)                            48 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
   08  └‣─  (expression_statement) [Node RecordSet(M0)]  07
   10  ─‣─  (expression_statement) [Node RecordSet(M0)]  07
-  12  └‣─  (debugger_statement) [SuppressEnd]  33
-  14  ─‣─  (debugger_statement) [SuppressEnd]  33
+  12  └‣─  (debugger_statement) [SuppressEnd]  22
+  14  ─‣─  (debugger_statement) [SuppressEnd]  22
   16                                        ▶
-  17                                        ▶ empty
+  17                                        ▶ p1
   18  └‣─  (debugger_statement) [SuppressEnd]  23
   20  ─‣─  (debugger_statement) [SuppressEnd]  23
-  22       (@30)                            30 : 20 / 18
+  22  ─‣┘  _                                10
   23  ─‣┘  _                                16
-  24   !   (statement_block) [SuppressBegin]  22
-  26  ──!  _                                24, 26
-  28  └─!  _                                24, 26
-  30  -ε-                                   28, 17
-  32       (@30)                            30 : 14 / 12
-  33  ─‣┘  _                                10
-  34   !   (statement_block) [SuppressBegin]  32
-  36  ──!  _                                34, 36
-  38  └─!  _                                34, 36
-  40   !   (program)                        38, 08
+  24       (@34)                            34 : 20 / 18
+  27   !   (statement_block) [SuppressBegin]  24
+  29  ──!  _                                27, 29
+  31  ...
+  32  └─!  _                                27, 29
+  34  -ε-                                   32, 17
+  36       (@34)                            34 : 14 / 12
+  39  ...
+  40   !   (statement_block) [SuppressBegin]  36
+  42  ──!  _                                40, 42
+  44  └─!  _                                40, 42
+  46  ...
+  47  ...
+  48   !   (program)                        44, 08
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [RecordOpen]                     02
-  02       (@40)                            40 : 03
-       ▶   (@40)
+  02       (@48)                            48 : 03
+       ▶   (@48)
 
-@40:
-  40       (program)                        38, 08
+@48:
+  48       (program)                        44, 08
        ●   program
-  38       _                                34, 36
+  44       _                                40, 42
        ●   statement_block
-  34       (statement_block) [SuppressBegin]  32
+  40       (statement_block) [SuppressBegin]  36
        ●   statement_block
-  32       (@30)                            30 : 14 / 12
-       ▶   (@30)
+  36       (@34)                            34 : 14 / 12
+       ▶   (@34)
 
-@30:
-  30  -ε-                                   28, 17
-  28       _                                24, 26
+@34:
+  34  -ε-                                   32, 17
+  32       _                                27, 29
        ●   {
-  24       (statement_block) [SuppressBegin]  22
+  27       (statement_block) [SuppressBegin]  24
        ○   {
-  28  ❮❮❮ 
-  26       _                                24, 26
+  32  ❮❮❮ 
+  29       _                                27, 29
        ●   statement_block
-  24       (statement_block) [SuppressBegin]  22
+  27       (statement_block) [SuppressBegin]  24
        ●   statement_block
-  22       (@30)                            30 : 20 / 18
-       ▶   (@30)
+  24       (@34)                            34 : 20 / 18
+       ▶   (@34)
 
-@30:
-  30  -ε-                                   28, 17
-  28       _                                24, 26
+@34:
+  34  -ε-                                   32, 17
+  32       _                                27, 29
        ●   {
-  24       (statement_block) [SuppressBegin]  22
+  27       (statement_block) [SuppressBegin]  24
        ○   {
-  28  ❮❮❮ 
-  26       _                                24, 26
+  32  ❮❮❮ 
+  29       _                                27, 29
        ●   debugger_statement
-  24       (statement_block) [SuppressBegin]  22
+  27       (statement_block) [SuppressBegin]  24
        ○   debugger_statement
-  26  ❮❮❮ 
-  26       _                                24, 26
+  29  ❮❮❮ 
+  29       _                                27, 29
        ●   }
-  24       (statement_block) [SuppressBegin]  22
+  27       (statement_block) [SuppressBegin]  24
        ○   }
-  26  ❮❮❮ 
-  26       _                                24, 26
-  30  ❮❮❮ 
-  17   ◀   (@30)                            empty
+  29  ❮❮❮ 
+  29       _                                27, 29
+  34  ❮❮❮ 
+  17   ◀   (@34)                            p1
 
-@30:
+@34:
   18       (debugger_statement) [SuppressEnd]  23
        ○   {
        ●   debugger_statement
   23       _                                16
        ●   statement_block
-  16   ◀   (@30)                            
+  16   ◀   (@34)                            
 
-@40:
-  14       (debugger_statement) [SuppressEnd]  33
+@48:
+  14       (debugger_statement) [SuppressEnd]  22
        ●   debugger_statement
-  33       _                                10
+  22       _                                10
        ●   statement_block
   10       (expression_statement) [Node RecordSet(M0)]  07
        ●   expression_statement
   07       _                                06
        ●   program
-  06   ◀   (@40)                            
+  06   ◀   (@48)                            
 
 Q:
   03  -ε-  [RecordClose]                    05

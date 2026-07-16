@@ -43,8 +43,8 @@ impl EffectDepths {
 pub struct CallResume {
     /// Callee entry (raw code address).
     pub target: u16,
-    /// Return address after the callee (raw code address).
-    pub next: u16,
+    /// Executor-owned token identifying the call's return map.
+    pub call_site: u16,
     /// Field constraint the next candidate must satisfy, if any.
     pub field: Option<NodeFieldId>,
     /// How to advance to the next candidate.

@@ -68,15 +68,14 @@ Examples:
 
 Instruction forms:
 
-| Instruction | Format                                   |
-| ----------- | ---------------------------------------- |
-| Match       | `addr nav field: (kind) [effects] succs` |
-| Epsilon     | `addr -ε- [effects] succs`               |
-| Call        | `addr nav field: (@target) target : ret` |
-| RoutedCall  | `addr (@target) target : ret`            |
-| SplitCall   | `addr (@target) target : matched / zero` |
-| Return      | `addr ▶` or `addr ▶ empty`               |
-| Padding     | `addr ...`                               |
+| Instruction | Format                                     |
+| ----------- | ------------------------------------------ |
+| Match       | `addr nav field: (kind) [effects] succs`   |
+| Epsilon     | `addr -ε- [effects] succs`                 |
+| Call1       | `addr nav field: (@target) target : ret0`  |
+| CallN       | `addr (@target) target : ret0 / ret1 / …`  |
+| Return      | `addr ▶` for port 0; `addr ▶ pN` otherwise |
+| Padding     | `addr ...`                                 |
 
 An empty navigation column means `Stay`. `-ε-` means `Nav::Epsilon`, a distinct
 mode with no cursor movement or node check.

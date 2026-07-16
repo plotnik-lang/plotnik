@@ -1,0 +1,337 @@
+Choice = [
+  Left: {
+    (identifier == "a")? @a
+    .
+    (identifier == "z")? @z
+  }
+  X: (identifier == "x") @x
+]
+
+Q = (program
+  (expression_statement
+    (array
+      "["
+      (Choice) @choice
+      (identifier == "b") @b
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[a, x, b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+  choice: Choice;
+}
+
+export type Choice =
+  | { $tag: "Left"; $data: { a: Node | null; z: Node | null } }
+  | { $tag: "X"; $data: { x: Node } };
+--------------------- OUTPUT ---------------------
+{
+  "b": {
+    "kind": "identifier",
+    "span": [7, 8],
+    "text": "b"
+  },
+  "choice": {
+    "$data": {
+      "x": {
+        "kind": "identifier",
+        "span": [4, 5],
+        "text": "x"
+      }
+    },
+    "$tag": "X"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "z"
+S03 "a"
+S04 "x"
+S05 "Left"
+S06 "X"
+S07 "choice"
+S08 "Choice"
+S09 "Q"
+S10 "identifier"
+S11 "program"
+S12 "expression_statement"
+S13 "array"
+S14 "["
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { a, z }
+T3 = Record  M2:1  ; { x }
+T4 = Variant M3:2  ; Left | X
+T5 = Record  M5:2  ; { choice, b }
+
+[type_members]
+M0: S03 → T1  ; a: T1
+M1: S02 → T1  ; z: T1
+M2: S04 → T0  ; x: <Node>
+M3: S05 → T2  ; Left: T2
+M4: S06 → T3  ; X: T3
+M5: S07 → T4  ; choice: Choice
+M6: S01 → T0  ; b: <Node>
+
+[type_names]
+N0: S08 → T4  ; Choice
+N1: S09 → T5  ; Q
+
+[entry_points]
+Q = 00 :: T5
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@66)                            66 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─‣─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+  11  ─•─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+  14  ...
+  15  ...
+  16  ─◦─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+  19                                        ▶
+  20                                        ▶ p1
+  21                                        ▶ p2
+  22  -ε-  [Absent RecordSet(M1) VariantClose]  20
+  24  ─•─  (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  27   !   (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  30  ──!  _                                27, 30
+  32   !   _ [Absent RecordSet(M0)]         27, 30
+  34   !   (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  37  ──!  _                                34, 37
+  39  ...
+  40   !   _                                34, 37
+  42  -ε-  [VariantOpen(M3)]                40, 32
+  44  -ε-  [VariantOpen(M3) Absent RecordSet(M0) Absent RecordSet(M1) VariantClose]  21
+  47  ...
+  48   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  19
+  51  ──!  _                                42, 48, 51
+  53  -ε-                                   51, 44
+  55  ...
+  56       (@53)                            53 : 08 / 11 / 16
+  59   !   "["                              56
+  60  ──!  _                                59, 60
+  62  └─!  _                                59, 60
+  64  └‣─  (array)                          62
+  65  └‣─  (expression_statement)           64
+  66   !   (program)                        65
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@66)                            66 : 03
+       ▶   (@66)
+
+@66:
+  66       (program)                        65
+       ●   program
+  65       (expression_statement)           64
+       ●   expression_statement
+  64       (array)                          62
+       ●   array
+  62       _                                59, 60
+       ●   [
+  59       "["                              56
+       ●   [
+  56       (@53)                            53 : 08 / 11 / 16
+       ▶   (@53)
+
+@53:
+  53  -ε-                                   51, 44
+  51       _                                42, 48, 51
+       ●   identifier
+  42  -ε-  [VariantOpen(M3)]                40, 32
+  40       _                                34, 37
+       ●   identifier
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ,
+  34  ❮❮❮ 
+  22  -ε-  [Absent RecordSet(M1) VariantClose]  20
+  20   ◀   (@53)                            p1
+
+@66:
+  11       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+       ○   ,
+  40  ❮❮❮ 
+  37       _                                34, 37
+       ●   ,
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ,
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   identifier
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   ,
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ,
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   identifier
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   ]
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ]
+  37  ❮❮❮ 
+  37       _                                34, 37
+  42  ❮❮❮ 
+  32       _ [Absent RecordSet(M0)]         27, 30
+       ●   identifier
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  32  ❮❮❮ 
+  30       _                                27, 30
+       ●   ,
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ,
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   identifier
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   ,
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ,
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   identifier
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   ]
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ]
+  30  ❮❮❮ 
+  30       _                                27, 30
+  51  ❮❮❮ 
+  48       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  19
+  51  ❮❮❮ 
+  51       _                                42, 48, 51
+       ●   ,
+  42  -ε-  [VariantOpen(M3)]                40, 32
+  40       _                                34, 37
+       ●   ,
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ,
+  40  ❮❮❮ 
+  37       _                                34, 37
+       ●   identifier
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   ,
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ,
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   identifier
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   ]
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ]
+  37  ❮❮❮ 
+  37       _                                34, 37
+  42  ❮❮❮ 
+  32       _ [Absent RecordSet(M0)]         27, 30
+       ●   ,
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ,
+  32  ❮❮❮ 
+  30       _                                27, 30
+       ●   identifier
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   ,
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ,
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   identifier
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   ]
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ]
+  30  ❮❮❮ 
+  30       _                                27, 30
+  51  ❮❮❮ 
+  48       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  19
+       ○   ,
+  51  ❮❮❮ 
+  51       _                                42, 48, 51
+       ●   identifier
+  42  -ε-  [VariantOpen(M3)]                40, 32
+  40       _                                34, 37
+       ●   identifier
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  40  ❮❮❮ 
+  37       _                                34, 37
+       ●   ,
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ,
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   identifier
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  37  ❮❮❮ 
+  37       _                                34, 37
+       ●   ]
+  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+       ○   ]
+  37  ❮❮❮ 
+  37       _                                34, 37
+  42  ❮❮❮ 
+  32       _ [Absent RecordSet(M0)]         27, 30
+       ●   identifier
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  32  ❮❮❮ 
+  30       _                                27, 30
+       ●   ,
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ,
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   identifier
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+  30  ❮❮❮ 
+  30       _                                27, 30
+       ●   ]
+  27       (identifier) [Node RecordSet(M1) VariantClose] == "z"  19
+       ○   ]
+  30  ❮❮❮ 
+  30       _                                27, 30
+  51  ❮❮❮ 
+  48       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  19
+       ●   identifier
+  19   ◀   (@53)                            
+
+@66:
+  08       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+       ○   ,
+       ●   identifier
+  07       _                                06
+       ●   program
+  06   ◀   (@66)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

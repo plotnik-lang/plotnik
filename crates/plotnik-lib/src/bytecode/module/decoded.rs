@@ -6,9 +6,11 @@
 //! byte-level decoders remain the single source of truth and feed this build.
 
 use crate::bytecode::{
-    BYTECODE_WORD_SIZE, CodeAddr, Effect, Nav, NodeKindConstraint, PredicateOp, SuccessorAddr,
+    BYTECODE_WORD_SIZE, CallOwnership, CodeAddr, Effect, Nav, NodeKindConstraint, PredicateOp,
+    SuccessorAddr,
 };
 use crate::core::NodeFieldId;
+use plotnik_rt::PortId;
 
 use super::super::instructions::header_byte;
 use super::Instruction;
@@ -20,9 +22,7 @@ use super::Instruction;
 pub(crate) enum DecodedInstr {
     Match(DecodedMatch),
     Call(DecodedCall),
-    RoutedCall(DecodedRoutedCall),
-    SplitCall(DecodedSplitCall),
-    Return(plotnik_rt::ReturnOutcome),
+    Return(PortId),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -59,23 +59,18 @@ pub(crate) struct DecodedPredicate {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct DecodedCall {
+    pub(crate) ownership: CallOwnership,
     pub(crate) nav: Nav,
     pub(crate) node_field: Option<NodeFieldId>,
-    pub(crate) next: SuccessorAddr,
     pub(crate) target: SuccessorAddr,
+    returns_base: u32,
+    returns_len: u8,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct DecodedSplitCall {
-    pub(crate) matched: SuccessorAddr,
-    pub(crate) empty: SuccessorAddr,
-    pub(crate) target: SuccessorAddr,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct DecodedRoutedCall {
-    pub(crate) next: SuccessorAddr,
-    pub(crate) target: SuccessorAddr,
+impl DecodedCall {
+    pub(crate) fn caller_owned(self) -> bool {
+        self.ownership == CallOwnership::Caller
+    }
 }
 
 /// The whole pre-decoded instruction stream plus the side pools its
@@ -109,6 +104,16 @@ impl DecodedProgram {
     #[inline]
     pub(crate) fn successors(&self, m: &DecodedMatch) -> &[SuccessorAddr] {
         &self.successors[m.succ_base as usize..][..m.succ_len as usize]
+    }
+
+    #[inline]
+    pub(crate) fn call_returns(&self, call: &DecodedCall) -> &[SuccessorAddr] {
+        &self.successors[call.returns_base as usize..][..call.returns_len as usize]
+    }
+
+    #[inline]
+    pub(crate) fn call_return(&self, call: &DecodedCall, port: PortId) -> SuccessorAddr {
+        self.call_returns(call)[port.index()]
     }
 }
 
@@ -153,44 +158,28 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                 }));
                 // Interior words of a multi-word Match are never addressed.
                 for _ in 1..opcode.word_count() {
-                    program
-                        .words
-                        .push(DecodedInstr::Return(plotnik_rt::ReturnOutcome::Matched));
+                    program.words.push(DecodedInstr::Return(PortId::ZERO));
                 }
                 word_addr += opcode.word_count() as usize;
             }
             Instruction::Call(c) => {
+                let returns_base = pool_base(program.successors.len());
+                program.successors.extend(c.returns());
                 program.words.push(DecodedInstr::Call(DecodedCall {
+                    ownership: c.ownership,
                     nav: c.nav,
                     node_field: c.node_field,
-                    next: c.next,
                     target: c.target,
+                    returns_base,
+                    returns_len: c.arity() as u8,
                 }));
-                word_addr += 1;
-            }
-            Instruction::RoutedCall(c) => {
-                program
-                    .words
-                    .push(DecodedInstr::RoutedCall(DecodedRoutedCall {
-                        next: c.next,
-                        target: c.target,
-                    }));
-                word_addr += 1;
-            }
-            Instruction::SplitCall(c) => {
-                program
-                    .words
-                    .push(DecodedInstr::SplitCall(DecodedSplitCall {
-                        matched: c.returns.matched,
-                        empty: c.returns.empty,
-                        target: c.target,
-                    }));
-                word_addr += 1;
+                for _ in 1..opcode.word_count() {
+                    program.words.push(DecodedInstr::Return(PortId::ZERO));
+                }
+                word_addr += opcode.word_count() as usize;
             }
             Instruction::Return(return_) => {
-                program
-                    .words
-                    .push(DecodedInstr::Return(return_.mode.outcome()));
+                program.words.push(DecodedInstr::Return(return_.port));
                 word_addr += 1;
             }
         }

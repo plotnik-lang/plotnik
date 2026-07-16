@@ -16,7 +16,8 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v9: `Childless*` navigation family (anchors over an empty-matching child list).
 /// v10: inspection spans — three span effect kinds and the `spans` section.
 /// v11: `Text`/`Bool` types and balanced scalar-provenance effects.
-pub const VERSION: u32 = 11;
+/// v12: generalized multi-port calls and immutable callee contracts on returns.
+pub const VERSION: u32 = 12;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;

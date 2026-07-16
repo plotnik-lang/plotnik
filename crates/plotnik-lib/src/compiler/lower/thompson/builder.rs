@@ -5,10 +5,12 @@ use std::collections::HashSet;
 use indexmap::IndexMap;
 
 use crate::bytecode::{Labeling as SpanLabeling, Nav, SpanKind};
+use crate::compiler::analyze::boundary::BoundaryAnalyzer;
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
+use crate::compiler::lower::boundary::ExitMap;
 use crate::compiler::lower::ir::{
     CalleeEntry, DefBodyMode, DefOutputMode, DefSpecialization, EffectIR, InstructionIR, Label,
     LabelOrigin, NfaGraph, ReturnAddr, ReturnIR,
@@ -18,6 +20,7 @@ use crate::compiler::lower::verify::verify_fresh_build;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxNode;
 
+use super::boundary::{EntryObligation, NavigationContract};
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
 use super::scope::{CaptureExits, RecordScope, SkipExit};
@@ -28,6 +31,7 @@ use crate::compiler::analyze::types::type_check::definition_value_root;
 pub struct NfaBuilder<'a> {
     pub(super) ctx: &'a LowerInput<'a>,
     pub(super) anchor_semantics: AnchorSemantics<'a>,
+    pub(super) boundary_relations: BoundaryAnalyzer<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
     /// Compilation window every fresh label is attributed to (see [`LabelOrigin`]).
@@ -64,6 +68,11 @@ impl<'a> NfaBuilder<'a> {
         Self {
             ctx,
             anchor_semantics: AnchorSemantics::new(ctx.symbol_table),
+            boundary_relations: BoundaryAnalyzer::new(
+                ctx.analysis.interner,
+                ctx.symbol_table,
+                ctx.analysis.dependency_analysis,
+            ),
             instructions: Vec::new(),
             next_label_id: 0,
             current_origin: None,
@@ -267,23 +276,38 @@ impl<'a> NfaBuilder<'a> {
             .body(name)
             .expect("analyzed definition has a body");
 
+        if let Some(contract) = specialization.boundary_contract() {
+            self.compile_boundary_def_specialization(specialization, body, contract, entry_label);
+            return;
+        }
+
+        let route = specialization.route();
         let matched_return = self.fresh_label();
-        let matched_return_instr = match specialization.route() {
+        let matched_return_instr = match route {
             crate::compiler::lower::ir::DefRoute::Caller => ReturnIR::matched(matched_return),
-            crate::compiler::lower::ir::DefRoute::Routed { .. } => {
-                ReturnIR::routed_matched(matched_return)
-            }
+            crate::compiler::lower::ir::DefRoute::Routed { nav, .. } => ReturnIR::routed_matched(
+                matched_return,
+                EntryObligation::new(NavigationContract::from_nav(nav)),
+            ),
         };
         self.instructions.push(matched_return_instr.into());
-        let exits = if specialization.route().splits() {
+        let exits = if route.splits() {
             let empty_return = self.fresh_label();
-            self.instructions
-                .push(ReturnIR::routed_empty(empty_return).into());
+            let crate::compiler::lower::ir::DefRoute::Routed { nav, .. } = route else {
+                unreachable!("only routed definition bodies expose an empty return")
+            };
+            self.instructions.push(
+                ReturnIR::routed_empty(
+                    empty_return,
+                    EntryObligation::new(NavigationContract::from_nav(nav)),
+                )
+                .into(),
+            );
             CaptureExits::Split {
                 match_exit: matched_return,
                 skip_exit: SkipExit::To(empty_return),
             }
-        } else if specialization.route().requires_consumption() {
+        } else if route.requires_consumption() {
             CaptureExits::Split {
                 match_exit: matched_return,
                 skip_exit: SkipExit::Fail,
@@ -322,6 +346,101 @@ impl<'a> NfaBuilder<'a> {
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
+    }
+
+    fn compile_boundary_def_specialization(
+        &mut self,
+        specialization: &DefSpecialization,
+        body: &Pattern,
+        contract: crate::compiler::lower::ir::DefBoundaryContract,
+        entry_label: Label,
+    ) {
+        assert!(
+            !specialization.mode().has_capture_type(),
+            "boundary-aware structural definitions cannot use capture-type output lowering"
+        );
+
+        let mut exits = ExitMap::new();
+        let mut def_span = None;
+        for &port in specialization.ports().ports() {
+            let return_label = self.fresh_label();
+            let port_id = specialization
+                .ports()
+                .port_id(port)
+                .expect("specialization port belongs to its dense signature");
+            self.instructions
+                .push(ReturnIR::callee_owned(return_label, port_id, contract.entry()).into());
+
+            let (return_exit, span) = self.bracket_def_body_exit(body, return_label);
+            def_span = def_span.or(span);
+            exits.insert(port, return_exit);
+        }
+
+        let type_id = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_def_output(specialization.def_id())
+            .value();
+        self.inline_stack.push(specialization.def_id());
+        let mode = specialization.mode().clone();
+        let body_entry = self.with_scope_if_present(type_id, |this| {
+            this.compile_boundary_def_body(body, &mode, contract, &exits)
+        });
+        self.inline_stack.pop();
+
+        let body_entry = body_entry
+            .map(|entry| self.wrap_def_body_entry(entry, def_span))
+            .expect("a boundary specialization exposes only reachable operational ports");
+        if body_entry != entry_label {
+            self.emit_epsilon(entry_label, vec![body_entry]);
+        }
+    }
+
+    fn compile_boundary_def_body(
+        &mut self,
+        body: &Pattern,
+        mode: &DefBodyMode,
+        contract: crate::compiler::lower::ir::DefBoundaryContract,
+        exits: &ExitMap<Label>,
+    ) -> Option<Label> {
+        if mode.marks_source() {
+            return self.with_source_marking(|this| {
+                this.compile_boundary_def_output(body, mode, contract, exits)
+            });
+        }
+        self.compile_boundary_def_output(body, mode, contract, exits)
+    }
+
+    fn compile_boundary_def_output(
+        &mut self,
+        body: &Pattern,
+        mode: &DefBodyMode,
+        contract: crate::compiler::lower::ir::DefBoundaryContract,
+        exits: &ExitMap<Label>,
+    ) -> Option<Label> {
+        if mode.suppresses_output() {
+            return self.with_suppression(|this| {
+                this.compile_boundary_pattern_to(
+                    body,
+                    contract.input(),
+                    contract.entry(),
+                    exits,
+                    true,
+                )
+            });
+        }
+
+        if definition_value_root(body) {
+            return self.compile_boundary_definition_value(
+                body,
+                contract.input(),
+                contract.entry(),
+                exits,
+            );
+        }
+
+        self.compile_boundary_pattern_to(body, contract.input(), contract.entry(), exits, true)
     }
 
     fn compile_def_body(

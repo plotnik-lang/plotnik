@@ -1,0 +1,150 @@
+Prefix = {
+  (identifier == "a")?
+  .
+  (identifier == "x")?
+}
+
+Q = (program
+  (expression_statement
+    (array
+      "["
+      (Prefix)
+      (identifier == "b") @b
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[c, b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "b"
+S2 "x"
+S3 "a"
+S4 "Q"
+S5 "identifier"
+S6 "program"
+S7 "expression_statement"
+S8 "array"
+S9 "["
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Record  M0:1  ; { b }
+
+[type_members]
+M0: S1 → T1  ; b: <Node>
+
+[type_names]
+N0: S4 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@42)                            42 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  07
+  11  ─•─  (identifier) [Node RecordSet(M0)] == "b"  07
+  14  ...
+  15  ...
+  16  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  07
+  19                                        ▶
+  20                                        ▶ p1
+  21                                        ▶ p2
+  22  ─•─  (identifier) == "x"              19
+  24  ─◦─  (identifier) == "x"              19
+  26   !   (identifier) == "a"              22, 20
+  28  ──!  _                                26, 28
+  30  -ε-                                   28, 24, 21
+  32       (@30)                            30 : 08 / 11 / 16
+  35   !   "["                              32
+  36  ──!  _                                35, 36
+  38  └─!  _                                35, 36
+  40  └‣─  (array)                          38
+  41  └‣─  (expression_statement)           40
+  42   !   (program)                        41
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@42)                            42 : 03
+       ▶   (@42)
+
+@42:
+  42       (program)                        41
+       ●   program
+  41       (expression_statement)           40
+       ●   expression_statement
+  40       (array)                          38
+       ●   array
+  38       _                                35, 36
+       ●   [
+  35       "["                              32
+       ●   [
+  32       (@30)                            30 : 08 / 11 / 16
+       ▶   (@30)
+
+@30:
+  30  -ε-                                   28, 24, 21
+  28       _                                26, 28
+       ●   identifier
+  26       (identifier) == "a"              22, 20
+  28  ❮❮❮ 
+  28       _                                26, 28
+       ●   ,
+  26       (identifier) == "a"              22, 20
+       ○   ,
+  28  ❮❮❮ 
+  28       _                                26, 28
+       ●   identifier
+  26       (identifier) == "a"              22, 20
+  28  ❮❮❮ 
+  28       _                                26, 28
+       ●   ]
+  26       (identifier) == "a"              22, 20
+       ○   ]
+  28  ❮❮❮ 
+  28       _                                26, 28
+  30  ❮❮❮ 
+  24       (identifier) == "x"              19
+  30  ❮❮❮ 
+  21   ◀   (@30)                            p2
+
+@42:
+  16       (identifier) [Node RecordSet(M0)] == "b"  07
+  38  ❮❮❮ 
+  36       _                                35, 36
+       ●   identifier
+  35       "["                              32
+       ○   identifier
+  36  ❮❮❮ 
+  36       _                                35, 36
+       ●   ,
+  35       "["                              32
+       ○   ,
+  36  ❮❮❮ 
+  36       _                                35, 36
+       ●   identifier
+  35       "["                              32
+       ○   identifier
+  36  ❮❮❮ 
+  36       _                                35, 36
+       ●   ]
+  35       "["                              32
+       ○   ]
+  36  ❮❮❮ 
+  36       _                                35, 36
+  40  ❮❮❮ 
+  41  ❮❮❮ 

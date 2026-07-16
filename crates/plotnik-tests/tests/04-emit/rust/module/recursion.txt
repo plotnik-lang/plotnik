@@ -17,7 +17,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 4;
+pub const REQUIRED_RUNTIME_ABI: u32 = 5;
 
 use ::plotnik_rt::Node;
 
@@ -299,6 +299,21 @@ mod matcher {
     const S21_Q_EP: u16 = 15;
     const S22_Q_EP: u16 = 16;
 
+    /// Resolve a callee-local return port through the immutable call-site map.
+    #[inline]
+    fn call_return(call_site: u16, port: rt::PortId) -> u16 {
+        match (call_site, port.to_byte()) {
+            (S06_EXPR, 0) => S04_EXPR,
+            (S16_Q, 0) => S14_Q,
+            (S18_EXPR_EP, 0) => S17_EXPR_EP,
+            (S21_Q_EP, 0) => S20_Q_EP,
+            _ => unreachable!(
+                "call site {call_site} has no return port {}",
+                port.to_byte()
+            ),
+        }
+    }
+
     /// Match the `Expr` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn expr_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
@@ -433,7 +448,8 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   02   !   (parenthesized_expression) [VariantOpen(Paren)]  06
@@ -463,12 +479,12 @@ mod matcher {
                     S06_EXPR,
                     rt::CallResume {
                         target: S00_EXPR,
-                        next: S04_EXPR,
+                        call_site: S06_EXPR,
                         field: None,
                         policy: rt::SkipPolicy::Any,
                     },
                 ));
-                eng.enter_frame(S04_EXPR);
+                eng.enter_frame(S06_EXPR);
                 Flow::Jump(S00_EXPR)
             }
             //   07   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  01
@@ -487,7 +503,8 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   11   !   (program)                        13
@@ -533,12 +550,12 @@ mod matcher {
                     S16_Q,
                     rt::CallResume {
                         target: S00_EXPR,
-                        next: S14_Q,
+                        call_site: S16_Q,
                         field: None,
                         policy: rt::SkipPolicy::Any,
                     },
                 ));
-                eng.enter_frame(S14_Q);
+                eng.enter_frame(S16_Q);
                 Flow::Jump(S00_EXPR)
             }
             //   17                                        ▶
@@ -546,12 +563,13 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   18       (Expr)                           00 : 17
             S18_EXPR_EP => {
-                eng.enter_frame(S17_EXPR_EP);
+                eng.enter_frame(S18_EXPR_EP);
                 Flow::Jump(S00_EXPR)
             }
             //   19                                        ▶
@@ -559,7 +577,8 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   20  -ε-  [RecordClose]                    19
@@ -569,7 +588,7 @@ mod matcher {
             }
             //   21       (Q)                              11 : 20
             S21_Q_EP => {
-                eng.enter_frame(S20_Q_EP);
+                eng.enter_frame(S21_Q_EP);
                 Flow::Jump(S11_Q)
             }
             //   22  -ε-  [RecordOpen]                     21
@@ -668,7 +687,7 @@ mod matcher {
                         cp.ip,
                         resume,
                     ));
-                    eng.enter_frame(resume.next);
+                    eng.enter_frame(resume.call_site);
                     return Unwound::Resumed(resume.target);
                 }
 

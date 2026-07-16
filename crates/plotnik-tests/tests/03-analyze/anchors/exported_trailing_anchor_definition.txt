@@ -1,0 +1,15 @@
+Tail = {
+  (identifier == "a")?
+  .
+}
+
+Q = (array
+  "["
+  (Tail)
+  (identifier == "b")
+  "]"
+)
+-------------------- SYMBOLS ---------------------
+Tail
+Q
+  Tail

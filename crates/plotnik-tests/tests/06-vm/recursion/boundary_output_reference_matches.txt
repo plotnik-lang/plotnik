@@ -1,0 +1,182 @@
+Chain = [
+  Base: {
+    (identifier == "a") @head
+    .
+    (identifier == "x")? @x
+  }
+  More: {
+    (identifier == "a") @head
+    ","
+    (Chain) @tail
+    .
+    (identifier == "x")? @x
+  }
+]
+
+Q = (program
+  (expression_statement
+    (array
+      "["
+      (Chain)
+      (identifier == "b") @b
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[a, a, b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "b": {
+    "kind": "identifier",
+    "span": [7, 8],
+    "text": "b"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "x"
+S03 "a"
+S04 "head"
+S05 "tail"
+S06 "Base"
+S07 "More"
+S08 "Chain"
+S09 "Q"
+S10 "identifier"
+S11 ","
+S12 "program"
+S13 "expression_statement"
+S14 "array"
+S15 "["
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { head, x }
+T3 = Record  M2:3  ; { head, x, tail }
+T4 = Variant M5:2  ; Base | More
+T5 = Record  M7:1  ; { b }
+
+[type_members]
+M0: S04 → T0  ; head: <Node>
+M1: S02 → T1  ; x: T1
+M2: S04 → T0  ; head: <Node>
+M3: S02 → T1  ; x: T1
+M4: S05 → T4  ; tail: Chain
+M5: S06 → T2  ; Base: T2
+M6: S07 → T3  ; More: T3
+M7: S01 → T0  ; b: <Node>
+
+[type_names]
+N0: S08 → T4  ; Chain
+N1: S09 → T5  ; Q
+
+[entry_points]
+Q = 00 :: T5
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@44)                            44 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─‣─  (identifier) [Node RecordSet(M7)] == "b"  07
+  11  ─•─  (identifier) [Node RecordSet(M7)] == "b"  07
+  14                                        ▶
+  15                                        ▶ p1
+  16  ─•─  (identifier) == "x"              14
+  18   !   (identifier) == "a"              16, 15
+  20  -ε-                                   16, 15
+  22  ...
+  23  ...
+  24       (@32)                            32 : 20 / 20
+  27   !   ","                              24
+  28  ──!  _                                27, 28
+  30   !   (identifier) == "a"              28
+  32  ──!  _                                18, 30, 32
+  34       (@32)                            32 : 08 / 11
+  37   !   "["                              34
+  38  ──!  _                                37, 38
+  40  └─!  _                                37, 38
+  42  └‣─  (array)                          40
+  43  └‣─  (expression_statement)           42
+  44   !   (program)                        43
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@44)                            44 : 03
+       ▶   (@44)
+
+@44:
+  44       (program)                        43
+       ●   program
+  43       (expression_statement)           42
+       ●   expression_statement
+  42       (array)                          40
+       ●   array
+  40       _                                37, 38
+       ●   [
+  37       "["                              34
+       ●   [
+  34       (@32)                            32 : 08 / 11
+       ▶   (@32)
+
+@32:
+  32       _                                18, 30, 32
+       ●   identifier
+  18       (identifier) == "a"              16, 15
+       ●   identifier
+  16       (identifier) == "x"              14
+       ○   ,
+  18  ❮❮❮ 
+  15   ◀   (@32)                            p1
+
+@44:
+  11       (identifier) [Node RecordSet(M7)] == "b"  07
+       ○   ,
+  32  ❮❮❮ 
+  30       (identifier) == "a"              28
+       ●   identifier
+  28       _                                27, 28
+       ●   ,
+  27       ","                              24
+       ●   ,
+  24       (@32)                            32 : 20 / 20
+       ▶   (@32)
+
+@32:
+  32       _                                18, 30, 32
+       ●   identifier
+  18       (identifier) == "a"              16, 15
+       ●   identifier
+  16       (identifier) == "x"              14
+       ○   ,
+  18  ❮❮❮ 
+  15   ◀   (@32)                            p1
+
+@32:
+  20  -ε-                                   16, 15
+  16       (identifier) == "x"              14
+       ○   ,
+  20  ❮❮❮ 
+  15   ◀   (@32)                            p1
+
+@44:
+  11       (identifier) [Node RecordSet(M7)] == "b"  07
+       ○   ,
+       ●   identifier
+  07       _                                06
+       ●   program
+  06   ◀   (@44)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

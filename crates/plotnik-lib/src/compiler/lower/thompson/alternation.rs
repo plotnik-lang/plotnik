@@ -442,7 +442,7 @@ impl NfaBuilder<'_> {
 
     /// Effects that complete every merged field absent from `provided`, resolved
     /// against the enclosing scope.
-    fn merged_field_completion_effects(
+    pub(super) fn merged_field_completion_effects(
         &self,
         completions: &FieldCompletions,
         fields: &BTreeMap<Symbol, RecordField>,

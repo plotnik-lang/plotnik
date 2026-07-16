@@ -12,9 +12,8 @@ pub(crate) use super::decode::{
     DecodeCase, DecodeItem, DecodeItemKind, DecodeScope, DecodeValue, ResultDecodePlan,
 };
 pub(crate) use super::matcher::{
-    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, OrdinaryCallPlan,
-    PredicatePlan, PredicateValuePlan, RegexId, RoutedCallPlan, SplitCallPlan, StateId,
-    StateOrigin, StatePlan, StatePlanKind,
+    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, PredicatePlan,
+    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
 };
 
 /// Everything a generated module shares across target languages.

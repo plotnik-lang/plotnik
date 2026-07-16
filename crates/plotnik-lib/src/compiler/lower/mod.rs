@@ -7,6 +7,7 @@ use crate::compiler::lower::pack::pack_instructions;
 use crate::compiler::lower::thompson::NfaBuilder;
 use crate::compiler::lower::verify::{run_root_pruning_verified, run_verified, verify_constructed};
 
+pub(crate) mod boundary;
 pub mod collapse;
 pub mod dead;
 pub mod dedup;

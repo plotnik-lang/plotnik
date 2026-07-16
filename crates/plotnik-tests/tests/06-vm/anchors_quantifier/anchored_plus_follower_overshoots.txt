@@ -57,15 +57,15 @@ Q:
   03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  (identifier) == "foo"            08
-  08  ─‣┘  _                                09
-  09  ─‣┘  _                                10
-  10                                        ▶
-  11  ─•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
+  08  ─‣┘² _                                09
+  09                                        ▶
+  10  ─•─  (expression_statement) [Node RecordSet(M2)]  06
+  12  -ε-  [ListClose RecordSet(M1)]        10
   14  ...
   15  ...
-  16  └•─  (debugger_statement) [ListOpen Node ArrayPush]  19, 11
-  19  ─•─  (debugger_statement) [Node ArrayPush]  19, 11
-  21  ─•─  (debugger_statement) [ListOpen Node ArrayPush]  19, 11
+  16  └•─  (debugger_statement) [ListOpen Node ArrayPush]  19, 12
+  19  ─•─  (debugger_statement) [Node ArrayPush]  19, 12
+  21  ─•─  (debugger_statement) [ListOpen Node ArrayPush]  19, 12
   24  -ε-  [Absent RecordSet(M0)]           16
   26   !   (lexical_declaration) [Node RecordSet(M0)]  21
   28  ──!  _                                26, 28
@@ -98,5 +98,5 @@ Q:
   28       _                                26, 28
   32  ❮❮❮ 
   24  -ε-  [Absent RecordSet(M0)]           16
-  16       (debugger_statement) [ListOpen Node ArrayPush]  19, 11
+  16       (debugger_statement) [ListOpen Node ArrayPush]  19, 12
        ○   expression_statement

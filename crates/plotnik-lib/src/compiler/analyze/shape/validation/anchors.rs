@@ -1,75 +1,50 @@
 //! Semantic validation for anchor placement.
 //!
-//! Anchors require context to be meaningful:
-//! - **Boundary anchors** (at start/end of sequence) need parent named node context
-//! - **Interior anchors** (between items) are always valid
-//!
-//! This validation ensures anchors are placed where they can be meaningfully compiled.
+//! Definition boundaries are call boundaries, not automatic errors. A group or
+//! definition may export a leading/trailing anchor for a caller to discharge
+//! with a sibling or named-node boundary. Only exported anchors that remain
+//! contextless across every definition composition are rejected here.
 
-use super::ValidationInput;
-use crate::compiler::analyze::Located;
-use crate::compiler::analyze::visitor::{Visitor, walk_named_node_pattern, walk_seq_pattern};
+use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast::{NamedNodePattern, SeqItem, SeqPattern};
 
-pub fn validate_anchors(input: ValidationInput) {
-    let ValidationInput {
-        source_id,
-        ast,
-        diag,
-    } = input;
-    let mut visitor = AnchorValidator {
-        diag,
-        in_named_node: false,
-    };
-    visitor.visit(&Located::new(source_id, ast.clone()));
+pub(crate) struct AnchorValidationInput<'a, 'd> {
+    pub analysis: &'a AnchorContextAnalysis<'a>,
+    pub dependency_analysis: &'a DependencyAnalysis,
+    pub diag: &'d mut Diagnostics,
 }
 
-struct AnchorValidator<'d> {
-    diag: &'d mut Diagnostics,
-    in_named_node: bool,
-}
+pub(crate) fn validate_anchors(input: AnchorValidationInput<'_, '_>) -> bool {
+    let context_free_roots = input
+        .dependency_analysis
+        .sccs()
+        .iter()
+        .flatten()
+        .copied()
+        .filter(|&def_id| !input.analysis.definition_requires_external_context(def_id));
+    let discharged = input.dependency_analysis.reachable_from(context_free_roots);
 
-impl Visitor for AnchorValidator<'_> {
-    fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
-        let prev = self.in_named_node;
-        self.in_named_node = true;
+    let mut valid = true;
+    for &def_id in input.dependency_analysis.sccs().iter().flatten() {
+        if !input.analysis.definition_requires_external_context(def_id)
+            || discharged.contains(def_id)
+        {
+            continue;
+        }
 
-        self.check_items(node.source(), node.node().items());
-
-        // Named node provides first/last/adjacent context, so any anchor inside is valid.
-        walk_named_node_pattern(self, node);
-
-        self.in_named_node = prev;
-    }
-
-    fn visit_seq_pattern(&mut self, seq: &Located<SeqPattern>) {
-        self.check_items(seq.source(), seq.node().items());
-
-        walk_seq_pattern(self, seq);
-    }
-}
-
-impl AnchorValidator<'_> {
-    fn check_items(&mut self, source: SourceId, items: impl Iterator<Item = SeqItem>) {
-        let items: Vec<_> = items.collect();
-        let len = items.len();
-
-        for (i, item) in items.iter().enumerate() {
-            if let SeqItem::Anchor(anchor) = item {
-                let is_boundary = i == 0 || i == len - 1;
-
-                if is_boundary && !self.in_named_node {
-                    self.diag
-                        .report(
-                            DiagnosticKind::AnchorWithoutContext,
-                            Span::new(source, anchor.text_range()),
-                        )
-                        .emit();
-                }
-            }
+        let source = input.dependency_analysis.def_source_id(def_id);
+        for range in input.analysis.exported_anchor_ranges(def_id) {
+            valid = false;
+            input
+                .diag
+                .report(
+                    DiagnosticKind::AnchorWithoutContext,
+                    Span::new(source, range),
+                )
+                .emit();
         }
     }
+    valid
 }

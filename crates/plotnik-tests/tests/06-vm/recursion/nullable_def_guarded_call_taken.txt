@@ -55,24 +55,26 @@ Q:
   03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
-  07  ─‣┘  _                                06
-  08  └‣─  (expression_statement) [Node RecordSet(M0)]  07
-  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  07
-  12  └•─  (debugger_statement) [SuppressEnd]  29
-  14  ─‣─  (debugger_statement) [SuppressEnd]  29
-  16                                        ▶
-  17                                        ▶ empty
-  18  └•─  (debugger_statement) [SuppressEnd]  23
-  20  ─‣─  (debugger_statement) [SuppressEnd]  23
-  22       (@26)                            26 : 20 / 18
-  23  ─‣┘  _                                16
-  24  └•─  (statement_block) [SuppressBegin]  22
-  26  -ε-                                   24, 17
-  28       (@26)                            26 : 14 / 12
-  29  ─‣┘  _                                10
-  30   !   (statement_block) [SuppressBegin]  28
-  32  ──!  _                                30, 32
-  34  └─!  _                                30, 32
+  07  ─‣┘  _                                10
+  08  └‣─  (expression_statement) [Node RecordSet(M0)]  23
+  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  23
+  12  └•─  (debugger_statement)             07
+  13  ─‣─  (debugger_statement)             07
+  14                                        ▶
+  15                                        ▶ p1
+  16  └•─  (debugger_statement)             21
+  17  ─‣─  (debugger_statement)             21
+  18       (@24)                            24 : 17 / 16
+  21  ─‣┘  _                                14
+  22  └•─  (statement_block)                18
+  23  ─‣┘  _                                06
+  24  -ε-                                   22, 15
+  26       (@24)                            24 : 13 / 12
+  29   !   (statement_block)                26
+  30  ...
+  31  ...
+  32  ──!  _                                29, 32
+  34  └─!  _                                29, 32
   36   !   (program)                        34, 08
 --------------------- TRACE ----------------------
 Q:
@@ -83,45 +85,45 @@ Q:
 @36:
   36       (program)                        34, 08
        ●   program
-  34       _                                30, 32
+  34       _                                29, 32
        ●   statement_block
-  30       (statement_block) [SuppressBegin]  28
+  29       (statement_block)                26
        ●   statement_block
-  28       (@26)                            26 : 14 / 12
-       ▶   (@26)
+  26       (@24)                            24 : 13 / 12
+       ▶   (@24)
 
-@26:
-  26  -ε-                                   24, 17
-  24       (statement_block) [SuppressBegin]  22
+@24:
+  24  -ε-                                   22, 15
+  22       (statement_block)                18
        ○   {
        ●   statement_block
-  22       (@26)                            26 : 20 / 18
-       ▶   (@26)
+  18       (@24)                            24 : 17 / 16
+       ▶   (@24)
 
-@26:
-  26  -ε-                                   24, 17
-  24       (statement_block) [SuppressBegin]  22
+@24:
+  24  -ε-                                   22, 15
+  22       (statement_block)                18
        ○   {
        ○   debugger_statement
-  26  ❮❮❮ 
-  17   ◀   (@26)                            empty
+  24  ❮❮❮ 
+  15   ◀   (@24)                            p1
 
-@26:
-  18       (debugger_statement) [SuppressEnd]  23
+@24:
+  16       (debugger_statement)             21
        ○   {
        ●   debugger_statement
-  23       _                                16
+  21       _                                14
        ●   statement_block
-  16   ◀   (@26)                            
+  14   ◀   (@24)                            
 
 @36:
-  14       (debugger_statement) [SuppressEnd]  29
+  13       (debugger_statement)             07
        ●   debugger_statement
-  29       _                                10
+  07       _                                10
        ●   statement_block
-  10       (expression_statement) [Node RecordSet(M0)]  07
+  10       (expression_statement) [Node RecordSet(M0)]  23
        ●   expression_statement
-  07       _                                06
+  23       _                                06
        ●   program
   06   ◀   (@36)                            
 

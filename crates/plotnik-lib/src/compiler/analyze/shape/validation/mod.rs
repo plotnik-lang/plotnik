@@ -2,7 +2,8 @@
 //!
 //! Validates semantic constraints that aren't captured by parsing or type checking:
 //! - Alternative-label consistency
-//! - Anchor placement rules (anchors)
+//! - Local shape rules; cross-definition anchor context is validated after
+//!   name and dependency analysis
 //! - Empty constructs (empty_constructs)
 //! - Predicate regex patterns (predicates)
 //! - String escape sequences (strings)
@@ -90,11 +91,6 @@ pub fn validate_ast<'q>(input: ShapeValidationInput<'q, '_>) -> Option<Validated
             ast,
             diag: &mut *input.diag,
         });
-        validate_anchors(ValidationInput {
-            source_id: source.id,
-            ast,
-            diag: &mut *input.diag,
-        });
         validate_empty_constructs(ValidationInput {
             source_id: source.id,
             ast,
@@ -117,6 +113,6 @@ pub fn validate_ast<'q>(input: ShapeValidationInput<'q, '_>) -> Option<Validated
 }
 
 pub use alternative_labels::validate_alternative_labels;
-pub use anchors::validate_anchors;
+pub(crate) use anchors::{AnchorValidationInput, validate_anchors};
 pub use empty_constructs::validate_empty_constructs;
 pub use predicates::validate_predicates;

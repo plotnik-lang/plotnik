@@ -1,0 +1,113 @@
+Tail = {
+  (identifier == "a")
+  .
+}
+
+Q = (program
+  (expression_statement
+    (array
+      "["
+      (Tail)
+      (identifier == "b") @b
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[a, b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "b": {
+    "kind": "identifier",
+    "span": [4, 5],
+    "text": "b"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "b"
+S2 "a"
+S3 "Q"
+S4 "identifier"
+S5 "program"
+S6 "expression_statement"
+S7 "array"
+S8 "["
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Record  M0:1  ; { b }
+
+[type_members]
+M0: S1 → T1  ; b: <Node>
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@26)                            26 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  11
+  11  ─‣┘³ _                                12
+  12                                        ▶
+  13                                        ▶
+  14   !   (identifier) == "a"              13
+  16  ──!  _                                14, 16
+  18       (@16)                            16 : 08
+  19   !   "["                              18
+  20  ──!  _                                19, 20
+  22  └─!  _                                19, 20
+  24  └‣─  (array)                          22
+  25  └‣─  (expression_statement)           24
+  26   !   (program)                        25
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@26)                            26 : 03
+       ▶   (@26)
+
+@26:
+  26       (program)                        25
+       ●   program
+  25       (expression_statement)           24
+       ●   expression_statement
+  24       (array)                          22
+       ●   array
+  22       _                                19, 20
+       ●   [
+  19       "["                              18
+       ●   [
+  18       (@16)                            16 : 08
+       ▶   (@16)
+
+@16:
+  16       _                                14, 16
+       ●   identifier
+  14       (identifier) == "a"              13
+       ●   identifier
+  13   ◀   (@16)                            
+
+@26:
+  08       (identifier) [Node RecordSet(M0)] == "b"  11
+       ○   ,
+       ●   identifier
+  11       _                                12
+       ●   program
+  12   ◀   (@26)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

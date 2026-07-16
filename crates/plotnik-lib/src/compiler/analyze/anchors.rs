@@ -244,8 +244,13 @@ impl<'a> AnchorSemantics<'a> {
 
     /// Check for trailing anchor in items, descending into a sole-child sequence if needed.
     pub fn check_trailing_anchor(&self, items: &[SeqItem]) -> (bool, Option<Nav>) {
-        if let Some(SeqItem::Anchor(anchor)) = items.last() {
-            if anchor.is_exact() {
+        if matches!(items.last(), Some(SeqItem::Anchor(_))) {
+            let trailing_is_exact = items
+                .iter()
+                .rev()
+                .take_while(|item| matches!(item, SeqItem::Anchor(_)))
+                .any(|item| matches!(item, SeqItem::Anchor(anchor) if anchor.is_exact()));
+            if trailing_is_exact {
                 return (true, Some(Nav::UpExact(1)));
             }
 
@@ -312,7 +317,8 @@ impl<'a> AnchorSemantics<'a> {
         for (idx, item) in items.iter().enumerate() {
             match item {
                 SeqItem::Anchor(anchor) => {
-                    pending_anchor_exact = Some(anchor.is_exact());
+                    pending_anchor_exact =
+                        Some(pending_anchor_exact.unwrap_or(false) || anchor.is_exact());
                 }
                 SeqItem::Pattern(pattern) => {
                     let current_is_anonymous =

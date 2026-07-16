@@ -126,6 +126,32 @@ fn debug_implies_serde_regardless_of_builder_order() {
     assert!(generated.contains("pub fn parse_to_json("));
 }
 
+#[test]
+fn generated_calls_route_ports_through_immutable_call_sites() {
+    let generated = generated_module(
+        r#"
+        Body = [
+          Rec: {(comment) (B)}
+          Base: (comment)
+        ]
+        B = {(Body)?? (Body)?}
+        Q = (program {
+          (B)
+          .!
+          (comment) @rest
+        })
+        "#,
+        RustCodegenConfig::new(),
+    );
+
+    assert!(generated.contains("fn call_return(call_site: u16, port: rt::PortId) -> u16"));
+    assert!(generated.contains(", 1) =>"));
+    assert!(generated.contains("eng.enter_frame(resume.call_site);"));
+    assert!(generated.contains("rt::PortId::from_raw("));
+    assert!(!generated.contains("ReturnOutcome"));
+    assert!(!generated.contains("enter_split_frame"));
+}
+
 fn generated_module(query: &str, config: RustCodegenConfig) -> String {
     QueryBuilder::from_inline(query)
         .compile(synthetic_grammar())

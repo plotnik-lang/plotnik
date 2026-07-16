@@ -9,7 +9,7 @@
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 4;
+pub const REQUIRED_RUNTIME_ABI: u32 = 5;
 
 use ::plotnik_rt::Node;
 
@@ -178,6 +178,18 @@ mod matcher {
     const S09_STANDALONE_EP: u16 = 7;
     const S10_STANDALONE_EP: u16 = 8;
 
+    /// Resolve a callee-local return port through the immutable call-site map.
+    #[inline]
+    fn call_return(call_site: u16, port: rt::PortId) -> u16 {
+        match (call_site, port.to_byte()) {
+            (S09_STANDALONE_EP, 0) => S08_STANDALONE_EP,
+            _ => unreachable!(
+                "call site {call_site} has no return port {}",
+                port.to_byte()
+            ),
+        }
+    }
+
     /// Match the `Standalone` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn standalone_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
@@ -287,7 +299,8 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   02   !   (program)                        04
@@ -351,7 +364,8 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   08  -ε-  [RecordClose]                    07
@@ -361,7 +375,7 @@ mod matcher {
             }
             //   09       (Standalone)                     02 : 08
             S09_STANDALONE_EP => {
-                eng.enter_frame(S08_STANDALONE_EP);
+                eng.enter_frame(S09_STANDALONE_EP);
                 Flow::Jump(S02_STANDALONE)
             }
             //   10  -ε-  [RecordOpen]                     09
@@ -459,7 +473,7 @@ mod matcher {
                         cp.ip,
                         resume,
                     ));
-                    eng.enter_frame(resume.next);
+                    eng.enter_frame(resume.call_site);
                     return Unwound::Resumed(resume.target);
                 }
 

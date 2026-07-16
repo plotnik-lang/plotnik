@@ -12,7 +12,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 4;
+pub const REQUIRED_RUNTIME_ABI: u32 = 5;
 
 use ::plotnik_rt::Node;
 
@@ -215,6 +215,18 @@ mod matcher {
     const S22_Q_EP: u16 = 13;
     const S23_Q_EP: u16 = 14;
 
+    /// Resolve a callee-local return port through the immutable call-site map.
+    #[inline]
+    fn call_return(call_site: u16, port: rt::PortId) -> u16 {
+        match (call_site, port.to_byte()) {
+            (S22_Q_EP, 0) => S21_Q_EP,
+            _ => unreachable!(
+                "call site {call_site} has no return port {}",
+                port.to_byte()
+            ),
+        }
+    }
+
     /// Match the `Q` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn q_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
@@ -324,7 +336,8 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   02   !   (program)                        19
@@ -416,7 +429,8 @@ mod matcher {
                 if eng.frames_empty() {
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   21  -ε-  [RecordClose]                    20
@@ -426,7 +440,7 @@ mod matcher {
             }
             //   22       (Q)                              02 : 21
             S22_Q_EP => {
-                eng.enter_frame(S21_Q_EP);
+                eng.enter_frame(S22_Q_EP);
                 Flow::Jump(S02_Q)
             }
             //   23  -ε-  [RecordOpen]                     22
@@ -520,7 +534,7 @@ mod matcher {
                         cp.ip,
                         resume,
                     ));
-                    eng.enter_frame(resume.next);
+                    eng.enter_frame(resume.call_site);
                     return Unwound::Resumed(resume.target);
                 }
 

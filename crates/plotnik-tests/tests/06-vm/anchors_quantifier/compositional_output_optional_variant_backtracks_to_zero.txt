@@ -1,0 +1,172 @@
+Q = (program
+  (expression_statement
+    (array
+      "["
+      [
+        A: {
+          (identifier == "a")
+          .
+        }
+        X: (identifier == "x")
+      ]? @choice
+      (identifier == "b") @b
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[a, c, b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+  choice: QChoice | null;
+}
+
+export type QChoice =
+  | { $tag: "A" }
+  | { $tag: "X" };
+--------------------- OUTPUT ---------------------
+{
+  "b": {
+    "kind": "identifier",
+    "span": [7, 8],
+    "text": "b"
+  },
+  "choice": null
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "a"
+S03 "x"
+S04 "A"
+S05 "X"
+S06 "choice"
+S07 "QChoice"
+S08 "Q"
+S09 "program"
+S10 "expression_statement"
+S11 "array"
+S12 "["
+S13 "identifier"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Variant M0:2  ; A | X
+T3 = Option(T2)  ; QChoice?
+T4 = Record  M2:2  ; { choice, b }
+
+[type_members]
+M0: S04 → T0  ; A: <NoValue>
+M1: S05 → T0  ; X: <NoValue>
+M2: S06 → T3  ; choice: T3
+M3: S01 → T1  ; b: <Node>
+
+[type_names]
+N0: S07 → T2  ; QChoice
+N1: S08 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@38)                            38 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─‣─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  11  ─•─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  14  ...
+  15  ...
+  16  ─‣─  (identifier) [Absent RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  19   !   (identifier) [VariantOpen(M0) VariantClose] == "a"  11
+  22  ...
+  23  ...
+  24   !   (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  27  ──!  _                                19, 24, 27
+  29   !   "["                              27, 16
+  31  ...
+  32  ──!  _                                29, 32
+  34  └─!  _                                29, 32
+  36  └‣─  (array)                          34
+  37  └‣─  (expression_statement)           36
+  38   !   (program)                        37
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@38)                            38 : 03
+       ▶   (@38)
+
+@38:
+  38       (program)                        37
+       ●   program
+  37       (expression_statement)           36
+       ●   expression_statement
+  36       (array)                          34
+       ●   array
+  34       _                                29, 32
+       ●   [
+  29       "["                              27, 16
+       ●   [
+  27       _                                19, 24, 27
+       ●   identifier
+  19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
+       ●   identifier
+  11       (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  07
+       ○   ,
+  27  ❮❮❮ 
+  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  27  ❮❮❮ 
+  27       _                                19, 24, 27
+       ●   ,
+  19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
+       ○   ,
+  27  ❮❮❮ 
+  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                19, 24, 27
+       ●   identifier
+  19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
+  27  ❮❮❮ 
+  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  27  ❮❮❮ 
+  27       _                                19, 24, 27
+       ●   ,
+  19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
+       ○   ,
+  27  ❮❮❮ 
+  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                19, 24, 27
+       ●   identifier
+  19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
+  27  ❮❮❮ 
+  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  27  ❮❮❮ 
+  27       _                                19, 24, 27
+       ●   ]
+  19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
+       ○   ]
+  27  ❮❮❮ 
+  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+       ○   ]
+  27  ❮❮❮ 
+  27       _                                19, 24, 27
+  29  ❮❮❮ 
+  16       (identifier) [Absent RecordSet(M2) Node RecordSet(M3)] == "b"  07
+       ○   ,
+       ○   ,
+       ●   identifier
+  07       _                                06
+       ●   program
+  06   ◀   (@38)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

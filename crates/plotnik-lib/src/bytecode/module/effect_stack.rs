@@ -627,7 +627,7 @@ fn analyze(
                     }
                 }
             }
-            Instruction::Call(_) | Instruction::RoutedCall(_) | Instruction::SplitCall(_) => {
+            Instruction::Call(_) => {
                 unreachable!("calls exit before ordinary instruction dispatch")
             }
         }
@@ -641,10 +641,10 @@ fn analyze(
     })
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct CallRoute {
     target: CodeAddr,
-    returns: CallReturnAddrs,
+    returns: Vec<CodeAddr>,
 }
 
 impl CallRoute {
@@ -652,38 +652,20 @@ impl CallRoute {
         match instruction {
             Instruction::Call(call) => Some(Self {
                 target: CodeAddr::from(u16::from(call.target)),
-                returns: CallReturnAddrs::Single([CodeAddr::from(u16::from(call.next))]),
-            }),
-            Instruction::RoutedCall(call) => Some(Self {
-                target: CodeAddr::from(u16::from(call.target)),
-                returns: CallReturnAddrs::Single([CodeAddr::from(u16::from(call.next))]),
-            }),
-            Instruction::SplitCall(call) => Some(Self {
-                target: CodeAddr::from(u16::from(call.target)),
-                returns: CallReturnAddrs::Split([
-                    CodeAddr::from(u16::from(call.returns.matched)),
-                    CodeAddr::from(u16::from(call.returns.empty)),
-                ]),
+                returns: call
+                    .returns()
+                    .map(|addr| CodeAddr::from(u16::from(addr)))
+                    .collect(),
             }),
             Instruction::Match(_) | Instruction::Return(_) => None,
         }
     }
 
-    fn push_returns(self, work: &mut Vec<(CodeAddr, AbsState)>, state: AbsState) {
-        match self.returns {
-            CallReturnAddrs::Single([return_]) => work.push((return_, state)),
-            CallReturnAddrs::Split([matched, empty]) => {
-                work.push((empty, state.clone()));
-                work.push((matched, state));
-            }
+    fn push_returns(&self, work: &mut Vec<(CodeAddr, AbsState)>, state: AbsState) {
+        for &return_ in self.returns.iter().rev() {
+            work.push((return_, state.clone()));
         }
     }
-}
-
-#[derive(Clone, Copy)]
-enum CallReturnAddrs {
-    Single([CodeAddr; 1]),
-    Split([CodeAddr; 2]),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -33,13 +33,13 @@ Q = 00 :: T0
 Q:
   00       (@13)                            13 : 01
   01                                        ▶
-  02   !   (identifier) == "a"              04
-  04  !─┘  _                                05
-  05  ─‣┘  _                                06
-  06                                        ▶
+  02  !─┘  _                                03
+  03  ─‣┘  _                                04
+  04                                        ▶
+  05   !   (identifier) == "a"              02
   07  ...
-  08  ──!  _                                02, 08
-  10  └─!  _                                02, 08
+  08  ──!  _                                05, 08
+  10  └─!  _                                05, 08
   12  └‣─  (expression_statement)           10
   13   !   (program)                        12
 --------------------- TRACE ----------------------
@@ -52,21 +52,21 @@ Q:
        ●   program
   12       (expression_statement)           10
        ●   expression_statement
-  10       _                                02, 08
+  10       _                                05, 08
        ●   identifier
-  02       (identifier) == "a"              04
+  05       (identifier) == "a"              02
        ●   identifier
-  04       _                                05
+  02       _                                03
   10  ❮❮❮ 
-  08       _                                02, 08
+  08       _                                05, 08
        ●   comment
-  02       (identifier) == "a"              04
+  05       (identifier) == "a"              02
        ○   comment
   08  ❮❮❮ 
-  08       _                                02, 08
+  08       _                                05, 08
        ●   ;
-  02       (identifier) == "a"              04
+  05       (identifier) == "a"              02
        ○   ;
   08  ❮❮❮ 
-  08       _                                02, 08
+  08       _                                05, 08
   12  ❮❮❮ 

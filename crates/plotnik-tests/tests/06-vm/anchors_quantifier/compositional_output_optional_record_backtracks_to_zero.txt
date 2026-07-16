@@ -1,0 +1,371 @@
+Q = (program
+  (expression_statement
+    (array
+      "["
+      {
+        (identifier == "a")? @a
+        .
+        (identifier == "x")? @x
+      }? @prefix
+      (identifier == "b") @b
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[a, c, b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+  prefix: QPrefix | null;
+}
+
+export interface QPrefix {
+  a: Node | null;
+  x: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "b": {
+    "kind": "identifier",
+    "span": [7, 8],
+    "text": "b"
+  },
+  "prefix": null
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "x"
+S03 "a"
+S04 "prefix"
+S05 "QPrefix"
+S06 "Q"
+S07 "program"
+S08 "expression_statement"
+S09 "array"
+S10 "["
+S11 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { a, x }
+T3 = Option(T2)  ; QPrefix?
+T4 = Record  M2:2  ; { prefix, b }
+
+[type_members]
+M0: S03 → T1  ; a: T1
+M1: S02 → T1  ; x: T1
+M2: S04 → T3  ; prefix: T3
+M3: S01 → T0  ; b: <Node>
+
+[type_names]
+N0: S05 → T2  ; QPrefix
+N1: S06 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@52)                            52 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─‣─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  11  ─•─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  14  ...
+  15  ...
+  16  ─‣─  (identifier) [Absent RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  19  -ε-  [Absent RecordSet(M1)]           11
+  21  ─•─  (identifier) [Node RecordSet(M1)] == "x"  08
+  24   !   (identifier) [Node RecordSet(M1)] == "x"  08
+  27  ──!  _                                24, 27
+  29   !   _ [Absent RecordSet(M0)]         24, 27
+  31  ...
+  32   !   (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  35  ──!  _                                32, 35
+  37   !   _                                32, 35
+  39  ...
+  40  -ε-  [RecordOpen]                     37, 29
+  42  ──!  _                                40, 42
+  44   !   "["                              42, 16
+  46  ──!  _                                44, 46
+  48  └─!  _                                44, 46
+  50  └‣─  (array)                          48
+  51  └‣─  (expression_statement)           50
+  52   !   (program)                        51
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@52)                            52 : 03
+       ▶   (@52)
+
+@52:
+  52       (program)                        51
+       ●   program
+  51       (expression_statement)           50
+       ●   expression_statement
+  50       (array)                          48
+       ●   array
+  48       _                                44, 46
+       ●   [
+  44       "["                              42, 16
+       ●   [
+  42       _                                40, 42
+       ●   identifier
+  40  -ε-  [RecordOpen]                     37, 29
+  37       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ●   identifier
+  21       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ,
+  32  ❮❮❮ 
+  19  -ε-  [Absent RecordSet(M1)]           11
+  11       (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+       ○   ,
+  37  ❮❮❮ 
+  35       _                                32, 35
+       ●   ,
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ,
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   ,
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ,
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   ]
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ]
+  35  ❮❮❮ 
+  35       _                                32, 35
+  40  ❮❮❮ 
+  29       _ [Absent RecordSet(M0)]         24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  29  ❮❮❮ 
+  27       _                                24, 27
+       ●   ,
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   ,
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   ]
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ]
+  27  ❮❮❮ 
+  27       _                                24, 27
+  42  ❮❮❮ 
+  42       _                                40, 42
+       ●   ,
+  40  -ε-  [RecordOpen]                     37, 29
+  37       _                                32, 35
+       ●   ,
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ,
+  37  ❮❮❮ 
+  35       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   ,
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ,
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   ]
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ]
+  35  ❮❮❮ 
+  35       _                                32, 35
+  40  ❮❮❮ 
+  29       _ [Absent RecordSet(M0)]         24, 27
+       ●   ,
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ,
+  29  ❮❮❮ 
+  27       _                                24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   ,
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   ]
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ]
+  27  ❮❮❮ 
+  27       _                                24, 27
+  42  ❮❮❮ 
+  42       _                                40, 42
+       ●   identifier
+  40  -ε-  [RecordOpen]                     37, 29
+  37       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  37  ❮❮❮ 
+  35       _                                32, 35
+       ●   ,
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ,
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   ]
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ]
+  35  ❮❮❮ 
+  35       _                                32, 35
+  40  ❮❮❮ 
+  29       _ [Absent RecordSet(M0)]         24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  29  ❮❮❮ 
+  27       _                                24, 27
+       ●   ,
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ,
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   ]
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ]
+  27  ❮❮❮ 
+  27       _                                24, 27
+  42  ❮❮❮ 
+  42       _                                40, 42
+       ●   ,
+  40  -ε-  [RecordOpen]                     37, 29
+  37       _                                32, 35
+       ●   ,
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ,
+  37  ❮❮❮ 
+  35       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  35  ❮❮❮ 
+  35       _                                32, 35
+       ●   ]
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ]
+  35  ❮❮❮ 
+  35       _                                32, 35
+  40  ❮❮❮ 
+  29       _ [Absent RecordSet(M0)]         24, 27
+       ●   ,
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ,
+  29  ❮❮❮ 
+  27       _                                24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  27  ❮❮❮ 
+  27       _                                24, 27
+       ●   ]
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ]
+  27  ❮❮❮ 
+  27       _                                24, 27
+  42  ❮❮❮ 
+  42       _                                40, 42
+       ●   identifier
+  40  -ε-  [RecordOpen]                     37, 29
+  37       _                                32, 35
+       ●   identifier
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+  37  ❮❮❮ 
+  35       _                                32, 35
+       ●   ]
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ]
+  35  ❮❮❮ 
+  35       _                                32, 35
+  40  ❮❮❮ 
+  29       _ [Absent RecordSet(M0)]         24, 27
+       ●   identifier
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+  29  ❮❮❮ 
+  27       _                                24, 27
+       ●   ]
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ]
+  27  ❮❮❮ 
+  27       _                                24, 27
+  42  ❮❮❮ 
+  42       _                                40, 42
+       ●   ]
+  40  -ε-  [RecordOpen]                     37, 29
+  37       _                                32, 35
+       ●   ]
+  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
+       ○   ]
+  37  ❮❮❮ 
+  35       _                                32, 35
+  40  ❮❮❮ 
+  29       _ [Absent RecordSet(M0)]         24, 27
+       ●   ]
+  24       (identifier) [Node RecordSet(M1)] == "x"  08
+       ○   ]
+  29  ❮❮❮ 
+  27       _                                24, 27
+  42  ❮❮❮ 
+  42       _                                40, 42
+  44  ❮❮❮ 
+  16       (identifier) [Absent RecordSet(M2) Node RecordSet(M3)] == "b"  07
+       ○   ,
+       ○   ,
+       ●   identifier
+  07       _                                06
+       ●   program
+  06   ◀   (@52)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

@@ -1,10 +1,12 @@
 //! Lowering for built-in text and boolean capture types.
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
+use crate::compiler::analyze::boundary::BoundaryState;
 use crate::compiler::analyze::types::{
     CaptureTypePlan, CaptureTypePlanKind, OptionMode, TerminalData,
 };
 use crate::compiler::ids::DefId;
+use crate::compiler::lower::boundary::ExitMap;
 use crate::compiler::lower::ir::{
     CalleeEntry, DefBodyMode, DefSpecialization, EffectIR, Label, ReturnAddr, SplitReturnAddrs,
 };
@@ -12,9 +14,10 @@ use crate::compiler::lower::spans::{SpanBindingIR, SpanId};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind};
 
 use super::NfaBuilder;
+use super::boundary::EntryObligation;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::nfa_emit::{ForkTargets, Greediness};
-use super::quantifier::{QuantifierForm, classify_quantifier};
+use super::quantifier::{BoundaryIterationOutput, QuantifierForm, classify_quantifier};
 use super::scope::{CaptureExits, SkipExit};
 
 #[derive(Clone)]
@@ -49,6 +52,11 @@ struct CaptureBinding {
 enum CaptureTerminal {
     Text(TerminalData),
     Presence(TerminalData),
+}
+
+struct BoundaryOptionPlan {
+    mode: OptionMode,
+    inner: CaptureTypePlan,
 }
 
 impl CaptureTerminal {
@@ -149,6 +157,290 @@ impl<'a> NfaBuilder<'a> {
             entry,
             destination: ValueDestination::Effects(effects),
         }
+    }
+
+    pub(super) fn boundary_capture_type_supported(
+        &self,
+        pattern: &Pattern,
+        plan: &CaptureTypePlan,
+    ) -> bool {
+        match plan.kind() {
+            CaptureTypePlanKind::TextTerminal { .. } | CaptureTypePlanKind::BoolTerminal { .. } => {
+                true
+            }
+            CaptureTypePlanKind::Option { inner, .. } => {
+                let Pattern::QuantifiedPattern(quant) = pattern else {
+                    return false;
+                };
+                let QuantifierForm::Quantified {
+                    inner: pattern,
+                    kind,
+                } = classify_quantifier(quant)
+                else {
+                    return false;
+                };
+                kind.kind() == QuantifierKind::Optional
+                    && self.boundary_capture_type_supported(&pattern, inner)
+            }
+            CaptureTypePlanKind::List { element } => {
+                let Pattern::QuantifiedPattern(quant) = pattern else {
+                    return false;
+                };
+                let QuantifierForm::Quantified {
+                    inner: pattern,
+                    kind,
+                } = classify_quantifier(quant)
+                else {
+                    return false;
+                };
+                matches!(
+                    kind.kind(),
+                    QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
+                ) && self.boundary_capture_type_supported(&pattern, element)
+            }
+        }
+    }
+
+    pub(super) fn compile_boundary_capture_type(
+        &mut self,
+        capture: &ast::CapturedPattern,
+        plan: &CaptureTypePlan,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+    ) -> Option<Label> {
+        let inner = capture
+            .inner()
+            .expect("a capture-type transformation has an ordinary captured value");
+        let binding = self.capture_type_binding(capture);
+        let entry = self.compile_boundary_capture_type_plan(
+            &inner,
+            plan,
+            input,
+            entry,
+            targets,
+            binding.destination,
+        )?;
+        Some(self.wrap_entry_pre(entry, binding.entry))
+    }
+
+    pub(super) fn compile_boundary_capture_type_plan_to_effects(
+        &mut self,
+        pattern: &Pattern,
+        plan: &CaptureTypePlan,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        destination: Vec<EffectIR>,
+    ) -> Option<Label> {
+        self.compile_boundary_capture_type_plan(
+            pattern,
+            plan,
+            input,
+            entry,
+            targets,
+            ValueDestination::Effects(destination),
+        )
+    }
+
+    fn compile_boundary_capture_type_plan(
+        &mut self,
+        pattern: &Pattern,
+        plan: &CaptureTypePlan,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        destination: ValueDestination,
+    ) -> Option<Label> {
+        match plan.kind().clone() {
+            CaptureTypePlanKind::TextTerminal { data } => self.compile_boundary_capture_terminal(
+                pattern,
+                input,
+                entry,
+                targets,
+                destination,
+                CaptureTerminal::Text(data),
+            ),
+            CaptureTypePlanKind::BoolTerminal { data } => self.compile_boundary_capture_terminal(
+                pattern,
+                input,
+                entry,
+                targets,
+                destination,
+                CaptureTerminal::Presence(data),
+            ),
+            CaptureTypePlanKind::Option { mode, inner } => self.compile_boundary_capture_option(
+                pattern,
+                input,
+                entry,
+                targets,
+                destination,
+                BoundaryOptionPlan {
+                    mode,
+                    inner: *inner,
+                },
+            ),
+            CaptureTypePlanKind::List { element } => self.compile_boundary_capture_list(
+                pattern,
+                input,
+                entry,
+                targets,
+                destination,
+                *element,
+            ),
+        }
+    }
+
+    fn compile_boundary_capture_terminal(
+        &mut self,
+        pattern: &Pattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        destination: ValueDestination,
+        terminal: CaptureTerminal,
+    ) -> Option<Label> {
+        if terminal.is_presence() && !self.records_inspection() {
+            let mut inner_targets = ExitMap::new();
+            for (port, &target) in targets.iter() {
+                let mut effects = vec![EffectIR::bool_value(true)];
+                effects.extend(destination.clone().into_effects());
+                inner_targets.insert(port, self.emit_effects_if_nonempty(target, effects));
+            }
+            return self.with_terminal_data(terminal.data(), |this| {
+                this.compile_boundary_pattern_to(pattern, input, entry, &inner_targets, false)
+            });
+        }
+
+        let mut inner_targets = ExitMap::new();
+        for (port, &target) in targets.iter() {
+            let mut effects = vec![terminal.close()];
+            effects.extend(destination.clone().into_effects());
+            inner_targets.insert(port, self.emit_effects_if_nonempty(target, effects));
+        }
+        let inner = self.with_source_marking(|this| {
+            this.with_terminal_data(terminal.data(), |this| {
+                this.compile_boundary_pattern_to(pattern, input, entry, &inner_targets, false)
+            })
+        })?;
+        Some(self.emit_effects_epsilon(
+            inner,
+            vec![EffectIR::scalar_open()],
+            CaptureEffects::default(),
+        ))
+    }
+
+    fn compile_boundary_capture_option(
+        &mut self,
+        pattern: &Pattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        destination: ValueDestination,
+        option: BoundaryOptionPlan,
+    ) -> Option<Label> {
+        let Pattern::QuantifiedPattern(quant) = pattern else {
+            return None;
+        };
+        let QuantifierForm::Quantified { kind, .. } = classify_quantifier(quant) else {
+            return None;
+        };
+        if kind.kind() != QuantifierKind::Optional {
+            return None;
+        }
+
+        let span = self.span_id(quant.syntax(), SpanKind::Quantifier);
+        let destination = destination.into_effects();
+        let mut final_targets = ExitMap::new();
+        for (port, &target) in targets.iter() {
+            let destination_target = self.emit_effects_if_nonempty(target, destination.clone());
+            let final_target = span.map_or(destination_target, |span| {
+                self.emit_effects_if_nonempty(destination_target, vec![EffectIR::span_end(span.0)])
+            });
+            final_targets.insert(port, final_target);
+        }
+        let zero_effects = match option.mode {
+            OptionMode::Preserve => vec![EffectIR::absent()],
+            OptionMode::Bool => vec![EffectIR::bool_value(false)],
+        };
+        let inner = self.compile_boundary_optional_output(
+            quant,
+            input,
+            entry,
+            &final_targets,
+            BoundaryIterationOutput::CaptureType {
+                plan: option.inner,
+                destination: vec![],
+            },
+            zero_effects,
+        )?;
+        Some(span.map_or(inner, |span| {
+            self.wrap_entry_pre(inner, vec![EffectIR::span_start(span.0)])
+        }))
+    }
+
+    fn compile_boundary_capture_list(
+        &mut self,
+        pattern: &Pattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        destination: ValueDestination,
+        element: CaptureTypePlan,
+    ) -> Option<Label> {
+        let Pattern::QuantifiedPattern(quant) = pattern else {
+            return None;
+        };
+        let QuantifierForm::Quantified { kind, .. } = classify_quantifier(quant) else {
+            return None;
+        };
+        if !matches!(
+            kind.kind(),
+            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
+        ) {
+            return None;
+        }
+
+        let span = self.span_id(quant.syntax(), SpanKind::Quantifier);
+        let destination = destination.into_effects();
+        let quantifier_end: Vec<_> = span
+            .map(|span| EffectIR::span_end(span.0))
+            .into_iter()
+            .collect();
+        let mut closed_targets = ExitMap::new();
+        for (port, &target) in targets.iter() {
+            let destination_target = self.emit_effects_if_nonempty(target, destination.clone());
+            closed_targets.insert(
+                port,
+                self.emit_list_close(
+                    super::scope::ScopeCloseEffects {
+                        leading: &quantifier_end,
+                        capture: &[],
+                        outer: &[],
+                    },
+                    destination_target,
+                ),
+            );
+        }
+        let iterations = self.compile_boundary_loop_output(
+            quant,
+            input,
+            entry,
+            &closed_targets,
+            BoundaryIterationOutput::CaptureType {
+                plan: element,
+                destination: vec![EffectIR::array_push()],
+            },
+        )?;
+        Some(
+            self.emit_list_open(
+                iterations,
+                vec![],
+                span.map(|span| EffectIR::span_start(span.0))
+                    .into_iter()
+                    .collect(),
+            ),
+        )
     }
 }
 

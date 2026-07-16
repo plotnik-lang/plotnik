@@ -12,7 +12,7 @@ In an encoded successor operand, raw `0` may instead mean terminal; non-terminal
 successors decode as `SuccessorAddr`, which cannot contain zero. Call targets and
 return addresses are always nonzero.
 
-Multi-word `Match` instructions occupy consecutive bytecode words. For example,
+Multi-word `Match` and `CallN` instructions occupy consecutive bytecode words. For example,
 `Match32` at address 5 occupies words 5 through 8, and the next instruction
 starts at address 9.
 
@@ -21,27 +21,27 @@ starts at address 9.
 ```text
 header (u8)
 ┌───────────┬──────────────┬────────────┐
-│ segment(2)│ node_kind(2) │ opcode(4)  │
+│ segment(2)│ flags(2)     │ opcode(4)  │
 └───────────┴──────────────┴────────────┘
   bits 7-6     bits 5-4      bits 3-0
 ```
 
 - `segment`: reserved, must be `0`.
-- `node_kind`: used only by `Match`; must be `0` for calls and `Return`.
+- `flags`: node-kind class for `Match`; ownership/port flags for calls; entry
+  ownership for `Return`.
 - `opcode`: instruction kind.
 
-| Opcode | Name       | Size     | Description                                    |
-| :----- | :--------- | :------- | :--------------------------------------------- |
-| 0x0    | Match8     | 8 bytes  | Fast-path match                                |
-| 0x1    | Match16    | 16 bytes | Extended match with inline payload             |
-| 0x2    | Match24    | 24 bytes | Extended match with inline payload             |
-| 0x3    | Match32    | 32 bytes | Extended match with inline payload             |
-| 0x4    | Match48    | 48 bytes | Extended match with inline payload             |
-| 0x5    | Match64    | 64 bytes | Extended match with inline payload             |
-| 0x6    | Call       | 8 bytes  | Definition call                                |
-| 0x7    | Return     | 8 bytes  | Return from definition or entry point          |
-| 0x8    | SplitCall  | 8 bytes  | Nullable call with two continuations           |
-| 0x9    | RoutedCall | 8 bytes  | Matched-only call with callee-owned navigation |
+| Opcode | Name    | Size     | Description                                     |
+| :----- | :------ | :------- | :---------------------------------------------- |
+| 0x0    | Match8  | 8 bytes  | Fast-path match                                 |
+| 0x1    | Match16 | 16 bytes | Extended match with inline payload              |
+| 0x2    | Match24 | 24 bytes | Extended match with inline payload              |
+| 0x3    | Match32 | 32 bytes | Extended match with inline payload              |
+| 0x4    | Match48 | 48 bytes | Extended match with inline payload              |
+| 0x5    | Match64 | 64 bytes | Extended match with inline payload              |
+| 0x6    | Call1   | 8 bytes  | One-port definition call                        |
+| 0x7    | CallN   | 24 bytes | Definition call with two to eight continuations |
+| 0x8    | Return  | 8 bytes  | Return from definition or entry point           |
 
 ## Navigation
 
@@ -201,12 +201,12 @@ struct Predicate {
 Higher bits are reserved and must be zero. `value_ref` indexes either the string
 table or regex table, depending on regex mode.
 
-## Call
+## Call1
 
 ```rust
 #[repr(C)]
-struct Call {
-    type_id: u8,
+struct Call1 {
+    header: u8,
     nav: u8,
     node_field: u16, // 0 = no field constraint
     next: u16,       // SuccessorAddr: return address
@@ -214,65 +214,60 @@ struct Call {
 }
 ```
 
-`Call` applies its navigation and field constraint, when present, before entering the
-callee.
+The header flag bits are:
 
-## SplitCall
+- bit 0: entry ownership (`0` caller, `1` callee);
+- bit 1: whether port 0 consumed a node.
 
-```rust
-#[repr(C)]
-struct SplitCall {
-    type_id: u8,
-    entry_nav: u8,
-    matched: u16, // SuccessorAddr: matched return address
-    empty: u16,   // SuccessorAddr: empty-match return address
-    target: u16,  // SuccessorAddr: callee entry
-}
-```
+Caller-owned calls apply `nav` and `node_field` before entering the callee and
+must expose a consuming port. Callee-owned calls retain the authored entry
+obligation for validation; their specialized target performs the actual entry
+work.
 
-`SplitCall` performs no navigation or field check. `entry_nav` records the
-navigation routed into its specialized callee so the loader can verify cursor
-depth without reconstructing compiler provenance. Candidate-search checkpoints
-therefore remain inside the nullable body's authored alternative order. A matched
-`Return` resumes at `matched` at the routed navigation depth; an empty
-`Return` resumes at `empty` at the caller's original depth.
-
-## RoutedCall
+## CallN
 
 ```rust
 #[repr(C)]
-struct RoutedCall {
-    type_id: u8,
-    entry_nav: u8,
-    reserved: u16,
-    next: u16,     // SuccessorAddr: return address
-    target: u16,   // SuccessorAddr: callee entry
+struct CallN {
+    header: u8,
+    nav: u8,
+    node_field: u16, // 0 = no field constraint
+    target: u16,     // SuccessorAddr: callee entry
+    arity: u8,       // 2..=8
+    consumed_mask: u8,
+    returns: [u16; 8],
 }
 ```
 
-`RoutedCall` is the matched-only counterpart to `SplitCall`. Its specialized
-callee owns `entry_nav`, so the instruction performs no navigation itself;
-the encoded value exists so validation can prove the matched return depth.
-`reserved` must be zero. A routed call cannot target an ordinary or
-split-return body.
+Header flag bit 0 stores entry ownership; bit 1 is reserved and must be zero.
+The first `arity` return slots are nonzero `SuccessorAddr` values indexed by
+the callee-local dense `PortId`; unused slots are zero. `consumed_mask` records
+the cursor contract of each port. Bits outside `arity` must be zero, and every
+port of a caller-owned call must be consuming.
 
 ## Return
 
 ```rust
 #[repr(C)]
 struct Return {
-    type_id: u8,
-    outcome: u8, // 0 = matched, 1 = empty
-    entry: u8,   // 0 = caller-owned, 1 = routed
-    _reserved: [u8; 5],
+    header: u8,
+    port: u8, // 0..=7
+    nav: u8,
+    _reserved0: u8,
+    node_field: u16, // 0 = no field constraint
+    _reserved1: u16,
 }
 ```
 
-Reserved bytes must be zero. `entry` lets the loader prove that ordinary calls
-target caller-navigated bodies while routed and split calls target bodies that
-own entry navigation; it is not needed by the VM after validation. Return pops
-a frame and selects the continuation for its outcome. If no frame exists, only
-a matched, caller-owned return may accept the entry point.
+Header flag bit 0 stores the callee entry ownership and bit 1 is reserved.
+Caller-owned returns must encode the canonical body contract `Stay` with no
+field. Callee-owned returns encode the exact authored navigation and optional
+field embedded in that specialization. Reserved bytes must be zero.
+
+At runtime, only `port` participates in dispatch: Return pops a frame containing
+the immutable call-site address, then resolves `(call_site, port)` through that
+call's continuation map. The remaining metadata is load-time validation data.
+If no frame exists, only port 0 may accept the entry point.
 
 ## Validation
 
@@ -285,9 +280,12 @@ The loader verifies:
 - span effect operands address a real span entry;
 - `RecordSet`/`VariantOpen` payloads address a real member, `BoolClose`/`BoolValue` are `0..=1`, and
   every unit effect has a zero payload;
-- calls and returns uphold cursor-depth neutrality;
-- ordinary calls target matched-only bodies, split calls target bodies with
-  both outcomes, and entry point wrappers return matched only;
+- every return reachable from one callee declares one uniform entry contract;
+- every call exactly matches its callee's entry ownership, authored navigation,
+  optional field, dense arity, and per-port cursor contract;
+- callee ports are dense, every call supplies exactly the callee arity, calls
+  to one specialized target agree on entry ownership and port behavior, and
+  entry point wrappers use the caller-owned contract and return through port 0 only;
 - every accepted output-event path keeps the materializer stack balanced;
 - suppression effects cannot underflow their depth and finish balanced;
 - the committed match journal cannot underflow or mis-nest the inspection span

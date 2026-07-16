@@ -8,11 +8,13 @@
 //! - Captured patterns: `@name`, `pattern @name`
 
 use crate::bytecode::{EffectKind, Nav, PredicateOp, SpanKind};
+use crate::compiler::analyze::boundary::BoundaryState;
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
+use crate::compiler::lower::boundary::{ExitMap, ExitPort, ExitSignature};
 use crate::compiler::lower::ir::{
-    CalleeEntry, DefBodyMode, DefRoute, DefSpecialization, EffectArg, EffectIR, InstructionIR,
-    Label, MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,
+    CallEntry, CalleeEntry, DefBodyMode, DefRoute, DefSpecialization, EffectArg, EffectIR,
+    InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,
 };
 use crate::compiler::parse::ast::{self, MissingArg, Pattern};
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode};
@@ -22,6 +24,7 @@ use crate::core::{NodeFieldId, NodeKindId};
 use crate::compiler::analyze::types::CaptureKind;
 
 use super::NfaBuilder;
+use super::boundary::EntryObligation;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::pattern_owns_iteration;
 use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
@@ -216,6 +219,7 @@ impl NfaBuilder<'_> {
             let entry = self.compile_seq_items(SeqItemsCtx {
                 items: &items,
                 exit: up_label,
+                node_final_exit: Some(final_exit),
                 is_inside_node: true,
                 first_nav: None,
                 capture: CaptureEffects::default(),
@@ -518,6 +522,123 @@ impl NfaBuilder<'_> {
         }
         let mode = self.propagate_source_mode(DefBodyMode::ordinary());
         self.compile_ref_call(DefSpecialization::new(def_id, mode), ctx, field_override)
+    }
+
+    /// Call a match-only definition through its exact boundary contract.
+    ///
+    /// The specialization owns entry navigation and exposes only operational
+    /// ports both reachable from `input` and admitted by this call site.
+    /// Continuations are serialized in the specialization's dense local port
+    /// order; a missing target remains failure rather than falling back to a
+    /// canonical consumed or empty continuation.
+    pub(super) fn compile_boundary_ref_call(
+        &mut self,
+        def_id: DefId,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+    ) -> Option<Label> {
+        let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let mode = match self.ref_call_lowering(output, false) {
+            RefLowering::PlainCall => DefBodyMode::ordinary(),
+            RefLowering::SuppressedCall => DefBodyMode::ordinary().suppress_output(),
+            RefLowering::ScopedValue | RefLowering::PendingValue => {
+                unreachable!("an opaque reference does not observe the callee value")
+            }
+        };
+        let mode = self.propagate_source_mode(mode);
+        self.compile_boundary_ref_call_with_mode(def_id, mode, input, entry, targets)
+    }
+
+    /// Boundary-aware value call for a captured definition reference.
+    ///
+    /// Record-valued callees are bracketed at the call site exactly like an
+    /// ordinary reference: every admitted return closes the same caller-owned
+    /// record before attaching it, including an empty structural outcome that
+    /// still produced a record of optional fields.
+    pub(super) fn compile_boundary_captured_ref_call(
+        &mut self,
+        def_id: DefId,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        capture_effects: &[EffectIR],
+    ) -> Option<Label> {
+        let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let type_id = output
+            .value()
+            .expect("a reference capture targets a value-producing definition");
+        let is_record = matches!(
+            self.ctx.analysis.type_analysis.expect_type_shape(type_id),
+            TypeShape::Record(_)
+        );
+        let mut return_targets = ExitMap::new();
+        for (port, &target) in targets.iter() {
+            let target = if is_record {
+                self.emit_record_close_with_effects(
+                    ScopeCloseEffects {
+                        leading: &[],
+                        capture: capture_effects,
+                        outer: &[],
+                    },
+                    target,
+                )
+            } else {
+                self.emit_effects_if_nonempty(target, capture_effects.to_vec())
+            };
+            return_targets.insert(port, target);
+        }
+
+        let mode = self.propagate_source_mode(DefBodyMode::ordinary());
+        let call =
+            self.compile_boundary_ref_call_with_mode(def_id, mode, input, entry, &return_targets)?;
+        Some(if is_record {
+            self.emit_record_open(call)
+        } else {
+            call
+        })
+    }
+
+    fn compile_boundary_ref_call_with_mode(
+        &mut self,
+        def_id: DefId,
+        mode: DefBodyMode,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+    ) -> Option<Label> {
+        let reachable_ports: Vec<_> = self
+            .boundary_relations
+            .definition(def_id)
+            .outcomes(input)
+            .iter()
+            .copied()
+            .map(ExitPort::from_outcome)
+            .filter(|&port| targets.get(port).is_some())
+            .collect();
+        if reachable_ports.is_empty() {
+            return None;
+        }
+
+        let signature = ExitSignature::from_ports(reachable_ports);
+        let specialization =
+            DefSpecialization::boundary(def_id, mode, input, entry, signature.clone());
+        let target = self.ensure_def_specialization(specialization);
+        let returns = signature
+            .ports()
+            .iter()
+            .map(|&port| {
+                *targets
+                    .get(port)
+                    .expect("callee signature contains only admitted call-site ports")
+            })
+            .collect();
+
+        Some(self.emit_generalized_call(
+            CallEntry::CalleeOwned { obligation: entry },
+            returns,
+            CalleeEntry(target),
+        ))
     }
 
     /// Compile a reference as a `Call` to the definition's standalone body.

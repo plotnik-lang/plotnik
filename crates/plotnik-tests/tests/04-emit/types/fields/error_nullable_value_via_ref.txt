@@ -1,0 +1,12 @@
+Maybe = (identifier)?
+Q = (variable_declarator name: (Maybe))
+------------------ DIAGNOSTICS -------------------
+error: grammar field `name` cannot match a sequence
+ --> query.ptk:2:32
+  |
+1 | Maybe = (identifier)?
+  |         ------------- defined here
+2 | Q = (variable_declarator name: (Maybe))
+  |                                ^^^^^^^
+  |
+help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint

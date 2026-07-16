@@ -50,13 +50,10 @@ pub(crate) use format::{
 };
 pub(crate) use header::Header;
 pub(crate) use instructions::{
-    Call, Match, MatchInstr, MatchPredicate, Return, ReturnEntry, ReturnMode, RoutedCall,
-    SplitCall, SplitCallReturns, SuccessorAddr, select_match_opcode,
+    Call, CallOwnership, CalleeContract, Match, MatchInstr, MatchPredicate, Return, SuccessorAddr,
+    select_match_opcode,
 };
-pub(crate) use module::{
-    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall, DecodedSplitCall,
-    Instruction,
-};
+pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Instruction};
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 // Nav and the regex DFA runtime live in `plotnik-rt` (shared with generated
 // code); re-exported here because they are part of the bytecode vocabulary.

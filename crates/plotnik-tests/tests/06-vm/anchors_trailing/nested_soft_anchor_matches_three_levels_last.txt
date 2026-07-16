@@ -55,12 +55,12 @@ Q:
   02       (@28)                            28 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   (number) [Node RecordSet(M0)]    08
-  08  ─•┘³ _                                09
-  09  ─‣┘² _                                10
-  10                                        ▶
-  11  ──!  _                                06, 11
-  13  └─!  _                                06, 11
+  06  ─•┘³ _                                07
+  07  ─‣┘² _                                08
+  08                                        ▶
+  09   !   (number) [Node RecordSet(M0)]    06
+  11  ──!  _                                09, 11
+  13  └─!  _                                09, 11
   15   !   (array)                          13
   16  ──!  _                                15, 16
   18  └─!  _                                15, 16
@@ -102,20 +102,20 @@ Q:
        ●   array
   15       (array)                          13
        ●   array
-  13       _                                06, 11
+  13       _                                09, 11
        ●   [
-  06       (number) [Node RecordSet(M0)]    08
+  09       (number) [Node RecordSet(M0)]    06
        ○   [
   13  ❮❮❮ 
-  11       _                                06, 11
+  11       _                                09, 11
        ●   number
-  06       (number) [Node RecordSet(M0)]    08
+  09       (number) [Node RecordSet(M0)]    06
        ●   number
-  08       _                                09
+  06       _                                07
        ●   array
-  09       _                                10
+  07       _                                08
        ●   program
-  10   ◀   (@28)                            
+  08   ◀   (@28)                            
 
 Q:
   03  -ε-  [RecordClose]                    05

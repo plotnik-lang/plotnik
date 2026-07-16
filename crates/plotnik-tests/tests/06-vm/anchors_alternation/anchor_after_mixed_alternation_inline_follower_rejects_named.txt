@@ -1,0 +1,101 @@
+Q = (program
+  (expression_statement
+    (call_expression
+      arguments: (arguments
+        [
+          (identifier == "a")
+          ";"
+        ]
+        .
+        (identifier == "b") @b
+      )
+    )
+  )
+)
+--------------------- INPUT ----------------------
+f(a, c, b)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "b"
+S2 "a"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "call_expression"
+S7 "arguments"
+S8 "identifier"
+S9 ";"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { b }
+
+[type_members]
+M0: S1 → T0  ; b: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entry_points]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@21)                            21 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘⁴ _                                06
+  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  07
+  11  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  07
+  14  └‣─  (identifier) == "a"              08
+  16  └‣─  ";"                              11
+  17  └‣─  arguments: (arguments)           14, 16
+  19  └‣─  (call_expression)                17
+  20  └‣─  (expression_statement)           19
+  21   !   (program)                        20
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@21)                            21 : 03
+       ▶   (@21)
+
+@21:
+  21       (program)                        20
+       ●   program
+  20       (expression_statement)           19
+       ●   expression_statement
+  19       (call_expression)                17
+       ●   call_expression
+  17       arguments: (arguments)           14, 16
+       ○   identifier
+       ●   arguments
+  14       (identifier) == "a"              08
+       ○   (
+       ●   identifier
+  08       (identifier) [Node RecordSet(M0)] == "b"  07
+       ○   ,
+  14  ❮❮❮ 
+       ○   ,
+       ○   ,
+       ○   )
+  17  ❮❮❮ 
+  16       ";"                              11
+       ○   (
+       ○   identifier
+       ○   ,
+       ○   identifier
+       ○   ,
+       ○   identifier
+       ○   )
+  17  ❮❮❮ 
+  19  ❮❮❮ 
+  20  ❮❮❮ 

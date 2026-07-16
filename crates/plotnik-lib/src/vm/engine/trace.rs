@@ -28,7 +28,7 @@ use crate::bytecode::{
 };
 use crate::core::{Colors, NodeFieldId};
 
-use plotnik_runtime::{JournalEvent, ReturnOutcome};
+use plotnik_runtime::{JournalEvent, PortId};
 
 /// Verbosity level for trace output.
 ///
@@ -96,7 +96,7 @@ pub trait Tracer {
     fn trace_call(&mut self, target_ip: CodeAddr);
 
     /// Called when returning from a definition.
-    fn trace_return(&mut self, outcome: ReturnOutcome);
+    fn trace_return(&mut self, port: PortId);
 
     /// Called when a checkpoint is created.
     fn trace_checkpoint_created(&mut self, ip: CodeAddr);
@@ -155,7 +155,7 @@ impl Tracer for NoopTracer {
     fn trace_call(&mut self, _target_ip: CodeAddr) {}
 
     #[inline(always)]
-    fn trace_return(&mut self, _outcome: ReturnOutcome) {}
+    fn trace_return(&mut self, _port: PortId) {}
 
     #[inline(always)]
     fn trace_checkpoint_created(&mut self, _ip: CodeAddr) {}
@@ -524,24 +524,12 @@ impl Tracer for PrintTracer<'_> {
             Instruction::Call(c) => {
                 let name = self.def_ref_name(CodeAddr::from(u16::from(c.target)));
                 let content = self.format_def_ref(&name);
-                let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
-                self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
-            }
-            Instruction::RoutedCall(c) => {
-                let name = self.def_ref_name(CodeAddr::from(u16::from(c.target)));
-                let content = self.format_def_ref(&name);
-                let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
-                self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
-            }
-            Instruction::SplitCall(c) => {
-                let name = self.def_ref_name(CodeAddr::from(u16::from(c.target)));
-                let content = self.format_def_ref(&name);
-                let successors = format!(
-                    "{:02} : {:02} / {:02}",
-                    u16::from(c.target),
-                    u16::from(c.returns.matched),
-                    u16::from(c.returns.empty)
-                );
+                let returns = c
+                    .returns()
+                    .map(|addr| format!("{:02}", u16::from(addr)))
+                    .collect::<Vec<_>>()
+                    .join(" / ");
+                let successors = format!("{:02} : {returns}", u16::from(c.target));
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
             Instruction::Return(_) => {
@@ -662,7 +650,7 @@ impl Tracer for PrintTracer<'_> {
         self.call_stack.push(name);
     }
 
-    fn trace_return(&mut self, outcome: ReturnOutcome) {
+    fn trace_return(&mut self, port: PortId) {
         let ip = self
             .deferred_return_ip
             .take()
@@ -674,15 +662,15 @@ impl Tracer for PrintTracer<'_> {
         let content = self.format_def_ref(&name);
         // Show ◼ when returning from top-level (stack now empty)
         let is_top_level = self.call_stack.is_empty();
-        let successor = match (is_top_level, outcome) {
-            (true, ReturnOutcome::Matched) => "◼",
-            (false, ReturnOutcome::Matched) => "",
-            (false, ReturnOutcome::Empty) => "empty",
-            (true, ReturnOutcome::Empty) => {
-                unreachable!("entry point empty returns are rejected during module validation")
+        let successor = match (is_top_level, port.to_byte()) {
+            (true, 0) => "◼".to_string(),
+            (false, 0) => String::new(),
+            (false, port) => format!("p{port}"),
+            (true, _) => {
+                unreachable!("entry points return only through port zero")
             }
         };
-        self.add_instruction(ip, trace::RETURN, &content, successor);
+        self.add_instruction(ip, trace::RETURN, &content, &successor);
         if let Some(caller) = self.call_stack.last().cloned() {
             self.push_def_header(&caller);
         }

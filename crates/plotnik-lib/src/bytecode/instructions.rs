@@ -14,7 +14,7 @@ use super::constants::{
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
 use super::node_kind_constraint::NodeKindConstraint;
-use plotnik_rt::Nav;
+use plotnik_rt::{Nav, PortId};
 
 /// Fixed header bytes before an extended Match's payload — exactly the first
 /// bytecode word. Effects, negated fields, an optional predicate, and successors follow,
@@ -57,7 +57,8 @@ pub(crate) mod header_byte {
         (b >> SEGMENT_SHIFT) & FIELD2_MASK
     }
 
-    /// The 2-bit node-class field (bits 5-4); meaningful only for Match.
+    /// The 2-bit opcode-specific field (bits 5-4): node class for Match,
+    /// ownership/contract flags for Call and Return.
     pub(crate) fn node_class_bits(b: u8) -> u8 {
         (b >> NODE_CLASS_SHIFT) & FIELD2_MASK
     }
@@ -238,10 +239,9 @@ pub enum Opcode {
     Match32 = 0x3,
     Match48 = 0x4,
     Match64 = 0x5,
-    Call = 0x6,
-    Return = 0x7,
-    SplitCall = 0x8,
-    RoutedCall = 0x9,
+    Call1 = 0x6,
+    CallN = 0x7,
+    Return = 0x8,
 }
 
 impl Opcode {
@@ -255,10 +255,9 @@ impl Opcode {
             0x3 => Some(Self::Match32),
             0x4 => Some(Self::Match48),
             0x5 => Some(Self::Match64),
-            0x6 => Some(Self::Call),
-            0x7 => Some(Self::Return),
-            0x8 => Some(Self::SplitCall),
-            0x9 => Some(Self::RoutedCall),
+            0x6 => Some(Self::Call1),
+            0x7 => Some(Self::CallN),
+            0x8 => Some(Self::Return),
             _ => None,
         }
     }
@@ -273,7 +272,8 @@ impl Opcode {
             Self::Match32 => 32,
             Self::Match48 => 48,
             Self::Match64 => 64,
-            Self::Call | Self::Return | Self::SplitCall | Self::RoutedCall => BYTECODE_WORD_SIZE,
+            Self::Call1 | Self::Return => BYTECODE_WORD_SIZE,
+            Self::CallN => 3 * BYTECODE_WORD_SIZE,
         }
     }
 
@@ -297,6 +297,9 @@ impl Opcode {
     /// Payload capacity in u16 slots — whatever follows the one-word header.
     /// Zero for non-extended variants (Match8, Call, Return).
     pub const fn payload_slots(self) -> usize {
+        if !self.is_match() || matches!(self, Self::Match8) {
+            return 0;
+        }
         (self.size() - MATCH_PAYLOAD_START) / PAYLOAD_SLOT_SIZE
     }
 }
@@ -732,42 +735,158 @@ impl MatchInstr {
     }
 }
 
-/// Call instruction for invoking definitions (recursion).
+const CALL_MAX_RETURNS: usize = PortId::COUNT as usize;
+const CALL_OWNERSHIP_BIT: u8 = 1;
+const CALL1_CONSUMED_BIT: u8 = 2;
+
+/// Which side of a call boundary owns navigation and field selection.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CallOwnership {
+    Caller,
+    Callee,
+}
+
+impl CallOwnership {
+    pub(crate) fn from_bit(bit: u8) -> Self {
+        if bit == 0 { Self::Caller } else { Self::Callee }
+    }
+
+    pub(crate) fn to_bit(self) -> u8 {
+        match self {
+            Self::Caller => 0,
+            Self::Callee => CALL_OWNERSHIP_BIT,
+        }
+    }
+}
+
+/// Immutable entry protocol implemented by a callee body.
+///
+/// Caller-owned bodies are exact and therefore carry no body-side navigation
+/// or field. Callee-owned bodies embed the exact authored obligation that
+/// every call targeting them must declare.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CalleeContract {
+    CallerOwned,
+    CalleeOwned {
+        nav: Nav,
+        node_field: Option<NodeFieldId>,
+    },
+}
+
+impl CalleeContract {
+    pub fn ownership(self) -> CallOwnership {
+        match self {
+            Self::CallerOwned => CallOwnership::Caller,
+            Self::CalleeOwned { .. } => CallOwnership::Callee,
+        }
+    }
+
+    pub fn nav(self) -> Nav {
+        match self {
+            Self::CallerOwned => Nav::Stay,
+            Self::CalleeOwned { nav, .. } => nav,
+        }
+    }
+
+    pub fn node_field(self) -> Option<NodeFieldId> {
+        match self {
+            Self::CallerOwned => None,
+            Self::CalleeOwned { node_field, .. } => node_field,
+        }
+    }
+}
+
+/// Unified decoded call view. `Call1` and `CallN` differ only in physical
+/// density; execution and validation consume this semantic shape.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Call {
-    /// Segment index (0-3).
     pub segment: u8,
-    /// Navigation to apply before jumping to target.
+    pub ownership: CallOwnership,
     pub nav: Nav,
-    /// Field constraint (None = no constraint).
     pub node_field: Option<NodeFieldId>,
-    /// Return address (current segment).
-    pub next: SuccessorAddr,
-    /// Callee entry point (target segment from type_id).
     pub target: SuccessorAddr,
+    returns: [Option<SuccessorAddr>; CALL_MAX_RETURNS],
+    returns_len: u8,
+    consumed_mask: u8,
 }
 
 impl Call {
     pub fn new(
+        ownership: CallOwnership,
         nav: Nav,
         node_field: Option<NodeFieldId>,
-        next: SuccessorAddr,
+        return_addrs: &[SuccessorAddr],
+        consumed_mask: u8,
         target: SuccessorAddr,
     ) -> Self {
+        assert!(
+            (1..=CALL_MAX_RETURNS).contains(&return_addrs.len()),
+            "call must have 1..={CALL_MAX_RETURNS} return addresses"
+        );
+        let valid_mask = PortId::dense_mask(return_addrs.len());
+        assert_eq!(
+            consumed_mask & !valid_mask,
+            0,
+            "call consumed mask has bits outside its arity"
+        );
+        assert!(
+            ownership == CallOwnership::Callee || consumed_mask == valid_mask,
+            "caller-owned calls cannot expose empty ports"
+        );
+
+        let mut returns = [None; CALL_MAX_RETURNS];
+        for (slot, &addr) in returns.iter_mut().zip(return_addrs) {
+            *slot = Some(addr);
+        }
         Self {
             segment: 0,
+            ownership,
             nav,
             node_field,
-            next,
             target,
+            returns,
+            returns_len: return_addrs.len() as u8,
+            consumed_mask,
         }
     }
 
-    /// Decode from 8-byte bytecode.
-    ///
-    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    /// For Call, node_class bits are ignored (always 0).
-    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
+    pub fn arity(self) -> usize {
+        usize::from(self.returns_len)
+    }
+
+    pub fn returns(&self) -> impl ExactSizeIterator<Item = SuccessorAddr> + '_ {
+        self.returns[..self.arity()]
+            .iter()
+            .map(|addr| addr.expect("call return slots inside arity are populated"))
+    }
+
+    pub fn return_addr(self, port: PortId) -> SuccessorAddr {
+        assert!(
+            port.index() < self.arity(),
+            "return port is within call arity"
+        );
+        self.returns[port.index()].expect("call return slots inside arity are populated")
+    }
+
+    pub fn port_consumed(self, port: PortId) -> bool {
+        self.consumed_mask & port.bit() != 0
+    }
+
+    pub fn consumed_mask(self) -> u8 {
+        self.consumed_mask
+    }
+
+    pub fn callee_contract(self) -> CalleeContract {
+        match self.ownership {
+            CallOwnership::Caller => CalleeContract::CallerOwned,
+            CallOwnership::Callee => CalleeContract::CalleeOwned {
+                nav: self.nav,
+                node_field: self.node_field,
+            },
+        }
+    }
+
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
         let header = bytes[0];
         let segment = header_byte::segment(header);
         let opcode = header_byte::opcode(header).expect("invalid opcode");
@@ -775,214 +894,79 @@ impl Call {
             segment == 0,
             "non-zero segment not yet supported: {segment}"
         );
-        assert_eq!(opcode, Opcode::Call, "expected Call opcode");
 
-        Self {
-            segment,
-            nav: Nav::from_byte(bytes[1]),
-            node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]]))
-                .map(NodeFieldId::from),
-            next: SuccessorAddr::try_from(u16::from_le_bytes([bytes[4], bytes[5]]))
-                .expect("successor address must be non-zero"),
-            target: SuccessorAddr::try_from(u16::from_le_bytes([bytes[6], bytes[7]]))
-                .expect("successor address must be non-zero"),
+        let flags = header_byte::node_class_bits(header);
+        let ownership = CallOwnership::from_bit(flags & CALL_OWNERSHIP_BIT);
+        let nav = Nav::from_byte(bytes[1]);
+        let node_field =
+            NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]])).map(NodeFieldId::from);
+        let successor_addr = |offset| {
+            SuccessorAddr::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
+                .expect("successor address must be non-zero")
+        };
+
+        match opcode {
+            Opcode::Call1 => {
+                let consumed_mask = u8::from(flags & CALL1_CONSUMED_BIT != 0);
+                Self::new(
+                    ownership,
+                    nav,
+                    node_field,
+                    &[successor_addr(4)],
+                    consumed_mask,
+                    successor_addr(6),
+                )
+            }
+            Opcode::CallN => {
+                let arity = usize::from(bytes[6]);
+                let mut return_addrs = Vec::with_capacity(arity);
+                for index in 0..arity {
+                    return_addrs.push(successor_addr(BYTECODE_WORD_SIZE + index * 2));
+                }
+                Self::new(
+                    ownership,
+                    nav,
+                    node_field,
+                    &return_addrs,
+                    bytes[7],
+                    successor_addr(4),
+                )
+            }
+            _ => unreachable!("Call::from_bytes requires Call1 or CallN"),
         }
     }
 
-    /// Encode to 8-byte bytecode.
-    ///
-    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    pub fn to_bytes(self) -> [u8; 8] {
-        let mut bytes = [0u8; 8];
-        bytes[0] = header_byte::pack(self.segment, 0, Opcode::Call);
+    pub fn to_bytes(self) -> Vec<u8> {
+        if self.arity() == 1 {
+            let mut bytes = vec![0u8; Opcode::Call1.size()];
+            let flags = self.ownership.to_bit()
+                | if self.consumed_mask & PortId::ZERO.bit() != 0 {
+                    CALL1_CONSUMED_BIT
+                } else {
+                    0
+                };
+            bytes[0] = header_byte::pack(self.segment, flags, Opcode::Call1);
+            bytes[1] = self.nav.to_byte();
+            bytes[2..4].copy_from_slice(&self.node_field.map_or(0, u16::from).to_le_bytes());
+            bytes[4..6].copy_from_slice(
+                &u16::from(self.returns[0].expect("call has one return")).to_le_bytes(),
+            );
+            bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
+            return bytes;
+        }
+
+        let mut bytes = vec![0u8; Opcode::CallN.size()];
+        bytes[0] = header_byte::pack(self.segment, self.ownership.to_bit(), Opcode::CallN);
         bytes[1] = self.nav.to_byte();
         bytes[2..4].copy_from_slice(&self.node_field.map_or(0, u16::from).to_le_bytes());
-        bytes[4..6].copy_from_slice(&u16::from(self.next).to_le_bytes());
-        bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
+        bytes[4..6].copy_from_slice(&u16::from(self.target).to_le_bytes());
+        bytes[6] = self.returns_len;
+        bytes[7] = self.consumed_mask;
+        for (index, addr) in self.returns().enumerate() {
+            let offset = BYTECODE_WORD_SIZE + index * 2;
+            bytes[offset..offset + 2].copy_from_slice(&u16::from(addr).to_le_bytes());
+        }
         bytes
-    }
-}
-
-/// Matched-only call whose callee owns entry navigation.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct RoutedCall {
-    pub segment: u8,
-    /// Navigation owned by the routed callee, retained for validation.
-    pub entry_nav: Nav,
-    pub next: SuccessorAddr,
-    pub target: SuccessorAddr,
-}
-
-impl RoutedCall {
-    pub fn new(entry_nav: Nav, next: SuccessorAddr, target: SuccessorAddr) -> Self {
-        Self {
-            segment: 0,
-            entry_nav,
-            next,
-            target,
-        }
-    }
-
-    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
-        let header = bytes[0];
-        let segment = header_byte::segment(header);
-        let opcode = header_byte::opcode(header).expect("invalid opcode");
-        assert!(
-            segment == 0,
-            "non-zero segment not yet supported: {segment}"
-        );
-        assert_eq!(opcode, Opcode::RoutedCall, "expected RoutedCall opcode");
-
-        let successor_addr = |offset| {
-            SuccessorAddr::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
-                .expect("successor address must be non-zero")
-        };
-        Self {
-            segment,
-            entry_nav: Nav::from_byte(bytes[1]),
-            next: successor_addr(4),
-            target: successor_addr(6),
-        }
-    }
-
-    pub fn to_bytes(self) -> [u8; 8] {
-        let mut bytes = [0u8; 8];
-        bytes[0] = header_byte::pack(self.segment, 0, Opcode::RoutedCall);
-        bytes[1] = self.entry_nav.to_byte();
-        bytes[4..6].copy_from_slice(&u16::from(self.next).to_le_bytes());
-        bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
-        bytes
-    }
-}
-
-/// Call instruction for a nullable definition with distinct return outcomes.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct SplitCall {
-    /// Segment index (0-3).
-    pub segment: u8,
-    /// Navigation owned by the routed callee, retained for validation.
-    pub entry_nav: Nav,
-    pub returns: SplitCallReturns,
-    /// Callee entry point.
-    pub target: SuccessorAddr,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct SplitCallReturns {
-    pub matched: SuccessorAddr,
-    pub empty: SuccessorAddr,
-}
-
-impl SplitCall {
-    pub fn new(entry_nav: Nav, returns: SplitCallReturns, target: SuccessorAddr) -> Self {
-        Self {
-            segment: 0,
-            entry_nav,
-            returns,
-            target,
-        }
-    }
-
-    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
-        let header = bytes[0];
-        let segment = header_byte::segment(header);
-        let opcode = header_byte::opcode(header).expect("invalid opcode");
-        assert!(
-            segment == 0,
-            "non-zero segment not yet supported: {segment}"
-        );
-        assert_eq!(opcode, Opcode::SplitCall, "expected SplitCall opcode");
-
-        let successor_addr = |offset| {
-            SuccessorAddr::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
-                .expect("successor address must be non-zero")
-        };
-        Self {
-            segment,
-            entry_nav: Nav::from_byte(bytes[1]),
-            returns: SplitCallReturns {
-                matched: successor_addr(2),
-                empty: successor_addr(4),
-            },
-            target: successor_addr(6),
-        }
-    }
-
-    pub fn to_bytes(self) -> [u8; 8] {
-        let mut bytes = [0u8; 8];
-        bytes[0] = header_byte::pack(self.segment, 0, Opcode::SplitCall);
-        bytes[1] = self.entry_nav.to_byte();
-        bytes[2..4].copy_from_slice(&u16::from(self.returns.matched).to_le_bytes());
-        bytes[4..6].copy_from_slice(&u16::from(self.returns.empty).to_le_bytes());
-        bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
-        bytes
-    }
-}
-
-/// Which side of the call boundary owns a returning body's entry navigation.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ReturnEntry {
-    Caller,
-    Routed,
-}
-
-/// Complete return protocol. Invalid combinations such as a caller-owned
-/// empty return are unrepresentable after decoding.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ReturnMode {
-    CallerMatched,
-    RoutedMatched,
-    RoutedEmpty,
-}
-
-impl ReturnMode {
-    pub fn from_bytes(outcome: u8, entry: u8) -> Option<Self> {
-        match (
-            plotnik_rt::ReturnOutcome::from_byte(outcome),
-            ReturnEntry::from_byte(entry),
-        ) {
-            (Some(plotnik_rt::ReturnOutcome::Matched), Some(ReturnEntry::Caller)) => {
-                Some(Self::CallerMatched)
-            }
-            (Some(plotnik_rt::ReturnOutcome::Matched), Some(ReturnEntry::Routed)) => {
-                Some(Self::RoutedMatched)
-            }
-            (Some(plotnik_rt::ReturnOutcome::Empty), Some(ReturnEntry::Routed)) => {
-                Some(Self::RoutedEmpty)
-            }
-            _ => None,
-        }
-    }
-
-    pub fn outcome(self) -> plotnik_rt::ReturnOutcome {
-        match self {
-            Self::CallerMatched | Self::RoutedMatched => plotnik_rt::ReturnOutcome::Matched,
-            Self::RoutedEmpty => plotnik_rt::ReturnOutcome::Empty,
-        }
-    }
-
-    pub fn entry(self) -> ReturnEntry {
-        match self {
-            Self::CallerMatched => ReturnEntry::Caller,
-            Self::RoutedMatched | Self::RoutedEmpty => ReturnEntry::Routed,
-        }
-    }
-}
-
-impl ReturnEntry {
-    pub fn from_byte(byte: u8) -> Option<Self> {
-        match byte {
-            0 => Some(Self::Caller),
-            1 => Some(Self::Routed),
-            _ => None,
-        }
-    }
-
-    pub fn to_byte(self) -> u8 {
-        match self {
-            Self::Caller => 0,
-            Self::Routed => 1,
-        }
     }
 }
 
@@ -991,39 +975,31 @@ impl ReturnEntry {
 pub struct Return {
     /// Segment index (0-3).
     pub segment: u8,
-    pub mode: ReturnMode,
+    pub port: PortId,
+    pub contract: CalleeContract,
 }
 
 impl Return {
     pub fn new() -> Self {
-        Self::matched()
+        Self::port(PortId::ZERO)
     }
 
-    pub fn matched() -> Self {
-        Self {
-            segment: 0,
-            mode: ReturnMode::CallerMatched,
-        }
+    pub fn port(port: PortId) -> Self {
+        Self::with_contract(port, CalleeContract::CallerOwned)
     }
 
-    pub fn routed_matched() -> Self {
+    pub fn with_contract(port: PortId, contract: CalleeContract) -> Self {
         Self {
             segment: 0,
-            mode: ReturnMode::RoutedMatched,
-        }
-    }
-
-    pub fn routed_empty() -> Self {
-        Self {
-            segment: 0,
-            mode: ReturnMode::RoutedEmpty,
+            port,
+            contract,
         }
     }
 
     /// Decode from 8-byte bytecode.
     ///
     /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    /// For Return, node_class bits are ignored (always 0).
+    /// For Return, header flag bit 0 stores callee entry ownership.
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let header = bytes[0];
         let segment = header_byte::segment(header);
@@ -1034,9 +1010,20 @@ impl Return {
         );
         assert_eq!(opcode, Opcode::Return, "expected Return opcode");
 
+        let flags = header_byte::node_class_bits(header);
+        let ownership = CallOwnership::from_bit(flags & CALL_OWNERSHIP_BIT);
+        let nav = Nav::from_byte(bytes[2]);
+        let node_field =
+            NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]])).map(NodeFieldId::from);
+        let contract = match ownership {
+            CallOwnership::Caller => CalleeContract::CallerOwned,
+            CallOwnership::Callee => CalleeContract::CalleeOwned { nav, node_field },
+        };
+
         Self {
             segment,
-            mode: ReturnMode::from_bytes(bytes[1], bytes[2]).expect("validated return mode"),
+            port: PortId::from_byte(bytes[1]).expect("validated return port"),
+            contract,
         }
     }
 
@@ -1045,10 +1032,21 @@ impl Return {
     /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     pub fn to_bytes(self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        bytes[0] = header_byte::pack(self.segment, 0, Opcode::Return);
-        bytes[1] = self.mode.outcome().to_byte();
-        bytes[2] = self.mode.entry().to_byte();
-        // bytes[3..8] are reserved/padding
+        bytes[0] = header_byte::pack(
+            self.segment,
+            self.contract.ownership().to_bit(),
+            Opcode::Return,
+        );
+        bytes[1] = self.port.to_byte();
+        bytes[2] = self.contract.nav().to_byte();
+        bytes[4..6].copy_from_slice(
+            &self
+                .contract
+                .node_field()
+                .map_or(0, u16::from)
+                .to_le_bytes(),
+        );
+        // bytes 3 and 6-7 are reserved/padding.
         bytes
     }
 }

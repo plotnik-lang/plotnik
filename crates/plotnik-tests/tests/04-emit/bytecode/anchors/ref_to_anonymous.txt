@@ -7,8 +7,8 @@ Test = (array
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Comma = 13
-Test  = 17
+Comma = 16
+Test  = 20
 
 [transitions]
 Comma:
@@ -17,22 +17,28 @@ Comma:
 
 Test:
   04                                        ▶
-  05   !   (array)                          11
+  05   !   (array)                          14
   06  ─‣┘  _                                04
   07  ─◦─  (string) [Node RecordSet(next)]  06
-  08   !   (Comma)                          02 : 07
-  10  ──!  _                                08, 10
-  11  └─!  _                                08, 10
+
+Comma (consuming, routed Down):
+  09                                        ▶
+  10   !   ","                              09
+  12  ──!  _                                10, 12
+  13  └─!  _                                10, 12
+
+Test:
+  14       (Comma (consuming, routed Down))  13 : 07
 
 Comma (entry point):
-  12                                        ▶
-  13       (Comma)                          02 : 12
+  15                                        ▶
+  16       (Comma)                          02 : 15
 
 Test (entry point):
-  14                                        ▶
-  15  -ε-  [RecordClose]                    14
-  16       (Test)                           05 : 15
-  17  -ε-  [RecordOpen]                     16
+  17                                        ▶
+  18  -ε-  [RecordClose]                    17
+  19       (Test)                           05 : 18
+  20  -ε-  [RecordOpen]                     19
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -65,7 +71,7 @@ Comma:
 
 Test:
   02  -ε-  [RecordOpen]                     04
-  04       (@20)                            20 : 05
+  04       (@21)                            21 : 05
   05  -ε-  [RecordClose]                    07
   07                                        ▶
   08  ─◦─  (string) [Node RecordSet(M0)]    10
@@ -73,8 +79,9 @@ Test:
   11                                        ▶
   12   !   ","                              11
   13                                        ▶
-  14   !   (@12)                            12 : 08
-  15  ...
-  16  ──!  _                                14, 16
-  18  └─!  _                                14, 16
-  20   !   (array)                          18
+  14                                        ▶
+  15   !   ","                              14
+  16  ──!  _                                15, 16
+  18  └─!  _                                15, 16
+  20       (@18)                            18 : 08
+  21   !   (array)                          20

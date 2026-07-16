@@ -4,22 +4,22 @@ Q = (statement_block
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 12
+Q = 13
 
 [transitions]
 Q:
   01                                        ▶
-  02   !   (statement_block)                08
-  04  ─◦┘  _                                01
-  05   !   "}" [Node RecordSet(op)]         04
-  07  ──!  _                                05, 07
-  08  └─!  _                                05, 07
+  02   !   (statement_block)                09
+  05  ─◦┘  _                                01
+  06   !   "}" [Node RecordSet(op)]         05
+  08  ──!  _                                06, 08
+  09  └─!  _                                06, 08
 
 Q (entry point):
-  09                                        ▶
-  10  -ε-  [RecordClose]                    09
-  11       (Q)                              02 : 10
-  12  -ε-  [RecordOpen]                     11
+  10                                        ▶
+  11  -ε-  [RecordClose]                    10
+  12       (Q)                              02 : 11
+  13  -ε-  [RecordOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -47,9 +47,9 @@ Q:
   02       (@14)                            14 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   "}" [Node RecordSet(M0)]         08
-  08  ─◦┘  _                                09
-  09                                        ▶
-  10  ──!  _                                06, 10
-  12  └─!  _                                06, 10
+  06                                        ▶
+  07  ─◦┘  _                                06
+  08   !   "}" [Node RecordSet(M0)]         07
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
   14   !   (statement_block)                12

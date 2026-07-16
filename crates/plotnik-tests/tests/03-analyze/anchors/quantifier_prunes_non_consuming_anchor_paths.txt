@@ -1,0 +1,35 @@
+Tail = {
+  .
+  (identifier)
+}
+
+Discharge = {
+  (identifier)
+  (Tail)
+}
+
+Optional = {
+  {.}?
+  (Tail)
+}
+
+Mixed = {
+  [
+    {.}
+    (identifier)
+  ]?
+  (Tail)
+}
+
+Q = (Mixed)
+-------------------- SYMBOLS ---------------------
+Tail
+Discharge
+  Tail
+Optional
+  Tail
+Mixed
+  Tail
+Q
+  Mixed
+    Tail

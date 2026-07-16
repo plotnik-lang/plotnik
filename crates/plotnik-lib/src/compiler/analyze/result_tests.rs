@@ -26,6 +26,7 @@ fn capture_layout_assigns_one_absolute_member_sequence() {
     types.declare_definitions([(def, interner.intern("Q"))]);
     types.record_def_output(def, DefinitionOutput::Value(parent));
     types.record_def_root_extent(def, RootExtent::SingleNode);
+    types.record_def_requires_anchor_context(def, false);
     let types = types.finish();
 
     let ordered = collect_ordered_types(&types);
@@ -57,6 +58,7 @@ fn capture_layout_accepts_256_fields() {
     types.declare_definitions([(def, interner.intern("Q"))]);
     types.record_def_output(def, DefinitionOutput::Value(output));
     types.record_def_root_extent(def, RootExtent::SingleNode);
+    types.record_def_requires_anchor_context(def, false);
     let types = types.finish();
 
     let layout = CaptureLayout::build(&types, &collect_ordered_types(&types))

@@ -32,9 +32,9 @@ Q:
   00       (@12)                            12 : 01
   01                                        ▶
   02  └‣─  (identifier) == "a"              04
-  04  ─‣┘  _                                05
-  05  ─•┘  _                                06
-  06                                        ▶
+  04  ─‣┘  _                                06
+  05                                        ▶
+  06  ─•┘  _                                05
   07   !   (expression_statement)           02
   08  ──!  _                                07, 08
   10  └─!  _                                07, 08
@@ -53,9 +53,9 @@ Q:
        ●   expression_statement
   02       (identifier) == "a"              04
        ●   identifier
-  04       _                                05
+  04       _                                06
        ●   expression_statement
-  05       _                                06
+  06       _                                05
   02  ❮❮❮ 
        ○   ;
   10  ❮❮❮ 
