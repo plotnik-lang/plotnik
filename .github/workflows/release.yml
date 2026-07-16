@@ -73,7 +73,7 @@ jobs:
           cache-all-crates: "true"
           prefix-key: v0-rust-codegen-release
 
-      - name: Generate Rust fixtures
+      - name: Generate Rust snapshot tests
         run: make codegen-rust
 
       - name: Lint generated Rust

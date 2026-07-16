@@ -30,9 +30,9 @@ mod tests {
         let mut command = Command::new("sh");
         command.args(["-c", "printf 'generated badly' >&2; exit 7"]);
 
-        let error = capture(&mut command, "generate fixture `bad.txt`").unwrap_err();
+        let error = capture(&mut command, "generate snapshot `bad.txt`").unwrap_err();
 
-        assert!(error.contains("generate fixture `bad.txt`"));
+        assert!(error.contains("generate snapshot `bad.txt`"));
         assert!(error.contains("command:"));
         assert!(error.contains("status: exit status: 7"));
         assert!(error.contains("generated badly"));

@@ -1,18 +1,18 @@
 use std::path::{Path, PathBuf};
 
-pub(crate) struct Fixture {
+pub(crate) struct Snapshot {
     pub path: PathBuf,
-    pub name: FixtureName,
-    pub kind: FixtureKind,
+    pub name: SnapshotName,
+    pub kind: SnapshotKind,
 }
 
 #[derive(Clone)]
-pub(crate) struct FixtureName {
+pub(crate) struct SnapshotName {
     display: String,
     components: Vec<String>,
 }
 
-impl FixtureName {
+impl SnapshotName {
     fn from_relative(path: &Path) -> Result<Self, String> {
         let components = path
             .iter()
@@ -20,11 +20,11 @@ impl FixtureName {
                 component
                     .to_str()
                     .map(str::to_owned)
-                    .ok_or_else(|| format!("fixture path is not UTF-8: {}", path.display()))
+                    .ok_or_else(|| format!("snapshot path is not UTF-8: {}", path.display()))
             })
             .collect::<Result<Vec<_>, _>>()?;
         if components.is_empty() {
-            return Err("fixture path has no components".into());
+            return Err("snapshot path has no components".into());
         }
         Ok(Self {
             display: components.join("/"),
@@ -84,7 +84,7 @@ pub(crate) enum VmMode {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum FixtureKind {
+pub(crate) enum SnapshotKind {
     Parser {
         trivia: TriviaPolicy,
     },
@@ -107,8 +107,8 @@ pub(crate) enum FixtureKind {
     },
 }
 
-impl FixtureKind {
-    fn classify(stage: &str, name: &FixtureName) -> Result<Self, String> {
+impl SnapshotKind {
+    fn classify(stage: &str, name: &SnapshotName) -> Result<Self, String> {
         let lints = if name.contains("lints") {
             LintPolicy::Strict
         } else {
@@ -160,7 +160,7 @@ impl FixtureKind {
                 lints,
             }),
             _ => Err(format!(
-                "unknown fixture kind `{}` under `{stage}`",
+                "unknown snapshot kind `{}` under `{stage}`",
                 name.as_str()
             )),
         }
@@ -218,12 +218,12 @@ impl FixtureKind {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum FixtureMode {
+pub(crate) enum SnapshotMode {
     Check,
     AcceptAll,
 }
 
-impl FixtureMode {
+impl SnapshotMode {
     pub fn from_env() -> Result<Self, String> {
         if env_switch("SHOT")? {
             Ok(Self::AcceptAll)
@@ -315,7 +315,7 @@ pub(crate) struct GeneratedOutput {
 }
 
 impl GeneratedOutput {
-    pub fn validate(kind: FixtureKind, sections: Vec<GeneratedSection>) -> Result<Self, String> {
+    pub fn validate(kind: SnapshotKind, sections: Vec<GeneratedSection>) -> Result<Self, String> {
         let legal = kind.legal_sections();
         let mut output: Vec<GeneratedSection> = Vec::with_capacity(sections.len());
         let mut last_position = None;
@@ -356,17 +356,17 @@ impl GeneratedOutput {
     }
 }
 
-pub(crate) fn fixture(root: &Path, relative: &str) -> Result<Fixture, String> {
+pub(crate) fn snapshot(root: &Path, relative: &str) -> Result<Snapshot, String> {
     let relative_path = Path::new(relative);
     let stage = relative_path
         .components()
         .next()
         .and_then(|component| component.as_os_str().to_str())
-        .ok_or_else(|| format!("fixture path has no UTF-8 stage: {relative}"))?;
+        .ok_or_else(|| format!("snapshot path has no UTF-8 stage: {relative}"))?;
     let name_path = relative_path.with_extension("");
-    let name = FixtureName::from_relative(&name_path)?;
-    let kind = FixtureKind::classify(stage, &name)?;
-    Ok(Fixture {
+    let name = SnapshotName::from_relative(&name_path)?;
+    let kind = SnapshotKind::classify(stage, &name)?;
+    Ok(Snapshot {
         path: root.join(relative_path),
         name,
         kind,

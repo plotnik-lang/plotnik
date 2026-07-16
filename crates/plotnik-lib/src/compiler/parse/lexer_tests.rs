@@ -5,22 +5,22 @@ use similar::TextDiff;
 
 use super::lexer::dump_tokens;
 
-const FIXTURE_EXT: &str = "txt";
+const SNAPSHOT_EXT: &str = "txt";
 
 #[test]
-fn lexer_fixtures() {
+fn lexer_snapshots() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("test_data/01-lexer");
-    let mut fixtures = Vec::new();
-    discover(&root, &mut fixtures);
-    fixtures.sort();
+    let mut snapshots = Vec::new();
+    discover(&root, &mut snapshots);
+    snapshots.sort();
     assert!(
-        !fixtures.is_empty(),
-        "01-lexer fixtures should be present under {}",
+        !snapshots.is_empty(),
+        "01-lexer snapshots should be present under {}",
         root.display()
     );
 
     let mut failures = Vec::new();
-    for path in fixtures {
+    for path in snapshots {
         let raw =
             fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         let normalized = raw.replace("\r\n", "\n");
@@ -47,21 +47,21 @@ fn lexer_fixtures() {
 
     assert!(
         failures.is_empty(),
-        "lexer fixtures out of date - run `make shot`:\n\n{}",
+        "lexer snapshots out of date - run `make shot`:\n\n{}",
         failures.join("\n\n")
     );
 }
 
 fn discover(dir: &Path, out: &mut Vec<PathBuf>) {
     let entries =
-        fs::read_dir(dir).unwrap_or_else(|e| panic!("read fixture dir {}: {e}", dir.display()));
+        fs::read_dir(dir).unwrap_or_else(|e| panic!("read snapshot dir {}: {e}", dir.display()));
     for entry in entries {
         let entry =
-            entry.unwrap_or_else(|e| panic!("read fixture entry in {}: {e}", dir.display()));
+            entry.unwrap_or_else(|e| panic!("read snapshot entry in {}: {e}", dir.display()));
         let path = entry.path();
         if path.is_dir() {
             discover(&path, out);
-        } else if path.extension().and_then(|e| e.to_str()) == Some(FIXTURE_EXT) {
+        } else if path.extension().and_then(|e| e.to_str()) == Some(SNAPSHOT_EXT) {
             out.push(path);
         }
     }
@@ -78,7 +78,7 @@ fn parse_query<'a>(raw: &'a str, path: &Path) -> &'a str {
         offset += line.len();
     }
     panic!(
-        "fixture {} must contain a `TOKENS` section rule",
+        "snapshot {} must contain a `TOKENS` section rule",
         path.display()
     )
 }

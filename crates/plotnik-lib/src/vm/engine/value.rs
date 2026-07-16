@@ -190,7 +190,7 @@ enum WorkItem<'a> {
 /// Output depth tracks source depth for captured-recursive queries, and a high or
 /// `Unbounded` depth limit lets it exceed any native-stack budget — so the walk
 /// uses an explicit work stack. Emission is byte-identical to the equivalent
-/// recursive printer; the `06-vm` golden fixtures pin that.
+/// recursive printer; the `06-vm` snapshots pin that.
 fn format_value<'a>(ctx: &mut FormatCtx<'_>, value: &'a Value<'a>, indent: usize) {
     let mut stack = vec![WorkItem::Value(value, indent)];
     while let Some(item) = stack.pop() {

@@ -8,7 +8,7 @@ use plotnik_rt::{Limit, RuntimeLimitSpec};
 pub struct Config {
     /// Rust output-type configuration shared with the type renderer.
     pub(crate) rust_types: RustTypesConfig,
-    /// Whether to emit the JSON surface used by generated-code golden tests.
+    /// Whether to emit the JSON surface used by generated-code snapshot tests.
     pub(crate) debug: bool,
     /// The limit policy compiled into the module's safe entry points.
     /// Chosen at generation time, never at the call site: the query is

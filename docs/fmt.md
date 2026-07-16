@@ -2,7 +2,7 @@
 
 Canonical formatting rules for `.ptk` queries — the specification for the
 formatter. The rules are informed by the hand-formatted query text of the
-golden-fixture corpus (`crates/plotnik-tests/tests/`). Exact agreement numbers
+snapshot corpus (`crates/plotnik-tests/tests/`). Exact agreement numbers
 must be recomputed from the implementation before they are documented; the
 working draft no longer claims results from an unavailable reference tool.
 
@@ -348,7 +348,7 @@ are deliberately not part of the canonical style. The formatter rewrites them.
   Canonical style fans out. One shape for "broken" keeps diffs and the mental
   model trivial.
 - **Stacked closers** — `value: (template_string … @frag))))`. They may appear
-  in authored fixtures; canonical output puts each broken group's closer on
+  in authored snapshots; canonical output puts each broken group's closer on
   its own line.
 - **Grid/column alignment** — `labeled_alternation_30_alternative_cascade.txt`
   lays alternatives out
@@ -356,7 +356,7 @@ are deliberately not part of the canonical style. The formatter rewrites them.
 - **Compact labeled alternations** — `Entry = [Id: (identifier) @id  Num: (number) @num]`
   (note the double space). Labeled alternations always break; multi-space
   separators never survive.
-- **Emphasis fan-out** — fixtures often break a construct that fits inline
+- **Emphasis fan-out** — snapshots often break a construct that fits inline
   because it is the construct under test (`(d\n  (C)\n  (A)\n)` at 11 chars,
   captured wrapper chains in `04-emit/bytecode/captures/`). A formatter
   cannot see emphasis; authored breaks are not preserved. This is the main
@@ -364,12 +364,12 @@ are deliberately not part of the canonical style. The formatter rewrites them.
 
 ## Corpus rollout
 
-The structural rules intentionally disagree with some authored fixture layout:
+The structural rules intentionally disagree with some authored snapshot layout:
 hugged containers, stacked closers, compact labeled alternations, emphasis-only fan-out, and
 capture-dense lines are all reflowed. Once the formatter exists, its dry-run
 report is the source of truth for rollout size. Do not carry old agreement
 percentages forward without a reproducible corpus test tied to the current
-rules and fixture revision.
+rules and snapshot revision.
 
 ## Algorithm sketch
 

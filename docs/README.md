@@ -37,7 +37,7 @@ compiler/emit/
   targets/{bytecode,rust,typescript}/
 ```
 
-Golden emission fixtures mirror that taxonomy under `04-emit/bytecode`,
+Emission snapshots mirror that taxonomy under `04-emit/bytecode`,
 `04-emit/types`, and `04-emit/rust/module`; VM semantics remain under `06-vm`.
 
 ## Quick Links by Audience

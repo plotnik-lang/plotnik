@@ -131,8 +131,8 @@ test-codegen-rust:
 
 shot:
 	@# See AGENTS.md for diagnostic guidelines
-	@# SHOT=1 accepts the golden-fixture suite (tests/0N-*); TRYBUILD=overwrite
-	@# refreshes the macro_diagnostics .stderr goldens; cargo insta accept does the rest.
+	@# SHOT=1 updates custom inline snapshots; TRYBUILD=overwrite updates .stderr snapshots.
+	@# The first run also records pending Insta snapshots, which cargo insta then accepts.
 	@SHOT=1 TRYBUILD=overwrite cargo test \
 		--workspace \
 		--lib \

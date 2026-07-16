@@ -6,20 +6,20 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A completed same-directory temporary file that removes itself unless renamed.
-struct TempFixtureFile {
+struct TempSnapshotFile {
     path: PathBuf,
     file: Option<File>,
 }
 
-impl TempFixtureFile {
+impl TempSnapshotFile {
     fn create(target: &Path) -> Result<Self, String> {
         let parent = target
             .parent()
-            .expect("fixture path always has a parent directory");
+            .expect("snapshot path always has a parent directory");
         let file_name = target
             .file_name()
             .and_then(|name| name.to_str())
-            .expect("fixture file name is valid UTF-8");
+            .expect("snapshot file name is valid UTF-8");
 
         loop {
             let nonce = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -60,7 +60,7 @@ impl TempFixtureFile {
     }
 }
 
-impl Drop for TempFixtureFile {
+impl Drop for TempSnapshotFile {
     fn drop(&mut self) {
         if !self.path.as_os_str().is_empty() {
             let _ = fs::remove_file(&self.path);
@@ -70,11 +70,11 @@ impl Drop for TempFixtureFile {
 
 /// Replace `path` atomically after all bytes have been written and flushed.
 ///
-/// This guarantees readers see either the old complete fixture or the new one.
-/// It does not promise crash durability; the fixture workflow does not require
+/// This guarantees readers see either the old complete snapshot or the new one.
+/// It does not promise crash durability; the snapshot workflow does not require
 /// an `fsync` of the file and parent directory.
 pub fn replace(path: &Path, contents: &str) -> Result<(), String> {
-    TempFixtureFile::create(path)?
+    TempSnapshotFile::create(path)?
         .write(contents)?
         .replace(path)
 }

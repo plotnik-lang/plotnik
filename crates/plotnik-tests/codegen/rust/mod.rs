@@ -114,7 +114,7 @@ fn prepare_cases(cases: &[Case]) -> Result<Vec<RustCase<'_>>, String> {
         let rust_test = format!("{shard}/{name}");
         if let Some(previous) = names.insert(rust_test.clone(), &case.relative) {
             return Err(format!(
-                "fixtures `{previous}` and `{}` both normalize to Rust test `{rust_test}`",
+                "snapshots `{previous}` and `{}` both normalize to Rust test `{rust_test}`",
                 case.relative
             ));
         }
@@ -132,7 +132,7 @@ fn stage(root: &Path, plotnik: &Path, cases: &[RustCase<'_>]) -> Result<(), Stri
         shards.entry(&case.shard).or_default().push(case);
         let directory = case_directory(root, case);
         fs::create_dir_all(&directory).map_err(|error| {
-            format!("create fixture directory {}: {error}", directory.display())
+            format!("create snapshot directory {}: {error}", directory.display())
         })?;
         let query_path = directory.join("query.ptk");
         fs::write(&query_path, case.case.query.as_bytes())
@@ -167,7 +167,7 @@ fn case_directory(root: &Path, case: &RustCase<'_>) -> PathBuf {
         .case
         .relative
         .strip_suffix(".txt")
-        .expect("corpus fixture paths end in .txt");
+        .expect("corpus snapshot paths end in .txt");
     root.join("generated").join(stem)
 }
 
@@ -178,7 +178,7 @@ fn render_shard(cases: &[&RustCase<'_>]) -> String {
             .case
             .relative
             .strip_suffix(".txt")
-            .expect("corpus fixture paths end in .txt");
+            .expect("corpus snapshot paths end in .txt");
         let module = format!("matcher_{index:03}");
         let _ = writeln!(
             out,
@@ -191,7 +191,7 @@ fn render_shard(cases: &[&RustCase<'_>]) -> String {
             .case
             .relative
             .strip_suffix(".txt")
-            .expect("corpus fixture paths end in .txt");
+            .expect("corpus snapshot paths end in .txt");
         let module = format!("matcher_{index:03}");
         let language = language_variant(case.case.language);
         let _ = writeln!(out, "#[test]");
@@ -209,7 +209,7 @@ fn render_shard(cases: &[&RustCase<'_>]) -> String {
         );
         let _ = writeln!(
             out,
-            "        .expect(\"fixture must stay within generated runtime limits\")"
+            "        .expect(\"snapshot must stay within generated runtime limits\")"
         );
         let _ = writeln!(
             out,
@@ -353,23 +353,23 @@ fn grammar_package_root(grammar_json: &Path) -> Result<&Path, String> {
 fn rust_names(relative: &str) -> Result<(String, String), String> {
     let stem = relative
         .strip_suffix(".txt")
-        .ok_or_else(|| format!("fixture path does not end in `.txt`: {relative}"))?;
+        .ok_or_else(|| format!("snapshot path does not end in `.txt`: {relative}"))?;
     let components = stem.split('/').collect::<Vec<_>>();
     if components.len() < 2 {
         return Err(format!(
-            "fixture path must contain a Rust shard and test name: {relative}"
+            "snapshot path must contain a Rust shard and test name: {relative}"
         ));
     }
     let shard = components
         .first()
-        .ok_or_else(|| format!("fixture path has no shard: {relative}"))?
+        .ok_or_else(|| format!("snapshot path has no shard: {relative}"))?
         .to_string();
     if !components.iter().all(|component| is_snake_case(component)) {
         return Err(format!(
-            "fixture path components must be snake_case for Rust: {relative}"
+            "snapshot path components must be snake_case for Rust: {relative}"
         ));
     }
-    Ok((shard, format!("fixture_{}", components[1..].join("__"))))
+    Ok((shard, format!("snapshot_{}", components[1..].join("__"))))
 }
 
 fn is_snake_case(value: &str) -> bool {
@@ -421,16 +421,16 @@ mod tests {
             rust_names("captures/nested/named_node.txt").unwrap(),
             (
                 "captures".to_string(),
-                "fixture_nested__named_node".to_string()
+                "snapshot_nested__named_node".to_string()
             )
         );
     }
 
     #[test]
-    fn rust_test_names_are_valid_when_fixture_names_are_keywords() {
+    fn rust_test_names_are_valid_when_snapshot_names_are_keywords() {
         assert_eq!(
             rust_names("captures/match.txt").unwrap(),
-            ("captures".to_string(), "fixture_match".to_string())
+            ("captures".to_string(), "snapshot_match".to_string())
         );
     }
 
@@ -441,7 +441,7 @@ mod tests {
         let shard = render_shard(&prepared.iter().collect::<Vec<_>>());
 
         assert!(shard.contains("matcher_000::Q::parse_to_json(&tree, source)"));
-        assert!(shard.contains("fn fixture_named_node()"));
+        assert!(shard.contains("fn snapshot_named_node()"));
         assert!(shard.contains("assert_eq!(expected, actual);"));
         assert!(!shard.contains("serde_json"));
     }

@@ -8,7 +8,7 @@
 //!
 //! Emission is deterministic — instructions render in label order, names and
 //! tables come from `BTreeMap`s — so the same query always produces the same
-//! code (golden-snapshot-able, cache-friendly).
+//! code (snapshot-friendly, cache-friendly).
 //!
 //! Control skeletons (`run`, `backtrack`, `match_retry`) transcribe the VM's
 //! `execute_with_stats` / `backtrack` handler-for-handler over the shared
