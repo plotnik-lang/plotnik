@@ -735,14 +735,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 .ctx
                 .type_ctx
                 .records_raw_output_provenance()
-                .then(|| raw.observation(capture_type.raw_intent(self.source)));
+                .then(|| raw.observation(capture_type.raw_intent(captured.source())));
             let field = self.finish_capture_type(raw, capture_type);
             if let Some(observation) = observation {
-                self.ctx.type_ctx.record_raw_capture_observation(
-                    captured_pattern.clone(),
-                    self.source,
-                    observation.emitting(field),
-                );
+                self.ctx
+                    .type_ctx
+                    .record_raw_capture_observation(captured.clone(), observation.emitting(field));
             }
             return PatternShape::new(
                 RootExtent::SingleNode,
@@ -827,7 +825,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .ctx
             .type_ctx
             .records_raw_output_provenance()
-            .then(|| raw.observation(capture_type.raw_intent(self.source)));
+            .then(|| raw.observation(capture_type.raw_intent(captured.source())));
         let field_info = self.finish_capture_type(raw, capture_type);
         if let Some(observation) = observation {
             let observation = if emits_field {
@@ -835,11 +833,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             } else {
                 observation
             };
-            self.ctx.type_ctx.record_raw_capture_observation(
-                captured_pattern.clone(),
-                self.source,
-                observation,
-            );
+            self.ctx
+                .type_ctx
+                .record_raw_capture_observation(captured.clone(), observation);
         }
         let flow = destination.finish(self.ctx.type_ctx, capture_name, field_info);
 

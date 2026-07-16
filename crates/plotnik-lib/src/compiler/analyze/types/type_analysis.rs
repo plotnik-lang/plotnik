@@ -12,6 +12,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use crate::compiler::analyze::Located;
 use crate::compiler::analyze::types::raw_output::{RawCaptureObservation, RawOutputGraphBuilder};
 use crate::compiler::analyze::types::type_shape::{
     DefinitionOutput, PatternFlow, PatternShape, RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL,
@@ -811,14 +812,13 @@ impl TypeAnalysisBuilder {
 
     pub(crate) fn record_raw_capture_observation(
         &mut self,
-        captured_pattern: CapturedPattern,
-        source: crate::compiler::diagnostics::source::SourceId,
+        captured_pattern: Located<CapturedPattern>,
         observation: RawCaptureObservation,
     ) {
         let Some(graph) = &mut self.raw_output_graph else {
             return;
         };
-        graph.record_capture(captured_pattern, source, observation);
+        graph.record_capture(captured_pattern, observation);
     }
 
     pub(crate) fn records_raw_output_provenance(&self) -> bool {
