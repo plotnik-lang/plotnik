@@ -15,6 +15,7 @@ pub struct PortId(u8);
 impl PortId {
     /// Maximum number of return ports exposed by one callee.
     pub const COUNT: u8 = 8;
+    pub const ZERO: Self = Self(0);
 
     /// Construct a port when `index` is in the runtime port universe.
     pub const fn new(index: u8) -> Option<Self> {
@@ -45,6 +46,20 @@ impl PortId {
 
     pub const fn index(self) -> usize {
         self.0 as usize
+    }
+
+    /// This port's position in a per-port bit mask.
+    pub const fn bit(self) -> u8 {
+        1 << self.0
+    }
+
+    /// Mask containing every dense port from zero through `port_count - 1`.
+    pub const fn dense_mask(port_count: usize) -> u8 {
+        assert!(
+            port_count <= Self::COUNT as usize,
+            "port count must be at most 8"
+        );
+        ((1u16 << port_count) - 1) as u8
     }
 }
 

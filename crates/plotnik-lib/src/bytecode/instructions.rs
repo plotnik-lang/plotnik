@@ -14,7 +14,7 @@ use super::constants::{
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
 use super::node_kind_constraint::NodeKindConstraint;
-use plotnik_rt::Nav;
+use plotnik_rt::{Nav, PortId};
 
 /// Fixed header bytes before an extended Match's payload — exactly the first
 /// bytecode word. Effects, negated fields, an optional predicate, and successors follow,
@@ -735,7 +735,7 @@ impl MatchInstr {
     }
 }
 
-const CALL_MAX_RETURNS: usize = plotnik_rt::PortId::COUNT as usize;
+const CALL_MAX_RETURNS: usize = PortId::COUNT as usize;
 const CALL_OWNERSHIP_BIT: u8 = 1;
 const CALL1_CONSUMED_BIT: u8 = 2;
 
@@ -823,7 +823,7 @@ impl Call {
             (1..=CALL_MAX_RETURNS).contains(&return_addrs.len()),
             "call must have 1..={CALL_MAX_RETURNS} return addresses"
         );
-        let valid_mask = ((1u16 << return_addrs.len()) - 1) as u8;
+        let valid_mask = PortId::dense_mask(return_addrs.len());
         assert_eq!(
             consumed_mask & !valid_mask,
             0,
@@ -860,7 +860,7 @@ impl Call {
             .map(|addr| addr.expect("call return slots inside arity are populated"))
     }
 
-    pub fn return_addr(self, port: plotnik_rt::PortId) -> SuccessorAddr {
+    pub fn return_addr(self, port: PortId) -> SuccessorAddr {
         assert!(
             port.index() < self.arity(),
             "return port is within call arity"
@@ -868,8 +868,8 @@ impl Call {
         self.returns[port.index()].expect("call return slots inside arity are populated")
     }
 
-    pub fn port_consumed(self, port: plotnik_rt::PortId) -> bool {
-        self.consumed_mask & (1 << port.to_byte()) != 0
+    pub fn port_consumed(self, port: PortId) -> bool {
+        self.consumed_mask & port.bit() != 0
     }
 
     pub fn consumed_mask(self) -> u8 {
@@ -940,7 +940,7 @@ impl Call {
         if self.arity() == 1 {
             let mut bytes = vec![0u8; Opcode::Call1.size()];
             let flags = self.ownership.to_bit()
-                | if self.consumed_mask & 1 != 0 {
+                | if self.consumed_mask & PortId::ZERO.bit() != 0 {
                     CALL1_CONSUMED_BIT
                 } else {
                     0
@@ -975,20 +975,20 @@ impl Call {
 pub struct Return {
     /// Segment index (0-3).
     pub segment: u8,
-    pub port: plotnik_rt::PortId,
+    pub port: PortId,
     pub contract: CalleeContract,
 }
 
 impl Return {
     pub fn new() -> Self {
-        Self::port(plotnik_rt::PortId::new(0).expect("zero is a valid port"))
+        Self::port(PortId::ZERO)
     }
 
-    pub fn port(port: plotnik_rt::PortId) -> Self {
+    pub fn port(port: PortId) -> Self {
         Self::with_contract(port, CalleeContract::CallerOwned)
     }
 
-    pub fn with_contract(port: plotnik_rt::PortId, contract: CalleeContract) -> Self {
+    pub fn with_contract(port: PortId, contract: CalleeContract) -> Self {
         Self {
             segment: 0,
             port,
@@ -1022,7 +1022,7 @@ impl Return {
 
         Self {
             segment,
-            port: plotnik_rt::PortId::from_byte(bytes[1]).expect("validated return port"),
+            port: PortId::from_byte(bytes[1]).expect("validated return port"),
             contract,
         }
     }

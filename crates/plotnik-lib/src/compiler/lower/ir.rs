@@ -962,10 +962,7 @@ pub struct ReturnIR {
 
 impl ReturnIR {
     pub fn new(label: Label) -> Self {
-        Self::port(
-            label,
-            PortId::from_byte(0).expect("zero is a valid port id"),
-        )
+        Self::port(label, PortId::ZERO)
     }
 
     pub fn port(label: Label, port: PortId) -> Self {
@@ -989,11 +986,7 @@ impl ReturnIR {
     }
 
     pub fn routed_matched(label: Label, obligation: EntryObligation) -> Self {
-        Self::callee_owned(
-            label,
-            PortId::from_byte(0).expect("zero is a valid port id"),
-            obligation,
-        )
+        Self::callee_owned(label, PortId::ZERO, obligation)
     }
 
     pub fn routed_empty(label: Label, obligation: EntryObligation) -> Self {

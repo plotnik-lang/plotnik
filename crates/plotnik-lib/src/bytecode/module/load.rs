@@ -87,11 +87,11 @@ impl ReturnPorts {
     const NONE: Self = Self(0);
 
     fn dense(arity: usize) -> Self {
-        Self(((1u16 << arity) - 1) as u8)
+        Self(PortId::dense_mask(arity))
     }
 
     fn insert(&mut self, port: PortId) {
-        self.0 |= 1 << port.to_byte();
+        self.0 |= port.bit();
     }
 }
 
@@ -162,7 +162,7 @@ impl DepthRoute {
     }
 
     fn consumed(self, port: PortId) -> bool {
-        self.consumed_mask & (1 << port.to_byte()) != 0
+        self.consumed_mask & port.bit() != 0
     }
 }
 
@@ -742,7 +742,7 @@ impl Module {
                     let next_net = net + m.nav.depth_delta();
                     if m.succ_count() == 0 {
                         let expected_exit = route
-                            .expected_exit(PortId::new(0).expect("zero is a valid port"))
+                            .expected_exit(PortId::ZERO)
                             .ok_or(ModuleError::DepthImbalance(addr))?;
                         if next_net != expected_exit {
                             return Err(ModuleError::DepthImbalance(addr));
@@ -1006,7 +1006,7 @@ impl Module {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
                     let consumed_mask = read_u8(instr_off + 7)?;
-                    let valid_mask = ((1u16 << arity) - 1) as u8;
+                    let valid_mask = PortId::dense_mask(arity);
                     if consumed_mask & !valid_mask != 0
                         || (flags & 1 == 0 && consumed_mask != valid_mask)
                     {

@@ -182,7 +182,7 @@ mod tests {
             CallIR::new(Label(0), ReturnAddr(Label(3)), CalleeEntry(Label(1))),
             ReturnIR::callee_owned(
                 Label(2),
-                PortId::new(0).expect("zero is a valid port"),
+                PortId::ZERO,
                 EntryObligation::new(NavigationContract::from_nav(Nav::Next)),
             ),
         );
@@ -313,12 +313,11 @@ impl ReturnPorts {
     const NONE: Self = Self(0);
 
     fn dense(len: usize) -> Self {
-        assert!(len <= usize::from(PortId::COUNT));
-        Self(((1u16 << len) - 1) as u8)
+        Self(PortId::dense_mask(len))
     }
 
     fn insert(&mut self, port: PortId) {
-        self.0 |= 1 << port.to_byte();
+        self.0 |= port.bit();
     }
 }
 

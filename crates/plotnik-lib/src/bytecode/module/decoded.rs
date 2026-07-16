@@ -158,9 +158,7 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                 }));
                 // Interior words of a multi-word Match are never addressed.
                 for _ in 1..opcode.word_count() {
-                    program.words.push(DecodedInstr::Return(
-                        PortId::new(0).expect("zero is a valid port"),
-                    ));
+                    program.words.push(DecodedInstr::Return(PortId::ZERO));
                 }
                 word_addr += opcode.word_count() as usize;
             }
@@ -176,9 +174,7 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                     returns_len: c.arity() as u8,
                 }));
                 for _ in 1..opcode.word_count() {
-                    program.words.push(DecodedInstr::Return(
-                        PortId::new(0).expect("zero is a valid port"),
-                    ));
+                    program.words.push(DecodedInstr::Return(PortId::ZERO));
                 }
                 word_addr += opcode.word_count() as usize;
             }

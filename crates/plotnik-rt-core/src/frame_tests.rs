@@ -49,14 +49,20 @@ fn pruning_drops_frames_above_the_active_parent() {
 
 #[test]
 fn port_ids_cover_exactly_the_eight_port_universe() {
+    assert_eq!(PortId::ZERO.to_byte(), 0);
+
     for index in 0..PortId::COUNT {
         let port = PortId::from_byte(index).expect("port is in range");
         assert_eq!(port.to_byte(), index);
         assert_eq!(port.index(), usize::from(index));
+        assert_eq!(port.bit(), 1 << index);
     }
 
     assert_eq!(PortId::from_byte(PortId::COUNT), None);
     assert_eq!(PortId::from_byte(u8::MAX), None);
+    assert_eq!(PortId::dense_mask(0), 0);
+    assert_eq!(PortId::dense_mask(3), 0b111);
+    assert_eq!(PortId::dense_mask(usize::from(PortId::COUNT)), u8::MAX);
 }
 
 #[test]
