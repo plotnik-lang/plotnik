@@ -49,12 +49,12 @@ fn run() -> Result<(), String> {
 
     let corpus = corpus::discover(manifest_dir, args.filter.as_deref())?;
     if corpus.cases.is_empty() {
-        return Err("codegen corpus selection contains no runnable fixtures".to_string());
+        return Err("codegen corpus selection contains no runnable snapshots".to_string());
     }
 
     rust::generate(manifest_dir, &plotnik, &corpus.cases)?;
     eprintln!(
-        "generated {} Rust tests from {} golden fixtures ({} diagnostic-only skipped) in {:.2?}",
+        "generated {} Rust tests from {} snapshots ({} diagnostic-only skipped) in {:.2?}",
         corpus.cases.len(),
         corpus.selected,
         corpus.skipped,

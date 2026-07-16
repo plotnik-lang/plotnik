@@ -1,4 +1,4 @@
-//! Shared parsing for golden-fixture documents and section boundaries.
+//! Shared parsing for snapshot documents and section boundaries.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Document {
@@ -38,7 +38,7 @@ pub fn parse_document(raw: &str) -> Result<Document, String> {
 
     let query = query_lines.join("\n");
     if query.trim().is_empty() {
-        return Err("fixture has no query (text before the first `--- … ---` rule)".into());
+        return Err("snapshot has no query (text before the first `--- … ---` rule)".into());
     }
     let sections = sections
         .into_iter()
@@ -50,8 +50,8 @@ pub fn parse_document(raw: &str) -> Result<Document, String> {
     Ok(Document { query, sections })
 }
 
-/// A known fixture section at column zero, normalized to the harness's internal
-/// name. Unknown dash-padded source lines are fixture data, not boundaries.
+/// A known snapshot section at column zero, normalized to the harness's internal
+/// name. Unknown dash-padded source lines are snapshot data, not boundaries.
 pub fn parse_section_header(line: &str) -> Option<String> {
     let label = rule_label(line)?;
     let name = match label.split_once('(') {
@@ -85,7 +85,7 @@ pub fn parse_section_header(line: &str) -> Option<String> {
 
 /// The label inside a `----- LABEL -----` rule, or `None` when the line isn't a
 /// rule. A rule sits at column zero and pads its label with a space on each side
-/// (` LABEL `), exactly as the golden harness emits it; requiring that padding
+/// (` LABEL `), exactly as the snapshot test harness emits it; requiring that padding
 /// keeps authored query and input bytes from becoming boundaries accidentally.
 fn rule_label(line: &str) -> Option<&str> {
     let line = line.trim_end();
@@ -121,6 +121,6 @@ mod tests {
     fn document_requires_query_text() {
         let error = parse_document("--- INPUT ---\nx").unwrap_err();
 
-        assert!(error.contains("fixture has no query"));
+        assert!(error.contains("snapshot has no query"));
     }
 }

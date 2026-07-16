@@ -22,7 +22,7 @@ pub(crate) fn source(
         .arg("--color")
         .arg("never");
     let context = format!(
-        "generate {target} fixture `{}` with grammar {}",
+        "generate {target} snapshot `{}` with grammar {}",
         case.relative,
         case.grammar_json.display()
     );

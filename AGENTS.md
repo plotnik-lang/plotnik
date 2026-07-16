@@ -37,7 +37,7 @@ Two zones, one rule each:
 
 ## Backward compatibility
 
-As Plotnik is pre-release, backward compatibility is irrelevant and must not affect design or implementation. Make breaking changes directly and update all in-tree callers, tests, fixtures, and docs. Keep existing compatibility machinery, but use it only to validate the current format and keep all internal format-version integers at `0`.
+As Plotnik is pre-release, backward compatibility is irrelevant and must not affect design or implementation. Make breaking changes directly and update all in-tree callers, tests, test data, snapshots, and docs. Keep existing compatibility machinery, but use it only to validate the current format and keep all internal format-version integers at `0`.
 
 Do not add:
 
@@ -49,14 +49,14 @@ Do not add:
 
 # Commands
 
-| Command                  | What it does                                          |
-| ------------------------ | ----------------------------------------------------- |
-| `make check`             | `cargo check --workspace --all-targets`               |
-| `make clippy`            | clippy with `-D warnings`                             |
-| `make test [FILTER=...]` | full test suite via native Rust test harnesses        |
-| `make shot [FILTER=...]` | accept golden fixtures + insta snapshots, then re-run |
-| `make fmt`               | `cargo fmt` + prettier                                |
-| `make coverage-lines`    | per-file missing lines for `plotnik-lib`              |
+| Command                  | What it does                                   |
+| ------------------------ | ---------------------------------------------- |
+| `make check`             | `cargo check --workspace --all-targets`        |
+| `make clippy`            | clippy with `-D warnings`                      |
+| `make test [FILTER=...]` | full test suite via native Rust test harnesses |
+| `make shot [FILTER=...]` | update custom + Insta snapshots, then re-run   |
+| `make fmt`               | `cargo fmt` + prettier                         |
+| `make coverage-lines`    | per-file missing lines for `plotnik-lib`       |
 
 Check your changes: `make test`
 Before commit: `make fmt`
@@ -87,7 +87,7 @@ crates/
     src/vm/                    # runtime engine, backtracking, materialization
   plotnik-rt/                  # shared runtime engine (VM + generated matchers)
   plotnik-tests/
-    tests/                     # golden fixtures
+    tests/                     # snapshot tests
       mod.rs                   # test harness + docs
       01-lexer/
       02-parser/
@@ -209,15 +209,15 @@ cargo run -p plotnik-cli -- lang list                       # languages + aliase
 
 # Testing
 
-The golden fixtures have priority over Rust-based tests.
+The snapshot tests have priority over Rust-based tests.
 
 - Run `make shot` to (re)write generated sections
-- Use `FILTER=<name>` with `make test` or `make shot` to run the same filtered fixture subset
-- Name new fixture folders after existing ones in sibling stages
+- Use `FILTER=<name>` with `make test` or `make shot` to run the same filtered snapshot subset
+- Name new snapshot folders after existing ones in sibling stages
 - Rust `*_tests.rs` are unit-logic only
   - `foo.rs` gets a sibling `foo_tests.rs`, declared as `#[cfg(test)] mod foo_tests;`
   - AAA sections separated by blank lines (unless all 3 are one-liners)
   - single-line input literal, multi-line uses `indoc!`
-- Don't generate data for `insta` snapshots and golden fixtures by hand:
+- Don't generate snapshot data by hand:
   - use `@""` for `insta` placeholders, then `make shot`
-  - fill inputs only for golden snapshots
+  - author snapshot inputs only; let `make shot` write generated sections

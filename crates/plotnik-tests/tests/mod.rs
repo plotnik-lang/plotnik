@@ -1,6 +1,6 @@
-//! Golden-fixture test suite.
+//! Snapshot test suite.
 //!
-//! Each file under `tests/0N-stage/` is one fixture: an authored Plotnik query,
+//! Each file under `tests/0N-stage/` is one snapshot: an authored Plotnik query,
 //! an optional `INPUT` source section, and generated artifact sections
 //! the harness rewrites in place on accept. The stage directory selects which
 //! artifacts render.
@@ -9,8 +9,8 @@
 //! The `INPUT` rule's parenthesized grammar selects what a query compiles against:
 //! `INPUT (ts)` picks TypeScript, `INPUT (dart)` dart, plain `INPUT` JavaScript
 //! (see `Lang::resolve`). Authors may dash the rule loosely (`--- INPUT (ts) ---`);
-//! `make shot` normalizes it. For a 06-vm fixture the body is the source the VM
-//! runs; for a compile-only emission fixture only the grammar matters,
+//! `make shot` normalizes it. For a 06-vm snapshot the body is the source the VM
+//! runs; for a compile-only emission snapshot only the grammar matters,
 //! so the body is left empty — the rule is a pure grammar selector. The stage
 //! directory selects which artifacts render:
 //!
@@ -23,7 +23,7 @@
 //! | `04-emit/rust/module` | generated Rust matcher module                                      |
 //! | `06-vm`      | typescript, output, inspection if enabled, bytecode, trace (requires input) |
 //!
-//! Compile-stage fixtures under an `inspection/` folder compile with
+//! Compile-stage snapshots under an `inspection/` folder compile with
 //! `BytecodeConfig::inspection(BytecodeInspection::Spans)`.
 //!
 //! The `DIAGNOSTICS` section renders whenever the query produces warnings or errors.
@@ -32,23 +32,23 @@
 //! tests. Warnings coexist with the normal sections.
 //!
 //! The `02-parser/trivia` folder renders its CST with trivia (whitespace/comments)
-//! included — that attachment is exactly what those fixtures pin; every other
-//! parser fixture omits trivia for a leaner tree.
+//! included — that attachment is exactly what those snapshots pin; every other
+//! parser snapshot omits trivia for a leaner tree.
 //!
 //! Run:   `cargo test -p plotnik-tests --test snapshots`
 //! Accept: `SHOT=1 cargo test -p plotnik-tests --test snapshots` (also wired into `make shot`)
 //!
-//! Native test names are snake_case-normalized fixture paths, so a name filter
+//! Native test names are snake_case-normalized snapshot paths, so a name filter
 //! scopes a run: a stage (`stage_06_vm`), a folder (`stage_06_vm::captures`), or
 //! one construct across every stage at once — `captures`, `quantifiers`, `anchors`,
 //! `alternations`, `definitions`, `predicates`, `recursion`. That last form only
 //! stays complete because every stage spells a construct identically; keep new
 //! folders on that vocabulary.
 //!
-//! Organize the corpus like a specification. Give each behavior a small fixture of
-//! its own before adding fixtures for interactions with other behaviors. Atomic
-//! fixtures use the shortest unambiguous name in their construct folder; interaction
-//! fixtures name the dimensions that make them more specific. A fixture should not
+//! Organize the corpus like a specification. Give each behavior a small snapshot of
+//! its own before adding snapshots for interactions with other behaviors. Atomic
+//! snapshots use the shortest unambiguous name in their construct folder; interaction
+//! snapshots name the dimensions that make them more specific. A snapshot should not
 //! contain unrelated behavior merely to exercise several features at once. Stage and
 //! folder boundaries follow the current compiler pipeline and subsystem ownership,
 //! not historical implementation phases.
@@ -67,31 +67,31 @@ use plotnik_lib::{
     RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TraceRecorder, TypeScriptBinding,
     TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
-use plotnik_tests::fixture::parse_document;
+use plotnik_tests::snapshot::parse_document;
 use support::formatter::Assessment;
 use support::snapshots::{
-    Fixture, FixtureKind, FixtureMode, GeneratedOutput, GeneratedSection, InspectionPolicy,
-    MappingPolicy, SectionKind, SerdePolicy, TriviaPolicy, VmMode, fixture,
+    GeneratedOutput, GeneratedSection, InspectionPolicy, MappingPolicy, SectionKind, SerdePolicy,
+    Snapshot, SnapshotKind, SnapshotMode, TriviaPolicy, VmMode, snapshot,
 };
 
 mod support;
 
-fn run_fixture(relative: &str) -> Result<(), String> {
+fn run_snapshot(relative: &str) -> Result<(), String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let fx = fixture(&root, relative)?;
-    let mode = fixture_mode()?;
-    check(&fx, mode)
+    let snapshot = snapshot(&root, relative)?;
+    let mode = snapshot_mode()?;
+    check(&snapshot, mode)
 }
 
-fn fixture_mode() -> Result<FixtureMode, String> {
-    static MODE: LazyLock<Result<FixtureMode, String>> = LazyLock::new(FixtureMode::from_env);
+fn snapshot_mode() -> Result<SnapshotMode, String> {
+    static MODE: LazyLock<Result<SnapshotMode, String>> = LazyLock::new(SnapshotMode::from_env);
     match &*MODE {
         Ok(mode) => Ok(*mode),
         Err(error) => Err(error.clone()),
     }
 }
 
-/// The authored half of a fixture; generated sections are recomputed, not parsed back.
+/// The authored half of a snapshot; generated sections are recomputed, not parsed back.
 struct Parsed {
     query: String,
     input: Option<Input>,
@@ -102,56 +102,56 @@ struct Input {
     text: String,
 }
 
-fn check(fx: &Fixture, mode: FixtureMode) -> Result<(), String> {
-    let raw =
-        fs::read_to_string(&fx.path).map_err(|e| format!("read {}: {e}", fx.path.display()))?;
-    let parsed = parse_fixture(&raw, fx.kind, fx.name.as_str())?;
+fn check(snapshot: &Snapshot, mode: SnapshotMode) -> Result<(), String> {
+    let raw = fs::read_to_string(&snapshot.path)
+        .map_err(|e| format!("read {}: {e}", snapshot.path.display()))?;
+    let parsed = parse_snapshot(&raw, snapshot.kind, snapshot.name.as_str())?;
     let actual = raw.replace("\r\n", "\n");
-    let evaluated = support::formatter::evaluate(&parsed.query, fx.name.as_str())?;
+    let evaluated = support::formatter::evaluate(&parsed.query, snapshot.name.as_str())?;
 
-    if matches!(mode, FixtureMode::AcceptAll) {
-        let query = if fx.kind.preserves_query_layout() {
+    if matches!(mode, SnapshotMode::AcceptAll) {
+        let query = if snapshot.kind.preserves_query_layout() {
             parsed.query
         } else {
             evaluated.into_query_or(parsed.query)
         };
-        let generated = render(fx.kind, &query, parsed.input.as_ref())?;
+        let generated = render(snapshot.kind, &query, parsed.input.as_ref())?;
         if generated.is_empty() {
             return Err(format!(
-                "fixture `{}` produced no sections",
-                fx.name.as_str()
+                "snapshot `{}` produced no sections",
+                snapshot.name.as_str()
             ));
         }
         let accepted = canonical(&query, parsed.input.as_ref(), &generated);
         if actual != accepted {
-            support::atomic_file::replace(&fx.path, &accepted)?;
+            support::atomic_file::replace(&snapshot.path, &accepted)?;
         }
         return Ok(());
     }
 
-    let generated = render(fx.kind, &parsed.query, parsed.input.as_ref())?;
+    let generated = render(snapshot.kind, &parsed.query, parsed.input.as_ref())?;
     if generated.is_empty() {
         return Err(format!(
-            "fixture `{}` produced no sections",
-            fx.name.as_str()
+            "snapshot `{}` produced no sections",
+            snapshot.name.as_str()
         ));
     }
     let expected = canonical(&parsed.query, parsed.input.as_ref(), &generated);
     if actual != expected {
         return Err(format!(
-            "fixture out of date — run `make shot` (or `SHOT=1 cargo test -p plotnik-tests --test snapshots`):\n{}",
+            "snapshot out of date — run `make shot` (or `SHOT=1 cargo test -p plotnik-tests --test snapshots`):\n{}",
             unified_diff(&actual, &expected)
         ));
     }
 
-    if fx.kind.preserves_query_layout() {
+    if snapshot.kind.preserves_query_layout() {
         return Ok(());
     }
     let Assessment::Changed(query) = evaluated else {
         return Ok(());
     };
 
-    let generated = render(fx.kind, &query, parsed.input.as_ref())?;
+    let generated = render(snapshot.kind, &query, parsed.input.as_ref())?;
     let formatted = canonical(&query, parsed.input.as_ref(), &generated);
     Err(format!(
         "query formatting is out of date — run `make shot`:\n{}",
@@ -159,7 +159,7 @@ fn check(fx: &Fixture, mode: FixtureMode) -> Result<(), String> {
     ))
 }
 
-fn parse_fixture(raw: &str, kind: FixtureKind, name: &str) -> Result<Parsed, String> {
+fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Parsed, String> {
     let document = parse_document(raw)?;
     let sections = document.sections;
 
@@ -192,9 +192,9 @@ fn parse_fixture(raw: &str, kind: FixtureKind, name: &str) -> Result<Parsed, Str
 }
 
 fn validate_generated_headers(
-    kind: FixtureKind,
+    kind: SnapshotKind,
     name: &str,
-    sections: &[plotnik_tests::fixture::Section],
+    sections: &[plotnik_tests::snapshot::Section],
 ) -> Result<(), String> {
     let legal = kind.legal_sections();
     let mut cursor = 0;
@@ -209,7 +209,7 @@ fn validate_generated_headers(
             .position(|known| *known == section_kind)
         else {
             return Err(format!(
-                "section `{header}` is invalid or out of order for `{name}`; fixture section rules are reserved in authored query/input text"
+                "section `{header}` is invalid or out of order for `{name}`; snapshot section rules are reserved in authored query/input text"
             ));
         };
         cursor += offset + 1;
@@ -219,15 +219,15 @@ fn validate_generated_headers(
 }
 
 fn render(
-    kind: FixtureKind,
+    kind: SnapshotKind,
     query: &str,
     input: Option<&Input>,
 ) -> Result<Vec<GeneratedSection>, String> {
     let sections = match kind {
         // The `trivia` folder pins how whitespace/comments attach to the CST, so it
-        // renders the trivia-inclusive CST; every other parser fixture omits trivia.
-        FixtureKind::Parser { trivia } => render_frontend(query, FrontendMode::Parser(trivia)),
-        FixtureKind::Analyze => render_frontend(query, FrontendMode::Analyze),
+        // renders the trivia-inclusive CST; every other parser snapshot omits trivia.
+        SnapshotKind::Parser { trivia } => render_frontend(query, FrontendMode::Parser(trivia)),
+        SnapshotKind::Analyze => render_frontend(query, FrontendMode::Analyze),
         compile => render_compile(compile, query, input),
     }?;
     Ok(GeneratedOutput::validate(kind, sections)?.into_sections())
@@ -253,7 +253,7 @@ fn render_frontend(query: &str, kind: FrontendMode) -> Result<Vec<GeneratedSecti
         ));
     }
     match kind {
-        // Parser recovery fixtures pin diagnostics only; a half-built error CST is noise.
+        // Parser recovery snapshots pin diagnostics only; a half-built error CST is noise.
         FrontendMode::Parser(trivia) if !has_errors => {
             let cst = analyzed.dump_cst_with_trivia(matches!(trivia, TriviaPolicy::Include));
             out.push(GeneratedSection::new(SectionKind::Cst, cst));
@@ -273,7 +273,7 @@ fn render_frontend(query: &str, kind: FrontendMode) -> Result<Vec<GeneratedSecti
 }
 
 fn render_compile(
-    kind: FixtureKind,
+    kind: SnapshotKind,
     query: &str,
     input: Option<&Input>,
 ) -> Result<Vec<GeneratedSection>, String> {
@@ -300,7 +300,7 @@ fn render_compile(
     });
 
     match kind {
-        FixtureKind::Bytecode { inspection, .. } => {
+        SnapshotKind::Bytecode { inspection, .. } => {
             let emission = emit_bytecode(&compiled, inspection);
             let module = emission
                 .artifact()
@@ -321,7 +321,7 @@ fn render_compile(
                 dump_bytecode(module, Colors::new(false)),
             ));
         }
-        FixtureKind::Types { serde, mapping, .. } => {
+        SnapshotKind::Types { serde, mapping, .. } => {
             out.extend(diag);
             let typescript = render_typescript(&compiled);
             out.push(GeneratedSection::new(
@@ -353,7 +353,7 @@ fn render_compile(
                 ));
             }
         }
-        FixtureKind::Matcher { .. } => {
+        SnapshotKind::Matcher { .. } => {
             out.extend(diag);
             let matcher = compiled
                 .emit(RustCodegenConfig::new())
@@ -363,7 +363,7 @@ fn render_compile(
                 .into_source();
             out.push(GeneratedSection::new(SectionKind::Matcher, matcher));
         }
-        FixtureKind::Vm { mode, .. } => {
+        SnapshotKind::Vm { mode, .. } => {
             let inspection = match mode {
                 VmMode::StructuredTrace => InspectionPolicy::Include,
                 VmMode::TextTrace { inspection } => inspection,
@@ -373,10 +373,10 @@ fn render_compile(
                 .artifact()
                 .expect("valid query should emit a bytecode module");
             let input = input.ok_or_else(|| {
-                "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit".to_string()
+                "06-vm snapshots require an `INPUT` section; compile-only snapshots belong in 04-emit".to_string()
             })?;
             if module.entry_point("Q").is_none() {
-                return Err("06-vm fixtures require a callable definition named `Q`".to_string());
+                return Err("06-vm snapshots require a callable definition named `Q`".to_string());
             }
             let entry = "Q";
             let run = run_vm(VmScenario {
@@ -430,8 +430,8 @@ fn render_compile(
                 dump_bytecode(module, Colors::new(false)),
             ));
         }
-        FixtureKind::Parser { .. } | FixtureKind::Analyze => {
-            unreachable!("frontend fixtures do not reach compilation")
+        SnapshotKind::Parser { .. } | SnapshotKind::Analyze => {
+            unreachable!("frontend snapshots do not reach compilation")
         }
     }
     Ok(out)
@@ -524,7 +524,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         let output = match result {
             Ok(journal) => {
                 // The verified variant (not plain `materialize`) so a type-unsound emission
-                // panics the fixture in debug; the check compiles out under `--release`.
+                // panics the snapshot in debug; the check compiles out under `--release`.
                 let value = materialize_verified(
                     scenario.source,
                     scenario.module,
@@ -537,7 +537,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
             }
             Err(RuntimeError::NoMatch) => "<no match>".to_string(),
             // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
-            // not — fail the trial rather than accept a resource limit as golden output.
+            // not — fail the trial rather than accept a resource limit as expected output.
             Err(err) => {
                 return Err(format!("VM run failed for `{}`: {err}", scenario.entry));
             }
@@ -569,7 +569,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 rendered
             });
             // The verified variant (not plain `materialize`) so a type-unsound emission
-            // panics the fixture in debug; the check compiles out under `--release`.
+            // panics the snapshot in debug; the check compiles out under `--release`.
             let value = materialize_verified(
                 scenario.source,
                 scenario.module,
@@ -585,7 +585,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         }
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
         // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
-        // not — fail the trial rather than accept a resource limit as golden output.
+        // not — fail the trial rather than accept a resource limit as expected output.
         Err(err) => return Err(format!("VM run failed for `{}`: {err}", scenario.entry)),
     };
     Ok(VmArtifacts::TextTrace {
@@ -616,7 +616,7 @@ impl Lang {
                 ts: arborium_dart::language().into(),
             }),
             Some(other) => Err(format!(
-                "source language `{other}` is not wired into the fixture suite yet (have: javascript, typescript, dart)"
+                "source language `{other}` is not wired into the snapshot suite yet (have: javascript, typescript, dart)"
             )),
         }
     }
@@ -655,7 +655,7 @@ fn source_map(query: &str) -> SourceMap {
     sm
 }
 
-/// The canonical file text every fixture is compared against. Rebuilding the whole
+/// The canonical file text every snapshot is compared against. Rebuilding the whole
 /// file each run, rather than editing sections in place, is what drops stale
 /// sections on accept.
 fn canonical(query: &str, input: Option<&Input>, generated: &[GeneratedSection]) -> String {
@@ -706,7 +706,7 @@ fn section_rule(name: &str) -> String {
         None => name.to_ascii_uppercase(),
     };
     // At least one dash each side so an over-wide label still round-trips through
-    // the fixture parser; width degrades gracefully past 50 columns.
+    // the snapshot parser; width degrades gracefully past 50 columns.
     let fill = WIDTH.saturating_sub(label.len() + 2);
     let half = fill / 2;
     let left = half.max(1);
@@ -722,4 +722,4 @@ fn unified_diff(actual: &str, expected: &str) -> String {
         .to_string()
 }
 
-include!(concat!(env!("OUT_DIR"), "/golden_tests.rs"));
+include!(concat!(env!("OUT_DIR"), "/snapshot_tests.rs"));

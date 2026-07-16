@@ -1,4 +1,4 @@
-//! Workspace-internal test crate. Hosts golden fixtures, integration tests, and
+//! Workspace-internal test crate. Hosts snapshots, integration tests, and
 //! benchmarks that need concrete tree-sitter language packages.
 
-pub mod fixture;
+pub mod snapshot;

@@ -17,7 +17,7 @@ pub fn parse(language: Language, source: &str) -> Tree {
     let mut parser = Parser::new();
     parser
         .set_language(&language)
-        .expect("fixture language must be compatible with tree-sitter");
+        .expect("snapshot language must be compatible with tree-sitter");
     parser
         .parse(source, None)
         .expect("tree-sitter must return a syntax tree")

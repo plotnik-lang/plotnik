@@ -283,6 +283,6 @@ consumption for matching progress.
 
 A rename is complete only when the concept has the same name everywhere a
 contributor will search for it: types, variants, functions, modules, filenames,
-fixtures, diagnostics, CLI flags, protocol keys, generated APIs, and current
+test data, snapshots, diagnostics, CLI flags, protocol keys, generated APIs, and current
 documentation. Review each occurrence in context before changing it; a shared
 spelling does not prove shared meaning.

@@ -313,7 +313,7 @@ enum Edge {
 /// Default ceiling on satisfiability work before the query is declared too complex.
 /// Charged for automaton state allocation and in the two quadratic solve loops
 /// (`closure` and a `Visible` `thread_step`) for state visits and pattern-edge scans,
-/// so it caps the dominant costs. The widest real fixture settles in a few thousand
+/// so it caps the dominant costs. The widest real snapshot settles in a few thousand
 /// work units, leaving roughly three orders of magnitude of headroom, while a child list
 /// past about a thousand wide trips it in a fraction of a second rather than running
 /// for tens. Tunable per query via
