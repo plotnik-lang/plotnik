@@ -35,6 +35,18 @@ Two zones, one rule each:
   - hedging with `unwrap_or` / `.ok()` is a smell:
     - either assert, or move the check to the validation layer
 
+## Backward compatibility
+
+As Plotnik is pre-release, backward compatibility is irrelevant and must not affect design or implementation. Make breaking changes directly and update all in-tree callers, tests, fixtures, and docs. Keep existing compatibility machinery, but use it only to validate the current format and keep all internal format-version integers at `0`.
+
+Do not add:
+
+- migrations
+- legacy paths
+- compatibility modes
+- deprecation periods
+- speculative version wrappers
+
 # Commands
 
 | Command                  | What it does                                          |

@@ -89,7 +89,7 @@ impl TraceRecorder {
 
     pub fn finish(self) -> ExecutionTrace {
         ExecutionTrace {
-            v: 1,
+            v: 0,
             records: self.records,
             truncated: self.truncated,
         }

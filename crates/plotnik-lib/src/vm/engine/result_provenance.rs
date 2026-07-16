@@ -8,12 +8,6 @@ use crate::bytecode::{Module, SpanKind};
 use plotnik_runtime::{JournalEvent, MatchJournal};
 
 #[derive(Debug, Serialize)]
-pub struct ResultProvenance {
-    pub version: u32,
-    pub entries: Vec<ResultProvenanceEntry>,
-}
-
-#[derive(Debug, Serialize)]
 pub struct ResultProvenanceEntry {
     pub query_span_id: u16,
     pub parent: Option<u32>,
@@ -65,7 +59,10 @@ impl ValueProvenance {
     }
 }
 
-pub fn extract_result_provenance(journal: &MatchJournal<'_>, module: &Module) -> ResultProvenance {
+pub fn extract_result_provenance(
+    journal: &MatchJournal<'_>,
+    module: &Module,
+) -> Vec<ResultProvenanceEntry> {
     let extractor = ProvenanceExtractor::new(module);
     extractor.extract(journal.as_slice())
 }
@@ -100,7 +97,7 @@ impl<'m> ProvenanceExtractor<'m> {
         }
     }
 
-    fn extract(mut self, events: &[JournalEvent<'_>]) -> ResultProvenance {
+    fn extract(mut self, events: &[JournalEvent<'_>]) -> Vec<ResultProvenanceEntry> {
         for (event_index, event) in events.iter().enumerate() {
             let event_index = u32::try_from(event_index).expect("journal event index fits in u32");
             match event {
@@ -212,10 +209,7 @@ impl<'m> ProvenanceExtractor<'m> {
             self.open.is_empty(),
             "provenance span stack must be empty after the match journal"
         );
-        ResultProvenance {
-            version: 1,
-            entries: self.entries,
-        }
+        self.entries
     }
 
     fn close_span(&mut self, id: u16, event_index: u32) {

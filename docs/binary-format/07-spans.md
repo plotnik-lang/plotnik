@@ -45,9 +45,8 @@ Values 9 and 10 encode `SpanKind::Alternation(Labeling::Unlabeled)` and
 syntax construct.
 
 `capture_type` covers `:: T`, `:: text`, or `:: bool`. `negated_grammar_field` and
-`predicate` are reserved for
-inspection detail; v12 loaders accept the kind values, but the compiler does
-not emit them yet.
+`predicate` are reserved for inspection detail; loaders accept the kind values,
+but the compiler does not emit them yet.
 
 ## Span Effects
 

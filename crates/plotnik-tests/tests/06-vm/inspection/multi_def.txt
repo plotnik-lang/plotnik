@@ -36,220 +36,217 @@ export interface Q {
   }
 }
 ------------------- INSPECTION -------------------
-{
-  "version": 1,
-  "entries": [
-    {
-      "query_span_id": 3,
-      "parent": null,
-      "source_span": [
-        0,
-        3
-      ],
-      "bindings": [],
-      "range": [
-        1,
-        41
-      ]
-    },
-    {
-      "query_span_id": 4,
-      "parent": 0,
-      "source_span": [
-        0,
-        3
-      ],
-      "bindings": [],
-      "range": [
-        2,
-        40
-      ]
-    },
-    {
-      "query_span_id": 5,
-      "parent": 1,
-      "source_span": [
-        0,
-        3
-      ],
-      "bindings": [],
-      "range": [
-        3,
-        39
-      ]
-    },
-    {
-      "query_span_id": 6,
-      "parent": 2,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        4,
-        21
-      ]
-    },
-    {
-      "query_span_id": 8,
-      "parent": 3,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        5,
-        20
-      ]
-    },
-    {
-      "query_span_id": 0,
-      "parent": 4,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        7,
-        15
-      ]
-    },
-    {
-      "query_span_id": 2,
-      "parent": 5,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        8,
-        14
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 6,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [
-        {
-          "path": "/name",
-          "event_index": 11
-        }
-      ],
-      "range": [
-        9,
-        13
-      ]
-    },
-    {
-      "query_span_id": 7,
-      "parent": 4,
-      "source_span": null,
-      "bindings": [
-        {
-          "path": "/first",
-          "event_index": 17
-        }
-      ],
-      "range": [
-        16,
-        19
-      ]
-    },
-    {
-      "query_span_id": 9,
-      "parent": 2,
-      "source_span": [
-        2,
-        3
-      ],
-      "bindings": [],
-      "range": [
-        21,
-        38
-      ]
-    },
-    {
-      "query_span_id": 11,
-      "parent": 9,
-      "source_span": [
-        2,
-        3
-      ],
-      "bindings": [],
-      "range": [
-        22,
-        37
-      ]
-    },
-    {
-      "query_span_id": 0,
-      "parent": 10,
-      "source_span": [
-        2,
-        3
-      ],
-      "bindings": [],
-      "range": [
-        24,
-        32
-      ]
-    },
-    {
-      "query_span_id": 2,
-      "parent": 11,
-      "source_span": [
-        2,
-        3
-      ],
-      "bindings": [],
-      "range": [
-        25,
-        31
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 12,
-      "source_span": [
-        2,
-        3
-      ],
-      "bindings": [
-        {
-          "path": "/name",
-          "event_index": 28
-        }
-      ],
-      "range": [
-        26,
-        30
-      ]
-    },
-    {
-      "query_span_id": 10,
-      "parent": 10,
-      "source_span": null,
-      "bindings": [
-        {
-          "path": "/second",
-          "event_index": 34
-        }
-      ],
-      "range": [
-        33,
-        36
-      ]
-    }
-  ]
-}
+[
+  {
+    "query_span_id": 3,
+    "parent": null,
+    "source_span": [
+      0,
+      3
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      41
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 0,
+    "source_span": [
+      0,
+      3
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      40
+    ]
+  },
+  {
+    "query_span_id": 5,
+    "parent": 1,
+    "source_span": [
+      0,
+      3
+    ],
+    "bindings": [],
+    "range": [
+      3,
+      39
+    ]
+  },
+  {
+    "query_span_id": 6,
+    "parent": 2,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      4,
+      21
+    ]
+  },
+  {
+    "query_span_id": 8,
+    "parent": 3,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      5,
+      20
+    ]
+  },
+  {
+    "query_span_id": 0,
+    "parent": 4,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      7,
+      15
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 5,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      8,
+      14
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 6,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [
+      {
+        "path": "/name",
+        "event_index": 11
+      }
+    ],
+    "range": [
+      9,
+      13
+    ]
+  },
+  {
+    "query_span_id": 7,
+    "parent": 4,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/first",
+        "event_index": 17
+      }
+    ],
+    "range": [
+      16,
+      19
+    ]
+  },
+  {
+    "query_span_id": 9,
+    "parent": 2,
+    "source_span": [
+      2,
+      3
+    ],
+    "bindings": [],
+    "range": [
+      21,
+      38
+    ]
+  },
+  {
+    "query_span_id": 11,
+    "parent": 9,
+    "source_span": [
+      2,
+      3
+    ],
+    "bindings": [],
+    "range": [
+      22,
+      37
+    ]
+  },
+  {
+    "query_span_id": 0,
+    "parent": 10,
+    "source_span": [
+      2,
+      3
+    ],
+    "bindings": [],
+    "range": [
+      24,
+      32
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 11,
+    "source_span": [
+      2,
+      3
+    ],
+    "bindings": [],
+    "range": [
+      25,
+      31
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 12,
+    "source_span": [
+      2,
+      3
+    ],
+    "bindings": [
+      {
+        "path": "/name",
+        "event_index": 28
+      }
+    ],
+    "range": [
+      26,
+      30
+    ]
+  },
+  {
+    "query_span_id": 10,
+    "parent": 10,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/second",
+        "event_index": 34
+      }
+    ],
+    "range": [
+      33,
+      36
+    ]
+  }
+]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

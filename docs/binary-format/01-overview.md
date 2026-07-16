@@ -79,14 +79,14 @@ The bytes filling each 64-byte alignment gap (and the final tail up to
 `total_size`) are reserved zero; bytecode validation rejects a non-zero byte in
 any gap.
 
-## Header (v12)
+## Header (v0)
 
 ```rust
 #[repr(C, align(64))]
 struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     magic: [u8; 4],          // b"PTKQ"
-    version: u32,            // 11
+    version: u32,            // 0
     checksum: u32,           // CRC32 of everything after header
     total_size: u32,
     str_blob_size: u32,
@@ -119,7 +119,7 @@ mutate emitted bytecode to prove that malformed compiler output is rejected
 cleanly. The CRC catches accidental corruption; structural
 checks uphold the no-panic guarantee. Validation runs in this order:
 
-1. **Magic / version / size** — `PTKQ`, version 12, and `total_size` equal to the
+1. **Magic / version / size** — `PTKQ`, version 0, and `total_size` equal to the
    byte length.
 2. **Reserved bytes** — bytes 44–63 must be zero (the checksum does not cover the
    header, so these are checked explicitly).

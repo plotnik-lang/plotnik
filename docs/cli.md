@@ -341,6 +341,9 @@ spans and tokens, diagnostics, TypeScript declarations and bindings, entry
 points, the result and its provenance, run statistics, and an optional
 execution trace in one JSON document.
 
+`result_provenance` is either `null` or a direct array of provenance entries;
+it has no versioned envelope.
+
 ```sh
 plotnik inspect query.ptk app.js --json
 

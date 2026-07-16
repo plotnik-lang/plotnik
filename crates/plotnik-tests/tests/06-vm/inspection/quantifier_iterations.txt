@@ -30,119 +30,116 @@ export interface Q {
   ]
 }
 ------------------- INSPECTION -------------------
-{
-  "version": 1,
-  "entries": [
-    {
-      "query_span_id": 0,
-      "parent": null,
-      "source_span": [
-        0,
-        5
-      ],
-      "bindings": [],
-      "range": [
-        1,
-        24
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 0,
-      "source_span": [
-        0,
-        5
-      ],
-      "bindings": [],
-      "range": [
-        2,
-        23
-      ]
-    },
-    {
-      "query_span_id": 3,
-      "parent": 1,
-      "source_span": [
-        0,
-        5
-      ],
-      "bindings": [],
-      "range": [
-        4,
-        18
-      ]
-    },
-    {
-      "query_span_id": 4,
-      "parent": 2,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [
-        {
-          "path": "/0",
-          "event_index": 7
-        }
-      ],
-      "range": [
-        5,
-        9
-      ]
-    },
-    {
-      "query_span_id": 4,
-      "parent": 2,
-      "source_span": [
-        2,
-        3
-      ],
-      "bindings": [
-        {
-          "path": "/1",
-          "event_index": 11
-        }
-      ],
-      "range": [
-        9,
-        13
-      ]
-    },
-    {
-      "query_span_id": 4,
-      "parent": 2,
-      "source_span": [
-        4,
-        5
-      ],
-      "bindings": [
-        {
-          "path": "/2",
-          "event_index": 15
-        }
-      ],
-      "range": [
-        13,
-        17
-      ]
-    },
-    {
-      "query_span_id": 2,
-      "parent": 1,
-      "source_span": null,
-      "bindings": [
-        {
-          "path": "/stmts",
-          "event_index": 20
-        }
-      ],
-      "range": [
-        19,
-        22
-      ]
-    }
-  ]
-}
+[
+  {
+    "query_span_id": 0,
+    "parent": null,
+    "source_span": [
+      0,
+      5
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      24
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 0,
+    "source_span": [
+      0,
+      5
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      23
+    ]
+  },
+  {
+    "query_span_id": 3,
+    "parent": 1,
+    "source_span": [
+      0,
+      5
+    ],
+    "bindings": [],
+    "range": [
+      4,
+      18
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 2,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [
+      {
+        "path": "/0",
+        "event_index": 7
+      }
+    ],
+    "range": [
+      5,
+      9
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 2,
+    "source_span": [
+      2,
+      3
+    ],
+    "bindings": [
+      {
+        "path": "/1",
+        "event_index": 11
+      }
+    ],
+    "range": [
+      9,
+      13
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 2,
+    "source_span": [
+      4,
+      5
+    ],
+    "bindings": [
+      {
+        "path": "/2",
+        "event_index": 15
+      }
+    ],
+    "range": [
+      13,
+      17
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 1,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/stmts",
+        "event_index": 20
+      }
+    ],
+    "range": [
+      19,
+      22
+    ]
+  }
+]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -6,18 +6,11 @@ use super::effects::EFFECT_PAYLOAD_BITS;
 pub const MAGIC: [u8; 4] = *b"PTKQ";
 
 /// Current bytecode format version.
-/// v2: Removed explicit offsets (computed from counts), added regex section.
-/// v3: Removed flags field.
-/// v4: Removed the trivia section.
-/// v5: Added extras-only anchor navigation modes.
-/// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
-/// v7: Type kind and effect opcode discriminants renumbered contiguously.
-/// v8: single effects list per Match; one wrapper per entry point.
-/// v9: `Childless*` navigation family (anchors over an empty-matching child list).
-/// v10: inspection spans — three span effect kinds and the `spans` section.
-/// v11: `Text`/`Bool` types and balanced scalar-provenance effects.
-/// v12: generalized multi-port calls and immutable callee contracts on returns.
-pub const VERSION: u32 = 12;
+///
+/// Plotnik is pre-release, so format changes update all in-tree producers and
+/// consumers together while this stays zero. The header field and loader check
+/// remain in place for the first compatibility-bearing release.
+pub const VERSION: u32 = 0;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;

@@ -22,9 +22,7 @@ pub use plotnik_runtime::{
 pub use error::RuntimeError;
 pub use execution_trace::{ExecutionTrace, TraceEvent, TraceNode, TraceRecord, TraceRecorder};
 pub use materializer::{ValueMaterializer, materialize_verified};
-pub use result_provenance::{
-    ProvenanceBinding, ResultProvenance, ResultProvenanceEntry, extract_result_provenance,
-};
+pub use result_provenance::{ProvenanceBinding, ResultProvenanceEntry, extract_result_provenance};
 pub use trace::{NoopTracer, PrintTracer, PrintTracerBuilder, Tracer, Verbosity};
 pub use value::{NodeValue, Value};
 pub use verify::debug_verify_type;

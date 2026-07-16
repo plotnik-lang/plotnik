@@ -220,8 +220,8 @@ Result construction and debugging also have separate artifacts:
 - `ResultDecoder` builds typed output from those events; it does not replay an
   execution.
 - An **execution trace** records matcher execution for debugging.
-- A **result provenance map** connects query spans, document spans, result
-  bindings, and journal-event ranges.
+- A **result provenance entry list** connects query spans, document spans,
+  result bindings, and journal-event ranges.
 
 Event names should expose the subject when the verb alone is ambiguous:
 `ArrayPush` and `RecordSet`, not bare `Push` and `Set`. Shape names remain

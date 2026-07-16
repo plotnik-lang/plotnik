@@ -16,81 +16,78 @@ export interface Q {
   }
 }
 ------------------- INSPECTION -------------------
-{
-  "version": 1,
-  "entries": [
-    {
-      "query_span_id": 0,
-      "parent": null,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        1,
-        13
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 0,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        2,
-        12
-      ]
-    },
-    {
-      "query_span_id": 2,
-      "parent": 1,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        3,
-        11
-      ]
-    },
-    {
-      "query_span_id": 4,
-      "parent": 2,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        4,
-        10
-      ]
-    },
-    {
-      "query_span_id": 3,
-      "parent": 3,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [
-        {
-          "path": "/id",
-          "event_index": 7
-        }
-      ],
-      "range": [
-        5,
-        9
-      ]
-    }
-  ]
-}
+[
+  {
+    "query_span_id": 0,
+    "parent": null,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      13
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 0,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      12
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 1,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      3,
+      11
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 2,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      4,
+      10
+    ]
+  },
+  {
+    "query_span_id": 3,
+    "parent": 3,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [
+      {
+        "path": "/id",
+        "event_index": 7
+      }
+    ],
+    "range": [
+      5,
+      9
+    ]
+  }
+]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

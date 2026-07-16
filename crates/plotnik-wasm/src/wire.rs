@@ -39,8 +39,8 @@ pub struct InfoParts<'a> {
 
 pub fn info_json(parts: InfoParts) -> JsonValue {
     json!({
-        // Version marker for the day the shape needs a breaking change.
-        "version": 1,
+        // Reserved for the first compatibility-bearing release.
+        "version": 0,
         "query_spans": parts.module.map(query_spans_json).unwrap_or_else(|| json!([])),
         "query_tokens": parts.query_tokens,
         "diagnostics": parts.diagnostics,

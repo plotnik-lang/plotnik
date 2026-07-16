@@ -11,99 +11,96 @@ export type Q = undefined;
 --------------------- OUTPUT ---------------------
 null
 ------------------- INSPECTION -------------------
-{
-  "version": 1,
-  "entries": [
-    {
-      "query_span_id": 3,
-      "parent": null,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        0,
-        14
-      ]
-    },
-    {
-      "query_span_id": 4,
-      "parent": 0,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        1,
-        13
-      ]
-    },
-    {
-      "query_span_id": 5,
-      "parent": 1,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        2,
-        12
-      ]
-    },
-    {
-      "query_span_id": 6,
-      "parent": 2,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        3,
-        11
-      ]
-    },
-    {
-      "query_span_id": 0,
-      "parent": 3,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        4,
-        10
-      ]
-    },
-    {
-      "query_span_id": 2,
-      "parent": 4,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        5,
-        9
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 5,
-      "source_span": null,
-      "bindings": [],
-      "range": [
-        6,
-        8
-      ]
-    }
-  ]
-}
+[
+  {
+    "query_span_id": 3,
+    "parent": null,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      0,
+      14
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 0,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      13
+    ]
+  },
+  {
+    "query_span_id": 5,
+    "parent": 1,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      12
+    ]
+  },
+  {
+    "query_span_id": 6,
+    "parent": 2,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      3,
+      11
+    ]
+  },
+  {
+    "query_span_id": 0,
+    "parent": 3,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      4,
+      10
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 4,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      5,
+      9
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 5,
+    "source_span": null,
+    "bindings": [],
+    "range": [
+      6,
+      8
+    ]
+  }
+]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
