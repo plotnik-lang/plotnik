@@ -1,6 +1,6 @@
 Q = (program
-  (comment)? @doc :: str
-  (comment)* @comments :: str
+  (comment)? @doc :: text
+  (comment)* @comments :: text
   (expression_statement)? @has_statement :: bool
 )
 ------------------- TYPESCRIPT -------------------

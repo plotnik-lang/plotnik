@@ -3,7 +3,7 @@ Q = (program
     {
       (comment) @comment
     } @inner :: Q
-  } @outer :: str
+  } @outer :: text
 )
 ------------------ DIAGNOSTICS -------------------
 error: type name `Q` is already used for a different type

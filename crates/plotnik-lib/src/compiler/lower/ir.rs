@@ -385,16 +385,16 @@ impl EffectIR {
         Self::literal(EffectKind::ScalarMark, 0)
     }
 
-    pub fn str_close() -> Self {
-        Self::literal(EffectKind::StrClose, 0)
+    pub fn text_close() -> Self {
+        Self::literal(EffectKind::TextClose, 0)
     }
 
     pub fn bool_close(value: bool) -> Self {
         Self::literal(EffectKind::BoolClose, usize::from(value))
     }
 
-    pub fn node_str() -> Self {
-        Self::literal(EffectKind::NodeStr, 0)
+    pub fn node_text() -> Self {
+        Self::literal(EffectKind::NodeText, 0)
     }
 
     pub fn node_bool() -> Self {

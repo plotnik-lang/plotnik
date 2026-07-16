@@ -1,7 +1,7 @@
 Q = (program
   (comment)? @has_comment :: bool
   (expression_statement
-    (identifier) @name :: str
+    (identifier) @name :: text
   )
 )
 ---------------------- NFA -----------------------
@@ -15,7 +15,7 @@ Q:
   03  ─‣┘  _                                01
   04  └‣─  (expression_statement) [BoolValue(0) RecordSet(has_comment)]  06
   05  ─‣┘  _                                03
-  06  └‣─  (identifier) [NodeStr RecordSet(name)]  05
+  06  └‣─  (identifier) [NodeText RecordSet(name)]  05
   07  ─‣─  (expression_statement) [BoolValue(1) RecordSet(has_comment)]  06
   11   !   (comment)                        07
   13  ──!  _                                11, 13
@@ -58,7 +58,7 @@ Q:
   02       (@20)                            20 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [NodeStr RecordSet(M1)]  08
+  06  └‣─  (identifier) [NodeText RecordSet(M1)]  08
   08  ─‣┘  _                                09
   09  ─‣┘  _                                10
   10                                        ▶

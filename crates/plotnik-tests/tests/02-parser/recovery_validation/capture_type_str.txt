@@ -1,14 +1,14 @@
-Q = (a) @x :: string
+Q = (a) @x :: str
 ------------------ DIAGNOSTICS -------------------
-error: unknown capture type `string`
+error: unknown capture type `str`
  --> query.ptk:1:15
   |
-1 | Q = (a) @x :: string
-  |               ^^^^^^
+1 | Q = (a) @x :: str
+  |               ^^^
   |
 help: use `:: text`
   |
-1 - Q = (a) @x :: string
+1 - Q = (a) @x :: str
 1 + Q = (a) @x :: text
   |
 help: write `:: text`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`

@@ -269,9 +269,9 @@ pub fn format_effect(effect: &Effect) -> String {
         EffectKind::SpanEnd => format!("SpanEnd#{}", effect.payload),
         EffectKind::ScalarOpen => "ScalarOpen".to_string(),
         EffectKind::ScalarMark => "ScalarMark".to_string(),
-        EffectKind::StrClose => "StrClose".to_string(),
+        EffectKind::TextClose => "TextClose".to_string(),
         EffectKind::BoolClose => format!("BoolClose({})", effect.payload),
-        EffectKind::NodeStr => "NodeStr".to_string(),
+        EffectKind::NodeText => "NodeText".to_string(),
         EffectKind::NodeBool => "NodeBool".to_string(),
         EffectKind::BoolValue => format!("BoolValue({})", effect.payload),
     }

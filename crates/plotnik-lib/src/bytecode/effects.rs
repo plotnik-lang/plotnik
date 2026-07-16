@@ -33,11 +33,11 @@ pub enum EffectKind {
     /// Mark the current explicit node-pattern match in every open scalar frame.
     ScalarMark = 16,
     /// Close a scalar frame and produce source text (or null with no marks).
-    StrClose = 17,
+    TextClose = 17,
     /// Close a scalar frame and produce the boolean encoded in the payload.
     BoolClose = 18,
     /// Produce the current node's source text directly.
-    NodeStr = 19,
+    NodeText = 19,
     /// Produce `true` for the current matched node directly.
     NodeBool = 20,
     /// Produce the boolean encoded in the payload without provenance.
@@ -91,9 +91,9 @@ impl EffectKind {
             14 => Self::SpanEnd,
             15 => Self::ScalarOpen,
             16 => Self::ScalarMark,
-            17 => Self::StrClose,
+            17 => Self::TextClose,
             18 => Self::BoolClose,
-            19 => Self::NodeStr,
+            19 => Self::NodeText,
             20 => Self::NodeBool,
             21 => Self::BoolValue,
             _ => return None,
@@ -114,12 +114,12 @@ impl EffectKind {
     pub fn reads_cursor(self) -> bool {
         matches!(
             self,
-            Self::Node | Self::SpanStartAt | Self::ScalarMark | Self::NodeStr | Self::NodeBool
+            Self::Node | Self::SpanStartAt | Self::ScalarMark | Self::NodeText | Self::NodeBool
         )
     }
 
     pub fn is_motion_barrier(self) -> bool {
-        matches!(self, Self::ScalarOpen | Self::StrClose | Self::BoolClose)
+        matches!(self, Self::ScalarOpen | Self::TextClose | Self::BoolClose)
     }
 
     pub fn frame_action(self) -> Option<FrameAction> {
@@ -131,7 +131,7 @@ impl EffectKind {
             Self::VariantOpen => FrameAction::Open(ValueFrameKind::Variant),
             Self::VariantClose => FrameAction::Close(ValueFrameKind::Variant),
             Self::ScalarOpen => FrameAction::Open(ValueFrameKind::Scalar),
-            Self::StrClose | Self::BoolClose => FrameAction::Close(ValueFrameKind::Scalar),
+            Self::TextClose | Self::BoolClose => FrameAction::Close(ValueFrameKind::Scalar),
             _ => return None,
         };
         Some(action)

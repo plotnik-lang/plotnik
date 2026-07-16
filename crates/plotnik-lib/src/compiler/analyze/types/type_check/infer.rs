@@ -235,7 +235,7 @@ impl ResolvedCaptureType {
 
 fn suggested_builtin_capture_type(name: &str) -> Option<&'static str> {
     match name {
-        "string" => Some("str"),
+        "str" | "string" => Some("text"),
         "boolean" => Some("bool"),
         _ => None,
     }
@@ -961,7 +961,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         report
             .hint(
-                "write `:: str`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`",
+                "write `:: text`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`",
             )
             .emit();
     }

@@ -1,5 +1,5 @@
 Q = (program
-  (comment)* @comments :: str
+  (comment)* @comments :: text
   (expression_statement)? @has_statement :: bool
 )
 -------------------- MATCHER ---------------------
@@ -370,12 +370,12 @@ mod matcher {
                 eng.push_successors(&[S09_Q]);
                 Flow::Jump(S08_Q)
             }
-            //   21   !   (comment) [NodeStr ArrayPush]    23, 18
+            //   21   !   (comment) [NodeText ArrayPush]   23, 18
             S21_Q => 'state: {
                 if !cand_s21_q(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.node_str();
+                eng.node_text();
                 eng.emit_output_event(|_| rt::JournalEvent::ArrayPush);
                 eng.push_successors(&[S18_Q]);
                 Flow::Jump(S23_Q)

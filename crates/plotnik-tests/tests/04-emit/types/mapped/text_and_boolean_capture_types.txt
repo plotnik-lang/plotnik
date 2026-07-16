@@ -1,5 +1,5 @@
 Q = (program
-  (comment)? @doc :: str
+  (comment)? @doc :: text
   (expression_statement)? @present :: bool
 )
 ------------------- TYPESCRIPT -------------------

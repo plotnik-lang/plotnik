@@ -55,7 +55,7 @@ fn scalar_effect_metadata_preserves_motion_and_frame_boundaries() {
         Some(FrameAction::Open(ValueFrameKind::Scalar))
     );
     assert_eq!(
-        EffectKind::StrClose.frame_action(),
+        EffectKind::TextClose.frame_action(),
         Some(FrameAction::Close(ValueFrameKind::Scalar))
     );
     assert_eq!(
@@ -64,9 +64,9 @@ fn scalar_effect_metadata_preserves_motion_and_frame_boundaries() {
     );
     assert!(EffectKind::ScalarMark.reads_cursor());
     assert!(EffectKind::ScalarOpen.is_motion_barrier());
-    assert!(EffectKind::StrClose.is_motion_barrier());
+    assert!(EffectKind::TextClose.is_motion_barrier());
     assert!(EffectKind::BoolClose.is_motion_barrier());
-    assert!(EffectKind::NodeStr.reads_cursor());
+    assert!(EffectKind::NodeText.reads_cursor());
     assert!(EffectKind::NodeBool.reads_cursor());
     assert!(!EffectKind::BoolValue.reads_cursor());
     assert!(EffectKind::BoolValue.accepts_payload(0, 0, 0));

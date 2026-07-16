@@ -1,7 +1,7 @@
 Q = (program
   {
     (comment)? @comment
-  } @value :: str
+  } @value :: text
 )
 --------------------- INPUT ----------------------
 value;
@@ -10,11 +10,11 @@ export interface Q {
   value: string | null;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `str` replaces structured data with source text
+warning: capture type `text` replaces structured data with source text
  --> query.ptk:4:12
   |
-4 |   } @value :: str
-  |            ^^^^^^
+4 |   } @value :: text
+  |            ^^^^^^^
   |
 help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
@@ -111,10 +111,10 @@ N0: S2 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P0 def        0..60  source_id=0  T2
-P1 pattern    4..60  source_id=0
+P0 def        0..61  source_id=0  T2
+P1 pattern    4..61  source_id=0
 P2 capture    45..51  source_id=0  T2.M0
-P3 capture_type 52..58  source_id=0  T0
+P3 capture_type 52..59  source_id=0  T0
 P4 sequence   15..44  source_id=0
 P5 capture    32..40  source_id=0
 P6 quantifier 30..31  source_id=0
@@ -126,10 +126,10 @@ Q:
   02       (@28)                            28 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  -ε-  [StrClose RecordSet(M0) SpanEnd#2]  08
+  06  -ε-  [TextClose RecordSet(M0) SpanEnd#2]  08
   08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
   10                                        ▶
-  11  -ε-  [StrClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  11  -ε-  [TextClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
   14  -ε-  [SpanEnd#6 SpanEnd#4]            11
   16   !   (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
   19  ──!  _                                16, 19
@@ -157,7 +157,7 @@ Q:
   19       _                                16, 19
   24  ❮❮❮ 
   14  -ε-  [SpanEnd#6 SpanEnd#4]            11
-  11  -ε-  [StrClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  11  -ε-  [TextClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
   10   ◀   (@28)                            
 
 Q:

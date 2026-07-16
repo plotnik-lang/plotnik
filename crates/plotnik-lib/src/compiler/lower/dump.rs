@@ -321,9 +321,9 @@ impl NfaDumper<'_> {
             EffectKind::SpanEnd => format!("SpanEnd#{}", literal(e.payload())),
             EffectKind::ScalarOpen => "ScalarOpen".to_string(),
             EffectKind::ScalarMark => "ScalarMark".to_string(),
-            EffectKind::StrClose => "StrClose".to_string(),
+            EffectKind::TextClose => "TextClose".to_string(),
             EffectKind::BoolClose => format!("BoolClose({})", literal(e.payload())),
-            EffectKind::NodeStr => "NodeStr".to_string(),
+            EffectKind::NodeText => "NodeText".to_string(),
             EffectKind::NodeBool => "NodeBool".to_string(),
             EffectKind::BoolValue => format!("BoolValue({})", literal(e.payload())),
         }

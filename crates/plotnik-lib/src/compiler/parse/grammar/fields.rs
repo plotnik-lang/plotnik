@@ -9,7 +9,7 @@ use super::utils::starts_uppercase;
 use super::validation::Ident;
 
 impl Parser<'_, '_> {
-    /// Capture type: `::Type`, `::str`, or `::bool`.
+    /// Capture type: `::Type`, `::text`, or `::bool`.
     pub(crate) fn parse_capture_type(&mut self) {
         self.start_node(SyntaxKind::CaptureType);
         self.expect(SyntaxKind::DoubleColon, "'::' for capture type");

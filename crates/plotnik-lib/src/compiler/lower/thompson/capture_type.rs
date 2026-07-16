@@ -64,14 +64,14 @@ impl CaptureTerminal {
 
     fn close(self) -> EffectIR {
         match self {
-            Self::Text(_) => EffectIR::str_close(),
+            Self::Text(_) => EffectIR::text_close(),
             Self::Presence(_) => EffectIR::bool_close(true),
         }
     }
 
     fn node_value(self) -> EffectIR {
         match self {
-            Self::Text(_) => EffectIR::node_str(),
+            Self::Text(_) => EffectIR::node_text(),
             Self::Presence(_) => EffectIR::node_bool(),
         }
     }

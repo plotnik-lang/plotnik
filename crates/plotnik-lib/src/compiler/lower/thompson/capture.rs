@@ -141,7 +141,7 @@ pub(super) fn first_unmatched_close(post: &[EffectIR]) -> Option<usize> {
             | EffectKind::RecordClose
             | EffectKind::VariantClose
             | EffectKind::SuppressEnd
-            | EffectKind::StrClose
+            | EffectKind::TextClose
             | EffectKind::BoolClose => return Some(i),
             _ => {}
         }

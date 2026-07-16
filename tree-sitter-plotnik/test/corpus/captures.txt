@@ -54,7 +54,7 @@ Capture types
 ================================================================================
 Q = (p
   (a) @x :: Type
-  (a) @text :: str
+  (a) @text :: text
   (a)? @present :: bool
   (a) @unknown :: num
   {(b) @inner}+ @rows :: Row

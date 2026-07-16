@@ -37,11 +37,11 @@ pub enum JournalEvent<'t> {
     /// Contribute an explicit node-pattern match to every open scalar frame.
     ScalarMark(Node<'t>),
     /// Close a scalar frame and materialize its source text (or null when unmarked).
-    StrClose,
+    TextClose,
     /// Close a scalar frame and materialize the supplied boolean.
     BoolClose(bool),
     /// Materialize the matched node's source text without a scalar frame.
-    NodeStr(Node<'t>),
+    NodeText(Node<'t>),
     /// Materialize presence for the matched node without a scalar frame.
     NodeBool(Node<'t>),
     /// Materialize a boolean with no source provenance.

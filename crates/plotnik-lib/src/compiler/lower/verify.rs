@@ -507,9 +507,9 @@ mod debug_impl {
             RecordClose => ScopeRole::Close(RecordOpen),
             VariantClose => ScopeRole::Close(VariantOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
-            StrClose | BoolClose => ScopeRole::Close(ScalarOpen),
-            Node | ArrayPush | RecordSet | Absent | ScalarMark | NodeStr | NodeBool | BoolValue
-            | SpanStartAt | SpanStart | SpanEnd => {
+            TextClose | BoolClose => ScopeRole::Close(ScalarOpen),
+            Node | ArrayPush | RecordSet | Absent | ScalarMark | NodeText | NodeBool
+            | BoolValue | SpanStartAt | SpanStart | SpanEnd => {
                 return None;
             }
         };

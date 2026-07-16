@@ -336,18 +336,18 @@ The `@func` capture on the sequence creates a nested scope. All captures inside 
 | Syntax       | Effect                                                |
 | ------------ | ----------------------------------------------------- |
 | `@x`         | Inferred (usually `Node`)                             |
-| `@x :: str`  | Source text for the captured value                    |
+| `@x :: text` | Source text for the captured value                    |
 | `@x :: bool` | Observable presence; an absent option becomes `false` |
 | `@x :: Name` | Custom nominal name for the inferred type             |
 
-`str` and `bool` are the complete lowercase built-in set. Any other lowercase
-name is an error. Custom names must be `PascalCase`; `Str` is a custom name,
-not the built-in `str`. The common spellings `string` and `boolean` are
-diagnosed with fixes to `str` and `bool`.
+`text` and `bool` are the complete lowercase built-in set. Any other lowercase
+name is an error. Custom names must be `PascalCase`; `Text` is a custom name,
+not the built-in `text`. The old spelling `str` and the common spellings
+`string` and `boolean` are diagnosed with fixes to `text` and `bool`.
 
 A built-in capture type is applied only after the ordinary capture has been
 validated, so it cannot legalize an invalid multi-node or no-value capture.
-`str` recursively preserves option and list dimensions: `Node?` becomes
+`text` recursively preserves option and list dimensions: `Node?` becomes
 `string | null`, and `Node[]` becomes `string[]`. Every list item owns its
 own document byte range. A composite value becomes the source slice from its first
 matched node through its last; a valid zero-node value becomes `null`.
@@ -356,7 +356,7 @@ matched node through its last; a valid zero-node value becomes `null`.
 absent path becomes `false`; a required value is rejected unless the same
 result field is omitted by an alternative. That alternative supplies `false`.
 
-Replacing composite data with `str` or `bool` emits a warning.
+Replacing composite data with `text` or `bool` emits a warning.
 
 Every composite type has a compiler-generated name already
 (`{Parent}{Field}` along the capture path), so custom capture types are
@@ -412,7 +412,7 @@ Rules:
 | `(Def) @x`              | Definition type, or error if match-only |
 | `(Def)* @xs`            | List of the definition's type           |
 | `[...] @_`              | Match and discard                       |
-| `@x :: str`             | Source text, preserving `?`/`*`/`+`     |
+| `@x :: text`            | Source text, preserving `?`/`*`/`+`     |
 | `@x :: bool`            | Presence boolean                        |
 | `@x :: T`               | Custom type name                        |
 
@@ -1182,27 +1182,27 @@ payloads never get standalone declarations.
 
 ## Quick Reference
 
-| Feature                  | Tree-sitter        | Plotnik                     |
-| ------------------------ | ------------------ | --------------------------- |
-| Capture                  | `@name`            | `@name` (snake_case only)   |
-| Discard                  |                    | `@_` or `@_name`            |
-| Capture type             |                    | `@x :: str`, `bool`, or `T` |
-| Named node               | `(type)`           | `(type)`                    |
-| Anonymous node           | `"text"`           | `"text"`                    |
-| Any node                 | `_`                | `_`                         |
-| Any named node           | `(_)`              | `(_)`                       |
-| Grammar-field constraint | `field: pattern`   | `field: pattern`            |
-| Negated grammar field    | `!field`           | `-field`                    |
-| Quantifiers              | `?` `*` `+`        | `?` `*` `+`                 |
-| Lazy                     |                    | `??` `*?` `+?`              |
-| Sequence                 | `((a) (b))`        | `{(a) (b)}`                 |
-| Alternation              | `[a b]`            | `[a b]`                     |
-| Labeled alternation      |                    | `[A: (a) B: (b)]`           |
-| Anchor                   | `.`                | `.` soft, `.!` exact        |
-| Predicate                | `(#eq? @x "foo")`  | `(node == "foo")`           |
-| Regex predicate          | `(#match? @x "p")` | `(node =~ /p/)`             |
-| Definition               |                    | `Name = pattern`            |
-| Definition reference     |                    | `(Name)`                    |
+| Feature                  | Tree-sitter        | Plotnik                      |
+| ------------------------ | ------------------ | ---------------------------- |
+| Capture                  | `@name`            | `@name` (snake_case only)    |
+| Discard                  |                    | `@_` or `@_name`             |
+| Capture type             |                    | `@x :: text`, `bool`, or `T` |
+| Named node               | `(type)`           | `(type)`                     |
+| Anonymous node           | `"text"`           | `"text"`                     |
+| Any node                 | `_`                | `_`                          |
+| Any named node           | `(_)`              | `(_)`                        |
+| Grammar-field constraint | `field: pattern`   | `field: pattern`             |
+| Negated grammar field    | `!field`           | `-field`                     |
+| Quantifiers              | `?` `*` `+`        | `?` `*` `+`                  |
+| Lazy                     |                    | `??` `*?` `+?`               |
+| Sequence                 | `((a) (b))`        | `{(a) (b)}`                  |
+| Alternation              | `[a b]`            | `[a b]`                      |
+| Labeled alternation      |                    | `[A: (a) B: (b)]`            |
+| Anchor                   | `.`                | `.` soft, `.!` exact         |
+| Predicate                | `(#eq? @x "foo")`  | `(node == "foo")`            |
+| Regex predicate          | `(#match? @x "p")` | `(node =~ /p/)`              |
+| Definition               |                    | `Name = pattern`             |
+| Definition reference     |                    | `(Name)`                     |
 
 ---
 

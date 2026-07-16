@@ -191,7 +191,7 @@ impl DiagnosticKind {
     pub fn hint(&self) -> Option<&'static str> {
         let text = match self {
             Self::ExpectedSubtype => "e.g., `expression#binary_expression`",
-            Self::ExpectedCaptureType => "e.g., `:: str` or `:: MyType` after a capture",
+            Self::ExpectedCaptureType => "e.g., `:: text` or `:: MyType` after a capture",
             Self::ExpectedGrammarFieldName => "e.g., `-value`",
             Self::EmptyTree => "use `(_)` to match any named node, or `_` for any node",
             Self::EmptyAnonymousNode => {
@@ -204,7 +204,7 @@ impl DiagnosticKind {
                 "captures attach to the pattern before them: `(node) @name`"
             }
             Self::CaptureTypeWithoutCapture => {
-                "capture types attach to a regular capture: `(node) @name :: str`"
+                "capture types attach to a regular capture: `(node) @name :: text`"
             }
             Self::CaptureNameInvalid => "capture names become result field names",
             Self::DefNameInvalid => "definition names become result type names",

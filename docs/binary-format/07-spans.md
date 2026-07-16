@@ -44,7 +44,7 @@ Values 9 and 10 encode `SpanKind::Alternation(Labeling::Unlabeled)` and
 `SpanKind::Alternation(Labeling::Labeled)`; labeling does not create a second
 syntax construct.
 
-`capture_type` covers `:: T`, `:: str`, or `:: bool`. `negated_grammar_field` and
+`capture_type` covers `:: T`, `:: text`, or `:: bool`. `negated_grammar_field` and
 `predicate` are reserved for
 inspection detail; v11 loaders accept the kind values, but the compiler does
 not emit them yet.
@@ -65,7 +65,7 @@ cursor already points at the matched node. The compiler asserts this on the
 fresh Thompson IR before optimization; later passes may move it only along
 cursor-preserving epsilon chains.
 
-The `str` and `bool` capture types contribute their exact runtime provenance independently
+The `text` and `bool` capture types contribute their exact runtime provenance independently
 of inspection-detail spans. While a capture span is open, its scalar marks are
 folded into a possibly absent document bounding range: a present string highlights
 precisely the text it returns, a present boolean may carry its document range, and

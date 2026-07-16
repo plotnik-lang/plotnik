@@ -6,4 +6,4 @@ error: unknown capture type `foo`
 1 | Q = (a) @x :: foo
   |               ^^^
   |
-help: write `:: str`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`
+help: write `:: text`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`

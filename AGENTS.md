@@ -99,23 +99,23 @@ Pipeline:
 
 Full spec: `docs/lang-reference.md`, `docs/type-system.md`. The essentials:
 
-| Syntax              | Meaning                                     |
-| ------------------- | ------------------------------------------- |
-| `(node_kind)`       | Named node                                  |
-| `"text"` / `'text'` | Anonymous node (literal token)              |
-| `(_)` / `_`         | Any named node / any node                   |
-| `@name`             | Capture (snake_case only)                   |
-| `@x :: T`           | Capture type (`str`, `bool`, or PascalCase) |
-| `field: pattern`    | Grammar-field constraint                    |
-| `-field`            | Negated grammar-field constraint            |
-| `?` `*` `+`         | Quantifiers (lazy: `??` etc)                |
-| `.` / `.!`          | Soft / exact anchor                         |
-| `{...}`             | Sequence (siblings in order)                |
-| `[...]`             | Alternation                                 |
-| `Name = ...`        | Definition                                  |
-| `(Name)`            | Definition reference                        |
-| `(node == "x")`     | String predicate (== != ^= $= \*=)          |
-| `(node =~ /x/)`     | Regex predicate (=~ !~)                     |
+| Syntax              | Meaning                                      |
+| ------------------- | -------------------------------------------- |
+| `(node_kind)`       | Named node                                   |
+| `"text"` / `'text'` | Anonymous node (literal token)               |
+| `(_)` / `_`         | Any named node / any node                    |
+| `@name`             | Capture (snake_case only)                    |
+| `@x :: T`           | Capture type (`text`, `bool`, or PascalCase) |
+| `field: pattern`    | Grammar-field constraint                     |
+| `-field`            | Negated grammar-field constraint             |
+| `?` `*` `+`         | Quantifiers (lazy: `??` etc)                 |
+| `.` / `.!`          | Soft / exact anchor                          |
+| `{...}`             | Sequence (siblings in order)                 |
+| `[...]`             | Alternation                                  |
+| `Name = ...`        | Definition                                   |
+| `(Name)`            | Definition reference                         |
+| `(node == "x")`     | String predicate (== != ^= $= \*=)           |
+| `(node =~ /x/)`     | Regex predicate (=~ !~)                      |
 
 Rules that trip everyone:
 

@@ -36,7 +36,7 @@ fn bool_decoder_consumes_one_balanced_scalar() {
 
 #[test]
 fn absent_string_is_consumed_as_an_option() {
-    let journal = journal(vec![JournalEvent::ScalarOpen, JournalEvent::StrClose]);
+    let journal = journal(vec![JournalEvent::ScalarOpen, JournalEvent::TextClose]);
 
     let mut decoder = ResultDecoder::new(journal.output_events(), "");
 

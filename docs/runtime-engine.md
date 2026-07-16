@@ -139,7 +139,7 @@ the current call stack.
 
 Events are appended only on paths that have not backtracked. Suppression (`@_`)
 increments a depth counter; ordinary output events are skipped while the counter
-is non-zero. Scalar marks bypass suppression so an enclosing `:: str` or
+is non-zero. Scalar marks bypass suppression so an enclosing `:: text` or
 `:: bool` value can retain provenance across a suppressed nested value. Scalar
 open and close events obey suppression, so `matches` records no scalar output
 events.
@@ -158,9 +158,9 @@ pub enum JournalEvent<'t> {
     Absent,
     ScalarOpen,
     ScalarMark(tree_sitter::Node<'t>),
-    StrClose,
+    TextClose,
     BoolClose(bool),
-    NodeStr(tree_sitter::Node<'t>),
+    NodeText(tree_sitter::Node<'t>),
     NodeBool(tree_sitter::Node<'t>),
     BoolValue(bool),
     SpanStart { id: u16, node: Option<tree_sitter::Node<'t>> },
@@ -179,9 +179,9 @@ pub enum JournalEvent<'t> {
 | VariantOpen/Close      | Build a variant value                                    |
 | ScalarOpen             | Begin one value-local source-provenance frame            |
 | ScalarMark             | Add the current explicit node match to every open scalar |
-| StrClose               | Close a scalar and produce its source slice or `null`    |
+| TextClose              | Close a scalar and produce its source slice or `null`    |
 | BoolClose(value)       | Close a scalar and produce the encoded boolean           |
-| NodeStr                | Produce one matched node's source text directly          |
+| NodeText               | Produce one matched node's source text directly          |
 | NodeBool               | Produce `true` for one matched node directly             |
 | BoolValue(value)       | Produce a boolean without source provenance              |
 | SpanStart/SpanEnd      | Bracket result-provenance scopes                         |
@@ -189,10 +189,10 @@ pub enum JournalEvent<'t> {
 `ScalarMark` stores the matched node, not a byte sentinel. Each open scalar
 frame expands its document bounding range, when present, to include its marks. No marks means no
 matched node; a real zero-byte node contributes `Some(n..n)`. Consequently
-`StrClose` distinguishes an absent value (`null`) from a zero-byte node (`""`).
+`TextClose` distinguishes an absent value (`null`) from a zero-byte node (`""`).
 `BoolClose` takes its value only from its encoded boolean; marks provide
 result provenance and never implement truthiness.
-Direct node scalars use `NodeStr` or `NodeBool` instead of allocating a scalar
+Direct node scalars use `NodeText` or `NodeBool` instead of allocating a scalar
 frame; framed events remain the general document-bounding-range representation.
 Non-inspection lowering has no consumer for boolean source provenance, so it
 emits `BoolValue(true)` for a present value instead of `NodeBool` or a balanced
@@ -221,7 +221,7 @@ produce the completed value.
 
 Scalar frames are part of the same balanced frame algebra as lists, records,
 and variants. `ScalarOpen` pushes a frame, `ScalarMark` expands its document bounding range, and
-exactly one of `StrClose` or `BoolClose` closes it. Source text is sliced once
+exactly one of `TextClose` or `BoolClose` closes it. Source text is sliced once
 from the validated source and remains borrowed; booleans are stored directly.
 The bytecode loader rejects mis-nested scalar effects before execution.
 

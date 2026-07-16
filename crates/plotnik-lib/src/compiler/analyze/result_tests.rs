@@ -117,7 +117,7 @@ fn output_items_include_only_reachable_fragments() {
 fn scalar_capture_does_not_publish_its_structured_fragment() {
     let source = emitted_types(
         "Chunk = {(comment) @comment (expression_statement) @statement}\n\
-         Q = (program (Chunk) @text :: str)",
+         Q = (program (Chunk) @text :: text)",
     );
 
     assert!(source.contains("text: string;"), "{source}");

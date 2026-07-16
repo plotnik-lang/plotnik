@@ -15,7 +15,7 @@ Pred = (identifier =~ /^get/) @fn :: Getter
 ;                                 ^ @punctuation.delimiter
 ;                                    ^ @type
 
-Text = (identifier) @text :: str
+Text = (identifier) @text :: text
 ;                             ^ @type.builtin
 
 Flag = (comment)? @present :: bool

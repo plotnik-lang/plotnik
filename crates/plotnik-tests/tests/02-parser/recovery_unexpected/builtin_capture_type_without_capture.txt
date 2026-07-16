@@ -1,9 +1,9 @@
-Text = (identifier) :: str
+Text = (identifier) :: text
 ------------------ DIAGNOSTICS -------------------
 error: capture type has no capture
  --> query.ptk:1:21
   |
-1 | Text = (identifier) :: str
+1 | Text = (identifier) :: text
   |                     ^^
   |
-help: capture types attach to a regular capture: `(node) @name :: str`
+help: capture types attach to a regular capture: `(node) @name :: text`

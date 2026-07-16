@@ -1,6 +1,6 @@
 Q = (program
   {
-    (comment) @x :: str
+    (comment) @x :: text
   } @a :: Foo
   {
     (comment) @x

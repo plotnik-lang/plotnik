@@ -1,10 +1,10 @@
 Q = (program
   [
     (expression_statement
-      (identifier) @x :: str
+      (identifier) @x :: text
     )
     (expression_statement
-      (number)? @x :: str
+      (number)? @x :: text
     )
   ]
 )

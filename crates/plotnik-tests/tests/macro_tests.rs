@@ -82,7 +82,7 @@ mod scalar_output {
     plotnik::query! {
         r#"
         Q = (program
-          (comment)* @comments :: str
+          (comment)* @comments :: text
           (expression_statement)? @has_statement :: bool
         )
         "#,
@@ -92,7 +92,7 @@ mod scalar_output {
 
 mod mixed_borrows {
     plotnik::query! {
-        "Q = (program (expression_statement (identifier) @text :: str) @statement)",
+        "Q = (program (expression_statement (identifier) @text :: text) @statement)",
         grammar = "arborium-javascript",
     }
 }
@@ -108,7 +108,7 @@ mod recursive_split_returns {
         Q = (program {
           (B)
           .!
-          [(comment == "//b") (comment == "//stop")] @rest :: str
+          [(comment == "//b") (comment == "//stop")] @rest :: text
         })
         "#,
         grammar = "arborium-javascript",

@@ -6,4 +6,4 @@ error: capture type has no capture
 1 | Q = (a) :: Foo
   |         ^^
   |
-help: capture types attach to a regular capture: `(node) @name :: str`
+help: capture types attach to a regular capture: `(node) @name :: text`

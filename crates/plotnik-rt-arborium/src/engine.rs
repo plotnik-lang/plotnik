@@ -361,16 +361,16 @@ impl<'t> Engine<'t> {
         Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
-    pub fn scalar_close_str(&mut self) -> Option<&JournalEvent<'t>> {
-        self.scalar_close(JournalEvent::StrClose)
+    pub fn scalar_close_text(&mut self) -> Option<&JournalEvent<'t>> {
+        self.scalar_close(JournalEvent::TextClose)
     }
 
     pub fn scalar_close_bool(&mut self, value: bool) -> Option<&JournalEvent<'t>> {
         self.scalar_close(JournalEvent::BoolClose(value))
     }
 
-    pub fn node_str(&mut self) -> Option<&JournalEvent<'t>> {
-        self.emit_output_event(|cursor| JournalEvent::NodeStr(cursor.node()))
+    pub fn node_text(&mut self) -> Option<&JournalEvent<'t>> {
+        self.emit_output_event(|cursor| JournalEvent::NodeText(cursor.node()))
     }
 
     pub fn node_bool(&mut self) -> Option<&JournalEvent<'t>> {

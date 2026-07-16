@@ -83,7 +83,7 @@ Use **greedy** and **lazy**, not greedy and non-greedy, as the primary
 quantifier pair. Both preferences may backtrack when the continuation fails.
 Use **capture type**, not annotation or modifier. A capture binds a pattern's
 result, which may be a node, text, record, list, option, or variant; it does not
-merely name a matched node. The built-ins `:: str` and `:: bool` change the
+merely name a matched node. The built-ins `:: text` and `:: bool` change the
 captured representation; a PascalCase capture type supplies a result type name
 without changing the underlying matched shape.
 

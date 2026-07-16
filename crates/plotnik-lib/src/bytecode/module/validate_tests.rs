@@ -57,7 +57,7 @@ fn emit_bytes(query_src: &str) -> Vec<u8> {
 const SPLIT_CALL_QUERY: &str = indoc! {r#"
     Body = [ Rec: {(comment) @c (B)} Base: (comment) @c ]
     B = { (Body)?? @first (Body)? @second }
-    Q = (program (B) @x :: str)
+    Q = (program (B) @x :: text)
 "#};
 
 const ROUTED_CALL_QUERY: &str = indoc! {r#"
@@ -1130,7 +1130,7 @@ fn forged_mismatched_scalar_frame_is_rejected() {
           {
             (comment) @comment
             (expression_statement (identifier) @id)
-          } @chunk :: str
+          } @chunk :: text
         )
     "#});
     let slot = first_effect_op(&bytes, |op| op == EffectKind::ScalarOpen as u16);
@@ -1138,7 +1138,7 @@ fn forged_mismatched_scalar_frame_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("StrClose must close a ScalarOpen frame");
+        Module::load_compiler_output(&bytes).expect_err("TextClose must close a ScalarOpen frame");
     assert!(matches!(err, ModuleError::EffectStackImbalance(_)));
 }
 
@@ -1702,7 +1702,7 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
 #[test]
 fn scalar_primitive_typedefs_use_reserved_zero_metadata() {
     for (query, expected) in [
-        (r#"Q = (identifier) @id :: str"#, TypeKind::Text),
+        (r#"Q = (identifier) @id :: text"#, TypeKind::Text),
         (
             r#"Q = (program (identifier)? @present :: bool)"#,
             TypeKind::Bool,

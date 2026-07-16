@@ -1,11 +1,11 @@
 Q = (program
   (lexical_declaration
     (variable_declarator
-      name: (identifier) @name :: str
+      name: (identifier) @name :: text
     )
   )
   [
-    A: (comment)? @doc :: str
+    A: (comment)? @doc :: text
     B: (expression_statement)
   ]
 )
@@ -14,7 +14,7 @@ warning: alternative labels have no output effect here: captures from the altern
   --> query.ptk:7:3
    |
  7 | /   [
- 8 | |     A: (comment)? @doc :: str
+ 8 | |     A: (comment)? @doc :: text
  9 | |     B: (expression_statement)
 10 | |   ]
    | |___^
