@@ -410,10 +410,11 @@ impl<'q, 'd> Parser<'q, 'd> {
         // Use full range for easier downstream error suppression
         let full_range = TextRange::new(open.span.start(), current.end());
         let source_id = self.source_id;
-        let Some(report) = self.report_at(kind, full_range) else {
-            return;
-        };
-        report
+        // The opener may already own a warning (legacy sequence syntax). Report
+        // past start-offset dedup so that warning cannot suppress this gating error.
+        self.diagnostics
+            .report(kind, Span::new(source_id, full_range))
+            .suppression_range(full_range)
             .related_to(
                 Span::new(source_id, open.span),
                 format!("{construct} started here"),

@@ -1,7 +1,7 @@
 use indoc::indoc;
 
 use super::format::{FormatError, format_query, format_query_measured, format_query_with_config};
-use crate::compiler::diagnostics::Error;
+use crate::compiler::diagnostics::{DiagnosticKind, Error};
 use crate::compiler::parse::ParseConfig;
 
 #[test]
@@ -431,6 +431,19 @@ fn rejects_parse_errors_and_propagates_limits() {
         ),
         Err(FormatError::Resource(Error::ParseFuelExhausted))
     ));
+}
+
+#[test]
+fn rejects_recovered_group_without_closer() {
+    let error = format_query("((\"(\"").expect_err("unclosed nested group is rejected");
+    let diagnostics = error.diagnostics().expect("syntax failure has diagnostics");
+
+    assert_eq!(diagnostics.error_count(), 1);
+    assert!(
+        diagnostics
+            .kinds()
+            .any(|kind| kind == DiagnosticKind::UnclosedTree)
+    );
 }
 
 #[test]
