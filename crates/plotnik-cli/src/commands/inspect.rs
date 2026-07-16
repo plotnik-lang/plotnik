@@ -157,7 +157,6 @@ struct BundleParts<'a> {
 
 fn bundle_json(parts: BundleParts<'_>) -> Value {
     let mut object = Map::new();
-    object.insert("version".to_string(), json!(0));
     object.insert("query_spans".to_string(), parts.query_spans);
     object.insert("query_tokens".to_string(), parts.query_tokens);
     object.insert("diagnostics".to_string(), parts.diagnostics);
