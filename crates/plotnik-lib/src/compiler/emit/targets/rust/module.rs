@@ -374,6 +374,7 @@ impl<'a> Generator<'a> {
                 let name = rust_string(&expected.name);
                 format!("({id}, {name}, {named})")
             }),
+            2,
         );
         out.push('\n');
         out.push_str("/// Field ids baked into the field checks: `(id, name)`.\n");
@@ -385,6 +386,7 @@ impl<'a> Generator<'a> {
                 let name = rust_string(&field.name);
                 format!("({id}, {name})")
             }),
+            3,
         );
         out.push('\n');
         let template = if self.config.grammar_identity.is_some() {
@@ -457,9 +459,10 @@ impl<'a> Generator<'a> {
                 let _ = writeln!(out, "        ({call_site}, {port}) => {target},");
             }
         }
-        out.push_str(
-            "        _ => unreachable!(\"call site {call_site} has no return port {}\", port.to_byte()),\n",
-        );
+        out.push_str("        _ => unreachable!(\n");
+        out.push_str("            \"call site {call_site} has no return port {}\",\n");
+        out.push_str("            port.to_byte()\n");
+        out.push_str("        ),\n");
         out.push_str("    }\n");
         out.push_str("}\n");
     }
@@ -528,13 +531,21 @@ impl<'a> Generator<'a> {
                 StatePlanKind::Match(plan) => self.match_arm(out, state, plan),
                 StatePlanKind::Call(plan) => self.call_arm(out, state, plan),
                 StatePlanKind::Return(port) => {
+                    let port = port.to_byte();
+                    let top_level = if port == 0 {
+                        "Flow::Accept".to_owned()
+                    } else {
+                        format!("panic!(\"entry point returned through nonzero port {port}\")")
+                    };
+                    let port = port.to_string();
                     splice(
                         out,
                         "        ",
                         RETURN_ARM,
                         &[
                             ("STATE", &self.state(state.id).const_name),
-                            ("PORT", &port.to_byte().to_string()),
+                            ("PORT", &port),
+                            ("TOP_LEVEL", &top_level),
                         ],
                     );
                 }
@@ -1087,7 +1098,12 @@ fn policy_expr(policy: SkipPolicy) -> String {
     format!("rt::SkipPolicy::{policy:?}")
 }
 
-fn render_const_slice(out: &mut String, declaration: &str, entries: impl Iterator<Item = String>) {
+fn render_const_slice(
+    out: &mut String,
+    declaration: &str,
+    entries: impl Iterator<Item = String>,
+    inline_entry_limit: usize,
+) {
     let entries = entries.collect::<Vec<_>>();
     if entries.is_empty() {
         let _ = writeln!(out, "{declaration} = &[];");
@@ -1100,7 +1116,7 @@ fn render_const_slice(out: &mut String, declaration: &str, entries: impl Iterato
         let _ = writeln!(out, "{compact}");
         return;
     }
-    if entries.len() <= 2 && joined.len() + 12 <= 100 {
+    if entries.len() <= inline_entry_limit && joined.len() + 12 <= 100 {
         let _ = writeln!(out, "{declaration} =");
         let _ = writeln!(out, "    &[{joined}];");
         return;
@@ -1466,11 +1482,7 @@ eng.push_checkpoint(rt::Checkpoint::call_retry(
 const RETURN_ARM: &str = r#"
 @STATE@ => {
     if eng.frames_empty() {
-        if @PORT@ == 0 {
-            Flow::Accept
-        } else {
-            panic!("entry point returned through nonzero port @PORT@");
-        }
+        @TOP_LEVEL@
     } else {
         let call_site = eng.exit_frame();
         Flow::Jump(call_return(call_site, rt::PortId::from_raw(@PORT@)))

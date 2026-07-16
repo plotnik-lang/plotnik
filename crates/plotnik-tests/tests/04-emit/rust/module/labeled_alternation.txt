@@ -240,7 +240,10 @@ mod matcher {
     fn call_return(call_site: u16, port: rt::PortId) -> u16 {
         match (call_site, port.to_byte()) {
             (S15_Q_EP, 0) => S14_Q_EP,
-            _ => unreachable!("call site {call_site} has no return port {}", port.to_byte()),
+            _ => unreachable!(
+                "call site {call_site} has no return port {}",
+                port.to_byte()
+            ),
         }
     }
 
@@ -351,11 +354,7 @@ mod matcher {
             //   01                                        ▶
             S01_Q => {
                 if eng.frames_empty() {
-                    if 0 == 0 {
-                        Flow::Accept
-                    } else {
-                        panic!("entry point returned through nonzero port 0");
-                    }
+                    Flow::Accept
                 } else {
                     let call_site = eng.exit_frame();
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
@@ -435,11 +434,7 @@ mod matcher {
             //   13                                        ▶
             S13_Q_EP => {
                 if eng.frames_empty() {
-                    if 0 == 0 {
-                        Flow::Accept
-                    } else {
-                        panic!("entry point returned through nonzero port 0");
-                    }
+                    Flow::Accept
                 } else {
                     let call_site = eng.exit_frame();
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))

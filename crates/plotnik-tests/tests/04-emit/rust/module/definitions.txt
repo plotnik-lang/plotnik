@@ -260,7 +260,10 @@ mod matcher {
             (S14_Q, 0) => S13_Q,
             (S18_INNER_EP, 0) => S17_INNER_EP,
             (S22_Q_EP, 0) => S21_Q_EP,
-            _ => unreachable!("call site {call_site} has no return port {}", port.to_byte()),
+            _ => unreachable!(
+                "call site {call_site} has no return port {}",
+                port.to_byte()
+            ),
         }
     }
 
@@ -391,11 +394,7 @@ mod matcher {
             //   01                                        ▶
             S01_INNER => {
                 if eng.frames_empty() {
-                    if 0 == 0 {
-                        Flow::Accept
-                    } else {
-                        panic!("entry point returned through nonzero port 0");
-                    }
+                    Flow::Accept
                 } else {
                     let call_site = eng.exit_frame();
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
@@ -439,11 +438,7 @@ mod matcher {
             //   06                                        ▶
             S06_Q => {
                 if eng.frames_empty() {
-                    if 0 == 0 {
-                        Flow::Accept
-                    } else {
-                        panic!("entry point returned through nonzero port 0");
-                    }
+                    Flow::Accept
                 } else {
                     let call_site = eng.exit_frame();
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
@@ -515,11 +510,7 @@ mod matcher {
             //   16                                        ▶
             S16_INNER_EP => {
                 if eng.frames_empty() {
-                    if 0 == 0 {
-                        Flow::Accept
-                    } else {
-                        panic!("entry point returned through nonzero port 0");
-                    }
+                    Flow::Accept
                 } else {
                     let call_site = eng.exit_frame();
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
@@ -543,11 +534,7 @@ mod matcher {
             //   20                                        ▶
             S20_Q_EP => {
                 if eng.frames_empty() {
-                    if 0 == 0 {
-                        Flow::Accept
-                    } else {
-                        panic!("entry point returned through nonzero port 0");
-                    }
+                    Flow::Accept
                 } else {
                     let call_site = eng.exit_frame();
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
