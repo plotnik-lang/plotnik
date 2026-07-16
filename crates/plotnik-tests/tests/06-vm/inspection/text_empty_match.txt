@@ -22,72 +22,69 @@ help: result fields, cases, text, or boolean values produced inside the capture 
   "value": null
 }
 ------------------- INSPECTION -------------------
-{
-  "version": 1,
-  "entries": [
-    {
-      "query_span_id": 0,
-      "parent": null,
-      "source_span": [
-        0,
-        6
-      ],
-      "bindings": [],
-      "range": [
-        1,
-        14
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 0,
-      "source_span": [
-        0,
-        6
-      ],
-      "bindings": [],
-      "range": [
-        2,
-        13
-      ]
-    },
-    {
-      "query_span_id": 2,
-      "parent": 1,
-      "source_span": null,
-      "bindings": [
-        {
-          "path": "/value",
-          "event_index": 10
-        }
-      ],
-      "range": [
-        3,
-        12
-      ]
-    },
-    {
-      "query_span_id": 4,
-      "parent": 2,
-      "source_span": null,
-      "bindings": [],
-      "range": [
-        5,
-        9
-      ]
-    },
-    {
-      "query_span_id": 6,
-      "parent": 3,
-      "source_span": null,
-      "bindings": [],
-      "range": [
-        6,
-        8
-      ]
-    }
-  ]
-}
+[
+  {
+    "query_span_id": 0,
+    "parent": null,
+    "source_span": [
+      0,
+      6
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      14
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 0,
+    "source_span": [
+      0,
+      6
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      13
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 1,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/value",
+        "event_index": 10
+      }
+    ],
+    "range": [
+      3,
+      12
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 2,
+    "source_span": null,
+    "bindings": [],
+    "range": [
+      5,
+      9
+    ]
+  },
+  {
+    "query_span_id": 6,
+    "parent": 3,
+    "source_span": null,
+    "bindings": [],
+    "range": [
+      6,
+      8
+    ]
+  }
+]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

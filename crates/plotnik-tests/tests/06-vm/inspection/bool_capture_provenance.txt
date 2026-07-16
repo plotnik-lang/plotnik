@@ -12,68 +12,65 @@ export interface Q {
   "present": true
 }
 ------------------- INSPECTION -------------------
-{
-  "version": 1,
-  "entries": [
-    {
-      "query_span_id": 0,
-      "parent": null,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        1,
-        11
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 0,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        2,
-        10
-      ]
-    },
-    {
-      "query_span_id": 2,
-      "parent": 1,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [
-        {
-          "path": "/present",
-          "event_index": 6
-        }
-      ],
-      "range": [
-        3,
-        9
-      ]
-    },
-    {
-      "query_span_id": 5,
-      "parent": 2,
-      "source_span": [
-        0,
-        1
-      ],
-      "bindings": [],
-      "range": [
-        4,
-        8
-      ]
-    }
-  ]
-}
+[
+  {
+    "query_span_id": 0,
+    "parent": null,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      11
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 0,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      10
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 1,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [
+      {
+        "path": "/present",
+        "event_index": 6
+      }
+    ],
+    "range": [
+      3,
+      9
+    ]
+  },
+  {
+    "query_span_id": 5,
+    "parent": 2,
+    "source_span": [
+      0,
+      1
+    ],
+    "bindings": [],
+    "range": [
+      4,
+      8
+    ]
+  }
+]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -27,7 +27,7 @@ fn session_info_uses_domain_names_at_the_protocol_boundary() {
     assert_eq!(
         info,
         json!({
-            "version": 1,
+            "version": 0,
             "query_spans": [],
             "query_tokens": [{ "kind": "ident", "span": [0, 1] }],
             "diagnostics": [],

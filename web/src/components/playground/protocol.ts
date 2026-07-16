@@ -93,12 +93,23 @@ export interface RunStats {
   peak_live_heap_bytes: number;
 }
 
+export interface ResultProvenanceEntry {
+  query_span_id: number;
+  parent: number | null;
+  source_span: [number, number] | null;
+  bindings: {
+    path: string;
+    event_index: number;
+  }[];
+  range: [number, number];
+}
+
 /** `Session::run()`/`trace()` — either a result or a runtime error ("no
     match" included); `execution_trace` is attached to both when recording. */
 export type RunResult =
   | {
       result: unknown;
-      result_provenance: unknown;
+      result_provenance: ResultProvenanceEntry[] | null;
       run_stats: RunStats;
       execution_trace?: unknown;
       error?: undefined;

@@ -33,7 +33,7 @@ export type QExpr =
 }
 ---------------- EXECUTION_TRACE -----------------
 {
-  "v": 1,
+  "v": 0,
   "records": [
     {
       "ip": 0,

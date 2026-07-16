@@ -30,153 +30,150 @@ export interface Q {
   }
 }
 ------------------- INSPECTION -------------------
-{
-  "version": 1,
-  "entries": [
-    {
-      "query_span_id": 8,
-      "parent": null,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "range": [
-        1,
-        26
-      ]
-    },
-    {
-      "query_span_id": 9,
-      "parent": 0,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "range": [
-        2,
-        25
-      ]
-    },
-    {
-      "query_span_id": 10,
-      "parent": 1,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "range": [
-        3,
-        24
-      ]
-    },
-    {
-      "query_span_id": 12,
-      "parent": 2,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "range": [
-        4,
-        23
-      ]
-    },
-    {
-      "query_span_id": 0,
-      "parent": 3,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "range": [
-        5,
-        19
-      ]
-    },
-    {
-      "query_span_id": 1,
-      "parent": 4,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "range": [
-        6,
-        18
-      ]
-    },
-    {
-      "query_span_id": 5,
-      "parent": 5,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [
-        {
-          "path": "/$tag",
-          "event_index": 8
-        }
-      ],
-      "range": [
-        7,
-        17
-      ]
-    },
-    {
-      "query_span_id": 7,
-      "parent": 6,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [],
-      "range": [
-        9,
-        15
-      ]
-    },
-    {
-      "query_span_id": 6,
-      "parent": 7,
-      "source_span": [
-        0,
-        2
-      ],
-      "bindings": [
-        {
-          "path": "/$data/num",
-          "event_index": 12
-        }
-      ],
-      "range": [
-        10,
-        14
-      ]
-    },
-    {
-      "query_span_id": 11,
-      "parent": 3,
-      "source_span": null,
-      "bindings": [
-        {
-          "path": "/expr",
-          "event_index": 20
-        }
-      ],
-      "range": [
-        19,
-        22
-      ]
-    }
-  ]
-}
+[
+  {
+    "query_span_id": 8,
+    "parent": null,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      26
+    ]
+  },
+  {
+    "query_span_id": 9,
+    "parent": 0,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      25
+    ]
+  },
+  {
+    "query_span_id": 10,
+    "parent": 1,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [],
+    "range": [
+      3,
+      24
+    ]
+  },
+  {
+    "query_span_id": 12,
+    "parent": 2,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [],
+    "range": [
+      4,
+      23
+    ]
+  },
+  {
+    "query_span_id": 0,
+    "parent": 3,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [],
+    "range": [
+      5,
+      19
+    ]
+  },
+  {
+    "query_span_id": 1,
+    "parent": 4,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [],
+    "range": [
+      6,
+      18
+    ]
+  },
+  {
+    "query_span_id": 5,
+    "parent": 5,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [
+      {
+        "path": "/$tag",
+        "event_index": 8
+      }
+    ],
+    "range": [
+      7,
+      17
+    ]
+  },
+  {
+    "query_span_id": 7,
+    "parent": 6,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [],
+    "range": [
+      9,
+      15
+    ]
+  },
+  {
+    "query_span_id": 6,
+    "parent": 7,
+    "source_span": [
+      0,
+      2
+    ],
+    "bindings": [
+      {
+        "path": "/$data/num",
+        "event_index": 12
+      }
+    ],
+    "range": [
+      10,
+      14
+    ]
+  },
+  {
+    "query_span_id": 11,
+    "parent": 3,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/expr",
+        "event_index": 20
+      }
+    ],
+    "range": [
+      19,
+      22
+    ]
+  }
+]
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
