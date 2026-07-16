@@ -647,19 +647,19 @@ impl NfaBuilder<'_> {
 
     fn compile_boundary_capture(
         &mut self,
-        capture: &ast::CapturedPattern,
+        captured_pattern: &ast::CapturedPattern,
         input: BoundaryState,
         entry: EntryObligation,
         targets: &ExitMap<Label>,
     ) -> Option<Label> {
-        let inner = capture.inner()?;
-        if capture.is_discard() || self.is_suppressed() {
+        let inner = captured_pattern.inner()?;
+        if captured_pattern.capture().is_discard() || self.is_suppressed() {
             return self.with_suppression(|this| {
                 this.compile_boundary_pattern_to(&inner, input, entry, targets, false)
             });
         }
 
-        let pattern = Pattern::CapturedPattern(capture.clone());
+        let pattern = Pattern::CapturedPattern(captured_pattern.clone());
         let fact = self
             .ctx
             .analysis
@@ -668,9 +668,15 @@ impl NfaBuilder<'_> {
         let capture_type_plan = fact.built_in_plan().map(|(_, plan)| plan.clone());
         let mechanism = fact.kind();
         if let Some(plan) = capture_type_plan {
-            return self.compile_boundary_capture_type(capture, &plan, input, entry, targets);
+            return self.compile_boundary_capture_type(
+                captured_pattern,
+                &plan,
+                input,
+                entry,
+                targets,
+            );
         }
-        let capture_effects = self.build_capture_effects(capture, Some(mechanism));
+        let capture_effects = self.build_capture_effects(captured_pattern, Some(mechanism));
 
         if let Pattern::QuantifiedPattern(quantified) = &inner {
             return match mechanism {
@@ -1473,15 +1479,15 @@ impl NfaBuilder<'_> {
                     .inner()
                     .is_some_and(|inner| self.boundary_pattern_supported(&inner, visited))
             }
-            Pattern::CapturedPattern(capture) => {
+            Pattern::CapturedPattern(captured_pattern) => {
                 let relation = self.boundary_relations.pattern(pattern);
                 if BoundaryState::all().all(|input| simple_boundary_routes(&relation, input)) {
                     return true;
                 }
-                let Some(inner) = capture.inner() else {
+                let Some(inner) = captured_pattern.inner() else {
                     return true;
                 };
-                if capture.is_discard() || self.is_suppressed() {
+                if captured_pattern.capture().is_discard() || self.is_suppressed() {
                     return self.boundary_pattern_supported(&inner, visited);
                 }
                 let fact = self.ctx.analysis.type_analysis.expect_capture_fact(pattern);

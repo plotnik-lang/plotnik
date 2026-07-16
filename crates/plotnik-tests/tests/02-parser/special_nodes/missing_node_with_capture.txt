@@ -5,7 +5,7 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       NamedNode
         ParenOpen "("
         KwMissing "MISSING"
@@ -13,10 +13,12 @@ Root
         StringContent ";"
         DoubleQuote "\""
         ParenClose ")"
-      CaptureToken "@missing_semi"
+      Capture
+        CaptureToken "@missing_semi"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @missing_semi
+    CapturedPattern
       NamedNode MISSING
+      Capture @missing_semi

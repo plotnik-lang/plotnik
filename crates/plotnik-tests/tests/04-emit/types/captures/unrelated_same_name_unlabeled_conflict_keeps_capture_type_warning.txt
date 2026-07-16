@@ -12,13 +12,15 @@ Q = [
   } @x
 ]
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `text` replaces structured data with source text
- --> query.ptk:6:12
+warning: capture type `text` replaces the record value captured by `@x` with source text
+ --> query.ptk:6:9
   |
+5 |         (identifier) @id
+  |                      --- this captured value is suppressed by `@x :: text`
 6 |       } @x :: text
-  |            ^^^^^^^
+  |         ^^^^^^^^^^
   |
-help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+help: remove `:: text` to return the record value instead
 
 error: capture `@x` has incompatible types across alternatives
   --> query.ptk:8:18

@@ -76,8 +76,11 @@ pub fn infer_types(
 }
 
 fn pattern_has_builtin_capture_type(pattern: &Pattern) -> bool {
-    if let Pattern::CapturedPattern(capture) = pattern
-        && let Some(name) = capture.capture_type().and_then(|syntax| syntax.name())
+    if let Pattern::CapturedPattern(captured_pattern) = pattern
+        && let Some(name) = captured_pattern
+            .capture()
+            .capture_type()
+            .and_then(|syntax| syntax.name())
         && BuiltInCaptureType::parse(name.text()).is_some()
     {
         return true;

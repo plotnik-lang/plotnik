@@ -1,0 +1,36 @@
+Q = (program
+  {
+    {
+      (comment) @leaf
+    }? @inner :: bool
+  } @outer :: text
+)
+------------------ DIAGNOSTICS -------------------
+warning: capture type `bool` replaces the record value captured by `@inner` with a presence boolean
+ --> query.ptk:5:8
+  |
+4 |       (comment) @leaf
+  |                 ----- this captured value is suppressed by `@inner :: bool`
+5 |     }? @inner :: bool
+  |        ^^^^^^^^^^^^^^
+  |
+help: remove `:: bool` to return the record value instead
+
+warning: capture type `text` replaces the record value captured by `@outer` with source text
+ --> query.ptk:6:5
+  |
+5 |     }? @inner :: bool
+  |        -------------- this captured value is suppressed by `@outer :: text`
+6 |   } @outer :: text
+  |     ^^^^^^^^^^^^^^
+  |
+help: remove `:: text` to return the record value instead
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  outer: string | null;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub outer: ::core::option::Option<&'s str>,
+}

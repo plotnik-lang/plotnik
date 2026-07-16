@@ -13,7 +13,7 @@ Root
       Id "expression"
       Hash "#"
       Id "binary_expression"
-      Capture
+      CapturedPattern
         Field
           Id "left"
           Colon ":"
@@ -21,8 +21,9 @@ Root
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
-        CaptureToken "@left"
-      Capture
+        Capture
+          CaptureToken "@left"
+      CapturedPattern
         Field
           Id "right"
           Colon ":"
@@ -30,16 +31,19 @@ Root
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
-        CaptureToken "@right"
+        Capture
+          CaptureToken "@right"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode expression
-      CapturedPattern @left
+      CapturedPattern
         FieldPattern left:
           NamedNode (any)
-      CapturedPattern @right
+        Capture @left
+      CapturedPattern
         FieldPattern right:
           NamedNode (any)
+        Capture @right

@@ -20,19 +20,21 @@ Root
         Alternation
           BracketOpen "["
           Alternative
-            Capture
+            CapturedPattern
               NamedNode
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
-              CaptureToken "@name"
+              Capture
+                CaptureToken "@name"
           Alternative
-            Capture
+            CapturedPattern
               DefRef
                 ParenOpen "("
                 Id "NestedCall"
                 ParenClose ")"
-              CaptureToken "@inner"
+              Capture
+                CaptureToken "@inner"
           BracketClose "]"
       Field
         Id "arguments"
@@ -50,10 +52,12 @@ Root
       FieldPattern function:
         Alternation
           Alternative
-            CapturedPattern @name
+            CapturedPattern
               NamedNode identifier
+              Capture @name
           Alternative
-            CapturedPattern @inner
+            CapturedPattern
               Ref NestedCall
+              Capture @inner
       FieldPattern arguments:
         NamedNode arguments

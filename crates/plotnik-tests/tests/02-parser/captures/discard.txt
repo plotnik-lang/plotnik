@@ -8,17 +8,19 @@ Root
     NamedNode
       ParenOpen "("
       Id "call"
-      Capture
+      CapturedPattern
         NamedNode
           ParenOpen "("
           Id "arguments"
           ParenClose ")"
-        DiscardToken "@_"
+        Capture
+          DiscardToken "@_"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode call
-      CapturedPattern @_
+      CapturedPattern
         NamedNode arguments
+        Capture @_

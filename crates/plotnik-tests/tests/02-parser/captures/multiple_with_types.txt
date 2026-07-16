@@ -8,11 +8,11 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       NamedNode
         ParenOpen "("
         Id "binary"
-        Capture
+        CapturedPattern
           Field
             Id "left"
             Colon ":"
@@ -20,11 +20,12 @@ Root
               ParenOpen "("
               Underscore "_"
               ParenClose ")"
-          CaptureToken "@left"
-          CaptureType
-            DoubleColon "::"
-            Id "Lhs"
-        Capture
+          Capture
+            CaptureToken "@left"
+            CaptureType
+              DoubleColon "::"
+              Id "Lhs"
+        CapturedPattern
           Field
             Id "right"
             Colon ":"
@@ -32,24 +33,32 @@ Root
               ParenOpen "("
               Underscore "_"
               ParenClose ")"
-          CaptureToken "@right"
-          CaptureType
-            DoubleColon "::"
-            Id "Rhs"
+          Capture
+            CaptureToken "@right"
+            CaptureType
+              DoubleColon "::"
+              Id "Rhs"
         ParenClose ")"
-      CaptureToken "@expr"
-      CaptureType
-        DoubleColon "::"
-        Id "BinaryExpr"
+      Capture
+        CaptureToken "@expr"
+        CaptureType
+          DoubleColon "::"
+          Id "BinaryExpr"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @expr :: BinaryExpr
+    CapturedPattern
       NamedNode binary
-        CapturedPattern @left :: Lhs
+        CapturedPattern
           FieldPattern left:
             NamedNode (any)
-        CapturedPattern @right :: Rhs
+          Capture @left
+            CaptureType Lhs
+        CapturedPattern
           FieldPattern right:
             NamedNode (any)
+          Capture @right
+            CaptureType Rhs
+      Capture @expr
+        CaptureType BinaryExpr

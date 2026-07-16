@@ -31,13 +31,24 @@ export interface Q {
   x: string | null;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `text` replaces structured data with source text
-  --> query.ptk:16:12
+warning: capture type `text` replaces the record value captured by `@x` with source text
+  --> query.ptk:16:9
    |
+ 3 |     (comment) @c
+   |               -- this captured value is suppressed by `@x :: text`
+...
+ 6 |   Base: (comment) @c
+   |                   -- this captured value is suppressed by `@x :: text`
+...
+10 |   (Body)?? @first
+   |            ------ this captured value is suppressed by `@x :: text`
+11 |   (Body)? @second
+   |           ------- this captured value is suppressed by `@x :: text`
+...
 16 |     (B) @x :: text
-   |            ^^^^^^^
+   |         ^^^^^^^^^^
    |
-help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+help: remove `:: text` to return the record value instead
 --------------------- OUTPUT ---------------------
 {
   "rest": "//stop",

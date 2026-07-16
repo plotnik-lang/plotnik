@@ -81,7 +81,7 @@ impl NodeKind {
             SyntaxKind::Alternative => Self::Prefix(PrefixKind::Alternative {
                 labeled: has_direct_token(elements, SyntaxKind::Id),
             }),
-            SyntaxKind::Capture => Self::Suffix(SuffixKind::Capture),
+            SyntaxKind::CapturedPattern => Self::Suffix(SuffixKind::Capture),
             SyntaxKind::Quantifier => Self::Suffix(SuffixKind::Quantifier),
             SyntaxKind::DefRef | SyntaxKind::Str | SyntaxKind::Wildcard => Self::PatternAtom,
             SyntaxKind::Anchor => Self::Anchor,

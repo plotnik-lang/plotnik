@@ -8,25 +8,26 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       Alternation
         BracketOpen "["
         Alternative
           Id "Base"
           Colon ":"
-          Capture
+          CapturedPattern
             NamedNode
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
-            CaptureToken "@name"
+            Capture
+              CaptureToken "@name"
         Alternative
           Id "Access"
           Colon ":"
           NamedNode
             ParenOpen "("
             Id "member_expression"
-            Capture
+            CapturedPattern
               Field
                 Id "object"
                 Colon ":"
@@ -34,24 +35,30 @@ Root
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-              CaptureToken "@obj"
+              Capture
+                CaptureToken "@obj"
             ParenClose ")"
         BracketClose "]"
-      CaptureToken "@chain"
-      CaptureType
-        DoubleColon "::"
-        Id "MemberChain"
+      Capture
+        CaptureToken "@chain"
+        CaptureType
+          DoubleColon "::"
+          Id "MemberChain"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @chain :: MemberChain
+    CapturedPattern
       Alternation
         Alternative Base:
-          CapturedPattern @name
+          CapturedPattern
             NamedNode identifier
+            Capture @name
         Alternative Access:
           NamedNode member_expression
-            CapturedPattern @obj
+            CapturedPattern
               FieldPattern object:
                 NamedNode (any)
+              Capture @obj
+      Capture @chain
+        CaptureType MemberChain

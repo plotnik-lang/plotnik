@@ -8,19 +8,21 @@ Root
     NamedNode
       ParenOpen "("
       Id "pair"
-      Capture
+      CapturedPattern
         Field
           Id "key"
           Colon ":"
           Wildcard
             Underscore "_"
-        CaptureToken "@key"
+        Capture
+          CaptureToken "@key"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode pair
-      CapturedPattern @key
+      CapturedPattern
         FieldPattern key:
           NodeWildcard
+        Capture @key

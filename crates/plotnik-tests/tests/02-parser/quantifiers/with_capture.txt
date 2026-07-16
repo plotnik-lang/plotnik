@@ -5,18 +5,20 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       Quantifier
         NamedNode
           ParenOpen "("
           Id "statement"
           ParenClose ")"
         Star "*"
-      CaptureToken "@statements"
+      Capture
+        CaptureToken "@statements"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @statements
+    CapturedPattern
       QuantifiedPattern *
         NamedNode statement
+      Capture @statements

@@ -18,46 +18,49 @@ Root
       Alternative
         Id "Ident"
         Colon ":"
-        Capture
+        CapturedPattern
           NamedNode
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
-          CaptureToken "@name"
-          CaptureType
-            DoubleColon "::"
-            Id "Foo"
+          Capture
+            CaptureToken "@name"
+            CaptureType
+              DoubleColon "::"
+              Id "Foo"
       Alternative
         Id "Num"
         Colon ":"
-        Capture
+        CapturedPattern
           NamedNode
             ParenOpen "("
             Id "number"
             ParenClose ")"
-          CaptureToken "@value"
-          CaptureType
-            DoubleColon "::"
-            Id "Foo"
+          Capture
+            CaptureToken "@value"
+            CaptureType
+              DoubleColon "::"
+              Id "Foo"
       Alternative
         Id "Str"
         Colon ":"
-        Capture
+        CapturedPattern
           NamedNode
             ParenOpen "("
             Id "string"
             ParenClose ")"
-          CaptureToken "@value"
-          CaptureType
-            DoubleColon "::"
-            Id "Foo"
+          Capture
+            CaptureToken "@value"
+            CaptureType
+              DoubleColon "::"
+              Id "Foo"
       Alternative
         Id "Binary"
         Colon ":"
         NamedNode
           ParenOpen "("
           Id "binary_expression"
-          Capture
+          CapturedPattern
             Field
               Id "left"
               Colon ":"
@@ -65,8 +68,9 @@ Root
                 ParenOpen "("
                 Id "Expression"
                 ParenClose ")"
-            CaptureToken "@left"
-          Capture
+            Capture
+              CaptureToken "@left"
+          CapturedPattern
             Field
               Id "right"
               Colon ":"
@@ -74,7 +78,8 @@ Root
                 ParenOpen "("
                 Id "Expression"
                 ParenClose ")"
-            CaptureToken "@right"
+            Capture
+              CaptureToken "@right"
           ParenClose ")"
       BracketClose "]"
 ---------------------- AST -----------------------
@@ -83,19 +88,27 @@ Root
   Def Expression
     Alternation
       Alternative Ident:
-        CapturedPattern @name :: Foo
+        CapturedPattern
           NamedNode identifier
+          Capture @name
+            CaptureType Foo
       Alternative Num:
-        CapturedPattern @value :: Foo
+        CapturedPattern
           NamedNode number
+          Capture @value
+            CaptureType Foo
       Alternative Str:
-        CapturedPattern @value :: Foo
+        CapturedPattern
           NamedNode string
+          Capture @value
+            CaptureType Foo
       Alternative Binary:
         NamedNode binary_expression
-          CapturedPattern @left
+          CapturedPattern
             FieldPattern left:
               Ref Expression
-          CapturedPattern @right
+            Capture @left
+          CapturedPattern
             FieldPattern right:
               Ref Expression
+            Capture @right

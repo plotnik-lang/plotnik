@@ -6,32 +6,36 @@ Root
   Def
     Id "Expr"
     Equals "="
-    Capture
+    CapturedPattern
       NamedNode
         ParenOpen "("
         Id "identifier"
         ParenClose ")"
-      CaptureToken "@id"
+      Capture
+        CaptureToken "@id"
   Def
     Id "Q"
     Equals "="
     NamedNode
       ParenOpen "("
       Id "call"
-      Capture
+      CapturedPattern
         DefRef
           ParenOpen "("
           Id "Expr"
           ParenClose ")"
-        CaptureToken "@inner"
+        Capture
+          CaptureToken "@inner"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Expr
-    CapturedPattern @id
+    CapturedPattern
       NamedNode identifier
+      Capture @id
   Def Q
     NamedNode call
-      CapturedPattern @inner
+      CapturedPattern
         Ref Expr
+        Capture @inner

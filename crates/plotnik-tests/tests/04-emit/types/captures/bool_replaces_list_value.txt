@@ -1,0 +1,30 @@
+Q = (program
+  [
+    {
+      (comment) @comment
+    }* @items :: bool
+    (expression_statement)
+  ]
+)
+------------------ DIAGNOSTICS -------------------
+warning: capture type `bool` replaces the list value captured by `@items` with a presence boolean
+ --> query.ptk:5:8
+  |
+3 | /     {
+4 | |       (comment) @comment
+  | |                 -------- this captured value is suppressed by `@items :: bool`
+5 | |     }* @items :: bool
+  | |      - ^^^^^^^^^^^^^^
+  | |______|
+  |        `@items` no longer contains the collected items
+  |
+help: remove `:: bool` to return the list value instead
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  items: boolean;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q {
+    pub items: bool,
+}

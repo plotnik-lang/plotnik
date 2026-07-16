@@ -8,17 +8,19 @@ Root
     NamedNode
       ParenOpen "("
       Id "binary_expression"
-      Capture
+      CapturedPattern
         Str
           DoubleQuote "\""
           StringContent "+"
           DoubleQuote "\""
-        CaptureToken "@op"
+        Capture
+          CaptureToken "@op"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode binary_expression
-      CapturedPattern @op
+      CapturedPattern
         AnonymousNode "+"
+        Capture @op

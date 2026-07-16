@@ -10,28 +10,32 @@ Root
     Equals "="
     Sequence
       BraceOpen "{"
-      Capture
+      CapturedPattern
         Quantifier
           NamedNode
             ParenOpen "("
             Id "comment"
             ParenClose ")"
           Star "*"
-        CaptureToken "@comments"
-      Capture
+        Capture
+          CaptureToken "@comments"
+      CapturedPattern
         NamedNode
           ParenOpen "("
           Id "function"
           ParenClose ")"
-        CaptureToken "@fn"
+        Capture
+          CaptureToken "@fn"
       BraceClose "}"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     Seq
-      CapturedPattern @comments
+      CapturedPattern
         QuantifiedPattern *
           NamedNode comment
-      CapturedPattern @fn
+        Capture @comments
+      CapturedPattern
         NamedNode function
+        Capture @fn

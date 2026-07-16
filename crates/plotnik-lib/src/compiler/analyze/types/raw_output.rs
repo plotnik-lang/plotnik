@@ -9,6 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+use crate::compiler::analyze::Located;
 use crate::compiler::analyze::types::capture_kind::CaptureKind;
 use crate::compiler::analyze::types::capture_type::{
     BuiltInCaptureType, CaptureFact, CaptureTypePlan, FieldCompletion, FieldCompletions,
@@ -22,7 +23,7 @@ use crate::compiler::analyze::types::type_shape::{
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast::Pattern;
+use crate::compiler::parse::ast::{CapturedPattern, Pattern};
 use crate::core::Symbol;
 
 mod normalize;
@@ -94,7 +95,7 @@ struct RawFlowId(u32);
 
 #[derive(Clone, Debug)]
 struct RawCaptureOutput {
-    occurrence: Pattern,
+    occurrence: Located<CapturedPattern>,
     observation: RawCaptureObservation,
 }
 
@@ -163,6 +164,7 @@ struct RawAlternationOutput {
 pub(crate) struct RawOutputGraph {
     captures: Vec<RawCaptureOutput>,
     flows: Vec<RawPatternOutput>,
+    capture_producer_ids_by_record_type: HashMap<TypeId, BTreeSet<RawCaptureId>>,
     alternations: HashMap<Pattern, RawAlternationOutput>,
 }
 
@@ -177,6 +179,15 @@ impl RawOutputGraph {
         self.flows
             .get(id.0 as usize)
             .expect("raw flow id must reference a recorded pattern")
+    }
+
+    fn capture_producer_ids_for_record_type(
+        &self,
+        record_type_id: TypeId,
+    ) -> &BTreeSet<RawCaptureId> {
+        self.capture_producer_ids_by_record_type
+            .get(&record_type_id)
+            .expect("raw record type must retain its capture producers")
     }
 }
 /// Mutable recorder used only by the raw inference builder.
@@ -193,23 +204,22 @@ pub(crate) struct RawOutputGraphBuilder {
 impl RawOutputGraphBuilder {
     pub(crate) fn record_capture(
         &mut self,
-        occurrence: Pattern,
+        captured_pattern: Located<CapturedPattern>,
         observation: RawCaptureObservation,
     ) {
-        if let Some(&id) = self.capture_ids.get(&occurrence) {
-            self.captures[id.0 as usize] = RawCaptureOutput {
-                occurrence,
-                observation,
-            };
+        let pattern_key = Pattern::CapturedPattern(captured_pattern.node().clone());
+        let output = RawCaptureOutput {
+            occurrence: captured_pattern,
+            observation,
+        };
+        if let Some(&id) = self.capture_ids.get(&pattern_key) {
+            self.captures[id.0 as usize] = output;
             return;
         }
 
         let id = RawCaptureId(self.captures.len() as u32);
-        self.capture_ids.insert(occurrence.clone(), id);
-        self.captures.push(RawCaptureOutput {
-            occurrence,
-            observation,
-        });
+        self.capture_ids.insert(pattern_key, id);
+        self.captures.push(output);
     }
 
     pub(crate) fn record_pattern(
@@ -279,9 +289,23 @@ impl RawOutputGraphBuilder {
     }
 
     pub(crate) fn finish(self) -> RawOutputGraph {
+        let mut capture_producer_ids_by_record_type: HashMap<TypeId, BTreeSet<RawCaptureId>> =
+            HashMap::new();
+        for output in &self.flows {
+            let RawPatternFlow::Fields(flow) = &output.flow else {
+                continue;
+            };
+            let producer_ids = capture_producer_ids_by_record_type
+                .entry(flow.type_id)
+                .or_default();
+            for field in flow.fields.values() {
+                producer_ids.extend(field.producers.iter().copied());
+            }
+        }
         RawOutputGraph {
             captures: self.captures,
             flows: self.flows,
+            capture_producer_ids_by_record_type,
             alternations: self.alternations,
         }
     }

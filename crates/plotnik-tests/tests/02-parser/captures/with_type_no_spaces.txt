@@ -5,18 +5,21 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       NamedNode
         ParenOpen "("
         Id "identifier"
         ParenClose ")"
-      CaptureToken "@name"
-      CaptureType
-        DoubleColon "::"
-        Id "Foo"
+      Capture
+        CaptureToken "@name"
+        CaptureType
+          DoubleColon "::"
+          Id "Foo"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @name :: Foo
+    CapturedPattern
       NamedNode identifier
+      Capture @name
+        CaptureType Foo

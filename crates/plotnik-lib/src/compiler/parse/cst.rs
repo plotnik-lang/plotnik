@@ -200,6 +200,7 @@ pub enum SyntaxKind {
     DefRef,
     Str,
     Field,
+    CapturedPattern,
     Capture,
     CaptureType,
     Quantifier,

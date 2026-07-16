@@ -57,17 +57,17 @@ impl GuardedRefOutput {
 impl CaptureRequest {
     fn for_capture(
         compiler: &mut NfaBuilder<'_>,
-        cap: &ast::CapturedPattern,
+        captured_pattern: &ast::CapturedPattern,
         nav: Option<Nav>,
         mechanism: CaptureKind,
         outer_capture: CaptureEffects,
     ) -> Self {
         Self {
-            inner: cap
+            inner: captured_pattern
                 .inner()
                 .expect("ordinary capture request has an inner pattern"),
             nav,
-            capture_effects: compiler.build_capture_effects(cap, Some(mechanism)),
+            capture_effects: compiler.build_capture_effects(captured_pattern, Some(mechanism)),
             outer_capture,
         }
     }
@@ -1258,18 +1258,18 @@ impl NfaBuilder<'_> {
     /// - Suppressed region: SuppressBegin → inner → SuppressEnd → outer_effects → exit
     pub(super) fn compile_captured(
         &mut self,
-        cap: &ast::CapturedPattern,
+        captured_pattern: &ast::CapturedPattern,
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
         exits: CaptureExits,
     ) -> Label {
-        let inner_opt = cap.inner();
+        let inner_opt = captured_pattern.inner();
         // Must precede mechanism dispatch: discards ignore the mechanism
         // entirely and must not build any capture effects for it. Inside an
         // already-suppressed region every capture is equally inert — inference
         // dropped its field, so emitting `RecordSet` would resolve against the wrong
         // scope (the panic behind #470).
-        if cap.is_discard() || self.is_suppressed() {
+        if captured_pattern.capture().is_discard() || self.is_suppressed() {
             return self.compile_suppressed_region(
                 inner_opt.as_ref(),
                 nav_override,
@@ -1278,27 +1278,33 @@ impl NfaBuilder<'_> {
             );
         }
 
-        let capture_pattern = Pattern::CapturedPattern(cap.clone());
+        let pattern = Pattern::CapturedPattern(captured_pattern.clone());
         let fact = self
             .ctx
             .analysis
             .type_analysis
-            .expect_capture_fact(&capture_pattern);
+            .expect_capture_fact(&pattern);
         let mechanism = inner_opt.as_ref().map(|_| fact.kind());
         let capture_type_plan = fact.built_in_plan().map(|(_, plan)| plan.clone());
 
         if let (Some(_), Some(plan)) = (inner_opt.as_ref(), capture_type_plan.as_ref()) {
             return self
                 .capture_type(plan, nav_override, exits)
-                .captured(cap, outer_capture);
+                .captured(captured_pattern, outer_capture);
         }
 
         let Some(mechanism) = mechanism else {
-            let capture_effects = self.build_capture_effects(cap, None);
+            let capture_effects = self.build_capture_effects(captured_pattern, None);
             return self.emit_effects_epsilon(exits.match_exit(), capture_effects, outer_capture);
         };
 
-        let req = CaptureRequest::for_capture(self, cap, nav_override, mechanism, outer_capture);
+        let req = CaptureRequest::for_capture(
+            self,
+            captured_pattern,
+            nav_override,
+            mechanism,
+            outer_capture,
+        );
 
         match mechanism {
             // List: `ListOpen → quantifier (with ArrayPush) → ListClose+capture → exit(s)`.

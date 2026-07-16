@@ -7,13 +7,15 @@ Q = (program
   ]
 )
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `bool` replaces the captured value with a boolean
- --> query.ptk:5:13
+warning: capture type `bool` replaces the record value captured by `@seen` with a presence boolean
+ --> query.ptk:5:7
   |
+4 |       (expression_statement) @item
+  |                              ----- this captured value is suppressed by `@seen :: bool`
 5 |     } @seen :: bool
-  |             ^^^^^^^
+  |       ^^^^^^^^^^^^^
   |
-help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+help: remove `:: bool` to return the record value instead
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 14

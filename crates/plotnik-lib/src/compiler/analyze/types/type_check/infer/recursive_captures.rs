@@ -64,13 +64,15 @@ impl InferVisitor<'_, '_> {
         };
 
         match pattern {
-            Pattern::CapturedPattern(cap) => {
+            Pattern::CapturedPattern(captured_pattern) => {
                 // A suppressed subtree makes no result-construction demands (inline checks
                 // skip it too).
-                if cap.is_discard() {
+                if captured_pattern.capture().is_discard() {
                     return;
                 }
-                let Some(inner) = cap.inner() else { return };
+                let Some(inner) = captured_pattern.inner() else {
+                    return;
+                };
                 match &inner {
                     Pattern::DefRef(_) => {
                         if let Some(shape) =

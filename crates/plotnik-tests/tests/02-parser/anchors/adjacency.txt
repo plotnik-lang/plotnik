@@ -12,28 +12,32 @@ Root
     NamedNode
       ParenOpen "("
       Id "dotted_name"
-      Capture
+      CapturedPattern
         NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
-        CaptureToken "@a"
+        Capture
+          CaptureToken "@a"
       Anchor
         Dot "."
-      Capture
+      CapturedPattern
         NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
-        CaptureToken "@b"
+        Capture
+          CaptureToken "@b"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode dotted_name
-      CapturedPattern @a
+      CapturedPattern
         NamedNode identifier
+        Capture @a
       .
-      CapturedPattern @b
+      CapturedPattern
         NamedNode identifier
+        Capture @b

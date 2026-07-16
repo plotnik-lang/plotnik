@@ -12,13 +12,22 @@ export interface Q {
   value: string | null;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `text` replaces structured data with source text
- --> query.ptk:7:12
+warning: capture type `text` replaces the variant value captured by `@value` with source text
+ --> query.ptk:7:5
   |
-7 |   ] @value :: text
-  |            ^^^^^^^
+2 | /   [
+3 | |     Empty: {
+4 | |       (comment)? @comment
+  | |                  -------- this captured value is suppressed by `@value :: text`
+5 | |     }
+6 | |     Expr: (expression_statement) @expression
+  | |                                  ----------- this captured value is suppressed by `@value :: text`
+7 | |   ] @value :: text
+  | |   - ^^^^^^^^^^^^^^
+  | |___|
+  |     `@value` no longer identifies the matched case: `Empty` or `Expr`
   |
-help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+help: remove `:: text` to return the variant value instead
 --------------------- OUTPUT ---------------------
 {
   "value": null

@@ -165,7 +165,8 @@ ast_node!(
 );
 ast_node!(Alternative, Alternative);
 ast_node!(SeqPattern, Sequence);
-ast_node!(CapturedPattern, Capture);
+ast_node!(CapturedPattern, CapturedPattern);
+ast_node!(Capture, Capture);
 ast_node!(CaptureTypeSyntax, CaptureType);
 ast_node!(QuantifiedPattern, Quantifier);
 ast_node!(FieldPattern, Field);
@@ -531,6 +532,19 @@ macro_rules! sequence_accessors {
 sequence_accessors!(NamedNodePattern, SeqPattern);
 
 impl CapturedPattern {
+    pub fn capture(&self) -> Capture {
+        self.0
+            .children()
+            .find_map(Capture::cast)
+            .expect("captured pattern must contain capture syntax")
+    }
+
+    pub fn inner(&self) -> Option<Pattern> {
+        self.0.children().find_map(Pattern::cast)
+    }
+}
+
+impl Capture {
     /// Returns the capture token (@name or @_name).
     /// The token text includes the @ prefix.
     pub fn name(&self) -> Option<SyntaxToken> {
@@ -543,10 +557,6 @@ impl CapturedPattern {
     /// Discards match structurally but don't contribute to output.
     pub fn is_discard(&self) -> bool {
         find_token(&self.0, |k| k == SyntaxKind::DiscardToken).is_some()
-    }
-
-    pub fn inner(&self) -> Option<Pattern> {
-        self.0.children().find_map(Pattern::cast)
     }
 
     pub fn capture_type(&self) -> Option<CaptureTypeSyntax> {

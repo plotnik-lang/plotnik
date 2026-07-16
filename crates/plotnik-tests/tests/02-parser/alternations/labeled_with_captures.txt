@@ -8,7 +8,7 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       Alternation
         BracketOpen "["
         Alternative
@@ -17,7 +17,7 @@ Root
           NamedNode
             ParenOpen "("
             Id "assignment_expression"
-            Capture
+            CapturedPattern
               Field
                 Id "left"
                 Colon ":"
@@ -25,7 +25,8 @@ Root
                   ParenOpen "("
                   Id "identifier"
                   ParenClose ")"
-              CaptureToken "@left"
+              Capture
+                CaptureToken "@left"
             ParenClose ")"
         Alternative
           Id "Call"
@@ -33,7 +34,7 @@ Root
           NamedNode
             ParenOpen "("
             Id "call_expression"
-            Capture
+            CapturedPattern
               Field
                 Id "function"
                 Colon ":"
@@ -41,23 +42,28 @@ Root
                   ParenOpen "("
                   Id "identifier"
                   ParenClose ")"
-              CaptureToken "@func"
+              Capture
+                CaptureToken "@func"
             ParenClose ")"
         BracketClose "]"
-      CaptureToken "@stmt"
+      Capture
+        CaptureToken "@stmt"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @stmt
+    CapturedPattern
       Alternation
         Alternative Assign:
           NamedNode assignment_expression
-            CapturedPattern @left
+            CapturedPattern
               FieldPattern left:
                 NamedNode identifier
+              Capture @left
         Alternative Call:
           NamedNode call_expression
-            CapturedPattern @func
+            CapturedPattern
               FieldPattern function:
                 NamedNode identifier
+              Capture @func
+      Capture @stmt

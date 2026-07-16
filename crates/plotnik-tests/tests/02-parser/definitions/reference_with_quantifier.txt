@@ -16,14 +16,15 @@ Root
     NamedNode
       ParenOpen "("
       Id "list"
-      Capture
+      CapturedPattern
         Quantifier
           DefRef
             ParenOpen "("
             Id "Item"
             ParenClose ")"
           Star "*"
-        CaptureToken "@items"
+        Capture
+          CaptureToken "@items"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
@@ -32,6 +33,7 @@ Root
     NamedNode identifier
   Def Q
     NamedNode list
-      CapturedPattern @items
+      CapturedPattern
         QuantifiedPattern *
           Ref Item
+        Capture @items

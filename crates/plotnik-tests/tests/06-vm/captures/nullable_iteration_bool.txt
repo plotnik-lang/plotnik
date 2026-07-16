@@ -10,13 +10,15 @@ export interface Q {
   present: boolean;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `bool` replaces the captured value with a boolean
- --> query.ptk:4:15
+warning: capture type `bool` replaces the record value captured by `@present` with a presence boolean
+ --> query.ptk:4:6
   |
+3 |     (comment)? @comment
+  |                -------- this captured value is suppressed by `@present :: bool`
 4 |   }? @present :: bool
-  |               ^^^^^^^
+  |      ^^^^^^^^^^^^^^^^
   |
-help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+help: remove `:: bool` to return the record value instead
 --------------------- OUTPUT ---------------------
 {
   "present": false

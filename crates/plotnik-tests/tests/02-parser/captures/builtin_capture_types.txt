@@ -11,37 +11,43 @@ Root
     NamedNode
       ParenOpen "("
       Id "program"
-      Capture
+      CapturedPattern
         Quantifier
           NamedNode
             ParenOpen "("
             Id "comment"
             ParenClose ")"
           Question "?"
-        CaptureToken "@doc"
-        CaptureType
-          DoubleColon "::"
-          Id "text"
-      Capture
+        Capture
+          CaptureToken "@doc"
+          CaptureType
+            DoubleColon "::"
+            Id "text"
+      CapturedPattern
         Quantifier
           NamedNode
             ParenOpen "("
             Id "expression_statement"
             ParenClose ")"
           Question "?"
-        CaptureToken "@has_statement"
-        CaptureType
-          DoubleColon "::"
-          Id "bool"
+        Capture
+          CaptureToken "@has_statement"
+          CaptureType
+            DoubleColon "::"
+            Id "bool"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode program
-      CapturedPattern @doc :: text
+      CapturedPattern
         QuantifiedPattern ?
           NamedNode comment
-      CapturedPattern @has_statement :: bool
+        Capture @doc
+          CaptureType text
+      CapturedPattern
         QuantifiedPattern ?
           NamedNode expression_statement
+        Capture @has_statement
+          CaptureType bool

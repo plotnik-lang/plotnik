@@ -8,7 +8,7 @@ Root
     NamedNode
       ParenOpen "("
       Id "call"
-      Capture
+      CapturedPattern
         Field
           Id "function"
           Colon ":"
@@ -16,13 +16,15 @@ Root
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
-        CaptureToken "@func"
+        Capture
+          CaptureToken "@func"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode call
-      CapturedPattern @func
+      CapturedPattern
         FieldPattern function:
           NamedNode identifier
+        Capture @func
