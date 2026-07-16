@@ -25,6 +25,7 @@
 <br/>
 
 Plotnik is the tool for working with Tree-sitter reliably:
+
 - Write queries with [familiar syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html).
 - Generate extractors in your language (Rust + more to come).
 - Get structured results without walking the tree or assembling flat captures.
@@ -48,9 +49,9 @@ async function fetchUser(userId, options) {
 Function = (program
   (function_declaration
     "async"? @async :: bool
-    name: (identifier) @name :: str
+    name: (identifier) @name :: text
     parameters: (formal_parameters
-      (identifier)* @args :: str
+      (identifier)* @args :: text
     )
     body: (statement_block) @body
   )

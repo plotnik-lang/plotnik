@@ -728,15 +728,15 @@ impl<'a> Generator<'a> {
             EffectKind::ScalarMark => {
                 let _ = writeln!(out, "{indent}eng.scalar_mark();");
             }
-            EffectKind::StrClose => {
-                let _ = writeln!(out, "{indent}eng.scalar_close_str();");
+            EffectKind::TextClose => {
+                let _ = writeln!(out, "{indent}eng.scalar_close_text();");
             }
             EffectKind::BoolClose => {
                 let value = effect.payload != 0;
                 let _ = writeln!(out, "{indent}eng.scalar_close_bool({value});");
             }
-            EffectKind::NodeStr => {
-                let _ = writeln!(out, "{indent}eng.node_str();");
+            EffectKind::NodeText => {
+                let _ = writeln!(out, "{indent}eng.node_text();");
             }
             EffectKind::NodeBool => {
                 let _ = writeln!(out, "{indent}eng.node_bool();");

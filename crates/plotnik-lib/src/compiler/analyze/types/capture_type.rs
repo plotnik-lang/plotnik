@@ -16,14 +16,14 @@ use super::type_shape::RecordField;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BuiltInCaptureType {
-    Str,
+    Text,
     Bool,
 }
 
 impl BuiltInCaptureType {
     pub fn parse(name: &str) -> Option<Self> {
         match name {
-            "str" => Some(Self::Str),
+            "text" => Some(Self::Text),
             "bool" => Some(Self::Bool),
             _ => None,
         }

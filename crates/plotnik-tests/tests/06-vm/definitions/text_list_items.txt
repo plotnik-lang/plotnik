@@ -1,7 +1,7 @@
 Comments = (comment)*
 
 Q = (program
-  (Comments) @comments :: str
+  (Comments) @comments :: text
 )
 --------------------- INPUT ----------------------
 // first
@@ -54,7 +54,7 @@ Q:
   08  ─‣┘  _ [RecordSet(M0)]                10
   10                                        ▶
   11  -ε-  [ListClose RecordSet(M0)]        10
-  13   !   (comment) [NodeStr ArrayPush]    16, 06
+  13   !   (comment) [NodeText ArrayPush]   16, 06
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
@@ -72,11 +72,11 @@ Q:
   20  -ε-  [ListOpen]                       18, 11
   18       _                                13, 16
        ●   comment
-  13       (comment) [NodeStr ArrayPush]    16, 06
+  13       (comment) [NodeText ArrayPush]   16, 06
        ●   comment
   16       _                                13, 16
        ●   comment
-  13       (comment) [NodeStr ArrayPush]    16, 06
+  13       (comment) [NodeText ArrayPush]   16, 06
        ●   comment
   16       _                                13, 16
   13  ❮❮❮ 

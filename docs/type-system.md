@@ -418,15 +418,15 @@ NestedCall = (call_expression
 ## Capture Types
 
 Analysis first infers and validates the ordinary capture, then applies the
-written capture type. Removing `:: str` or `:: bool` therefore always leaves
+written capture type. Removing `:: text` or `:: bool` therefore always leaves
 an independently valid capture.
 
-### Built-in `str`
+### Built-in `text`
 
-`str` replaces each terminal value with the document byte range owned by that value
+`text` replaces each terminal value with the document byte range owned by that value
 and preserves its existing containers:
 
-| Ordinary type     | `:: str` result     |
+| Ordinary type     | `:: text` result    |
 | ----------------- | ------------------- |
 | `Node`            | `string`            |
 | `Node \| null`    | `string \| null`    |
@@ -463,7 +463,7 @@ elements.
 ### Custom capture types
 
 PascalCase capture types assign nominal names without changing the underlying
-value. `str` and `bool` are the only lowercase built-ins; `:: Str` and
+value. `text` and `bool` are the only lowercase built-ins; `:: Text` and
 `:: Bool` are custom names. A custom name may name a captured node or a
 composite shape; it cannot name the result of a built-in capture type because
 each capture has only one capture-type position.

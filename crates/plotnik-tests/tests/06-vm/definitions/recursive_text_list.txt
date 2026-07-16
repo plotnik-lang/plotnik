@@ -1,5 +1,5 @@
 A = (program
-  (B) @comments :: str
+  (B) @comments :: text
 )
 
 B = [
@@ -77,7 +77,7 @@ Q:
   14  ─‣┘  _ [RecordSet(M0)]                16
   16                                        ▶
   17  -ε-  [ListClose RecordSet(M0)]        16
-  19  -ε-  [StrClose ArrayPush]             64, 12
+  19  -ε-  [TextClose ArrayPush]            64, 12
   21   !   (comment) [ScalarMark]           19
   23                                        ▶
   24  -ε-  [RecordSet(M0)]                  23
@@ -85,7 +85,7 @@ Q:
   27                                        ▶ empty
   28  -ε-  [ListClose]                      26
   30  -ε-  [ListClose]                      27
-  32  -ε-  [StrClose ArrayPush]             44, 28
+  32  -ε-  [TextClose ArrayPush]            44, 28
   34   !   (comment) [ScalarMark]           32
   36  -ε-  [SuppressEnd]                    32
   38   !   (@53)                            53 : 36
@@ -132,13 +132,13 @@ Q:
   61  -ε-  [ScalarOpen]                     21, 59
   21       (comment) [ScalarMark]           19
        ●   comment
-  19  -ε-  [StrClose ArrayPush]             64, 12
+  19  -ε-  [TextClose ArrayPush]            64, 12
   64       _                                61, 64
        ●   comment
   61  -ε-  [ScalarOpen]                     21, 59
   21       (comment) [ScalarMark]           19
        ●   comment
-  19  -ε-  [StrClose ArrayPush]             64, 12
+  19  -ε-  [TextClose ArrayPush]            64, 12
   64       _                                61, 64
   19  ❮❮❮ 
   12  -ε-  [ListClose]                      14

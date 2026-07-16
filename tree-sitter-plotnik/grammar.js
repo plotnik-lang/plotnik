@@ -73,7 +73,7 @@ module.exports = grammar({
         ),
       ),
 
-    builtin_capture_type: (_) => choice("str", "bool"),
+    builtin_capture_type: (_) => choice("text", "bool"),
 
     // Lowercase names are syntactically complete so semantic analysis can
     // diagnose unknown built-ins. Custom names are PascalCase and deliberately

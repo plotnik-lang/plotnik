@@ -11,4 +11,4 @@ help: use `:: bool`
 1 - Q = (a) @x :: boolean
 1 + Q = (a) @x :: bool
   |
-help: write `:: str`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`
+help: write `:: text`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`

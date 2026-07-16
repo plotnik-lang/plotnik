@@ -93,7 +93,7 @@ impl<'a> ValueMaterializer<'a> {
                 JournalEvent::Absent => {
                     pending = Some(Value::Absent);
                 }
-                JournalEvent::NodeStr(node) => {
+                JournalEvent::NodeText(node) => {
                     pending = Some(Value::Text(plotnik_runtime::node_text(self.source, node)));
                 }
                 JournalEvent::NodeBool(_) => {
@@ -118,18 +118,18 @@ impl<'a> ValueMaterializer<'a> {
                         });
                     }
                 }
-                JournalEvent::StrClose => {
+                JournalEvent::TextClose => {
                     let top = stack.pop();
                     let Some(ValueAccumulator::Scalar(scalar)) = top else {
                         panic!(
-                            "event {event_idx}: StrClose expects Scalar on stack, found {:?}",
+                            "event {event_idx}: TextClose expects Scalar on stack, found {:?}",
                             top.as_ref().map(|frame| frame.kind())
                         );
                     };
                     assert_eq!(
                         scalar + 1,
                         scalar_ranges.len(),
-                        "event {event_idx}: StrClose violates scalar frame nesting"
+                        "event {event_idx}: TextClose violates scalar frame nesting"
                     );
                     let range = scalar_ranges
                         .pop()

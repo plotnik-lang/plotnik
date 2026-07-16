@@ -322,10 +322,9 @@ fn take_scalar_close_prefix(
         0
     };
 
-    if !effects
-        .get(close_index)
-        .is_some_and(|effect| matches!(effect.kind(), EffectKind::StrClose | EffectKind::BoolClose))
-    {
+    if !effects.get(close_index).is_some_and(|effect| {
+        matches!(effect.kind(), EffectKind::TextClose | EffectKind::BoolClose)
+    }) {
         return Vec::new();
     }
 

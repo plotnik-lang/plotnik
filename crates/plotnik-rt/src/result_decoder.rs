@@ -110,7 +110,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
             match &self.events[index] {
                 JournalEvent::ScalarOpen => depth += 1,
                 JournalEvent::ScalarMark(_) => marked = true,
-                JournalEvent::StrClose => {
+                JournalEvent::TextClose => {
                     depth -= 1;
                     if depth != 0 {
                         continue;
@@ -153,14 +153,14 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
     }
 
     pub fn expect_str(&mut self) -> &'s str {
-        if let Some(JournalEvent::NodeStr(node)) = self.peek() {
+        if let Some(JournalEvent::NodeText(node)) = self.peek() {
             let value = node_text(self.source, node);
             self.pos += 1;
             return value;
         }
         let (range, close) = self.read_scalar();
-        if !matches!(close, JournalEvent::StrClose) {
-            self.mismatch("StrClose", close);
+        if !matches!(close, JournalEvent::TextClose) {
+            self.mismatch("TextClose", close);
         }
         let range = range.expect("a non-null text decoder requires at least one scalar mark");
         source_text(self.source, range)
@@ -201,7 +201,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
                         None => mark,
                     });
                 }
-                JournalEvent::StrClose | JournalEvent::BoolClose(_) => {
+                JournalEvent::TextClose | JournalEvent::BoolClose(_) => {
                     depth -= 1;
                     if depth == 0 {
                         return (range, entry);
@@ -305,7 +305,7 @@ fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
             JournalEvent::ListClose
             | JournalEvent::RecordClose
             | JournalEvent::VariantClose
-            | JournalEvent::StrClose
+            | JournalEvent::TextClose
             | JournalEvent::BoolClose(_) => {
                 outer.push(cur);
                 cur = NO_RECORD_SET;

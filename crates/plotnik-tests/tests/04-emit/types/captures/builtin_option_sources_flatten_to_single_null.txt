@@ -1,7 +1,7 @@
 Q = (program
   [
     (expression_statement
-      (identifier)? @x :: str
+      (identifier)? @x :: text
     )
     (debugger_statement)
   ]

@@ -28,14 +28,14 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
         match capture_type {
-            BuiltInCaptureType::Str => self.plan_str(contract),
+            BuiltInCaptureType::Text => self.plan_text(contract),
             BuiltInCaptureType::Bool => self.plan_bool(contract.fact.field(), may_be_absent),
         }
     }
 
-    fn plan_str(&mut self, contract: RawCaptureContract) -> Result<PlannedCapture, &'static str> {
+    fn plan_text(&mut self, contract: RawCaptureContract) -> Result<PlannedCapture, &'static str> {
         let raw = contract.fact.field();
-        let (plan, absorbs_null) = self.str_plan(
+        let (plan, absorbs_null) = self.text_plan(
             raw.final_type,
             contract.zero_node_terminal,
             &mut HashSet::new(),
@@ -59,14 +59,14 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         })
     }
 
-    fn str_plan(
+    fn text_plan(
         &mut self,
         type_id: TypeId,
         zero_node_terminal: bool,
         visiting: &mut HashSet<TypeId>,
     ) -> Result<(CaptureTypePlan, bool), &'static str> {
         if !visiting.insert(type_id) {
-            return Err("capture type `str` cannot normalize a recursive container type");
+            return Err("capture type `text` cannot normalize a recursive container type");
         }
 
         let result = match self.raw.shape(type_id) {
@@ -86,7 +86,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 ))
             }
             TypeShape::Option(inner) => {
-                let (inner, _) = self.str_plan(*inner, false, visiting)?;
+                let (inner, _) = self.text_plan(*inner, false, visiting)?;
                 let option = self.types.intern_option(inner.final_type());
                 Ok((
                     CaptureTypePlan::option(option, OptionMode::Preserve, inner),
@@ -94,7 +94,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 ))
             }
             TypeShape::List { element, minimum } => {
-                let (element, _) = self.str_plan(*element, false, visiting)?;
+                let (element, _) = self.text_plan(*element, false, visiting)?;
                 let list = self.types.intern_type(TypeShape::List {
                     element: element.final_type(),
                     minimum: *minimum,
@@ -102,7 +102,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 Ok((CaptureTypePlan::list(list, element), false))
             }
             TypeShape::Ref(target) => {
-                self.str_plan(self.raw.declaration(*target), zero_node_terminal, visiting)
+                self.text_plan(self.raw.declaration(*target), zero_node_terminal, visiting)
             }
             TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")

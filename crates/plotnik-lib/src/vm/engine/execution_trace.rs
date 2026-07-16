@@ -159,9 +159,9 @@ impl TraceRecorder {
             JournalEvent::Absent => "Absent".to_string(),
             JournalEvent::ScalarOpen => "ScalarOpen".to_string(),
             JournalEvent::ScalarMark(_) => "ScalarMark".to_string(),
-            JournalEvent::StrClose => "StrClose".to_string(),
+            JournalEvent::TextClose => "TextClose".to_string(),
             JournalEvent::BoolClose(value) => format!("BoolClose({value})"),
-            JournalEvent::NodeStr(_) => "NodeStr".to_string(),
+            JournalEvent::NodeText(_) => "NodeText".to_string(),
             JournalEvent::NodeBool(_) => "NodeBool".to_string(),
             JournalEvent::BoolValue(value) => format!("BoolValue({value})"),
             JournalEvent::SpanStart { id, node } => {
@@ -198,9 +198,9 @@ impl TraceRecorder {
             EffectKind::SpanEnd => format!("SpanEnd#{payload}"),
             EffectKind::ScalarOpen => "ScalarOpen".to_string(),
             EffectKind::ScalarMark => "ScalarMark".to_string(),
-            EffectKind::StrClose => "StrClose".to_string(),
+            EffectKind::TextClose => "TextClose".to_string(),
             EffectKind::BoolClose => format!("BoolClose({})", payload != 0),
-            EffectKind::NodeStr => "NodeStr".to_string(),
+            EffectKind::NodeText => "NodeText".to_string(),
             EffectKind::NodeBool => "NodeBool".to_string(),
             EffectKind::BoolValue => format!("BoolValue({})", payload != 0),
         }
@@ -210,7 +210,7 @@ impl TraceRecorder {
         match event {
             JournalEvent::Node(node) => Some(trace_node(*node)),
             JournalEvent::ScalarMark(node) => Some(trace_node(*node)),
-            JournalEvent::NodeStr(node) | JournalEvent::NodeBool(node) => Some(trace_node(*node)),
+            JournalEvent::NodeText(node) | JournalEvent::NodeBool(node) => Some(trace_node(*node)),
             JournalEvent::SpanStart {
                 node: Some(node), ..
             } => Some(trace_node(*node)),

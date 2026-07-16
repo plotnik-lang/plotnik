@@ -1,7 +1,7 @@
 Comments = (comment)*
 
 Q = (program
-  (Comments) @comments :: str
+  (Comments) @comments :: text
 )
 ---------------------- NFA -----------------------
 [entry_points]
@@ -14,7 +14,7 @@ Q:
   03  ─‣┘  _ [RecordSet(comments)]          01
   06  -ε-  [ListClose]                      03
   07  -ε-  [ListClose RecordSet(comments)]  01
-  09   !   (comment) [NodeStr ArrayPush]    11, 06
+  09   !   (comment) [NodeText ArrayPush]   11, 06
   11  ──!  _                                09, 11
   12  └─!  _                                09, 11
   17  -ε-  [ListOpen]                       12, 07
@@ -60,7 +60,7 @@ Q:
   08  ─‣┘  _ [RecordSet(M0)]                10
   10                                        ▶
   11  -ε-  [ListClose RecordSet(M0)]        10
-  13   !   (comment) [NodeStr ArrayPush]    16, 06
+  13   !   (comment) [NodeText ArrayPush]   16, 06
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16

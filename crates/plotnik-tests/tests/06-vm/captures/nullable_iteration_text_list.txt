@@ -1,7 +1,7 @@
 Q = (program
   {
     (comment)? @comment
-  }* @comments :: str
+  }* @comments :: text
 )
 --------------------- INPUT ----------------------
 value;
@@ -10,11 +10,11 @@ export interface Q {
   comments: string[];
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `str` replaces structured data with source text
+warning: capture type `text` replaces structured data with source text
  --> query.ptk:4:16
   |
-4 |   }* @comments :: str
-  |                ^^^^^^
+4 |   }* @comments :: text
+  |                ^^^^^^^
   |
 help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
@@ -52,7 +52,7 @@ Q:
   06                                        ▶
   07  ...
   08  -ε-  [ListClose RecordSet(M0)]        06
-  10  -ε-  [StrClose ArrayPush]             20, 26
+  10  -ε-  [TextClose ArrayPush]            20, 26
   12   !   (comment) [ScalarMark]           10
   14  ──!  _                                12, 14
   16   !   _                                12, 14

@@ -1,5 +1,5 @@
 A = (program
-  (B) @comments :: str
+  (B) @comments :: text
 )
 
 B = [

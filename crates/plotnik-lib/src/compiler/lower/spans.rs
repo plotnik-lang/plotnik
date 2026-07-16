@@ -265,7 +265,7 @@ fn collect_pattern(
                     .built_in_plan()
                     .map(|(capture_type, _)| {
                         let primitive = match capture_type {
-                            BuiltInCaptureType::Str => TYPE_TEXT,
+                            BuiltInCaptureType::Text => TYPE_TEXT,
                             BuiltInCaptureType::Bool => TYPE_BOOL,
                         };
                         SpanBindingIR::Type(primitive)

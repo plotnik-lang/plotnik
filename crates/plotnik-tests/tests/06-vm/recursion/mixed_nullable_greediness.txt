@@ -13,12 +13,12 @@ B = {
 
 Q = (program
   {
-    (B) @x :: str
+    (B) @x :: text
     .!
     [
       (comment == "//b")
       (comment == "//stop")
-    ] @rest :: str
+    ] @rest :: text
   }
 )
 --------------------- INPUT ----------------------
@@ -31,11 +31,11 @@ export interface Q {
   x: string | null;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `str` replaces structured data with source text
+warning: capture type `text` replaces structured data with source text
   --> query.ptk:16:12
    |
-16 |     (B) @x :: str
-   |            ^^^^^^
+16 |     (B) @x :: text
+   |            ^^^^^^^
    |
 help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 --------------------- OUTPUT ---------------------
@@ -96,7 +96,7 @@ Q:
   02       (@76)                            76 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  -ε-  [StrClose RecordSet(M7)]         08
+  06  -ε-  [TextClose RecordSet(M7)]        08
   08  ─‣┘  _                                09
   09                                        ▶
   10  └─!  (comment) [ScalarMark] == "//b"  06
@@ -105,8 +105,8 @@ Q:
   16  ──!  (comment) [ScalarMark] == "//b"  06
   18  ──!  (comment) [ScalarMark] == "//stop"  06
   20  -ε-  [ScalarOpen]                     16, 18
-  22  -ε-  [StrClose RecordSet(M6)]         20
-  24  -ε-  [StrClose RecordSet(M6)]         14
+  22  -ε-  [TextClose RecordSet(M6)]        20
+  24  -ε-  [TextClose RecordSet(M6)]        14
   26                                        ▶
   27                                        ▶
   28                                        ▶ empty
@@ -217,7 +217,7 @@ Q:
 
 @76:
   54  -ε-  [SuppressEnd]                    22
-  22  -ε-  [StrClose RecordSet(M6)]         20
+  22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
@@ -245,7 +245,7 @@ Q:
 
 @76:
   54  -ε-  [SuppressEnd]                    22
-  22  -ε-  [StrClose RecordSet(M6)]         20
+  22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
@@ -267,13 +267,13 @@ Q:
 
 @76:
   54  -ε-  [SuppressEnd]                    22
-  22  -ε-  [StrClose RecordSet(M6)]         20
+  22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
   18       (comment) [ScalarMark] == "//stop"  06
        ●   comment
-  06  -ε-  [StrClose RecordSet(M7)]         08
+  06  -ε-  [TextClose RecordSet(M7)]        08
   08       _                                09
        ●   program
   09   ◀   (@76)                            

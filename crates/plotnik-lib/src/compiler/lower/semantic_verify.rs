@@ -716,7 +716,7 @@ impl<'a> Program<'a> {
         }
 
         match effect.kind() {
-            Node | Absent | NodeStr | NodeBool | BoolValue => {
+            Node | Absent | NodeText | NodeBool | BoolValue => {
                 if *state.pending == PendingState::Full {
                     return Err(SemanticVerifyError::EffectStack(label));
                 }
@@ -756,7 +756,7 @@ impl<'a> Program<'a> {
                 *state.pending = PendingState::Empty;
             }
             ListOpen | ListClose | RecordOpen | RecordClose | VariantOpen | VariantClose
-            | ScalarOpen | StrClose | BoolClose => {
+            | ScalarOpen | TextClose | BoolClose => {
                 unreachable!("frame effects return before data dispatch")
             }
         }

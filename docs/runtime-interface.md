@@ -64,7 +64,7 @@ A document binds together five things that must not drift independently:
 5. the binding-native node type returned in captured output.
 
 Rust spells this as separate `&Tree` and `&str` parameters. Output may borrow
-the two independently: node fields borrow the tree and `str` fields borrow the
+the two independently: node fields borrow the tree and text fields borrow the
 source. GC'd
 targets should normally expose one `Document` object so its ownership and
 encoding obligations cannot be separated accidentally.
@@ -303,9 +303,9 @@ Generated runtimes implement this vocabulary:
 | `VariantClose`      | Close the variant value and make it pending.       |
 | `ScalarOpen`        | Begin one value-local source-provenance frame.     |
 | `ScalarMark(node)`  | Add an explicit matched node to every open scalar. |
-| `StrClose`          | Close a scalar and produce source text or null.    |
+| `TextClose`         | Close a scalar and produce source text or null.    |
 | `BoolClose(value)`  | Close a scalar and produce the supplied boolean.   |
-| `NodeStr(node)`     | Produce one matched node's source text directly.   |
+| `NodeText(node)`    | Produce one matched node's source text directly.   |
 | `NodeBool(node)`    | Produce `true` for one matched node directly.      |
 | `BoolValue(value)`  | Produce a boolean without source provenance.       |
 
@@ -328,11 +328,11 @@ events in the generated-runtime ABI.
 
 Scalar events use balanced value semantics. `ScalarOpen` starts with no range;
 every mark expands the frame's document bounding range to include the node's
-half-open UTF-8 byte range. `StrClose` returns `null` when the range is absent and otherwise borrows that
+half-open UTF-8 byte range. `TextClose` returns `null` when the range is absent and otherwise borrows that
 slice from the source. A real `n..n` mark therefore returns `""`, not `null`.
 `BoolClose` uses its boolean payload and retains the bounding range only as result
 provenance; it never derives truthiness from marks.
-For a scalar whose raw value is one node, `NodeStr` and `NodeBool` are the
+For a scalar whose raw value is one node, `NodeText` and `NodeBool` are the
 equivalent one-entry fast path; the node also carries result provenance.
 Production lowering uses `BoolValue(true)` for presence booleans because their
 document range is not observable there; `NodeBool` and balanced boolean frames

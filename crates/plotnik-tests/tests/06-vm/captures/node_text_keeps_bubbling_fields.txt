@@ -1,7 +1,7 @@
 Q = (program
   (expression_statement
     (identifier) @id
-  ) @statement :: str
+  ) @statement :: text
 )
 --------------------- INPUT ----------------------
 value;
@@ -51,7 +51,7 @@ Q:
   03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  (identifier) [Node RecordSet(M1)]  08
-  08  ─‣┘² _ [NodeStr RecordSet(M0)]        10
+  08  ─‣┘² _ [NodeText RecordSet(M0)]       10
   10                                        ▶
   11  └‣─  (expression_statement)           06
   12   !   (program)                        11
@@ -68,7 +68,7 @@ Q:
        ●   expression_statement
   06       (identifier) [Node RecordSet(M1)]  08
        ●   identifier
-  08       _ [NodeStr RecordSet(M0)]        10
+  08       _ [NodeText RecordSet(M0)]       10
        ●   program
   10   ◀   (@12)                            
 

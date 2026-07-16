@@ -811,9 +811,9 @@ impl<'t> VM<'t> {
             EffectSuppression::Output => {
                 let logged = match op.kind {
                     ScalarOpen => self.engine.scalar_open(),
-                    StrClose => self.engine.scalar_close_str(),
+                    TextClose => self.engine.scalar_close_text(),
                     BoolClose => self.engine.scalar_close_bool(op.payload != 0),
-                    NodeStr => self.engine.node_str(),
+                    NodeText => self.engine.node_text(),
                     NodeBool => self.engine.node_bool(),
                     BoolValue => self.engine.bool_value(op.payload != 0),
                     _ => self.engine.emit_output_event(|cursor| match op.kind {
@@ -828,7 +828,7 @@ impl<'t> VM<'t> {
                         VariantClose => JournalEvent::VariantClose,
                         Absent => JournalEvent::Absent,
                         SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd
-                        | ScalarOpen | ScalarMark | StrClose | BoolClose | NodeStr | NodeBool
+                        | ScalarOpen | ScalarMark | TextClose | BoolClose | NodeText | NodeBool
                         | BoolValue => {
                             unreachable!("metadata routes non-ordinary output effects first")
                         }

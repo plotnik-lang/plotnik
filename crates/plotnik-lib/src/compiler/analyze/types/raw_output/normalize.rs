@@ -159,8 +159,8 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
                 .diagnostics
                 .report(DiagnosticKind::CaptureTypeReplacesData, span)
                 .detail(match capture_type {
-                    BuiltInCaptureType::Str => {
-                        "capture type `str` replaces structured data with source text"
+                    BuiltInCaptureType::Text => {
+                        "capture type `text` replaces structured data with source text"
                     }
                     BuiltInCaptureType::Bool => {
                         "capture type `bool` replaces the captured value with a boolean"

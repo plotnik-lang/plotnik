@@ -1,5 +1,5 @@
 Q = (program
-  (comment)? @doc :: str
+  (comment)? @doc :: text
   (expression_statement)? @has_statement :: bool
 )
 ---------------------- CST -----------------------
@@ -21,7 +21,7 @@ Root
         CaptureToken "@doc"
         CaptureType
           DoubleColon "::"
-          Id "str"
+          Id "text"
       Capture
         Quantifier
           NamedNode
@@ -39,7 +39,7 @@ Root
 Root
   Def Q
     NamedNode program
-      CapturedPattern @doc :: str
+      CapturedPattern @doc :: text
         QuantifiedPattern ?
           NamedNode comment
       CapturedPattern @has_statement :: bool

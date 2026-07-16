@@ -166,7 +166,7 @@ impl<'m> ProvenanceExtractor<'m> {
                         source_span: None,
                     });
                 }
-                JournalEvent::NodeStr(node) | JournalEvent::NodeBool(node) => {
+                JournalEvent::NodeText(node) | JournalEvent::NodeBool(node) => {
                     let source_span = Some(node_span(*node));
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
@@ -195,7 +195,7 @@ impl<'m> ProvenanceExtractor<'m> {
                         extend_bounding_range(&mut entry.source_span, source_span);
                     }
                 }
-                JournalEvent::StrClose | JournalEvent::BoolClose(_) => {
+                JournalEvent::TextClose | JournalEvent::BoolClose(_) => {
                     let scalar = self
                         .scalar_frames
                         .pop()

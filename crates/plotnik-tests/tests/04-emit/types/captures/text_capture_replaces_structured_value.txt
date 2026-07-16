@@ -4,14 +4,14 @@ Chunk = {
 }
 
 Q = (program
-  (Chunk) @text :: str
+  (Chunk) @text :: text
 )
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `str` replaces structured data with source text
+warning: capture type `text` replaces structured data with source text
  --> query.ptk:7:17
   |
-7 |   (Chunk) @text :: str
-  |                 ^^^^^^
+7 |   (Chunk) @text :: text
+  |                 ^^^^^^^
   |
 help: result fields, cases, text, or boolean values produced inside the capture will not be returned
 ------------------- TYPESCRIPT -------------------
