@@ -1,4 +1,20 @@
+use crate::compiler::DiagnosticKind;
 use crate::compiler::query::QueryBuilder;
+
+#[test]
+fn unclosed_legacy_sequence_is_an_error() {
+    let query = QueryBuilder::from_inline("((\"(\"")
+        .analyze()
+        .expect("query parsing stays within resource limits");
+
+    assert!(!query.is_valid());
+    assert!(
+        query
+            .diagnostics()
+            .kinds()
+            .any(|kind| kind == DiagnosticKind::UnclosedTree)
+    );
+}
 
 #[test]
 fn deeply_nested_trees_hit_recursion_limit() {
