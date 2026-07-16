@@ -8,11 +8,11 @@ use crate::core::{NodeFieldId, NodeKindId};
 
 use super::effects::{Effect, EffectKind};
 use super::instructions::{
-    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, RoutedCall, SplitCall,
-    SplitCallReturns, SuccessorAddr, align_to_section, select_match_opcode,
+    Call, CallOwnership, CalleeContract, EncodeError, Match, MatchInstr, MatchPredicate, Opcode,
+    Return, SuccessorAddr, align_to_section, select_match_opcode,
 };
 use super::node_kind_constraint::NodeKindConstraint;
-use plotnik_rt::Nav;
+use plotnik_rt::{Nav, PortId};
 
 #[test]
 fn from_u8_decodes_known_and_rejects_unknown() {
@@ -23,16 +23,15 @@ fn from_u8_decodes_known_and_rejects_unknown() {
         (0x3, Opcode::Match32),
         (0x4, Opcode::Match48),
         (0x5, Opcode::Match64),
-        (0x6, Opcode::Call),
-        (0x7, Opcode::Return),
-        (0x8, Opcode::SplitCall),
-        (0x9, Opcode::RoutedCall),
+        (0x6, Opcode::Call1),
+        (0x7, Opcode::CallN),
+        (0x8, Opcode::Return),
     ];
 
     for (nibble, expected) in known {
         assert_eq!(Opcode::from_u8(nibble), Some(expected));
     }
-    for nibble in 0xAu8..=0xF {
+    for nibble in 0x9u8..=0xF {
         assert_eq!(Opcode::from_u8(nibble), None, "nibble {nibble:#x}");
     }
 }
@@ -45,16 +44,16 @@ fn opcode_sizes() {
     assert_eq!(Opcode::Match32.size(), 32);
     assert_eq!(Opcode::Match48.size(), 48);
     assert_eq!(Opcode::Match64.size(), 64);
-    assert_eq!(Opcode::Call.size(), 8);
+    assert_eq!(Opcode::Call1.size(), 8);
     assert_eq!(Opcode::Return.size(), 8);
-    assert_eq!(Opcode::SplitCall.size(), 8);
-    assert_eq!(Opcode::RoutedCall.size(), 8);
+    assert_eq!(Opcode::CallN.size(), 24);
 }
 
 #[test]
 fn opcode_word_counts() {
     assert_eq!(Opcode::Match8.word_count(), 1);
     assert_eq!(Opcode::Match16.word_count(), 2);
+    assert_eq!(Opcode::CallN.word_count(), 3);
     assert_eq!(Opcode::Match32.word_count(), 4);
     assert_eq!(Opcode::Match64.word_count(), 8);
 }
@@ -91,55 +90,60 @@ fn align_to_section_works() {
 }
 
 #[test]
-fn call_roundtrip() {
+fn call1_roundtrip() {
+    let next = SuccessorAddr::try_from(100).expect("successor address must be non-zero");
     let c = Call::new(
+        CallOwnership::Caller,
         Nav::Down,
         NonZeroU16::new(42).map(NodeFieldId::from),
-        SuccessorAddr::try_from(100).expect("successor address must be non-zero"),
+        &[next],
+        1,
         SuccessorAddr::try_from(500).expect("successor address must be non-zero"),
     );
 
     let bytes = c.to_bytes();
-    let decoded = Call::from_bytes(bytes);
+    assert_eq!(bytes.len(), Opcode::Call1.size());
+    let decoded = Call::from_bytes(&bytes);
     assert_eq!(decoded, c);
 }
 
 #[test]
 fn return_roundtrip() {
-    for r in [
-        Return::matched(),
-        Return::routed_matched(),
-        Return::routed_empty(),
-    ] {
-        let bytes = r.to_bytes();
-        let decoded = Return::from_bytes(bytes);
-        assert_eq!(decoded, r);
+    for raw in 0..PortId::COUNT {
+        let port = PortId::new(raw).expect("test port is valid");
+        for contract in [
+            CalleeContract::CallerOwned,
+            CalleeContract::CalleeOwned {
+                nav: Nav::NextExact,
+                node_field: NonZeroU16::new(42).map(NodeFieldId::from),
+            },
+        ] {
+            let return_ = Return::with_contract(port, contract);
+            let bytes = return_.to_bytes();
+            assert_eq!(Return::from_bytes(bytes), return_);
+        }
     }
 }
 
 #[test]
-fn split_call_roundtrip() {
-    let call = SplitCall::new(
-        Nav::Next,
-        SplitCallReturns {
-            matched: SuccessorAddr::try_from(100).expect("successor address must be non-zero"),
-            empty: SuccessorAddr::try_from(200).expect("successor address must be non-zero"),
-        },
-        SuccessorAddr::try_from(500).expect("successor address must be non-zero"),
-    );
-
-    assert_eq!(SplitCall::from_bytes(call.to_bytes()), call);
-}
-
-#[test]
-fn routed_call_roundtrip() {
-    let call = RoutedCall::new(
-        Nav::Next,
+fn calln_roundtrip() {
+    let returns = [
         SuccessorAddr::try_from(100).expect("successor address must be non-zero"),
+        SuccessorAddr::try_from(200).expect("successor address must be non-zero"),
+        SuccessorAddr::try_from(300).expect("successor address must be non-zero"),
+    ];
+    let call = Call::new(
+        CallOwnership::Callee,
+        Nav::Next,
+        None,
+        &returns,
+        0b101,
         SuccessorAddr::try_from(500).expect("successor address must be non-zero"),
     );
 
-    assert_eq!(RoutedCall::from_bytes(call.to_bytes()), call);
+    let bytes = call.to_bytes();
+    assert_eq!(bytes.len(), Opcode::CallN.size());
+    assert_eq!(Call::from_bytes(&bytes), call);
 }
 
 #[test]

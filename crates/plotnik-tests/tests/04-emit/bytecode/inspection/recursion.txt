@@ -29,7 +29,7 @@ Q:
 Expr (split, routed Down):
   26  -ε-                                   52, 41
   27                                        ▶
-  28                                        ▶ empty
+  28                                        ▶ p1
   30   !   (identifier) [VariantClose]      27
   32  ──!  _                                30, 32
   33   !   _ [VariantOpen(Empty)]           30, 32
@@ -99,20 +99,20 @@ P12 ref        114..120  source_id=0  T1
 [instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
-  02       (@80)                            80 : 03
+  02       (@88)                            88 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  74
+  08   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  82
   11  ──!  _                                08, 11
   13   !   _ [SpanStart#3]                  08, 11
   15  ...
   16  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0)]  13
   18  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
-  24  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  74
+  24  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  82
   27                                        ▶
-  28                                        ▶ empty
+  28                                        ▶ p1
   29   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  27
   32  ──!  _                                29, 32
   34   !   _ [SpanStart#3]                  29, 32
@@ -120,20 +120,24 @@ Q:
   38  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  06
   40  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  28
   44  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  27
-  47       (@58)                            58 : 48 / 44
-  48  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  27
-  51   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 VariantOpen(M1) SpanStartAt#6 SpanStart#7 SuppressBegin]  47
-  54  ──!  _                                36, 51, 54
-  56  └─!  _                                36, 51, 54
-  58  -ε-  [SpanStart#0]                    56, 40
-  60       (@58)                            58 : 61 / 24
-  61  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  74
-  64   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 VariantOpen(M1) SpanStartAt#6 SpanStart#7 SuppressBegin]  60
-  67  ──!  _                                16, 64, 67
-  69  └─!  _                                16, 64, 67
-  71  ...
-  72  -ε-  [SpanStart#0]                    69, 18
-  74  ─‣┘  _ [SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
-  77  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  72
+  47  ...
+  48       (@64)                            64 : 51 / 44
+  51  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  27
+  54  ...
+  55  ...
+  56   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 VariantOpen(M1) SpanStartAt#6 SpanStart#7 SuppressBegin]  48
+  59  ──!  _                                36, 56, 59
+  61  └─!  _                                36, 56, 59
+  63  ...
+  64  -ε-  [SpanStart#0]                    61, 40
+  66       (@64)                            64 : 69 / 24
+  69  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  82
+  72   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 VariantOpen(M1) SpanStartAt#6 SpanStart#7 SuppressBegin]  66
+  75  ──!  _                                16, 72, 75
+  77  └─!  _                                16, 72, 75
   79  ...
-  80   !   (program) [SpanStart#8 SpanStartAt#9]  77
+  80  -ε-  [SpanStart#0]                    77, 18
+  82  ─‣┘  _ [SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
+  85  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  80
+  87  ...
+  88   !   (program) [SpanStart#8 SpanStartAt#9]  85

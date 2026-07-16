@@ -25,9 +25,8 @@ use std::fmt::Write as _;
 
 use crate::bytecode::{EffectKind, PredicateOp};
 use crate::compiler::emit::plan::{
-    CallPlan, CheckPlan, CodegenPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, OrdinaryCallPlan,
-    PredicatePlan, PredicateValuePlan, RegexId, RoutedCallPlan, SplitCallPlan, StateId,
-    StateOrigin, StatePlan, StatePlanKind,
+    CallPlan, CheckPlan, CodegenPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, PredicatePlan,
+    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
 };
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::Config;
@@ -259,6 +258,7 @@ impl<'a> Generator<'a> {
         self.field_consts(&mut machinery);
         self.regex_statics(&mut machinery);
         self.state_consts(&mut machinery);
+        self.call_return_fn(&mut machinery);
         self.entry_fns(&mut machinery);
         machinery.push_str(DRIVER_SKELETON);
         self.dispatch_fn(&mut machinery);
@@ -439,6 +439,31 @@ impl<'a> Generator<'a> {
         }
     }
 
+    fn call_return_fn(&self, out: &mut String) {
+        out.push('\n');
+        out.push_str(
+            "/// Resolve a callee-local return port through the immutable call-site map.\n",
+        );
+        out.push_str("#[inline]\n");
+        out.push_str("fn call_return(call_site: u16, port: rt::PortId) -> u16 {\n");
+        out.push_str("    match (call_site, port.to_byte()) {\n");
+        for state in self.plan.matcher().states() {
+            let StatePlanKind::Call(plan) = &state.kind else {
+                continue;
+            };
+            let call_site = &self.state(state.id).const_name;
+            for (port, &target) in plan.returns.iter().enumerate() {
+                let target = &self.state(target).const_name;
+                let _ = writeln!(out, "        ({call_site}, {port}) => {target},");
+            }
+        }
+        out.push_str(
+            "        _ => unreachable!(\"call site {call_site} has no return port {}\", port.to_byte()),\n",
+        );
+        out.push_str("    }\n");
+        out.push_str("}\n");
+    }
+
     fn entry_fns(&self, out: &mut String) {
         // An unbounded resource emits `false` for its metering const, folding
         // the check out of `run`. With both unbounded there is no ceiling to
@@ -502,16 +527,15 @@ impl<'a> Generator<'a> {
                 }
                 StatePlanKind::Match(plan) => self.match_arm(out, state, plan),
                 StatePlanKind::Call(plan) => self.call_arm(out, state, plan),
-                StatePlanKind::Return(outcome) => {
-                    let template = match outcome {
-                        plotnik_rt::ReturnOutcome::Matched => RETURN_MATCHED_ARM,
-                        plotnik_rt::ReturnOutcome::Empty => RETURN_EMPTY_ARM,
-                    };
+                StatePlanKind::Return(port) => {
                     splice(
                         out,
                         "        ",
-                        template,
-                        &[("STATE", &self.state(state.id).const_name)],
+                        RETURN_ARM,
+                        &[
+                            ("STATE", &self.state(state.id).const_name),
+                            ("PORT", &port.to_byte().to_string()),
+                        ],
                     );
                 }
             }
@@ -751,21 +775,20 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// The dispatch arm for a Call: navigate (or stay), satisfy the field
-    /// constraint, leave a call-retry checkpoint when the nav owns a search,
-    /// then enter the callee.
+    /// The dispatch arm for a Call. Caller-owned entry work navigates, checks
+    /// the field, and may retain a sibling retry. Callee-owned entry work is
+    /// already embedded in the specialized target.
     fn call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
-        match plan {
-            CallPlan::Ordinary(plan) => self.ordinary_call_arm(out, state_plan, plan),
-            CallPlan::Routed(plan) => self.routed_call_arm(out, state_plan, plan),
-            CallPlan::Split(plan) => self.split_call_arm(out, state_plan, plan),
+        if plan.caller_owned() {
+            self.caller_owned_call_arm(out, state_plan, plan);
+        } else {
+            self.callee_owned_call_arm(out, state_plan, plan);
         }
     }
 
-    fn ordinary_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &OrdinaryCallPlan) {
+    fn caller_owned_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
         let state = &self.state(state_plan.id).const_name;
         let target = &self.state(plan.target).const_name;
-        let next = &self.state(plan.next).const_name;
         let stays_on_current_node = plan.stays_on_current_node();
 
         if plan.can_fail_before_flow() {
@@ -810,38 +833,23 @@ impl<'a> Generator<'a> {
                 &[
                     ("STATE", state),
                     ("TARGET", target),
-                    ("NEXT", next),
+                    ("CALL_SITE", state),
                     ("FIELD", &field),
                     ("POLICY", &policy_expr(policy)),
                 ],
             );
         }
 
-        let _ = writeln!(out, "            eng.enter_frame({next});");
+        let _ = writeln!(out, "            eng.enter_frame({state});");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
     }
 
-    fn split_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &SplitCallPlan) {
+    fn callee_owned_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
         let state = &self.state(state_plan.id).const_name;
         let target = &self.state(plan.target).const_name;
-        let matched = &self.state(plan.matched).const_name;
-        let empty = &self.state(plan.empty).const_name;
         let _ = writeln!(out, "        {state} => {{");
-        let _ = writeln!(
-            out,
-            "            eng.enter_split_frame({matched}, {empty});"
-        );
-        let _ = writeln!(out, "            Flow::Jump({target})");
-        out.push_str("        }\n");
-    }
-
-    fn routed_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &RoutedCallPlan) {
-        let state = &self.state(state_plan.id).const_name;
-        let target = &self.state(plan.target).const_name;
-        let next = &self.state(plan.next).const_name;
-        let _ = writeln!(out, "        {state} => {{");
-        let _ = writeln!(out, "            eng.enter_frame({next});");
+        let _ = writeln!(out, "            eng.enter_frame({state});");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
     }
@@ -1448,29 +1456,24 @@ eng.push_checkpoint(rt::Checkpoint::call_retry(
     @STATE@,
     rt::CallResume {
         target: @TARGET@,
-        next: @NEXT@,
+        call_site: @CALL_SITE@,
         field: @FIELD@,
         policy: @POLICY@,
     },
 ));
 "#;
 
-const RETURN_MATCHED_ARM: &str = r#"
+const RETURN_ARM: &str = r#"
 @STATE@ => {
     if eng.frames_empty() {
-        Flow::Accept
+        if @PORT@ == 0 {
+            Flow::Accept
+        } else {
+            panic!("entry point returned through nonzero port @PORT@");
+        }
     } else {
-        Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
-    }
-}
-"#;
-
-const RETURN_EMPTY_ARM: &str = r#"
-@STATE@ => {
-    if eng.frames_empty() {
-        panic!("entry point returned empty");
-    } else {
-        Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Empty))
+        let call_site = eng.exit_frame();
+        Flow::Jump(call_return(call_site, rt::PortId::from_raw(@PORT@)))
     }
 }
 "#;
@@ -1519,7 +1522,7 @@ fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
                     cp.ip,
                     resume,
                 ));
-                eng.enter_frame(resume.next);
+                eng.enter_frame(resume.call_site);
                 return Unwound::Resumed(resume.target);
             }
 

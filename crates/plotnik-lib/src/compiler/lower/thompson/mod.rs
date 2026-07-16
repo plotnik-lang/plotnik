@@ -16,6 +16,7 @@
 //! - `sequences`: Sequence and alternation compilation
 
 mod alternation;
+pub(crate) mod boundary;
 mod builder;
 mod capture;
 mod capture_type;
@@ -26,6 +27,8 @@ mod quantifier;
 mod scope;
 mod sequences;
 
+#[cfg(test)]
+mod boundary_tests;
 #[cfg(test)]
 mod capture_tests;
 #[cfg(test)]

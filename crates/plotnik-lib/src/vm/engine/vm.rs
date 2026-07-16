@@ -3,16 +3,15 @@
 use tree_sitter::Tree;
 
 use crate::bytecode::{
-    CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall,
-    DecodedSplitCall, Effect, EffectKind, EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp,
-    SuccessorAddr,
+    CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind,
+    EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp, SuccessorAddr,
 };
 
 use crate::core::NodeFieldId;
 
 use plotnik_runtime::{
-    CallResume, Checkpoint, Engine, JournalEvent, MatchJournal, ResolvedRuntimeLimits, Resume,
-    ReturnOutcome, RuntimeLimitSpec, SkipPolicy,
+    CallResume, Checkpoint, Engine, JournalEvent, MatchJournal, PortId, ResolvedRuntimeLimits,
+    Resume, RuntimeLimitSpec, SkipPolicy,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
@@ -188,9 +187,7 @@ impl<'t> VM<'t> {
             let result = match module.decoded().instruction_at(self.ip) {
                 DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
                 DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
-                DecodedInstr::RoutedCall(c) => self.exec_routed_call(c, tracer),
-                DecodedInstr::SplitCall(c) => self.exec_split_call(c, tracer),
-                DecodedInstr::Return(outcome) => self.exec_return(outcome, tracer),
+                DecodedInstr::Return(port) => self.exec_return(port, module, tracer),
             };
 
             match result {
@@ -465,6 +462,12 @@ impl<'t> VM<'t> {
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
+        let call_site = self.ip;
+        if !c.caller_owned() {
+            self.enter_callee(c.target, call_site, tracer);
+            return Ok(());
+        }
+
         let skip_policy =
             self.navigate_to_field_with_policy(c.nav, c.node_field, module, tracer)?;
 
@@ -476,59 +479,32 @@ impl<'t> VM<'t> {
         {
             let resume = CallResume {
                 target: u16::from(c.target),
-                next: u16::from(c.next),
+                call_site: u16::from(call_site),
                 field: c.node_field,
                 policy,
             };
-            let cp = self.call_retry_checkpoint(self.ip, resume);
+            let cp = self.call_retry_checkpoint(call_site, resume);
             self.engine.push_checkpoint(cp);
             if T::ENABLED {
-                tracer.trace_checkpoint_created(self.ip);
+                tracer.trace_checkpoint_created(call_site);
             }
         }
 
-        self.enter_callee(c.target, c.next, tracer);
+        self.enter_callee(c.target, call_site, tracer);
         Ok(())
     }
 
-    fn exec_split_call<T: Tracer>(
-        &mut self,
-        call: DecodedSplitCall,
-        tracer: &mut T,
-    ) -> Result<(), Signal> {
-        if T::ENABLED {
-            tracer.trace_call(CodeAddr::from(u16::from(call.target)));
-        }
-        self.engine
-            .enter_split_frame(u16::from(call.matched), u16::from(call.empty));
-        self.ip = CodeAddr::from(u16::from(call.target));
-        Ok(())
-    }
-
-    fn exec_routed_call<T: Tracer>(
-        &mut self,
-        call: DecodedRoutedCall,
-        tracer: &mut T,
-    ) -> Result<(), Signal> {
-        if T::ENABLED {
-            tracer.trace_call(CodeAddr::from(u16::from(call.target)));
-        }
-        self.engine.enter_frame(u16::from(call.next));
-        self.ip = CodeAddr::from(u16::from(call.target));
-        Ok(())
-    }
-
-    /// Push a frame for `target` (returning to `next`) and jump in.
+    /// Push a frame for `target`, retaining the immutable call-site map token.
     fn enter_callee<T: Tracer>(
         &mut self,
         target: SuccessorAddr,
-        next: SuccessorAddr,
+        call_site: CodeAddr,
         tracer: &mut T,
     ) {
         if T::ENABLED {
             tracer.trace_call(CodeAddr::from(u16::from(target)));
         }
-        self.engine.enter_frame(u16::from(next));
+        self.engine.enter_frame(u16::from(call_site));
         self.ip = CodeAddr::from(u16::from(target));
     }
 
@@ -599,24 +575,29 @@ impl<'t> VM<'t> {
 
     fn exec_return<T: Tracer>(
         &mut self,
-        outcome: ReturnOutcome,
+        port: PortId,
+        module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if T::ENABLED {
-            tracer.trace_return(outcome);
+            tracer.trace_return(port);
         }
 
         // If no frames, we're returning from the top-level entry point → Accept
         if self.engine.frames_empty() {
             assert_eq!(
-                outcome,
-                ReturnOutcome::Matched,
-                "entry point returned through an empty call continuation"
+                port.to_byte(),
+                0,
+                "entry point returned through a non-zero call port"
             );
             return Err(ControlFlow::Accept.into());
         }
 
-        self.ip = CodeAddr::from(self.engine.exit_frame(outcome));
+        let call_site = CodeAddr::from(self.engine.exit_frame());
+        let DecodedInstr::Call(call) = module.decoded().instruction_at(call_site) else {
+            unreachable!("frame call-site token must address a Call");
+        };
+        self.ip = CodeAddr::from(u16::from(module.decoded().call_return(&call, port)));
         Ok(())
     }
 
@@ -688,8 +669,7 @@ impl<'t> VM<'t> {
                     self.enter_callee(
                         SuccessorAddr::try_from(resume.target)
                             .expect("validated call target is non-zero"),
-                        SuccessorAddr::try_from(resume.next)
-                            .expect("validated call continuation is non-zero"),
+                        CodeAddr::from(resume.call_site),
                         tracer,
                     );
                     return ControlFlow::Backtracked.into();

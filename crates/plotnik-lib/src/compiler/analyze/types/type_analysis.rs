@@ -64,9 +64,13 @@ pub struct TypeAnalysis {
     /// over every scheduled definition, including match-only definitions.
     pub(super) def_output: BTreeMap<DefId, DefinitionOutput>,
 
-    /// Each definition's static top-level extent. `SingleNode` definitions are
-    /// selectable as entry points; all others remain reusable fragments.
+    /// Each definition's static top-level extent.
     def_root_extent: BTreeMap<DefId, RootExtent>,
+
+    /// Whether the definition exports a leading or trailing anchor obligation.
+    /// Such definitions remain reusable fragments even when they consume
+    /// exactly one root node: a contextless entry point cannot discharge them.
+    def_requires_anchor_context: BTreeMap<DefId, bool>,
 
     pub(super) pattern_result: HashMap<Pattern, PatternShape>,
 
@@ -315,8 +319,16 @@ impl TypeAnalysis {
             .expect("admitted definition must have an inferred root extent")
     }
 
+    pub fn def_requires_anchor_context(&self, def_id: DefId) -> bool {
+        *self
+            .def_requires_anchor_context
+            .get(&def_id)
+            .expect("admitted definition must have an anchor-context classification")
+    }
+
     pub fn is_selectable_definition(&self, def_id: DefId) -> bool {
         self.expect_def_root_extent(def_id) == RootExtent::SingleNode
+            && !self.def_requires_anchor_context(def_id)
     }
 
     /// Follow a `Ref` chain to the underlying materialized type; non-ref types
@@ -420,16 +432,31 @@ impl TypeAnalysis {
             self.def_root_extent.len(),
             "definition output and root-extent tables must cover the same definitions",
         );
+        assert_eq!(
+            self.def_output.len(),
+            self.def_requires_anchor_context.len(),
+            "definition output and anchor-context tables must cover the same definitions",
+        );
         for def_id in self.def_output.keys() {
             assert!(
                 self.def_root_extent.contains_key(def_id),
                 "every definition output must have an inferred root extent",
+            );
+            assert!(
+                self.def_requires_anchor_context.contains_key(def_id),
+                "every definition output must have an anchor-context classification",
             );
         }
         for def_id in self.def_root_extent.keys() {
             assert!(
                 self.def_output.contains_key(def_id),
                 "every definition root extent must have an inferred output",
+            );
+        }
+        for def_id in self.def_requires_anchor_context.keys() {
+            assert!(
+                self.def_output.contains_key(def_id),
+                "every anchor-context classification must have an inferred output",
             );
         }
 
@@ -589,6 +616,7 @@ impl TypeAnalysisBuilder {
                 definition_declarations: BTreeMap::new(),
                 def_output: BTreeMap::new(),
                 def_root_extent: BTreeMap::new(),
+                def_requires_anchor_context: BTreeMap::new(),
                 pattern_result: HashMap::new(),
                 capture_facts: HashMap::new(),
                 field_completions: HashMap::new(),
@@ -858,6 +886,12 @@ impl TypeAnalysisBuilder {
 
     pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
         self.analysis.def_root_extent(def_id)
+    }
+
+    pub fn record_def_requires_anchor_context(&mut self, def_id: DefId, requires_context: bool) {
+        self.analysis
+            .def_requires_anchor_context
+            .insert(def_id, requires_context);
     }
 
     /// Install the naming pass's result. Names must be complete and validated

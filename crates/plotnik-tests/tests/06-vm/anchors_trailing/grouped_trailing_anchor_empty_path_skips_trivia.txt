@@ -1,0 +1,88 @@
+Q = (program
+  (expression_statement
+    (array
+      {
+        (identifier == "a")?
+        .
+      }
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[/* comment */]
+------------------- TYPESCRIPT -------------------
+export type Q = undefined;
+--------------------- OUTPUT ---------------------
+null
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "program"
+S3 "expression_statement"
+S4 "array"
+S5 "identifier"
+S6 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 00 :: T0
+
+[instructions]
+Q:
+  00       (@16)                            16 : 01
+  01                                        ▶
+  02                                        ▶
+  03  └•┘  _                                07
+  04  ─•┘  _                                07
+  05   !   (identifier) == "a"              04
+  07  ─‣┘² _                                02
+  08  ──!  _                                05, 08
+  10  └─!  _                                05, 08
+  12  └‣─  (array)                          10, 03
+  14  └‣─  (expression_statement)           12
+  15  ...
+  16   !   (program)                        14
+--------------------- TRACE ----------------------
+Q:
+  00       (@16)                            16 : 01
+       ▶   (@16)
+
+@16:
+  16       (program)                        14
+       ●   program
+  14       (expression_statement)           12
+       ●   expression_statement
+  12       (array)                          10, 03
+       ●   array
+  10       _                                05, 08
+       ●   [
+  05       (identifier) == "a"              04
+       ○   [
+  10  ❮❮❮ 
+  08       _                                05, 08
+       ●   comment
+  05       (identifier) == "a"              04
+       ○   comment
+  08  ❮❮❮ 
+  08       _                                05, 08
+       ●   ]
+  05       (identifier) == "a"              04
+       ○   ]
+  08  ❮❮❮ 
+  08       _                                05, 08
+  12  ❮❮❮ 
+  03       _                                07
+       ●   array
+  07       _                                02
+       ●   program
+  02   ◀   (@16)                            
+
+Q:
+  01   ◀   (Q)                              ◼

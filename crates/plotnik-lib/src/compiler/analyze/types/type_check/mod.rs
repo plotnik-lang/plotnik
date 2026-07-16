@@ -18,6 +18,7 @@ pub(crate) use infer::definition_value_root;
 
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
 use crate::compiler::analyze::types::BuiltInCaptureType;
 use crate::compiler::analyze::types::naming::{RawTypeNameValidator, TypeNamer};
 use crate::compiler::diagnostics::report::Diagnostics;
@@ -33,8 +34,13 @@ pub fn infer_types(
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) -> TypeAnalysis {
-    let structural_facts =
-        infer::StructuralFacts::analyze(interner, symbol_table, dependency_analysis);
+    let anchor_contexts = AnchorContextAnalysis::new(interner, symbol_table, dependency_analysis);
+    let structural_facts = infer::StructuralFacts::analyze(
+        interner,
+        symbol_table,
+        dependency_analysis,
+        &anchor_contexts,
+    );
 
     // One syntax-only O(AST) pre-scan buys the common path zero provenance
     // allocation. Folding this flag into inference would still make every

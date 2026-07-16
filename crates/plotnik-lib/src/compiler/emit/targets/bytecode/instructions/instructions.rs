@@ -3,30 +3,30 @@
 use std::collections::BTreeMap;
 
 use crate::bytecode::{
-    BYTECODE_WORD_SIZE, Call, CodeAddr, Effect, MatchInstr, MatchPredicate, Return, RoutedCall,
-    SplitCall, SplitCallReturns, SuccessorAddr,
+    BYTECODE_WORD_SIZE, Call, CallOwnership, CalleeContract, CodeAddr, Effect, MatchInstr,
+    MatchPredicate, Return, SuccessorAddr,
 };
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{ConstantPool, EmitError};
 use crate::compiler::lower::ir::{
-    CallIR, CallProtocol, EffectArg, EffectIR, InstructionIR, Label, MatchIR,
+    CallIR, CalleeEntryContract, EffectArg, EffectIR, InstructionIR, Label, MatchIR, NfaGraph,
 };
 
 pub fn emit_instructions(
-    instructions: &[InstructionIR],
+    nfa: &NfaGraph,
     layout: &LayoutMap,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
     let mut bytes = vec![0u8; layout.total_words() as usize * BYTECODE_WORD_SIZE];
 
-    for instr in instructions {
+    for instr in nfa.instructions() {
         let label = instr.label();
         let Some(&code_addr) = layout.code_addrs().get(&label) else {
             continue;
         };
 
         let offset = u16::from(code_addr) as usize * BYTECODE_WORD_SIZE;
-        let resolved = resolve_instruction(instr, layout.code_addrs(), pool)?;
+        let resolved = resolve_instruction(instr, nfa, layout.code_addrs(), pool)?;
 
         let end = offset + resolved.len();
         if end <= bytes.len() {
@@ -39,19 +39,24 @@ pub fn emit_instructions(
 
 fn resolve_instruction(
     instr: &InstructionIR,
+    nfa: &NfaGraph,
     map: &BTreeMap<Label, CodeAddr>,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
     match instr {
         InstructionIR::Match(m) => resolve_match(m, map, pool),
-        InstructionIR::Call(c) => Ok(resolve_call(c, map).to_vec()),
+        InstructionIR::Call(c) => Ok(resolve_call(c, nfa, map)),
         InstructionIR::Return(return_) => {
-            let encoded = match return_.mode {
-                crate::bytecode::ReturnMode::CallerMatched => Return::matched(),
-                crate::bytecode::ReturnMode::RoutedMatched => Return::routed_matched(),
-                crate::bytecode::ReturnMode::RoutedEmpty => Return::routed_empty(),
+            let contract = match return_.entry {
+                CalleeEntryContract::CallerOwned => CalleeContract::CallerOwned,
+                CalleeEntryContract::CalleeOwned { obligation } => CalleeContract::CalleeOwned {
+                    nav: obligation.navigation().authored(),
+                    node_field: obligation.field(),
+                },
             };
-            Ok(encoded.to_bytes().to_vec())
+            Ok(Return::with_contract(return_.port, contract)
+                .to_bytes()
+                .to_vec())
         }
     }
 }
@@ -101,30 +106,46 @@ fn resolve_match(
     instr.encode().map_err(EmitError::Encode)
 }
 
-fn resolve_call(c: &CallIR, map: &BTreeMap<Label, CodeAddr>) -> [u8; 8] {
+fn resolve_call(c: &CallIR, nfa: &NfaGraph, map: &BTreeMap<Label, CodeAddr>) -> Vec<u8> {
     let successor_addr = |label: Label| {
         SuccessorAddr::try_from(label.resolve(map)).expect("successor address must be non-zero")
     };
     let target = successor_addr(c.target);
-    match c.protocol {
-        CallProtocol::Ordinary {
-            nav,
-            node_field,
-            next,
-        } => Call::new(nav, node_field, successor_addr(next), target).to_bytes(),
-        CallProtocol::Routed { entry_nav, next } => {
-            RoutedCall::new(entry_nav, successor_addr(next), target).to_bytes()
-        }
-        CallProtocol::Split { entry_nav, returns } => SplitCall::new(
-            entry_nav,
-            SplitCallReturns {
-                matched: successor_addr(returns[0]),
-                empty: successor_addr(returns[1]),
-            },
-            target,
-        )
-        .to_bytes(),
-    }
+    let specialization = nfa
+        .specialization_for_entry(c.target)
+        .expect("calls target definition specializations");
+    assert_eq!(
+        c.returns.len(),
+        specialization.ports().len(),
+        "call continuation count matches callee port signature"
+    );
+    let consumed_mask = specialization
+        .ports()
+        .ports()
+        .iter()
+        .enumerate()
+        .fold(0u8, |mask, (index, port)| {
+            mask | if port.consumed() { 1 << index } else { 0 }
+        });
+    let returns = c
+        .returns
+        .iter()
+        .copied()
+        .map(successor_addr)
+        .collect::<Vec<_>>();
+    Call::new(
+        if c.entry.caller_owned() {
+            CallOwnership::Caller
+        } else {
+            CallOwnership::Callee
+        },
+        c.entry.nav(),
+        c.entry.field(),
+        &returns,
+        consumed_mask,
+        target,
+    )
+    .to_bytes()
 }
 
 fn resolve_effect(effect: &EffectIR) -> Effect {

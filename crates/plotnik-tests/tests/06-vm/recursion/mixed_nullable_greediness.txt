@@ -93,7 +93,7 @@ Q = 00 :: T8
 [instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
-  02       (@76)                            76 : 03
+  02       (@87)                            87 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  -ε-  [TextClose RecordSet(M7)]        08
@@ -108,165 +108,185 @@ Q:
   22  -ε-  [TextClose RecordSet(M6)]        20
   24  -ε-  [TextClose RecordSet(M6)]        14
   26                                        ▶
-  27                                        ▶
-  28                                        ▶ empty
-  29  -ε-  [SuppressEnd]                    27
-  31   !   (@52)                            52 : 29
-  32  -ε-  [SuppressBegin]                  31
-  34  ──!  _                                32, 34
-  36  -ε-  [SuppressEnd]                    34, 27
-  38   !   (@52)                            52 : 36
+  27                                        ▶ p1
+  28                                        ▶
+  29                                        ▶
+  30                                        ▶ p1
+  31  ...
+  32  -ε-  [SuppressEnd]                    29
+  34   !   (@58)                            58 : 32
+  35  -ε-  [SuppressBegin]                  34
+  37  ──!  _                                35, 37
   39  ...
-  40  -ε-  [SuppressBegin]                  38
-  42  ──!  _                                40, 42
-  44  -ε-                                   34, 28, 42
-  46       (@44)                            44 : 26 / 26
+  40  -ε-  [SuppressEnd]                    37, 29
+  42   !   (@58)                            58 : 40
+  43  -ε-  [SuppressBegin]                  42
+  45  ──!  _                                43, 45
   47  ...
-  48   !   (comment) [ScalarMark]           46
-  50   !   (comment) [ScalarMark]           26
-  52  -ε-                                   48, 50
-  54  -ε-  [SuppressEnd]                    22
-  56   !   (@52)                            52 : 54
-  57  -ε-  [SuppressBegin]                  56
-  59  ──!  _                                57, 59
-  61  └─!  _                                57, 59
+  48  -ε-                                   37, 30, 45
+  50       (@48)                            48 : 28 / 28
+  53   !   (comment) [ScalarMark]           50
+  55  ...
+  56   !   (comment) [ScalarMark]           28
+  58  -ε-                                   53, 56
+  60  -ε-  [SuppressEnd]                    26
+  62   !   (@58)                            58 : 60
   63  ...
-  64  -ε-  [SuppressEnd]                    59, 22
-  66   !   (@52)                            52 : 64
-  67  -ε-  [SuppressBegin]                  66
-  69  ──!  _                                67, 69
-  71  ...
-  72  └─!  _                                67, 69
-  74  -ε-  [ScalarOpen]                     61, 24, 72
-  76   !   (program)                        74
+  64  -ε-  [SuppressBegin]                  62
+  66  ──!  _                                64, 66
+  68  └─!  _                                64, 66
+  70  -ε-  [SuppressEnd]                    66, 26
+  72   !   (@58)                            58 : 70
+  73  -ε-  [SuppressBegin]                  72
+  75  ──!  _                                73, 75
+  77  └─!  _                                73, 75
+  79  ...
+  80  -ε-                                   68, 27, 77
+  82       (@80)                            80 : 22 / 24
+  85  -ε-  [ScalarOpen]                     82
+  87   !   (program)                        85
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [RecordOpen]                     02
-  02       (@76)                            76 : 03
-       ▶   (@76)
+  02       (@87)                            87 : 03
+       ▶   (@87)
 
-@76:
-  76       (program)                        74
+@87:
+  87       (program)                        85
        ●   program
-  74  -ε-  [ScalarOpen]                     61, 24, 72
-  61       _                                57, 59
+  85  -ε-  [ScalarOpen]                     82
+  82       (@80)                            80 : 22 / 24
+       ▶   (@80)
+
+@80:
+  80  -ε-                                   68, 27, 77
+  68       _                                64, 66
        ●   comment
-  57  -ε-  [SuppressBegin]                  56
-  56       (@52)                            52 : 54
-       ▶   (@52)
+  64  -ε-  [SuppressBegin]                  62
+  62       (@58)                            58 : 60
+       ▶   (@58)
 
-@52:
-  52  -ε-                                   48, 50
-  48       (comment) [ScalarMark]           46
+@58:
+  58  -ε-                                   53, 56
+  53       (comment) [ScalarMark]           50
        ●   comment
-  46       (@44)                            44 : 26 / 26
-       ▶   (@44)
+  50       (@48)                            48 : 28 / 28
+       ▶   (@48)
 
-@44:
-  44  -ε-                                   34, 28, 42
-  34       _                                32, 34
+@48:
+  48  -ε-                                   37, 30, 45
+  37       _                                35, 37
        ●   comment
-  32  -ε-  [SuppressBegin]                  31
-  31       (@52)                            52 : 29
-       ▶   (@52)
+  35  -ε-  [SuppressBegin]                  34
+  34       (@58)                            58 : 32
+       ▶   (@58)
 
-@52:
-  52  -ε-                                   48, 50
-  48       (comment) [ScalarMark]           46
+@58:
+  58  -ε-                                   53, 56
+  53       (comment) [ScalarMark]           50
        ●   comment
-  46       (@44)                            44 : 26 / 26
-       ▶   (@44)
+  50       (@48)                            48 : 28 / 28
+       ▶   (@48)
 
-@44:
-  44  -ε-                                   34, 28, 42
-  34       _                                32, 34
+@48:
+  48  -ε-                                   37, 30, 45
+  37       _                                35, 37
        ●   comment
-  32  -ε-  [SuppressBegin]                  31
-  31       (@52)                            52 : 29
-       ▶   (@52)
+  35  -ε-  [SuppressBegin]                  34
+  34       (@58)                            58 : 32
+       ▶   (@58)
 
-@52:
-  52  -ε-                                   48, 50
-  48       (comment) [ScalarMark]           46
+@58:
+  58  -ε-                                   53, 56
+  53       (comment) [ScalarMark]           50
        ●   comment
-  46       (@44)                            44 : 26 / 26
-       ▶   (@44)
+  50       (@48)                            48 : 28 / 28
+       ▶   (@48)
 
-@44:
-  44  -ε-                                   34, 28, 42
-  34       _                                32, 34
-  44  ❮❮❮ 
-  28   ◀   (@44)                            empty
+@48:
+  48  -ε-                                   37, 30, 45
+  37       _                                35, 37
+  48  ❮❮❮ 
+  30   ◀   (@48)                            p1
 
-@52:
-  26   ◀   (@52)                            
+@58:
+  28   ◀   (@58)                            
 
-@44:
-  29  -ε-  [SuppressEnd]                    27
-  27   ◀   (@44)                            
+@48:
+  32  -ε-  [SuppressEnd]                    29
+  29   ◀   (@48)                            
 
-@52:
-  26   ◀   (@52)                            
+@58:
+  28   ◀   (@58)                            
 
-@44:
-  29  -ε-  [SuppressEnd]                    27
-  27   ◀   (@44)                            
+@48:
+  32  -ε-  [SuppressEnd]                    29
+  29   ◀   (@48)                            
 
-@52:
-  26   ◀   (@52)                            
+@58:
+  28   ◀   (@58)                            
 
-@76:
-  54  -ε-  [SuppressEnd]                    22
+@80:
+  60  -ε-  [SuppressEnd]                    26
+  26   ◀   (@80)                            
+
+@87:
   22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
   18       (comment) [ScalarMark] == "//stop"  06
-  44  ❮❮❮ 
-  42       _                                40, 42
-  52  ❮❮❮ 
-  50       (comment) [ScalarMark]           26
+  48  ❮❮❮ 
+  45       _                                43, 45
+  58  ❮❮❮ 
+  56       (comment) [ScalarMark]           28
        ●   comment
-  26   ◀   (@52)                            
+  28   ◀   (@58)                            
 
-@44:
-  29  -ε-  [SuppressEnd]                    27
-  27   ◀   (@44)                            
+@48:
+  32  -ε-  [SuppressEnd]                    29
+  29   ◀   (@48)                            
 
-@52:
-  26   ◀   (@52)                            
+@58:
+  28   ◀   (@58)                            
 
-@44:
-  29  -ε-  [SuppressEnd]                    27
-  27   ◀   (@44)                            
+@48:
+  32  -ε-  [SuppressEnd]                    29
+  29   ◀   (@48)                            
 
-@52:
-  26   ◀   (@52)                            
+@58:
+  28   ◀   (@58)                            
 
-@76:
-  54  -ε-  [SuppressEnd]                    22
+@80:
+  60  -ε-  [SuppressEnd]                    26
+  26   ◀   (@80)                            
+
+@87:
   22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
   20  ❮❮❮ 
   18       (comment) [ScalarMark] == "//stop"  06
-  34  ❮❮❮ 
-  34       _                                32, 34
-  44  ❮❮❮ 
-  28   ◀   (@44)                            empty
+  37  ❮❮❮ 
+  37       _                                35, 37
+  48  ❮❮❮ 
+  30   ◀   (@48)                            p1
 
-@52:
-  26   ◀   (@52)                            
+@58:
+  28   ◀   (@58)                            
 
-@44:
-  29  -ε-  [SuppressEnd]                    27
-  27   ◀   (@44)                            
+@48:
+  32  -ε-  [SuppressEnd]                    29
+  29   ◀   (@48)                            
 
-@52:
-  26   ◀   (@52)                            
+@58:
+  28   ◀   (@58)                            
 
-@76:
-  54  -ε-  [SuppressEnd]                    22
+@80:
+  60  -ε-  [SuppressEnd]                    26
+  26   ◀   (@80)                            
+
+@87:
   22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
@@ -276,7 +296,7 @@ Q:
   06  -ε-  [TextClose RecordSet(M7)]        08
   08       _                                09
        ●   program
-  09   ◀   (@76)                            
+  09   ◀   (@87)                            
 
 Q:
   03  -ε-  [RecordClose]                    05

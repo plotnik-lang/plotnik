@@ -31,6 +31,6 @@ pub(in crate::compiler) fn emit(
     let tables = pipeline.build_tables()?;
     let regexes = build_regex_table(nfa, pipeline.strings())?;
     let pool = ConstantPool::new(pipeline.types(), pipeline.strings(), &regexes);
-    let instructions = emit_instructions(nfa.instructions(), pipeline.layout(), pool)?;
+    let instructions = emit_instructions(nfa, pipeline.layout(), pool)?;
     pipeline.write_module(pool, &tables, &instructions)
 }

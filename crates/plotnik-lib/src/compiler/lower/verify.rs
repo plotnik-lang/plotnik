@@ -89,9 +89,10 @@ mod debug_impl {
 
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
+    use crate::compiler::lower::boundary::ExitPort;
     use crate::compiler::lower::ir::{
         DefRoute, DefSpecialization, EffectArg, InstructionIR, Label, MatchIR, NfaGraph,
-        NodeKindConstraint, PredicateValueIR, ReturnOutcome,
+        NodeKindConstraint, PortId, PredicateValueIR,
     };
 
     /// Max completed paths recorded per fingerprint. This counts root-to-leaf
@@ -124,7 +125,7 @@ mod debug_impl {
         Predicate(u8, String),
         Effect(EffectKind, Option<String>),
         Call(String),
-        Return(crate::compiler::lower::ir::ReturnOutcome),
+        Return(PortId),
         /// Cycle back-reference detected during traversal.
         CycleRef,
         /// Label referenced but not present in the instruction list.
@@ -394,7 +395,7 @@ mod debug_impl {
                 }
                 InstructionIR::Return(return_) => NodeContribution {
                     see_through: false,
-                    ops: vec![SemanticOp::Return(return_.outcome())],
+                    ops: vec![SemanticOp::Return(return_.port)],
                     succs: vec![],
                 },
             }
@@ -620,11 +621,14 @@ mod debug_impl {
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
 
         for (root, entry) in entries(nfa) {
-            let route = match &root {
-                WalkRoot::EntryPoint(_) => DefRoute::Caller,
-                WalkRoot::Def(specialization) => specialization.route(),
+            let (route, ports) = match &root {
+                WalkRoot::EntryPoint(_) => (DefRoute::Caller, vec![ExitPort::ConsumedOtherNone]),
+                WalkRoot::Def(specialization) => (
+                    specialization.route(),
+                    specialization.ports().ports().to_vec(),
+                ),
             };
-            check_depth_root(root, entry, route, &instr_map)?;
+            check_depth_root(root, entry, route, &ports, &instr_map, nfa)?;
         }
         Ok(())
     }
@@ -638,7 +642,7 @@ mod debug_impl {
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
 
         for (root, entry) in entries(nfa) {
-            check_empty_root(root, entry, &instr_map)?;
+            check_empty_root(root, entry, &instr_map, nfa)?;
         }
         Ok(())
     }
@@ -667,6 +671,7 @@ mod debug_impl {
         root: WalkRoot,
         entry: Label,
         instr_map: &HashMap<Label, &InstructionIR>,
+        nfa: &NfaGraph,
     ) -> Result<(), String> {
         let mut memo: HashMap<Label, bool> = HashMap::new();
         let mut work = vec![(entry, true)];
@@ -701,9 +706,20 @@ mod debug_impl {
                     }
                 }
                 InstructionIR::Call(c) => {
-                    work.push((c.matched_return(), false));
-                    if let Some(empty) = c.empty_return() {
-                        work.push((empty, empty_path));
+                    let specialization =
+                        nfa.specialization_for_entry(c.target).ok_or_else(|| {
+                            format!(
+                                "{root:?}: call {:?} targets non-definition {:?}",
+                                c.label, c.target
+                            )
+                        })?;
+                    for (&continuation, &port) in
+                        c.returns.iter().zip(specialization.ports().ports())
+                    {
+                        work.push((
+                            continuation,
+                            if port.consumed() { false } else { empty_path },
+                        ));
                     }
                 }
                 InstructionIR::Return(_) => {}
@@ -717,7 +733,9 @@ mod debug_impl {
         root: WalkRoot,
         entry: Label,
         route: DefRoute,
+        ports: &[ExitPort],
         instr_map: &HashMap<Label, &InstructionIR>,
+        nfa: &NfaGraph,
     ) -> Result<(), String> {
         let mut memo: HashMap<Label, i32> = HashMap::new();
         let mut work = vec![(entry, 0i32)];
@@ -743,7 +761,7 @@ mod debug_impl {
                     let next_net = net + m.nav.depth_delta();
                     if m.successors.is_empty() {
                         let expected_exit = route
-                            .return_depth(ReturnOutcome::Matched)
+                            .return_depth(true)
                             .expect("every body has a matched route");
                         if next_net != expected_exit {
                             return Err(format!(
@@ -758,25 +776,38 @@ mod debug_impl {
                     }
                 }
                 InstructionIR::Call(c) => {
-                    work.push((c.matched_return(), net + c.entry_nav().depth_delta()));
-                    if let Some(empty) = c.empty_return() {
-                        work.push((empty, net));
+                    let specialization =
+                        nfa.specialization_for_entry(c.target).ok_or_else(|| {
+                            format!(
+                                "{root:?}: call {:?} targets non-definition {:?}",
+                                c.label, c.target
+                            )
+                        })?;
+                    for (&continuation, &port) in
+                        c.returns.iter().zip(specialization.ports().ports())
+                    {
+                        let delta =
+                            c.entry.continuation_depth(port.consumed()).ok_or_else(|| {
+                                format!(
+                                    "{root:?}: caller-owned call {:?} exposes an empty port",
+                                    c.label
+                                )
+                            })?;
+                        work.push((continuation, net + delta));
                     }
                 }
                 InstructionIR::Return(r) => {
-                    if r.entry() != route.return_entry() {
+                    let Some(port) = ports.get(r.port.index()).copied() else {
                         return Err(format!(
-                            "{root:?}: return {:?} has {:?} entry, expected {:?}",
+                            "{root:?}: return {:?} uses undeclared port {}",
                             r.label,
-                            r.entry(),
-                            route.return_entry()
+                            r.port.to_byte()
                         ));
-                    }
-                    let Some(expected_exit) = route.return_depth(r.outcome()) else {
+                    };
+                    let Some(expected_exit) = route.return_depth(port.consumed()) else {
                         return Err(format!(
-                            "{root:?}: return {:?} has unsupported {:?} outcome",
-                            r.label,
-                            r.outcome()
+                            "{root:?}: return {:?} has an unsupported empty port",
+                            r.label
                         ));
                     };
                     if net != expected_exit {

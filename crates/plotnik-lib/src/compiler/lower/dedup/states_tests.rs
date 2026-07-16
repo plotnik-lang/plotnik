@@ -173,7 +173,7 @@ fn call_references_rewritten() {
             _ => None,
         })
         .expect("call present");
-    assert_eq!(call.matched_return(), Label(5));
+    assert_eq!(call.return_labels(), &[Label(5)]);
     assert_eq!(call.target, Label(5));
     assert_eq!(
         nfa.def_entries[&DefSpecialization::ordinary(DefId::from_raw(0))],

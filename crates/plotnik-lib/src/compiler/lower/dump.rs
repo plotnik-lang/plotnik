@@ -16,7 +16,7 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
-    CallIR, CallProtocol, DefOutputOrigin, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin,
+    CallEntry, CallIR, DefOutputOrigin, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin,
     MatchIR, NfaGraph, NodeKindConstraint, PredicateValueIR, SemanticNfa, SourceMode,
 };
 use crate::core::{Colors, NodeFieldId, NodeKindId};
@@ -373,9 +373,9 @@ impl NfaDumper<'_> {
 
     fn format_call(&self, call: &CallIR) -> String {
         let c = &self.colors;
-        let symbol = match call.protocol {
-            CallProtocol::Ordinary { nav, .. } => nav_symbol(nav),
-            CallProtocol::Routed { .. } | CallProtocol::Split { .. } => Symbol::EMPTY,
+        let symbol = match call.entry {
+            CallEntry::CallerOwned { nav, .. } => nav_symbol(nav),
+            CallEntry::CalleeOwned { .. } => Symbol::EMPTY,
         };
         let prefix = self.prefix(call.label, symbol);
 
@@ -412,11 +412,13 @@ impl NfaDumper<'_> {
 
     fn format_return(&self, return_: &crate::compiler::lower::ir::ReturnIR) -> String {
         let prefix = self.prefix(return_.label, Symbol::EMPTY);
-        let outcome = match return_.outcome() {
-            crate::compiler::lower::ir::ReturnOutcome::Matched => "▶",
-            crate::compiler::lower::ir::ReturnOutcome::Empty => "▶ empty",
+        let port = return_.port.to_byte();
+        let successor = if port == 0 {
+            "▶".to_string()
+        } else {
+            format!("▶ p{port}")
         };
-        LineBuilder::new(self.label_width).pad_successors(prefix, outcome)
+        LineBuilder::new(self.label_width).pad_successors(prefix, &successor)
     }
 }
 

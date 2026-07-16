@@ -1,0 +1,98 @@
+Q = (program
+  (expression_statement
+    (call_expression
+      function: (identifier)
+      optional_chain: (optional_chain)?
+      .
+      arguments: (arguments) @args
+    )
+  )
+)
+--------------------- INPUT ----------------------
+f?.()
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  args: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "args": {
+    "kind": "arguments",
+    "span": [3, 5],
+    "text": "()"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "args"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "call_expression"
+S6 "identifier"
+S7 "optional_chain"
+S8 "arguments"
+S9 "function"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { args }
+
+[type_members]
+M0: S1 → T0  ; args: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entry_points]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06  ─•─  arguments: (arguments) [Node RecordSet(M0)]  08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10   !   optional_chain: (optional_chain)  06
+  11  ──!  _                                10, 11
+  13   !   (identifier)                     11, 06
+  15  ...
+  16  ─‣─  function: _                      13, 16
+  18  └‣─  function: _                      13, 16
+  20  └‣─  (call_expression)                18
+  21  └‣─  (expression_statement)           20
+  22   !   (program)                        21
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@22)                            22 : 03
+       ▶   (@22)
+
+@22:
+  22       (program)                        21
+       ●   program
+  21       (expression_statement)           20
+       ●   expression_statement
+  20       (call_expression)                18
+       ●   call_expression
+  18       function: _                      13, 16
+       ●   identifier
+  13       (identifier)                     11, 06
+       ●   identifier
+  11       _                                10, 11
+       ●   optional_chain
+  10       optional_chain: (optional_chain)  06
+       ●   optional_chain
+  06       arguments: (arguments) [Node RecordSet(M0)]  08
+       ●   arguments
+  08       _                                09
+       ●   program
+  09   ◀   (@22)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

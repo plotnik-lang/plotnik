@@ -317,7 +317,7 @@ impl Tracer for TraceRecorder {
         );
     }
 
-    fn trace_return(&mut self, _outcome: plotnik_runtime::ReturnOutcome) {
+    fn trace_return(&mut self, _port: plotnik_runtime::PortId) {
         self.add_record(TraceEvent::Return, None);
     }
 

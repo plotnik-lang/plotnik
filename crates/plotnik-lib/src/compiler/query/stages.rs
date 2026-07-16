@@ -7,7 +7,10 @@ use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::result::{ResultModel, ResultSchema};
-use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
+use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
+use crate::compiler::analyze::shape::validation::{
+    AnchorValidationInput, ShapeValidationInput, validate_anchors, validate_ast,
+};
 use crate::compiler::analyze::types::check_entry_points;
 use crate::compiler::analyze::types::type_check::{self, RootExtent, TypeAnalysis};
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
@@ -154,6 +157,18 @@ impl QueryParsed {
             &mut interner,
             self.limits.references(),
         )?;
+        let anchors_valid = {
+            let anchor_contexts =
+                AnchorContextAnalysis::new(&interner, &symbol_table, &dependency_analysis);
+            validate_anchors(AnchorValidationInput {
+                analysis: &anchor_contexts,
+                dependency_analysis: &dependency_analysis,
+                diag: &mut self.diag,
+            })
+        };
+        if !anchors_valid {
+            return Ok(Query::parsed_only(self));
+        }
         validate_recursion(
             &dependency_analysis,
             validated.ast_map(),

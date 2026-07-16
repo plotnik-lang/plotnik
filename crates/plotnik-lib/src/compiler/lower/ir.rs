@@ -10,14 +10,15 @@ use std::collections::BTreeMap;
 use crate::bytecode::{CodeAddr, EffectKind, Nav, PredicateOp, select_match_opcode};
 use indexmap::IndexMap;
 
+use crate::compiler::analyze::boundary::BoundaryState;
 use crate::compiler::analyze::types::CaptureTypePlan;
 use crate::compiler::ids::{DefId, ResultMemberId, TypeId};
+use crate::compiler::lower::boundary::{ExitPort, ExitSignature};
 use crate::compiler::lower::spans::SpanTable;
+use crate::compiler::lower::thompson::boundary::{EntryObligation, NavigationContract};
 use crate::core::NodeFieldId;
 
-pub(crate) use crate::bytecode::ReturnEntry;
-pub(crate) use crate::bytecode::ReturnMode;
-pub use plotnik_rt::ReturnOutcome;
+pub use plotnik_rt::PortId;
 
 /// Node kind constraint for Match instructions.
 ///
@@ -199,32 +200,25 @@ impl DefRoute {
         )
     }
 
-    pub(crate) fn return_depth(self, outcome: ReturnOutcome) -> Option<i32> {
-        match (self, outcome) {
-            (Self::Caller, ReturnOutcome::Matched) => Some(0),
-            (Self::Caller, ReturnOutcome::Empty) => None,
-            (Self::Routed { nav, .. }, ReturnOutcome::Matched) => Some(nav.depth_delta()),
+    pub(crate) fn return_depth(self, consumed: bool) -> Option<i32> {
+        match (self, consumed) {
+            (Self::Caller, true) => Some(0),
+            (Self::Caller, false) => None,
+            (Self::Routed { nav, .. }, true) => Some(nav.depth_delta()),
             (
                 Self::Routed {
                     returns: RoutedReturns::Split,
                     ..
                 },
-                ReturnOutcome::Empty,
+                false,
             ) => Some(0),
             (
                 Self::Routed {
                     returns: RoutedReturns::MatchOnly,
                     ..
                 },
-                ReturnOutcome::Empty,
+                false,
             ) => None,
-        }
-    }
-
-    pub(crate) fn return_entry(self) -> ReturnEntry {
-        match self {
-            Self::Caller => ReturnEntry::Caller,
-            Self::Routed { .. } => ReturnEntry::Routed,
         }
     }
 }
@@ -235,6 +229,39 @@ pub(crate) struct DefSpecialization {
     def_id: DefId,
     mode: DefBodyMode,
     route: DefRoute,
+    boundary: Option<DefBoundaryContract>,
+    ports: ExitSignature,
+}
+
+/// Entry-side semantic contract owned by a boundary-aware specialization.
+///
+/// The exact reachable port signature remains on [`DefSpecialization`] because
+/// ordinary and boundary-aware bodies share the same generalized return ABI.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct DefBoundaryContract {
+    input: BoundaryState,
+    entry: EntryObligation,
+}
+
+/// Immutable entry protocol implemented by one specialized definition body.
+///
+/// Caller-owned bodies are exact: navigation and field selection happen at
+/// each call site. Callee-owned bodies embed one exact obligation into their
+/// nullable structure, so every call targeting that body must agree with it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum CalleeEntryContract {
+    CallerOwned,
+    CalleeOwned { obligation: EntryObligation },
+}
+
+impl DefBoundaryContract {
+    pub(crate) fn input(self) -> BoundaryState {
+        self.input
+    }
+
+    pub(crate) fn entry(self) -> EntryObligation {
+        self.entry
+    }
 }
 
 impl DefSpecialization {
@@ -243,6 +270,8 @@ impl DefSpecialization {
             def_id,
             mode: DefBodyMode::ordinary(),
             route: DefRoute::Caller,
+            boundary: None,
+            ports: ExitSignature::singleton(ExitPort::ConsumedOtherNone),
         }
     }
 
@@ -251,6 +280,8 @@ impl DefSpecialization {
             def_id,
             mode,
             route: DefRoute::Caller,
+            boundary: None,
+            ports: ExitSignature::singleton(ExitPort::ConsumedOtherNone),
         }
     }
 
@@ -259,6 +290,8 @@ impl DefSpecialization {
             def_id,
             mode,
             route: DefRoute::match_only(nav),
+            boundary: None,
+            ports: ExitSignature::singleton(ExitPort::ConsumedOtherNone),
         }
     }
 
@@ -267,6 +300,29 @@ impl DefSpecialization {
             def_id,
             mode,
             route: DefRoute::split(nav),
+            boundary: None,
+            ports: ExitSignature::from_ports([ExitPort::ConsumedOtherNone, ExitPort::EmptyNone]),
+        }
+    }
+
+    pub(crate) fn boundary(
+        def_id: DefId,
+        mode: DefBodyMode,
+        input: BoundaryState,
+        entry: EntryObligation,
+        ports: ExitSignature,
+    ) -> Self {
+        let route = if ports.ports().iter().any(|port| !port.consumed()) {
+            DefRoute::split(entry.navigation().authored())
+        } else {
+            DefRoute::match_only(entry.navigation().authored())
+        };
+        Self {
+            def_id,
+            mode,
+            route,
+            boundary: Some(DefBoundaryContract { input, entry }),
+            ports,
         }
     }
 
@@ -282,8 +338,34 @@ impl DefSpecialization {
         self.route
     }
 
+    pub(crate) fn boundary_contract(&self) -> Option<DefBoundaryContract> {
+        self.boundary
+    }
+
+    pub(crate) fn entry_contract(&self) -> CalleeEntryContract {
+        if let Some(boundary) = self.boundary {
+            return CalleeEntryContract::CalleeOwned {
+                obligation: boundary.entry(),
+            };
+        }
+
+        match self.route {
+            DefRoute::Caller => CalleeEntryContract::CallerOwned,
+            DefRoute::Routed { nav, .. } => CalleeEntryContract::CalleeOwned {
+                obligation: EntryObligation::new(NavigationContract::from_nav(nav)),
+            },
+        }
+    }
+
+    pub(crate) fn ports(&self) -> &ExitSignature {
+        &self.ports
+    }
+
     pub(crate) fn is_ordinary(&self) -> bool {
-        self.mode.is_ordinary() && self.route == DefRoute::Caller
+        self.mode.is_ordinary()
+            && self.route == DefRoute::Caller
+            && self.boundary.is_none()
+            && self.ports.ports() == [ExitPort::ConsumedOtherNone]
     }
 }
 
@@ -511,7 +593,14 @@ impl InstructionIR {
     pub fn size(&self) -> usize {
         match self {
             Self::Match(m) => m.size(),
-            Self::Call(_) | Self::Return(_) => 8,
+            Self::Call(call) => {
+                if call.returns.len() == 1 {
+                    8
+                } else {
+                    24
+                }
+            }
+            Self::Return(_) => 8,
         }
     }
 
@@ -670,27 +759,65 @@ impl From<MatchIR> for InstructionIR {
 pub struct CallIR {
     /// Where this instruction lives.
     pub label: Label,
-    /// Complete entry/return protocol. Its variants encode only executable
-    /// combinations, so caller-owned calls can never acquire split returns.
-    pub protocol: CallProtocol,
+    /// Which side of the call boundary discharges entry navigation and field
+    /// selection.
+    pub entry: CallEntry,
     /// Callee entry point.
     pub target: Label,
+    /// Continuations indexed by the callee-local dense [`PortId`].
+    pub returns: Vec<Label>,
 }
 
-/// Entry protocol for a definition call.
+/// Entry ownership for a definition call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CallProtocol {
-    /// The call instruction navigates before entering an exact callee body and
-    /// has one matched continuation.
-    Ordinary {
+pub enum CallEntry {
+    /// The call instruction navigates and checks the field before entering an
+    /// exact callee body.
+    CallerOwned {
         nav: Nav,
-        node_field: Option<NodeFieldId>,
-        next: Label,
+        field: Option<NodeFieldId>,
     },
-    /// The callee owns entry navigation and has one matched continuation.
-    Routed { entry_nav: Nav, next: Label },
-    /// The callee owns entry navigation and selects node-consuming or empty.
-    Split { entry_nav: Nav, returns: [Label; 2] },
+    /// The specialized callee carries the entry obligation through nullable
+    /// structure and discharges it at each eventual first consumer.
+    CalleeOwned { obligation: EntryObligation },
+}
+
+impl CallEntry {
+    pub fn nav(self) -> Nav {
+        match self {
+            Self::CallerOwned { nav, .. } => nav,
+            Self::CalleeOwned { obligation } => obligation.navigation().authored(),
+        }
+    }
+
+    pub fn field(self) -> Option<NodeFieldId> {
+        match self {
+            Self::CallerOwned { field, .. } => field,
+            Self::CalleeOwned { obligation } => obligation.field(),
+        }
+    }
+
+    pub fn caller_owned(self) -> bool {
+        matches!(self, Self::CallerOwned { .. })
+    }
+
+    pub(crate) fn target_contract(self) -> CalleeEntryContract {
+        match self {
+            Self::CallerOwned { .. } => CalleeEntryContract::CallerOwned,
+            Self::CalleeOwned { obligation } => CalleeEntryContract::CalleeOwned { obligation },
+        }
+    }
+
+    pub fn continuation_depth(self, consumed: bool) -> Option<i32> {
+        match (self, consumed) {
+            (Self::CallerOwned { nav, .. }, true) => Some(nav.depth_delta()),
+            (Self::CallerOwned { .. }, false) => None,
+            (Self::CalleeOwned { obligation }, true) => {
+                Some(obligation.navigation().authored().depth_delta())
+            }
+            (Self::CalleeOwned { .. }, false) => Some(0),
+        }
+    }
 }
 
 impl CallIR {
@@ -698,12 +825,12 @@ impl CallIR {
     pub fn new(label: Label, return_addr: ReturnAddr, callee: CalleeEntry) -> Self {
         Self {
             label,
-            protocol: CallProtocol::Ordinary {
+            entry: CallEntry::CallerOwned {
                 nav: Nav::Stay,
-                node_field: None,
-                next: return_addr.0,
+                field: None,
             },
             target: callee.0,
+            returns: vec![return_addr.0],
         }
     }
 
@@ -716,11 +843,11 @@ impl CallIR {
     ) -> Self {
         Self {
             label,
-            protocol: CallProtocol::Routed {
-                entry_nav,
-                next: return_addr.0,
+            entry: CallEntry::CalleeOwned {
+                obligation: EntryObligation::new(NavigationContract::from_nav(entry_nav)),
             },
             target: callee.0,
+            returns: vec![return_addr.0],
         }
     }
 
@@ -734,18 +861,37 @@ impl CallIR {
     ) -> Self {
         Self {
             label,
-            protocol: CallProtocol::Split {
-                entry_nav,
-                returns: [returns.matched.0, returns.empty.0],
+            entry: CallEntry::CalleeOwned {
+                obligation: EntryObligation::new(NavigationContract::from_nav(entry_nav)),
             },
             target: callee.0,
+            returns: vec![returns.matched.0, returns.empty.0],
+        }
+    }
+
+    pub fn generalized(
+        label: Label,
+        entry: CallEntry,
+        returns: Vec<Label>,
+        callee: CalleeEntry,
+    ) -> Self {
+        assert!(
+            !returns.is_empty() && returns.len() <= usize::from(PortId::COUNT),
+            "call must provide 1..={} continuations",
+            PortId::COUNT
+        );
+        Self {
+            label,
+            entry,
+            target: callee.0,
+            returns,
         }
     }
 
     pub fn nav(mut self, nav: Nav) -> Self {
-        let CallProtocol::Ordinary {
+        let CallEntry::CallerOwned {
             nav: current_nav, ..
-        } = &mut self.protocol
+        } = &mut self.entry
         else {
             panic!("routed calls derive navigation from their callee route")
         };
@@ -754,58 +900,35 @@ impl CallIR {
     }
 
     pub fn node_field(mut self, f: impl Into<Option<NodeFieldId>>) -> Self {
-        let CallProtocol::Ordinary { node_field, .. } = &mut self.protocol else {
-            panic!("routed calls cannot carry a field constraint")
-        };
-        *node_field = f.into();
+        let field = f.into();
+        match &mut self.entry {
+            CallEntry::CallerOwned { field: current, .. } => {
+                *current = field;
+            }
+            CallEntry::CalleeOwned { obligation } => {
+                assert!(
+                    obligation.field().is_none(),
+                    "a callee-owned call must discharge at most one grammar field"
+                );
+                if let Some(field) = field {
+                    *obligation = obligation.with_field(field);
+                }
+            }
+        }
         self
     }
 
-    pub fn entry_nav(&self) -> Nav {
-        match self.protocol {
-            CallProtocol::Ordinary { nav, .. } => nav,
-            CallProtocol::Routed { entry_nav, .. } | CallProtocol::Split { entry_nav, .. } => {
-                entry_nav
-            }
-        }
-    }
-
     pub fn field(&self) -> Option<NodeFieldId> {
-        match self.protocol {
-            CallProtocol::Ordinary { node_field, .. } => node_field,
-            CallProtocol::Routed { .. } | CallProtocol::Split { .. } => None,
-        }
+        self.entry.field()
     }
 
     pub fn return_labels(&self) -> &[Label] {
-        match &self.protocol {
-            CallProtocol::Ordinary { next, .. } | CallProtocol::Routed { next, .. } => {
-                std::slice::from_ref(next)
-            }
-            CallProtocol::Split { returns, .. } => returns,
-        }
-    }
-
-    pub fn matched_return(&self) -> Label {
-        self.return_labels()[0]
-    }
-
-    pub fn empty_return(&self) -> Option<Label> {
-        match self.protocol {
-            CallProtocol::Split { returns, .. } => Some(returns[1]),
-            CallProtocol::Ordinary { .. } | CallProtocol::Routed { .. } => None,
-        }
+        &self.returns
     }
 
     pub(crate) fn remap_returns(&mut self, mut resolve: impl FnMut(Label) -> Label) {
-        match &mut self.protocol {
-            CallProtocol::Ordinary { next, .. } | CallProtocol::Routed { next, .. } => {
-                *next = resolve(*next)
-            }
-            CallProtocol::Split { returns, .. } => {
-                returns[0] = resolve(returns[0]);
-                returns[1] = resolve(returns[1]);
-            }
+        for target in &mut self.returns {
+            *target = resolve(*target);
         }
     }
 }
@@ -831,42 +954,54 @@ impl From<CallIR> for InstructionIR {
 pub struct ReturnIR {
     /// Where this instruction lives.
     pub label: Label,
-    /// Complete entry/outcome protocol.
-    pub mode: ReturnMode,
+    /// Callee-local dense exit port.
+    pub port: PortId,
+    /// Entry protocol implemented by the body containing this return.
+    pub(crate) entry: CalleeEntryContract,
 }
 
 impl ReturnIR {
     pub fn new(label: Label) -> Self {
-        Self::matched(label)
+        Self::port(
+            label,
+            PortId::from_byte(0).expect("zero is a valid port id"),
+        )
+    }
+
+    pub fn port(label: Label, port: PortId) -> Self {
+        Self {
+            label,
+            port,
+            entry: CalleeEntryContract::CallerOwned,
+        }
+    }
+
+    pub(crate) fn callee_owned(label: Label, port: PortId, obligation: EntryObligation) -> Self {
+        Self {
+            label,
+            port,
+            entry: CalleeEntryContract::CalleeOwned { obligation },
+        }
     }
 
     pub fn matched(label: Label) -> Self {
-        Self {
+        Self::new(label)
+    }
+
+    pub fn routed_matched(label: Label, obligation: EntryObligation) -> Self {
+        Self::callee_owned(
             label,
-            mode: ReturnMode::CallerMatched,
-        }
+            PortId::from_byte(0).expect("zero is a valid port id"),
+            obligation,
+        )
     }
 
-    pub fn routed_matched(label: Label) -> Self {
-        Self {
+    pub fn routed_empty(label: Label, obligation: EntryObligation) -> Self {
+        Self::callee_owned(
             label,
-            mode: ReturnMode::RoutedMatched,
-        }
-    }
-
-    pub fn routed_empty(label: Label) -> Self {
-        Self {
-            label,
-            mode: ReturnMode::RoutedEmpty,
-        }
-    }
-
-    pub fn outcome(&self) -> ReturnOutcome {
-        self.mode.outcome()
-    }
-
-    pub(crate) fn entry(&self) -> ReturnEntry {
-        self.mode.entry()
+            PortId::from_byte(1).expect("one is a valid port id"),
+            obligation,
+        )
     }
 }
 
@@ -921,6 +1056,12 @@ impl NfaGraph {
 
     pub(crate) fn entry_point_wrappers(&self) -> &IndexMap<DefId, Label> {
         &self.entry_point_wrappers
+    }
+
+    pub(crate) fn specialization_for_entry(&self, entry: Label) -> Option<&DefSpecialization> {
+        self.def_entries
+            .iter()
+            .find_map(|(specialization, &label)| (label == entry).then_some(specialization))
     }
 
     pub(crate) fn spans(&self) -> Option<&SpanTable> {

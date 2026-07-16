@@ -47,6 +47,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::nullability::compute_nullable_defs;
 use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
 use crate::compiler::diagnostics::report::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
@@ -1477,6 +1478,7 @@ pub(super) struct InferPassEnv<'a, 'd> {
 pub(super) struct StructuralFacts {
     nullable_defs: HashSet<DefId>,
     definition_root_extents: HashMap<DefId, RootExtent>,
+    definition_requires_anchor_context: HashMap<DefId, bool>,
 }
 
 impl StructuralFacts {
@@ -1484,7 +1486,20 @@ impl StructuralFacts {
         interner: &Interner,
         symbol_table: &SymbolTable,
         dependency_analysis: &DependencyAnalysis,
+        anchor_contexts: &AnchorContextAnalysis<'_>,
     ) -> Self {
+        let definition_requires_anchor_context = dependency_analysis
+            .sccs()
+            .iter()
+            .flatten()
+            .copied()
+            .map(|def_id| {
+                (
+                    def_id,
+                    anchor_contexts.definition_requires_external_context(def_id),
+                )
+            })
+            .collect();
         Self {
             nullable_defs: compute_nullable_defs(interner, symbol_table, dependency_analysis),
             definition_root_extents: super::root_extent::compute_definition_root_extents(
@@ -1492,6 +1507,7 @@ impl StructuralFacts {
                 symbol_table,
                 dependency_analysis,
             ),
+            definition_requires_anchor_context,
         }
     }
 }
@@ -1537,6 +1553,14 @@ impl<'a, 'd> InferPass<'a, 'd> {
         // through recursion. Only result types need SCC deferral.
         for (&def_id, &extent) in &self.analysis.structural_facts.definition_root_extents {
             self.ctx.record_def_root_extent(def_id, extent);
+        }
+        for (&def_id, &requires_context) in &self
+            .analysis
+            .structural_facts
+            .definition_requires_anchor_context
+        {
+            self.ctx
+                .record_def_requires_anchor_context(def_id, requires_context);
         }
 
         self.process_sccs();

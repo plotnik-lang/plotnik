@@ -15,7 +15,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 4;
+pub const REQUIRED_RUNTIME_ABI: u32 = 5;
 
 use ::plotnik_rt::Node;
 
@@ -195,6 +195,15 @@ mod matcher {
     const S14_Q_EP: u16 = 10;
     const S15_Q_EP: u16 = 11;
 
+    /// Resolve a callee-local return port through the immutable call-site map.
+    #[inline]
+    fn call_return(call_site: u16, port: rt::PortId) -> u16 {
+        match (call_site, port.to_byte()) {
+            (S14_Q_EP, 0) => S13_Q_EP,
+            _ => unreachable!("call site {call_site} has no return port {}", port.to_byte()),
+        }
+    }
+
     /// Match the `Q` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn q_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
@@ -302,9 +311,14 @@ mod matcher {
             //   01                                        ▶
             S01_Q => {
                 if eng.frames_empty() {
-                    Flow::Accept
+                    if 0 == 0 {
+                        Flow::Accept
+                    } else {
+                        panic!("entry point returned through nonzero port 0");
+                    }
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   02   !   (program)                        04
@@ -380,9 +394,14 @@ mod matcher {
             //   12                                        ▶
             S12_Q_EP => {
                 if eng.frames_empty() {
-                    Flow::Accept
+                    if 0 == 0 {
+                        Flow::Accept
+                    } else {
+                        panic!("entry point returned through nonzero port 0");
+                    }
                 } else {
-                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
+                    let call_site = eng.exit_frame();
+                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
             //   13  -ε-  [RecordClose]                    12
@@ -392,7 +411,7 @@ mod matcher {
             }
             //   14       (Q)                              02 : 13
             S14_Q_EP => {
-                eng.enter_frame(S13_Q_EP);
+                eng.enter_frame(S14_Q_EP);
                 Flow::Jump(S02_Q)
             }
             //   15  -ε-  [RecordOpen]                     14
@@ -491,7 +510,7 @@ mod matcher {
                         cp.ip,
                         resume,
                     ));
-                    eng.enter_frame(resume.next);
+                    eng.enter_frame(resume.call_site);
                     return Unwound::Resumed(resume.target);
                 }
 

@@ -7,7 +7,7 @@
 use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
     MATCH_PAYLOAD_START, MatchCounts, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
-    PREDICATE_SLOTS, ReturnEntry, header_byte,
+    PREDICATE_SLOTS, header_byte,
 };
 use super::super::node_kind_constraint::NodeKindConstraint;
 use super::super::sections::SymbolNameEntry;
@@ -16,8 +16,9 @@ use super::super::{
     HEADER_SIZE, MAX_SPANS, SECTION_ALIGN, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, SpanKind, VERSION,
 };
 use super::*;
+use crate::bytecode::CalleeContract;
 use crate::bytecode::predicate_op::PredicateOp;
-use plotnik_rt::Nav;
+use plotnik_rt::{Nav, PortId};
 use std::collections::{HashMap, HashSet};
 
 /// Bytecode validation error.
@@ -80,79 +81,88 @@ pub enum ModuleError {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct ReturnOutcomes(u8);
+struct ReturnPorts(u8);
 
-impl ReturnOutcomes {
+impl ReturnPorts {
     const NONE: Self = Self(0);
-    const MATCHED: Self = Self(1);
-    const BOTH: Self = Self(3);
 
-    fn insert(&mut self, outcome: plotnik_rt::ReturnOutcome) {
-        self.0 |= match outcome {
-            plotnik_rt::ReturnOutcome::Matched => Self::MATCHED.0,
-            plotnik_rt::ReturnOutcome::Empty => 2,
-        };
+    fn dense(arity: usize) -> Self {
+        Self(((1u16 << arity) - 1) as u8)
+    }
+
+    fn insert(&mut self, port: PortId) {
+        self.0 |= 1 << port.to_byte();
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct ReturnContract {
-    outcomes: ReturnOutcomes,
-    entry: Option<ReturnEntry>,
+    ports: ReturnPorts,
+    entry: Option<CalleeContract>,
     mixed_entries: bool,
 }
 
 impl ReturnContract {
     const NONE: Self = Self {
-        outcomes: ReturnOutcomes::NONE,
+        ports: ReturnPorts::NONE,
         entry: None,
         mixed_entries: false,
     };
 
     fn insert(&mut self, return_: Return) {
-        self.outcomes.insert(return_.mode.outcome());
+        self.ports.insert(return_.port);
         match self.entry {
-            None => self.entry = Some(return_.mode.entry()),
-            Some(entry) if entry != return_.mode.entry() => self.mixed_entries = true,
+            None => self.entry = Some(return_.contract),
+            Some(entry) if entry != return_.contract => self.mixed_entries = true,
             Some(_) => {}
         }
     }
 
-    fn is(self, outcomes: ReturnOutcomes, entry: ReturnEntry) -> bool {
-        self.outcomes == outcomes && self.entry == Some(entry) && !self.mixed_entries
+    fn is(self, ports: ReturnPorts, entry: CalleeContract) -> bool {
+        self.ports == ports && self.entry == Some(entry) && !self.mixed_entries
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum DepthRoute {
-    Caller,
-    RoutedMatchOnly(i32),
-    RoutedSplit(i32),
+struct DepthRoute {
+    contract: CalleeContract,
+    arity: u8,
+    consumed_mask: u8,
 }
 
 impl DepthRoute {
-    fn expected(self, outcome: plotnik_rt::ReturnOutcome) -> Option<i32> {
-        match (self, outcome) {
-            (Self::Caller, plotnik_rt::ReturnOutcome::Matched) => Some(0),
-            (Self::RoutedMatchOnly(depth), plotnik_rt::ReturnOutcome::Matched)
-            | (Self::RoutedSplit(depth), plotnik_rt::ReturnOutcome::Matched) => Some(depth),
-            (Self::RoutedSplit(_), plotnik_rt::ReturnOutcome::Empty) => Some(0),
-            (Self::Caller | Self::RoutedMatchOnly(_), plotnik_rt::ReturnOutcome::Empty) => None,
+    fn entry_point() -> Self {
+        Self {
+            contract: CalleeContract::CallerOwned,
+            arity: 1,
+            consumed_mask: 1,
         }
     }
 
-    fn matched_depth(self) -> i32 {
-        match self {
-            Self::Caller => 0,
-            Self::RoutedMatchOnly(depth) | Self::RoutedSplit(depth) => depth,
+    fn from_call(call: Call) -> Self {
+        Self {
+            contract: call.callee_contract(),
+            arity: call.arity() as u8,
+            consumed_mask: call.consumed_mask(),
         }
     }
 
-    fn return_entry(self) -> ReturnEntry {
-        match self {
-            Self::Caller => ReturnEntry::Caller,
-            Self::RoutedMatchOnly(_) | Self::RoutedSplit(_) => ReturnEntry::Routed,
+    fn expected_exit(self, port: PortId) -> Option<i32> {
+        if port.index() >= usize::from(self.arity) {
+            return None;
         }
+        match self.contract {
+            CalleeContract::CallerOwned => Some(0),
+            CalleeContract::CalleeOwned { nav, .. } => Some(if self.consumed(port) {
+                nav.depth_delta()
+            } else {
+                0
+            }),
+        }
+    }
+
+    fn consumed(self, port: PortId) -> bool {
+        self.consumed_mask & (1 << port.to_byte()) != 0
     }
 }
 
@@ -171,6 +181,26 @@ fn read_operand_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
         .get(off..off + 2)
         .map(|b| u16::from_le_bytes([b[0], b[1]]))
         .ok_or(ModuleError::MalformedInstructionStream)
+}
+
+fn call_word_count(call: Call) -> u16 {
+    if call.arity() == 1 { 1 } else { 3 }
+}
+
+fn is_call_nav(nav: Nav) -> bool {
+    matches!(
+        nav,
+        Nav::Stay
+            | Nav::StayExact
+            | Nav::Next
+            | Nav::NextSkip
+            | Nav::NextSkipExtras
+            | Nav::NextExact
+            | Nav::Down
+            | Nav::DownSkip
+            | Nav::DownSkipExtras
+            | Nav::DownExact
+    )
 }
 
 impl Module {
@@ -572,18 +602,14 @@ impl Module {
         Ok(())
     }
 
-    /// Every entry body returns at the cursor depth promised by its call form.
-    ///
-    /// The VM treats call bodies as independent cursors: a `Call` applies its own
-    /// navigation, then resumes at `next` after a net-neutral callee returns.
-    /// A `SplitCall` routes its entry navigation through the callee instead, so
-    /// its body and both continuations have that navigation's depth delta.
+    /// Every entry body and every per-port continuation observes the cursor
+    /// contract declared by its call site.
     fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
         let mut roots = HashMap::new();
 
         for entry_point in self.entry_points().iter() {
             let target = entry_point.target();
-            let route = DepthRoute::Caller;
+            let route = DepthRoute::entry_point();
             if let Some(expected) = roots.insert(target, route)
                 && expected != route
             {
@@ -597,33 +623,13 @@ impl Module {
                 Instruction::Match(m) => m.word_count(),
                 Instruction::Call(c) => {
                     let target = CodeAddr::from(u16::from(c.target));
-                    let route = DepthRoute::Caller;
+                    let route = DepthRoute::from_call(c);
                     if let Some(expected) = roots.insert(target, route)
                         && expected != route
                     {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
-                    1
-                }
-                Instruction::RoutedCall(c) => {
-                    let target = CodeAddr::from(u16::from(c.target));
-                    let route = DepthRoute::RoutedMatchOnly(c.entry_nav.depth_delta());
-                    if let Some(previous) = roots.insert(target, route)
-                        && previous != route
-                    {
-                        return Err(ModuleError::MalformedInstructionStream);
-                    }
-                    1
-                }
-                Instruction::SplitCall(c) => {
-                    let target = CodeAddr::from(u16::from(c.target));
-                    let route = DepthRoute::RoutedSplit(c.entry_nav.depth_delta());
-                    if let Some(previous) = roots.insert(target, route)
-                        && previous != route
-                    {
-                        return Err(ModuleError::MalformedInstructionStream);
-                    }
-                    1
+                    call_word_count(c)
                 }
                 Instruction::Return(_) => 1,
             };
@@ -638,10 +644,8 @@ impl Module {
         Ok(())
     }
 
-    /// Calls and callees must agree on the return outcomes carried by their
-    /// frames. This keeps malformed bytecode from selecting a continuation an
-    /// ordinary frame does not own, or from encoding a split call whose empty
-    /// route can never be taken.
+    /// Calls and callees must agree on the exact dense port set carried by
+    /// their frames.
     fn validate_return_routes(&self) -> Result<(), ModuleError> {
         let mut cache = HashMap::new();
 
@@ -649,7 +653,7 @@ impl Module {
             let target = entry_point.target();
             if !self
                 .return_contract(target, &mut cache)
-                .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
+                .is(ReturnPorts::dense(1), CalleeContract::CallerOwned)
             {
                 return Err(ModuleError::MalformedInstructionStream);
             }
@@ -663,31 +667,11 @@ impl Module {
                     let target = CodeAddr::from(u16::from(call.target));
                     if !self
                         .return_contract(target, &mut cache)
-                        .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
+                        .is(ReturnPorts::dense(call.arity()), call.callee_contract())
                     {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
-                    1
-                }
-                Instruction::RoutedCall(call) => {
-                    let target = CodeAddr::from(u16::from(call.target));
-                    if !self
-                        .return_contract(target, &mut cache)
-                        .is(ReturnOutcomes::MATCHED, ReturnEntry::Routed)
-                    {
-                        return Err(ModuleError::MalformedInstructionStream);
-                    }
-                    1
-                }
-                Instruction::SplitCall(call) => {
-                    let target = CodeAddr::from(u16::from(call.target));
-                    if !self
-                        .return_contract(target, &mut cache)
-                        .is(ReturnOutcomes::BOTH, ReturnEntry::Routed)
-                    {
-                        return Err(ModuleError::MalformedInstructionStream);
-                    }
-                    1
+                    call_word_count(call)
                 }
                 Instruction::Return(_) => 1,
             };
@@ -722,13 +706,8 @@ impl Module {
                             .map(|next| CodeAddr::from(u16::from(next))),
                     );
                 }
-                Instruction::Call(call) => work.push(CodeAddr::from(u16::from(call.next))),
-                Instruction::RoutedCall(call) => {
-                    work.push(CodeAddr::from(u16::from(call.next)));
-                }
-                Instruction::SplitCall(call) => {
-                    work.push(CodeAddr::from(u16::from(call.returns.empty)));
-                    work.push(CodeAddr::from(u16::from(call.returns.matched)));
+                Instruction::Call(call) => {
+                    work.extend(call.returns().map(|next| CodeAddr::from(u16::from(next))));
                 }
                 Instruction::Return(return_) => contract.insert(return_),
             }
@@ -752,10 +731,7 @@ impl Module {
 
             match self.decode_instruction(addr) {
                 Instruction::Return(return_) => {
-                    if return_.mode.entry() != route.return_entry() {
-                        return Err(ModuleError::DepthImbalance(addr));
-                    }
-                    let Some(expected_exit) = route.expected(return_.mode.outcome()) else {
+                    let Some(expected_exit) = route.expected_exit(return_.port) else {
                         return Err(ModuleError::DepthImbalance(addr));
                     };
                     if net != expected_exit {
@@ -765,7 +741,9 @@ impl Module {
                 Instruction::Match(m) => {
                     let next_net = net + m.nav.depth_delta();
                     if m.succ_count() == 0 {
-                        let expected_exit = route.matched_depth();
+                        let expected_exit = route
+                            .expected_exit(PortId::new(0).expect("zero is a valid port"))
+                            .ok_or(ModuleError::DepthImbalance(addr))?;
                         if next_net != expected_exit {
                             return Err(ModuleError::DepthImbalance(addr));
                         }
@@ -776,20 +754,15 @@ impl Module {
                     }
                 }
                 Instruction::Call(c) => {
-                    work.push((CodeAddr::from(u16::from(c.next)), net + c.nav.depth_delta()));
-                }
-                Instruction::RoutedCall(c) => {
-                    work.push((
-                        CodeAddr::from(u16::from(c.next)),
-                        net + c.entry_nav.depth_delta(),
-                    ));
-                }
-                Instruction::SplitCall(c) => {
-                    work.push((
-                        CodeAddr::from(u16::from(c.returns.matched)),
-                        net + c.entry_nav.depth_delta(),
-                    ));
-                    work.push((CodeAddr::from(u16::from(c.returns.empty)), net));
+                    for (index, continuation) in c.returns().enumerate() {
+                        let port = PortId::new(index as u8).expect("call arity is at most eight");
+                        let delta = if c.port_consumed(port) {
+                            c.nav.depth_delta()
+                        } else {
+                            0
+                        };
+                        work.push((CodeAddr::from(u16::from(continuation)), net + delta));
+                    }
                 }
             }
         }
@@ -973,30 +946,39 @@ impl Module {
             if header_byte::segment(header) != 0 {
                 return Err(ModuleError::MalformedInstructionStream);
             }
-            // node_class_bits (header bits 4-5) is meaningful only for Match
-            // variants; Call/Return ignore it, so the format pins those bits to
-            // zero — a malformed non-zero node_class_bits there is smuggled state.
-            if matches!(
-                opcode,
-                Opcode::Call | Opcode::RoutedCall | Opcode::Return | Opcode::SplitCall
-            ) && header_byte::node_class_bits(header) != 0
-            {
-                return Err(ModuleError::MalformedInstructionStream);
-            }
-
             match opcode {
                 Opcode::Return => {
-                    if plotnik_rt::ReturnOutcome::from_byte(read_u8(instr_off + 1)?).is_none() {
+                    if PortId::from_byte(read_u8(instr_off + 1)?).is_none() {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
-                    if ReturnEntry::from_byte(read_u8(instr_off + 2)?).is_none() {
+                    let flags = header_byte::node_class_bits(header);
+                    if flags & !1 != 0 {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
-                    check_zero(instr_off + 3, 5)?;
+                    let Some(nav) = Nav::try_from_byte(read_u8(instr_off + 2)?) else {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    };
+                    if !is_call_nav(nav) {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    }
+                    let node_field = read_operand_u16(storage, instr_off + 4)?;
+                    if flags & 1 == 0 && (nav != Nav::Stay || node_field != 0) {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    }
+                    check_zero(instr_off + 3, 1)?;
+                    check_zero(instr_off + 6, 2)?;
                 }
-                Opcode::Call => {
-                    // `Call::from_bytes` decodes a nav and two non-zero successor addresses.
-                    if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
+                Opcode::Call1 => {
+                    let Some(nav) = Nav::try_from_byte(read_u8(instr_off + 1)?) else {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    };
+                    if !is_call_nav(nav) {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    }
+                    let flags = header_byte::node_class_bits(header);
+                    let caller_owned = flags & 1 == 0;
+                    let consumed = flags & 2 != 0;
+                    if caller_owned && !consumed {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
                     let next = read_operand_u16(storage, instr_off + 4)?;
@@ -1007,34 +989,42 @@ impl Module {
                     targets.push(CodeAddr::from(next));
                     targets.push(CodeAddr::from(target));
                 }
-                Opcode::RoutedCall => {
-                    if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
+                Opcode::CallN => {
+                    let Some(nav) = Nav::try_from_byte(read_u8(instr_off + 1)?) else {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    };
+                    if !is_call_nav(nav) {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
-                    check_zero(instr_off + 2, 2)?;
-                    let next = read_operand_u16(storage, instr_off + 4)?;
-                    let target = read_operand_u16(storage, instr_off + 6)?;
-                    if next == 0 || target == 0 {
+                    let flags = header_byte::node_class_bits(header);
+                    if flags & !1 != 0 {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
-                    targets.push(CodeAddr::from(next));
+                    let target = read_operand_u16(storage, instr_off + 4)?;
+                    let arity = usize::from(read_u8(instr_off + 6)?);
+                    if !(2..=usize::from(PortId::COUNT)).contains(&arity) || target == 0 {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    }
+                    let consumed_mask = read_u8(instr_off + 7)?;
+                    let valid_mask = ((1u16 << arity) - 1) as u8;
+                    if consumed_mask & !valid_mask != 0
+                        || (flags & 1 == 0 && consumed_mask != valid_mask)
+                    {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    }
                     targets.push(CodeAddr::from(target));
-                }
-                Opcode::SplitCall => {
-                    if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedInstructionStream);
+                    for index in 0..usize::from(PortId::COUNT) {
+                        let return_addr =
+                            read_operand_u16(storage, instr_off + BYTECODE_WORD_SIZE + index * 2)?;
+                        if index < arity {
+                            if return_addr == 0 {
+                                return Err(ModuleError::MalformedInstructionStream);
+                            }
+                            targets.push(CodeAddr::from(return_addr));
+                        } else if return_addr != 0 {
+                            return Err(ModuleError::MalformedInstructionStream);
+                        }
                     }
-                    let matched = read_operand_u16(storage, instr_off + 2)?;
-                    let empty = read_operand_u16(storage, instr_off + 4)?;
-                    let target = read_operand_u16(storage, instr_off + 6)?;
-                    if matched == 0 || empty == 0 || target == 0 {
-                        return Err(ModuleError::MalformedInstructionStream);
-                    }
-                    targets.extend([
-                        CodeAddr::from(matched),
-                        CodeAddr::from(empty),
-                        CodeAddr::from(target),
-                    ]);
                 }
                 opcode if opcode.is_match() => {
                     // A Match variant (`Match8` or extended).

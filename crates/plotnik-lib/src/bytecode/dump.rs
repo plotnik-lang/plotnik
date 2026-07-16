@@ -14,7 +14,7 @@ use super::module::{Instruction, Module};
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
-use super::{Call, Match, Return, RoutedCall, SPAN_NO_BINDING, SplitCall};
+use super::{Call, CallOwnership, Match, Return, SPAN_NO_BINDING};
 use plotnik_rt::Nav;
 
 /// Generate a human-readable dump of the bytecode module.
@@ -432,10 +432,14 @@ struct DumpFormatter<'a> {
 fn instruction_word_count(instr: &Instruction) -> u16 {
     match instr {
         Instruction::Match(m) => m.word_count(),
-        Instruction::Call(_)
-        | Instruction::RoutedCall(_)
-        | Instruction::SplitCall(_)
-        | Instruction::Return(_) => 1,
+        Instruction::Call(call) => {
+            if call.arity() == 1 {
+                1
+            } else {
+                3
+            }
+        }
+        Instruction::Return(_) => 1,
     }
 }
 
@@ -454,59 +458,8 @@ impl DumpFormatter<'_> {
         match instr {
             Instruction::Match(m) => self.format_match(addr, m),
             Instruction::Call(c) => self.format_call(addr, c),
-            Instruction::RoutedCall(c) => self.format_routed_call(addr, c),
-            Instruction::SplitCall(c) => self.format_split_call(addr, c),
             Instruction::Return(r) => self.format_return(addr, r),
         }
-    }
-
-    fn format_routed_call(&self, addr: CodeAddr, call: &RoutedCall) -> String {
-        let colors = &self.ctx.colors;
-        let builder = LineBuilder::new(self.addr_width);
-        let prefix = format!(
-            "  {:0sw$} {} ",
-            addr,
-            Symbol::EMPTY.format(),
-            sw = self.addr_width
-        );
-        let target_name = self
-            .ctx
-            .label_for(call.target)
-            .map(String::from)
-            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
-        let content = format!("({}{}{})", colors.blue, target_name, colors.reset);
-        let successors = format!(
-            "{:0w$} : {:0w$}",
-            u16::from(call.target),
-            u16::from(call.next),
-            w = self.addr_width
-        );
-        builder.pad_successors(format!("{prefix}{content}"), &successors)
-    }
-
-    fn format_split_call(&self, addr: CodeAddr, call: &SplitCall) -> String {
-        let colors = &self.ctx.colors;
-        let builder = LineBuilder::new(self.addr_width);
-        let prefix = format!(
-            "  {:0sw$} {} ",
-            addr,
-            Symbol::EMPTY.format(),
-            sw = self.addr_width
-        );
-        let target_name = self
-            .ctx
-            .label_for(call.target)
-            .map(String::from)
-            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
-        let content = format!("({}{}{})", colors.blue, target_name, colors.reset);
-        let successors = format!(
-            "{:0w$} : {:0w$} / {:0w$}",
-            u16::from(call.target),
-            u16::from(call.returns.matched),
-            u16::from(call.returns.empty),
-            w = self.addr_width
-        );
-        builder.pad_successors(format!("{prefix}{content}"), &successors)
     }
 
     fn format_match(&self, addr: CodeAddr, m: &Match) -> String {
@@ -539,7 +492,10 @@ impl DumpFormatter<'_> {
     fn format_call(&self, addr: CodeAddr, call: &Call) -> String {
         let c = &self.ctx.colors;
         let builder = LineBuilder::new(self.addr_width);
-        let symbol = nav_symbol(call.nav);
+        let symbol = match call.ownership {
+            CallOwnership::Caller => nav_symbol(call.nav),
+            CallOwnership::Callee => Symbol::EMPTY,
+        };
         let prefix = format!("  {:0aw$} {} ", addr, symbol.format(), aw = self.addr_width);
 
         // Format field constraint if present
@@ -557,11 +513,14 @@ impl DumpFormatter<'_> {
             .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
         // Definition name in call is blue
         let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
-        // Format as "target : return" with numeric IDs
+        let returns = call
+            .returns()
+            .map(|addr| format!("{:0w$}", u16::from(addr), w = self.addr_width))
+            .collect::<Vec<_>>()
+            .join(" / ");
         let successors = format!(
-            "{:0w$} : {:0w$}",
+            "{:0w$} : {returns}",
             u16::from(call.target),
-            u16::from(call.next),
             w = self.addr_width
         );
 
@@ -577,11 +536,13 @@ impl DumpFormatter<'_> {
             Symbol::EMPTY.format(),
             sw = self.addr_width
         );
-        let outcome = match return_.mode.outcome() {
-            plotnik_rt::ReturnOutcome::Matched => "▶",
-            plotnik_rt::ReturnOutcome::Empty => "▶ empty",
+        let port = return_.port.to_byte();
+        let successor = if port == 0 {
+            "▶".to_string()
+        } else {
+            format!("▶ p{port}")
         };
-        builder.pad_successors(prefix, outcome)
+        builder.pad_successors(prefix, &successor)
     }
 
     fn format_addr(&self, addr: SuccessorAddr) -> String {

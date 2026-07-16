@@ -1,0 +1,16 @@
+Tail = {
+  (identifier)
+  .
+}
+
+Alias = (Tail)
+Q = (Alias)
+------------------ DIAGNOSTICS -------------------
+error: anchor needs an enclosing node
+ --> query.ptk:3:3
+  |
+3 |   .
+  |   ^
+  |
+help: wrap in a named node: `(parent . (child))`
+-------------------- SYMBOLS ---------------------

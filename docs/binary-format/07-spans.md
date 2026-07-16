@@ -46,7 +46,7 @@ syntax construct.
 
 `capture_type` covers `:: T`, `:: text`, or `:: bool`. `negated_grammar_field` and
 `predicate` are reserved for
-inspection detail; v11 loaders accept the kind values, but the compiler does
+inspection detail; v12 loaders accept the kind values, but the compiler does
 not emit them yet.
 
 ## Span Effects

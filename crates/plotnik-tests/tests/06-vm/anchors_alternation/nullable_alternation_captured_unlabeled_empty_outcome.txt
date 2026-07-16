@@ -1,0 +1,157 @@
+Q = (program
+  (expression_statement
+    (array
+      "["
+      [
+        {
+          (identifier == "a")? @a
+          .
+        }
+        (identifier == "x") @x
+      ] @choice
+      (identifier == "b") @b
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  b: Node;
+  choice: QChoice;
+}
+
+export interface QChoice {
+  a: Node | null;
+  x: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "b": {
+    "kind": "identifier",
+    "span": [1, 2],
+    "text": "b"
+  },
+  "choice": {
+    "a": null,
+    "x": null
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "a"
+S03 "x"
+S04 "choice"
+S05 "QChoice"
+S06 "Q"
+S07 "program"
+S08 "expression_statement"
+S09 "array"
+S10 "["
+S11 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { a, x }
+T3 = Record  M2:2  ; { choice, b }
+
+[type_members]
+M0: S02 → T1  ; a: T1
+M1: S03 → T1  ; x: T1
+M2: S04 → T2  ; choice: QChoice
+M3: S01 → T0  ; b: <Node>
+
+[type_names]
+N0: S05 → T2  ; QChoice
+N1: S06 → T3  ; Q
+
+[entry_points]
+Q = 00 :: T3
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@44)                            44 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─‣─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  11  ─•─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  14  ...
+  15  ...
+  16  ─◦─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  19   !   (identifier) [Node RecordSet(M0)] == "a"  11
+  22  ──!  _                                19, 22
+  24   !   _ [Absent RecordSet(M1)]         19, 22
+  26  -ε-  [Absent RecordSet(M1) Absent RecordSet(M0)]  16
+  29   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  08
+  32  ──!  _                                24, 29, 32
+  34  -ε-  [RecordOpen]                     32, 26
+  36   !   "["                              34
+  37  ──!  _                                36, 37
+  39  ...
+  40  └─!  _                                36, 37
+  42  └‣─  (array)                          40
+  43  └‣─  (expression_statement)           42
+  44   !   (program)                        43
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@44)                            44 : 03
+       ▶   (@44)
+
+@44:
+  44       (program)                        43
+       ●   program
+  43       (expression_statement)           42
+       ●   expression_statement
+  42       (array)                          40
+       ●   array
+  40       _                                36, 37
+       ●   [
+  36       "["                              34
+       ●   [
+  34  -ε-  [RecordOpen]                     32, 26
+  32       _                                24, 29, 32
+       ●   identifier
+  24       _ [Absent RecordSet(M1)]         19, 22
+       ●   identifier
+  19       (identifier) [Node RecordSet(M0)] == "a"  11
+  24  ❮❮❮ 
+  22       _                                19, 22
+       ●   ]
+  19       (identifier) [Node RecordSet(M0)] == "a"  11
+       ○   ]
+  22  ❮❮❮ 
+  22       _                                19, 22
+  32  ❮❮❮ 
+  29       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  08
+  32  ❮❮❮ 
+  32       _                                24, 29, 32
+       ●   ]
+  24       _ [Absent RecordSet(M1)]         19, 22
+       ●   ]
+  19       (identifier) [Node RecordSet(M0)] == "a"  11
+       ○   ]
+  24  ❮❮❮ 
+  22       _                                19, 22
+  32  ❮❮❮ 
+  29       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  08
+       ○   ]
+  32  ❮❮❮ 
+  32       _                                24, 29, 32
+  34  ❮❮❮ 
+  26  -ε-  [Absent RecordSet(M1) Absent RecordSet(M0)]  16
+  16       (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+       ●   identifier
+  07       _                                06
+       ●   program
+  06   ◀   (@44)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

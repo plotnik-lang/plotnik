@@ -20,6 +20,7 @@ struct Fixture {
 fn record_def(builder: &mut TypeAnalysisBuilder, def_id: DefId, type_id: TypeId) {
     builder.record_def_output(def_id, DefinitionOutput::Value(type_id));
     builder.record_def_root_extent(def_id, RootExtent::SingleNode);
+    builder.record_def_requires_anchor_context(def_id, false);
 }
 
 fn borrows_any(facts: &TypeFacts, ty: TypeId) -> bool {

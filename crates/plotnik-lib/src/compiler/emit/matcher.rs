@@ -17,8 +17,8 @@ use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::dump::NfaDumper;
 use crate::compiler::lower::ir::{
-    CallIR, CallProtocol, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR,
-    NfaGraph, PredicateIR, PredicateValueIR,
+    CallIR, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph, PortId,
+    PredicateIR, PredicateValueIR,
 };
 use crate::compiler::regex::normalize;
 use crate::core::{NodeFieldId, NodeKindId};
@@ -69,7 +69,7 @@ pub(crate) enum StatePlanKind {
     },
     Match(MatchPlan),
     Call(CallPlan),
-    Return(plotnik_rt::ReturnOutcome),
+    Return(PortId),
 }
 
 #[derive(Clone, Debug)]
@@ -110,45 +110,36 @@ impl MatchPlan {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum CallPlan {
-    Ordinary(OrdinaryCallPlan),
-    Routed(RoutedCallPlan),
-    Split(SplitCallPlan),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CallOwnership {
+    Caller,
+    Callee,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct OrdinaryCallPlan {
+pub(crate) struct CallPlan {
+    pub(crate) ownership: CallOwnership,
     pub(crate) nav: Nav,
     pub(crate) search: SkipPolicy,
     pub(crate) retry: Option<SkipPolicy>,
     pub(crate) field: Option<u16>,
     pub(crate) target: StateId,
-    pub(crate) next: StateId,
+    pub(crate) returns: Vec<StateId>,
 }
 
-impl OrdinaryCallPlan {
+impl CallPlan {
+    pub(crate) fn caller_owned(&self) -> bool {
+        self.ownership == CallOwnership::Caller
+    }
+
     pub(crate) fn stays_on_current_node(&self) -> bool {
         matches!(self.nav, Nav::Stay | Nav::StayExact)
     }
 
     /// Whether navigation or field selection can fail before entering the call.
     pub(crate) fn can_fail_before_flow(&self) -> bool {
-        !self.stays_on_current_node() || self.field.is_some()
+        self.caller_owned() && (!self.stays_on_current_node() || self.field.is_some())
     }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct SplitCallPlan {
-    pub(crate) target: StateId,
-    pub(crate) matched: StateId,
-    pub(crate) empty: StateId,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct RoutedCallPlan {
-    pub(crate) target: StateId,
-    pub(crate) next: StateId,
 }
 
 #[derive(Clone, Debug)]
@@ -404,7 +395,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         let kind = match instruction {
             InstructionIR::Match(instruction) => self.match_state(instruction),
             InstructionIR::Call(instruction) => StatePlanKind::Call(self.call_state(instruction)),
-            InstructionIR::Return(return_) => StatePlanKind::Return(return_.outcome()),
+            InstructionIR::Return(return_) => StatePlanKind::Return(return_.port),
         };
         StatePlan {
             id: StateId(u16::try_from(index).expect("validated state count fits u16 ids")),
@@ -447,33 +438,39 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
 
     fn call_state(&mut self, instruction: &CallIR) -> CallPlan {
         let target = resolve_state(self.ids, instruction.target);
-        let matched = resolve_state(self.ids, instruction.matched_return());
-        match instruction.protocol {
-            CallProtocol::Split { returns, .. } => CallPlan::Split(SplitCallPlan {
-                target,
-                matched,
-                empty: resolve_state(self.ids, returns[1]),
-            }),
-            CallProtocol::Routed { .. } => CallPlan::Routed(RoutedCallPlan {
-                target,
-                next: matched,
-            }),
-            CallProtocol::Ordinary {
-                nav, node_field, ..
-            } => {
-                let field = node_field.map(|field| self.record_field(field).id);
-                let stays = matches!(nav, Nav::Stay | Nav::StayExact);
-                let search = nav.skip_policy();
-                let retry = (!stays && search != SkipPolicy::Exact).then_some(search);
-                CallPlan::Ordinary(OrdinaryCallPlan {
-                    nav,
-                    search,
-                    retry,
-                    field,
-                    target,
-                    next: matched,
-                })
-            }
+        let nav = instruction.entry.nav();
+        let search = nav.skip_policy();
+        let caller_owned = instruction.entry.caller_owned();
+        let stays = matches!(nav, Nav::Stay | Nav::StayExact);
+        let retry = (caller_owned && !stays && search != SkipPolicy::Exact).then_some(search);
+        let field = instruction
+            .entry
+            .field()
+            .map(|field| self.record_field(field).id);
+        let returns = instruction
+            .return_labels()
+            .iter()
+            .copied()
+            .map(|label| resolve_state(self.ids, label))
+            .collect::<Vec<_>>();
+        assert!(
+            !returns.is_empty() && returns.len() <= usize::from(PortId::COUNT),
+            "call plan must provide 1..={} continuations",
+            PortId::COUNT
+        );
+
+        CallPlan {
+            ownership: if caller_owned {
+                CallOwnership::Caller
+            } else {
+                CallOwnership::Callee
+            },
+            nav,
+            search,
+            retry,
+            field,
+            target,
+            returns,
         }
     }
 

@@ -86,3 +86,15 @@ fn from_nav_projects_skip_suffix() {
     assert_eq!(GapClass::from_nav(Nav::Stay), None);
     assert_eq!(GapClass::from_nav(Nav::StayExact), None);
 }
+
+#[test]
+fn tightening_never_allows_soft_to_loosen_exact() {
+    assert_eq!(
+        GapClass::Exact.tighten(GapClass::AnonymousAndExtras),
+        GapClass::Exact
+    );
+    assert_eq!(
+        GapClass::Exact.tighten(GapClass::ExtrasOnly),
+        GapClass::Exact
+    );
+}

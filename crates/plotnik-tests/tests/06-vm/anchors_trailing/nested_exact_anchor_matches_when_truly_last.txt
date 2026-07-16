@@ -50,13 +50,13 @@ Q:
   02       (@22)                            22 : 03
   03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   (identifier) [Node RecordSet(M0)]  08
-  08  !─┘  _                                09
-  09  ─‣┘  _                                10
-  10  !─┘  _                                11
-  11                                        ▶
-  12  ──!  _                                06, 12
-  14  └─!  _                                06, 12
+  06  !─┘  _                                07
+  07  ─‣┘  _                                09
+  08                                        ▶
+  09  !─┘  _                                08
+  10   !   (identifier) [Node RecordSet(M0)]  06
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
   16  └‣─  (binary_expression)              14
   17   !   (expression_statement)           16
   18  ──!  _                                17, 18
@@ -85,28 +85,28 @@ Q:
        ●   expression_statement
   16       (binary_expression)              14
        ●   binary_expression
-  14       _                                06, 12
+  14       _                                10, 12
        ●   identifier
-  06       (identifier) [Node RecordSet(M0)]  08
+  10       (identifier) [Node RecordSet(M0)]  06
        ●   identifier
-  08       _                                09
+  06       _                                07
   14  ❮❮❮ 
-  12       _                                06, 12
+  12       _                                10, 12
        ●   +
-  06       (identifier) [Node RecordSet(M0)]  08
+  10       (identifier) [Node RecordSet(M0)]  06
        ○   +
   12  ❮❮❮ 
-  12       _                                06, 12
+  12       _                                10, 12
        ●   identifier
-  06       (identifier) [Node RecordSet(M0)]  08
+  10       (identifier) [Node RecordSet(M0)]  06
        ●   identifier
-  08       _                                09
+  06       _                                07
        ●   binary_expression
-  09       _                                10
+  07       _                                09
        ●   expression_statement
-  10       _                                11
+  09       _                                08
        ●   program
-  11   ◀   (@22)                            
+  08   ◀   (@22)                            
 
 Q:
   03  -ε-  [RecordClose]                    05

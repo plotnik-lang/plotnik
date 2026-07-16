@@ -9,7 +9,7 @@ use std::ops::Deref;
 use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
-use super::instructions::{Call, Match, Opcode, Return, RoutedCall, SplitCall, header_byte};
+use super::instructions::{Call, Match, Opcode, Return, header_byte};
 use super::sections::SymbolNameEntry;
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
@@ -24,8 +24,7 @@ mod effect_stack;
 mod load;
 
 pub(crate) use decoded::{
-    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedProgram, DecodedRoutedCall,
-    DecodedSplitCall,
+    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedProgram,
 };
 pub(crate) use load::ModuleError;
 
@@ -72,8 +71,6 @@ impl ByteStorage {
 pub enum Instruction<'a> {
     Match(Match<'a>),
     Call(Call),
-    RoutedCall(RoutedCall),
-    SplitCall(SplitCall),
     Return(Return),
 }
 
@@ -84,18 +81,7 @@ impl<'a> Instruction<'a> {
 
         let opcode = header_byte::opcode(bytes[0]).expect("invalid opcode");
         match opcode {
-            Opcode::Call => {
-                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
-                Self::Call(Call::from_bytes(arr))
-            }
-            Opcode::SplitCall => {
-                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
-                Self::SplitCall(SplitCall::from_bytes(arr))
-            }
-            Opcode::RoutedCall => {
-                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
-                Self::RoutedCall(RoutedCall::from_bytes(arr))
-            }
+            Opcode::Call1 | Opcode::CallN => Self::Call(Call::from_bytes(bytes)),
             Opcode::Return => {
                 let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
                 Self::Return(Return::from_bytes(arr))

@@ -46,7 +46,7 @@ use crate::bytecode::{Nav, NodeKindConstraint};
 use crate::core::NodeFieldId;
 
 use crate::compiler::lower::ir::{
-    CallProtocol, EffectIR, InstructionIR, Label, NfaGraph, PredicateIR,
+    CallEntry, EffectIR, InstructionIR, Label, NfaGraph, PredicateIR,
 };
 
 pub fn dedup_states(nfa: &mut NfaGraph) {
@@ -95,7 +95,8 @@ enum StateKey {
         successors: Vec<SuccKey>,
     },
     Call {
-        protocol: CallProtocol,
+        entry: CallEntry,
+        returns: Vec<SuccKey>,
         target: Label,
     },
 }
@@ -120,7 +121,15 @@ impl StateKey {
                     .collect(),
             }),
             InstructionIR::Call(c) => Some(Self::Call {
-                protocol: c.protocol,
+                entry: c.entry,
+                returns: c
+                    .returns
+                    .iter()
+                    .map(|&s| match norm {
+                        SuccNorm::SelfLoop if s == c.label => SuccKey::SelfLoop,
+                        _ => SuccKey::Other(s),
+                    })
+                    .collect(),
                 target: c.target,
             }),
             InstructionIR::Return(_) => None,

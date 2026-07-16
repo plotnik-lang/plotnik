@@ -1,0 +1,135 @@
+B = (identifier == "b") @self
+
+Q = (program
+  (expression_statement
+    (call_expression
+      arguments: (arguments
+        [
+          (identifier == "a")
+          ";"
+        ]
+        .
+        (B) @b
+      )
+    )
+  )
+)
+--------------------- INPUT ----------------------
+f(a, /* c */ b)
+------------------- TYPESCRIPT -------------------
+export interface B {
+  self: Node;
+}
+
+export interface Q {
+  b: B;
+}
+--------------------- OUTPUT ---------------------
+{
+  "b": {
+    "self": {
+      "kind": "identifier",
+      "span": [13, 14],
+      "text": "b"
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "a"
+S03 "self"
+S04 "B"
+S05 "Q"
+S06 "identifier"
+S07 "program"
+S08 "expression_statement"
+S09 "call_expression"
+S10 "arguments"
+S11 ";"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { self }
+T2 = Record  M1:1  ; { b }
+
+[type_members]
+M0: S03 → T0  ; self: <Node>
+M1: S01 → T1  ; b: B
+
+[type_names]
+N0: S04 → T1  ; B
+N1: S05 → T2  ; Q
+
+[entry_points]
+B = 00 :: T1
+Q = 06 :: T2
+
+[instructions]
+B:
+  00  -ε-  [RecordOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@38)                            38 : 09
+  09  -ε-  [RecordClose]                    11
+  11                                        ▶
+  12  -ε-  [RecordClose RecordSet(M1)]      14
+  14  ─‣┘⁴ _                                19
+  15                                        ▶
+  16   !   (identifier) [Node RecordSet(M0)] == "b"  15
+  19                                        ▶
+  20                                        ▶
+  21  ─•─  (identifier) [Node RecordSet(M0)] == "b"  20
+  24       (@21)                            21 : 12
+  25                                        ▶
+  26  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  25
+  29       (@26)                            26 : 12
+  30  └‣─  (identifier) [RecordOpen] == "a"  24
+  32  └‣─  ";" [RecordOpen]                 29
+  34  └‣─  arguments: (arguments)           30, 32
+  36  └‣─  (call_expression)                34
+  37  └‣─  (expression_statement)           36
+  38   !   (program)                        37
+--------------------- TRACE ----------------------
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@38)                            38 : 09
+       ▶   (@38)
+
+@38:
+  38       (program)                        37
+       ●   program
+  37       (expression_statement)           36
+       ●   expression_statement
+  36       (call_expression)                34
+       ●   call_expression
+  34       arguments: (arguments)           30, 32
+       ○   identifier
+       ●   arguments
+  30       (identifier) [RecordOpen] == "a"  24
+       ○   (
+       ●   identifier
+  24       (@21)                            21 : 12
+       ▶   (@21)
+
+@21:
+  21       (identifier) [Node RecordSet(M0)] == "b"  20
+       ○   ,
+       ○   comment
+       ●   identifier
+  20   ◀   (@21)                            
+
+@38:
+  12  -ε-  [RecordClose RecordSet(M1)]      14
+  14       _                                19
+       ●   program
+  19   ◀   (@38)                            
+
+Q:
+  09  -ε-  [RecordClose]                    11
+  11   ◀   (Q)                              ◼

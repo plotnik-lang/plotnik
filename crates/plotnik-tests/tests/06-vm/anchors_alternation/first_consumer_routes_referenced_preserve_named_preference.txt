@@ -1,0 +1,154 @@
+Choice = [
+  Named: {
+    (identifier == "a") @a
+    (identifier == "b") @b
+  }
+  Anon: {
+    "," @comma
+    (identifier == "b") @b
+  }
+]
+
+Q = (program
+  (expression_statement
+    (array
+      "["
+      (identifier == "p")
+      .
+      (Choice) @choice
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[p, a, b]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  choice: Choice;
+}
+
+export type Choice =
+  | { $tag: "Named"; $data: { a: Node; b: Node } }
+  | { $tag: "Anon"; $data: { b: Node; comma: Node } };
+--------------------- OUTPUT ---------------------
+{
+  "choice": {
+    "$data": {
+      "a": {
+        "kind": "identifier",
+        "span": [4, 5],
+        "text": "a"
+      },
+      "b": {
+        "kind": "identifier",
+        "span": [7, 8],
+        "text": "b"
+      }
+    },
+    "$tag": "Named"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "a"
+S03 "p"
+S04 "comma"
+S05 "Named"
+S06 "Anon"
+S07 "choice"
+S08 "Choice"
+S09 "Q"
+S10 "identifier"
+S11 ","
+S12 "program"
+S13 "expression_statement"
+S14 "array"
+S15 "["
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { a, b }
+T2 = Record  M2:2  ; { b, comma }
+T3 = Variant M4:2  ; Named | Anon
+T4 = Record  M6:1  ; { choice }
+
+[type_members]
+M0: S02 → T0  ; a: <Node>
+M1: S01 → T0  ; b: <Node>
+M2: S01 → T0  ; b: <Node>
+M3: S04 → T0  ; comma: <Node>
+M4: S05 → T1  ; Named: T1
+M5: S06 → T2  ; Anon: T2
+M6: S07 → T3  ; choice: Choice
+
+[type_names]
+N0: S08 → T3  ; Choice
+N1: S09 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@33)                            33 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+  06       (@24)                            24 : 08
+  07  ...
+  08  ─‣┘³ _ [RecordSet(M6)]                10
+  10                                        ▶
+  11                                        ▶
+  12  ─‣─  (identifier) [Node RecordSet(M1) VariantClose] == "b"  11
+  15  ...
+  16  ─•─  (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  12
+  19  ─‣─  (identifier) [Node RecordSet(M2) VariantClose] == "b"  11
+  22  ─◦─  "," [VariantOpen(M5) Node RecordSet(M3)]  19
+  24  -ε-                                   16, 22
+  26   !   (identifier) == "p"              06
+  28  ──!  _                                26, 28
+  30  └‣─  "["                              28
+  31  └‣─  (array)                          30
+  32  └‣─  (expression_statement)           31
+  33   !   (program)                        32
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [RecordOpen]                     02
+  02       (@33)                            33 : 03
+       ▶   (@33)
+
+@33:
+  33       (program)                        32
+       ●   program
+  32       (expression_statement)           31
+       ●   expression_statement
+  31       (array)                          30
+       ●   array
+  30       "["                              28
+       ●   [
+  28       _                                26, 28
+       ●   identifier
+  26       (identifier) == "p"              06
+       ●   identifier
+  06       (@24)                            24 : 08
+       ▶   (@24)
+
+@24:
+  24  -ε-                                   16, 22
+  16       (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  12
+       ○   ,
+       ●   identifier
+  12       (identifier) [Node RecordSet(M1) VariantClose] == "b"  11
+       ○   ,
+       ●   identifier
+  11   ◀   (@24)                            
+
+@33:
+  08       _ [RecordSet(M6)]                10
+       ●   program
+  10   ◀   (@33)                            
+
+Q:
+  03  -ε-  [RecordClose]                    05
+  05   ◀   (Q)                              ◼

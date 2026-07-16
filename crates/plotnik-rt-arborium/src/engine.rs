@@ -246,19 +246,10 @@ impl<'t> Engine<'t> {
             .expect("snapshot cursor active flag tracks cursor pool activation")
     }
 
-    /// Enter an ordinary callee with one matched continuation.
-    pub fn enter_frame(&mut self, return_addr: u16) {
-        self.enter_frame_with(crate::FrameReturns::single(return_addr));
-    }
-
-    /// Enter a nullable callee whose node-consuming and empty outcomes resume at
-    /// different continuations.
-    pub fn enter_split_frame(&mut self, matched: u16, empty: u16) {
-        self.enter_frame_with(crate::FrameReturns::split(matched, empty));
-    }
-
-    fn enter_frame_with(&mut self, returns: crate::FrameReturns) {
-        self.frames.push(returns);
+    /// Enter a callee, retaining the executor-owned token that identifies the
+    /// call's return map.
+    pub fn enter_frame(&mut self, call_site: u16) {
+        self.frames.push(call_site);
         self.recursion_depth += 1;
         debug_assert_eq!(
             self.recursion_depth,
@@ -267,13 +258,15 @@ impl<'t> Engine<'t> {
         );
     }
 
-    /// Exit the current callee, returning its return address. Prunes frames
-    /// no live checkpoint can restore (O(1) amortized).
+    /// Exit the current callee, returning its call-site token. The executor
+    /// combines this token with the callee's [`crate::PortId`] to select a
+    /// continuation. Prunes frames no live checkpoint can restore (O(1)
+    /// amortized).
     ///
     /// Panics if no frame is active; executors gate on [`Engine::frames_empty`]
     /// (an empty frame stack at Return means entry point acceptance).
-    pub fn exit_frame(&mut self, outcome: crate::ReturnOutcome) -> u16 {
-        let return_addr = self.frames.pop(outcome);
+    pub fn exit_frame(&mut self) -> u16 {
+        let call_site = self.frames.pop();
         self.recursion_depth = self
             .recursion_depth
             .checked_sub(1)
@@ -284,7 +277,7 @@ impl<'t> Engine<'t> {
             "recursion_depth desynced from frame stack after Return"
         );
         self.frames.prune(self.checkpoints.max_frame_idx());
-        return_addr
+        call_site
     }
 
     #[inline]

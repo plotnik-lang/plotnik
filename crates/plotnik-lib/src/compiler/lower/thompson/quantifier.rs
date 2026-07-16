@@ -4,16 +4,19 @@
 //! `compile_quantified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
+use crate::compiler::analyze::boundary::BoundaryState;
 use crate::compiler::analyze::types::CaptureTypePlan;
-use crate::compiler::analyze::types::type_shape::PatternFlow;
+use crate::compiler::analyze::types::type_shape::{PatternFlow, TypeShape};
 use crate::compiler::ids::TypeId;
+use crate::compiler::lower::boundary::{ExitMap, ExitPort};
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
 
 use super::NfaBuilder;
+use super::boundary::{EntryObligation, NavigationContract, next_boundary_state};
 use super::capture::{
     CaptureEffects, PatternCtx, element_type_id, first_unmatched_close, needs_record_wrapper,
 };
@@ -177,6 +180,17 @@ impl ExitNav {
 struct QuantifierRoute {
     first_nav: Option<Nav>,
     exits: CaptureExits,
+}
+
+#[derive(Clone)]
+pub(super) enum BoundaryIterationOutput {
+    Value {
+        destination: Vec<EffectIR>,
+    },
+    CaptureType {
+        plan: CaptureTypePlan,
+        destination: Vec<EffectIR>,
+    },
 }
 
 impl QuantifierRoute {
@@ -349,6 +363,540 @@ impl NfaBuilder<'_> {
             IterationScope::capture_type(element),
             QuantifierRoute::with_exits(nav_override, exits),
         )
+    }
+
+    pub(super) fn compile_boundary_value_pattern_to(
+        &mut self,
+        pattern: &Pattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        destination: &[EffectIR],
+    ) -> Option<Label> {
+        if let Pattern::DefRef(reference) = pattern {
+            let def_id = self.resolve_ref_def_id(reference);
+            return self.compile_boundary_captured_ref_call(
+                def_id,
+                input,
+                entry,
+                targets,
+                destination,
+            );
+        }
+
+        let flow = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_pattern_result(pattern)
+            .flow
+            .clone();
+        let shape = flow.type_id().map(|type_id| {
+            (
+                type_id,
+                self.ctx
+                    .analysis
+                    .type_analysis
+                    .expect_type_shape(type_id)
+                    .clone(),
+            )
+        });
+
+        if let Some((type_id, TypeShape::Record(_))) = &shape {
+            let mut inner_targets = ExitMap::new();
+            for (port, &target) in targets.iter() {
+                let close = self.emit_record_close_with_effects(
+                    ScopeCloseEffects {
+                        leading: &[],
+                        capture: destination,
+                        outer: &[],
+                    },
+                    target,
+                );
+                inner_targets.insert(port, close);
+            }
+            let inner = self.with_scope(*type_id, |this| {
+                this.compile_boundary_pattern_to(pattern, input, entry, &inner_targets, false)
+            })?;
+            return Some(self.emit_record_open(inner));
+        }
+
+        let mut inner_targets = ExitMap::new();
+        let needs_node = self.element_needs_node(pattern);
+        for (port, &target) in targets.iter() {
+            let mut effects = Vec::with_capacity(destination.len() + usize::from(needs_node));
+            if needs_node {
+                effects.push(EffectIR::node());
+            }
+            effects.extend_from_slice(destination);
+            inner_targets.insert(port, self.emit_effects_if_nonempty(target, effects));
+        }
+
+        if matches!(shape, Some((_, TypeShape::Variant(_))))
+            && let Pattern::Alternation(alternation) = pattern
+        {
+            return self.compile_boundary_labeled_alternation(
+                alternation,
+                input,
+                entry,
+                &inner_targets,
+            );
+        }
+
+        self.compile_boundary_pattern_to(pattern, input, entry, &inner_targets, false)
+    }
+
+    fn compile_boundary_iteration_output(
+        &mut self,
+        inner: &Pattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        output: BoundaryIterationOutput,
+    ) -> Option<Label> {
+        let relation = self.boundary_relations.pattern(inner);
+        let first_classes: BTreeSet<_> = relation
+            .outcomes(input)
+            .iter()
+            .filter(|outcome| {
+                outcome.consumed && targets.get(ExitPort::from_outcome(**outcome)).is_some()
+            })
+            .map(|outcome| outcome.first)
+            .collect();
+        if first_classes.is_empty() {
+            return None;
+        }
+        let search_nav = if first_classes.len() == 1 {
+            let next_class = *first_classes
+                .first()
+                .expect("one first-consumer class was measured");
+            quantifier_search_nav(entry.resolve_nav(input, next_class))
+        } else {
+            None
+        };
+        let body_entry = search_nav.map_or(entry, |_| {
+            EntryObligation::new(NavigationContract::from_nav(Nav::StayExact))
+        });
+
+        let body = match output {
+            BoundaryIterationOutput::Value { destination } => self
+                .compile_boundary_value_pattern_to(
+                    inner,
+                    input,
+                    body_entry,
+                    targets,
+                    &destination,
+                )?,
+            BoundaryIterationOutput::CaptureType { plan, destination } => self
+                .compile_boundary_capture_type_plan_to_effects(
+                    inner,
+                    &plan,
+                    input,
+                    body_entry,
+                    targets,
+                    destination,
+                )?,
+        };
+
+        let Some(search_nav) = search_nav else {
+            return Some(body);
+        };
+        if let Some(field) = entry.field() {
+            return Some(self.emit_position_search_with_field(search_nav, field, body));
+        }
+        Some(self.emit_position_search(search_nav, body))
+    }
+
+    pub(super) fn compile_boundary_optional_output(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        output: BoundaryIterationOutput,
+        zero_effects: Vec<EffectIR>,
+    ) -> Option<Label> {
+        let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
+            unreachable!("boundary optional lowering receives a quantified pattern")
+        };
+        assert_eq!(kind.kind(), QuantifierKind::Optional);
+
+        let relation = self.boundary_relations.pattern(&inner);
+        let mut consuming_targets = ExitMap::new();
+        for outcome in relation
+            .outcomes(input)
+            .iter()
+            .filter(|outcome| outcome.consumed)
+        {
+            let overall_port = ExitPort::from_state(outcome.state, true);
+            if let Some(&target) = targets.get(overall_port) {
+                consuming_targets.insert(ExitPort::from_outcome(*outcome), target);
+            }
+        }
+        let iterate = if consuming_targets.is_empty() {
+            None
+        } else {
+            self.compile_boundary_iteration_output(&inner, input, entry, &consuming_targets, output)
+        };
+        let zero = targets
+            .get(ExitPort::from_state(input, false))
+            .copied()
+            .map(|target| self.emit_effects_if_nonempty(target, zero_effects));
+
+        match (iterate, zero) {
+            (Some(iterate), Some(zero)) => Some(self.emit_fork_epsilon(
+                ForkTargets {
+                    prefer: iterate,
+                    other: zero,
+                },
+                Greediness::from(kind),
+            )),
+            (Some(iterate), None) => Some(iterate),
+            (None, Some(zero)) => Some(zero),
+            (None, None) => None,
+        }
+    }
+
+    pub(super) fn compile_boundary_loop_output(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        output: BoundaryIterationOutput,
+    ) -> Option<Label> {
+        let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
+            unreachable!("boundary loop lowering receives a quantified pattern")
+        };
+        assert!(matches!(
+            kind.kind(),
+            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
+        ));
+
+        let relation = self.boundary_relations.pattern(&inner);
+        let mut reachable = BTreeSet::new();
+        let mut pending = vec![input];
+        while let Some(state) = pending.pop() {
+            for outcome in relation
+                .outcomes(state)
+                .iter()
+                .filter(|outcome| outcome.consumed)
+            {
+                let next = next_boundary_state(state, ExitPort::from_outcome(*outcome));
+                if reachable.insert(next) {
+                    pending.push(next);
+                }
+            }
+        }
+
+        let mut productive: BTreeSet<_> = reachable
+            .iter()
+            .copied()
+            .filter(|state| targets.get(ExitPort::from_state(*state, true)).is_some())
+            .collect();
+        loop {
+            let before = productive.len();
+            for state in &reachable {
+                if productive.contains(state) {
+                    continue;
+                }
+                let leads_to_productive = relation
+                    .outcomes(*state)
+                    .iter()
+                    .filter(|outcome| outcome.consumed)
+                    .map(|outcome| next_boundary_state(*state, ExitPort::from_outcome(*outcome)))
+                    .any(|next| productive.contains(&next));
+                if leads_to_productive {
+                    productive.insert(*state);
+                }
+            }
+            if productive.len() == before {
+                break;
+            }
+        }
+
+        let labels: BTreeMap<_, _> = productive
+            .iter()
+            .copied()
+            .map(|state| (state, self.fresh_label()))
+            .collect();
+        let greediness = Greediness::from(kind);
+        for state in productive.iter().copied() {
+            let mut repeat_targets = ExitMap::new();
+            for outcome in relation
+                .outcomes(state)
+                .iter()
+                .filter(|outcome| outcome.consumed)
+            {
+                let next = next_boundary_state(state, ExitPort::from_outcome(*outcome));
+                if let Some(&target) = labels.get(&next) {
+                    repeat_targets.insert(ExitPort::from_outcome(*outcome), target);
+                }
+            }
+            let repeat = if repeat_targets.is_empty() {
+                None
+            } else {
+                let repeat_entry = EntryObligation::new(NavigationContract::from_nav(
+                    entry.navigation().authored().sibling_continuation(),
+                ));
+                self.compile_boundary_iteration_output(
+                    &inner,
+                    state,
+                    repeat_entry,
+                    &repeat_targets,
+                    output.clone(),
+                )
+            };
+            let exit = targets.get(ExitPort::from_state(state, true)).copied();
+            let label = labels[&state];
+            match (repeat, exit) {
+                (Some(repeat), Some(exit)) => self.emit_fork_epsilon_at(
+                    label,
+                    ForkTargets {
+                        prefer: repeat,
+                        other: exit,
+                    },
+                    greediness,
+                ),
+                (Some(repeat), None) => self.emit_epsilon(label, vec![repeat]),
+                (None, Some(exit)) => self.emit_epsilon(label, vec![exit]),
+                (None, None) => {
+                    unreachable!("only productive quantifier states receive loop labels")
+                }
+            }
+        }
+
+        let mut first_targets = ExitMap::new();
+        for outcome in relation
+            .outcomes(input)
+            .iter()
+            .filter(|outcome| outcome.consumed)
+        {
+            let next = next_boundary_state(input, ExitPort::from_outcome(*outcome));
+            if let Some(&target) = labels.get(&next) {
+                first_targets.insert(ExitPort::from_outcome(*outcome), target);
+            }
+        }
+        let first = if first_targets.is_empty() {
+            None
+        } else {
+            self.compile_boundary_iteration_output(&inner, input, entry, &first_targets, output)
+        };
+
+        if kind.kind() == QuantifierKind::OneOrMore {
+            return first;
+        }
+
+        let zero = targets.get(ExitPort::from_state(input, false)).copied();
+        match (first, zero) {
+            (Some(first), Some(zero)) => Some(self.emit_fork_epsilon(
+                ForkTargets {
+                    prefer: first,
+                    other: zero,
+                },
+                greediness,
+            )),
+            (Some(first), None) => Some(first),
+            (None, Some(zero)) => Some(zero),
+            (None, None) => None,
+        }
+    }
+
+    pub(super) fn compile_boundary_optional_capture(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        capture_effects: Vec<EffectIR>,
+    ) -> Option<Label> {
+        let QuantifierForm::Quantified { kind, .. } = classify_quantifier(quant) else {
+            return None;
+        };
+        if kind.kind() != QuantifierKind::Optional {
+            return None;
+        }
+
+        let span = self.span_id(quant.syntax(), SpanKind::Quantifier);
+        let capture = CaptureEffects::new_post(capture_effects.clone());
+        let mut final_targets = ExitMap::new();
+        for (port, &target) in targets.iter() {
+            let target = span.map_or(target, |span| {
+                self.emit_effects_if_nonempty(target, vec![EffectIR::span_end(span.0)])
+            });
+            let target = if port.consumed() {
+                target
+            } else {
+                self.emit_absence_for_skip_path(target, &capture)
+            };
+            final_targets.insert(port, target);
+        }
+
+        let inner = self.compile_boundary_optional_output(
+            quant,
+            input,
+            entry,
+            &final_targets,
+            BoundaryIterationOutput::Value {
+                destination: capture_effects,
+            },
+            vec![],
+        )?;
+        Some(span.map_or(inner, |span| {
+            self.wrap_entry_pre(inner, vec![EffectIR::span_start(span.0)])
+        }))
+    }
+
+    pub(super) fn compile_boundary_list_capture(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+        capture_effects: Vec<EffectIR>,
+    ) -> Option<Label> {
+        let QuantifierForm::Quantified { kind, .. } = classify_quantifier(quant) else {
+            return None;
+        };
+        if !matches!(
+            kind.kind(),
+            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
+        ) {
+            return None;
+        }
+
+        let span = self.span_id(quant.syntax(), SpanKind::Quantifier);
+        let quantifier_end: Vec<_> = span
+            .map(|span| EffectIR::span_end(span.0))
+            .into_iter()
+            .collect();
+        let mut closed_targets = ExitMap::new();
+        for (port, &target) in targets.iter() {
+            closed_targets.insert(
+                port,
+                self.emit_list_close(
+                    ScopeCloseEffects {
+                        leading: &quantifier_end,
+                        capture: &capture_effects,
+                        outer: &[],
+                    },
+                    target,
+                ),
+            );
+        }
+        let iterations = self.compile_boundary_loop_output(
+            quant,
+            input,
+            entry,
+            &closed_targets,
+            BoundaryIterationOutput::Value {
+                destination: vec![EffectIR::array_push()],
+            },
+        )?;
+        Some(
+            self.emit_list_open(
+                iterations,
+                vec![],
+                span.map(|span| EffectIR::span_start(span.0))
+                    .into_iter()
+                    .collect(),
+            ),
+        )
+    }
+
+    pub(super) fn compile_boundary_definition_value(
+        &mut self,
+        pattern: &Pattern,
+        input: BoundaryState,
+        entry: EntryObligation,
+        targets: &ExitMap<Label>,
+    ) -> Option<Label> {
+        if let Pattern::FieldPattern(field) = pattern
+            && let Some(value) = field.value()
+            && let Some(field_id) = self.resolve_field(field)
+        {
+            return self.compile_boundary_definition_value(
+                &value,
+                input,
+                entry.with_field(field_id),
+                targets,
+            );
+        }
+
+        if let Pattern::Alternation(alternation) = pattern {
+            return self.compile_boundary_labeled_alternation(alternation, input, entry, targets);
+        }
+
+        let Pattern::QuantifiedPattern(quant) = pattern else {
+            unreachable!("only labeled alternations and quantifiers are definition value roots")
+        };
+        let QuantifierForm::Quantified { kind, .. } = classify_quantifier(quant) else {
+            return self.compile_boundary_pattern_to(pattern, input, entry, targets, false);
+        };
+        let span = self.span_id(quant.syntax(), SpanKind::Quantifier);
+
+        match kind.kind() {
+            QuantifierKind::Optional => {
+                let mut final_targets = ExitMap::new();
+                for (port, &target) in targets.iter() {
+                    let target = span.map_or(target, |span| {
+                        self.emit_effects_if_nonempty(target, vec![EffectIR::span_end(span.0)])
+                    });
+                    final_targets.insert(port, target);
+                }
+                let inner = self.compile_boundary_optional_output(
+                    quant,
+                    input,
+                    entry,
+                    &final_targets,
+                    BoundaryIterationOutput::Value {
+                        destination: vec![],
+                    },
+                    vec![EffectIR::absent()],
+                )?;
+                Some(span.map_or(inner, |span| {
+                    self.wrap_entry_pre(inner, vec![EffectIR::span_start(span.0)])
+                }))
+            }
+            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
+                let quantifier_end: Vec<_> = span
+                    .map(|span| EffectIR::span_end(span.0))
+                    .into_iter()
+                    .collect();
+                let mut closed_targets = ExitMap::new();
+                for (port, &target) in targets.iter() {
+                    closed_targets.insert(
+                        port,
+                        self.emit_list_close(
+                            ScopeCloseEffects {
+                                leading: &quantifier_end,
+                                capture: &[],
+                                outer: &[],
+                            },
+                            target,
+                        ),
+                    );
+                }
+                let iterations = self.compile_boundary_loop_output(
+                    quant,
+                    input,
+                    entry,
+                    &closed_targets,
+                    BoundaryIterationOutput::Value {
+                        destination: vec![EffectIR::array_push()],
+                    },
+                )?;
+                Some(
+                    self.emit_list_open(
+                        iterations,
+                        vec![],
+                        span.map(|span| EffectIR::span_start(span.0))
+                            .into_iter()
+                            .collect(),
+                    ),
+                )
+            }
+        }
     }
 
     /// Compile only the admitted empty outcomes of a nullable pattern.
@@ -528,6 +1076,7 @@ impl NfaBuilder<'_> {
             return self.compile_seq_items(SeqItemsCtx {
                 items: &items,
                 exit: match_exit,
+                node_final_exit: None,
                 is_inside_node,
                 first_nav: nav_override,
                 capture,

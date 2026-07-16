@@ -1,0 +1,206 @@
+B = (identifier == "b") @self
+
+Q = (program
+  (expression_statement
+    (array
+      "["
+      [
+        {
+          (identifier == "a")
+          .
+        }
+        (identifier == "x")
+      ] @left :: text
+      (B) @right
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[a, c, b]
+------------------- TYPESCRIPT -------------------
+export interface B {
+  self: Node;
+}
+
+export interface Q {
+  left: string;
+  right: B;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "b"
+S02 "a"
+S03 "x"
+S04 "self"
+S05 "left"
+S06 "right"
+S07 "B"
+S08 "Q"
+S09 "identifier"
+S10 "program"
+S11 "expression_statement"
+S12 "array"
+S13 "["
+
+[type_defs]
+T0 = <Node>
+T1 = <Text>
+T2 = Record  M0:1  ; { self }
+T3 = Record  M1:2  ; { left, right }
+
+[type_members]
+M0: S04 → T0  ; self: <Node>
+M1: S05 → T1  ; left: <Text>
+M2: S06 → T2  ; right: B
+
+[type_names]
+N0: S07 → T2  ; B
+N1: S08 → T3  ; Q
+
+[entry_points]
+B = 00 :: T2
+Q = 06 :: T3
+
+[instructions]
+B:
+  00  -ε-  [RecordOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [RecordClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@52)                            52 : 09
+  09  -ε-  [RecordClose]                    11
+  11                                        ▶
+  12  -ε-  [RecordClose RecordSet(M2)]      14
+  14  ─‣┘³ _                                19
+  15                                        ▶
+  16   !   (identifier) [Node RecordSet(M0)] == "b"  15
+  19                                        ▶
+  20                                        ▶
+  21   !   (identifier) [Node RecordSet(M0)] == "b"  20
+  24  ──!  _                                21, 24
+  26       (@24)                            24 : 12
+  27                                        ▶
+  28  ─•─  (identifier) [Node RecordSet(M0)] == "b"  27
+  31       (@28)                            28 : 12
+  32  -ε-  [TextClose RecordSet(M1) RecordOpen]  26
+  34  -ε-  [TextClose RecordSet(M1) RecordOpen]  31
+  36   !   (identifier) [ScalarMark] == "a"  34
+  38   !   (identifier) [ScalarMark] == "x"  32
+  40  ──!  _                                36, 38, 40
+  42  -ε-  [ScalarOpen]                     40
+  44   !   "["                              42
+  45  ──!  _                                44, 45
+  47  ...
+  48  └─!  _                                44, 45
+  50  └‣─  (array)                          48
+  51  └‣─  (expression_statement)           50
+  52   !   (program)                        51
+--------------------- TRACE ----------------------
+Q:
+  06  -ε-  [RecordOpen]                     08
+  08       (@52)                            52 : 09
+       ▶   (@52)
+
+@52:
+  52       (program)                        51
+       ●   program
+  51       (expression_statement)           50
+       ●   expression_statement
+  50       (array)                          48
+       ●   array
+  48       _                                44, 45
+       ●   [
+  44       "["                              42
+       ●   [
+  42  -ε-  [ScalarOpen]                     40
+  40       _                                36, 38, 40
+       ●   identifier
+  36       (identifier) [ScalarMark] == "a"  34
+       ●   identifier
+  34  -ε-  [TextClose RecordSet(M1) RecordOpen]  31
+  31       (@28)                            28 : 12
+       ▶   (@28)
+
+@28:
+  28       (identifier) [Node RecordSet(M0)] == "b"  27
+       ○   ,
+  40  ❮❮❮ 
+  38       (identifier) [ScalarMark] == "x"  32
+  40  ❮❮❮ 
+  40       _                                36, 38, 40
+       ●   ,
+  36       (identifier) [ScalarMark] == "a"  34
+       ○   ,
+  40  ❮❮❮ 
+  38       (identifier) [ScalarMark] == "x"  32
+       ○   ,
+  40  ❮❮❮ 
+  40       _                                36, 38, 40
+       ●   identifier
+  36       (identifier) [ScalarMark] == "a"  34
+  40  ❮❮❮ 
+  38       (identifier) [ScalarMark] == "x"  32
+  40  ❮❮❮ 
+  40       _                                36, 38, 40
+       ●   ,
+  36       (identifier) [ScalarMark] == "a"  34
+       ○   ,
+  40  ❮❮❮ 
+  38       (identifier) [ScalarMark] == "x"  32
+       ○   ,
+  40  ❮❮❮ 
+  40       _                                36, 38, 40
+       ●   identifier
+  36       (identifier) [ScalarMark] == "a"  34
+  40  ❮❮❮ 
+  38       (identifier) [ScalarMark] == "x"  32
+  40  ❮❮❮ 
+  40       _                                36, 38, 40
+       ●   ]
+  36       (identifier) [ScalarMark] == "a"  34
+       ○   ]
+  40  ❮❮❮ 
+  38       (identifier) [ScalarMark] == "x"  32
+       ○   ]
+  40  ❮❮❮ 
+  40       _                                36, 38, 40
+  48  ❮❮❮ 
+  45       _                                44, 45
+       ●   identifier
+  44       "["                              42
+       ○   identifier
+  45  ❮❮❮ 
+  45       _                                44, 45
+       ●   ,
+  44       "["                              42
+       ○   ,
+  45  ❮❮❮ 
+  45       _                                44, 45
+       ●   identifier
+  44       "["                              42
+       ○   identifier
+  45  ❮❮❮ 
+  45       _                                44, 45
+       ●   ,
+  44       "["                              42
+       ○   ,
+  45  ❮❮❮ 
+  45       _                                44, 45
+       ●   identifier
+  44       "["                              42
+       ○   identifier
+  45  ❮❮❮ 
+  45       _                                44, 45
+       ●   ]
+  44       "["                              42
+       ○   ]
+  45  ❮❮❮ 
+  45       _                                44, 45
+  50  ❮❮❮ 
+  51  ❮❮❮ 

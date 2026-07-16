@@ -13,9 +13,10 @@ use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
 use crate::compiler::analyze::result::{CaptureMember, CaptureMemberKind, ResultSchema};
 use crate::compiler::analyze::types::type_shape::CasePayload;
 use crate::compiler::ids::ResultMemberId;
+use crate::compiler::lower::boundary::ExitPort;
 use crate::compiler::lower::ir::{
-    CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, NfaGraph, ReturnEntry,
-    ReturnOutcome, SemanticNfa,
+    CalleeEntryContract, DefRoute, EffectArg, EffectIR, InstructionIR, Label, NfaGraph, PortId,
+    ReturnIR, SemanticNfa,
 };
 
 const STATE_BUDGET: usize = 1 << 18;
@@ -118,8 +119,18 @@ fn verify_state_count(semantic: &SemanticNfa) -> Result<(), SemanticVerifyError>
 mod tests {
     use indexmap::IndexMap;
 
-    use super::{MAX_STATES, SemanticVerifyError, verify_state_count};
-    use crate::compiler::lower::ir::{InstructionIR, Label, MatchIR, NfaGraph, SemanticNfa};
+    use super::{MAX_STATES, Program, SemanticVerifyError, verify_state_count};
+    use crate::bytecode::Nav;
+    use crate::compiler::analyze::refs::DependencyAnalysis;
+    use crate::compiler::analyze::result::{ResultModel, ResultSchema};
+    use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
+    use crate::compiler::ids::DefId;
+    use crate::compiler::lower::ir::{
+        CallIR, CalleeEntry, DefSpecialization, InstructionIR, Label, MatchIR, NfaGraph, PortId,
+        ReturnAddr, ReturnIR, SemanticNfa,
+    };
+    use crate::compiler::lower::thompson::boundary::{EntryObligation, NavigationContract};
+    use crate::core::Interner;
 
     #[test]
     fn semantic_state_id_boundary_matches_codegen_dense_ids() {
@@ -148,6 +159,66 @@ mod tests {
             spans: None,
             label_origins: vec![None; count],
         })
+    }
+
+    #[test]
+    fn call_entry_must_match_the_target_specialization() {
+        let graph = graph_with_call_and_return(
+            CallIR::routed(
+                Label(0),
+                Nav::Next,
+                ReturnAddr(Label(3)),
+                CalleeEntry(Label(1)),
+            ),
+            ReturnIR::new(Label(2)),
+        );
+
+        assert_malformed_return_contract(&graph);
+    }
+
+    #[test]
+    fn every_return_must_declare_the_specialization_entry_contract() {
+        let graph = graph_with_call_and_return(
+            CallIR::new(Label(0), ReturnAddr(Label(3)), CalleeEntry(Label(1))),
+            ReturnIR::callee_owned(
+                Label(2),
+                PortId::new(0).expect("zero is a valid port"),
+                EntryObligation::new(NavigationContract::from_nav(Nav::Next)),
+            ),
+        );
+
+        assert_malformed_return_contract(&graph);
+    }
+
+    fn graph_with_call_and_return(call: CallIR, return_: ReturnIR) -> NfaGraph {
+        NfaGraph {
+            instructions: vec![
+                call.into(),
+                MatchIR::epsilon(Label(1), Label(2)).into(),
+                return_.into(),
+                ReturnIR::new(Label(3)).into(),
+            ],
+            def_entries: IndexMap::from([(
+                DefSpecialization::ordinary(DefId::from_raw(0)),
+                Label(1),
+            )]),
+            entry_point_wrappers: IndexMap::new(),
+            spans: None,
+            label_origins: vec![None; 4],
+        }
+    }
+
+    fn assert_malformed_return_contract(graph: &NfaGraph) {
+        let types = TypeAnalysisBuilder::new().finish();
+        let deps = DependencyAnalysis::empty();
+        let interner = Interner::new();
+        let model = ResultModel::new(&types, &deps).expect("empty result model is valid");
+        let schema = ResultSchema::new(&model, &types, &deps, &interner);
+
+        let Err(error) = Program::new(graph, &schema) else {
+            panic!("malformed call/callee entry contract must be rejected");
+        };
+        assert!(matches!(error, SemanticVerifyError::Malformed(_)));
     }
 }
 
@@ -236,46 +307,46 @@ impl DefSummary {
 type DefSummaries = HashMap<Label, DefSummary>;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct ReturnOutcomes(u8);
+struct ReturnPorts(u8);
 
-impl ReturnOutcomes {
+impl ReturnPorts {
     const NONE: Self = Self(0);
-    const MATCHED: Self = Self(1);
-    const BOTH: Self = Self(3);
 
-    fn insert(&mut self, outcome: crate::compiler::lower::ir::ReturnOutcome) {
-        self.0 |= match outcome {
-            crate::compiler::lower::ir::ReturnOutcome::Matched => Self::MATCHED.0,
-            crate::compiler::lower::ir::ReturnOutcome::Empty => 2,
-        };
+    fn dense(len: usize) -> Self {
+        assert!(len <= usize::from(PortId::COUNT));
+        Self(((1u16 << len) - 1) as u8)
+    }
+
+    fn insert(&mut self, port: PortId) {
+        self.0 |= 1 << port.to_byte();
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct ReturnContract {
-    outcomes: ReturnOutcomes,
-    entry: Option<ReturnEntry>,
+    ports: ReturnPorts,
+    entry: Option<CalleeEntryContract>,
     mixed_entries: bool,
 }
 
 impl ReturnContract {
     const NONE: Self = Self {
-        outcomes: ReturnOutcomes::NONE,
+        ports: ReturnPorts::NONE,
         entry: None,
         mixed_entries: false,
     };
 
-    fn insert(&mut self, return_: &crate::compiler::lower::ir::ReturnIR) {
-        self.outcomes.insert(return_.outcome());
+    fn insert(&mut self, return_: &ReturnIR) {
+        self.ports.insert(return_.port);
         match self.entry {
-            None => self.entry = Some(return_.entry()),
-            Some(entry) if entry != return_.entry() => self.mixed_entries = true,
+            None => self.entry = Some(return_.entry),
+            Some(entry) if entry != return_.entry => self.mixed_entries = true,
             Some(_) => {}
         }
     }
 
-    fn is(self, outcomes: ReturnOutcomes, entry: ReturnEntry) -> bool {
-        self.outcomes == outcomes && self.entry == Some(entry) && !self.mixed_entries
+    fn is(self, ports: ReturnPorts, entry: CalleeEntryContract) -> bool {
+        self.ports == ports && self.entry == Some(entry) && !self.mixed_entries
     }
 }
 
@@ -356,10 +427,22 @@ impl<'a> Program<'a> {
         for &entry in self.graph.entry_point_wrappers().values() {
             if !self
                 .return_contract(entry, &mut cache)
-                .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
+                .is(ReturnPorts::dense(1), CalleeEntryContract::CallerOwned)
             {
                 return Err(SemanticVerifyError::Malformed(format!(
                     "entry point {entry:?} has the wrong return contract"
+                )));
+            }
+        }
+        for (specialization, &entry) in &self.graph.def_entries {
+            let expected_entry = specialization.entry_contract();
+            let expected_ports = ReturnPorts::dense(specialization.ports().len());
+            if !self
+                .return_contract(entry, &mut cache)
+                .is(expected_ports, expected_entry)
+            {
+                return Err(SemanticVerifyError::Malformed(format!(
+                    "specialization {specialization:?} has a malformed entry or return-port contract"
                 )));
             }
         }
@@ -367,18 +450,38 @@ impl<'a> Program<'a> {
             let InstructionIR::Call(call) = instruction else {
                 continue;
             };
-            let expected = match call.protocol {
-                CallProtocol::Ordinary { .. } => (ReturnOutcomes::MATCHED, ReturnEntry::Caller),
-                CallProtocol::Routed { .. } => (ReturnOutcomes::MATCHED, ReturnEntry::Routed),
-                CallProtocol::Split { .. } => (ReturnOutcomes::BOTH, ReturnEntry::Routed),
+            let Some(specialization) = self.graph.specialization_for_entry(call.target) else {
+                return Err(SemanticVerifyError::Malformed(format!(
+                    "call {:?} targets a non-definition entry {:?}",
+                    call.label, call.target
+                )));
             };
-            if !self
-                .return_contract(call.target, &mut cache)
-                .is(expected.0, expected.1)
+            if call.returns.len() != specialization.ports().len() {
+                return Err(SemanticVerifyError::Malformed(format!(
+                    "call {:?} supplies {} continuations for callee {:?} with {} ports",
+                    call.label,
+                    call.returns.len(),
+                    call.target,
+                    specialization.ports().len()
+                )));
+            }
+            let expected_entry = specialization.entry_contract();
+            if call.entry.target_contract() != expected_entry {
+                return Err(SemanticVerifyError::Malformed(format!(
+                    "call {:?} and callee {:?} disagree on entry ownership, navigation, or field",
+                    call.label, call.target
+                )));
+            }
+            if call.entry.caller_owned()
+                && specialization
+                    .ports()
+                    .ports()
+                    .iter()
+                    .any(|port| !port.consumed())
             {
                 return Err(SemanticVerifyError::Malformed(format!(
-                    "call {:?} and callee {:?} disagree on return outcomes",
-                    call.label, call.target
+                    "caller-owned call {:?} exposes an empty return port",
+                    call.label
                 )));
             }
         }
@@ -861,7 +964,7 @@ impl<'a> Program<'a> {
     }
 
     fn verify_cursor_depth(&self) -> Result<(), SemanticVerifyError> {
-        for (entry, route) in self.depth_entries() {
+        for (entry, route, ports) in self.depth_entries() {
             let mut memo = HashMap::new();
             let mut work = vec![(entry, 0i32)];
             while let Some((label, depth)) = work.pop() {
@@ -877,7 +980,7 @@ impl<'a> Program<'a> {
                     InstructionIR::Match(matched) => {
                         let next_depth = depth + matched.nav.depth_delta();
                         let expected_exit = route
-                            .return_depth(ReturnOutcome::Matched)
+                            .return_depth(true)
                             .expect("every body has a matched route");
                         if matched.successors.is_empty() && next_depth != expected_exit {
                             return Err(SemanticVerifyError::CursorDepth(format!(
@@ -889,26 +992,34 @@ impl<'a> Program<'a> {
                         }
                     }
                     InstructionIR::Call(call) => {
-                        work.push((
-                            call.matched_return(),
-                            depth + call.entry_nav().depth_delta(),
-                        ));
-                        if let Some(empty) = call.empty_return() {
-                            work.push((empty, depth));
+                        let Some(specialization) = self.graph.specialization_for_entry(call.target)
+                        else {
+                            return Err(SemanticVerifyError::CursorDepth(format!(
+                                "call {label:?} targets a non-definition entry {:?}",
+                                call.target
+                            )));
+                        };
+                        for (&continuation, &port) in
+                            call.returns.iter().zip(specialization.ports().ports())
+                        {
+                            let Some(delta) = call.entry.continuation_depth(port.consumed()) else {
+                                return Err(SemanticVerifyError::CursorDepth(format!(
+                                    "call {label:?} has an illegal empty port for caller-owned entry"
+                                )));
+                            };
+                            work.push((continuation, depth + delta));
                         }
                     }
                     InstructionIR::Return(return_) => {
-                        if return_.entry() != route.return_entry() {
+                        let Some(port) = ports.get(return_.port.index()).copied() else {
                             return Err(SemanticVerifyError::CursorDepth(format!(
-                                "return state {label:?} has {:?} entry, expected {:?}",
-                                return_.entry(),
-                                route.return_entry()
+                                "return state {label:?} uses undeclared port {}",
+                                return_.port.to_byte()
                             )));
-                        }
-                        let Some(expected_exit) = route.return_depth(return_.outcome()) else {
+                        };
+                        let Some(expected_exit) = route.return_depth(port.consumed()) else {
                             return Err(SemanticVerifyError::CursorDepth(format!(
-                                "return state {label:?} has unsupported {:?} outcome",
-                                return_.outcome()
+                                "return state {label:?} has an unsupported empty port"
                             )));
                         };
                         if depth != expected_exit {
@@ -950,9 +1061,20 @@ impl<'a> Program<'a> {
                         }
                     }
                     InstructionIR::Call(call) => {
-                        work.push((call.matched_return(), false));
-                        if let Some(empty) = call.empty_return() {
-                            work.push((empty, empty_path));
+                        let Some(specialization) = self.graph.specialization_for_entry(call.target)
+                        else {
+                            return Err(SemanticVerifyError::Malformed(format!(
+                                "call {label:?} targets a non-definition entry {:?}",
+                                call.target
+                            )));
+                        };
+                        for (&continuation, &port) in
+                            call.returns.iter().zip(specialization.ports().ports())
+                        {
+                            work.push((
+                                continuation,
+                                if port.consumed() { false } else { empty_path },
+                            ));
                         }
                     }
                     InstructionIR::Return(_) => {}
@@ -970,18 +1092,17 @@ impl<'a> Program<'a> {
             .copied()
     }
 
-    fn depth_entries(&self) -> Vec<(Label, DefRoute)> {
+    fn depth_entries(&self) -> Vec<(Label, DefRoute, Vec<ExitPort>)> {
         let wrappers = self
             .graph
             .entry_point_wrappers
             .values()
             .copied()
-            .map(|entry| (entry, DefRoute::Caller));
-        let definitions = self
-            .graph
-            .def_entries
-            .iter()
-            .map(|(variant, &entry)| (entry, variant.route()));
+            .map(|entry| (entry, DefRoute::Caller, vec![ExitPort::ConsumedOtherNone]));
+        let definitions =
+            self.graph.def_entries.iter().map(|(variant, &entry)| {
+                (entry, variant.route(), variant.ports().ports().to_vec())
+            });
         wrappers.chain(definitions).collect()
     }
 }
@@ -991,14 +1112,8 @@ fn push_call_returns(
     call: &crate::compiler::lower::ir::CallIR,
     state: AbsState,
 ) {
-    match call.protocol {
-        CallProtocol::Ordinary { next, .. } | CallProtocol::Routed { next, .. } => {
-            work.push((next, state));
-        }
-        CallProtocol::Split { returns, .. } => {
-            work.push((returns[1], state.clone()));
-            work.push((returns[0], state));
-        }
+    for &continuation in call.returns.iter().rev() {
+        work.push((continuation, state.clone()));
     }
 }
 

@@ -22,13 +22,162 @@ macro_rules! expect_invalid {
 
 #[test]
 fn structural_validation_failure_stops_later_analysis() {
-    let query = Query::expect("Q = {. (Missing)}");
+    let query = Query::expect("Q = {. (identifier) @x (identifier) @x}");
 
     assert!(!query.is_valid());
     let kinds: Vec<_> = query.diagnostics().kinds().collect();
     assert!(kinds.contains(&DiagnosticKind::AnchorWithoutContext));
-    assert!(!kinds.contains(&DiagnosticKind::UndefinedReference));
+    assert!(!kinds.contains(&DiagnosticKind::DuplicateCaptureInScope));
     assert_eq!(query.dump_symbols(), "");
+}
+
+#[test]
+fn exported_boundary_anchor_is_a_non_selectable_fragment() {
+    let query = Query::parse_and_validate(indoc!(
+        r#"
+        Tail = {
+          (identifier == "a")?
+          .
+        }
+        Q = (array
+          "["
+          (Tail)
+          (identifier == "b")
+          "]"
+        )
+        "#
+    ));
+    let analysis = query.analysis().expect("valid query has analysis");
+    let tail = analysis
+        .dependency_analysis
+        .def_id_for_name(&analysis.interner, "Tail")
+        .expect("Tail is defined");
+    let q = analysis
+        .dependency_analysis
+        .def_id_for_name(&analysis.interner, "Q")
+        .expect("Q is defined");
+
+    assert_eq!(
+        analysis.type_analysis.expect_def_root_extent(tail),
+        crate::compiler::analyze::types::RootExtent::Other
+    );
+    assert!(analysis.type_analysis.def_requires_anchor_context(tail));
+    assert!(!analysis.type_analysis.is_selectable_definition(tail));
+    assert!(!analysis.type_analysis.def_requires_anchor_context(q));
+    assert!(analysis.type_analysis.is_selectable_definition(q));
+}
+
+#[test]
+fn single_node_exported_boundary_anchor_is_still_a_fragment() {
+    let query = Query::parse_and_validate(indoc!(
+        "
+        Tail = {(identifier) .}
+        Q = (array \"[\" (Tail) \"]\")
+        "
+    ));
+    let analysis = query.analysis().expect("valid query has analysis");
+    let tail = analysis
+        .dependency_analysis
+        .def_id_for_name(&analysis.interner, "Tail")
+        .expect("Tail is defined");
+
+    assert_eq!(
+        analysis.type_analysis.expect_def_root_extent(tail),
+        crate::compiler::analyze::types::RootExtent::SingleNode
+    );
+    assert!(analysis.type_analysis.def_requires_anchor_context(tail));
+    assert!(!analysis.type_analysis.is_selectable_definition(tail));
+}
+
+#[test]
+fn compiled_query_exports_only_the_context_free_caller() {
+    let compiled = Query::parse_and_validate(indoc!(
+        "
+        Tail = {(identifier) .}
+        Q = (array \"[\" (Tail) \"]\")
+        "
+    ))
+    .bind(grammar())
+    .compile()
+    .expect("compilation answers");
+
+    assert!(
+        compiled.is_valid(),
+        "expected valid compilation:\n{}",
+        compiled.diagnostics().render(compiled.source_map())
+    );
+    assert_eq!(compiled.entry_point_names().collect::<Vec<_>>(), ["Q"]);
+}
+
+#[test]
+fn nullable_neighbor_exposes_an_otherwise_interior_anchor() {
+    let query = Query::expect("Q = {(a)? . (b)}");
+
+    assert!(!query.is_valid());
+    assert!(
+        query
+            .diagnostics()
+            .kinds()
+            .any(|kind| kind == DiagnosticKind::AnchorWithoutContext)
+    );
+}
+
+#[test]
+fn nested_group_inherits_its_consuming_neighbor_context() {
+    Query::parse_and_validate("Q = {(a) {. (b)}}");
+}
+
+#[test]
+fn contextless_alias_chain_reports_the_authored_anchor() {
+    let query = Query::expect(indoc!(
+        "
+        Tail = {(identifier) .}
+        Alias = (Tail)
+        Q = (Alias)
+        "
+    ));
+
+    assert!(!query.is_valid());
+    let rendered = query.dump_diagnostics();
+    assert!(
+        rendered.contains("anchor needs an enclosing node"),
+        "{rendered}"
+    );
+    assert!(rendered.contains("Tail = {(identifier) .}"), "{rendered}");
+}
+
+#[test]
+fn recursive_context_contract_keeps_the_authored_anchor_origin() {
+    let query = Query::expect(indoc!(
+        "
+        Tail = [
+          (identifier)
+          {(identifier) (Tail)? .}
+        ]
+        Alias = (Tail)
+        "
+    ));
+
+    assert!(!query.is_valid());
+    let rendered = query.dump_diagnostics();
+    assert!(
+        rendered.contains("anchor needs an enclosing node"),
+        "{rendered}"
+    );
+    assert!(rendered.contains("{(identifier) (Tail)? .}"), "{rendered}");
+}
+
+#[test]
+fn named_node_discharges_a_recursive_exported_anchor() {
+    Query::parse_and_validate(indoc!(
+        "
+        Tail = [
+          (identifier)
+          {(identifier) (Tail)? .}
+        ]
+        Q = (array \"[\" (Tail) \"]\")
+        "
+    ));
 }
 
 impl Query {
