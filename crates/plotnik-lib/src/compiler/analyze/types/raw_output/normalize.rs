@@ -2,7 +2,11 @@
 
 use super::planner::CaptureTypePlanner;
 use super::*;
+use crate::compiler::analyze::types::capture_type::{CaptureTypePlan, CaptureTypePlanKind};
 use crate::compiler::ids::TypeDeclId;
+
+// Past this point annotations crowd out the primary cause and the removal hint.
+const SUPPRESSED_CAPTURE_ANNOTATION_LIMIT: usize = 8;
 
 #[cfg(test)]
 #[path = "normalize_tests.rs"]
@@ -101,6 +105,19 @@ struct CaptureNormalizer<'s, 'a, 'd> {
     omitted: HashSet<RawCaptureId>,
 }
 
+enum DeferredCaptureDiagnostic {
+    InvalidCaptureType {
+        span: Span,
+        reason: &'static str,
+    },
+    SuppressedValue {
+        capture_id: RawCaptureId,
+        capture_type: BuiltInCaptureType,
+        capture_type_span: Span,
+        plan: CaptureTypePlan,
+    },
+}
+
 impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
     fn new(session: &'s mut NormalizationSession<'a, 'd>) -> Self {
         let blocked = session.graph.blocked_captures(&session.raw_types);
@@ -114,27 +131,73 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
 
     fn run(mut self) -> HashMap<RawCaptureId, NormalizedField> {
         let mut normalized = HashMap::new();
+        let mut deferred_diagnostics = Vec::new();
+        // Suppression warnings need every successful plan to recognize nested
+        // boundaries. Invalid-type errors join the queue to preserve capture order.
         for index in 0..self.session.graph.captures.len() {
             let id = RawCaptureId(index as u32);
             let capture = self.session.graph.captures[index].clone();
-            normalized.insert(id, self.normalize(id, &capture));
+            let (field, deferred_diagnostic) = self.normalize(id, &capture);
+            normalized.insert(id, field);
+            if let Some(deferred_diagnostic) = deferred_diagnostic {
+                deferred_diagnostics.push(deferred_diagnostic);
+            }
+        }
+
+        let suppression_boundary_ids = deferred_diagnostics
+            .iter()
+            .filter_map(|diagnostic| match diagnostic {
+                DeferredCaptureDiagnostic::SuppressedValue { capture_id, .. } => Some(*capture_id),
+                DeferredCaptureDiagnostic::InvalidCaptureType { .. } => None,
+            })
+            .collect::<HashSet<_>>();
+        for diagnostic in deferred_diagnostics {
+            match diagnostic {
+                DeferredCaptureDiagnostic::InvalidCaptureType { span, reason } => {
+                    self.session
+                        .diagnostics
+                        .report(DiagnosticKind::InvalidCaptureType, span)
+                        .detail(reason)
+                        .emit();
+                }
+                DeferredCaptureDiagnostic::SuppressedValue {
+                    capture_id,
+                    capture_type,
+                    capture_type_span,
+                    plan,
+                } => {
+                    let capture = self.session.graph.capture(capture_id).clone();
+                    self.report_suppressed_value(
+                        capture_id,
+                        &capture,
+                        capture_type,
+                        capture_type_span,
+                        &plan,
+                        &suppression_boundary_ids,
+                    );
+                }
+            }
         }
         normalized
     }
 
-    fn normalize(&mut self, id: RawCaptureId, capture: &RawCaptureOutput) -> NormalizedField {
+    fn normalize(
+        &mut self,
+        id: RawCaptureId,
+        capture: &RawCaptureOutput,
+    ) -> (NormalizedField, Option<DeferredCaptureDiagnostic>) {
         let raw_field = capture
             .observation
             .emitted_field
             .unwrap_or(capture.observation.contract.fact.field());
         let ordinary = NormalizedField::ordinary(raw_field, &self.session.raw_types);
-        let pattern = capture.occurrence.clone();
+        let pattern = Pattern::CapturedPattern(capture.occurrence.clone());
 
         let RawCaptureIntent::BuiltIn { capture_type, span } = capture.observation.intent else {
-            return ordinary;
+            return (ordinary, None);
         };
         if self.blocked.contains(&id) {
-            return ordinary;
+            return (ordinary, None);
         }
 
         let mut planner = CaptureTypePlanner::new(&self.session.raw_types, self.session.types);
@@ -145,30 +208,21 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
         ) {
             Ok(planned) => planned,
             Err(reason) => {
-                self.session
-                    .diagnostics
-                    .report(DiagnosticKind::InvalidCaptureType, span)
-                    .detail(reason)
-                    .emit();
-                return ordinary;
+                return (
+                    ordinary,
+                    Some(DeferredCaptureDiagnostic::InvalidCaptureType { span, reason }),
+                );
             }
         };
 
-        if planned.plan.suppresses_semantic_data() {
-            self.session
-                .diagnostics
-                .report(DiagnosticKind::CaptureTypeReplacesData, span)
-                .detail(match capture_type {
-                    BuiltInCaptureType::Text => {
-                        "capture type `text` replaces structured data with source text"
-                    }
-                    BuiltInCaptureType::Bool => {
-                        "capture type `bool` replaces the captured value with a boolean"
-                    }
-                })
-                .hint("result fields, cases, text, or boolean values produced inside the capture will not be returned")
-                .emit();
-        }
+        let deferred_diagnostic = planned.plan.suppresses_semantic_data().then(|| {
+            DeferredCaptureDiagnostic::SuppressedValue {
+                capture_id: id,
+                capture_type,
+                capture_type_span: span,
+                plan: planned.plan.clone(),
+            }
+        });
 
         self.session.types.analysis.capture_facts.insert(
             pattern,
@@ -178,7 +232,371 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
                 planned.plan,
             ),
         );
-        planned.field
+        (planned.field, deferred_diagnostic)
+    }
+
+    fn report_suppressed_value(
+        &mut self,
+        capture_id: RawCaptureId,
+        capture: &RawCaptureOutput,
+        capture_type: BuiltInCaptureType,
+        capture_type_span: Span,
+        plan: &CaptureTypePlan,
+        suppression_boundary_ids: &HashSet<RawCaptureId>,
+    ) {
+        assert_eq!(
+            capture.source, capture_type_span.source,
+            "capture and capture type must belong to the same source"
+        );
+        let captured_type_id = capture.observation.contract.fact.field().final_type;
+        let suppressed_value =
+            SuppressedValue::from_plan(&self.session.raw_types, captured_type_id, plan);
+        let capture_name = self
+            .session
+            .interner
+            .resolve(capture.observation.name)
+            .to_owned();
+        let (capture_type_name, replacement_description) = match capture_type {
+            BuiltInCaptureType::Text => ("text", "source text"),
+            BuiltInCaptureType::Bool => ("bool", "a presence boolean"),
+        };
+        let value_description = suppressed_value.description();
+        let primary_capture_span = capture_span(capture);
+        let suppressed_capture_ids = SuppressedCaptureCollector::new(
+            self.session.graph,
+            &self.session.raw_types,
+            suppression_boundary_ids,
+            capture_id,
+        )
+        .collect_from(captured_type_id);
+        let mut diagnostic = self
+            .session
+            .diagnostics
+            .report(
+                DiagnosticKind::CaptureTypeReplacesData,
+                primary_capture_span,
+            )
+            .detail(format!(
+                "capture type `{}` replaces the {value_description} captured by `@{capture_name}` with {replacement_description}",
+                capture_type_name,
+            ));
+
+        let result_shape_loss_annotation = suppressed_value.result_shape_loss_annotation(
+            self.session.interner,
+            &capture_name,
+            suppressed_capture_ids.is_empty(),
+        );
+        if let Some(annotation) = result_shape_loss_annotation {
+            let related_span = self
+                .session
+                .types
+                .type_provenance(suppressed_value.type_id)
+                .or_else(|| inner_pattern_span(&capture.occurrence, capture.source));
+            if let Some(related_span) = related_span {
+                diagnostic = diagnostic.related_to(related_span, annotation);
+            }
+        }
+
+        if !suppressed_capture_ids.is_empty() {
+            let hidden_capture_count = suppressed_capture_ids
+                .len()
+                .saturating_sub(SUPPRESSED_CAPTURE_ANNOTATION_LIMIT);
+            for (index, capture_id) in suppressed_capture_ids
+                .into_iter()
+                .take(SUPPRESSED_CAPTURE_ANNOTATION_LIMIT)
+                .enumerate()
+            {
+                let suppressed_capture = self.session.graph.capture(capture_id);
+                let annotation = if hidden_capture_count > 0
+                    && index + 1 == SUPPRESSED_CAPTURE_ANNOTATION_LIMIT
+                {
+                    format!(
+                        "this captured value is suppressed by `@{capture_name} :: {capture_type_name}`; {} not shown",
+                        format_additional_capture_count(hidden_capture_count)
+                    )
+                } else {
+                    format!(
+                        "this captured value is suppressed by `@{capture_name} :: {capture_type_name}`"
+                    )
+                };
+                diagnostic = diagnostic.related_to(capture_span(suppressed_capture), annotation);
+            }
+        }
+
+        diagnostic
+            .hint(format!(
+                "remove `:: {}` to return the {value_description} instead",
+                capture_type_name
+            ))
+            .emit();
+    }
+}
+
+fn format_additional_capture_count(count: usize) -> String {
+    if count == 1 {
+        return "1 more capture".to_string();
+    }
+    format!("{count} more captures")
+}
+
+struct SuppressedCaptureCollector<'a> {
+    graph: &'a RawOutputGraph,
+    raw_types: &'a RawTypeSnapshot,
+    suppression_boundary_ids: &'a HashSet<RawCaptureId>,
+    primary_capture_id: RawCaptureId,
+    seen_types: HashSet<TypeId>,
+    capture_ids: BTreeSet<RawCaptureId>,
+}
+
+impl<'a> SuppressedCaptureCollector<'a> {
+    fn new(
+        graph: &'a RawOutputGraph,
+        raw_types: &'a RawTypeSnapshot,
+        suppression_boundary_ids: &'a HashSet<RawCaptureId>,
+        primary_capture_id: RawCaptureId,
+    ) -> Self {
+        Self {
+            graph,
+            raw_types,
+            suppression_boundary_ids,
+            primary_capture_id,
+            seen_types: HashSet::new(),
+            capture_ids: BTreeSet::new(),
+        }
+    }
+
+    fn collect_from(mut self, type_id: TypeId) -> Vec<RawCaptureId> {
+        self.visit_type(type_id);
+        let mut capture_ids = self.capture_ids.into_iter().collect::<Vec<_>>();
+        capture_ids.sort_by_key(|&capture_id| {
+            let span = capture_span(self.graph.capture(capture_id));
+            (span.source, span.range.start(), span.range.end())
+        });
+        capture_ids
+    }
+
+    fn visit_type(&mut self, type_id: TypeId) {
+        if !self.seen_types.insert(type_id) {
+            return;
+        }
+
+        match self.raw_types.shape(type_id).clone() {
+            TypeShape::Ref(declaration) => {
+                self.visit_type(self.raw_types.declaration(declaration));
+            }
+            TypeShape::Option(inner) | TypeShape::List { element: inner, .. } => {
+                self.visit_type(inner);
+            }
+            TypeShape::Variant(cases) => {
+                for payload in cases.into_values() {
+                    if let Some(type_id) = payload.type_id() {
+                        self.visit_type(type_id);
+                    }
+                }
+            }
+            TypeShape::Record(_) => {
+                for producer_id in self.graph.capture_producer_ids_for_record_type(type_id) {
+                    self.visit_capture(producer_id);
+                }
+            }
+            TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
+        }
+    }
+
+    fn visit_capture(&mut self, capture_id: RawCaptureId) {
+        if capture_id == self.primary_capture_id {
+            return;
+        }
+        if !self.capture_ids.insert(capture_id) {
+            return;
+        }
+        // The boundary's normalized value is lost here, so annotate it. Its
+        // children were already suppressed by its own type and belong to its warning.
+        if self.suppression_boundary_ids.contains(&capture_id) {
+            return;
+        }
+        let type_id = self
+            .graph
+            .capture(capture_id)
+            .observation
+            .contract
+            .fact
+            .field()
+            .final_type;
+        self.visit_type(type_id);
+    }
+}
+
+enum SuppressedValueKind {
+    Record(Vec<Symbol>),
+    Variant(Vec<Symbol>),
+    List,
+}
+
+struct SuppressedValue {
+    type_id: TypeId,
+    kind: SuppressedValueKind,
+    repeated: bool,
+}
+
+impl SuppressedValue {
+    fn from_plan(raw_types: &RawTypeSnapshot, type_id: TypeId, plan: &CaptureTypePlan) -> Self {
+        Self::follow_plan(raw_types, type_id, plan, false)
+    }
+
+    fn follow_plan(
+        raw_types: &RawTypeSnapshot,
+        type_id: TypeId,
+        plan: &CaptureTypePlan,
+        repeated: bool,
+    ) -> Self {
+        // Follow the frozen plan alongside the raw type: `text` maps list
+        // elements, while `bool` can replace an omitted list as one value.
+        let type_id = raw_types.resolve_reference_chain(type_id);
+        match plan.kind() {
+            CaptureTypePlanKind::Option { inner, .. } => {
+                let TypeShape::Option(inner_type) = raw_types.shape(type_id) else {
+                    unreachable!("option capture-type plan must follow a raw option")
+                };
+                Self::follow_plan(raw_types, *inner_type, inner, repeated)
+            }
+            CaptureTypePlanKind::List { element } => {
+                let TypeShape::List { element: inner, .. } = raw_types.shape(type_id) else {
+                    unreachable!("list capture-type plan must follow a raw list")
+                };
+                Self::follow_plan(raw_types, *inner, element, true)
+            }
+            CaptureTypePlanKind::TextTerminal {
+                data: TerminalData::Semantic,
+            }
+            | CaptureTypePlanKind::BoolTerminal {
+                data: TerminalData::Semantic,
+            } => {
+                let kind = match raw_types.shape(type_id) {
+                    TypeShape::Record(fields) => {
+                        SuppressedValueKind::Record(fields.keys().copied().collect())
+                    }
+                    TypeShape::Variant(cases) => {
+                        SuppressedValueKind::Variant(cases.keys().copied().collect())
+                    }
+                    TypeShape::List { .. } => SuppressedValueKind::List,
+                    TypeShape::Node
+                    | TypeShape::Text
+                    | TypeShape::Bool
+                    | TypeShape::Option(_)
+                    | TypeShape::Ref(_) => {
+                        unreachable!("semantic capture-type terminal must replace a value")
+                    }
+                };
+                Self {
+                    type_id,
+                    kind,
+                    repeated,
+                }
+            }
+            CaptureTypePlanKind::TextTerminal {
+                data: TerminalData::NodeRepresentation,
+            }
+            | CaptureTypePlanKind::BoolTerminal {
+                data: TerminalData::NodeRepresentation,
+            } => {
+                unreachable!("node-representation capture type does not replace semantic data")
+            }
+        }
+    }
+
+    fn description(&self) -> &'static str {
+        match (&self.kind, self.repeated) {
+            (SuppressedValueKind::Record(_), false) => "record value",
+            (SuppressedValueKind::Record(_), true) => "record values",
+            (SuppressedValueKind::Variant(_), false) => "variant value",
+            (SuppressedValueKind::Variant(_), true) => "variant values",
+            (SuppressedValueKind::List, false) => "list value",
+            (SuppressedValueKind::List, true) => "list values",
+        }
+    }
+
+    fn result_shape_loss_annotation(
+        &self,
+        interner: &crate::core::Interner,
+        capture_name: &str,
+        include_record_field_annotation: bool,
+    ) -> Option<String> {
+        let subject = if self.repeated {
+            format!("each item in `@{capture_name}`")
+        } else {
+            format!("`@{capture_name}`")
+        };
+        // Capture annotations already account for record fields. Variant
+        // identity and list contents are separate losses and remain useful.
+        match &self.kind {
+            SuppressedValueKind::Record(fields) if include_record_field_annotation => {
+                Some(record_field_loss_annotation(&subject, fields, interner))
+            }
+            SuppressedValueKind::Record(_) => None,
+            SuppressedValueKind::Variant(cases) => {
+                let cases = format_member_names(cases, interner, "or");
+                Some(format!(
+                    "{subject} no longer identifies the matched case: {cases}"
+                ))
+            }
+            SuppressedValueKind::List => {
+                Some(format!("{subject} no longer contains the collected items"))
+            }
+        }
+    }
+}
+
+fn capture_span(capture: &RawCaptureOutput) -> Span {
+    Span::new(capture.source, capture.occurrence.capture().text_range())
+}
+
+fn inner_pattern_span(captured_pattern: &CapturedPattern, source: SourceId) -> Option<Span> {
+    captured_pattern
+        .inner()
+        .map(|inner| Span::new(source, inner.text_range()))
+}
+
+fn record_field_loss_annotation(
+    subject: &str,
+    fields: &[Symbol],
+    interner: &crate::core::Interner,
+) -> String {
+    assert!(!fields.is_empty(), "record values must have named fields");
+    let field_count = fields.len();
+    let formatted_fields = format_member_names(fields, interner, "and");
+    if field_count == 1 {
+        return format!("{subject} no longer contains field {formatted_fields}");
+    }
+    format!("{subject} no longer contains fields {formatted_fields}")
+}
+
+fn format_member_names(
+    members: &[Symbol],
+    interner: &crate::core::Interner,
+    conjunction: &str,
+) -> String {
+    const DISPLAY_LIMIT: usize = 4;
+
+    let shown = members
+        .iter()
+        .take(DISPLAY_LIMIT)
+        .map(|&name| format!("`{}`", interner.resolve(name)))
+        .collect::<Vec<_>>();
+    let remaining = members.len().saturating_sub(shown.len());
+    if remaining > 0 {
+        return format!("{}, {conjunction} {remaining} more", shown.join(", "));
+    }
+    match shown.as_slice() {
+        [] => unreachable!("member list was checked non-empty"),
+        [only] => only.clone(),
+        [first, second] => format!("{first} {conjunction} {second}"),
+        _ => {
+            let (last, rest) = shown
+                .split_last()
+                .expect("non-empty member list has a last element");
+            format!("{}, {conjunction} {last}", rest.join(", "))
+        }
     }
 }
 
@@ -229,6 +647,18 @@ impl RawTypeSnapshot {
             .declarations
             .get(&declaration)
             .expect("raw referenced declaration must have a body")
+    }
+
+    fn resolve_reference_chain(&self, mut type_id: TypeId) -> TypeId {
+        let mut seen = HashSet::new();
+        while let TypeShape::Ref(declaration) = self.shape(type_id) {
+            assert!(
+                seen.insert(*declaration),
+                "capture-type plan cannot traverse a reference-only cycle"
+            );
+            type_id = self.declaration(*declaration);
+        }
+        type_id
     }
 
     fn type_contains_invalid(&self, type_id: TypeId) -> bool {

@@ -139,7 +139,8 @@ impl<'a> NfaBuilder<'a> {
         compile(self)
     }
 
-    fn capture_type_binding(&mut self, capture: &ast::CapturedPattern) -> CaptureBinding {
+    fn capture_type_binding(&mut self, captured_pattern: &ast::CapturedPattern) -> CaptureBinding {
+        let capture = captured_pattern.capture();
         let name = capture
             .name()
             .expect("regular capture has a validated name");
@@ -203,16 +204,16 @@ impl<'a> NfaBuilder<'a> {
 
     pub(super) fn compile_boundary_capture_type(
         &mut self,
-        capture: &ast::CapturedPattern,
+        captured_pattern: &ast::CapturedPattern,
         plan: &CaptureTypePlan,
         input: BoundaryState,
         entry: EntryObligation,
         targets: &ExitMap<Label>,
     ) -> Option<Label> {
-        let inner = capture
+        let inner = captured_pattern
             .inner()
             .expect("a capture-type transformation has an ordinary captured value");
-        let binding = self.capture_type_binding(capture);
+        let binding = self.capture_type_binding(captured_pattern);
         let entry = self.compile_boundary_capture_type_plan(
             &inner,
             plan,
@@ -451,14 +452,14 @@ impl CaptureTypeLowerer<'_, '_> {
 
     pub(super) fn captured(
         mut self,
-        capture: &ast::CapturedPattern,
+        captured_pattern: &ast::CapturedPattern,
         outer: CaptureEffects,
     ) -> Label {
-        let inner = capture
+        let inner = captured_pattern
             .inner()
             .expect("a capture-type transformation has an ordinary captured value");
         let CaptureEffects { mut pre, post } = outer;
-        let binding = self.compiler.capture_type_binding(capture);
+        let binding = self.compiler.capture_type_binding(captured_pattern);
         pre.extend(binding.entry);
         let destination = binding.destination.followed_by(&post);
         let entry = self.lower(&inner, destination);

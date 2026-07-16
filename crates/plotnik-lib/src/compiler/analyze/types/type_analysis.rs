@@ -21,7 +21,7 @@ use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent}
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::{DefId, TypeDeclId};
-use crate::compiler::parse::ast::Pattern;
+use crate::compiler::parse::ast::{CapturedPattern, Pattern};
 use crate::core::Symbol;
 
 /// One custom `:: TypeName` occurrence, recorded during inference for the
@@ -811,13 +811,14 @@ impl TypeAnalysisBuilder {
 
     pub(crate) fn record_raw_capture_observation(
         &mut self,
-        pattern: Pattern,
+        captured_pattern: CapturedPattern,
+        source: crate::compiler::diagnostics::source::SourceId,
         observation: RawCaptureObservation,
     ) {
         let Some(graph) = &mut self.raw_output_graph else {
             return;
         };
-        graph.record_capture(pattern, observation);
+        graph.record_capture(captured_pattern, source, observation);
     }
 
     pub(crate) fn records_raw_output_provenance(&self) -> bool {

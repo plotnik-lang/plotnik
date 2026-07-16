@@ -197,9 +197,10 @@ impl NfaBuilder<'_> {
     /// mechanism in rather than have this re-classify the same inner.
     pub(super) fn build_capture_effects(
         &mut self,
-        cap: &ast::CapturedPattern,
+        captured_pattern: &ast::CapturedPattern,
         mechanism: Option<CaptureKind>,
     ) -> Vec<EffectIR> {
+        let capture = captured_pattern.capture();
         let mut effects = Vec::with_capacity(4);
         let mut member_ref = None;
 
@@ -215,7 +216,7 @@ impl NfaBuilder<'_> {
         // Add `RecordSet` if we have a capture name.
         // Always look up in the current scope - bubble captures don't create new scopes,
         // so all fields (including nested bubble captures) reference the same root record.
-        if let Some(name_token) = cap.name() {
+        if let Some(name_token) = capture.name() {
             let capture_name = &name_token.text()[1..];
             // Suppressed regions never reach here (their captures are inert), so
             // the enclosing scope is a record at every real capture site — except
@@ -237,7 +238,7 @@ impl NfaBuilder<'_> {
             }
         }
 
-        if let Some(id) = self.span_id(cap.syntax(), SpanKind::Capture) {
+        if let Some(id) = self.span_id(capture.syntax(), SpanKind::Capture) {
             if let Some(member_ref) = member_ref {
                 self.bind_span(id, SpanBindingIR::Member(member_ref));
             }

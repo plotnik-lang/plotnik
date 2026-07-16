@@ -8,7 +8,7 @@ Root
     NamedNode
       ParenOpen "("
       Id "node"
-      Capture
+      CapturedPattern
         Quantifier
           Field
             Id "foo"
@@ -18,14 +18,16 @@ Root
               Id "bar"
               ParenClose ")"
           Star "*"
-        CaptureToken "@baz"
+        Capture
+          CaptureToken "@baz"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
     NamedNode node
-      CapturedPattern @baz
+      CapturedPattern
         QuantifiedPattern *
           FieldPattern foo:
             NamedNode bar
+        Capture @baz

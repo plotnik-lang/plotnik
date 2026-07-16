@@ -1,0 +1,28 @@
+Q = (program
+  [
+    Comment: (comment)
+    Statement: (expression_statement)
+  ] @value :: text
+)
+------------------ DIAGNOSTICS -------------------
+warning: capture type `text` replaces the variant value captured by `@value` with source text
+ --> query.ptk:5:5
+  |
+2 | /   [
+3 | |     Comment: (comment)
+4 | |     Statement: (expression_statement)
+5 | |   ] @value :: text
+  | |   - ^^^^^^^^^^^^^^
+  | |___|
+  |     `@value` no longer identifies the matched case: `Comment` or `Statement`
+  |
+help: remove `:: text` to return the variant value instead
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  value: string;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub value: &'s str,
+}

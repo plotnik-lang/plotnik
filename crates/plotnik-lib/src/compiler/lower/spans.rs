@@ -243,7 +243,8 @@ fn collect_pattern(
                 collect_pattern(input, source, child, visibility, out);
             }
         }
-        Pattern::CapturedPattern(capture) => {
+        Pattern::CapturedPattern(captured_pattern) => {
+            let capture = captured_pattern.capture();
             if !capture.is_discard() {
                 let name = capture.name().expect("capture must have a name token");
                 out.push(Candidate {
@@ -256,11 +257,8 @@ fn collect_pattern(
             }
 
             if let Some(capture_type) = capture.capture_type() {
-                let capture_pattern = Pattern::CapturedPattern(capture.clone());
-                let fact = input
-                    .analysis
-                    .type_analysis
-                    .expect_capture_fact(&capture_pattern);
+                let pattern = Pattern::CapturedPattern(captured_pattern.clone());
+                let fact = input.analysis.type_analysis.expect_capture_fact(&pattern);
                 let binding = fact
                     .built_in_plan()
                     .map(|(capture_type, _)| {
@@ -270,7 +268,7 @@ fn collect_pattern(
                         };
                         SpanBindingIR::Type(primitive)
                     })
-                    .or_else(|| custom_capture_type_binding(input, capture, &capture_pattern))
+                    .or_else(|| custom_capture_type_binding(input, &capture, &pattern))
                     .and_then(|binding| visibility.bind(binding));
                 out.push(Candidate {
                     node: capture_type.syntax().clone(),
@@ -281,13 +279,13 @@ fn collect_pattern(
                 });
             }
 
-            if let Some(inner) = capture.inner() {
-                let capture_pattern = Pattern::CapturedPattern(capture.clone());
+            if let Some(inner) = captured_pattern.inner() {
+                let pattern = Pattern::CapturedPattern(captured_pattern.clone());
                 let suppresses_output = capture.is_discard()
                     || input
                         .analysis
                         .type_analysis
-                        .expect_capture_fact(&capture_pattern)
+                        .expect_capture_fact(&pattern)
                         .built_in_plan()
                         .is_some_and(|(_, plan)| plan.suppresses_semantic_data());
                 let inner_visibility = if suppresses_output {
@@ -348,7 +346,7 @@ fn collect_pattern(
 
 fn custom_capture_type_binding(
     input: &LowerInput<'_>,
-    capture: &ast::CapturedPattern,
+    capture: &ast::Capture,
     capture_pattern: &Pattern,
 ) -> Option<SpanBindingIR> {
     let name = capture.name()?;

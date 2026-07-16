@@ -196,13 +196,14 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        let captures = collect_capture_occurrences(inner);
-        if captures.is_empty() {
+        let captured_patterns = collect_capture_occurrences(inner);
+        if captured_patterns.is_empty() {
             return exit;
         }
 
         let mut absence_effects = Vec::new();
-        for capture in captures {
+        for captured_pattern in captured_patterns {
+            let capture = captured_pattern.capture();
             let name = capture
                 .name()
                 .expect("collected regular capture has a name");
@@ -376,19 +377,19 @@ impl NfaBuilder<'_> {
 }
 
 fn collect_capture_occurrences(pattern: &Pattern) -> Vec<ast::CapturedPattern> {
-    fn collect(pattern: &Pattern, captures: &mut Vec<ast::CapturedPattern>) {
-        if let Pattern::CapturedPattern(capture) = pattern
-            && !capture.is_discard()
-            && capture.name().is_some()
-        {
-            captures.push(capture.clone());
+    fn collect(pattern: &Pattern, captured_patterns: &mut Vec<ast::CapturedPattern>) {
+        if let Pattern::CapturedPattern(captured_pattern) = pattern {
+            let capture = captured_pattern.capture();
+            if !capture.is_discard() && capture.name().is_some() {
+                captured_patterns.push(captured_pattern.clone());
+            }
         }
         for child in pattern.children() {
-            collect(&child, captures);
+            collect(&child, captured_patterns);
         }
     }
 
-    let mut captures = Vec::new();
-    collect(pattern, &mut captures);
-    captures
+    let mut captured_patterns = Vec::new();
+    collect(pattern, &mut captured_patterns);
+    captured_patterns
 }

@@ -8,33 +8,40 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       Sequence
         BraceOpen "{"
-        Capture
+        CapturedPattern
           NamedNode
             ParenOpen "("
             Id "a"
             ParenClose ")"
-          CaptureToken "@a"
-        Capture
+          Capture
+            CaptureToken "@a"
+        CapturedPattern
           NamedNode
             ParenOpen "("
             Id "b"
             ParenClose ")"
-          CaptureToken "@b"
+          Capture
+            CaptureToken "@b"
         BraceClose "}"
-      CaptureToken "@seq"
-      CaptureType
-        DoubleColon "::"
-        Id "MySequence"
+      Capture
+        CaptureToken "@seq"
+        CaptureType
+          DoubleColon "::"
+          Id "MySequence"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @seq :: MySequence
+    CapturedPattern
       Seq
-        CapturedPattern @a
+        CapturedPattern
           NamedNode a
-        CapturedPattern @b
+          Capture @a
+        CapturedPattern
           NamedNode b
+          Capture @b
+      Capture @seq
+        CaptureType MySequence

@@ -5,17 +5,19 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       NamedNode
         ParenOpen "("
         Id "expression"
         Hash "#"
         Id "binary_expression"
         ParenClose ")"
-      CaptureToken "@expr"
+      Capture
+        CaptureToken "@expr"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @expr
+    CapturedPattern
       NamedNode expression
+      Capture @expr

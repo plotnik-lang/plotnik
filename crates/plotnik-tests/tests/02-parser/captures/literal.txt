@@ -5,15 +5,17 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       Str
         DoubleQuote "\""
         StringContent "foo"
         DoubleQuote "\""
-      CaptureToken "@keyword"
+      Capture
+        CaptureToken "@keyword"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @keyword
+    CapturedPattern
       AnonymousNode "foo"
+      Capture @keyword

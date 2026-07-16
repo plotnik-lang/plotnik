@@ -7,16 +7,18 @@ Root
     Whitespace " "
     Equals "="
     Whitespace " "
-    Capture
+    CapturedPattern
       NamedNode
         ParenOpen "("
         Id "identifier"
         ParenClose ")"
       Whitespace "  "
-      CaptureToken "@name"
+      Capture
+        CaptureToken "@name"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @name
+    CapturedPattern
       NamedNode identifier
+      Capture @name

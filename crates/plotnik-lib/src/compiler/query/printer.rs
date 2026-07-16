@@ -8,6 +8,7 @@ use rowan::NodeOrToken;
 
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::types::type_check::RootExtent;
+use crate::compiler::parse::ast::Capture;
 use crate::compiler::parse::{self as ast, SyntaxNode};
 use crate::compiler::source::{SourceKind, SourceMap};
 
@@ -326,28 +327,10 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                 writeln!(self.w, "{}Seq{}{}", prefix, extent, span)?;
                 self.format_tree_children(s.syntax(), depth + 1)?;
             }
-            ast::Pattern::CapturedPattern(c) => {
-                let name = c
-                    .name()
-                    .map(|t| t.text()[1..].to_string())
-                    .unwrap_or_default();
-                let type_ann = c
-                    .capture_type()
-                    .and_then(|t| t.name())
-                    .map(|t| t.text().to_string());
-                match type_ann {
-                    Some(ty) => writeln!(
-                        self.w,
-                        "{}CapturedPattern{}{} @{} :: {}",
-                        prefix, extent, span, name, ty
-                    )?,
-                    None => writeln!(
-                        self.w,
-                        "{}CapturedPattern{}{} @{}",
-                        prefix, extent, span, name
-                    )?,
-                }
-                self.format_pattern_if_present(c.inner(), depth + 1)?;
+            ast::Pattern::CapturedPattern(captured_pattern) => {
+                writeln!(self.w, "{}CapturedPattern{}{}", prefix, extent, span)?;
+                self.format_pattern_if_present(captured_pattern.inner(), depth + 1)?;
+                self.format_capture(&captured_pattern.capture(), depth + 1)?;
             }
             ast::Pattern::QuantifiedPattern(q) => {
                 let op = q
@@ -368,6 +351,27 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
             }
         }
         Ok(())
+    }
+
+    fn format_capture(&mut self, capture: &Capture, depth: usize) -> std::fmt::Result {
+        let prefix = indent(depth);
+        let span = self.printer.span_str(capture.text_range());
+        let name = capture
+            .name()
+            .map(|token| token.text().to_string())
+            .unwrap_or_default();
+        writeln!(self.w, "{}Capture{} {}", prefix, span, name)?;
+
+        let Some(capture_type) = capture.capture_type() else {
+            return Ok(());
+        };
+        let prefix = indent(depth + 1);
+        let span = self.printer.span_str(capture_type.text_range());
+        let name = capture_type
+            .name()
+            .map(|token| token.text().to_string())
+            .unwrap_or_default();
+        writeln!(self.w, "{}CaptureType{} {}", prefix, span, name)
     }
 
     fn format_pattern_if_present(

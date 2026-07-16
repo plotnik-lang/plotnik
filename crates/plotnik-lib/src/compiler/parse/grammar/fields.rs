@@ -158,8 +158,9 @@ impl Parser<'_, '_> {
             return;
         }
 
-        self.start_node_at(checkpoint, SyntaxKind::Capture);
+        self.start_node_at(checkpoint, SyntaxKind::CapturedPattern);
         self.drain_trivia();
+        self.start_node(SyntaxKind::Capture);
 
         let source = self.source;
         let span = self.current_span();
@@ -179,6 +180,7 @@ impl Parser<'_, '_> {
             }
         }
 
+        self.finish_node();
         self.finish_node();
     }
 

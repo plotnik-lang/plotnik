@@ -53,8 +53,9 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
-    AlternationPattern, Alternative, AnonymousNodePattern, CapturedPattern, DefRef, FieldPattern,
-    Labeling, NamedNodePattern, Pattern, QuantifiedPattern, SeqPattern, is_empty_group,
+    AlternationPattern, Alternative, AnonymousNodePattern, Capture, CapturedPattern, DefRef,
+    FieldPattern, Labeling, NamedNodePattern, Pattern, QuantifiedPattern, SeqPattern,
+    is_empty_group,
 };
 
 mod diagnostics;
@@ -697,38 +698,39 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ///   Inner fields become the captured type's fields.
     /// - Other expressions (named nodes, refs) don't create scopes.
     ///   Inner fields bubble up alongside the capture field.
-    fn infer_captured_pattern(&mut self, cap: &Located<CapturedPattern>) -> PatternShape {
-        let node = cap.node();
+    fn infer_captured_pattern(&mut self, captured: &Located<CapturedPattern>) -> PatternShape {
+        let captured_pattern = captured.node();
+        let capture = captured_pattern.capture();
 
         // Discards don't contribute to the result type. The inner
         // is still inferred for structural validation, but the explicit discard
         // needs neither an ineffective-label warning nor a collection boundary.
-        if node.is_discard() {
-            let info = match node.inner() {
+        if capture.is_discard() {
+            let info = match captured_pattern.inner() {
                 None => return PatternShape::no_value(),
                 Some(Pattern::QuantifiedPattern(q)) => {
-                    self.infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Discard)
+                    self.infer_quantified_pattern_in(&captured.wrap(q), QuantifiedContext::Discard)
                 }
-                Some(i) => self.infer_pattern_discarded(&cap.wrap(i)),
+                Some(i) => self.infer_pattern_discarded(&captured.wrap(i)),
             };
             return PatternShape::new(info.root_extent, PatternFlow::NoValue);
         }
 
-        let Some(name_tok) = node.name() else {
+        let Some(name_token) = capture.name() else {
             // Recover gracefully
-            return node
+            return captured_pattern
                 .inner()
-                .map(|i| self.infer_pattern(&cap.wrap(i)))
+                .map(|i| self.infer_pattern(&captured.wrap(i)))
                 .unwrap_or_else(PatternShape::no_value);
         };
-        let capture_name = self.ctx.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
+        let capture_name = self.ctx.interner.intern(&name_token.text()[1..]); // Strip @ prefix
 
-        let capture_type = self.resolve_capture_type(node);
+        let capture_type = self.resolve_capture_type(&capture);
         let errors_before_raw_capture = self.ctx.diag.error_count();
 
-        let Some(inner) = node.inner() else {
+        let Some(inner) = captured_pattern.inner() else {
             // A bare capture binds the current node.
-            let raw = RawCapture::admitted(node, capture_name, RawCaptureValue::node());
+            let raw = RawCapture::admitted(captured_pattern, capture_name, RawCaptureValue::node());
             let observation = self
                 .ctx
                 .type_ctx
@@ -737,7 +739,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let field = self.finish_capture_type(raw, capture_type);
             if let Some(observation) = observation {
                 self.ctx.type_ctx.record_raw_capture_observation(
-                    Pattern::CapturedPattern(node.clone()),
+                    captured_pattern.clone(),
+                    self.source,
                     observation.emitting(field),
                 );
             }
@@ -750,7 +753,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 ),
             );
         };
-        let inner = cap.wrap(inner);
+        let inner = captured.wrap(inner);
 
         // Determine how the inner flow relates to the capture.
         let captured_inner = self.resolve_capture_inner(&inner);
@@ -791,7 +794,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             capture_name,
             &inner_info,
             should_merge_fields,
-            name_tok.text_range(),
+            name_token.text_range(),
         );
         // A Node capture owns only its matched node. Diagnostics from child
         // captures that bubble beside it do not invalidate that node value or
@@ -815,7 +818,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Some(TypeShape::Option(_))
         ) && self.pattern_can_match_zero_nodes(inner.node());
         let raw = RawCapture::after_validation(
-            node,
+            captured_pattern,
             capture_name,
             RawCaptureValue::inferred(mechanism, raw_field, zero_node_terminal),
             raw_capture_valid,
@@ -833,7 +836,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 observation
             };
             self.ctx.type_ctx.record_raw_capture_observation(
-                Pattern::CapturedPattern(node.clone()),
+                captured_pattern.clone(),
+                self.source,
                 observation,
             );
         }
@@ -925,7 +929,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    fn resolve_capture_type(&mut self, capture: &CapturedPattern) -> ResolvedCaptureType {
+    fn resolve_capture_type(&mut self, capture: &Capture) -> ResolvedCaptureType {
         let Some(syntax) = capture.capture_type() else {
             return ResolvedCaptureType::None;
         };

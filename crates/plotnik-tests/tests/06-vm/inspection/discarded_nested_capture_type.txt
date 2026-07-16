@@ -9,13 +9,15 @@ export interface Q {
   outer: string | null;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `text` replaces structured data with source text
- --> query.ptk:4:12
+warning: capture type `text` replaces the record value captured by `@outer` with source text
+ --> query.ptk:4:5
   |
+3 |     (expression_statement)? @inner :: bool
+  |                             -------------- this captured value is suppressed by `@outer :: text`
 4 |   } @outer :: text
-  |            ^^^^^^^
+  |     ^^^^^^^^^^^^^^
   |
-help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+help: remove `:: text` to return the record value instead
 --------------------- OUTPUT ---------------------
 {
   "outer": null

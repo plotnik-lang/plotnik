@@ -10,13 +10,15 @@ export interface Q {
   comments: string[];
 }
 ------------------ DIAGNOSTICS -------------------
-warning: capture type `text` replaces structured data with source text
- --> query.ptk:4:16
+warning: capture type `text` replaces the record values captured by `@comments` with source text
+ --> query.ptk:4:6
   |
+3 |     (comment)? @comment
+  |                -------- this captured value is suppressed by `@comments :: text`
 4 |   }* @comments :: text
-  |                ^^^^^^^
+  |      ^^^^^^^^^^^^^^^^^
   |
-help: result fields, cases, text, or boolean values produced inside the capture will not be returned
+help: remove `:: text` to return the record values instead
 --------------------- OUTPUT ---------------------
 {
   "comments": []

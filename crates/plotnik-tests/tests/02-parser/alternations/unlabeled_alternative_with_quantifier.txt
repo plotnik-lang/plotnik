@@ -16,14 +16,15 @@ Root
           Id "identifier"
           ParenClose ")"
       Alternative
-        Capture
+        CapturedPattern
           Quantifier
             NamedNode
               ParenOpen "("
               Id "string"
               ParenClose ")"
             Star "*"
-          CaptureToken "@strings"
+          Capture
+            CaptureToken "@strings"
       BracketClose "]"
 ---------------------- AST -----------------------
 # query.ptk
@@ -33,6 +34,7 @@ Root
       Alternative
         NamedNode identifier
       Alternative
-        CapturedPattern @strings
+        CapturedPattern
           QuantifiedPattern *
             NamedNode string
+          Capture @strings

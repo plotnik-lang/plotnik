@@ -8,7 +8,7 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       Alternation
         BracketOpen "["
         Alternative
@@ -22,17 +22,20 @@ Root
             Id "number"
             ParenClose ")"
         BracketClose "]"
-      CaptureToken "@value"
-      CaptureType
-        DoubleColon "::"
-        Id "Value"
+      Capture
+        CaptureToken "@value"
+        CaptureType
+          DoubleColon "::"
+          Id "Value"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @value :: Value
+    CapturedPattern
       Alternation
         Alternative
           NamedNode identifier
         Alternative
           NamedNode number
+      Capture @value
+        CaptureType Value

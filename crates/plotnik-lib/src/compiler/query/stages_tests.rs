@@ -417,6 +417,49 @@ fn multifile_bind_field_error_in_referenced_body_spans_two_files() {
 }
 
 #[test]
+fn multifile_capture_type_warning_highlights_suppressed_captures_in_their_source() {
+    let mut source_map = SourceMap::new();
+    source_map.add_file(
+        SourcePath::new("captures.ptk"),
+        indoc!(
+            "
+            Chunk = {
+              (comment) @comment
+              (expression_statement) @statement
+            }
+            "
+        ),
+    );
+    source_map.add_file(
+        SourcePath::new("query.ptk"),
+        "Q = (program (Chunk) @text :: text)",
+    );
+
+    let analyzed = QueryBuilder::new(source_map).analyze().unwrap();
+
+    assert!(analyzed.is_valid());
+    insta::assert_snapshot!(analyzed.dump_diagnostics(), @"
+    warning: capture type `text` replaces the record value captured by `@text` with source text
+     --> query.ptk:1:22
+      |
+    1 | Q = (program (Chunk) @text :: text)
+      |                      ^^^^^^^^^^^^^
+      |
+     ::: captures.ptk:2:13
+      |
+    2 |   (comment) @comment
+      |             -------- this captured value is suppressed by `@text :: text`
+      |
+     ::: captures.ptk:3:26
+      |
+    3 |   (expression_statement) @statement
+      |                          ---------- this captured value is suppressed by `@text :: text`
+      |
+    help: remove `:: text` to return the record value instead
+    ");
+}
+
+#[test]
 fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
     // The duplicate-capture error lives inside `Foo`'s body in a.ptk; b.ptk only
     // references `Foo`. Inference no longer descends across the reference, so the

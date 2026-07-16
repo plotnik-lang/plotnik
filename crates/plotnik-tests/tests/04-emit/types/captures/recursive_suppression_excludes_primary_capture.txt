@@ -1,0 +1,36 @@
+Foo = {
+  (_
+    (Foo)? @child
+  )
+} @foo :: text
+
+Q = (program (Foo) @root)
+------------------ DIAGNOSTICS -------------------
+warning: capture type `text` replaces the record value captured by `@foo` with source text
+ --> query.ptk:5:3
+  |
+3 |     (Foo)? @child
+  |            ------ this captured value is suppressed by `@foo :: text`
+4 |   )
+5 | } @foo :: text
+  |   ^^^^^^^^^^^^
+  |
+help: remove `:: text` to return the record value instead
+------------------- TYPESCRIPT -------------------
+export interface Foo {
+  foo: string;
+}
+
+export interface Q {
+  root: Foo;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Foo<'s> {
+    pub foo: &'s str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub root: Foo<'s>,
+}

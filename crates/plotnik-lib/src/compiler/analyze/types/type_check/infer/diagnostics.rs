@@ -337,11 +337,11 @@ fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
 /// Collect captures that contribute result fields to one result scope.
 fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToken>) {
     for child in scope_root.children() {
-        if let Some(cap) = CapturedPattern::cast(child.clone()) {
-            if let Some(tok) = cap.name() {
+        if let Some(captured_pattern) = CapturedPattern::cast(child.clone()) {
+            if let Some(tok) = captured_pattern.capture().name() {
                 out.push(tok);
             }
-            if inner_captures_bubble_up(&cap) {
+            if inner_captures_bubble_up(&captured_pattern) {
                 direct_scope_capture_tokens(&child, out);
             }
             continue;
@@ -366,7 +366,8 @@ fn enclosing_scope_root(node: &SyntaxNode) -> SyntaxNode {
 }
 
 fn opens_nested_scope(node: &SyntaxNode) -> bool {
-    CapturedPattern::cast(node.clone()).is_some_and(|cap| !inner_captures_bubble_up(&cap))
+    CapturedPattern::cast(node.clone())
+        .is_some_and(|captured_pattern| !inner_captures_bubble_up(&captured_pattern))
 }
 
 fn is_pattern_node(node: &SyntaxNode) -> bool {
@@ -375,11 +376,11 @@ fn is_pattern_node(node: &SyntaxNode) -> bool {
 
 /// Decide whether a capture exposes its inner result fields to the surrounding result scope.
 /// Plain node captures do; structured captures, repetition captures, and discards contain them.
-fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
-    if cap.is_discard() {
+fn inner_captures_bubble_up(captured_pattern: &CapturedPattern) -> bool {
+    if captured_pattern.capture().is_discard() {
         return false;
     }
-    let mut inner = cap.inner();
+    let mut inner = captured_pattern.inner();
     loop {
         match inner {
             // A field constraint navigates to a child; it does not create a scope.

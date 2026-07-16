@@ -8,11 +8,11 @@ Root
   Def
     Id "Q"
     Equals "="
-    Capture
+    CapturedPattern
       NamedNode
         ParenOpen "("
         Id "function"
-        Capture
+        CapturedPattern
           Field
             Id "name"
             Colon ":"
@@ -20,44 +20,53 @@ Root
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
-          CaptureToken "@name"
-          CaptureType
-            DoubleColon "::"
-            Id "Foo"
+          Capture
+            CaptureToken "@name"
+            CaptureType
+              DoubleColon "::"
+              Id "Foo"
         Field
           Id "body"
           Colon ":"
           NamedNode
             ParenOpen "("
             Id "block"
-            Capture
+            CapturedPattern
               Quantifier
                 NamedNode
                   ParenOpen "("
                   Id "statement"
                   ParenClose ")"
                 Star "*"
-              CaptureToken "@body_stmts"
-              CaptureType
-                DoubleColon "::"
-                Id "Statement"
+              Capture
+                CaptureToken "@body_stmts"
+                CaptureType
+                  DoubleColon "::"
+                  Id "Statement"
             ParenClose ")"
         ParenClose ")"
-      CaptureToken "@func"
-      CaptureType
-        DoubleColon "::"
-        Id "Function"
+      Capture
+        CaptureToken "@func"
+        CaptureType
+          DoubleColon "::"
+          Id "Function"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    CapturedPattern @func :: Function
+    CapturedPattern
       NamedNode function
-        CapturedPattern @name :: Foo
+        CapturedPattern
           FieldPattern name:
             NamedNode identifier
+          Capture @name
+            CaptureType Foo
         FieldPattern body:
           NamedNode block
-            CapturedPattern @body_stmts :: Statement
+            CapturedPattern
               QuantifiedPattern *
                 NamedNode statement
+              Capture @body_stmts
+                CaptureType Statement
+      Capture @func
+        CaptureType Function
