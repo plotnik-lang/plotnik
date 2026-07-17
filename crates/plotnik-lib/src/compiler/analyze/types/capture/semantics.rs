@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 use crate::compiler::ids::TypeId;
 use crate::core::Symbol;
 
+use super::super::type_shape::RecordField;
 use super::CaptureKind;
-use super::type_shape::RecordField;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BuiltInCaptureType {

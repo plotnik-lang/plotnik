@@ -1,7 +1,14 @@
-//! Capture-type planning against the frozen raw type graph.
+//! Capture-type planning against the frozen inferred type graph.
 
-use super::normalize::{AbsencePolicy, NormalizedField, RawTypeSnapshot};
-use super::*;
+use std::collections::HashSet;
+
+use super::normalize::{AbsencePolicy, InferredTypeSnapshot, NormalizedField};
+use super::{
+    BuiltInCaptureType, CaptureContract, CaptureTypePlan, FieldCompletion, OptionMode, TerminalData,
+};
+use crate::compiler::analyze::types::type_shape::{
+    RecordField, TYPE_BOOL, TYPE_TEXT, TypeId, TypeShape,
+};
 
 pub(super) struct PlannedCapture {
     pub(super) plan: CaptureTypePlan,
@@ -9,22 +16,25 @@ pub(super) struct PlannedCapture {
 }
 
 pub(super) struct CaptureTypePlanner<'a, 'b> {
-    raw: &'a RawTypeSnapshot,
+    inferred_types: &'a InferredTypeSnapshot,
     types: &'b mut crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
 }
 
 impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
     pub(super) fn new(
-        raw: &'a RawTypeSnapshot,
+        inferred_types: &'a InferredTypeSnapshot,
         types: &'b mut crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
     ) -> Self {
-        Self { raw, types }
+        Self {
+            inferred_types,
+            types,
+        }
     }
 
     pub(super) fn plan(
         &mut self,
         capture_type: BuiltInCaptureType,
-        contract: RawCaptureContract,
+        contract: CaptureContract,
         may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
         match capture_type {
@@ -33,10 +43,10 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         }
     }
 
-    fn plan_text(&mut self, contract: RawCaptureContract) -> Result<PlannedCapture, &'static str> {
-        let raw = contract.fact.field();
+    fn plan_text(&mut self, contract: CaptureContract) -> Result<PlannedCapture, &'static str> {
+        let inferred = contract.fact.field();
         let (plan, absorbs_null) = self.text_plan(
-            raw.final_type,
+            inferred.final_type,
             contract.zero_node_terminal,
             &mut HashSet::new(),
         )?;
@@ -69,7 +79,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             return Err("capture type `text` cannot normalize a recursive container type");
         }
 
-        let result = match self.raw.shape(type_id) {
+        let result = match self.inferred_types.shape(type_id) {
             TypeShape::Node => Ok((
                 CaptureTypePlan::text_terminal(TYPE_TEXT, TerminalData::NodeRepresentation),
                 false,
@@ -101,9 +111,11 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 });
                 Ok((CaptureTypePlan::list(list, element), false))
             }
-            TypeShape::Ref(target) => {
-                self.text_plan(self.raw.declaration(*target), zero_node_terminal, visiting)
-            }
+            TypeShape::Ref(target) => self.text_plan(
+                self.inferred_types.declaration(*target),
+                zero_node_terminal,
+                visiting,
+            ),
             TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")
             }
@@ -114,10 +126,10 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
 
     fn plan_bool(
         &mut self,
-        raw: RecordField,
+        inferred: RecordField,
         may_be_absent: bool,
     ) -> Result<PlannedCapture, &'static str> {
-        let plan = self.bool_required(raw.final_type, may_be_absent, &mut HashSet::new())?;
+        let plan = self.bool_required(inferred.final_type, may_be_absent, &mut HashSet::new())?;
         Ok(PlannedCapture {
             plan,
             field: NormalizedField {
@@ -136,14 +148,16 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         if !visiting.insert(type_id) {
             return Err("capture type `bool` cannot normalize a recursive container type");
         }
-        let result = match self.raw.shape(type_id) {
+        let result = match self.inferred_types.shape(type_id) {
             TypeShape::Option(inner) => {
                 let inner = self.bool_present(*inner, visiting)?;
                 Ok(CaptureTypePlan::option(TYPE_BOOL, OptionMode::Bool, inner))
             }
-            TypeShape::Ref(target) => {
-                self.bool_required(self.raw.declaration(*target), may_be_absent, visiting)
-            }
+            TypeShape::Ref(target) => self.bool_required(
+                self.inferred_types.declaration(*target),
+                may_be_absent,
+                visiting,
+            ),
             TypeShape::List { .. } if may_be_absent => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
                 TerminalData::Semantic,
@@ -151,9 +165,12 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::List { .. } => Err(
                 "capture type `bool` cannot be applied to this list. Capture an option value inside the list, or inspect whether the list is empty after parsing",
             ),
-            TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) if may_be_absent => Ok(
-                CaptureTypePlan::bool_terminal(TYPE_BOOL, terminal_data(self.raw.shape(type_id))),
-            ),
+            TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) if may_be_absent => {
+                Ok(CaptureTypePlan::bool_terminal(
+                    TYPE_BOOL,
+                    terminal_data(self.inferred_types.shape(type_id)),
+                ))
+            }
             TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) => Err(
                 "capture type `bool` requires a value that may be absent. This capture is always present",
             ),
@@ -170,15 +187,17 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         type_id: TypeId,
         visiting: &mut HashSet<TypeId>,
     ) -> Result<CaptureTypePlan, &'static str> {
-        match self.raw.shape(type_id) {
+        match self.inferred_types.shape(type_id) {
             TypeShape::Option(_) => self.bool_required(type_id, false, visiting),
-            TypeShape::Ref(target) => self.bool_present(self.raw.declaration(*target), visiting),
+            TypeShape::Ref(target) => {
+                self.bool_present(self.inferred_types.declaration(*target), visiting)
+            }
             TypeShape::Node
             | TypeShape::Record(_)
             | TypeShape::Variant(_)
             | TypeShape::List { .. } => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,
-                terminal_data(self.raw.shape(type_id)),
+                terminal_data(self.inferred_types.shape(type_id)),
             )),
             TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")

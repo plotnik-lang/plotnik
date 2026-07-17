@@ -1,7 +1,5 @@
 use std::collections::HashSet;
 
-use rowan::TextRange;
-
 use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_description::describe_type;
 use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape, TypeId};
@@ -11,8 +9,8 @@ use crate::compiler::parse::ast::{
     AlternationPattern, CapturedPattern, Def, FieldPattern, Pattern, QuantifiedPattern,
 };
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::core::Symbol;
 use crate::core::utils::to_snake_case;
-use crate::core::{Interner, Symbol};
 
 use super::super::unify::UnifyError;
 use super::InferVisitor;
@@ -397,20 +395,17 @@ impl InferVisitor<'_, '_> {
         err: &UnifyError,
     ) {
         match err {
-            UnifyError::IncompatibleTypes {
+            UnifyError::IncompatibleFieldTypes {
                 field,
                 left_type,
                 right_type,
+                name_spans,
+                ..
             } => {
                 let field_name = self.ctx.interner.resolve(*field).to_string();
-                let sites = self.capture_sites_with_types(alternation, *field);
-                let source = self.source;
-                let (primary, rest) = match sites.split_first() {
+                let (primary, rest) = match name_spans.split_first() {
                     Some((first, rest)) => (first.0, rest),
-                    None => (
-                        alternation.text_range(),
-                        &[] as &[(TextRange, Option<TypeId>)],
-                    ),
+                    None => (Span::new(self.source, alternation.text_range()), &[][..]),
                 };
                 let left_type = self.describe_type(*left_type);
                 let right_type = self.describe_type(*right_type);
@@ -418,25 +413,20 @@ impl InferVisitor<'_, '_> {
                 let related = rest
                     .iter()
                     .map(|&(site, type_id)| {
-                        let label = type_id.map_or_else(
-                            || "this alternative produces a different type".to_string(),
-                            |type_id| {
-                                format!(
-                                    "`@{field_name}` has type `{}` here",
-                                    self.describe_type(type_id)
-                                )
-                            },
+                        let label = format!(
+                            "`@{field_name}` has type `{}` here",
+                            self.describe_type(type_id)
                         );
                         (site, label)
                     })
                     .collect::<Vec<_>>();
                 let mut builder = self
-                    .report(DiagnosticKind::IncompatibleCaptureTypes, primary)
+                    .report(DiagnosticKind::IncompatibleCaptureTypes, primary.range)
                     .detail(format!(
                         "`@{field_name}` has incompatible types `{left_type}` and `{right_type}` across alternatives"
                     ));
                 for (site, label) in related {
-                    builder = builder.related_to(Span::new(source, site), label);
+                    builder = builder.related_to(site, label);
                 }
                 builder
                     .hint("make every alternative produce the same type, or label the alternatives for a variant type")
@@ -453,93 +443,8 @@ impl InferVisitor<'_, '_> {
             .to_string()
     }
 
-    fn capture_sites_with_types(
-        &self,
-        alternation: &SyntaxNode,
-        field: Symbol,
-    ) -> Vec<(TextRange, Option<TypeId>)> {
-        let field_name = self.ctx.interner.resolve(field);
-        let mut captures = Vec::new();
-        direct_scope_captures(alternation, &mut captures);
-        captures
-            .into_iter()
-            .filter_map(|capture| {
-                let token = capture.capture().name()?;
-                if token.text().get(1..) != Some(field_name) {
-                    return None;
-                }
-                let pattern = Pattern::CapturedPattern(capture);
-                let type_id = self
-                    .ctx
-                    .type_ctx
-                    .in_progress()
-                    .pattern_result(&pattern)
-                    .and_then(|shape| {
-                        let PatternFlow::Fields(record) = &shape.flow else {
-                            return None;
-                        };
-                        self.ctx
-                            .type_ctx
-                            .in_progress()
-                            .expect_record_fields(*record)
-                            .get(&field)
-                            .map(|field| field.final_type)
-                    });
-                Some((token.text_range(), type_id))
-            })
-            .collect()
-    }
-
     fn describe_type(&self, type_id: TypeId) -> String {
         describe_type(&self.ctx.type_ctx.in_progress(), self.ctx.interner, type_id)
-    }
-}
-
-/// Map each result field in one source scope to its first capture.
-/// Nested structured-capture scopes are excluded because their fields do not
-/// bubble into this scope.
-pub(super) fn capture_site_map(
-    scope_root: &SyntaxNode,
-    interner: &Interner,
-) -> std::collections::BTreeMap<Symbol, TextRange> {
-    let mut tokens = Vec::new();
-    if let Some(captured_pattern) = CapturedPattern::cast(scope_root.clone()) {
-        if let Some(token) = captured_pattern.capture().name() {
-            tokens.push(token);
-        }
-        if inner_captures_bubble_up(&captured_pattern) {
-            direct_scope_capture_tokens(scope_root, &mut tokens);
-        }
-    } else {
-        direct_scope_capture_tokens(scope_root, &mut tokens);
-    }
-    let mut sites = std::collections::BTreeMap::new();
-    for token in tokens {
-        if token.kind() != SyntaxKind::CaptureToken {
-            continue;
-        }
-        let name = token
-            .text()
-            .strip_prefix('@')
-            .expect("capture token starts with `@`");
-        let symbol = interner
-            .get(name)
-            .expect("inferred capture name is interned");
-        sites.entry(symbol).or_insert(token.text_range());
-    }
-    sites
-}
-
-fn direct_scope_captures(scope_root: &SyntaxNode, out: &mut Vec<CapturedPattern>) {
-    for child in scope_root.children() {
-        if let Some(captured_pattern) = CapturedPattern::cast(child.clone()) {
-            out.push(captured_pattern.clone());
-            if inner_captures_bubble_up(&captured_pattern) {
-                direct_scope_captures(&child, out);
-            }
-            continue;
-        }
-        direct_scope_captures(&child, out);
     }
 }
 
