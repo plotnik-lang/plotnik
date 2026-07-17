@@ -79,11 +79,6 @@ impl Lang {
         })
     }
 
-    #[cfg(test)]
-    pub fn ts_language(&self) -> &Language {
-        &self.ts_language
-    }
-
     pub fn parse_source(&self, source: &str) -> Tree {
         let mut parser = Parser::new();
         parser
@@ -170,15 +165,6 @@ macro_rules! define_langs {
             ]
         }
 
-        #[cfg(test)]
-        pub fn enabled_language_names() -> Vec<&'static str> {
-            vec![
-                $(
-                    #[cfg(feature = $feature)]
-                    $name,
-                )*
-            ]
-        }
     };
 }
 

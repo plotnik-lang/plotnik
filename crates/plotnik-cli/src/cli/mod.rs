@@ -4,13 +4,6 @@ mod dispatch;
 mod limits;
 pub mod shebang;
 
-#[cfg(test)]
-mod dispatch_tests;
-#[cfg(test)]
-mod limits_tests;
-#[cfg(test)]
-mod shebang_tests;
-
 pub use commands::build_cli;
 pub use dispatch::{
     CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,

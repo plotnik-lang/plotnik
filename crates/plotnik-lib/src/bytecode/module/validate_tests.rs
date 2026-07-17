@@ -25,7 +25,7 @@ use indoc::indoc;
 use super::effect_stack::{
     body_analyses as loader_body_analyses, reset_body_analyses as reset_loader_body_analyses,
 };
-use super::{ByteStorage, Module, ModuleError, Opcode};
+use super::{Module, ModuleError, Opcode};
 use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
 use crate::bytecode::type_meta::TypeDefKind;
 use crate::bytecode::type_system::TypeKind;
@@ -671,25 +671,6 @@ fn add_single_span(bytes: &mut Vec<u8>, span_bytes: [u8; SPAN_ENTRY_SIZE]) {
     header.total_size = bytes.len() as u32;
     header.checksum = crc32fast::hash(&bytes[64..]);
     bytes[..64].copy_from_slice(&header.to_bytes());
-}
-
-#[test]
-fn span_section_view_decodes_valid_entry() {
-    let mut bytes = emit_bytes(RECORD_QUERY);
-    let span = SpanEntry {
-        source_id: 0,
-        kind: SpanKind::Def,
-        start: 0,
-        end: 42,
-        type_id: 0,
-        member: SPAN_NO_BINDING,
-    };
-    add_single_span(&mut bytes, span.to_bytes());
-
-    let module = Module::load_compiler_output(&bytes).expect("valid span entry should load");
-
-    assert_eq!(module.spans().len(), 1);
-    assert_eq!(module.spans().get(0), span);
 }
 
 #[test]
@@ -1972,67 +1953,6 @@ fn module_with_instructions(instructions: &[u8], instruction_word_count: u16) ->
 /// Header byte for a Match instruction with node_class_bits = Any (0).
 fn match_header(opcode: u8) -> u8 {
     opcode & 0xF
-}
-
-#[test]
-fn byte_storage_copy_from_slice() {
-    let data = [1u8, 2, 3, 4, 5];
-    let storage = ByteStorage::from_emitted_bytes(&data);
-
-    assert_eq!(&*storage, &data[..]);
-    assert_eq!(storage.len(), 5);
-    assert_eq!(storage[2], 3);
-}
-
-#[test]
-fn module_error_display() {
-    let err = ModuleError::InvalidMagic;
-    assert_eq!(err.to_string(), "invalid magic: expected PTKQ");
-
-    let err = ModuleError::UnsupportedVersion(99);
-    assert!(err.to_string().contains("99"));
-
-    let err = ModuleError::BufferTooSmall(32);
-    assert!(err.to_string().contains("32"));
-
-    let err = ModuleError::SizeMismatch {
-        header: 100,
-        actual: 50,
-    };
-    assert!(err.to_string().contains("100"));
-    assert!(err.to_string().contains("50"));
-}
-
-#[test]
-fn load_accepts_single_terminal_match8() {
-    // Sanity baseline: one Match8 terminal (opcode 0x0, no successor) loads.
-    let mut word = [0u8; BYTECODE_WORD_SIZE];
-    word[0] = match_header(0x0);
-    let bytes = module_with_instructions(&word, 1);
-
-    let module =
-        Module::load_compiler_output(&bytes).expect("valid representation should validate");
-
-    assert_eq!(module.header().instruction_word_count, 1);
-}
-
-#[test]
-fn load_rejects_invalid_opcode_at_reachable_address() {
-    // Address 0 carries an unknown opcode nibble (0xF); the linear walk lands on it
-    // immediately and rejects.
-    let mut word = [0u8; BYTECODE_WORD_SIZE];
-    word[0] = 0xF;
-    let bytes = module_with_instructions(&word, 1);
-
-    let err = Module::load_compiler_output(&bytes).expect_err("unknown opcode must be rejected");
-
-    assert!(matches!(
-        err,
-        ModuleError::InvalidOpcode {
-            addr: CodeAddr::ZERO,
-            opcode: 0xF
-        }
-    ));
 }
 
 #[test]

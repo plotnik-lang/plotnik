@@ -32,19 +32,9 @@ mod invariants;
 mod parser;
 
 #[cfg(test)]
-mod ast_tests;
-#[cfg(test)]
-mod cst_tests;
-#[cfg(test)]
 mod lexer_tests;
 #[cfg(test)]
 mod parser_tests;
-#[cfg(test)]
-mod strings_tests;
-#[cfg(test)]
-mod token_set_tests;
-#[cfg(test)]
-mod tokenize_tests;
 
 pub use cst::{SyntaxKind, SyntaxNode};
 

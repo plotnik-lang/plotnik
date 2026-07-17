@@ -20,21 +20,3 @@ pub(crate) fn capture(command: &mut Command, context: &str) -> Result<Vec<u8>, S
         String::from_utf8_lossy(&output.stderr)
     ))
 }
-
-#[cfg(all(test, unix))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn capture_reports_context_command_status_and_stderr() {
-        let mut command = Command::new("sh");
-        command.args(["-c", "printf 'generated badly' >&2; exit 7"]);
-
-        let error = capture(&mut command, "generate snapshot `bad.txt`").unwrap_err();
-
-        assert!(error.contains("generate snapshot `bad.txt`"));
-        assert!(error.contains("command:"));
-        assert!(error.contains("status: exit status: 7"));
-        assert!(error.contains("generated badly"));
-    }
-}

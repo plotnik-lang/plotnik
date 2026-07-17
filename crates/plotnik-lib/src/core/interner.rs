@@ -73,39 +73,4 @@ impl Interner {
     pub fn try_resolve(&self, sym: Symbol) -> Option<&str> {
         self.strings.get_index(sym.0 as usize).map(String::as_str)
     }
-
-    /// Number of interned strings.
-    #[inline]
-    #[cfg(test)]
-    pub fn len(&self) -> usize {
-        self.strings.len()
-    }
-
-    /// Iterate over all interned strings with their symbols.
-    #[inline]
-    #[cfg(test)]
-    pub fn iter(&self) -> impl Iterator<Item = (Symbol, &str)> {
-        self.strings
-            .iter()
-            .enumerate()
-            .map(|(i, s)| (Symbol(i as u32), s.as_str()))
-    }
-
-    /// Emit as a bytecode blob and offset table.
-    ///
-    /// Returns (concatenated UTF-8 bytes, offset for each string + sentinel).
-    /// The offsets array has `len() + 1` entries; the last is the total blob size.
-    #[cfg(test)]
-    pub fn to_blob(&self) -> (Vec<u8>, Vec<u32>) {
-        let mut blob = Vec::new();
-        let mut offsets = Vec::with_capacity(self.strings.len() + 1);
-
-        for s in &self.strings {
-            offsets.push(blob.len() as u32);
-            blob.extend_from_slice(s.as_bytes());
-        }
-        offsets.push(blob.len() as u32); // sentinel for length calculation
-
-        (blob, offsets)
-    }
 }

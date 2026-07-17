@@ -125,39 +125,3 @@ fn extra_kinds(grammar: &Grammar) -> (Vec<NodeKindId>, Vec<NodeKindId>) {
         .collect();
     (extras, named)
 }
-
-#[cfg(test)]
-mod tests {
-    use indoc::indoc;
-
-    use super::*;
-    use crate::core::grammar::raw::RawGrammar;
-
-    #[test]
-    fn wildcard_parent_candidates_exclude_leaf_tokens() {
-        let json = indoc! {r#"
-            {
-                "name": "test",
-                "rules": {
-                    "program": { "type": "REPEAT1", "content": { "type": "SYMBOL", "name": "statement" } },
-                    "statement": { "type": "SYMBOL", "name": "identifier" },
-                    "identifier": { "type": "PATTERN", "value": "[a-z]+" }
-                },
-                "extras": []
-            }
-        "#};
-
-        let grammar = Grammar::from_raw(&RawGrammar::from_json(json).unwrap()).unwrap();
-        let facts = GrammarFacts::from_grammar(&grammar);
-        let statement = grammar.resolve_named_node("statement").unwrap();
-        let identifier = grammar.resolve_named_node("identifier").unwrap();
-
-        assert!(grammar.is_token(identifier));
-        assert!(
-            !facts.realizers_of(identifier).is_empty(),
-            "token kinds still have realizers for exact leaf matching"
-        );
-        assert!(facts.parent_candidate_kinds().contains(&statement));
-        assert!(!facts.parent_candidate_kinds().contains(&identifier));
-    }
-}

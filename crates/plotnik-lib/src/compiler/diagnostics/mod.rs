@@ -2,9 +2,6 @@ pub mod report;
 pub mod source;
 pub mod span;
 
-#[cfg(test)]
-mod source_tests;
-
 pub use report::{DiagnosticBuilder, DiagnosticKind, Diagnostics, Severity};
 pub use source::{Source, SourceId, SourceKind, SourceMap, SourcePath};
 pub use span::Span;

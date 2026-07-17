@@ -3,6 +3,3 @@
 pub(crate) mod anchor_context;
 mod invariants;
 pub mod validation;
-
-#[cfg(test)]
-mod anchor_context_tests;

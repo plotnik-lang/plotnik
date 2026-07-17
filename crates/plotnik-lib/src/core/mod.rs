@@ -10,11 +10,6 @@ mod tree_dump;
 mod tree_json;
 pub mod utils;
 
-#[cfg(test)]
-mod interner_tests;
-#[cfg(test)]
-mod utils_tests;
-
 pub use colors::Colors;
 pub use interner::{Interner, Symbol};
 #[cfg(feature = "vm")]

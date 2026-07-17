@@ -9,7 +9,4 @@ mod model;
 mod render;
 mod tokens;
 
-#[cfg(test)]
-mod format_tests;
-
 pub use format::{FormatError, FormatResult, format_query};

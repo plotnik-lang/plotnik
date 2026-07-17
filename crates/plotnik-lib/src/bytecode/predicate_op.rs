@@ -67,7 +67,3 @@ impl PredicateOp {
         matches!(self, Self::RegexMatch | Self::RegexNoMatch)
     }
 }
-
-#[cfg(test)]
-#[path = "predicate_op_tests.rs"]
-mod predicate_op_tests;

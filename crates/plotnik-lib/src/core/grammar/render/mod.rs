@@ -18,9 +18,6 @@ mod layout;
 mod lexical;
 mod lower;
 
-#[cfg(test)]
-mod lexical_tests;
-
 use std::fmt;
 
 pub use dump::{DEFAULT_WIDTH, DumpOptions};

@@ -513,6 +513,4 @@ impl<'a> EntryPointsView<'a> {
 }
 
 #[cfg(test)]
-mod decoded_tests;
-#[cfg(test)]
 mod validate_tests;

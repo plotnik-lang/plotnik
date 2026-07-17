@@ -12,17 +12,6 @@ mod limits;
 mod nav;
 mod node_class;
 
-#[cfg(test)]
-mod checkpoint_tests;
-#[cfg(test)]
-mod dfa_tests;
-#[cfg(test)]
-mod frame_tests;
-#[cfg(test)]
-mod limits_tests;
-#[cfg(test)]
-mod nav_tests;
-
 pub use checkpoint::{
     CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume,
 };

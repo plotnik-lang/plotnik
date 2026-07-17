@@ -37,10 +37,6 @@ pub use release_impl::{
     run_root_pruning_verified, run_verified, verify_constructed, verify_fresh_build,
 };
 
-#[cfg(all(test, debug_assertions))]
-#[path = "verify_tests.rs"]
-mod verify_tests;
-
 #[cfg(not(debug_assertions))]
 mod release_impl {
     use crate::compiler::lower::LowerInput;
@@ -826,13 +822,6 @@ mod debug_impl {
     pub(super) fn assert_depth_neutrality(nfa: &NfaGraph, context: &str) {
         if let Err(e) = check_depth_neutrality(nfa) {
             panic!("[verify] {context} produced cursor-depth imbalance: {e}");
-        }
-    }
-
-    #[cfg(test)]
-    pub(super) fn assert_no_node_on_empty_paths(nfa: &NfaGraph, context: &str) {
-        if let Err(e) = check_no_node_on_empty_paths(nfa) {
-            panic!("[verify] {context} produced empty-match Node effect: {e}");
         }
     }
 

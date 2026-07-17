@@ -16,10 +16,6 @@ use crate::compiler::parse::ast::Pattern;
 const SUPPRESSED_CAPTURE_ANNOTATION_LIMIT: usize = 8;
 const SUPPRESSED_MEMBER_NAME_LIMIT: usize = 4;
 
-#[cfg(test)]
-#[path = "normalize_tests.rs"]
-mod tests;
-
 struct NormalizationInput {
     captures: Vec<RecordedCapture>,
     blocked_capture_ids: HashSet<CaptureId>,

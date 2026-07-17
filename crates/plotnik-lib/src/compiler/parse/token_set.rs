@@ -10,6 +10,11 @@ use rowan::Language;
 use crate::compiler::parse::cst::SyntaxKind::*;
 use crate::compiler::parse::cst::{QueryLang, SyntaxKind};
 
+const _: () = assert!(
+    (__LAST as u16) < 128,
+    "SyntaxKind count exceeds TokenSet capacity"
+);
+
 /// 128-bit bitset of `SyntaxKind`s for O(1) membership testing.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TokenSet(u128);

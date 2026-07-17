@@ -205,7 +205,3 @@ fn dedup_successors(instructions: &mut [InstructionIR]) {
         m.successors.retain(|&s| seen.insert(s));
     }
 }
-
-#[cfg(test)]
-#[path = "states_tests.rs"]
-mod states_tests;

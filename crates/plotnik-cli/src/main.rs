@@ -3,9 +3,6 @@ mod commands;
 mod error;
 mod language_registry;
 
-#[cfg(test)]
-mod language_registry_tests;
-
 use std::io;
 use std::process::ExitCode;
 

@@ -2136,7 +2136,6 @@ dependencies = [
  "clap",
  "clap_complete",
  "flate2",
- "indoc",
  "insta",
  "libc",
  "plotnik-lib",

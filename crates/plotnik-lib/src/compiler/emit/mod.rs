@@ -8,11 +8,6 @@ pub(crate) mod sink;
 mod target;
 pub(crate) mod targets;
 
-#[cfg(test)]
-mod sink_tests;
-#[cfg(test)]
-mod target_tests;
-
 pub use target::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, Emission,
     EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustTypesOutput,

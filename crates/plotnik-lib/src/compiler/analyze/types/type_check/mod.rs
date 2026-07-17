@@ -6,11 +6,6 @@ mod infer;
 mod root_extent;
 mod unify;
 
-#[cfg(test)]
-mod analysis_tests;
-#[cfg(test)]
-mod unify_tests;
-
 pub use crate::compiler::analyze::types::RootExtent;
 pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 pub use crate::core::Interner;

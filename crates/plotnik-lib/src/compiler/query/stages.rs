@@ -287,15 +287,6 @@ impl Query {
         self.analysis.as_ref()
     }
 
-    #[cfg(test)]
-    pub(crate) fn symbol_table(&self) -> &SymbolTable {
-        &self
-            .analysis
-            .as_ref()
-            .expect("test query must be valid before inspecting symbols")
-            .symbol_table
-    }
-
     pub fn source_map(&self) -> &SourceMap {
         self.parsed.source_map()
     }
@@ -627,11 +618,6 @@ impl BindOutcome {
         matches!(self, BindOutcome::Bound(_))
     }
 
-    #[cfg(test)]
-    pub(crate) fn interner(&self) -> &Interner {
-        self.expect_bound().interner()
-    }
-
     pub fn source_map(&self) -> &SourceMap {
         match self {
             BindOutcome::Bound(query) => query.source_map(),
@@ -648,11 +634,6 @@ impl BindOutcome {
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
         self.definition_names_vec().into_iter()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn grammar(&self) -> &GrammarBinding {
-        self.expect_bound().grammar()
     }
 
     #[cfg(test)]
@@ -730,12 +711,6 @@ impl BindOutcome {
             BindOutcome::Bound(query) => Some(query),
             BindOutcome::Invalid(_) => None,
         }
-    }
-
-    #[cfg(test)]
-    fn expect_bound(&self) -> &BoundQuery {
-        self.bound()
-            .expect("grammar-bound query data is only available after binding succeeds")
     }
 
     fn definition_names_vec(&self) -> Vec<String> {

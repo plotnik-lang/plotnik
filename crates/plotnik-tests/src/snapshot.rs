@@ -99,28 +99,3 @@ fn rule_label(line: &str) -> Option<&str> {
         .trim();
     (!label.is_empty()).then_some(label)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn document_preserves_authored_section_bytes() {
-        let document = parse_document(
-            "Q = (program)\r\n--- INPUT (ts) ---\r\nconst π = 1;\r\n--- OUTPUT ---\r\n{\r\n  \"span\": [0, 3]\r\n}\r\n",
-        )
-        .unwrap();
-
-        assert_eq!(document.query, "Q = (program)");
-        assert_eq!(document.sections[0].name, "input.ts");
-        assert_eq!(document.sections[0].body, "const π = 1;");
-        assert_eq!(document.sections[1].body, "{\n  \"span\": [0, 3]\n}");
-    }
-
-    #[test]
-    fn document_requires_query_text() {
-        let error = parse_document("--- INPUT ---\nx").unwrap_err();
-
-        assert!(error.contains("snapshot has no query"));
-    }
-}

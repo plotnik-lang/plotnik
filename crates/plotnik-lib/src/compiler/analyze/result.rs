@@ -680,12 +680,6 @@ impl<'a> ItemCollector<'a> {
     }
 }
 
-/// Value types in dependency order for wire-table emission.
-#[cfg(test)]
-pub(super) fn collect_ordered_types(types: &TypeAnalysis) -> Vec<TypeId> {
-    CollectedTypes::collect(types, types.iter_def_output().map(|(def_id, _)| def_id)).value_types
-}
-
 #[derive(Clone, Debug)]
 struct CollectedTypes {
     value_types: Vec<TypeId>,
