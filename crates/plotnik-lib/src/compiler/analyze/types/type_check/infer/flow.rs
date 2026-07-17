@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
-use crate::compiler::analyze::types::inference_flow::InferredField;
+use crate::compiler::analyze::types::capture::{InferredField, InferredFieldFlow};
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::Pattern;
@@ -48,7 +48,7 @@ impl InferVisitor<'_, '_> {
         &mut self,
         target: &mut ScopeFields,
         source_pattern: Pattern,
-        source: &crate::compiler::analyze::types::inference_flow::InferredFieldFlow,
+        source: &InferredFieldFlow,
     ) {
         for (&name, field) in &source.fields {
             self.insert_scope_field(

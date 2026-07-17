@@ -1,15 +1,23 @@
 use std::collections::HashSet;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::types::capture_type::{BuiltInCaptureType, RawCaptureFact};
-use crate::compiler::analyze::types::inference_flow::CaptureId;
 use crate::compiler::analyze::types::type_shape::RecordField;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::CapturedPattern;
 use crate::core::Symbol;
 
+mod field_flow;
+mod kind;
 mod normalize;
 mod planner;
+mod semantics;
+
+pub(super) use field_flow::{CaptureId, FieldSource, InferredField, InferredFieldFlow};
+pub use kind::CaptureKind;
+pub use semantics::{
+    BuiltInCaptureType, CaptureFact, CaptureTypePlan, CaptureTypePlanKind, FieldCompletion,
+    FieldCompletions, OptionMode, RawCaptureFact, TerminalData,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureTypeIntent {

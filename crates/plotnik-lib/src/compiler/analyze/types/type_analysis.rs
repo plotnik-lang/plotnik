@@ -13,10 +13,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::types::capture_normalization::{
-    CaptureObservation, CaptureProvenance,
-};
-use crate::compiler::analyze::types::inference_flow::CaptureId;
+use crate::compiler::analyze::types::capture::{CaptureId, CaptureObservation, CaptureProvenance};
 use crate::compiler::analyze::types::type_shape::{
     DefinitionOutput, PatternFlow, PatternShape, RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL,
     TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,

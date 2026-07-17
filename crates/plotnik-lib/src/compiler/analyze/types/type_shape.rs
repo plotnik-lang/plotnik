@@ -12,7 +12,7 @@ use crate::compiler::ids::TypeDeclId;
 use crate::core::Symbol;
 
 use super::RootExtent;
-use super::inference_flow::InferredFieldFlow;
+use super::capture::InferredFieldFlow;
 use crate::bytecode::type_system::PrimitiveType;
 pub use crate::compiler::parse::ast::QuantifierKind;
 

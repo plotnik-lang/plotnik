@@ -4,13 +4,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::planner::CaptureTypePlanner;
 use super::*;
-use crate::compiler::analyze::types::capture_type::{
-    CaptureFact, CaptureTypePlan, CaptureTypePlanKind, FieldCompletion, FieldCompletions,
-    TerminalData,
-};
-use crate::compiler::analyze::types::inference_flow::{
-    CaptureId, FieldSource, InferredField, InferredFieldFlow,
-};
 use crate::compiler::analyze::types::type_description::describe_type;
 use crate::compiler::analyze::types::type_shape::{
     CasePayload, ListMinimum, RecordField, TYPE_NODE, TypeId, TypeShape,

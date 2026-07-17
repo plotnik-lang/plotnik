@@ -6,20 +6,20 @@ use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) struct CaptureId(u32);
+pub(in crate::compiler::analyze::types) struct CaptureId(u32);
 
 impl CaptureId {
-    pub(super) fn from_index(index: usize) -> Self {
+    pub(in crate::compiler::analyze::types) fn from_index(index: usize) -> Self {
         Self(u32::try_from(index).expect("capture count fits u32"))
     }
 
-    pub(super) fn index(self) -> usize {
+    pub(in crate::compiler::analyze::types) fn index(self) -> usize {
         self.0 as usize
     }
 }
 
 #[derive(Clone, Debug)]
-pub(super) enum FieldSource {
+pub(in crate::compiler::analyze::types) enum FieldSource {
     Capture {
         capture_id: CaptureId,
         capture_span: Span,
@@ -36,7 +36,7 @@ pub(super) enum FieldSource {
 }
 
 impl FieldSource {
-    pub(super) fn capture_span(&self) -> Span {
+    pub(in crate::compiler::analyze::types) fn capture_span(&self) -> Span {
         match self {
             Self::Capture { capture_span, .. } | Self::Forwarded { capture_span, .. } => {
                 *capture_span
@@ -44,13 +44,13 @@ impl FieldSource {
         }
     }
 
-    pub(super) fn info(&self) -> RecordField {
+    pub(in crate::compiler::analyze::types) fn info(&self) -> RecordField {
         match self {
             Self::Capture { info, .. } | Self::Forwarded { info, .. } => *info,
         }
     }
 
-    pub(super) fn name_span(&self) -> Span {
+    pub(in crate::compiler::analyze::types) fn name_span(&self) -> Span {
         match self {
             Self::Capture { name_span, .. } | Self::Forwarded { name_span, .. } => *name_span,
         }
@@ -58,14 +58,14 @@ impl FieldSource {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct InferredField {
-    pub(super) info: RecordField,
-    pub(super) producers: BTreeSet<CaptureId>,
-    pub(super) sources: Vec<FieldSource>,
+pub(in crate::compiler::analyze::types) struct InferredField {
+    pub(in crate::compiler::analyze::types) info: RecordField,
+    pub(in crate::compiler::analyze::types) producers: BTreeSet<CaptureId>,
+    pub(in crate::compiler::analyze::types) sources: Vec<FieldSource>,
 }
 
 impl InferredField {
-    pub(super) fn capture(
+    pub(in crate::compiler::analyze::types) fn capture(
         info: RecordField,
         capture_id: CaptureId,
         name_span: Span,
@@ -83,7 +83,7 @@ impl InferredField {
         }
     }
 
-    pub(super) fn forwarded(
+    pub(in crate::compiler::analyze::types) fn forwarded(
         info: RecordField,
         pattern: Pattern,
         field: Symbol,
@@ -102,7 +102,7 @@ impl InferredField {
         }
     }
 
-    pub(super) fn first_name_span(&self) -> Span {
+    pub(in crate::compiler::analyze::types) fn first_name_span(&self) -> Span {
         self.sources
             .first()
             .expect("inferred result field retains an immediate source")
@@ -118,14 +118,17 @@ impl InferredField {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct InferredFieldFlow {
-    pub(super) type_id: TypeId,
-    pub(super) fields: BTreeMap<Symbol, InferredField>,
-    pub(super) alternation_omissions: Option<BTreeSet<Symbol>>,
+pub(in crate::compiler::analyze::types) struct InferredFieldFlow {
+    pub(in crate::compiler::analyze::types) type_id: TypeId,
+    pub(in crate::compiler::analyze::types) fields: BTreeMap<Symbol, InferredField>,
+    pub(in crate::compiler::analyze::types) alternation_omissions: Option<BTreeSet<Symbol>>,
 }
 
 impl InferredFieldFlow {
-    pub(super) fn new(type_id: TypeId, fields: BTreeMap<Symbol, InferredField>) -> Self {
+    pub(in crate::compiler::analyze::types) fn new(
+        type_id: TypeId,
+        fields: BTreeMap<Symbol, InferredField>,
+    ) -> Self {
         Self {
             type_id,
             fields,
@@ -133,7 +136,7 @@ impl InferredFieldFlow {
         }
     }
 
-    pub(super) fn alternation(
+    pub(in crate::compiler::analyze::types) fn alternation(
         type_id: TypeId,
         fields: BTreeMap<Symbol, InferredField>,
         alternation_omissions: BTreeSet<Symbol>,
@@ -145,7 +148,7 @@ impl InferredFieldFlow {
         }
     }
 
-    pub(super) fn forwarded(pattern: Pattern, source: &Self) -> Self {
+    pub(in crate::compiler::analyze::types) fn forwarded(pattern: Pattern, source: &Self) -> Self {
         let fields = source
             .fields
             .iter()

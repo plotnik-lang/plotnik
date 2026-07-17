@@ -2,9 +2,7 @@ use std::collections::BTreeMap;
 
 use super::unify::{UnifyError, unify_alternative_flows};
 use crate::compiler::Diagnostics;
-use crate::compiler::analyze::types::inference_flow::{
-    CaptureId, InferredField, InferredFieldFlow,
-};
+use crate::compiler::analyze::types::capture::{CaptureId, InferredField, InferredFieldFlow};
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{
     PatternFlow, PatternShape, RecordField, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,

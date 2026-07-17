@@ -2,10 +2,9 @@
 
 use std::collections::HashSet;
 
-use super::CaptureContract;
 use super::normalize::{AbsencePolicy, InferredTypeSnapshot, NormalizedField};
-use crate::compiler::analyze::types::capture_type::{
-    BuiltInCaptureType, CaptureTypePlan, FieldCompletion, OptionMode, TerminalData,
+use super::{
+    BuiltInCaptureType, CaptureContract, CaptureTypePlan, FieldCompletion, OptionMode, TerminalData,
 };
 use crate::compiler::analyze::types::type_shape::{
     RecordField, TYPE_BOOL, TYPE_TEXT, TypeId, TypeShape,

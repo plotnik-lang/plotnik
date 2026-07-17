@@ -2,9 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::compiler::analyze::types::inference_flow::{
-    CaptureId, InferredField, InferredFieldFlow,
-};
+use crate::compiler::analyze::types::capture::{CaptureId, InferredField, InferredFieldFlow};
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{
     ListMinimum, PatternFlow, PatternShape, RecordField, TypeId, TypeShape,

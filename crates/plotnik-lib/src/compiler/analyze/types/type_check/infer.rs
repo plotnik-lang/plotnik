@@ -28,12 +28,9 @@ use crate::core::{Interner, Symbol};
 use rowan::TextRange;
 
 use super::unify::unify_alternative_flows;
-use crate::compiler::analyze::types::capture_kind::CaptureKind;
-use crate::compiler::analyze::types::capture_normalization::{
-    CaptureContract, CaptureObservation, CaptureTypeIntent,
-};
-use crate::compiler::analyze::types::inference_flow::{
-    CaptureId, InferredField, InferredFieldFlow,
+use crate::compiler::analyze::types::capture::{
+    CaptureContract, CaptureId, CaptureKind, CaptureObservation, CaptureTypeIntent, InferredField,
+    InferredFieldFlow,
 };
 use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
