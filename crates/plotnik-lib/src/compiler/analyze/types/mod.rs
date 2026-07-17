@@ -1,10 +1,11 @@
 //! Result inference and static root extent computed over the query AST.
 
 pub mod capture_kind;
+mod capture_normalization;
 mod capture_type;
 mod entry_points;
+mod inference_flow;
 mod naming;
-mod raw_output;
 mod root_extent;
 pub mod type_analysis;
 pub mod type_check;

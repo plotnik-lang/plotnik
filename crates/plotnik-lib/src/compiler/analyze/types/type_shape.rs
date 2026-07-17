@@ -12,6 +12,7 @@ use crate::compiler::ids::TypeDeclId;
 use crate::core::Symbol;
 
 use super::RootExtent;
+use super::inference_flow::InferredFieldFlow;
 use crate::bytecode::type_system::PrimitiveType;
 pub use crate::compiler::parse::ast::QuantifierKind;
 
@@ -191,17 +192,31 @@ pub struct PatternShape {
     pub root_extent: RootExtent,
     /// What data flows through this expression.
     pub flow: PatternFlow,
+    pub(super) field_flow: Option<InferredFieldFlow>,
 }
 
 impl PatternShape {
     pub fn new(root_extent: RootExtent, flow: PatternFlow) -> Self {
-        Self { root_extent, flow }
+        Self {
+            root_extent,
+            flow,
+            field_flow: None,
+        }
+    }
+
+    pub(super) fn fields(root_extent: RootExtent, field_flow: InferredFieldFlow) -> Self {
+        Self {
+            root_extent,
+            flow: PatternFlow::Fields(field_flow.type_id),
+            field_flow: Some(field_flow),
+        }
     }
 
     pub fn no_value() -> Self {
         Self {
             root_extent: RootExtent::SingleNode,
             flow: PatternFlow::NoValue,
+            field_flow: None,
         }
     }
 }

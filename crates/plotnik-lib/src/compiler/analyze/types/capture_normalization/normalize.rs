@@ -1,11 +1,23 @@
 //! Focused capture-type and producer-flow normalization.
 
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+
 use super::planner::CaptureTypePlanner;
 use super::*;
-use crate::compiler::analyze::types::capture_type::{CaptureTypePlan, CaptureTypePlanKind};
+use crate::compiler::analyze::types::capture_type::{
+    CaptureFact, CaptureTypePlan, CaptureTypePlanKind, FieldCompletion, FieldCompletions,
+    TerminalData,
+};
+use crate::compiler::analyze::types::inference_flow::{
+    CaptureId, FieldSource, InferredField, InferredFieldFlow,
+};
 use crate::compiler::analyze::types::type_description::describe_type;
-use crate::compiler::analyze::types::type_shape::CasePayload;
+use crate::compiler::analyze::types::type_shape::{
+    CasePayload, ListMinimum, RecordField, TYPE_NODE, TypeId, TypeShape,
+};
+use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::ids::TypeDeclId;
+use crate::compiler::parse::ast::Pattern;
 
 // Past this point annotations crowd out the primary cause and the removal hint.
 const SUPPRESSED_CAPTURE_ANNOTATION_LIMIT: usize = 8;
@@ -15,61 +27,109 @@ const SUPPRESSED_MEMBER_NAME_LIMIT: usize = 4;
 #[path = "normalize_tests.rs"]
 mod tests;
 
-impl RawOutputGraph {
+struct NormalizationInput {
+    captures: Vec<RecordedCapture>,
+    blocked_capture_ids: HashSet<CaptureId>,
+    field_flows: HashMap<Pattern, InferredFieldFlow>,
+    order: Vec<Pattern>,
+    capture_producers_by_record_type: HashMap<TypeId, BTreeSet<CaptureId>>,
+}
+
+impl CaptureProvenance {
     pub(crate) fn normalize(
         self,
+        pattern_order: Vec<Pattern>,
         types: &mut crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
         interner: &crate::core::Interner,
         diagnostics: &mut Diagnostics,
     ) {
-        NormalizationSession::new(&self, types, interner, diagnostics).run();
-    }
-
-    fn blocked_captures(&self, raw_types: &RawTypeSnapshot) -> HashSet<RawCaptureId> {
-        let mut blocked = self
-            .captures
-            .iter()
-            .enumerate()
-            .filter_map(|(index, capture)| {
-                let fact = capture.observation.contract.fact;
-                (!fact.is_valid() || raw_types.type_contains_invalid(fact.field().final_type))
-                    .then_some(RawCaptureId(index as u32))
-            })
-            .collect::<HashSet<_>>();
-
-        for alternation in self.alternations.values() {
-            let Some(field) = alternation.incompatible_field else {
-                continue;
-            };
-            let Some(output) = alternation.fields.get(&field) else {
-                continue;
-            };
-            blocked.extend(output.producers.iter().copied());
-        }
-        blocked
-    }
-
-    fn omitted_captures(&self) -> HashSet<RawCaptureId> {
-        let mut omitted = HashSet::new();
-        for alternation in self.alternations.values() {
-            for (&name, field) in &alternation.fields {
-                if !alternation
-                    .alternatives
-                    .iter()
-                    .any(|alternative| alternative.omissions.contains(&name))
-                {
-                    continue;
-                }
-                omitted.extend(field.producers.iter().copied());
+        let mut field_flows = HashMap::new();
+        for pattern in &pattern_order {
+            let shape = types
+                .analysis
+                .pattern_result
+                .get_mut(pattern)
+                .expect("inference order references an inferred pattern");
+            if let Some(field_flow) = shape.field_flow.take() {
+                field_flows.insert(pattern.clone(), field_flow);
             }
         }
-        omitted
+
+        let mut capture_producers_by_record_type = HashMap::<TypeId, BTreeSet<CaptureId>>::new();
+        for field_flow in field_flows.values() {
+            let producers = capture_producers_by_record_type
+                .entry(field_flow.type_id)
+                .or_default();
+            for field in field_flow.fields.values() {
+                producers.extend(field.producers.iter().copied());
+            }
+        }
+
+        let input = NormalizationInput {
+            captures: self.captures,
+            blocked_capture_ids: self.blocked_capture_ids,
+            field_flows,
+            order: pattern_order,
+            capture_producers_by_record_type,
+        };
+        NormalizationSession::new(&input, types, interner, diagnostics).run();
+    }
+}
+
+impl NormalizationInput {
+    fn capture(&self, id: CaptureId) -> &RecordedCapture {
+        self.captures
+            .get(id.index())
+            .expect("capture id references an inferred capture")
+    }
+
+    fn field_flow(&self, pattern: &Pattern) -> Option<&InferredFieldFlow> {
+        self.field_flows.get(pattern)
+    }
+
+    fn blocked_captures(&self, inferred_types: &InferredTypeSnapshot) -> HashSet<CaptureId> {
+        let mut blocked_capture_ids = self.blocked_capture_ids.clone();
+        blocked_capture_ids.extend(self.captures.iter().enumerate().filter_map(
+            |(index, capture)| {
+                let fact = capture.observation.contract.fact;
+                (!fact.is_valid() || inferred_types.type_contains_invalid(fact.field().final_type))
+                    .then_some(CaptureId::from_index(index))
+            },
+        ));
+        blocked_capture_ids
+    }
+
+    fn omitted_capture_ids(&self) -> HashSet<CaptureId> {
+        let mut omitted_capture_ids = HashSet::new();
+        for field_flow in self.field_flows.values() {
+            let Some(alternation_omissions) = &field_flow.alternation_omissions else {
+                continue;
+            };
+            for name in alternation_omissions {
+                omitted_capture_ids.extend(
+                    field_flow
+                        .fields
+                        .get(name)
+                        .expect("omitted field belongs to its alternation flow")
+                        .producers
+                        .iter()
+                        .copied(),
+                );
+            }
+        }
+        omitted_capture_ids
+    }
+
+    fn capture_producer_ids_for_record_type(&self, record_type_id: TypeId) -> &BTreeSet<CaptureId> {
+        self.capture_producers_by_record_type
+            .get(&record_type_id)
+            .expect("record type retains its capture producers")
     }
 }
 
 struct NormalizationSession<'a, 'd> {
-    graph: &'a RawOutputGraph,
-    raw_types: RawTypeSnapshot,
+    input: &'a NormalizationInput,
+    inferred_types: InferredTypeSnapshot,
     types: &'d mut crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
     interner: &'a crate::core::Interner,
     diagnostics: &'d mut Diagnostics,
@@ -77,14 +137,14 @@ struct NormalizationSession<'a, 'd> {
 
 impl<'a, 'd> NormalizationSession<'a, 'd> {
     fn new(
-        graph: &'a RawOutputGraph,
+        input: &'a NormalizationInput,
         types: &'d mut crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder,
         interner: &'a crate::core::Interner,
         diagnostics: &'d mut Diagnostics,
     ) -> Self {
         Self {
-            graph,
-            raw_types: RawTypeSnapshot::new(types),
+            input,
+            inferred_types: InferredTypeSnapshot::new(types),
             types,
             interner,
             diagnostics,
@@ -93,19 +153,18 @@ impl<'a, 'd> NormalizationSession<'a, 'd> {
 
     fn run(mut self) {
         let captures = CaptureNormalizer::new(&mut self).run();
-        self.types.analysis.field_completions.clear();
-        let flow_count = self.graph.flows.len();
-        let mut flows = FlowNormalizer::new(&mut self, &captures);
-        for index in 0..flow_count {
-            flows.normalize(RawFlowId(index as u32));
+        let order = self.input.order.clone();
+        let mut field_flows = FieldFlowNormalizer::new(&mut self, &captures);
+        for pattern in order {
+            field_flows.normalize(&pattern);
         }
     }
 }
 
 struct CaptureNormalizer<'s, 'a, 'd> {
     session: &'s mut NormalizationSession<'a, 'd>,
-    blocked: HashSet<RawCaptureId>,
-    omitted: HashSet<RawCaptureId>,
+    blocked_capture_ids: HashSet<CaptureId>,
+    omitted_capture_ids: HashSet<CaptureId>,
 }
 
 enum DeferredCaptureDiagnostic {
@@ -114,27 +173,27 @@ enum DeferredCaptureDiagnostic {
 }
 
 struct SuppressedValueDiagnostic {
-    capture_id: RawCaptureId,
+    capture_id: CaptureId,
 }
 
 impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
     fn new(session: &'s mut NormalizationSession<'a, 'd>) -> Self {
-        let blocked = session.graph.blocked_captures(&session.raw_types);
-        let omitted = session.graph.omitted_captures();
+        let blocked_capture_ids = session.input.blocked_captures(&session.inferred_types);
+        let omitted_capture_ids = session.input.omitted_capture_ids();
         Self {
             session,
-            blocked,
-            omitted,
+            blocked_capture_ids,
+            omitted_capture_ids,
         }
     }
 
-    fn run(mut self) -> HashMap<RawCaptureId, NormalizedField> {
+    fn run(mut self) -> HashMap<CaptureId, NormalizedField> {
         let mut normalized = HashMap::new();
         let mut deferred_diagnostics = Vec::new();
         // Suppression warnings need every successful plan to recognize nested
         // boundaries. Invalid-type errors join the queue to preserve capture order.
-        for index in 0..self.session.graph.captures.len() {
-            let id = RawCaptureId(index as u32);
+        for index in 0..self.session.input.captures.len() {
+            let id = CaptureId::from_index(index);
             let (field, deferred_diagnostic) = self.normalize(id);
             normalized.insert(id, field);
             if let Some(deferred_diagnostic) = deferred_diagnostic {
@@ -166,33 +225,34 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
         normalized
     }
 
-    fn normalize(
-        &mut self,
-        id: RawCaptureId,
-    ) -> (NormalizedField, Option<DeferredCaptureDiagnostic>) {
-        let (raw_field, pattern, intent, contract) = {
-            let capture = self.session.graph.capture(id);
+    fn normalize(&mut self, id: CaptureId) -> (NormalizedField, Option<DeferredCaptureDiagnostic>) {
+        let (inferred_field, pattern, intent, contract) = {
+            let capture = self.session.input.capture(id);
             (
                 capture
                     .observation
-                    .emitted_field
+                    .produced_field
                     .unwrap_or(capture.observation.contract.fact.field()),
                 Pattern::CapturedPattern(capture.occurrence.node().clone()),
                 capture.observation.intent,
                 capture.observation.contract,
             )
         };
-        let ordinary = NormalizedField::ordinary(raw_field, &self.session.raw_types);
+        let ordinary = NormalizedField::ordinary(inferred_field, &self.session.inferred_types);
 
-        let RawCaptureIntent::BuiltIn { capture_type, span } = intent else {
+        let CaptureTypeIntent::BuiltIn { capture_type, span } = intent else {
             return (ordinary, None);
         };
-        if self.blocked.contains(&id) {
+        if self.blocked_capture_ids.contains(&id) {
             return (ordinary, None);
         }
 
-        let mut planner = CaptureTypePlanner::new(&self.session.raw_types, self.session.types);
-        let planned = match planner.plan(capture_type, contract, self.omitted.contains(&id)) {
+        let mut planner = CaptureTypePlanner::new(&self.session.inferred_types, self.session.types);
+        let planned = match planner.plan(
+            capture_type,
+            contract,
+            self.omitted_capture_ids.contains(&id),
+        ) {
             Ok(planned) => planned,
             Err(reason) => {
                 return (
@@ -218,7 +278,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
     fn report_suppressed_value(
         &mut self,
         request: SuppressedValueDiagnostic,
-        suppression_boundary_ids: &HashSet<RawCaptureId>,
+        suppression_boundary_ids: &HashSet<CaptureId>,
     ) {
         let capture_id = request.capture_id;
         let (
@@ -229,8 +289,8 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
             inner_pattern_span,
             capture_type,
         ) = {
-            let capture = self.session.graph.capture(capture_id);
-            let RawCaptureIntent::BuiltIn { capture_type, .. } = capture.observation.intent else {
+            let capture = self.session.input.capture(capture_id);
+            let CaptureTypeIntent::BuiltIn { capture_type, .. } = capture.observation.intent else {
                 unreachable!("suppressed-value diagnostic belongs to a built-in capture type")
             };
             (
@@ -251,10 +311,10 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
             .expect("suppressed-value diagnostic requires a normalized capture type");
         assert_eq!(
             fact_capture_type, capture_type,
-            "raw and normalized capture types must agree"
+            "inferred and normalized capture types must agree"
         );
         let suppressed_value =
-            SuppressedValue::from_plan(&self.session.raw_types, captured_type_id, plan);
+            SuppressedValue::from_plan(&self.session.inferred_types, captured_type_id, plan);
         let capture_name = self
             .session
             .interner
@@ -266,8 +326,8 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
         };
         let value_description = suppressed_value.description();
         let suppressed_capture_ids = SuppressedCaptureCollector::new(
-            self.session.graph,
-            &self.session.raw_types,
+            self.session.input,
+            &self.session.inferred_types,
             suppression_boundary_ids,
             capture_id,
         )
@@ -309,7 +369,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
                 .take(SUPPRESSED_CAPTURE_ANNOTATION_LIMIT)
                 .enumerate()
             {
-                let suppressed_capture = self.session.graph.capture(capture_id);
+                let suppressed_capture = self.session.input.capture(capture_id);
                 let annotation = if hidden_capture_count > 0
                     && index + 1 == SUPPRESSED_CAPTURE_ANNOTATION_LIMIT
                 {
@@ -343,24 +403,24 @@ fn format_additional_capture_count(count: usize) -> String {
 }
 
 struct SuppressedCaptureCollector<'a> {
-    graph: &'a RawOutputGraph,
-    raw_types: &'a RawTypeSnapshot,
-    suppression_boundary_ids: &'a HashSet<RawCaptureId>,
-    primary_capture_id: RawCaptureId,
+    input: &'a NormalizationInput,
+    inferred_types: &'a InferredTypeSnapshot,
+    suppression_boundary_ids: &'a HashSet<CaptureId>,
+    primary_capture_id: CaptureId,
     seen_types: HashSet<TypeId>,
-    capture_ids: BTreeSet<RawCaptureId>,
+    capture_ids: BTreeSet<CaptureId>,
 }
 
 impl<'a> SuppressedCaptureCollector<'a> {
     fn new(
-        graph: &'a RawOutputGraph,
-        raw_types: &'a RawTypeSnapshot,
-        suppression_boundary_ids: &'a HashSet<RawCaptureId>,
-        primary_capture_id: RawCaptureId,
+        input: &'a NormalizationInput,
+        inferred_types: &'a InferredTypeSnapshot,
+        suppression_boundary_ids: &'a HashSet<CaptureId>,
+        primary_capture_id: CaptureId,
     ) -> Self {
         Self {
-            graph,
-            raw_types,
+            input,
+            inferred_types,
             suppression_boundary_ids,
             primary_capture_id,
             seen_types: HashSet::new(),
@@ -368,7 +428,7 @@ impl<'a> SuppressedCaptureCollector<'a> {
         }
     }
 
-    fn collect_from(mut self, type_id: TypeId) -> Vec<RawCaptureId> {
+    fn collect_from(mut self, type_id: TypeId) -> Vec<CaptureId> {
         let mut pending = vec![SuppressedCaptureWork::Type(type_id)];
         while let Some(work) = pending.pop() {
             match work {
@@ -376,9 +436,9 @@ impl<'a> SuppressedCaptureCollector<'a> {
                     if !self.seen_types.insert(type_id) {
                         continue;
                     }
-                    match self.raw_types.shape(type_id) {
+                    match self.inferred_types.shape(type_id) {
                         TypeShape::Ref(declaration) => pending.push(SuppressedCaptureWork::Type(
-                            self.raw_types.declaration(*declaration),
+                            self.inferred_types.declaration(*declaration),
                         )),
                         TypeShape::Option(inner) | TypeShape::List { element: inner, .. } => {
                             pending.push(SuppressedCaptureWork::Type(*inner));
@@ -391,7 +451,7 @@ impl<'a> SuppressedCaptureCollector<'a> {
                                 .map(SuppressedCaptureWork::Type),
                         ),
                         TypeShape::Record(_) => pending.extend(
-                            self.graph
+                            self.input
                                 .capture_producer_ids_for_record_type(type_id)
                                 .iter()
                                 .copied()
@@ -411,7 +471,7 @@ impl<'a> SuppressedCaptureCollector<'a> {
                         continue;
                     }
                     let type_id = self
-                        .graph
+                        .input
                         .capture(capture_id)
                         .observation
                         .contract
@@ -425,7 +485,7 @@ impl<'a> SuppressedCaptureCollector<'a> {
 
         let mut capture_ids = self.capture_ids.into_iter().collect::<Vec<_>>();
         capture_ids.sort_by_key(|&capture_id| {
-            let span = capture_span(self.graph.capture(capture_id));
+            let span = capture_span(self.input.capture(capture_id));
             (span.source, span.range.start(), span.range.end())
         });
         capture_ids
@@ -434,7 +494,7 @@ impl<'a> SuppressedCaptureCollector<'a> {
 
 enum SuppressedCaptureWork {
     Type(TypeId),
-    Capture(RawCaptureId),
+    Capture(CaptureId),
 }
 
 enum SuppressedValueKind {
@@ -466,31 +526,35 @@ struct SuppressedValue {
 }
 
 impl SuppressedValue {
-    fn from_plan(raw_types: &RawTypeSnapshot, type_id: TypeId, plan: &CaptureTypePlan) -> Self {
-        Self::follow_plan(raw_types, type_id, plan, false)
+    fn from_plan(
+        inferred_types: &InferredTypeSnapshot,
+        type_id: TypeId,
+        plan: &CaptureTypePlan,
+    ) -> Self {
+        Self::follow_plan(inferred_types, type_id, plan, false)
     }
 
     fn follow_plan(
-        raw_types: &RawTypeSnapshot,
+        inferred_types: &InferredTypeSnapshot,
         type_id: TypeId,
         plan: &CaptureTypePlan,
         repeated: bool,
     ) -> Self {
-        // Follow the frozen plan alongside the raw type: `text` maps list
+        // Follow the frozen plan alongside the inferred type: `text` maps list
         // elements, while `bool` can replace an omitted list as one value.
-        let type_id = raw_types.resolve_reference_chain(type_id);
+        let type_id = inferred_types.resolve_reference_chain(type_id);
         match plan.kind() {
             CaptureTypePlanKind::Option { inner, .. } => {
-                let TypeShape::Option(inner_type) = raw_types.shape(type_id) else {
-                    unreachable!("option capture-type plan must follow a raw option")
+                let TypeShape::Option(inner_type) = inferred_types.shape(type_id) else {
+                    unreachable!("option capture-type plan must follow an inferred option")
                 };
-                Self::follow_plan(raw_types, *inner_type, inner, repeated)
+                Self::follow_plan(inferred_types, *inner_type, inner, repeated)
             }
             CaptureTypePlanKind::List { element } => {
-                let TypeShape::List { element: inner, .. } = raw_types.shape(type_id) else {
-                    unreachable!("list capture-type plan must follow a raw list")
+                let TypeShape::List { element: inner, .. } = inferred_types.shape(type_id) else {
+                    unreachable!("list capture-type plan must follow an inferred list")
                 };
-                Self::follow_plan(raw_types, *inner, element, true)
+                Self::follow_plan(inferred_types, *inner, element, true)
             }
             CaptureTypePlanKind::TextTerminal {
                 data: TerminalData::Semantic,
@@ -498,7 +562,7 @@ impl SuppressedValue {
             | CaptureTypePlanKind::BoolTerminal {
                 data: TerminalData::Semantic,
             } => {
-                let kind = match raw_types.shape(type_id) {
+                let kind = match inferred_types.shape(type_id) {
                     TypeShape::Record(fields) => SuppressedValueKind::Record(
                         SuppressedMemberSummary::from_names(fields.keys().copied()),
                     ),
@@ -573,7 +637,7 @@ impl SuppressedValue {
     }
 }
 
-fn capture_span(capture: &RawCaptureOutput) -> Span {
+fn capture_span(capture: &RecordedCapture) -> Span {
     let capture_syntax = capture.occurrence.node().capture();
     capture.occurrence.span_of(capture_syntax.text_range())
 }
@@ -629,13 +693,13 @@ fn format_member_names(
 }
 
 #[derive(Clone)]
-pub(super) struct RawTypeSnapshot {
+pub(super) struct InferredTypeSnapshot {
     types: Vec<Option<TypeShape>>,
     declarations: BTreeMap<TypeDeclId, TypeId>,
     invalid_containment: HashSet<TypeId>,
 }
 
-impl RawTypeSnapshot {
+impl InferredTypeSnapshot {
     fn new(types: &crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder) -> Self {
         let type_shapes = types.type_shapes_snapshot();
         let declarations = type_shapes
@@ -667,14 +731,14 @@ impl RawTypeSnapshot {
         self.types
             .get(type_id.0 as usize)
             .and_then(Option::as_ref)
-            .expect("raw capture type must be registered")
+            .expect("inferred capture type must be registered")
     }
 
     pub(super) fn declaration(&self, declaration: TypeDeclId) -> TypeId {
         *self
             .declarations
             .get(&declaration)
-            .expect("raw referenced declaration must have a body")
+            .expect("inferred referenced declaration must have a body")
     }
 
     fn resolve_reference_chain(&self, mut type_id: TypeId) -> TypeId {
@@ -711,17 +775,17 @@ fn compute_invalid_containment(
         if let TypeShape::Ref(declaration) = shape {
             let child = *declarations
                 .get(declaration)
-                .expect("raw referenced declaration has a body");
+                .expect("inferred referenced declaration has a body");
             containers
                 .get_mut(child.0 as usize)
-                .expect("raw child type must be registered")
+                .expect("inferred child type must be registered")
                 .push(container);
             continue;
         }
         for child in shape.child_type_ids() {
             containers
                 .get_mut(child.0 as usize)
-                .expect("raw child type must be registered")
+                .expect("inferred child type must be registered")
                 .push(container);
         }
     }
@@ -731,7 +795,7 @@ fn compute_invalid_containment(
     while let Some(type_id) = pending.pop() {
         for &container in containers
             .get(type_id.0 as usize)
-            .expect("invalid raw type must be registered")
+            .expect("invalid inferred type must be registered")
         {
             if contains_invalid.insert(container) {
                 pending.push(container);
@@ -754,8 +818,11 @@ pub(super) struct NormalizedField {
 }
 
 impl NormalizedField {
-    fn ordinary(info: RecordField, raw_types: &RawTypeSnapshot) -> Self {
-        let on_absence = if matches!(raw_types.shape(info.final_type), TypeShape::List { .. }) {
+    fn ordinary(info: RecordField, inferred_types: &InferredTypeSnapshot) -> Self {
+        let on_absence = if matches!(
+            inferred_types.shape(info.final_type),
+            TypeShape::List { .. }
+        ) {
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {
             AbsencePolicy::MakeOption
@@ -799,62 +866,43 @@ impl NormalizedField {
     }
 }
 
-struct FlowNormalizer<'s, 'c, 'a, 'd> {
+struct FieldFlowNormalizer<'s, 'c, 'a, 'd> {
     session: &'s mut NormalizationSession<'a, 'd>,
-    captures: &'c HashMap<RawCaptureId, NormalizedField>,
-    normalized: HashMap<RawFlowId, BTreeMap<Symbol, NormalizedField>>,
-    visiting: HashSet<RawFlowId>,
-    // Parent flows can revisit the same producer pair. Report each exact conflict once.
+    captures: &'c HashMap<CaptureId, NormalizedField>,
+    normalized: HashMap<Pattern, BTreeMap<Symbol, NormalizedField>>,
+    // Downstream flows can revisit the same producer pair. Report each exact conflict once.
     reported_conflicts: HashSet<(Symbol, Span, Span)>,
 }
 
-impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
+impl<'s, 'c, 'a, 'd> FieldFlowNormalizer<'s, 'c, 'a, 'd> {
     fn new(
         session: &'s mut NormalizationSession<'a, 'd>,
-        captures: &'c HashMap<RawCaptureId, NormalizedField>,
+        captures: &'c HashMap<CaptureId, NormalizedField>,
     ) -> Self {
         Self {
             session,
             captures,
             normalized: HashMap::new(),
-            visiting: HashSet::new(),
             reported_conflicts: HashSet::new(),
         }
     }
 
-    fn normalize(&mut self, id: RawFlowId) -> Option<&BTreeMap<Symbol, NormalizedField>> {
-        if self.normalized.contains_key(&id) {
-            return self.normalized.get(&id);
-        }
-        if !self.visiting.insert(id) {
-            unreachable!("pattern output graph follows the finite AST, not definition refs")
-        }
-
-        let output = self.session.graph.flow(id).clone();
-        let raw_fields = match &output.flow {
-            RawPatternFlow::Fields(fields) => fields.clone(),
-            RawPatternFlow::NoValue | RawPatternFlow::Value => {
-                self.visiting.remove(&id);
-                return None;
-            }
+    fn normalize(&mut self, pattern: &Pattern) {
+        let Some(inferred_flow) = self.session.input.field_flow(pattern).cloned() else {
+            return;
         };
-        let alternation = self
-            .session
-            .graph
-            .alternations
-            .get(&output.occurrence)
-            .cloned();
         let mut normalized = BTreeMap::new();
         let mut completions = BTreeMap::new();
 
-        for (&name, raw_field) in &raw_fields.fields {
-            let mut field = self.normalize_sources(&output, name, raw_field);
-            if let Some(alternation) = &alternation {
-                let omitted = alternation
-                    .alternatives
-                    .iter()
-                    .any(|alternative| alternative.omissions.contains(&name));
-                let completion = if omitted {
+        for (&name, inferred_field) in &inferred_flow.fields {
+            let mut field = self.normalize_sources(
+                inferred_flow.alternation_omissions.is_some(),
+                name,
+                inferred_field,
+            );
+            if let Some(alternation_omissions) = &inferred_flow.alternation_omissions {
+                let conditionally_present = alternation_omissions.contains(&name);
+                let completion = if conditionally_present {
                     let (completed, completion) = field.complete_absence(self.session.types);
                     field = completed;
                     completion
@@ -863,7 +911,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
                 };
                 completions.insert(name, completion);
             } else {
-                field = self.adapt_to_raw_output(raw_field, field);
+                field = self.adapt_to_inferred_output(inferred_field, field);
             }
             normalized.insert(name, field);
         }
@@ -874,40 +922,38 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             .collect();
         self.session
             .types
-            .replace_record_fields(raw_fields.type_id, fields);
+            .replace_record_fields(inferred_flow.type_id, fields);
 
-        if alternation.is_some() {
-            self.session.types.analysis.field_completions.insert(
-                output.occurrence.clone(),
-                FieldCompletions::new(completions),
-            );
+        if inferred_flow.alternation_omissions.is_some() {
+            self.session
+                .types
+                .analysis
+                .field_completions
+                .insert(pattern.clone(), FieldCompletions::new(completions));
         }
-        self.normalized.insert(id, normalized);
-        self.visiting.remove(&id);
-        self.normalized.get(&id)
+        let previous = self.normalized.insert(pattern.clone(), normalized);
+        assert!(
+            previous.is_none(),
+            "inference order contains each field-producing pattern once"
+        );
     }
 
     fn normalize_sources(
         &mut self,
-        owner: &RawPatternOutput,
+        alternation: bool,
         name: Symbol,
-        field: &RawFieldOutput,
+        field: &InferredField,
     ) -> NormalizedField {
         let mut sources = field.sources.iter();
-        let first = *sources
+        let first = sources
             .next()
-            .expect("raw public field must retain an immediate source");
+            .expect("inferred public field must retain an immediate source");
         let (mut normalized, mut previous_span) = self.normalize_source_with_span(first);
         let mut previous_type = normalized.info.final_type;
-        if !self
-            .session
-            .graph
-            .alternations
-            .contains_key(&owner.occurrence)
-        {
+        if !alternation {
             return normalized;
         }
-        for &source in sources {
+        for source in sources {
             let (other, other_span) = self.normalize_source_with_span(source);
             let right_type = other.info.final_type;
             match unify_normalized_fields(self.session.types, normalized, other) {
@@ -923,10 +969,9 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
                     {
                         continue;
                     }
-                    // Raw inference already owns structural incompatibilities.
-                    // A mismatch here can only be introduced by written capture
-                    // types, so report it without rewriting the raw ownership
-                    // graph that subsequent fields still depend on.
+                    // Inference already owns structural incompatibilities. A
+                    // mismatch here can only be introduced by written capture
+                    // types, so keep its field sources intact for later fields.
                     let types = self.session.types.in_progress();
                     let left_type = describe_type(&types, self.session.interner, previous_type);
                     let right_type = describe_type(&types, self.session.interner, right_type);
@@ -957,52 +1002,36 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         normalized
     }
 
-    fn normalize_source_with_span(&mut self, source: RawFieldSource) -> (NormalizedField, Span) {
-        let span = self.raw_source_span(source);
-        (self.normalize_source(source), span)
+    fn normalize_source_with_span(&mut self, source: &FieldSource) -> (NormalizedField, Span) {
+        let capture_span = source.capture_span();
+        (self.normalize_source(source), capture_span)
     }
 
-    fn raw_source_span(&self, source: RawFieldSource) -> Span {
-        let capture = match source {
-            RawFieldSource::Capture(capture) => capture,
-            RawFieldSource::Flow { flow, field } => *self
-                .session
-                .graph
-                .flow(flow)
-                .flow
-                .fields()
-                .and_then(|fields| fields.get(&field))
-                .and_then(|field| field.producers.first())
-                .expect("flowing result field retains a capture producer"),
-        };
-        capture_span(self.session.graph.capture(capture))
-    }
-
-    fn normalize_source(&mut self, source: RawFieldSource) -> NormalizedField {
+    fn normalize_source(&mut self, source: &FieldSource) -> NormalizedField {
         match source {
-            RawFieldSource::Capture(capture) => *self
+            FieldSource::Capture { capture_id, .. } => *self
                 .captures
-                .get(&capture)
-                .expect("every raw capture has a normalized field"),
-            RawFieldSource::Flow { flow, field } => *self
-                .normalize(flow)
-                .and_then(|fields| fields.get(&field))
-                .expect("field source must survive normalization"),
+                .get(capture_id)
+                .expect("every inferred capture has a normalized field"),
+            FieldSource::Forwarded { pattern, field, .. } => *self
+                .normalized
+                .get(pattern)
+                .and_then(|fields| fields.get(field))
+                .expect("inference records a field source before its forwarded field"),
         }
     }
 
-    fn adapt_to_raw_output(
+    fn adapt_to_inferred_output(
         &mut self,
-        raw_output: &RawFieldOutput,
+        inferred_output: &InferredField,
         mut field: NormalizedField,
     ) -> NormalizedField {
-        let source = raw_output
+        let source = inferred_output
             .sources
             .first()
-            .copied()
-            .expect("raw field has an immediate source");
-        let raw_source = self.raw_source_info(source);
-        if raw_source == raw_output.info {
+            .expect("inferred field has an immediate source");
+        let inferred_source = source.info();
+        if inferred_source == inferred_output.info {
             return field;
         }
 
@@ -1010,15 +1039,17 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             field.on_absence,
             AbsencePolicy::CompleteWith(FieldCompletion::Absent | FieldCompletion::False)
         ) && matches!(
-            self.session.raw_types.shape(raw_output.info.final_type),
-            TypeShape::Option(inner) if *inner == raw_source.final_type
+            self.session
+                .inferred_types
+                .shape(inferred_output.info.final_type),
+            TypeShape::Option(inner) if *inner == inferred_source.final_type
         ) {
             return field;
         }
 
         let Some(final_type) = self.adapt_final_type(
-            raw_source.final_type,
-            raw_output.info.final_type,
+            inferred_source.final_type,
+            inferred_output.info.final_type,
             field.info.final_type,
         ) else {
             return field;
@@ -1037,21 +1068,21 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
 
     fn adapt_final_type(
         &mut self,
-        raw_source: TypeId,
-        raw_output: TypeId,
+        inferred_source: TypeId,
+        inferred_output: TypeId,
         normalized: TypeId,
     ) -> Option<TypeId> {
-        if raw_source == raw_output {
+        if inferred_source == inferred_output {
             return Some(normalized);
         }
 
-        match self.session.raw_types.shape(raw_output).clone() {
+        match self.session.inferred_types.shape(inferred_output).clone() {
             TypeShape::Option(inner) => {
-                let inner = self.adapt_final_type(raw_source, inner, normalized)?;
+                let inner = self.adapt_final_type(inferred_source, inner, normalized)?;
                 Some(self.session.types.intern_option(inner))
             }
             TypeShape::List { element, minimum } => {
-                let element = self.adapt_final_type(raw_source, element, normalized)?;
+                let element = self.adapt_final_type(inferred_source, element, normalized)?;
                 Some(
                     self.session
                         .types
@@ -1059,27 +1090,6 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
                 )
             }
             _ => None,
-        }
-    }
-
-    fn raw_source_info(&self, source: RawFieldSource) -> RecordField {
-        match source {
-            RawFieldSource::Capture(capture) => self
-                .session
-                .graph
-                .capture(capture)
-                .observation
-                .emitted_field
-                .expect("field-producing capture has a raw emitted field"),
-            RawFieldSource::Flow { flow, field } => self
-                .session
-                .graph
-                .flow(flow)
-                .flow
-                .fields()
-                .and_then(|fields| fields.get(&field))
-                .map(|field| field.info)
-                .expect("field source must reference a raw fields flow"),
         }
     }
 }

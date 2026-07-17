@@ -13,7 +13,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::types::raw_output::{RawCaptureObservation, RawOutputGraphBuilder};
+use crate::compiler::analyze::types::capture_normalization::{
+    CaptureObservation, CaptureProvenance,
+};
+use crate::compiler::analyze::types::inference_flow::CaptureId;
 use crate::compiler::analyze::types::type_shape::{
     DefinitionOutput, PatternFlow, PatternShape, RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL,
     TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
@@ -235,11 +238,10 @@ impl TypeAnalysis {
 
     /// Fields of the record a `Fields` flow points to.
     ///
-    /// Every `PatternFlow::Fields` is constructed by interning a `Record` (see the
-    /// `intern_record`/`intern_single_field_record` calls at every `Fields` construction
-    /// site), so a non-`Record` id here is a broken type-system invariant, not a
-    /// runtime condition the query can trigger. We surface it loudly instead of
-    /// fabricating an empty record that would silently mistype the output.
+    /// Every `PatternFlow::Fields` is constructed by interning a `Record`, so a
+    /// non-`Record` id here is a broken type-system invariant, not a runtime
+    /// condition the query can trigger. We surface it loudly instead of fabricating
+    /// an empty record that would silently mistype the output.
     pub fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, RecordField> {
         match self.expect_type_shape(id) {
             TypeShape::Record(fields) => fields,
@@ -558,10 +560,8 @@ pub struct TypeAnalysisBuilder {
     /// Explicit capture-type declarations deduplicated by name and body.
     capture_type_declarations: HashMap<(Symbol, TypeId), TypeDeclId>,
 
-    /// Present only when the builtin pre-scan requests producer provenance.
-    /// Keeping the recorder on the builder prevents normalization details from
-    /// leaking into the ordinary public type model.
-    raw_output_graph: Option<RawOutputGraphBuilder>,
+    capture_provenance: CaptureProvenance,
+    pattern_order: Vec<Pattern>,
 
     /// Raw naming failures gate capture-type normalization but have no meaning
     /// after the builder freezes the final public graph.
@@ -627,7 +627,8 @@ impl TypeAnalysisBuilder {
             type_provenance: HashMap::new(),
             custom_capture_types: Vec::new(),
             capture_type_declarations: HashMap::new(),
-            raw_output_graph: None,
+            capture_provenance: CaptureProvenance::default(),
+            pattern_order: Vec::new(),
             invalid_types: HashSet::new(),
         };
 
@@ -647,18 +648,23 @@ impl TypeAnalysisBuilder {
         builder
     }
 
-    pub(crate) fn for_capture_normalization() -> Self {
-        let mut builder = Self::new();
-        builder.raw_output_graph = Some(RawOutputGraphBuilder::default());
-        builder
-    }
-
     /// Freeze the accumulated state, dropping the inference-only scratch. Admits
     /// the result only after asserting it is internally consistent.
     pub fn finish(self) -> TypeAnalysis {
         assert!(
-            self.raw_output_graph.is_none(),
-            "capture-type normalization must consume its producer provenance",
+            self.capture_provenance.captures.is_empty(),
+            "capture-type normalization must consume capture provenance",
+        );
+        assert!(
+            self.pattern_order.is_empty(),
+            "capture-type normalization must consume inference order",
+        );
+        assert!(
+            self.analysis
+                .pattern_result
+                .values()
+                .all(|shape| shape.field_flow.is_none()),
+            "capture-type normalization must consume field provenance",
         );
         self.analysis.assert_well_formed();
         self.analysis
@@ -719,10 +725,6 @@ impl TypeAnalysisBuilder {
 
     pub fn intern_record(&mut self, fields: BTreeMap<Symbol, RecordField>) -> TypeId {
         self.intern_type(TypeShape::Record(fields))
-    }
-
-    pub fn intern_single_field_record(&mut self, name: Symbol, info: RecordField) -> TypeId {
-        self.intern_type(TypeShape::Record(BTreeMap::from([(name, info)])))
     }
 
     pub(super) fn replace_record_fields(
@@ -799,63 +801,38 @@ impl TypeAnalysisBuilder {
     }
 
     pub fn record_pattern_result(&mut self, pattern: Pattern, shape: PatternShape) {
-        if let Some(graph) = &mut self.raw_output_graph {
-            graph.record_pattern(pattern.clone(), &shape, &self.analysis);
+        if !self.analysis.pattern_result.contains_key(&pattern) {
+            self.pattern_order.push(pattern.clone());
         }
         self.analysis.pattern_result.insert(pattern, shape);
     }
 
-    pub(crate) fn record_raw_capture_observation(
+    pub(super) fn record_capture(
         &mut self,
         captured_pattern: Located<CapturedPattern>,
-        observation: RawCaptureObservation,
-    ) {
-        let Some(graph) = &mut self.raw_output_graph else {
-            return;
-        };
-        graph.record_capture(captured_pattern, observation);
-    }
-
-    pub(crate) fn records_raw_output_provenance(&self) -> bool {
-        self.raw_output_graph.is_some()
+        observation: CaptureObservation,
+    ) -> CaptureId {
+        self.capture_provenance
+            .record_capture(captured_pattern, observation)
     }
 
     pub fn record_capture_fact(&mut self, pattern: Pattern, fact: CaptureFact) {
         self.analysis.capture_facts.insert(pattern, fact);
     }
 
-    pub fn record_field_completions(&mut self, pattern: Pattern, completions: FieldCompletions) {
-        self.analysis.field_completions.insert(pattern, completions);
-    }
-
     pub(crate) fn record_invalid_type(&mut self, type_id: TypeId) {
         self.invalid_types.insert(type_id);
     }
 
-    pub(crate) fn record_alternation_incompatibility(&mut self, pattern: Pattern, field: Symbol) {
-        let Some(graph) = &mut self.raw_output_graph else {
-            return;
-        };
-        graph.record_alternation_incompatibility(pattern, field);
+    pub(super) fn block_capture_producers(
+        &mut self,
+        producers: impl IntoIterator<Item = CaptureId>,
+    ) {
+        self.capture_provenance.block_captures(producers);
     }
 
-    /// Snapshot the alternation outputs that need field-completion tables.
-    /// The snapshot breaks the immutable borrow before tables are inserted
-    /// without cloning every inferred pattern and shape in the query.
-    pub(crate) fn alternation_field_results(&self) -> Vec<(Pattern, TypeId)> {
-        self.analysis
-            .pattern_result
-            .iter()
-            .filter_map(|(pattern, shape)| {
-                if !matches!(pattern, Pattern::Alternation(_)) {
-                    return None;
-                }
-                let PatternFlow::Fields(type_id) = shape.flow else {
-                    return None;
-                };
-                Some((pattern.clone(), type_id))
-            })
-            .collect()
+    pub(crate) fn has_built_in_capture_types(&self) -> bool {
+        self.capture_provenance.has_built_in_capture_types()
     }
 
     pub fn record_def_output(&mut self, def_id: DefId, output: DefinitionOutput) {
@@ -869,11 +846,9 @@ impl TypeAnalysisBuilder {
         interner: &crate::core::Interner,
         diagnostics: &mut Diagnostics,
     ) {
-        let graph = self
-            .raw_output_graph
-            .take()
-            .expect("capture-type pre-scan enables producer provenance");
-        graph.finish().normalize(self, interner, diagnostics);
+        let provenance = std::mem::take(&mut self.capture_provenance);
+        let pattern_order = std::mem::take(&mut self.pattern_order);
+        provenance.normalize(pattern_order, self, interner, diagnostics);
     }
 
     pub fn record_def_root_extent(&mut self, def_id: DefId, extent: RootExtent) {

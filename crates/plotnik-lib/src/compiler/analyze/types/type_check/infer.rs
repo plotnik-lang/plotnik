@@ -27,10 +27,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::core::{Interner, Symbol};
 use rowan::TextRange;
 
-use super::unify::unify_flows;
+use super::unify::unify_alternative_flows;
 use crate::compiler::analyze::types::capture_kind::CaptureKind;
-use crate::compiler::analyze::types::raw_output::{
-    RawCaptureContract, RawCaptureIntent, RawCaptureObservation,
+use crate::compiler::analyze::types::capture_normalization::{
+    CaptureContract, CaptureObservation, CaptureTypeIntent,
+};
+use crate::compiler::analyze::types::inference_flow::{
+    CaptureId, InferredField, InferredFieldFlow,
 };
 use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
@@ -40,7 +43,7 @@ use crate::compiler::analyze::types::type_shape::{
     RecordField, TYPE_NODE, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{
-    BuiltInCaptureType, CaptureFact, FieldCompletion, FieldCompletions, RawCaptureFact, RootExtent,
+    BuiltInCaptureType, CaptureFact, RawCaptureFact, RootExtent,
 };
 
 use crate::compiler::analyze::Located;
@@ -101,12 +104,12 @@ struct CaptureInner {
 /// Where one capture field lands after the inner pattern has been inferred.
 /// A node capture can bubble beside child fields; every other capture owns a
 /// fresh one-field scope. Resolving this before capture-type normalization is
-/// important: a duplicate bubbling name makes the raw capture invalid, so a
+/// important: a duplicate bubbling name makes the inferred capture invalid, so a
 /// built-in capture type must not add a cascading diagnostic.
 enum CaptureFieldDestination {
     OwnScope,
     Bubbling {
-        fields: BTreeMap<Symbol, RecordField>,
+        fields: BTreeMap<Symbol, InferredField>,
         admits_capture: bool,
     },
 }
@@ -119,40 +122,54 @@ impl CaptureFieldDestination {
         }
     }
 
-    fn finish(
+    fn into_field_flow(
         self,
         types: &mut TypeAnalysisBuilder,
         capture_name: Symbol,
         field: RecordField,
-    ) -> PatternFlow {
-        match self {
-            Self::OwnScope => {
-                PatternFlow::Fields(types.intern_single_field_record(capture_name, field))
-            }
+        capture_id: CaptureId,
+        name_span: Span,
+        capture_span: Span,
+    ) -> InferredFieldFlow {
+        let fields = match self {
+            Self::OwnScope => BTreeMap::from([(
+                capture_name,
+                InferredField::capture(field, capture_id, name_span, capture_span),
+            )]),
             Self::Bubbling {
                 mut fields,
                 admits_capture,
             } => {
                 if admits_capture {
-                    let previous = fields.insert(capture_name, field);
+                    let previous = fields.insert(
+                        capture_name,
+                        InferredField::capture(field, capture_id, name_span, capture_span),
+                    );
                     assert!(
                         previous.is_none(),
                         "capture destination was validated vacant"
                     );
                 }
-                PatternFlow::Fields(types.intern_record(fields))
+                fields
             }
-        }
+        };
+        let record = types.intern_record(
+            fields
+                .iter()
+                .map(|(&name, field)| (name, field.info))
+                .collect(),
+        );
+        InferredFieldFlow::new(record, fields)
     }
 }
 
-struct RawCaptureValue {
+struct InferredCaptureValue {
     mechanism: CaptureKind,
     field: RecordField,
     zero_node_terminal: bool,
 }
 
-impl RawCaptureValue {
+impl InferredCaptureValue {
     fn node() -> Self {
         Self {
             mechanism: CaptureKind::Node,
@@ -170,15 +187,15 @@ impl RawCaptureValue {
     }
 }
 
-struct RawCapture {
+struct InferredCapture {
     occurrence: CapturedPattern,
     name: Symbol,
-    value: RawCaptureValue,
+    value: InferredCaptureValue,
     valid: bool,
 }
 
-impl RawCapture {
-    fn admitted(occurrence: &CapturedPattern, name: Symbol, value: RawCaptureValue) -> Self {
+impl InferredCapture {
+    fn admitted(occurrence: &CapturedPattern, name: Symbol, value: InferredCaptureValue) -> Self {
         Self {
             occurrence: occurrence.clone(),
             name,
@@ -190,7 +207,7 @@ impl RawCapture {
     fn after_validation(
         occurrence: &CapturedPattern,
         name: Symbol,
-        value: RawCaptureValue,
+        value: InferredCaptureValue,
         valid: bool,
     ) -> Self {
         Self {
@@ -208,9 +225,9 @@ impl RawCapture {
         RawCaptureFact::rejected(self.value.mechanism, self.value.field)
     }
 
-    fn observation(&self, intent: RawCaptureIntent) -> RawCaptureObservation {
-        let contract = RawCaptureContract::new(self.fact(), self.value.zero_node_terminal);
-        RawCaptureObservation::new(self.name, contract, intent)
+    fn observation(&self, intent: CaptureTypeIntent) -> CaptureObservation {
+        let contract = CaptureContract::new(self.fact(), self.value.zero_node_terminal);
+        CaptureObservation::new(self.name, contract, intent)
     }
 }
 
@@ -222,15 +239,15 @@ enum ResolvedCaptureType {
 }
 
 impl ResolvedCaptureType {
-    fn raw_intent(&self, source: SourceId) -> RawCaptureIntent {
+    fn capture_type_intent(&self, source: SourceId) -> CaptureTypeIntent {
         match self {
-            Self::BuiltIn(capture_type, range) => RawCaptureIntent::BuiltIn {
+            Self::BuiltIn(capture_type, range) => CaptureTypeIntent::BuiltIn {
                 capture_type: *capture_type,
                 span: Span::new(source, *range),
             },
-            Self::Custom(name, _) => RawCaptureIntent::Custom(*name),
-            Self::Invalid => RawCaptureIntent::Invalid,
-            Self::None => RawCaptureIntent::None,
+            Self::Custom(name, _) => CaptureTypeIntent::Custom(*name),
+            Self::Invalid => CaptureTypeIntent::Invalid,
+            Self::None => CaptureTypeIntent::None,
         }
     }
 }
@@ -401,7 +418,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_named_node(&mut self, node: &Located<NamedNodePattern>) -> PatternShape {
         let children = node.node().children().map(|child| node.wrap(child));
         let merged = self.collect_child_fields(children);
-        PatternShape::new(RootExtent::SingleNode, self.merged_fields_flow(merged))
+        self.merged_fields_shape(RootExtent::SingleNode, merged)
     }
 
     /// Anonymous-node pattern or node wildcard: matches one position, produces nothing.
@@ -487,7 +504,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let root_extent = self.sequence_root_extent(&children);
         let merged = self.collect_child_fields(children.iter().cloned());
 
-        PatternShape::new(root_extent, self.merged_fields_flow(merged))
+        self.merged_fields_shape(root_extent, merged)
     }
 
     /// Merge the bubbling fields of a scope's children. A `Value` child does not
@@ -496,30 +513,38 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn collect_child_fields(
         &mut self,
         children: impl IntoIterator<Item = Located<Pattern>>,
-    ) -> BTreeMap<Symbol, RecordField> {
+    ) -> BTreeMap<Symbol, InferredField> {
         let mut merged_fields = flow::ScopeFields::default();
 
         for child in children {
             let child_info = self.infer_pattern(&child);
-            if let PatternFlow::Fields(type_id) = &child_info.flow {
-                let fields = self
-                    .ctx
-                    .type_ctx
-                    .in_progress()
-                    .expect_record_fields(*type_id)
-                    .clone();
-                self.merge_scope_fields(&mut merged_fields, &fields, child.node().syntax());
+            if matches!(child_info.flow, PatternFlow::Fields(_)) {
+                let fields = child_info
+                    .field_flow
+                    .as_ref()
+                    .expect("field-producing child retains inference provenance");
+                self.merge_scope_fields(&mut merged_fields, child.node().clone(), fields);
             }
         }
 
         merged_fields.into_fields()
     }
 
-    fn merged_fields_flow(&mut self, merged: BTreeMap<Symbol, RecordField>) -> PatternFlow {
+    fn merged_fields_shape(
+        &mut self,
+        root_extent: RootExtent,
+        merged: BTreeMap<Symbol, InferredField>,
+    ) -> PatternShape {
         if merged.is_empty() {
-            return PatternFlow::NoValue;
+            return PatternShape::new(root_extent, PatternFlow::NoValue);
         }
-        PatternFlow::Fields(self.ctx.type_ctx.intern_record(merged))
+        let record = self.ctx.type_ctx.intern_record(
+            merged
+                .iter()
+                .map(|(&name, field)| (name, field.info))
+                .collect(),
+        );
+        PatternShape::fields(root_extent, InferredFieldFlow::new(record, merged))
     }
 
     fn sequence_root_extent(&mut self, children: &[Located<Pattern>]) -> RootExtent {
@@ -606,20 +631,21 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         self.check_duplicate_labels(alternation);
         self.report_unused_alternative_labels(alternation.node());
 
-        let mut flows: Vec<PatternFlow> = Vec::new();
+        let mut alternatives = Vec::new();
         let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
-            if let Some(body_info) = self.infer_alternative_body(alternation, &alternative) {
-                combined_extent = combined_extent.combine(body_info.root_extent);
-                flows.push(body_info.flow);
-            }
+            let Some(body) = alternative.body() else {
+                alternatives.push((None, PatternShape::no_value()));
+                continue;
+            };
+            let body_info = self.infer_pattern(&alternation.wrap(body.clone()));
+            combined_extent = combined_extent.combine(body_info.root_extent);
+            alternatives.push((Some(body), body_info));
         }
 
         let pattern = Pattern::Alternation(alternation.node().clone());
-        let unified_flow = self.unify_alternation(pattern, flows);
-
-        PatternShape::new(combined_extent, unified_flow)
+        self.unify_alternation(combined_extent, pattern, alternatives)
     }
 
     fn check_duplicate_labels(&mut self, alternation: &Located<AlternationPattern>) {
@@ -655,38 +681,42 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         &mut self,
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
-        let mut flows: Vec<PatternFlow> = Vec::new();
+        let mut alternatives = Vec::new();
         let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
-            if let Some(body) = alternative.body() {
-                let info = self.infer_pattern(&alternation.wrap(body));
-                combined_extent = combined_extent.combine(info.root_extent);
-                flows.push(info.flow);
-            }
+            let Some(body) = alternative.body() else {
+                alternatives.push((None, PatternShape::no_value()));
+                continue;
+            };
+            let info = self.infer_pattern(&alternation.wrap(body.clone()));
+            combined_extent = combined_extent.combine(info.root_extent);
+            alternatives.push((Some(body), info));
         }
 
         for pattern in alternation.node().patterns() {
-            let info = self.infer_pattern(&alternation.wrap(pattern));
+            let info = self.infer_pattern(&alternation.wrap(pattern.clone()));
             combined_extent = combined_extent.combine(info.root_extent);
-            flows.push(info.flow);
+            alternatives.push((Some(pattern), info));
         }
 
         let pattern = Pattern::Alternation(alternation.node().clone());
-        let unified_flow = self.unify_alternation(pattern, flows);
-
-        PatternShape::new(combined_extent, unified_flow)
+        self.unify_alternation(combined_extent, pattern, alternatives)
     }
 
-    fn unify_alternation(&mut self, pattern: Pattern, flows: Vec<PatternFlow>) -> PatternFlow {
-        match unify_flows(self.ctx.type_ctx, flows) {
-            Ok(flow) => flow,
+    fn unify_alternation(
+        &mut self,
+        root_extent: RootExtent,
+        pattern: Pattern,
+        alternatives: Vec<(Option<Pattern>, PatternShape)>,
+    ) -> PatternShape {
+        match unify_alternative_flows(self.ctx.type_ctx, alternatives) {
+            Ok(Some(field_flow)) => PatternShape::fields(root_extent, field_flow),
+            Ok(None) => PatternShape::new(root_extent, PatternFlow::NoValue),
             Err(error) => {
-                self.ctx
-                    .type_ctx
-                    .record_alternation_incompatibility(pattern.clone(), error.field());
+                self.ctx.type_ctx.block_capture_producers(error.producers());
                 self.report_alternative_unify_error(pattern.syntax(), &error);
-                PatternFlow::NoValue
+                PatternShape::new(root_extent, PatternFlow::NoValue)
             }
         }
     }
@@ -724,32 +754,34 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 .unwrap_or_else(PatternShape::no_value);
         };
         let capture_name = self.ctx.interner.intern(&name_token.text()[1..]); // Strip @ prefix
+        let capture_range = capture.text_range();
 
         let capture_type = self.resolve_capture_type(&capture);
-        let errors_before_raw_capture = self.ctx.diag.error_count();
+        let errors_before_capture = self.ctx.diag.error_count();
 
         let Some(inner) = captured_pattern.inner() else {
             // A bare capture binds the current node.
-            let raw = RawCapture::admitted(captured_pattern, capture_name, RawCaptureValue::node());
-            let observation = self
+            let inferred = InferredCapture::admitted(
+                captured_pattern,
+                capture_name,
+                InferredCaptureValue::node(),
+            );
+            let observation =
+                inferred.observation(capture_type.capture_type_intent(captured.source()));
+            let field = self.finish_capture_type(inferred, capture_type);
+            let capture_id = self
                 .ctx
                 .type_ctx
-                .records_raw_output_provenance()
-                .then(|| raw.observation(capture_type.raw_intent(captured.source())));
-            let field = self.finish_capture_type(raw, capture_type);
-            if let Some(observation) = observation {
-                self.ctx
-                    .type_ctx
-                    .record_raw_capture_observation(captured.clone(), observation.emitting(field));
-            }
-            return PatternShape::new(
-                RootExtent::SingleNode,
-                PatternFlow::Fields(
-                    self.ctx
-                        .type_ctx
-                        .intern_single_field_record(capture_name, field),
-                ),
+                .record_capture(captured.clone(), observation.producing(field));
+            let field_flow = CaptureFieldDestination::OwnScope.into_field_flow(
+                self.ctx.type_ctx,
+                capture_name,
+                field,
+                capture_id,
+                Span::new(captured.source(), name_token.text_range()),
+                Span::new(captured.source(), capture_range),
             );
+            return PatternShape::fields(RootExtent::SingleNode, field_flow);
         };
         let inner = captured.wrap(inner);
 
@@ -787,7 +819,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         } else {
             base
         };
-        let raw_field = RecordField::new(final_type);
+        let inferred_field = RecordField::new(final_type);
         let destination = self.capture_field_destination(
             capture_name,
             inner.node(),
@@ -799,48 +831,50 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // captures that bubble beside it do not invalidate that node value or
         // hide this capture's own capture-type diagnostics. Structured/list
         // captures own their inner output, so an error in that output does
-        // invalidate their raw contract.
+        // invalidate their inferred contract.
         let inner_has_capture_error = !matches!(inner.node(), Pattern::QuantifiedPattern(_))
             && inner_info.flow.is_no_value()
             && (inner_info.root_extent == RootExtent::Other
                 || matches!(inner.node(), Pattern::DefRef(_)));
-        let owned_inner_error = mechanism != CaptureKind::Node
-            && self.ctx.diag.error_count() != errors_before_raw_capture;
-        let raw_capture_valid =
+        let owned_inner_error =
+            mechanism != CaptureKind::Node && self.ctx.diag.error_count() != errors_before_capture;
+        let capture_valid =
             destination.admits_capture() && !inner_has_capture_error && !owned_inner_error;
-        let emits_field = destination.admits_capture();
+        let produces_field = destination.admits_capture();
         let zero_node_terminal = !matches!(
             self.ctx
                 .type_ctx
                 .in_progress()
-                .type_shape(raw_field.final_type),
+                .type_shape(inferred_field.final_type),
             Some(TypeShape::Option(_))
         ) && self.pattern_can_match_zero_nodes(inner.node());
-        let raw = RawCapture::after_validation(
+        let inferred = InferredCapture::after_validation(
             captured_pattern,
             capture_name,
-            RawCaptureValue::inferred(mechanism, raw_field, zero_node_terminal),
-            raw_capture_valid,
+            InferredCaptureValue::inferred(mechanism, inferred_field, zero_node_terminal),
+            capture_valid,
         );
-        let observation = self
+        let observation = inferred.observation(capture_type.capture_type_intent(captured.source()));
+        let field_info = self.finish_capture_type(inferred, capture_type);
+        let observation = if produces_field {
+            observation.producing(field_info)
+        } else {
+            observation
+        };
+        let capture_id = self
             .ctx
             .type_ctx
-            .records_raw_output_provenance()
-            .then(|| raw.observation(capture_type.raw_intent(captured.source())));
-        let field_info = self.finish_capture_type(raw, capture_type);
-        if let Some(observation) = observation {
-            let observation = if emits_field {
-                observation.emitting(field_info)
-            } else {
-                observation
-            };
-            self.ctx
-                .type_ctx
-                .record_raw_capture_observation(captured.clone(), observation);
-        }
-        let flow = destination.finish(self.ctx.type_ctx, capture_name, field_info);
+            .record_capture(captured.clone(), observation);
+        let field_flow = destination.into_field_flow(
+            self.ctx.type_ctx,
+            capture_name,
+            field_info,
+            capture_id,
+            Span::new(captured.source(), name_token.text_range()),
+            Span::new(captured.source(), capture_range),
+        );
 
-        PatternShape::new(inner_info.root_extent, flow)
+        PatternShape::fields(inner_info.root_extent, field_flow)
     }
 
     /// `:: TypeName` — name a structured capture or alias its semantic leaf.
@@ -910,7 +944,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Some(TypeShape::Text | TypeShape::Bool) => {
                 unreachable!("ordinary captures cannot produce text or boolean roots")
             }
-            // Recovery-only no-value flow falls back to a Node alias, matching the raw
+            // Recovery-only no-value flow falls back to a Node alias, matching the inferred
             // capture's recovery type.
             _ => {
                 let declared = self.ctx.type_ctx.declare_capture_type(name, TYPE_NODE);
@@ -968,23 +1002,23 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     fn finish_capture_type(
         &mut self,
-        raw: RawCapture,
+        inferred: InferredCapture,
         capture_type: ResolvedCaptureType,
     ) -> RecordField {
-        let pattern = Pattern::CapturedPattern(raw.occurrence.clone());
-        let raw_fact = raw.fact();
-        let ordinary = || CaptureFact::ordinary(raw_fact.kind());
+        let pattern = Pattern::CapturedPattern(inferred.occurrence.clone());
+        let fact = inferred.fact();
+        let ordinary = || CaptureFact::ordinary(fact.kind());
 
         let field = match capture_type {
-            ResolvedCaptureType::Custom(name, range) if raw.valid => {
+            ResolvedCaptureType::Custom(name, range) if inferred.valid => {
                 let final_type =
-                    self.apply_custom_capture_type(raw.value.field.final_type, name, range);
+                    self.apply_custom_capture_type(inferred.value.field.final_type, name, range);
                 RecordField::new(final_type)
             }
             ResolvedCaptureType::BuiltIn(_, _)
             | ResolvedCaptureType::Custom(_, _)
             | ResolvedCaptureType::Invalid
-            | ResolvedCaptureType::None => raw.value.field,
+            | ResolvedCaptureType::None => inferred.value.field,
         };
         self.ctx.type_ctx.record_capture_fact(pattern, ordinary());
         field
@@ -1027,26 +1061,27 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             return CaptureFieldDestination::OwnScope;
         }
 
-        let PatternFlow::Fields(type_id) = &inner_info.flow else {
+        let PatternFlow::Fields(_) = &inner_info.flow else {
             unreachable!("node captures only merge field flow");
         };
-        let fields = self
-            .ctx
-            .type_ctx
-            .in_progress()
-            .expect_record_fields(*type_id)
-            .clone();
+        let fields = InferredFieldFlow::forwarded(
+            inner.clone(),
+            inner_info
+                .field_flow
+                .as_ref()
+                .expect("field-producing capture inner retains provenance"),
+        )
+        .fields;
         let admits_capture = !fields.contains_key(&capture_name);
         if !admits_capture {
             let field = self.ctx.interner.resolve(capture_name).to_string();
-            let first = diagnostics::capture_site_map(inner.syntax(), self.ctx.interner)
+            let first = fields
                 .get(&capture_name)
-                .copied()
-                .expect("bubbling result field has a capture site in its source scope");
-            let source = self.source;
+                .expect("duplicate result field has a first producer")
+                .first_name_span();
             self.report(DiagnosticKind::DuplicateCaptureInScope, range)
                 .detail(field)
-                .related_to(Span::new(source, first), "first captured here")
+                .related_to(first, "first captured here")
                 .emit();
         }
 
@@ -1137,7 +1172,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         };
         let quantifier = self.quantifier_kind(quant.node());
 
-        let flow = match quantifier {
+        let mut result = match quantifier {
             QuantifierKind::Optional => match context {
                 // A captured `?` of a multi-node no-value group has no single node
                 // to bind (or null), just like a captured repeat. Otherwise the
@@ -1150,7 +1185,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                         &inner_info,
                         Some(capture_name),
                     );
-                    inner_info.flow
+                    self.forward_shape(inner.node().clone(), &inner_info)
                 }
                 // Internal captures of a bare `?` have nothing to collect them,
                 // exactly like a bare repeat: a skip would scatter correlated
@@ -1158,14 +1193,17 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // bubbling shape so downstream inference stays coherent.
                 QuantifiedContext::Bare => {
                     self.report_uncollected_quantified_captures(quant.node(), &inner_info);
-                    self.make_flow_optional(inner_info.flow)
+                    self.make_flow_optional(inner.node().clone(), &inner_info)
                 }
-                QuantifiedContext::Discard => PatternFlow::NoValue,
+                QuantifiedContext::Discard => PatternShape::no_value(),
                 // The definition collects the skip as its own absence: the output
                 // is the option type itself, not a field-completion flag.
                 QuantifiedContext::DefinitionValue => {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
-                    PatternFlow::Value(self.ctx.type_ctx.intern_option(element))
+                    PatternShape::new(
+                        RootExtent::SingleNode,
+                        PatternFlow::Value(self.ctx.type_ctx.intern_option(element)),
+                    )
                 }
             },
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
@@ -1185,21 +1223,28 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 }
                 if context == QuantifiedContext::DefinitionValue {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
-                    PatternFlow::Value(
-                        self.ctx
-                            .type_ctx
-                            .intern_type(TypeShape::List { element, minimum }),
+                    PatternShape::new(
+                        RootExtent::SingleNode,
+                        PatternFlow::Value(
+                            self.ctx
+                                .type_ctx
+                                .intern_type(TypeShape::List { element, minimum }),
+                        ),
                     )
                 } else {
                     self.check_quantified_list_dimensionality(quant.node(), &inner_info, context);
-                    self.make_flow_list(inner_info.flow, minimum, context)
+                    PatternShape::new(
+                        RootExtent::SingleNode,
+                        self.make_flow_list(inner_info.flow.clone(), minimum, context),
+                    )
                 }
             }
         };
 
         // One match of a quantified pattern has variable top-level extent,
         // regardless of its element's extent.
-        PatternShape::new(RootExtent::Other, flow)
+        result.root_extent = RootExtent::Other;
+        result
     }
 
     fn check_quantified_list_dimensionality(
@@ -1312,26 +1357,62 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    fn make_flow_optional(&mut self, flow: PatternFlow) -> PatternFlow {
-        match flow {
-            PatternFlow::NoValue => PatternFlow::NoValue,
-            PatternFlow::Value(t) => PatternFlow::Value(self.ctx.type_ctx.intern_option(t)),
-            PatternFlow::Fields(type_id) => {
-                let fields = self
-                    .ctx
-                    .type_ctx
-                    .in_progress()
-                    .expect_record_fields(type_id)
-                    .clone();
-                let option_fields = fields
-                    .into_iter()
-                    .map(|(name, field)| {
-                        let final_type = self.ctx.type_ctx.intern_option(field.final_type);
-                        (name, RecordField::new(final_type))
+    fn make_flow_optional(
+        &mut self,
+        source_pattern: Pattern,
+        source: &PatternShape,
+    ) -> PatternShape {
+        match &source.flow {
+            PatternFlow::NoValue => PatternShape::no_value(),
+            PatternFlow::Value(type_id) => PatternShape::new(
+                RootExtent::SingleNode,
+                PatternFlow::Value(self.ctx.type_ctx.intern_option(*type_id)),
+            ),
+            PatternFlow::Fields(_) => {
+                let source_fields = source
+                    .field_flow
+                    .as_ref()
+                    .expect("field-producing optional inner retains provenance");
+                let fields = source_fields
+                    .fields
+                    .iter()
+                    .map(|(&name, field)| {
+                        let info = RecordField::new(
+                            self.ctx.type_ctx.intern_option(field.info.final_type),
+                        );
+                        (
+                            name,
+                            InferredField::forwarded(info, source_pattern.clone(), name, field),
+                        )
                     })
-                    .collect();
-                PatternFlow::Fields(self.ctx.type_ctx.intern_record(option_fields))
+                    .collect::<BTreeMap<_, _>>();
+                let record = self.ctx.type_ctx.intern_record(
+                    fields
+                        .iter()
+                        .map(|(&name, field)| (name, field.info))
+                        .collect(),
+                );
+                PatternShape::fields(
+                    RootExtent::SingleNode,
+                    InferredFieldFlow::new(record, fields),
+                )
             }
+        }
+    }
+
+    fn forward_shape(&self, source_pattern: Pattern, source: &PatternShape) -> PatternShape {
+        match &source.flow {
+            PatternFlow::Fields(_) => PatternShape::fields(
+                source.root_extent,
+                InferredFieldFlow::forwarded(
+                    source_pattern,
+                    source
+                        .field_flow
+                        .as_ref()
+                        .expect("field-producing source retains provenance"),
+                ),
+            ),
+            _ => PatternShape::new(source.root_extent, source.flow.clone()),
         }
     }
 
@@ -1402,7 +1483,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             self.report_field_requires_single_node(field.node(), value.node());
         }
 
-        PatternShape::new(RootExtent::SingleNode, value_info.flow)
+        let mut result = self.forward_shape(value.node().clone(), &value_info);
+        result.root_extent = RootExtent::SingleNode;
+        result
     }
 
     /// The field value under its capture/quantifier wrappers. `f: (x)* @c`
@@ -1491,7 +1574,7 @@ pub(super) struct InferPassEnv<'a, 'd> {
     pub diag: &'d mut Diagnostics,
 }
 
-/// Syntax-only fixpoints computed once before raw inference. Capture-type
+/// Syntax-only fixpoints computed once before type inference. Capture-type
 /// normalization reads the builtin-only provenance projection and never
 /// recomputes them.
 pub(super) struct StructuralFacts {
@@ -1541,13 +1624,6 @@ impl<'a, 'd> InferPass<'a, 'd> {
     pub fn new(analysis: InferPassEnv<'a, 'd>) -> Self {
         Self {
             ctx: TypeAnalysisBuilder::new(),
-            analysis,
-        }
-    }
-
-    pub fn normalizing_capture_types(analysis: InferPassEnv<'a, 'd>) -> Self {
-        Self {
-            ctx: TypeAnalysisBuilder::for_capture_normalization(),
             analysis,
         }
     }
@@ -1674,62 +1750,4 @@ impl<'a, 'd> InferPass<'a, 'd> {
             "definition root-extent pre-pass must agree with inference",
         );
     }
-}
-
-pub(super) fn freeze_field_completions(types: &mut TypeAnalysisBuilder) {
-    for (pattern, type_id) in types.alternation_field_results() {
-        let fields = types.in_progress().expect_record_fields(type_id).clone();
-        let alternative_fields = alternation_alternative_fields(types, &pattern);
-        let completions = fields
-            .into_iter()
-            .map(|(name, info)| {
-                let omitted = alternative_fields
-                    .iter()
-                    .any(|fields| !fields.contains(&name));
-                let completion = if !omitted {
-                    FieldCompletion::AlwaysPresent
-                } else if matches!(
-                    types.in_progress().type_shape(info.final_type),
-                    Some(TypeShape::List { .. })
-                ) {
-                    FieldCompletion::EmptyList
-                } else {
-                    FieldCompletion::Absent
-                };
-                (name, completion)
-            })
-            .collect();
-        types.record_field_completions(pattern, FieldCompletions::new(completions));
-    }
-}
-
-fn alternation_alternative_fields(
-    types: &TypeAnalysisBuilder,
-    pattern: &Pattern,
-) -> Vec<HashSet<Symbol>> {
-    let bodies: Vec<Option<Pattern>> = match pattern {
-        Pattern::Alternation(alternation) => alternation
-            .alternatives()
-            .map(|alternative| alternative.body())
-            .chain(alternation.patterns().map(Some))
-            .collect(),
-        _ => unreachable!("field completions are only built for alternations"),
-    };
-
-    bodies
-        .into_iter()
-        .map(|body| {
-            let Some(body) = body else {
-                return HashSet::new();
-            };
-            let view = types.in_progress();
-            let Some(shape) = view.pattern_result(&body) else {
-                return HashSet::new();
-            };
-            let PatternFlow::Fields(type_id) = shape.flow else {
-                return HashSet::new();
-            };
-            view.expect_record_fields(type_id).keys().copied().collect()
-        })
-        .collect()
 }
