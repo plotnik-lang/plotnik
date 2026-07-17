@@ -144,8 +144,6 @@ fn printer_with_custom_path() {
       |
     1 | hello world
       | ^^^^^
-      |
-    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -237,8 +235,6 @@ fn printer_multiple_diagnostics() {
       |
     1 | hello world!
       |       ^^^^
-      |
-    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -488,8 +484,6 @@ fn multi_file_cross_file_related() {
       |
     1 | Foo = (bar)
       | --- defined here
-      |
-    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 

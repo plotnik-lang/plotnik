@@ -5,46 +5,87 @@ use rowan::TextRange;
 
 use crate::compiler::analyze::types::type_shape::RecordField;
 use crate::compiler::diagnostics::report::DiagnosticKind;
+use crate::compiler::diagnostics::span::Span;
+use crate::compiler::parse::cst::SyntaxNode;
 use crate::core::Symbol;
 
 use super::InferVisitor;
+use super::diagnostics::capture_site_map;
 
-impl InferVisitor<'_, '_> {
-    /// Add one field to a scope, reporting a diagnostic if the name is already
-    /// bound. `range` locates the offending capture for the caret. This is the
-    /// duplicate-capture gate for merging independently inferred child flows.
-    /// A node's own bubbling capture validates its destination earlier, before
-    /// capture-type normalization, because that admission result gates whether
-    /// the capture type may run at all.
-    pub(super) fn insert_scope_field(
+struct ScopeField {
+    value: RecordField,
+    first_site: TextRange,
+}
+
+impl ScopeField {
+    fn new(value: RecordField, first_site: TextRange) -> Self {
+        Self { value, first_site }
+    }
+}
+
+#[derive(Default)]
+pub(super) struct ScopeFields {
+    entries: BTreeMap<Symbol, ScopeField>,
+}
+
+impl ScopeFields {
+    fn insert(
         &mut self,
-        target: &mut BTreeMap<Symbol, RecordField>,
         name: Symbol,
-        info: RecordField,
-        range: TextRange,
-    ) {
-        match target.entry(name) {
-            Entry::Vacant(e) => {
-                e.insert(info);
+        value: RecordField,
+        site: TextRange,
+    ) -> Result<(), TextRange> {
+        match self.entries.entry(name) {
+            Entry::Vacant(entry) => {
+                entry.insert(ScopeField::new(value, site));
+                Ok(())
             }
-            Entry::Occupied(_) => {
-                let field = self.ctx.interner.resolve(name).to_string();
-                self.report(DiagnosticKind::DuplicateCaptureInScope, range)
-                    .detail(field)
-                    .emit();
-            }
+            Entry::Occupied(entry) => Err(entry.get().first_site),
         }
     }
 
-    /// Fold `source` fields into `target` in place, rejecting name collisions.
+    pub(super) fn into_fields(self) -> BTreeMap<Symbol, RecordField> {
+        self.entries
+            .into_iter()
+            .map(|(name, field)| (name, field.value))
+            .collect()
+    }
+}
+
+impl InferVisitor<'_, '_> {
+    fn insert_scope_field(
+        &mut self,
+        target: &mut ScopeFields,
+        name: Symbol,
+        value: RecordField,
+        site: TextRange,
+    ) {
+        let Err(first_site) = target.insert(name, value, site) else {
+            return;
+        };
+
+        let field = self.ctx.interner.resolve(name).to_string();
+        let source = self.source;
+        self.report(DiagnosticKind::DuplicateCaptureInScope, site)
+            .detail(field)
+            .related_to(Span::new(source, first_site), "first captured here")
+            .emit();
+    }
+
+    /// Fold `source` fields into `target` in one pass over their capture
+    /// provenance, rejecting name collisions.
     pub(super) fn merge_scope_fields(
         &mut self,
-        target: &mut BTreeMap<Symbol, RecordField>,
+        target: &mut ScopeFields,
         source: &BTreeMap<Symbol, RecordField>,
-        range: TextRange,
+        source_root: &SyntaxNode,
     ) {
-        for (&name, &info) in source {
-            self.insert_scope_field(target, name, info, range);
+        let sites = capture_site_map(source_root, self.ctx.interner);
+        for (&name, &value) in source {
+            let site = *sites
+                .get(&name)
+                .expect("bubbling result field has a capture site in its source scope");
+            self.insert_scope_field(target, name, value, site);
         }
     }
 }

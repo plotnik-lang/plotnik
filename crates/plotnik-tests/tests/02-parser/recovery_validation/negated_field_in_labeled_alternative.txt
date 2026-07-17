@@ -9,4 +9,4 @@ error: negated grammar fields cannot appear directly in alternations
 2 |   Foo: -key
   |        ^^^^
   |
-help: negate the grammar field inside a node alternative: `[(a -field) (b)]`
+help: move the negated grammar field inside a concrete node alternative

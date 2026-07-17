@@ -3,13 +3,13 @@ Q = (array
   (identifier)*
 )
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), no `array` places this child first; an `array` begins with `"["`
+error: with the exact anchor (`.!`), this child cannot appear first in `array` because an `array` begins with `"["`
  --> query.ptk:1:6
   |
 1 | Q = (array
   |      ^^^^^
   |
-help: `.!` allows no syntax-tree node in its gap — not even an anonymous token or comment; the soft anchor `.` skips those: `(array
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(array
         .
         (identifier)*
       )`

@@ -2,12 +2,12 @@ Q = (function_declaration
   (program)
 )+ @fns
 ------------------ DIAGNOSTICS -------------------
-error: `program` cannot be a child of this node
+error: `program` cannot be an unlabeled child of `function_declaration`
  --> query.ptk:2:4
   |
 1 | Q = (function_declaration
-  |      -------------------- on `function_declaration`
+  |      -------------------- `function_declaration` starts here
 2 |   (program)
   |    ^^^^^^^
   |
-help: `function_declaration` has no unlabeled children — use its grammar fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`
+help: `function_declaration` has no unlabeled children. Use its grammar fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`

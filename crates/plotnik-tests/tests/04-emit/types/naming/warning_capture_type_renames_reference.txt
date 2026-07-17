@@ -4,7 +4,7 @@ Q = (program
   (Foo) @val :: Renamed
 )
 ------------------ DIAGNOSTICS -------------------
-warning: this capture already has type `Foo`; naming it `Renamed` won't have an effect
+warning: this capture already has type `Foo`. Naming it `Renamed` has no effect
  --> query.ptk:4:17
   |
 4 |   (Foo) @val :: Renamed

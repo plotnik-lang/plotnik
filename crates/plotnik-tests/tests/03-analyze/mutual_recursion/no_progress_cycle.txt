@@ -12,12 +12,13 @@ error: infinite recursion: cycle makes no progress
   |    - references B (completing cycle)
 ...
 6 | B = (A)
-  | -    ^
+  | -----^-
   | |    |
   | |    references A
   | B is defined here
   |
 help: match at least one syntax-tree node before recursing
+help: make every path through this cycle match a syntax-tree node before it returns to `B`
 -------------------- SYMBOLS ---------------------
 A
   B

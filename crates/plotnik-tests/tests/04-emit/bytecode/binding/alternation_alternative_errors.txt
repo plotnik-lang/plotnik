@@ -9,7 +9,7 @@ error: `function_declaraton` is not a valid node kind
 2 |   (function_declaraton)
   |    ^^^^^^^^^^^^^^^^^^^
   |
-help: did you mean `function_declaration`?
+help: replace with `function_declaration`
   |
 2 |   (function_declaration)
   |                     +
@@ -20,7 +20,7 @@ error: `class_declaraton` is not a valid node kind
 3 |   (class_declaraton)
   |    ^^^^^^^^^^^^^^^^
   |
-help: did you mean `class_declaration`?
+help: replace with `class_declaration`
   |
 3 |   (class_declaration)
   |                  +

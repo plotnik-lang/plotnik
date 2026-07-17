@@ -6,5 +6,5 @@ error: matching the `expression#` supertype is not supported yet
 1 | Q = (expression#statement_block)
   |      ^^^^^^^^^^
   |
-help: match the concrete subtypes with an alternation, e.g. `[(a) (b)]`
-help: subtypes of `expression`: `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, `jsx_self_closing_element`, `new_expression`, `primary_expression`, ... (4 more)
+help: choose the concrete subtypes of `expression` that this query should match
+help: the grammar includes `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, … (7 more)

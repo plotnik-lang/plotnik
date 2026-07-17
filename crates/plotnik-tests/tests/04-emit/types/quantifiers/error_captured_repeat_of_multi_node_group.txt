@@ -5,7 +5,7 @@ Q = (program
   }* @rows
 )
 ------------------ DIAGNOSTICS -------------------
-error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
+error: `@rows` cannot collect `{ (expression_statement) (debugger_statement) }*` because one repetition does not produce one node or value
  --> query.ptk:2:3
   |
 2 | /   {
@@ -14,4 +14,4 @@ error: one repeat of this `*` group doesn't match exactly one node, so there is 
 5 | |   }* @rows
   | |____^
   |
-help: add internal captures: `{(a) @a (b) @b}* @items`
+help: make each repetition produce a record by changing `(expression_statement)` to `(expression_statement) @rows_item`

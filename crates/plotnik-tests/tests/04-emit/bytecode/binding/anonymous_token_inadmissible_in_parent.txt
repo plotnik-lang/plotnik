@@ -7,4 +7,3 @@ error: the grammar builds no `array` with these children
   |      ^^^^^
   |
 help: `array` allows children `expression` or `spread_element`
-help: each child is admissible here on its own — it is their combination or order the grammar never produces

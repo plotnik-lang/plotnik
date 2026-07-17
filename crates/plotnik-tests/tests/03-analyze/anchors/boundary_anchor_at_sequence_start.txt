@@ -9,5 +9,5 @@ error: anchor needs an enclosing node
 2 |   .
   |   ^
   |
-help: wrap in a named node: `(parent . (child))`
+help: move the anchor and its neighboring pattern inside a named node
 -------------------- SYMBOLS ---------------------

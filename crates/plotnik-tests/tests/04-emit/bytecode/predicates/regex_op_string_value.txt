@@ -1,9 +1,11 @@
 Q = (identifier =~ "foo") @id
 ------------------ DIAGNOSTICS -------------------
-error: predicate operator and value do not match
+error: predicate `identifier =~ "foo"` uses `=~`, which requires a regex value, but supplies a quoted string
  --> query.ptk:1:17
   |
 1 | Q = (identifier =~ "foo") @id
-  |                 ^^^^^^^^
+  |      ---------- ^^^^^^^^
+  |      |
+  |      predicate applies to `identifier`
   |
-help: use a quoted string with `==`, `!=`, `^=`, `$=`, or `*=`; use `/…/` with `=~` or `!~`
+help: change the value in `=~ "foo"` to a regex value, or choose an operator that accepts a quoted string

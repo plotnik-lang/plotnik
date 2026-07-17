@@ -9,8 +9,12 @@ Q = (program
 error: type name `Q` is already used for a different type
  --> query.ptk:5:17
   |
-1 | Q = (program
-  | - already used here
-...
-5 |     } @inner :: Q
-  |                 ^
+1 | / Q = (program
+2 | |   {
+3 | |     {
+4 | |       (comment) @comment
+5 | |     } @inner :: Q
+  | |                 ^
+6 | |   } @outer :: text
+7 | | )
+  | |_- already used here

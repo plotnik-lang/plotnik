@@ -8,7 +8,6 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::shape::validation::ValidatedAst;
 use crate::compiler::analyze::visitor::Visitor;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
-use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{self, token_src};
 use crate::core::utils::find_similar;
 
@@ -59,10 +58,10 @@ impl Visitor for DefCollector<'_, '_, '_> {
 
         let name = token_src(&token, self.src);
         if self.builder.contains(name) {
-            let first = self.first_definition_name_span(name);
+            let first = self.builder.definition_span(name);
             let mut builder = self.diag.report(
                 DiagnosticKind::DuplicateDefinition,
-                def.span_of(token.text_range()),
+                def.span_of(def.node().syntax().text_range()),
             );
             if let Some(span) = first {
                 builder = builder.related_to(span, "first defined here");
@@ -71,22 +70,6 @@ impl Visitor for DefCollector<'_, '_, '_> {
         } else {
             self.builder.insert(name, def.source(), body);
         }
-    }
-}
-
-impl DefCollector<'_, '_, '_> {
-    /// The name-token span of the already-recorded definition (falling back to
-    /// its body).
-    fn first_definition_name_span(&self, name: &str) -> Option<Span> {
-        let (source, body) = self.builder.get(name)?;
-        let range = body
-            .syntax()
-            .parent()
-            .and_then(ast::Def::cast)
-            .and_then(|def| def.name())
-            .map(|tok| tok.text_range())
-            .unwrap_or_else(|| body.text_range());
-        Some(Span::new(source, range))
     }
 }
 
@@ -112,7 +95,14 @@ impl Visitor for ReferenceValidator<'_, '_> {
             r.span_of(name_token.text_range()),
         );
         if let Some(similar) = find_similar(name, &candidates) {
-            builder = builder.fix(format!("did you mean `({similar})`?"), similar);
+            builder = builder.fix(
+                format!("replace with the defined reference `({similar})`"),
+                similar,
+            );
+        } else {
+            builder = builder.hint(format!(
+                "define `{name}` before using `({name})`, or change the reference to an existing definition"
+            ));
         }
         builder.detail(name).emit();
     }

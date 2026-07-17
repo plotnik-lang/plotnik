@@ -3,7 +3,7 @@ Bad = {
   (number) @b
 }*
 ------------------ DIAGNOSTICS -------------------
-error: the definition names the list itself, so each `*` element — an anonymous record of captures — is left without a type name
+error: definition `Bad` names the list, but its element `{ (identifier) @a (number) @b }` is an anonymous record of captures without a type name
  --> query.ptk:1:7
   |
 1 |   Bad = {
@@ -13,4 +13,4 @@ error: the definition names the list itself, so each `*` element — an anonymou
 4 | | }*
   | |__^
   |
-help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)*`
+help: move `{ (identifier) @a (number) @b }` into its own named definition, then apply `*` to a reference to that definition

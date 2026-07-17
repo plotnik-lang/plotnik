@@ -11,7 +11,6 @@ help: use `-`
 1 - Q = (pair !key*)
 1 + Q = (pair -key*)
   |
-help: use `-field` instead of `!field`
 
 error: negated grammar fields cannot be quantified
  --> query.ptk:1:15

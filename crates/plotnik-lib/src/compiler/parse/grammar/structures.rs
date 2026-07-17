@@ -18,14 +18,20 @@ enum ParenHead<'q> {
     DefRef(&'q str),
 }
 
-/// Native node-predicate equivalent for the tree-sitter predicates that have one. The rest
+#[derive(Default)]
+struct TreeSitterPredicateArguments<'q> {
+    target: Option<&'q str>,
+    value: Option<&'q str>,
+}
+
+/// Native operator equivalent for the tree-sitter predicates that have one. The rest
 /// (`#any-of?`, `#set!`, `#is?`, …) have no equivalent and get no suggestion.
-fn predicate_suggestion(name: &str) -> Option<&'static str> {
+fn predicate_operator(name: &str) -> Option<&'static str> {
     match name {
-        "eq" => Some("use `(node == \"x\")`"),
-        "not-eq" => Some("use `(node != \"x\")`"),
-        "match" => Some("use `(node =~ /re/)`"),
-        "not-match" => Some("use `(node !~ /re/)`"),
+        "eq" => Some("=="),
+        "not-eq" => Some("!="),
+        "match" => Some("=~"),
+        "not-match" => Some("!~"),
         _ => None,
     }
 }
@@ -38,6 +44,7 @@ impl<'q> Parser<'q, '_> {
         let checkpoint = self.checkpoint();
         self.push_delimiter();
         let open_paren_span = self.current_span();
+        let mut tree_sitter_sequence = false;
         self.bump();
 
         let head = match self.current() {
@@ -69,12 +76,7 @@ impl<'q> Parser<'q, '_> {
                 // Parse as Seq so it works correctly, but warn to encourage {} syntax
                 if self.at_ts(PATTERN_FIRST_TOKENS) {
                     self.start_node_at(checkpoint, SyntaxKind::Sequence);
-                    if let Some(report) = self.report_at(
-                        DiagnosticKind::TreeSitterSequenceSyntaxDeprecated,
-                        open_paren_span,
-                    ) {
-                        report.emit();
-                    }
+                    tree_sitter_sequence = true;
                 } else {
                     self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 }
@@ -83,6 +85,9 @@ impl<'q> Parser<'q, '_> {
         };
 
         self.finish_named_node_parsing(checkpoint, head);
+        if tree_sitter_sequence {
+            self.report_tree_sitter_sequence(open_paren_span);
+        }
     }
 
     fn parse_id_ref_or_node(&mut self, checkpoint: Checkpoint) -> ParenHead<'q> {
@@ -118,7 +123,7 @@ impl<'q> Parser<'q, '_> {
         };
 
         if matches!(head, ParenHead::Concrete) && self.at_ts(PREDICATE_OPS) {
-            self.parse_node_predicate();
+            self.parse_node_predicate(name);
         }
 
         head
@@ -150,7 +155,9 @@ impl<'q> Parser<'q, '_> {
         }
 
         if let Some(report) = self.report_current(DiagnosticKind::ExpectedSubtype) {
-            report.emit();
+            report
+                .detail("`/` must be followed immediately by a subtype")
+                .emit();
         }
     }
 
@@ -210,15 +217,17 @@ impl<'q> Parser<'q, '_> {
         })
     }
 
-    /// A misplaced tree-sitter predicate (`#eq?`, `#match?`, `#set!`) — unsupported. Consume the
-    /// whole tight `#name[?!]` run into one Error node so it reports as a single unit instead of
-    /// cascading into a bogus node and quantifier. Only call when [`at_ts_predicate`] holds.
+    /// A misplaced tree-sitter predicate (`#eq?`, `#match?`, `#set!`) — unsupported. Consume its
+    /// name and recognizable arguments into one Error node so they do not cascade into bogus node
+    /// and quantifier diagnostics. Only call when [`at_ts_predicate`] holds.
     pub(crate) fn error_unsupported_predicate(&mut self) {
         self.start_node(SyntaxKind::Error);
         let (span, name) = self.consume_predicate_name();
+        let arguments = self.inspect_tree_sitter_predicate_arguments();
+        self.consume_tree_sitter_predicate_arguments(&arguments);
         self.finish_node();
 
-        self.report_unsupported_predicate(span, name);
+        self.report_unsupported_predicate(span, name, arguments);
     }
 
     /// Consume a tight predicate run `#name?` / `#name!`, returning its full span and the bare
@@ -247,11 +256,73 @@ impl<'q> Parser<'q, '_> {
     fn parse_node_predicate_error(&mut self, checkpoint: Checkpoint) {
         self.start_node_at(checkpoint, SyntaxKind::Error);
         let (span, name) = self.consume_predicate_name();
-        self.report_unsupported_predicate(span, name);
+        let arguments = self.inspect_tree_sitter_predicate_arguments();
         self.consume_until_matching_paren();
         self.pop_delimiter();
         self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
         self.finish_node();
+        self.report_unsupported_predicate(span, name, arguments);
+    }
+
+    fn inspect_tree_sitter_predicate_arguments(&mut self) -> TreeSitterPredicateArguments<'q> {
+        self.skip_trivia_to_buffer();
+        let mut pos = self.pos;
+        let mut arguments = TreeSitterPredicateArguments::default();
+
+        if let Some(token) = self.tokens.get(pos)
+            && token.kind == SyntaxKind::CaptureToken
+        {
+            arguments.target = Some(self.source_text(token.span));
+            pos += 1;
+        }
+
+        while self
+            .tokens
+            .get(pos)
+            .is_some_and(|token| token.kind.is_trivia())
+        {
+            pos += 1;
+        }
+        let Some(value) = self.tokens.get(pos) else {
+            return arguments;
+        };
+        match value.kind {
+            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
+                let quote = value.kind;
+                let start = value.span.start();
+                pos += 1;
+                while let Some(token) = self.tokens.get(pos) {
+                    if token.kind == quote {
+                        arguments.value =
+                            Some(self.source_text(TextRange::new(start, token.span.end())));
+                        break;
+                    }
+                    pos += 1;
+                }
+            }
+            SyntaxKind::RegexLiteral => {
+                arguments.value = Some(self.source_text(value.span));
+            }
+            _ => {}
+        }
+        arguments
+    }
+
+    fn consume_tree_sitter_predicate_arguments(
+        &mut self,
+        arguments: &TreeSitterPredicateArguments<'_>,
+    ) {
+        if arguments.target.is_some() {
+            self.bump();
+        }
+        if arguments.value.is_none() {
+            return;
+        }
+        match self.current() {
+            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.skip_string_tokens(),
+            SyntaxKind::RegexLiteral => self.bump(),
+            _ => unreachable!("inspected predicate value remains current"),
+        }
     }
 
     fn consume_until_matching_paren(&mut self) {
@@ -280,19 +351,39 @@ impl<'q> Parser<'q, '_> {
     /// Report an unsupported tree-sitter predicate, suggesting the native node predicate only
     /// for the ones with a real equivalent. `#set!`/`#is?`/`#any-of?` have none, so they get
     /// the bare "not supported" message rather than a misleading suggestion.
-    fn report_unsupported_predicate(&mut self, span: TextRange, name: &str) {
+    fn report_unsupported_predicate(
+        &mut self,
+        span: TextRange,
+        name: &str,
+        arguments: TreeSitterPredicateArguments<'_>,
+    ) {
+        let hint = match (predicate_operator(name), arguments.target, arguments.value) {
+            (Some(operator @ ("==" | "!=")), Some(target), Some(value)) => Some(format!(
+                "move `{operator} {value}` into the node pattern captured as `{target}`"
+            )),
+            (Some(operator @ ("=~" | "!~")), Some(target), Some(value)) => Some(format!(
+                "move a `{operator}` predicate for {value} into the node pattern captured as `{target}`"
+            )),
+            (Some(operator), Some(target), None) => Some(format!(
+                "`#{name}?` corresponds to `{operator}` inside the node pattern captured as `{target}`, but this call has no value"
+            )),
+            (Some(operator), _, _) => Some(format!(
+                "`#{name}?` corresponds to `{operator}` inside a node pattern, but this call does not provide both a captured target and a compatible value"
+            )),
+            (None, _, _) => None,
+        };
         let Some(report) = self.report_at(DiagnosticKind::UnsupportedPredicate, span) else {
             return;
         };
 
-        match predicate_suggestion(name) {
+        match hint {
             Some(hint) => report.hint(hint).emit(),
             None => report.emit(),
         }
     }
 
     /// Parse a node predicate: `== "value"`, `=~ /pattern/`, etc.
-    fn parse_node_predicate(&mut self) {
+    fn parse_node_predicate(&mut self, node_name: &str) {
         self.start_node(SyntaxKind::NodePredicate);
 
         self.bump();
@@ -302,7 +393,14 @@ impl<'q> Parser<'q, '_> {
                 self.skip_string_tokens();
             }
             SyntaxKind::UnterminatedString => {
-                self.error_and_bump(DiagnosticKind::UnclosedString);
+                if let Some(report) = self.report_current(DiagnosticKind::UnclosedString) {
+                    report
+                        .hint(format!(
+                            "close the quoted value in the predicate on `{node_name}`"
+                        ))
+                        .emit();
+                }
+                self.bump_as_error();
             }
             SyntaxKind::RegexLiteral => {
                 self.start_node(SyntaxKind::Regex);
@@ -325,6 +423,39 @@ impl<'q> Parser<'q, '_> {
         }
 
         self.finish_node();
+    }
+
+    fn report_tree_sitter_sequence(&mut self, open_paren_span: TextRange) {
+        let Some(end) = self.last_non_trivia_end() else {
+            return;
+        };
+        let range = TextRange::new(open_paren_span.start(), end);
+        let written = self.source_text(range).to_string();
+        let Some(inner) = written
+            .strip_prefix('(')
+            .and_then(|text| text.strip_suffix(')'))
+        else {
+            return;
+        };
+        let replacement = format!("{{{inner}}}");
+        if let Some(report) =
+            self.report_at(DiagnosticKind::TreeSitterSequenceSyntaxDeprecated, range)
+        {
+            let detail = if written.contains(['\r', '\n']) {
+                "this parenthesized group uses Tree-sitter syntax for a sibling sequence"
+                    .to_string()
+            } else {
+                format!("`{written}` uses Tree-sitter parentheses for a sibling sequence")
+            };
+            report
+                .detail(detail)
+                .fix("replace the outer parentheses with braces", replacement)
+                .emit();
+        }
+    }
+
+    fn source_text(&self, range: TextRange) -> &'q str {
+        &self.source[usize::from(range.start())..usize::from(range.end())]
     }
 
     /// Parse a regex literal: `/pattern/`
@@ -487,6 +618,9 @@ impl<'q> Parser<'q, '_> {
             if self.at(until) {
                 break;
             }
+            if self.consume_stray_closer_if_expected_later(until) {
+                continue;
+            }
             if self.at_ts(SEPARATORS) {
                 self.error_skip_separator();
                 continue;
@@ -562,6 +696,9 @@ impl<'q> Parser<'q, '_> {
             }
             if self.at(SyntaxKind::BracketClose) {
                 break;
+            }
+            if self.consume_stray_closer_if_expected_later(SyntaxKind::BracketClose) {
+                continue;
             }
             if self.at_ts(SEPARATORS) {
                 self.error_skip_separator();
@@ -694,6 +831,36 @@ impl<'q> Parser<'q, '_> {
         self.pop_delimiter();
         self.expect_close(SyntaxKind::BraceClose, DiagnosticKind::UnclosedSequence);
         self.finish_node();
+    }
+
+    fn consume_stray_closer_if_expected_later(&mut self, expected: SyntaxKind) -> bool {
+        let actual = self.current();
+        if !matches!(
+            actual,
+            SyntaxKind::ParenClose | SyntaxKind::BracketClose | SyntaxKind::BraceClose
+        ) || actual == expected
+            || !self.tokens[self.pos + 1..]
+                .iter()
+                .any(|token| token.kind == expected)
+        {
+            return false;
+        }
+
+        let (construct, expected_text) = match expected {
+            SyntaxKind::ParenClose => ("node", ")"),
+            SyntaxKind::BracketClose => ("alternation", "]"),
+            SyntaxKind::BraceClose => ("sequence", "}"),
+            _ => unreachable!("only closing delimiters reach delimiter recovery"),
+        };
+        let actual_text = self.current_text().to_string();
+        self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
+            report
+                .detail(format!(
+                    "unexpected `{actual_text}` inside this {construct}: the matching closer is `{expected_text}`"
+                ))
+                .fix(format!("remove the stray `{actual_text}`"), "")
+        });
+        true
     }
 
     /// Consume a separator token (comma or pipe) into an Error node and emit a helpful error.

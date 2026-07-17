@@ -1,17 +1,28 @@
+use std::collections::HashSet;
+
 use rowan::TextRange;
 
 use crate::compiler::analyze::types::RootExtent;
-use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape};
+use crate::compiler::analyze::types::type_description::describe_type;
+use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape, TypeId};
 use crate::compiler::diagnostics::report::DiagnosticKind;
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{
-    AlternationPattern, CapturedPattern, FieldPattern, Pattern, QuantifiedPattern,
+    AlternationPattern, CapturedPattern, Def, FieldPattern, Pattern, QuantifiedPattern,
 };
-use crate::compiler::parse::cst::{SyntaxNode, SyntaxToken};
+use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::core::utils::to_snake_case;
+use crate::core::{Interner, Symbol};
 
 use super::super::unify::UnifyError;
 use super::InferVisitor;
+
+struct ReferencedDefinition {
+    name: String,
+    span: Span,
+    body_span: Span,
+    capture_target: Option<String>,
+}
 
 impl InferVisitor<'_, '_> {
     pub(super) fn report_field_requires_single_node(
@@ -24,7 +35,7 @@ impl InferVisitor<'_, '_> {
             .map(|t| t.text().to_string())
             .unwrap_or_else(|| "grammar field".to_string());
 
-        let related = self.referenced_definition_range(value);
+        let related = self.referenced_definition(value);
 
         let mut builder = self
             .report(
@@ -32,20 +43,33 @@ impl InferVisitor<'_, '_> {
                 value.text_range(),
             )
             .detail(field_name);
-        if let Some((src, range)) = related {
-            builder = builder.related_to(Span::new(src, range), "defined here");
+        if let Some(definition) = related {
+            builder = builder.related_to(
+                definition.span,
+                format!("`{}` is defined here", definition.name),
+            );
         }
 
         builder.emit();
     }
 
-    fn referenced_definition_range(&self, value: &Pattern) -> Option<(SourceId, TextRange)> {
+    fn referenced_definition(&self, value: &Pattern) -> Option<ReferencedDefinition> {
         let Pattern::DefRef(r) = value else {
             return None;
         };
         let name = r.name()?;
         let (source, body) = self.ctx.symbol_table.definition(name.text())?;
-        Some((source, body.text_range()))
+        let span = self
+            .ctx
+            .symbol_table
+            .definition_span(name.text())
+            .expect("resolved definition has a declaration span");
+        Some(ReferencedDefinition {
+            name: name.text().to_string(),
+            span,
+            body_span: Span::new(source, body.text_range()),
+            capture_target: first_result_capture_target(body),
+        })
     }
 
     /// Report a captured quantifier whose no-value inner doesn't match exactly one
@@ -54,6 +78,7 @@ impl InferVisitor<'_, '_> {
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
+        capture_name: Option<Symbol>,
     ) {
         let capture_has_no_single_node =
             inner_info.root_extent == RootExtent::Other && inner_info.flow.is_no_value();
@@ -62,25 +87,78 @@ impl InferVisitor<'_, '_> {
         }
 
         let op = self.quantifier_operator(quant);
-        let (detail, hint) = if op.starts_with('?') {
+        let inner = quant
+            .inner()
+            .expect("validated quantified pattern has an inner pattern");
+        let inner_text = inline_source(inner.syntax());
+        let referenced_definition = self.referenced_definition(&inner);
+        let (detail, hint) = if let Some(capture_name) = capture_name {
+            let capture_name = self.ctx.interner.resolve(capture_name);
+            let suggested_capture = if op.starts_with('?') {
+                format!("{capture_name}_value")
+            } else {
+                format!("{capture_name}_item")
+            };
+            let direct_target = first_result_capture_target(&inner);
+            let capture_target = referenced_definition
+                .as_ref()
+                .and_then(|definition| definition.capture_target.as_deref())
+                .or(direct_target.as_deref());
+            let (unit, hint) = if op.starts_with('?') {
+                (
+                    "the optional pattern",
+                    result_capture_hint(
+                        referenced_definition.as_ref(),
+                        capture_target,
+                        &suggested_capture,
+                        "make the optional pattern produce a record when it matches",
+                    ),
+                )
+            } else {
+                (
+                    "one repetition",
+                    result_capture_hint(
+                        referenced_definition.as_ref(),
+                        capture_target,
+                        &suggested_capture,
+                        "make each repetition produce a record",
+                    ),
+                )
+            };
             (
                 format!(
-                    "this `{op}` group doesn't match exactly one node, so there is no single node to bind"
+                    "`@{capture_name}` cannot collect `{inner_text}{op}` because {unit} does not produce one node or value"
                 ),
-                "capture individual nodes inside the group: `{(a) @a (b) @b}? @x`".to_string(),
+                hint,
             )
         } else {
+            let definition = enclosing_definition_name(quant);
+            let subject = format!("definition `{definition}`");
+            let suggested_capture = format!("{}_item", to_snake_case(&definition));
+            let capture_target = first_result_capture_target(&inner);
             (
                 format!(
-                    "one repeat of this `{op}` group doesn't match exactly one node, so there is no single node to bind per element"
+                    "{subject} cannot collect `{inner_text}{op}` because one occurrence does not produce one node or value"
                 ),
-                format!("add internal captures: `{{(a) @a (b) @b}}{op} @items`"),
+                result_capture_hint(
+                    None,
+                    capture_target.as_deref(),
+                    &suggested_capture,
+                    &format!("make each `{op}` occurrence produce a record"),
+                ),
             )
         };
-        self.report(DiagnosticKind::CaptureWithoutSingleNode, quant.text_range())
+        let mut builder = self
+            .report(DiagnosticKind::CaptureWithoutSingleNode, quant.text_range())
             .detail(detail)
-            .hint(hint)
-            .emit();
+            .hint(hint);
+        if let Some(definition) = referenced_definition {
+            builder = builder.related_to(
+                definition.span,
+                format!("`{}` is defined here", definition.name),
+            );
+        }
+        builder.emit();
     }
 
     /// Report a capture whose no-value inner doesn't match exactly one node —
@@ -91,33 +169,45 @@ impl InferVisitor<'_, '_> {
         &mut self,
         inner: &Pattern,
         inner_info: &PatternShape,
+        capture_name: Symbol,
     ) {
         if inner_info.root_extent != RootExtent::Other || !inner_info.flow.is_no_value() {
             return;
         }
 
-        let (detail, hint) = match inner {
-            Pattern::DefRef(_) => (
-                "the referenced definition doesn't match exactly one node, so there is no single node to bind",
-                "capture nodes inside the definition, or drop this capture",
-            ),
-            Pattern::Alternation(_) => (
-                "this alternation doesn't match exactly one node, so there is no single node to bind",
-                "capture inside the alternatives, or drop this capture",
-            ),
-            _ => (
-                "this group doesn't match exactly one node, so there is no single node to bind",
-                "capture individual nodes inside the group: `{(a) @a (b) @b} @x`",
-            ),
+        let capture_name = self.ctx.interner.resolve(capture_name).to_string();
+        let inner_text = inline_source(inner.syntax());
+        let subject = match inner {
+            Pattern::DefRef(_) => "the referenced definition",
+            Pattern::Alternation(_) => "the alternation",
+            _ => "the grouped pattern",
         };
-
-        let related = self.referenced_definition_range(inner);
+        let detail = format!(
+            "`@{capture_name}` cannot capture `{inner_text}` because {subject} does not match exactly one node"
+        );
+        let related = self.referenced_definition(inner);
+        let suggested_capture = format!("{capture_name}_value");
+        let direct_target = first_result_capture_target(inner);
+        let capture_target = related
+            .as_ref()
+            .and_then(|definition| definition.capture_target.as_deref())
+            .or(direct_target.as_deref());
+        let hint = result_capture_hint(
+            related.as_ref(),
+            capture_target,
+            &suggested_capture,
+            "make the captured pattern produce a record",
+        );
         let mut builder = self
             .report(DiagnosticKind::CaptureWithoutSingleNode, inner.text_range())
             .detail(detail)
-            .hint(hint);
-        if let Some((src, range)) = related {
-            builder = builder.related_to(Span::new(src, range), "defined here");
+            .hint(hint)
+            .hint(format!("or remove `@{capture_name}`"));
+        if let Some(definition) = related {
+            builder = builder.related_to(
+                definition.span,
+                format!("`{}` is defined here", definition.name),
+            );
         }
         builder.emit();
     }
@@ -127,23 +217,40 @@ impl InferVisitor<'_, '_> {
         &mut self,
         inner: &Pattern,
         inner_info: &PatternShape,
+        capture_name: Symbol,
     ) -> bool {
         if !matches!(inner, Pattern::DefRef(_)) || !inner_info.flow.is_no_value() {
             return false;
         }
 
-        let Some((src, range)) = self.referenced_definition_range(inner) else {
-            return false;
-        };
+        let definition = self
+            .referenced_definition(inner)
+            .expect("resolved definition reference has definition provenance");
+        let capture_name = self.ctx.interner.resolve(capture_name).to_string();
+        let suggested_capture = format!("{capture_name}_value");
+        let hint = result_capture_hint(
+            Some(&definition),
+            definition.capture_target.as_deref(),
+            &suggested_capture,
+            &format!("make `{}` produce a result", definition.name),
+        );
         let mut builder = self
             .report(
                 DiagnosticKind::MatchOnlyReferenceCapture,
                 inner.text_range(),
             )
-            .detail(
-                "the referenced definition produces no value; add a capture inside it or capture a node pattern directly",
-            );
-        builder = builder.related_to(Span::new(src, range), "defined here");
+            .detail(format!(
+                "`@{capture_name}` cannot capture `({})` because `{}` produces no result value",
+                definition.name, definition.name
+            ))
+            .hint(hint)
+            .hint(format!(
+                "or remove `@{capture_name}` and capture a node pattern directly"
+            ));
+        builder = builder.related_to(
+            definition.span,
+            format!("`{}` is defined here", definition.name),
+        );
         builder.emit();
         true
     }
@@ -151,16 +258,24 @@ impl InferVisitor<'_, '_> {
     /// Report a repeat whose element is a reference that can match zero nodes.
     pub(super) fn report_nullable_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
         let op = self.quantifier_operator(quant);
-        let related = self.referenced_definition_range(inner);
+        let definition = self
+            .referenced_definition(inner)
+            .expect("nullable-repeat diagnostic is only emitted for resolved references");
+        let reference = format!("`({})`", definition.name);
+        let quantified = inline_source(quant.syntax());
         let mut builder = self
             .report(DiagnosticKind::NullableRepeat, quant.text_range())
             .detail(format!(
-                "the referenced definition can match zero nodes, but a `{op}` repeat must consume input on every iteration — its empty case could never occur here"
+                "`{quantified}` can repeat without matching a node because {reference} can match zero nodes"
             ))
-            .hint("make the definition consume at least one node, or drop the quantifier");
-        if let Some((src, range)) = related {
-            builder = builder.related_to(Span::new(src, range), "can match zero nodes here");
-        }
+            .hint(format!(
+                "make every path through `{}` match at least one node, or remove `{op}`",
+                definition.name
+            ));
+        builder = builder.related_to(
+            definition.body_span,
+            format!("this body of `{}` can match zero nodes", definition.name),
+        );
         builder.emit();
     }
 
@@ -173,17 +288,22 @@ impl InferVisitor<'_, '_> {
         element_desc: &str,
     ) {
         let op = self.quantifier_operator(quant);
-        let (collection, example_op) = if op.starts_with('?') {
-            ("option", op.as_str())
+        let collection = if op.starts_with('?') {
+            "option"
         } else {
-            ("list", op.as_str())
+            "list"
         };
+        let definition = enclosing_definition_name(quant);
+        let inner = quant
+            .inner()
+            .expect("validated quantified pattern has an inner pattern");
+        let inner_text = inline_source(inner.syntax());
         self.report(DiagnosticKind::UnnamedQuantifiedElement, quant.text_range())
             .detail(format!(
-                "the definition names the {collection} itself, so each `{op}` element — {element_desc} — is left without a type name"
+                "definition `{definition}` names the {collection}, but its element `{inner_text}` is {element_desc} without a type name"
             ))
             .hint(format!(
-                "name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem){example_op}`"
+                "move `{inner_text}` into its own named definition, then apply `{op}` to a reference to that definition"
             ))
             .emit();
     }
@@ -221,7 +341,7 @@ impl InferVisitor<'_, '_> {
             )
         } else {
             format!(
-                "captures {} repeat with `{}` but aren't collected into a list",
+                "captures {} repeat with `{}` but are not collected into a list",
                 captures_str, op
             )
         };
@@ -236,29 +356,27 @@ impl InferVisitor<'_, '_> {
                 .iter()
                 .filter_map(|tok| tok.text().get(1..).map(str::to_owned)),
         );
-        let placeholder = fresh_capture_name(&taken);
-        let brackets = capture_brackets(quant);
-        let hint = if op.starts_with('?') {
-            format!(
-                "add an optional capture so the group becomes an option of one record: `{}{} @{}`",
-                brackets, op, placeholder
-            )
+        let collection_name = fresh_capture_name(&taken);
+        let quantified_text = quant.syntax().text().to_string();
+        let fix_description = if op.starts_with('?') {
+            format!("collect the optional record in `@{collection_name}`")
         } else {
-            format!(
-                "add a repetition capture so each repeat becomes one record in a list: `{}{} @{}`",
-                brackets, op, placeholder
-            )
+            format!("collect one record per repetition in `@{collection_name}`")
         };
         self.report(
             DiagnosticKind::UncollectedQuantifiedCaptures,
             quant.text_range(),
         )
         .detail(detail)
-        .hint(hint)
-        .hint(format!(
-            "or discard the captures if only the structure matters: `{}{} @_`",
-            brackets, op
-        ))
+        .fix(
+            fix_description,
+            format!("{quantified_text} @{collection_name}"),
+        )
+        .hint(if op.starts_with('?') {
+            "append `@_` instead if the optional result should be discarded"
+        } else {
+            "append `@_` instead if the repeated result should be discarded"
+        })
         .emit();
     }
 
@@ -279,21 +397,46 @@ impl InferVisitor<'_, '_> {
         err: &UnifyError,
     ) {
         match err {
-            UnifyError::IncompatibleTypes { field } => {
+            UnifyError::IncompatibleTypes {
+                field,
+                left_type,
+                right_type,
+            } => {
                 let field_name = self.ctx.interner.resolve(*field).to_string();
-                let sites = capture_sites(alternation, &field_name);
+                let sites = self.capture_sites_with_types(alternation, *field);
                 let source = self.source;
                 let (primary, rest) = match sites.split_first() {
-                    Some((first, rest)) => (*first, rest),
-                    None => (alternation.text_range(), &[] as &[TextRange]),
+                    Some((first, rest)) => (first.0, rest),
+                    None => (
+                        alternation.text_range(),
+                        &[] as &[(TextRange, Option<TypeId>)],
+                    ),
                 };
+                let left_type = self.describe_type(*left_type);
+                let right_type = self.describe_type(*right_type);
 
+                let related = rest
+                    .iter()
+                    .map(|&(site, type_id)| {
+                        let label = type_id.map_or_else(
+                            || "this alternative produces a different type".to_string(),
+                            |type_id| {
+                                format!(
+                                    "`@{field_name}` has type `{}` here",
+                                    self.describe_type(type_id)
+                                )
+                            },
+                        );
+                        (site, label)
+                    })
+                    .collect::<Vec<_>>();
                 let mut builder = self
                     .report(DiagnosticKind::IncompatibleCaptureTypes, primary)
-                    .detail(field_name);
-                for &site in rest {
-                    builder =
-                        builder.related_to(Span::new(source, site), "and a different type here");
+                    .detail(format!(
+                        "`@{field_name}` has incompatible types `{left_type}` and `{right_type}` across alternatives"
+                    ));
+                for (site, label) in related {
+                    builder = builder.related_to(Span::new(source, site), label);
                 }
                 builder
                     .hint("make every alternative produce the same type, or label the alternatives for a variant type")
@@ -305,33 +448,99 @@ impl InferVisitor<'_, '_> {
     fn quantifier_operator(&self, quant: &QuantifiedPattern) -> String {
         quant
             .operator()
-            .map(|t| t.text().to_string())
-            .unwrap_or_else(|| "*".to_string())
+            .expect("validated quantified pattern has an operator")
+            .text()
+            .to_string()
+    }
+
+    fn capture_sites_with_types(
+        &self,
+        alternation: &SyntaxNode,
+        field: Symbol,
+    ) -> Vec<(TextRange, Option<TypeId>)> {
+        let field_name = self.ctx.interner.resolve(field);
+        let mut captures = Vec::new();
+        direct_scope_captures(alternation, &mut captures);
+        captures
+            .into_iter()
+            .filter_map(|capture| {
+                let token = capture.capture().name()?;
+                if token.text().get(1..) != Some(field_name) {
+                    return None;
+                }
+                let pattern = Pattern::CapturedPattern(capture);
+                let type_id = self
+                    .ctx
+                    .type_ctx
+                    .in_progress()
+                    .pattern_result(&pattern)
+                    .and_then(|shape| {
+                        let PatternFlow::Fields(record) = &shape.flow else {
+                            return None;
+                        };
+                        self.ctx
+                            .type_ctx
+                            .in_progress()
+                            .expect_record_fields(*record)
+                            .get(&field)
+                            .map(|field| field.final_type)
+                    });
+                Some((token.text_range(), type_id))
+            })
+            .collect()
+    }
+
+    fn describe_type(&self, type_id: TypeId) -> String {
+        describe_type(&self.ctx.type_ctx.in_progress(), self.ctx.interner, type_id)
     }
 }
 
-/// The bracket shorthand for a capture hint, matching the shape the user wrote:
-/// `[...]` for alternations, `(...)` for nodes and references, and `{...}` for
-/// sequences and other groups.
-fn capture_brackets(quant: &QuantifiedPattern) -> &'static str {
-    match quant.inner() {
-        Some(Pattern::Alternation(_)) => "[...]",
-        Some(Pattern::DefRef(_) | Pattern::NamedNodePattern(_)) => "(...)",
-        _ => "{...}",
-    }
-}
-
-/// Find same-named captures that belong to the alternation's result scope.
-/// Nested structured-capture scopes are excluded because their result fields cannot
-/// conflict here.
-fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
+/// Map each result field in one source scope to its first capture.
+/// Nested structured-capture scopes are excluded because their fields do not
+/// bubble into this scope.
+pub(super) fn capture_site_map(
+    scope_root: &SyntaxNode,
+    interner: &Interner,
+) -> std::collections::BTreeMap<Symbol, TextRange> {
     let mut tokens = Vec::new();
-    direct_scope_capture_tokens(alternation, &mut tokens);
-    tokens
-        .into_iter()
-        .filter(|tok| tok.text().get(1..) == Some(field_name))
-        .map(|tok| tok.text_range())
-        .collect()
+    if let Some(captured_pattern) = CapturedPattern::cast(scope_root.clone()) {
+        if let Some(token) = captured_pattern.capture().name() {
+            tokens.push(token);
+        }
+        if inner_captures_bubble_up(&captured_pattern) {
+            direct_scope_capture_tokens(scope_root, &mut tokens);
+        }
+    } else {
+        direct_scope_capture_tokens(scope_root, &mut tokens);
+    }
+    let mut sites = std::collections::BTreeMap::new();
+    for token in tokens {
+        if token.kind() != SyntaxKind::CaptureToken {
+            continue;
+        }
+        let name = token
+            .text()
+            .strip_prefix('@')
+            .expect("capture token starts with `@`");
+        let symbol = interner
+            .get(name)
+            .expect("inferred capture name is interned");
+        sites.entry(symbol).or_insert(token.text_range());
+    }
+    sites
+}
+
+fn direct_scope_captures(scope_root: &SyntaxNode, out: &mut Vec<CapturedPattern>) {
+    for child in scope_root.children() {
+        if let Some(captured_pattern) = CapturedPattern::cast(child.clone()) {
+            out.push(captured_pattern.clone());
+            if inner_captures_bubble_up(&captured_pattern) {
+                direct_scope_captures(&child, out);
+            }
+            continue;
+        }
+        direct_scope_captures(&child, out);
+    }
 }
 
 /// Collect captures that contribute result fields to one result scope.
@@ -398,9 +607,108 @@ fn inner_captures_bubble_up(captured_pattern: &CapturedPattern) -> bool {
 }
 
 /// Pick a suggestion that will not collide with captures already in scope.
-fn fresh_capture_name(taken: &[String]) -> &'static str {
-    ["items", "matches", "entries", "elements", "records"]
-        .into_iter()
-        .find(|candidate| !taken.iter().any(|t| t == candidate))
-        .unwrap_or("items")
+fn fresh_capture_name(taken: &[String]) -> String {
+    let taken: HashSet<&str> = taken.iter().map(String::as_str).collect();
+    for base in ["items", "matches", "entries", "elements", "records"] {
+        if !taken.contains(base) {
+            return base.to_string();
+        }
+    }
+    for suffix in 2.. {
+        let candidate = format!("items_{suffix}");
+        if !taken.contains(candidate.as_str()) {
+            return candidate;
+        }
+    }
+    unreachable!("an unbounded capture-name sequence always has a free name")
+}
+
+fn enclosing_definition_name(quant: &QuantifiedPattern) -> String {
+    quant
+        .syntax()
+        .ancestors()
+        .find_map(Def::cast)
+        .expect("inferred quantified pattern belongs to a definition")
+        .name()
+        .expect("validated definition has a name")
+        .text()
+        .to_string()
+}
+
+fn first_result_capture_target(pattern: &Pattern) -> Option<String> {
+    if let Some(target) = pattern
+        .children()
+        .find_map(|child| first_result_capture_target(&child))
+    {
+        return Some(target);
+    }
+
+    matches!(
+        pattern,
+        Pattern::NamedNodePattern(_) | Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_)
+    )
+    .then(|| inline_source(pattern.syntax()))
+}
+
+fn result_capture_hint(
+    definition: Option<&ReferencedDefinition>,
+    target: Option<&str>,
+    capture_name: &str,
+    outcome: &str,
+) -> String {
+    match (definition, target) {
+        (Some(definition), Some(target)) => format!(
+            "{outcome} by changing `{target}` to `{target} @{capture_name}` in definition `{}`",
+            definition.name
+        ),
+        (None, Some(target)) => {
+            format!("{outcome} by changing `{target}` to `{target} @{capture_name}`")
+        }
+        (Some(definition), None) => format!(
+            "make `{}` produce a result before collecting or capturing its value",
+            definition.name
+        ),
+        (None, None) => format!(
+            "{outcome} by placing `@{capture_name}` after the node that should provide its result"
+        ),
+    }
+}
+
+fn inline_source(node: &SyntaxNode) -> String {
+    let mut result = String::new();
+    let mut pending_space = false;
+    let mut after_line_comment = false;
+
+    for token in node
+        .descendants_with_tokens()
+        .filter_map(|element| element.into_token())
+    {
+        match token.kind() {
+            SyntaxKind::Whitespace => pending_space = true,
+            SyntaxKind::Newline if after_line_comment => {
+                result.push_str(" ⏎ ");
+                pending_space = false;
+                after_line_comment = false;
+            }
+            SyntaxKind::Newline => pending_space = true,
+            SyntaxKind::LineComment => {
+                if pending_space && !result.is_empty() {
+                    result.push(' ');
+                }
+                result.push_str(token.text());
+                pending_space = false;
+                after_line_comment = true;
+            }
+            _ => {
+                if pending_space && !result.is_empty() {
+                    result.push(' ');
+                }
+                result.push_str(token.text());
+                pending_space = false;
+                after_line_comment = false;
+            }
+        }
+    }
+
+    result
 }

@@ -6,5 +6,5 @@ error: unknown escape sequence in string
 1 | Q = (identifier == "a\qb")
   |                      ^^
   |
-help: supported escapes: `\n`, `\r`, `\t`, `\\`, `\"`, `\'`, `\u{…}`; write `\\` to match a literal backslash
+help: supported escapes are `\n`, `\r`, `\t`, `\\`, `\"`, `\'`, and `\u{…}`. Write `\\` to match a literal backslash
 -------------------- SYMBOLS ---------------------

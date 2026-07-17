@@ -149,13 +149,13 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 TerminalData::Semantic,
             )),
             TypeShape::List { .. } => Err(
-                "capture type `bool` cannot be applied to this list; capture an option value inside the list, or inspect whether the list is empty after parsing",
+                "capture type `bool` cannot be applied to this list. Capture an option value inside the list, or inspect whether the list is empty after parsing",
             ),
             TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) if may_be_absent => Ok(
                 CaptureTypePlan::bool_terminal(TYPE_BOOL, terminal_data(self.raw.shape(type_id))),
             ),
             TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) => Err(
-                "capture type `bool` requires a value that may be absent; this capture is always present",
+                "capture type `bool` requires a value that may be absent. This capture is always present",
             ),
             TypeShape::Text | TypeShape::Bool => {
                 unreachable!("a capture type cannot feed another capture type")

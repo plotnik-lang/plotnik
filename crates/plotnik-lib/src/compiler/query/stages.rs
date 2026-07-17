@@ -171,7 +171,6 @@ impl QueryParsed {
         }
         validate_recursion(
             &dependency_analysis,
-            validated.ast_map(),
             &symbol_table,
             &interner,
             &mut self.diag,

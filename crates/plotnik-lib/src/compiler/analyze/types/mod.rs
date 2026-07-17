@@ -8,6 +8,7 @@ mod raw_output;
 mod root_extent;
 pub mod type_analysis;
 pub mod type_check;
+mod type_description;
 pub mod type_shape;
 
 pub use capture_kind::CaptureKind;

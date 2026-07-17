@@ -6,4 +6,4 @@ error: an anchor cannot be a grammar-field value
 1 | Q = (pair key: .)
   |                ^
   |
-help: anchors order siblings: `(parent (a) . (b))`; a grammar field needs a pattern to match
+help: anchors order siblings. A grammar field needs a pattern that matches one child

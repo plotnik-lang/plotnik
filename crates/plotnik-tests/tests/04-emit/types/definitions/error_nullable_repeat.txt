@@ -8,13 +8,13 @@ Q = (program
   )
 )
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition can match zero nodes, but a `*` repeat must consume input on every iteration — its empty case could never occur here
+error: `(MaybeId)*` can repeat without matching a node because `(MaybeId)` can match zero nodes
  --> query.ptk:6:7
   |
 1 | MaybeId = (identifier)?
-  |           ------------- can match zero nodes here
+  |           ------------- this body of `MaybeId` can match zero nodes
 ...
 6 |       (MaybeId)* @xs
   |       ^^^^^^^^^^
   |
-help: make the definition consume at least one node, or drop the quantifier
+help: make every path through `MaybeId` match at least one node, or remove `*`

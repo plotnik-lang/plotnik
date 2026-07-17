@@ -142,20 +142,23 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    pub(crate) fn try_parse_quantifier(&mut self, checkpoint: Checkpoint) {
-        if self.at_ts(QUANTIFIERS) {
-            self.start_node_at(checkpoint, SyntaxKind::Quantifier);
-            self.bump();
-            self.finish_node();
+    pub(crate) fn try_parse_quantifier(&mut self, checkpoint: Checkpoint) -> Option<TextRange> {
+        if !self.at_ts(QUANTIFIERS) {
+            return None;
         }
+        let span = self.current_span();
+        self.start_node_at(checkpoint, SyntaxKind::Quantifier);
+        self.bump();
+        self.finish_node();
+        Some(span)
     }
 
-    pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
+    pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) -> Option<TextRange> {
         let is_capture = self.at(SyntaxKind::CaptureToken);
         let is_discard = self.at(SyntaxKind::DiscardToken);
 
         if !is_capture && !is_discard {
-            return;
+            return None;
         }
 
         self.start_node_at(checkpoint, SyntaxKind::CapturedPattern);
@@ -182,6 +185,10 @@ impl Parser<'_, '_> {
 
         self.finish_node();
         self.finish_node();
+        let capture_end = self
+            .last_non_trivia_end()
+            .expect("parsed capture has a final token");
+        Some(TextRange::new(span.start(), capture_end))
     }
 
     /// Tree-sitter style captures (`@foo.bar`, `@foo-bar`) lex as `@foo` `.`/`-` `bar`.

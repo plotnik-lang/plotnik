@@ -8,10 +8,10 @@ Seq = [
 
 Q = (array .! (Seq))
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), no `array` places this child first; an `array` begins with `"["`
+error: with the exact anchor (`.!`), this child cannot appear first in `array` because an `array` begins with `"["`
  --> query.ptk:9:6
   |
 9 | Q = (array .! (Seq))
   |      ^^^^^
   |
-help: `.!` allows no syntax-tree node in its gap — not even an anonymous token or comment; the soft anchor `.` skips those: `(array . (Seq))`
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(array . (Seq))`

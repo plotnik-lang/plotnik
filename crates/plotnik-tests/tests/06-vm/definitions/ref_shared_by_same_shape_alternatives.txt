@@ -15,20 +15,26 @@ Q = (program
 --------------------- INPUT ----------------------
 x
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@x` cannot capture `(Inner)` because `Inner` produces no result value
  --> query.ptk:6:7
   |
 1 | Inner = (identifier)
-  |         ------------ defined here
+  | -------------------- `Inner` is defined here
 ...
 6 |       (Inner) @x
   |       ^^^^^^^
+  |
+help: make `Inner` produce a result by changing `(identifier)` to `(identifier) @x_value` in definition `Inner`
+help: or remove `@x` and capture a node pattern directly
 
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@y` cannot capture `(Inner)` because `Inner` produces no result value
   --> query.ptk:10:9
    |
  1 | Inner = (identifier)
-   |         ------------ defined here
+   | -------------------- `Inner` is defined here
 ...
 10 |         (Inner) @y
    |         ^^^^^^^
+   |
+help: make `Inner` produce a result by changing `(identifier)` to `(identifier) @y_value` in definition `Inner`
+help: or remove `@y` and capture a node pattern directly

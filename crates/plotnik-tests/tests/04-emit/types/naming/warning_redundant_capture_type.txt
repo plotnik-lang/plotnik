@@ -4,7 +4,7 @@ Q = (program
   } @info :: QInfo
 )
 ------------------ DIAGNOSTICS -------------------
-warning: this capture already has type `QInfo`; naming it `QInfo` won't have an effect
+warning: this capture already has type `QInfo`. Naming it `QInfo` has no effect
  --> query.ptk:4:14
   |
 4 |   } @info :: QInfo

@@ -5,15 +5,17 @@ Seq = {
 
 Q = (program (Seq) @x)
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@x` cannot capture `(Seq)` because `Seq` produces no result value
  --> query.ptk:6:14
   |
-1 |   Seq = {
-  |  _______-
+1 | / Seq = {
 2 | |   (expression_statement)
 3 | |   (debugger_statement)
 4 | | }
-  | |_- defined here
+  | |_- `Seq` is defined here
 5 |
 6 |   Q = (program (Seq) @x)
   |                ^^^^^
+  |
+help: make `Seq` produce a result by changing `(expression_statement)` to `(expression_statement) @x_value` in definition `Seq`
+help: or remove `@x` and capture a node pattern directly

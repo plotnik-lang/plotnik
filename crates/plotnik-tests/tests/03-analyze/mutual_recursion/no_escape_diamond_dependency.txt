@@ -16,14 +16,14 @@ error: infinite recursion: no escape path
    |      - references C (completing cycle)
 ...
  9 | C = (c (D))
-   | -       ^
+   | --------^--
    | |       |
    | |       references D
    | C is defined here
 10 | D = (d (A))
    |         - references A
    |
-help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
+help: add an alternative to `D`, `A` or `C` that does not reference any definition in this cycle
 -------------------- SYMBOLS ---------------------
 A
   B

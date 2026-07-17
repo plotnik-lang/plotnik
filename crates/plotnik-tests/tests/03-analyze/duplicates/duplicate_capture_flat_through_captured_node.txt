@@ -6,10 +6,13 @@ Q = (foo
 )
 ------------------ DIAGNOSTICS -------------------
 error: capture `@x` already defined in this scope
- --> query.ptk:5:3
+ --> query.ptk:5:7
   |
+3 |     (a) @x
+  |         -- first captured here
+4 |   ) @p
 5 |   (b) @x
-  |   ^^^^^^
+  |       ^^
   |
 help: rename one capture, or use labeled alternatives to preserve which alternative matched
 -------------------- SYMBOLS ---------------------

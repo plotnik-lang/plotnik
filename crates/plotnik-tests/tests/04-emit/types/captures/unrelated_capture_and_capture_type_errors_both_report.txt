@@ -7,18 +7,18 @@ Bad = [
 
 Flag = (identifier) @flag :: bool
 ------------------ DIAGNOSTICS -------------------
-error: capture `@x` has incompatible types across alternatives
+error: `@x` has incompatible types `Node` and `{ id: Node }` across alternatives
  --> query.ptk:2:16
   |
 2 |   (identifier) @x
   |                ^^
 ...
 5 |   } @x
-  |     -- and a different type here
+  |     -- `@x` has type `{ id: Node }` here
   |
 help: make every alternative produce the same type, or label the alternatives for a variant type
 
-error: capture type `bool` requires a value that may be absent; this capture is always present
+error: capture type `bool` requires a value that may be absent. This capture is always present
  --> query.ptk:8:27
   |
 8 | Flag = (identifier) @flag :: bool

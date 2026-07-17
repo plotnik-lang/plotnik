@@ -6,4 +6,4 @@ error: definition must be named
 1 | (program (identifier) @id)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-help: give it a name like `Name = (program (identifier) @id)`
+help: add a PascalCase definition name and `=` before `(program (identifier) @id)`

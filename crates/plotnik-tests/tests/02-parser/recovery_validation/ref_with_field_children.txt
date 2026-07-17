@@ -12,4 +12,4 @@ help: remove the children
 2 - Q = (Expr name: (identifier))
 2 + Q = (Expr )
   |
-help: a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children
+help: a reference reuses its definition as a whole. Put child constraints in the definition or on a concrete node pattern

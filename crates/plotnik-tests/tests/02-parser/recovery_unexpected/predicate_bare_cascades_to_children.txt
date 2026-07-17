@@ -6,10 +6,4 @@ error: Tree-sitter predicates are not supported
 1 | (function #eq? @name "test")
   |           ^^^^
   |
-help: use `(node == "x")`
-
-error: expected a child node, or `)` to close
- --> query.ptk:1:16
-  |
-1 | (function #eq? @name "test")
-  |                ^^^^^
+help: move `== "test"` into the node pattern captured as `@name`

@@ -6,4 +6,4 @@ error: Tree-sitter predicates are not supported
 1 | (identifier) #match? @name "test"
   |              ^^^^^^^
   |
-help: use `(node =~ /re/)`
+help: move a `=~` predicate for "test" into the node pattern captured as `@name`

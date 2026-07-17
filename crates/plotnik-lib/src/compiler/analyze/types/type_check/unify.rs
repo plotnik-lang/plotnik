@@ -15,13 +15,25 @@ use crate::core::Symbol;
 #[derive(Clone, Debug)]
 pub enum UnifyError {
     /// Capture has incompatible types across alternatives.
-    IncompatibleTypes { field: Symbol },
+    IncompatibleTypes {
+        field: Symbol,
+        left_type: TypeId,
+        right_type: TypeId,
+    },
 }
 
 impl UnifyError {
+    fn incompatible(field: Symbol, left_type: TypeId, right_type: TypeId) -> Self {
+        Self::IncompatibleTypes {
+            field,
+            left_type,
+            right_type,
+        }
+    }
+
     pub fn field(&self) -> Symbol {
         match self {
-            Self::IncompatibleTypes { field } => *field,
+            Self::IncompatibleTypes { field, .. } => *field,
         }
     }
 }
@@ -141,7 +153,8 @@ fn merge_fields(
 
     for (key, a_info) in a {
         if let Some(b_info) = b.remove(&key) {
-            let final_type = unify_type_ids(ctx, a_info.final_type, b_info.final_type, key)?;
+            let final_type = unify_type_ids(ctx, a_info.final_type, b_info.final_type, key)
+                .map_err(|_| UnifyError::incompatible(key, a_info.final_type, b_info.final_type))?;
             result.insert(key, RecordField::new(final_type));
         } else {
             absent_fields.push((key, a_info));
@@ -218,5 +231,5 @@ fn unify_type_ids(
         return Ok(if *ma == ListMinimum::One { b } else { a });
     }
 
-    Err(UnifyError::IncompatibleTypes { field })
+    Err(UnifyError::incompatible(field, a, b))
 }

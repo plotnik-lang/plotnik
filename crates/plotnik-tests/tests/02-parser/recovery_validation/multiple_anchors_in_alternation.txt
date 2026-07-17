@@ -12,7 +12,7 @@ error: anchors cannot appear directly in alternations
 2 |   .
   |   ^
   |
-help: use `[{(a) . (b)} (c)]` to anchor within an alternative
+help: put the anchored siblings in a sequence within one alternative
 
 error: anchors cannot appear directly in alternations
  --> query.ptk:4:3
@@ -20,7 +20,7 @@ error: anchors cannot appear directly in alternations
 4 |   .
   |   ^
   |
-help: use `[{(a) . (b)} (c)]` to anchor within an alternative
+help: put the anchored siblings in a sequence within one alternative
 
 error: anchors cannot appear directly in alternations
  --> query.ptk:6:3
@@ -28,4 +28,4 @@ error: anchors cannot appear directly in alternations
 6 |   .
   |   ^
   |
-help: use `[{(a) . (b)} (c)]` to anchor within an alternative
+help: put the anchored siblings in a sequence within one alternative

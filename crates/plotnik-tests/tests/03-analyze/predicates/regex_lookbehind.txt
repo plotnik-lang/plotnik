@@ -6,5 +6,5 @@ error: lookahead/lookbehind is not supported in regex
 1 | Q = (identifier =~ /(?<=foo)bar/)
   |                      ^^^
   |
-help: some target engines cannot match lookaround; match the surrounding context with the query pattern instead
+help: some target engines cannot match lookaround. Match the surrounding context with the query pattern instead
 -------------------- SYMBOLS ---------------------

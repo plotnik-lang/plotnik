@@ -22,13 +22,13 @@ warning: capture type `text` replaces the record value captured by `@x` with sou
   |
 help: remove `:: text` to return the record value instead
 
-error: capture `@x` has incompatible types across alternatives
+error: `@x` has incompatible types `Node` and `{ other: Node }` across alternatives
   --> query.ptk:8:18
    |
  8 |     (identifier) @x
    |                  ^^
 ...
 12 |   } @x
-   |     -- and a different type here
+   |     -- `@x` has type `{ other: Node }` here
    |
 help: make every alternative produce the same type, or label the alternatives for a variant type

@@ -8,6 +8,7 @@ use indexmap::IndexMap;
 
 use crate::compiler::analyze::located::Located;
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast;
 
 /// Name-resolution registry: every named definition bound to its body AST and the
@@ -62,6 +63,12 @@ impl SymbolTable {
         Some((source_id, pattern))
     }
 
+    /// The complete declaration span of a resolved definition.
+    pub fn definition_span(&self, name: &str) -> Option<Span> {
+        let (source, body) = self.definition(name)?;
+        Some(span_of_definition(source, body))
+    }
+
     /// A definition's body bound to the source it lives in, so a pass crossing a
     /// reference into another workspace file carries the target's source with the node.
     pub fn located_definition(&self, name: &str) -> Option<Located<ast::Pattern>> {
@@ -114,6 +121,12 @@ impl SymbolTableBuilder {
         Some((source, pattern))
     }
 
+    /// The complete declaration span of an already-recorded definition.
+    pub fn definition_span(&self, name: &str) -> Option<Span> {
+        let (source, body) = self.get(name)?;
+        Some(span_of_definition(source, body))
+    }
+
     /// Record a definition. Returns `true` if newly inserted, `false` if it
     /// replaced an existing entry.
     pub fn insert(&mut self, name: &str, source_id: SourceId, pattern: ast::Pattern) -> bool {
@@ -127,4 +140,13 @@ impl SymbolTableBuilder {
     pub fn finish(self) -> SymbolTable {
         SymbolTable::new(self.table, self.files)
     }
+}
+
+fn span_of_definition(source: SourceId, body: &ast::Pattern) -> Span {
+    let definition = body
+        .syntax()
+        .parent()
+        .and_then(ast::Def::cast)
+        .expect("resolved definition body belongs to a definition");
+    Span::new(source, definition.syntax().text_range())
 }

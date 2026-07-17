@@ -4,11 +4,14 @@ Q = (program
   (expression_statement (A) @x)
 )
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@x` cannot capture `(A)` because `A` produces no result value
  --> query.ptk:4:25
   |
 1 | A = (identifier)
-  |     ------------ defined here
+  | ---------------- `A` is defined here
 ...
 4 |   (expression_statement (A) @x)
   |                         ^^^
+  |
+help: make `A` produce a result by changing `(identifier)` to `(identifier) @x_value` in definition `A`
+help: or remove `@x` and capture a node pattern directly

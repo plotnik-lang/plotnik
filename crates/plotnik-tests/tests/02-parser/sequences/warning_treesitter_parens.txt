@@ -1,12 +1,16 @@
 Q = ((a) (b))
 ------------------ DIAGNOSTICS -------------------
-warning: parenthesized sequences are Tree-sitter syntax
+warning: `((a) (b))` uses Tree-sitter parentheses for a sibling sequence
  --> query.ptk:1:5
   |
 1 | Q = ((a) (b))
-  |     ^
+  |     ^^^^^^^^^
   |
-help: use `{(a) (b)}` to match a sequence of siblings
+help: replace the outer parentheses with braces
+  |
+1 - Q = ((a) (b))
+1 + Q = {(a) (b)}
+  |
 ---------------------- CST -----------------------
 # query.ptk
 Root

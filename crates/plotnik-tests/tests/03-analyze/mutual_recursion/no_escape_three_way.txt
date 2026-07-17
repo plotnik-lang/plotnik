@@ -10,12 +10,12 @@ error: infinite recursion: no escape path
 2 | B = (b (C))
   |         - references C (completing cycle)
 3 | C = (c (A))
-  | -       ^
+  | --------^--
   | |       |
   | |       references A
   | C is defined here
   |
-help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
+help: add an alternative to `A`, `B` or `C` that does not reference any definition in this cycle
 -------------------- SYMBOLS ---------------------
 A
   B

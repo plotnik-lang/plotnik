@@ -2,7 +2,7 @@ Bad = (expression_statement
   (identifier) @id
 )?
 ------------------ DIAGNOSTICS -------------------
-error: the definition names the option itself, so each `?` element — an anonymous record of captures — is left without a type name
+error: definition `Bad` names the option, but its element `(expression_statement (identifier) @id )` is an anonymous record of captures without a type name
  --> query.ptk:1:7
   |
 1 |   Bad = (expression_statement
@@ -11,4 +11,4 @@ error: the definition names the option itself, so each `?` element — an anonym
 3 | | )?
   | |__^
   |
-help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)?`
+help: move `(expression_statement (identifier) @id )` into its own named definition, then apply `?` to a reference to that definition

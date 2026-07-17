@@ -8,7 +8,7 @@ error: `nme` is not a valid grammar field
 2 |   nme: (identifier) @name
   |   ^^^
   |
-help: did you mean `name`?
+help: replace with `name`
   |
 2 |   name: (identifier) @name
   |    +

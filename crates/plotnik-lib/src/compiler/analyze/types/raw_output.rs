@@ -21,7 +21,6 @@ use crate::compiler::analyze::types::type_shape::{
     TypeShape,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{CapturedPattern, Pattern};
 use crate::core::Symbol;
@@ -137,7 +136,6 @@ impl RawPatternFlow {
 #[derive(Clone, Debug)]
 struct RawPatternOutput {
     occurrence: Pattern,
-    source: SourceId,
     flow: RawPatternFlow,
 }
 
@@ -225,7 +223,6 @@ impl RawOutputGraphBuilder {
     pub(crate) fn record_pattern(
         &mut self,
         occurrence: Pattern,
-        source: SourceId,
         shape: &PatternShape,
         analysis: &TypeAnalysis,
     ) {
@@ -266,7 +263,6 @@ impl RawOutputGraphBuilder {
         if let Some(&id) = self.flow_ids.get(&occurrence) {
             self.flows[id.0 as usize] = RawPatternOutput {
                 occurrence: occurrence.clone(),
-                source,
                 flow,
             };
         } else {
@@ -274,7 +270,6 @@ impl RawOutputGraphBuilder {
             self.flow_ids.insert(occurrence.clone(), id);
             self.flows.push(RawPatternOutput {
                 occurrence: occurrence.clone(),
-                source,
                 flow,
             });
         }

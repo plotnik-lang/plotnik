@@ -10,12 +10,11 @@ error: `X` is not defined
 2 |   (X)
   |    ^
   |
-help: did you mean `(Q)`?
+help: replace with the defined reference `(Q)`
   |
 2 -   (X)
 2 +   (Q)
   |
-help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 
 error: `Y` is not defined
  --> query.ptk:3:4
@@ -23,12 +22,11 @@ error: `Y` is not defined
 3 |   (Y)
   |    ^
   |
-help: did you mean `(Q)`?
+help: replace with the defined reference `(Q)`
   |
 3 -   (Y)
 3 +   (Q)
   |
-help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 
 error: `Z` is not defined
  --> query.ptk:4:4
@@ -36,12 +34,11 @@ error: `Z` is not defined
 4 |   (Z)
   |    ^
   |
-help: did you mean `(Q)`?
+help: replace with the defined reference `(Q)`
   |
 4 -   (Z)
 4 +   (Q)
   |
-help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 -------------------- SYMBOLS ---------------------
 Q
   X?

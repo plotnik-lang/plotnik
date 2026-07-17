@@ -28,7 +28,6 @@ use crate::compiler::analyze::types::type_analysis::{
 use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast;
 use crate::core::utils::to_pascal_case;
 use crate::core::{Interner, Symbol};
 
@@ -104,7 +103,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 .def_output(def_id)
                 .expect("every definition is inferred before naming");
 
-            let span = definition_name_span(symbol_table, self.interner, name_sym);
+            let span = definition_span(symbol_table, self.interner, name_sym);
             let type_id = output.value();
 
             self.claim(name_sym, type_id, span);
@@ -197,7 +196,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                             self.warn_redundant_capture_type(
                                 capture_type.span,
                                 &format!(
-                                    "this capture already has type `{generated}`; naming it `{generated}` won't have an effect"
+                                    "this capture already has type `{generated}`. Naming it `{generated}` has no effect"
                                 ),
                             );
                         }
@@ -232,7 +231,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     let declaration_name = self.interner.resolve(declaration_name).to_owned();
                     let written_name = self.interner.resolve(capture_type.name).to_owned();
                     let detail = format!(
-                        "this capture already has type `{declaration_name}`; naming it `{written_name}` won't have an effect"
+                        "this capture already has type `{declaration_name}`. Naming it `{written_name}` has no effect"
                     );
                     self.warn_redundant_capture_type(capture_type.span, &detail);
                     return;
@@ -257,7 +256,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 };
                 self.warn_redundant_capture_type(
                     capture_type.span,
-                    "this capture already has type `Node`; naming it `Node` won't have an effect",
+                    "this capture already has type `Node`. Naming it `Node` has no effect",
                 );
             }
             TypeShape::Text | TypeShape::Bool | TypeShape::List { .. } | TypeShape::Option(_) => {}
@@ -273,7 +272,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             self.warn_redundant_capture_type(
                 capture_type.span,
                 &format!(
-                    "this capture already has type `{existing}`; naming it `{existing}` won't have an effect"
+                    "this capture already has type `{existing}`. Naming it `{existing}` has no effect"
                 ),
             );
         } else {
@@ -282,7 +281,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             self.warn_redundant_capture_type(
                 capture_type.span,
                 &format!(
-                    "this capture already has type `{existing}`; naming it `{written}` won't have an effect"
+                    "this capture already has type `{existing}`. Naming it `{written}` has no effect"
                 ),
             );
         }
@@ -397,20 +396,12 @@ impl<'a> RawTypeNameValidator<'a> {
     }
 }
 
-/// The span of a definition's name token (falling back to its body).
-fn definition_name_span(
+/// The complete declaration span of a definition.
+fn definition_span(
     symbol_table: &SymbolTable,
     interner: &Interner,
     name_sym: Symbol,
 ) -> Option<Span> {
     let name = interner.resolve(name_sym);
-    let (source, body) = symbol_table.definition(name)?;
-    let range = body
-        .syntax()
-        .parent()
-        .and_then(ast::Def::cast)
-        .and_then(|def| def.name())
-        .map(|tok| tok.text_range())
-        .unwrap_or_else(|| body.text_range());
-    Some(Span::new(source, range))
+    symbol_table.definition_span(name)
 }

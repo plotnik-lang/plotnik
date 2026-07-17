@@ -2,7 +2,7 @@ Bad = [
   A: (identifier) @id
 ]*
 ------------------ DIAGNOSTICS -------------------
-error: the definition names the list itself, so each `*` element — a labeled alternation — is left without a type name
+error: definition `Bad` names the list, but its element `[ A: (identifier) @id ]` is a labeled alternation without a type name
  --> query.ptk:1:7
   |
 1 |   Bad = [
@@ -11,4 +11,4 @@ error: the definition names the list itself, so each `*` element — a labeled a
 3 | | ]*
   | |__^
   |
-help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)*`
+help: move `[ A: (identifier) @id ]` into its own named definition, then apply `*` to a reference to that definition

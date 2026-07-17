@@ -8,13 +8,13 @@ Bad = (identifier) @bad
 ------------------- INPUT (ts) -------------------
 let x = 1;
 ------------------ DIAGNOSTICS -------------------
-warning: entry point can never match: matching starts at the syntax-tree root
+warning: entry point `Bad` cannot match the `program` syntax-tree root
  --> query.ptk:7:7
   |
 7 | Bad = (identifier) @bad
   |       ^^^^^^^^^^^^^^^^^
   |
-help: wrap the pattern in the grammar's root node, e.g. `(program ...)`
+help: make `Bad` start with a `program` node pattern because matching begins at the syntax-tree root
 ---------------------- NFA -----------------------
 [entry_points]
 Bad  = 27

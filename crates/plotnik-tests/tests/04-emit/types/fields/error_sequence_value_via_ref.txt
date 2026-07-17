@@ -8,14 +8,13 @@ Q = (variable_declarator name: (Row))
 error: grammar field `name` cannot match a sequence
  --> query.ptk:6:32
   |
-1 |   Row = {
-  |  _______-
+1 | / Row = {
 2 | |   (identifier)
 3 | |   (number)
 4 | | }
-  | |_- defined here
+  | |_- `Row` is defined here
 5 |
 6 |   Q = (variable_declarator name: (Row))
   |                                  ^^^^^
   |
-help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint
+help: a grammar field holds one child node. Match one pattern, or move the sequence outside the grammar-field constraint

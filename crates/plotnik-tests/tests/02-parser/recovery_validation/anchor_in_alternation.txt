@@ -10,4 +10,4 @@ error: anchors cannot appear directly in alternations
 3 |   .
   |   ^
   |
-help: use `[{(a) . (b)} (c)]` to anchor within an alternative
+help: put the anchored siblings in a sequence within one alternative

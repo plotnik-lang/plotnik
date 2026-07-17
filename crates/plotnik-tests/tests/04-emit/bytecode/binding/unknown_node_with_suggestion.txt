@@ -6,7 +6,7 @@ error: `function_declaraton` is not a valid node kind
 1 | Q = (function_declaraton) @fn
   |      ^^^^^^^^^^^^^^^^^^^
   |
-help: did you mean `function_declaration`?
+help: replace with `function_declaration`
   |
 1 | Q = (function_declaration) @fn
   |                       +

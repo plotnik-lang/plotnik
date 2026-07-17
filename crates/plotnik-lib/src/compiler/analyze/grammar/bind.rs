@@ -107,6 +107,10 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         let Some(grammar_root) = self.grammar.root() else {
             return;
         };
+        let grammar_root_name = self
+            .grammar
+            .node_kind(grammar_root)
+            .expect("grammar root must have a node-kind name");
 
         for def in root.defs() {
             let Some(name) = def.name() else { continue };
@@ -131,6 +135,14 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                     DiagnosticKind::EntryPointNeverMatchesRoot,
                     Span::new(source, located.node().text_range()),
                 )
+                .detail(format!(
+                    "entry point `{}` cannot match the `{grammar_root_name}` syntax-tree root",
+                    name.text()
+                ))
+                .hint(format!(
+                    "make `{}` start with a `{grammar_root_name}` node pattern because matching begins at the syntax-tree root",
+                    name.text()
+                ))
                 .emit();
         }
     }

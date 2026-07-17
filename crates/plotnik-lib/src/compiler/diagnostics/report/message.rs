@@ -190,9 +190,10 @@ impl DiagnosticKind {
     /// Call sites can add additional hints for context-specific information.
     pub fn hint(&self) -> Option<&'static str> {
         let text = match self {
-            Self::ExpectedSubtype => "e.g., `expression#binary_expression`",
-            Self::ExpectedCaptureType => "e.g., `:: text` or `:: MyType` after a capture",
-            Self::ExpectedGrammarFieldName => "e.g., `-value`",
+            Self::ExpectedCaptureType => {
+                "write `text`, `bool`, or a PascalCase result type after `::`"
+            }
+            Self::ExpectedGrammarFieldName => "write a snake_case field name after `-`",
             Self::EmptyTree => "use `(_)` to match any named node, or `_` for any node",
             Self::EmptyAnonymousNode => {
                 "anonymous nodes match literal tokens, like `\"+\"` or `\";\"`"
@@ -212,42 +213,36 @@ impl DiagnosticKind {
                 "alternative labels name variant cases when the alternation produces a value"
             }
             Self::GrammarFieldNameInvalid => "grammar field names are snake_case",
-            Self::TreeSitterSequenceSyntaxDeprecated => {
-                "use `{(a) (b)}` to match a sequence of siblings"
-            }
-            Self::NegationSyntaxDeprecated => "use `-field` instead of `!field`",
-            Self::SupertypeSlashDeprecated => {
-                "use `supertype#subtype` instead of `supertype/subtype`"
-            }
             Self::MixedAlternativeLabels => "either label every alternative or remove all labels",
             Self::DuplicateAlternativeLabel => {
                 "each alternative label must be unique within an alternation"
             }
-            Self::RecursionWithoutEscape => {
-                "add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`"
-            }
             Self::RecursionWithoutProgress => {
                 "match at least one syntax-tree node before recursing"
             }
-            Self::AnchorWithoutContext => "wrap in a named node: `(parent . (child))`",
-            Self::AnchorInAlternation => "use `[{(a) . (b)} (c)]` to anchor within an alternative",
+            Self::AnchorWithoutContext => {
+                "move the anchor and its neighboring pattern inside a named node"
+            }
+            Self::AnchorInAlternation => {
+                "put the anchored siblings in a sequence within one alternative"
+            }
             Self::QuantifiedAnchor | Self::CapturedAnchor => {
                 "anchors constrain position and produce no value"
             }
             Self::AnchorAsGrammarFieldValue => {
-                "anchors order siblings: `(parent (a) . (b))`; a grammar field needs a pattern to match"
+                "anchors order siblings. A grammar field needs a pattern that matches one child"
             }
             Self::NegatedFieldInAlternation => {
-                "negate the grammar field inside a node alternative: `[(a -field) (b)]`"
+                "move the negated grammar field inside a concrete node alternative"
             }
             Self::NegatedFieldInSequence => {
-                "a negated grammar field applies to the enclosing node; make it a direct child: `(node -field {...})`"
+                "a negated grammar field applies to the enclosing node. Make it a direct child of that node"
             }
             Self::QuantifiedNegatedField | Self::CapturedNegatedField => {
                 "a negated grammar field asserts absence and produces no value"
             }
             Self::NegatedFieldAsGrammarFieldValue => {
-                "a negated grammar field stands alone as a child: `(node -field)`"
+                "move the negated grammar field out of the field value and make it a direct child of the enclosing node"
             }
             Self::UnusedAlternativeLabels => {
                 "capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them"
@@ -255,79 +250,58 @@ impl DiagnosticKind {
             Self::UnclosedTree => "add `)` to close the node",
             Self::UnclosedSequence => "add `}` to close the sequence",
             Self::UnclosedAlternation => "add `]` to close the alternation",
-            Self::UnclosedString => {
-                "anonymous nodes match literal tokens; close the quote: `\"foo\"`"
-            }
             Self::ExpectedExpression => {
                 "an expression is a node `(kind)`, anonymous node `\"text\"`, sequence `{...}`, or alternation `[...]`"
             }
             Self::ExpectedPredicateValue => {
-                "e.g., `(identifier == \"foo\")` or `(identifier =~ /foo/)`"
+                "use a quoted string after a string operator, or a regex after `=~` or `!~`"
             }
             Self::GrammarFieldSequenceValue => {
-                "a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint"
-            }
-            Self::UndefinedReference => {
-                "`(Name)` uses a definition; define `Name = ...` or check the spelling"
+                "a grammar field holds one child node. Match one pattern, or move the sequence outside the grammar-field constraint"
             }
             Self::DuplicateCaptureInScope => {
                 "rename one capture, or use labeled alternatives to preserve which alternative matched"
             }
-            Self::PredicateOnNonLeaf => {
-                "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`"
-            }
             Self::UnknownStringEscape => {
-                r#"supported escapes: `\n`, `\r`, `\t`, `\\`, `\"`, `\'`, `\u{…}`; write `\\` to match a literal backslash"#
+                r#"supported escapes are `\n`, `\r`, `\t`, `\\`, `\"`, `\'`, and `\u{…}`. Write `\\` to match a literal backslash"#
             }
             Self::InvalidUnicodeEscape => {
                 r"write `\u{…}` with 1-6 hex digits naming a Unicode scalar value"
             }
             Self::EmptyRegex => {
-                "put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== \"foo\"`"
+                "put a pattern between the slashes, or use a quoted value with a string predicate operator"
             }
             Self::RegexBackreference => {
-                "the portable regex subset excludes backreferences; rewrite without `\\1`"
+                "the portable regex subset excludes backreferences. Rewrite the pattern without `\\1`"
             }
             Self::RegexLookaround => {
-                "some target engines cannot match lookaround; match the surrounding context with the query pattern instead"
+                "some target engines cannot match lookaround. Match the surrounding context with the query pattern instead"
             }
             Self::RegexNamedCapture => {
-                "regex captures are inert in plotnik; capture nodes with `@name` outside the regex"
+                "regex captures are inert in Plotnik. Capture the matched node outside the regex"
             }
             Self::RegexMultilineFlag | Self::RegexCrlfFlag => {
-                "spell line terminators explicitly; `^` and `$` always mean text start and end"
+                "spell line terminators explicitly. `^` and `$` always mean text start and end"
             }
             Self::RegexBoundaryVariant => {
                 "use `\\b` or `\\B`, which Plotnik defines as ASCII word boundaries on every target"
             }
-            Self::PredicateValueMismatch => {
-                "use a quoted string with `==`, `!=`, `^=`, `$=`, or `*=`; use `/…/` with `=~` or `!~`"
-            }
             Self::InvalidSupertypeSyntax => {
-                "supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`"
+                "category refinement applies to node kinds, not definition references. Remove the refinement or apply it to a concrete node kind"
             }
             Self::ErrorTakesNoArguments => {
-                "`(ERROR)` matches any error node as a leaf; use `(MISSING \"x\")` to match a missing token"
+                "`(ERROR)` matches any error node as a leaf. Use `MISSING` when matching a token inserted by parser recovery"
             }
             Self::MissingTakesNoChildren => {
-                "a missing node is a zero-byte node inserted by error recovery; write `(MISSING)`, `(MISSING kind)`, or `(MISSING \";\")`"
+                "a missing node is a zero-byte node inserted by error recovery. Give `MISSING` at most one node kind or quoted token"
             }
             Self::MissingKindNotToken => {
                 "use a token kind like `(MISSING identifier)`, a quoted literal like `(MISSING \";\")`, or bare `(MISSING)`"
             }
             Self::RefCannotHaveChildren => {
-                "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children"
-            }
-            Self::EntryPointNeverMatchesRoot => {
-                "wrap the pattern in the grammar's root node, e.g. `(program ...)`"
-            }
-            Self::NoEntryPoints => {
-                "a definition selectable as an entry point must match exactly one root node; wrap constraints in a node pattern, e.g. `Q = (program .)`"
+                "a reference reuses its definition as a whole. Put child constraints in the definition or on a concrete node pattern"
             }
             Self::EmptyQuery => "add a definition, e.g. `Q = (identifier) @id`",
-            Self::UnsupportedSupertype | Self::BareSupertype => {
-                "match the concrete subtypes with an alternation, e.g. `[(a) (b)]`"
-            }
             _ => return None,
         };
 
@@ -468,6 +442,7 @@ impl DiagnosticKind {
         match self {
             // The detail IS the full message.
             Self::UnexpectedToken | Self::BareIdentifier => "{}".to_string(),
+            Self::ExpectedSubtype | Self::TreeSitterSequenceSyntaxDeprecated => "{}".to_string(),
 
             Self::RefCannotHaveChildren => {
                 "`{}` is a reference and cannot have children".to_string()
@@ -484,6 +459,10 @@ impl DiagnosticKind {
             Self::MatchOnlyReferenceCapture => "{}".to_string(),
             Self::UnnamedQuantifiedElement => "{}".to_string(),
             Self::NullableRepeat => "{}".to_string(),
+            Self::IncompatibleCaptureTypes => "{}".to_string(),
+            Self::PredicateValueMismatch | Self::PredicateOnNonLeaf => "{}".to_string(),
+            Self::EntryPointNeverMatchesRoot | Self::NoEntryPoints => "{}".to_string(),
+            Self::GrammarFieldNotOnNodeKind | Self::InvalidChildType => "{}".to_string(),
             Self::TypeNameConflict => {
                 "type name `{}` is already used for a different type".to_string()
             }
@@ -494,27 +473,20 @@ impl DiagnosticKind {
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()
             }
-            Self::IncompatibleCaptureTypes => {
-                "capture `@{}` has incompatible types across alternatives".to_string()
-            }
             Self::IncompatibleRecordShapes => {
                 "capture `@{}` has incompatible record fields across alternatives".to_string()
             }
             Self::UnknownNodeKind => "`{}` is not a valid node kind".to_string(),
             Self::MissingKindNotToken => {
-                "`{}` has children — only leaf tokens can be missing nodes".to_string()
+                "`{}` has children. Only leaf tokens can be missing nodes".to_string()
             }
             Self::UnknownGrammarField => "`{}` is not a valid grammar field".to_string(),
-            Self::GrammarFieldNotOnNodeKind => {
-                "grammar field `{}` is not valid on this node kind".to_string()
-            }
             Self::InvalidGrammarFieldChildKind => "{}".to_string(),
-            Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
             Self::UnsupportedSupertype => {
                 "matching the `{}#` supertype is not supported yet".to_string()
             }
             Self::BareSupertype => "`{}` is a supertype, not a node kind".to_string(),
-            Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
+            Self::ChildUnderLeafToken => "`{}` is a leaf token and has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
             // The detail, when present, is the crafted message; bare emits use the summary.
             Self::UnsatisfiablePattern => "{}".to_string(),

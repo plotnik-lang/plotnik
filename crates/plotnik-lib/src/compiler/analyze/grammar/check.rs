@@ -41,12 +41,39 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                     let mismatched = (operator.is_regex_op() && predicate.string_value().is_some())
                         || (!operator.is_regex_op() && predicate.regex().is_some());
                     if mismatched {
-                        self.diag
+                        let node_kind = node
+                            .kind_token()
+                            .expect("validated named-node pattern has a kind");
+                        let node_name = node_kind.text();
+                        let operator_token = predicate
+                            .operator_token()
+                            .expect("resolved predicate operator has a token");
+                        let operator_text = operator_token.text();
+                        let predicate_text = predicate.syntax().text();
+                        let (required, supplied) = if operator.is_regex_op() {
+                            ("a regex value", "a quoted string")
+                        } else {
+                            ("a quoted string", "a regex value")
+                        };
+                        let mut builder = self
+                            .diag
                             .report(
                                 DiagnosticKind::PredicateValueMismatch,
                                 located.span_of(predicate.syntax().text_range()),
                             )
-                            .emit();
+                            .detail(format!(
+                                "predicate `{node_name} {predicate_text}` uses `{operator_text}`, which requires {required}, but supplies {supplied}"
+                            ))
+                            .hint(format!(
+                                "change the value in `{predicate_text}` to {required}, or choose an operator that accepts {supplied}"
+                            ));
+                        if let Some(ctx) = &child_ctx {
+                            builder = builder.related_to(
+                                ctx.span(),
+                                format!("predicate applies to `{node_name}`"),
+                            );
+                        }
+                        builder.emit();
                     }
                 }
 
@@ -57,11 +84,20 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                     && let Some(ctx) = &child_ctx
                     && self.grammar.has_declared_child_structure(ctx.id())
                 {
+                    let node_name = ctx.name(self.grammar);
+                    let predicate_text = pred.syntax().text();
                     self.diag
                         .report(
                             DiagnosticKind::PredicateOnNonLeaf,
                             located.span_of(pred.syntax().text_range()),
                         )
+                        .detail(format!(
+                            "predicate `{node_name} {predicate_text}` cannot test `{node_name}` because this node kind can contain children"
+                        ))
+                        .related_to(ctx.span(), format!("`{node_name}` starts here"))
+                        .hint(format!(
+                            "move `{predicate_text}` to a leaf child of `{node_name}`, or match a literal token directly"
+                        ))
                         .emit();
                 }
 
@@ -121,18 +157,22 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 }
             }
             Pattern::CapturedPattern(cap) => {
-                let Some(inner) = cap.inner() else { return };
+                let inner = cap
+                    .inner()
+                    .expect("validated captured pattern has an inner pattern");
                 let inner_located = located.wrap(inner);
                 self.check_pattern_grammar(&inner_located, ctx, participation, walk);
             }
             Pattern::QuantifiedPattern(q) => {
-                let Some(inner) = q.inner() else { return };
+                let inner = q
+                    .inner()
+                    .expect("validated quantified pattern has an inner pattern");
                 let inner_participation = participation.inside_quantifier_body(q);
                 let inner_located = located.wrap(inner);
                 self.check_pattern_grammar(&inner_located, ctx, inner_participation, walk);
             }
             Pattern::DefRef(r) => {
-                let Some(name_token) = r.name() else { return };
+                let name_token = r.name().expect("validated definition reference has a name");
                 let name = name_token.text();
                 // Validation is a pure function of `(name, ctx, participation)`, so caching it
                 // collapses diamond-shaped reference graphs that would otherwise be re-walked
@@ -374,7 +414,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .detail(field_name)
             .related_to(parent_span, format!("on `{}`", parent_name))
             .hint(format!(
-                "`-{0}` requires `{0}` to be absent, but every `{1}` has one — drop `-{0}`",
+                "`-{0}` requires `{0}` to be absent, but every `{1}` has one. Drop `-{0}`",
                 field_name, parent_name
             ))
             .emit();
@@ -513,10 +553,9 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             // `(_)` matches any named node — impossible only when the field admits literal
             // tokens exclusively.
             if self.field_is_anonymous_only(ctx.id(), field.id) {
-                let message = format!("a named node can't be the value of `{}`", field.name);
                 self.emit_invalid_field_value(
                     located.span_of(node.text_range()),
-                    message,
+                    "a named node",
                     ctx,
                     field,
                 );
@@ -540,13 +579,8 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .grammar
             .node_kind(value_id)
             .expect("resolved value must have a name");
-        let message = format!("`{}` can't be the value of `{}`", value_name, field.name);
-        self.emit_invalid_field_value(
-            located.span_of(type_token.text_range()),
-            message,
-            ctx,
-            field,
-        );
+        let value = format!("`{value_name}`");
+        self.emit_invalid_field_value(located.span_of(type_token.text_range()), &value, ctx, field);
     }
 
     fn check_field_anon_value(
@@ -572,11 +606,10 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             return;
         }
 
-        let value_name = value_token.text().to_string();
-        let message = format!("`{}` can't be the value of `{}`", value_name, field.name);
+        let value = format!("`{}`", value_token.text());
         self.emit_invalid_field_value(
             located.span_of(value_token.text_range()),
-            message,
+            &value,
             ctx,
             field,
         );
@@ -636,10 +669,24 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .collect::<Vec<_>>();
         let mut builder = self.diag.report(kind, span).detail(name.as_str());
         if !subtypes.is_empty() {
-            builder = builder.hint(format!(
-                "subtypes of `{name}`: {}",
-                format_list(&subtypes, 8)
-            ));
+            if subtypes.len() <= 8 {
+                let alternatives = subtypes
+                    .iter()
+                    .map(|subtype| format!("({subtype})"))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                builder = builder.hint(format!(
+                    "replace `{name}` with an exhaustive alternation of its concrete subtypes: `[{alternatives}]`"
+                ));
+            } else {
+                builder = builder.hint(format!(
+                    "choose the concrete subtypes of `{name}` that this query should match"
+                ));
+                builder = builder.hint(format!(
+                    "the grammar includes {}",
+                    format_list(&subtypes, 5)
+                ));
+            }
         }
         builder.emit();
         true

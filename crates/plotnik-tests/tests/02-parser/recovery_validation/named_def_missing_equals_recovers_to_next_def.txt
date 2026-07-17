@@ -19,4 +19,4 @@ error: expected a pattern
 1 | Broken ^^^
   |        ^^^
   |
-help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+help: start with `(` for a node, `[` for an alternation, `{` for a sequence, a quote for a literal token, or `_` for a wildcard

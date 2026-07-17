@@ -10,7 +10,7 @@ error: type name `Foo` is already used for a different type
  --> query.ptk:6:11
   |
 1 | Foo = (expression_statement (identifier) @id)
-  | --- already used here
+  | --------------------------------------------- already used here
 ...
 6 |   } @x :: Foo
   |           ^^^

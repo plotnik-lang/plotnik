@@ -11,7 +11,7 @@ error: with the exact anchor (`.!`), the first child of `array` must be `identif
 2 |   (array
   |    ^^^^^
   |
-help: `.!` allows no syntax-tree node in its gap — not even an anonymous token or comment; the soft anchor `.` skips those: `(array
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(array
           .
           (identifier)
         )`

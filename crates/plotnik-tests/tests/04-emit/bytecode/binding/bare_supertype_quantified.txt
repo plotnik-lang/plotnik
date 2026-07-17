@@ -8,5 +8,5 @@ error: `statement` is a supertype, not a node kind
 2 |   (statement)* @s
   |    ^^^^^^^^^
   |
-help: match the concrete subtypes with an alternation, e.g. `[(a) (b)]`
-help: subtypes of `statement`: `break_statement`, `continue_statement`, `debugger_statement`, `declaration`, `do_statement`, `empty_statement`, `export_statement`, `expression_statement`, ... (12 more)
+help: choose the concrete subtypes of `statement` that this query should match
+help: the grammar includes `break_statement`, `continue_statement`, `debugger_statement`, `declaration`, `do_statement`, … (15 more)

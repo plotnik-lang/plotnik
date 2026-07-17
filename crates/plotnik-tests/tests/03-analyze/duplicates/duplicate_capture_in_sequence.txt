@@ -4,10 +4,12 @@ Q = {
 }
 ------------------ DIAGNOSTICS -------------------
 error: capture `@x` already defined in this scope
- --> query.ptk:3:3
+ --> query.ptk:3:7
   |
+2 |   (a) @x
+  |       -- first captured here
 3 |   (b) @x
-  |   ^^^^^^
+  |       ^^
   |
 help: rename one capture, or use labeled alternatives to preserve which alternative matched
 -------------------- SYMBOLS ---------------------

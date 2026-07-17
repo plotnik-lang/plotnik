@@ -1,11 +1,12 @@
 Q = (binary_expression operator: (identifier))
 ------------------ DIAGNOSTICS -------------------
-error: `identifier` can't be the value of `operator`
+error: `identifier` is not valid for grammar field `operator` of `binary_expression`
  --> query.ptk:1:35
   |
 1 | Q = (binary_expression operator: (identifier))
-  |                        --------   ^^^^^^^^^^
-  |                        |
-  |                        grammar field `operator`
+  |      ----------------- --------   ^^^^^^^^^^
+  |      |                 |
+  |      |                 grammar field `operator`
+  |      `binary_expression` starts here
   |
-help: `operator` accepts only literal tokens — write `operator: "!="`
+help: `operator` accepts only literal tokens. Write `operator: "!="`

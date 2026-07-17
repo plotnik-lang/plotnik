@@ -3,10 +3,13 @@ Q = (program (A) @a)
 --------------------- INPUT ----------------------
 let x;
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@a` cannot capture `(A)` because `A` produces no result value
  --> query.ptk:2:14
   |
 1 | A = (lexical_declaration)
-  |     --------------------- defined here
+  | ------------------------- `A` is defined here
 2 | Q = (program (A) @a)
   |              ^^^
+  |
+help: make `A` produce a result by changing `(lexical_declaration)` to `(lexical_declaration) @a_value` in definition `A`
+help: or remove `@a` and capture a node pattern directly

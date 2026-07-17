@@ -5,8 +5,8 @@ error: `Expr` is already defined
  --> query.ptk:2:1
   |
 1 | Expr = (expression)
-  | ---- first defined here
+  | ------------------- first defined here
 2 | Expr = (other)
-  | ^^^^
+  | ^^^^^^^^^^^^^^
 -------------------- SYMBOLS ---------------------
 Expr

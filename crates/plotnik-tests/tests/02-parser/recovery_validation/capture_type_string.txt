@@ -11,4 +11,4 @@ help: use `:: text`
 1 - Q = (a) @x :: string
 1 + Q = (a) @x :: text
   |
-help: write `:: text`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`
+help: write `:: text`, `:: bool`, or a PascalCase custom capture type

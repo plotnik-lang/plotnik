@@ -88,7 +88,7 @@ pub struct InferVisitor<'a, 'd> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum QuantifiedContext {
     Bare,
-    Captured,
+    Captured(Symbol),
     Discard,
     DefinitionValue,
 }
@@ -365,7 +365,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         self.ctx
             .type_ctx
-            .record_pattern_result(pattern.node().clone(), self.source, info.clone());
+            .record_pattern_result(pattern.node().clone(), info.clone());
         info
     }
 
@@ -497,7 +497,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         &mut self,
         children: impl IntoIterator<Item = Located<Pattern>>,
     ) -> BTreeMap<Symbol, RecordField> {
-        let mut merged_fields: BTreeMap<Symbol, RecordField> = BTreeMap::new();
+        let mut merged_fields = flow::ScopeFields::default();
 
         for child in children {
             let child_info = self.infer_pattern(&child);
@@ -508,11 +508,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     .in_progress()
                     .expect_record_fields(*type_id)
                     .clone();
-                self.merge_scope_fields(&mut merged_fields, &fields, child.node().text_range());
+                self.merge_scope_fields(&mut merged_fields, &fields, child.node().syntax());
             }
         }
 
-        merged_fields
+        merged_fields.into_fields()
     }
 
     fn merged_fields_flow(&mut self, merged: BTreeMap<Symbol, RecordField>) -> PatternFlow {
@@ -754,7 +754,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let inner = captured.wrap(inner);
 
         // Determine how the inner flow relates to the capture.
-        let captured_inner = self.resolve_capture_inner(&inner);
+        let captured_inner = self.resolve_capture_inner(&inner, capture_name);
         let inner_info = captured_inner.info;
 
         // A no-value inner that doesn't match exactly one node has no single node
@@ -763,9 +763,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // machinery defines their value (list, or option-valued node), and the
         // exactly-one check runs on their element instead.
         if !matches!(inner.node(), Pattern::QuantifiedPattern(_))
-            && !self.report_capture_on_match_only_ref(inner.node(), &inner_info)
+            && !self.report_capture_on_match_only_ref(inner.node(), &inner_info, capture_name)
         {
-            self.report_capture_without_single_node(inner.node(), &inner_info);
+            self.report_capture_without_single_node(inner.node(), &inner_info, capture_name);
         }
 
         // Only the `Node` mechanism captures the matched node and lets the inner's
@@ -790,6 +790,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let raw_field = RecordField::new(final_type);
         let destination = self.capture_field_destination(
             capture_name,
+            inner.node(),
             &inner_info,
             should_merge_fields,
             name_token.text_range(),
@@ -961,9 +962,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
 
         report
-            .hint(
-                "write `:: text`, `:: bool`, or a PascalCase custom capture type such as `:: MyType`",
-            )
+            .hint("write `:: text`, `:: bool`, or a PascalCase custom capture type")
             .emit();
     }
 
@@ -1019,6 +1018,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn capture_field_destination(
         &mut self,
         capture_name: Symbol,
+        inner: &Pattern,
         inner_info: &PatternShape,
         should_merge_fields: bool,
         range: TextRange,
@@ -1039,8 +1039,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let admits_capture = !fields.contains_key(&capture_name);
         if !admits_capture {
             let field = self.ctx.interner.resolve(capture_name).to_string();
+            let first = diagnostics::capture_site_map(inner.syntax(), self.ctx.interner)
+                .get(&capture_name)
+                .copied()
+                .expect("bubbling result field has a capture site in its source scope");
+            let source = self.source;
             self.report(DiagnosticKind::DuplicateCaptureInScope, range)
                 .detail(field)
+                .related_to(Span::new(source, first), "first captured here")
                 .emit();
         }
 
@@ -1051,11 +1057,16 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// Logic for how quantifier on the inner expression affects the capture field.
-    fn resolve_capture_inner(&mut self, inner: &Located<Pattern>) -> CaptureInner {
+    fn resolve_capture_inner(
+        &mut self,
+        inner: &Located<Pattern>,
+        capture_name: Symbol,
+    ) -> CaptureInner {
         if let Pattern::QuantifiedPattern(q) = inner.node() {
             let quantifier = self.quantifier_kind(q);
             let located = inner.wrap(q.clone());
-            let info = self.infer_quantified_pattern_in(&located, QuantifiedContext::Captured);
+            let info = self
+                .infer_quantified_pattern_in(&located, QuantifiedContext::Captured(capture_name));
             CaptureInner {
                 info,
                 // `?` wraps the captured value in Option; `*` and `+` collect
@@ -1118,7 +1129,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let inner = quant.wrap(inner);
 
         let inner_info = match context {
-            QuantifiedContext::Captured | QuantifiedContext::DefinitionValue => {
+            QuantifiedContext::Captured(_) | QuantifiedContext::DefinitionValue => {
                 self.infer_pattern_value(&inner)
             }
             QuantifiedContext::Discard => self.infer_pattern_discarded(&inner),
@@ -1133,8 +1144,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // inner flow passes through untouched: the capture collects it
                 // as one option value — fields keep their true modality, and
                 // absence belongs to the capture field alone.
-                QuantifiedContext::Captured => {
-                    self.report_quantified_capture_without_single_node(quant.node(), &inner_info);
+                QuantifiedContext::Captured(capture_name) => {
+                    self.report_quantified_capture_without_single_node(
+                        quant.node(),
+                        &inner_info,
+                        Some(capture_name),
+                    );
                     inner_info.flow
                 }
                 // Internal captures of a bare `?` have nothing to collect them,
@@ -1164,7 +1179,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // lowering has to give the loop an exit it cannot have.
                 if matches!(
                     context,
-                    QuantifiedContext::Captured | QuantifiedContext::DefinitionValue
+                    QuantifiedContext::Captured(_) | QuantifiedContext::DefinitionValue
                 ) {
                     self.reject_nullable_repeat(quant.node(), &inner);
                 }
@@ -1200,8 +1215,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
             // A captured repeat of a multi-node no-value group has no defined
             // element value.
-            QuantifiedContext::Captured => {
-                self.report_quantified_capture_without_single_node(quant, inner_info);
+            QuantifiedContext::Captured(capture_name) => {
+                self.report_quantified_capture_without_single_node(
+                    quant,
+                    inner_info,
+                    Some(capture_name),
+                );
             }
             // Everything is discarded; there is nothing to collect wrongly.
             QuantifiedContext::Discard => {}
@@ -1277,7 +1296,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ) -> TypeId {
         match &inner_info.flow {
             PatternFlow::NoValue => {
-                self.report_quantified_capture_without_single_node(quant, inner_info);
+                self.report_quantified_capture_without_single_node(quant, inner_info, None);
                 TYPE_NODE
             }
             PatternFlow::Value(t) => {
@@ -1340,11 +1359,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
             // Captured repeats collect elements: matched nodes, pending values
             // (variant/reference results), or records of captured fields.
-            (QuantifiedContext::Captured, PatternFlow::NoValue) => {
+            (QuantifiedContext::Captured(_), PatternFlow::NoValue) => {
                 intern_list(self.ctx.type_ctx, TYPE_NODE)
             }
             (
-                QuantifiedContext::Captured,
+                QuantifiedContext::Captured(_),
                 PatternFlow::Value(element) | PatternFlow::Fields(element),
             ) => intern_list(self.ctx.type_ctx, element),
             (QuantifiedContext::DefinitionValue, _) => {

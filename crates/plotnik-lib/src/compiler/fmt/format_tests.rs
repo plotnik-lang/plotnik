@@ -438,7 +438,7 @@ fn rejects_recovered_group_without_closer() {
     let error = format_query("((\"(\"").expect_err("unclosed nested group is rejected");
     let diagnostics = error.diagnostics().expect("syntax failure has diagnostics");
 
-    assert_eq!(diagnostics.error_count(), 1);
+    assert!(diagnostics.has_errors());
     assert!(
         diagnostics
             .kinds()

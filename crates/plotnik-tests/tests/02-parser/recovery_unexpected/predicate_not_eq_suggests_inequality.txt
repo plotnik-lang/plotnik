@@ -6,4 +6,4 @@ error: Tree-sitter predicates are not supported
 1 | Q = #not-eq?
   |     ^^^^^^^^
   |
-help: use `(node != "x")`
+help: `#not-eq?` corresponds to `!=` inside a node pattern, but this call does not provide both a captured target and a compatible value

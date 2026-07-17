@@ -3,6 +3,7 @@
 use super::planner::CaptureTypePlanner;
 use super::*;
 use crate::compiler::analyze::types::capture_type::{CaptureTypePlan, CaptureTypePlanKind};
+use crate::compiler::analyze::types::type_description::describe_type;
 use crate::compiler::analyze::types::type_shape::CasePayload;
 use crate::compiler::ids::TypeDeclId;
 
@@ -313,7 +314,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
                     && index + 1 == SUPPRESSED_CAPTURE_ANNOTATION_LIMIT
                 {
                     format!(
-                        "this captured value is suppressed by `@{capture_name} :: {capture_type_name}`; {} not shown",
+                        "this captured value is suppressed by `@{capture_name} :: {capture_type_name}`. {} not shown",
                         format_additional_capture_count(hidden_capture_count)
                     )
                 } else {
@@ -803,6 +804,8 @@ struct FlowNormalizer<'s, 'c, 'a, 'd> {
     captures: &'c HashMap<RawCaptureId, NormalizedField>,
     normalized: HashMap<RawFlowId, BTreeMap<Symbol, NormalizedField>>,
     visiting: HashSet<RawFlowId>,
+    // Parent flows can revisit the same producer pair. Report each exact conflict once.
+    reported_conflicts: HashSet<(Symbol, Span, Span)>,
 }
 
 impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
@@ -815,6 +818,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             captures,
             normalized: HashMap::new(),
             visiting: HashSet::new(),
+            reported_conflicts: HashSet::new(),
         }
     }
 
@@ -893,7 +897,8 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         let first = *sources
             .next()
             .expect("raw public field must retain an immediate source");
-        let mut normalized = self.normalize_source(first);
+        let (mut normalized, mut previous_span) = self.normalize_source_with_span(first);
+        let mut previous_type = normalized.info.final_type;
         if !self
             .session
             .graph
@@ -903,26 +908,74 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             return normalized;
         }
         for &source in sources {
-            let other = self.normalize_source(source);
+            let (other, other_span) = self.normalize_source_with_span(source);
+            let right_type = other.info.final_type;
             match unify_normalized_fields(self.session.types, normalized, other) {
-                Ok(unified) => normalized = unified,
+                Ok(unified) => {
+                    normalized = unified;
+                    previous_span = other_span;
+                    previous_type = right_type;
+                }
                 Err(()) => {
+                    if !self
+                        .reported_conflicts
+                        .insert((name, previous_span, other_span))
+                    {
+                        continue;
+                    }
                     // Raw inference already owns structural incompatibilities.
                     // A mismatch here can only be introduced by written capture
                     // types, so report it without rewriting the raw ownership
                     // graph that subsequent fields still depend on.
+                    let types = self.session.types.in_progress();
+                    let left_type = describe_type(&types, self.session.interner, previous_type);
+                    let right_type = describe_type(&types, self.session.interner, right_type);
                     self.session
                         .diagnostics
                         .report(
                             DiagnosticKind::IncompatibleCaptureTypes,
-                            Span::new(owner.source, owner.occurrence.text_range()),
+                            other_span,
                         )
-                        .detail(self.session.interner.resolve(name))
+                        .detail(format!(
+                            "`@{}` has incompatible types `{left_type}` and `{right_type}` across alternatives after applying capture types",
+                            self.session.interner.resolve(name),
+                        ))
+                        .related_to(
+                            previous_span,
+                            format!(
+                                "`@{}` has type `{left_type}` here",
+                                self.session.interner.resolve(name)
+                            ),
+                        )
+                        .hint(
+                            "use the same capture type in every alternative, or label the alternatives to produce a variant",
+                        )
                         .emit();
                 }
             }
         }
         normalized
+    }
+
+    fn normalize_source_with_span(&mut self, source: RawFieldSource) -> (NormalizedField, Span) {
+        let span = self.raw_source_span(source);
+        (self.normalize_source(source), span)
+    }
+
+    fn raw_source_span(&self, source: RawFieldSource) -> Span {
+        let capture = match source {
+            RawFieldSource::Capture(capture) => capture,
+            RawFieldSource::Flow { flow, field } => *self
+                .session
+                .graph
+                .flow(flow)
+                .flow
+                .fields()
+                .and_then(|fields| fields.get(&field))
+                .and_then(|field| field.producers.first())
+                .expect("flowing result field retains a capture producer"),
+        };
+        capture_span(self.session.graph.capture(capture))
     }
 
     fn normalize_source(&mut self, source: RawFieldSource) -> NormalizedField {

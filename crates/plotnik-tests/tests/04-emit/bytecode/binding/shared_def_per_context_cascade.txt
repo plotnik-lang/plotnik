@@ -5,42 +5,45 @@ Q = (statement_block
   (binary_expression (Args))
 )
 ------------------ DIAGNOSTICS -------------------
-error: grammar field `arguments` is not valid on this node kind
+error: `arguments` is not a grammar field of `binary_expression`
  --> query.ptk:1:8
   |
 1 | Args = arguments: (identifier)
   |        ^^^^^^^^^
 ...
 5 |   (binary_expression (Args))
-  |    ----------------- on `binary_expression`
+  |    ----------------- `binary_expression` starts here
   |
 help: valid grammar fields for `binary_expression`: `left`, `operator`, `right`
 
-error: `identifier` can't be the value of `arguments`
+error: `identifier` is not valid for grammar field `arguments` of `call_expression`
  --> query.ptk:1:20
   |
 1 | Args = arguments: (identifier)
   |        ---------   ^^^^^^^^^^
   |        |
   |        grammar field `arguments`
+...
+4 |   (call_expression (Args))
+  |    --------------- `call_expression` starts here
   |
 help: `arguments` accepts: `arguments`, `template_string`
 
-error: `call_expression` cannot be a child of this node
+error: `call_expression` cannot be an unlabeled child of `statement_block`
  --> query.ptk:4:4
   |
 3 | Q = (statement_block
-  |      --------------- on `statement_block`
+  |      --------------- `statement_block` starts here
 4 |   (call_expression (Args))
   |    ^^^^^^^^^^^^^^^
   |
 help: valid children of `statement_block`: `statement`
 
-error: `binary_expression` cannot be a child of this node
+error: `binary_expression` cannot be an unlabeled child of `statement_block`
  --> query.ptk:5:4
   |
 3 | Q = (statement_block
-  |      --------------- on `statement_block`
+  |      --------------- `statement_block` starts here
 4 |   (call_expression (Args))
 5 |   (binary_expression (Args))
   |    ^^^^^^^^^^^^^^^^^

@@ -4,10 +4,10 @@ Q = (array
   (identifier) @id
 )
 ------------------ DIAGNOSTICS -------------------
-error: after the soft anchor (`.`), no `array` places this child first; an `array` begins with `"["`
+error: after the soft anchor (`.`), this child cannot appear first in `array` because an `array` begins with `"["`
  --> query.ptk:1:6
   |
 1 | Q = (array
   |      ^^^^^
   |
-help: here `.` skips extras only because one side can match an anonymous token; use `(_)` for a named node, or drop the anchor to match these children in any positions
+help: here `.` skips extras only because one side can match an anonymous token. Use `(_)` for a named node, or drop the anchor to match these children in any positions

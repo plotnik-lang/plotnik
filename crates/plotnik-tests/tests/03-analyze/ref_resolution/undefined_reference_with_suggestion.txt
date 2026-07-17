@@ -7,12 +7,11 @@ error: `Expl` is not defined
 2 | Q = (call_expression function: (Expl))
   |                                 ^^^^
   |
-help: did you mean `(Expr)`?
+help: replace with the defined reference `(Expr)`
   |
 2 - Q = (call_expression function: (Expl))
 2 + Q = (call_expression function: (Expr))
   |
-help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 -------------------- SYMBOLS ---------------------
 Expr
 Q

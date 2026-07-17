@@ -1,17 +1,13 @@
 Q = [(a) ) (b)]
 ------------------ DIAGNOSTICS -------------------
-error: missing closing `]`
+error: unexpected `)` inside this alternation: the matching closer is `]`
  --> query.ptk:1:10
   |
 1 | Q = [(a) ) (b)]
   |          ^
   |
-help: add `]` to close the alternation
-
-error: expected a pattern
- --> query.ptk:1:15
+help: remove the stray `)`
   |
-1 | Q = [(a) ) (b)]
-  |               ^
+1 - Q = [(a) ) (b)]
+1 + Q = [(a)  (b)]
   |
-help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

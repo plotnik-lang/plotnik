@@ -6,4 +6,4 @@ error: Tree-sitter predicates are not supported
 1 | (call (#eq? @x "foo"))
   |        ^^^^
   |
-help: use `(node == "x")`
+help: move `== "foo"` into the node pattern captured as `@x`

@@ -6,17 +6,17 @@ error: `A` is already defined
  --> query.ptk:2:1
   |
 1 | A = (x)
-  | - first defined here
+  | ------- first defined here
 2 | A = (y)
-  | ^
+  | ^^^^^^^
 
 error: `A` is already defined
  --> query.ptk:3:1
   |
 1 | A = (x)
-  | - first defined here
+  | ------- first defined here
 2 | A = (y)
 3 | A = (z)
-  | ^
+  | ^^^^^^^
 -------------------- SYMBOLS ---------------------
 A
