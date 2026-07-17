@@ -8,4 +8,4 @@ error: `-name` can never match
   |      |
   |      on `function_declaration`
   |
-help: `-name` requires `name` to be absent, but every `function_declaration` has one — drop `-name`
+help: `-name` requires `name` to be absent, but every `function_declaration` has one. Drop `-name`

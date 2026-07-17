@@ -6,4 +6,4 @@ error: expected a capture type after `::`
 1 | Q = (identifier) @name :: (
   |                           ^
   |
-help: e.g., `:: text` or `:: MyType` after a capture
+help: write `text`, `bool`, or a PascalCase result type after `::`

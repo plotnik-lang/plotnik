@@ -11,4 +11,4 @@ help: remove the children
 1 - Q = (MISSING (something))
 1 + Q = (MISSING )
   |
-help: a missing node is a zero-byte node inserted by error recovery; write `(MISSING)`, `(MISSING kind)`, or `(MISSING ";")`
+help: a missing node is a zero-byte node inserted by error recovery. Give `MISSING` at most one node kind or quoted token

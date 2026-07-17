@@ -174,8 +174,7 @@ fn report_node_too_complex(node: &Located<NamedNodePattern>, diag: &mut Diagnost
 fn emit_too_complex(span: Span, diag: &mut Diagnostics) {
     diag.report(DiagnosticKind::QueryTooComplex, span)
         .hint(
-            "simplify the pattern — deeply nested or repeatedly-referenced alternations \
-             can expand exponentially",
+            "simplify the pattern. Deeply nested or repeatedly referenced alternations can expand exponentially",
         )
         .emit();
 }
@@ -376,7 +375,7 @@ fn emit_negated_required_field(
         .detail(field.name.clone())
         .related_to(culprit.span(), format!("on {kind_name}"))
         .hint(format!(
-            "`-{0}` requires `{0}` to be absent, but every {1} has one — drop `-{0}`",
+            "`-{0}` requires `{0}` to be absent, but every {1} has one. Drop `-{0}`",
             field.name, kind_name
         ))
         .emit();
@@ -487,7 +486,7 @@ fn emit_anchor_failure(
             render_kind_list(ctx, &allowed, "other kinds"),
         ),
         None => format!(
-            "{demand}, no {kind_name} places this child {boundary_name}; \
+            "{demand}, this child cannot appear {boundary_name} in {kind_name} because \
              {} {kind_name} {} {}",
             indefinite_article(&kind_name),
             boundary_verb,
@@ -536,10 +535,6 @@ fn emit_arrangement_failure(
     if let Some(allows) = describe_allowed_children(ctx, culprit.kind, &kind_name) {
         builder = builder.hint(allows);
     }
-    builder = builder.hint(
-        "each child is admissible here on its own — it is their combination or order \
-         the grammar never produces",
-    );
     builder.emit();
 }
 
@@ -753,7 +748,7 @@ fn describe_allowed_children(
     if parts.is_empty() {
         return Some(format!("{kind_name} takes no named children"));
     }
-    Some(format!("{kind_name} allows {}", parts.join("; ")))
+    Some(format!("{kind_name} allows {}", parts.join(", ")))
 }
 
 /// The fix hint: for an exact anchor, the soft form often matches; for a soft anchor,
@@ -767,23 +762,22 @@ fn anchor_fix_hint(
     if exact {
         match relaxed_anchor_text(node, ctx) {
             Some(soft) => format!(
-                "`.!` allows no syntax-tree node in its gap — not even an anonymous \
-                 token or comment; \
-                 the soft anchor `.` skips those: `{soft}`"
+                "`.!` allows no syntax-tree node in its gap, including anonymous \
+                 tokens and comments. The soft anchor `.` skips those: `{soft}`"
             ),
-            None => "`.!` allows no syntax-tree node in its gap — not even an anonymous \
-                 token or comment; try the soft anchor `.`, which skips them"
+            None => "`.!` allows no syntax-tree node in its gap, including anonymous \
+                 tokens and comments. Use the soft anchor `.`, which skips them"
                 .to_string(),
         }
     } else {
         if soft_anchor_skips_extras_only(node, ctx) {
-            return "here `.` skips extras only because one side can match an anonymous token; \
-                    use `(_)` for a named node, or drop the anchor to match these children \
+            return "here `.` skips extras only because one side can match an anonymous token. \
+                    Use `(_)` for a named node, or drop the anchor to match these children \
                     in any positions"
                 .to_string();
         }
-        "`.` skips anonymous tokens and extras but never another named node; \
-         drop the anchor to match these children in any positions"
+        "`.` skips anonymous tokens and extras but never another named node. \
+         Drop the anchor to match these children in any positions"
             .to_string()
     }
 }

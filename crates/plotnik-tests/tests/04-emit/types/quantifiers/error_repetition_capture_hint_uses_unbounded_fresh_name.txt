@@ -1,0 +1,26 @@
+Q = {
+  (identifier) @items
+  (identifier) @matches
+  (identifier) @entries
+  (identifier) @elements
+  (identifier) @records
+  {
+    (number) @value
+  }*
+}
+------------------ DIAGNOSTICS -------------------
+error: captures `@value` repeat with `*` but are not collected into a list
+ --> query.ptk:7:3
+  |
+7 | /   {
+8 | |     (number) @value
+9 | |   }*
+  | |____^
+  |
+help: collect one record per repetition in `@items_2`
+  |
+7 |   {
+8 |     (number) @value
+9 ~   }* @items_2
+  |
+help: append `@_` instead if the repeated result should be discarded

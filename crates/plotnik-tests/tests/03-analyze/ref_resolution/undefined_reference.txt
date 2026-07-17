@@ -6,7 +6,7 @@ error: `Undefined` is not defined
 1 | Call = (call_expression function: (Undefined))
   |                                    ^^^^^^^^^
   |
-help: `(Name)` uses a definition; define `Name = ...` or check the spelling
+help: define `Undefined` before using `(Undefined)`, or change the reference to an existing definition
 -------------------- SYMBOLS ---------------------
 Call
   Undefined?

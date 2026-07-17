@@ -7,11 +7,14 @@ B = {
   )? @s
 }
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@x` cannot capture `(A)` because `A` produces no result value
  --> query.ptk:6:5
   |
 1 | A = (B)
-  |     --- defined here
+  | ------- `A` is defined here
 ...
 6 |     (A) @x
   |     ^^^
+  |
+help: make `A` produce a result before collecting or capturing its value
+help: or remove `@x` and capture a node pattern directly

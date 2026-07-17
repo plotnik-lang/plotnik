@@ -1,12 +1,16 @@
 Q = ((expression_statement))
 ------------------ DIAGNOSTICS -------------------
-warning: parenthesized sequences are Tree-sitter syntax
+warning: `((expression_statement))` uses Tree-sitter parentheses for a sibling sequence
  --> query.ptk:1:5
   |
 1 | Q = ((expression_statement))
-  |     ^
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
   |
-help: use `{(a) (b)}` to match a sequence of siblings
+help: replace the outer parentheses with braces
+  |
+1 - Q = ((expression_statement))
+1 + Q = {(expression_statement)}
+  |
 ---------------------- CST -----------------------
 # query.ptk
 Root

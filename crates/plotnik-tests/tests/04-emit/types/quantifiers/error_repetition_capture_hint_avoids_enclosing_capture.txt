@@ -5,7 +5,7 @@ Q = {
   }*
 }
 ------------------ DIAGNOSTICS -------------------
-error: captures `@x` repeat with `*` but aren't collected into a list
+error: captures `@x` repeat with `*` but are not collected into a list
  --> query.ptk:3:3
   |
 3 | /   {
@@ -13,5 +13,10 @@ error: captures `@x` repeat with `*` but aren't collected into a list
 5 | |   }*
   | |____^
   |
-help: add a repetition capture so each repeat becomes one record in a list: `{...}* @matches`
-help: or discard the captures if only the structure matters: `{...}* @_`
+help: collect one record per repetition in `@matches`
+  |
+3 |   {
+4 |     (number) @x
+5 ~   }* @matches
+  |
+help: append `@_` instead if the repeated result should be discarded

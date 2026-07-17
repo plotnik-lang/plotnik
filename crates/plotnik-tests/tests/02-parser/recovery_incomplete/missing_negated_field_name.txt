@@ -6,4 +6,4 @@ error: expected a grammar field name
 1 | Q = (call -)
   |            ^
   |
-help: e.g., `-value`
+help: write a snake_case field name after `-`

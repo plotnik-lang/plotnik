@@ -84,7 +84,9 @@ impl Parser<'_, '_> {
         self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
             report
                 .detail("expected a pattern")
-                .hint("try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`")
+                .hint(
+                    "start with `(` for a node, `[` for an alternation, `{` for a sequence, a quote for a literal token, or `_` for a wildcard",
+                )
         });
         false
     }
@@ -183,6 +185,7 @@ impl Parser<'_, '_> {
         }
 
         let checkpoint = self.checkpoint();
+        let pattern_start = self.current_span().start();
 
         let kind = self.current();
         match kind {
@@ -192,7 +195,12 @@ impl Parser<'_, '_> {
             SyntaxKind::Underscore => self.parse_wildcard(),
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.parse_string_pattern(),
             SyntaxKind::UnterminatedString => {
-                self.error_and_bump(DiagnosticKind::UnclosedString);
+                if let Some(report) = self.report_current(DiagnosticKind::UnclosedString) {
+                    report
+                        .hint("close the quote to finish this literal-token pattern")
+                        .emit();
+                }
+                self.bump_as_error();
             }
             SyntaxKind::Dot | SyntaxKind::DotBang => self.parse_anchor(),
             SyntaxKind::Negation | SyntaxKind::Minus => self.parse_negated_field(),
@@ -224,11 +232,56 @@ impl Parser<'_, '_> {
                 DiagnosticKind::CapturedNegatedField,
             );
         } else if suffix == SuffixMode::Apply {
-            self.try_parse_quantifier(checkpoint);
-            self.try_parse_capture(checkpoint);
+            let quantifier = self.try_parse_quantifier(checkpoint);
+            let capture = self.try_parse_capture(checkpoint);
+            self.reject_trailing_quantifier(pattern_start, quantifier, capture);
         }
 
         self.exit_recursion();
+    }
+
+    fn reject_trailing_quantifier(
+        &mut self,
+        pattern_start: rowan::TextSize,
+        quantifier: Option<TextRange>,
+        capture: Option<TextRange>,
+    ) {
+        if !self.at_ts(QUANTIFIERS) {
+            return;
+        }
+
+        let trailing = self.current_text().to_string();
+        let (detail, hint, remove) = match (quantifier, capture) {
+            (Some(first), _) => {
+                let first = &self.source[usize::from(first.start())..usize::from(first.end())];
+                (
+                    format!("this pattern already uses `{first}` and cannot also use `{trailing}`"),
+                    None,
+                    true,
+                )
+            }
+            (None, Some(capture)) => {
+                let body = &self.source[usize::from(pattern_start)..usize::from(capture.start())];
+                let capture =
+                    &self.source[usize::from(capture.start())..usize::from(capture.end())];
+                (
+                    format!(
+                        "`{trailing}` applies to the pattern, so it must appear before `{capture}`"
+                    ),
+                    Some(format!("write `{}{trailing} {capture}`", body.trim_end())),
+                    false,
+                )
+            }
+            (None, None) => unreachable!("trailing quantifier follows a parsed suffix"),
+        };
+
+        self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
+            let report = report.detail(detail);
+            if remove {
+                return report.fix("remove the second quantifier", "");
+            }
+            report.hint(hint.expect("misordered quantifier has a rewrite"))
+        });
     }
 
     fn reject_constraint_suffixes(&mut self, quantified: DiagnosticKind, captured: DiagnosticKind) {

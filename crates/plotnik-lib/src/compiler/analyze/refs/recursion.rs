@@ -14,18 +14,16 @@ use crate::compiler::analyze::visitor::{Visitor, walk_named_node_pattern, walk_p
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
-use crate::compiler::parse::ast::{Def, DefRef, NamedNodePattern, Pattern, Root, SeqPattern};
+use crate::compiler::parse::ast::{DefRef, NamedNodePattern, Pattern, SeqPattern};
 use crate::core::Interner;
 
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,
-    ast_map: &IndexMap<SourceId, Root>,
     symbol_table: &SymbolTable,
     interner: &Interner,
     diag: &mut Diagnostics,
 ) {
     let mut validator = RecursionValidator {
-        ast_map,
         symbol_table,
         interner,
         diag,
@@ -34,7 +32,6 @@ pub fn validate_recursion(
 }
 
 struct RecursionValidator<'a, 'd> {
-    ast_map: &'a IndexMap<SourceId, Root>,
     symbol_table: &'a SymbolTable,
     interner: &'a Interner,
     diag: &'d mut Diagnostics,
@@ -102,17 +99,15 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
             let kind = RecursionFlaw::NoEscape;
-            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
-                let chain = self.format_chain(raw_chain, kind);
-                self.report_cycle(kind.diagnostic_kind(), scc, chain);
+            if let Some(cycle) = self.find_cycle(scc, &scc_set, kind) {
+                self.report_cycle(kind, cycle);
             }
             return;
         }
 
         let kind = RecursionFlaw::NoProgress;
-        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
-            let chain = self.format_chain(raw_chain, kind);
-            self.report_cycle(kind.diagnostic_kind(), scc, chain);
+        if let Some(cycle) = self.find_cycle(scc, &scc_set, kind) {
+            self.report_cycle(kind, cycle);
         }
     }
 
@@ -122,7 +117,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         nodes: &'b [&'b str],
         domain: &IndexSet<&'b str>,
         kind: RecursionFlaw,
-    ) -> Option<Vec<(Span, &'b str)>> {
+    ) -> Option<Vec<CycleEdge<'b>>> {
         let search_scope = kind.search_scope();
         let mut adj = IndexMap::new();
         for &name in nodes {
@@ -142,45 +137,49 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         CycleFinder::find(nodes, &adj)
     }
 
-    fn format_chain(
-        &self,
-        raw_chain: Vec<(Span, &str)>,
-        kind: RecursionFlaw,
-    ) -> Vec<(Span, String)> {
-        if raw_chain.len() == 1 {
-            let (span, target) = &raw_chain[0];
-            let msg = kind.self_reference_message(target);
-            return vec![(*span, msg)];
+    fn format_chain(&self, cycle: &[CycleEdge<'_>], kind: RecursionFlaw) -> Vec<(Span, String)> {
+        if cycle.len() == 1 {
+            let edge = cycle[0];
+            let msg = kind.self_reference_message(edge.target);
+            return vec![(edge.span, msg)];
         }
 
-        let len = raw_chain.len();
-        raw_chain
-            .into_iter()
+        cycle
+            .iter()
             .enumerate()
-            .map(|(i, (span, target))| {
-                let msg = if i == len - 1 {
-                    format!("references {} (completing cycle)", target)
+            .map(|(index, edge)| {
+                let msg = if index == cycle.len() - 1 {
+                    format!("references {} (completing cycle)", edge.target)
                 } else {
-                    format!("references {}", target)
+                    format!("references {}", edge.target)
                 };
-                (span, msg)
+                (edge.span, msg)
             })
             .collect()
     }
 
-    fn report_cycle(&mut self, kind: DiagnosticKind, scc: &[&str], chain: Vec<(Span, String)>) {
-        let primary = chain
+    fn report_cycle(&mut self, flaw: RecursionFlaw, cycle: Vec<CycleEdge<'_>>) {
+        let primary = cycle
             .first()
-            .map(|(span, _)| *span)
+            .map(|edge| edge.span)
             .expect("a detected cycle yields a non-empty chain");
+        let return_target = cycle
+            .last()
+            .map(|edge| edge.target)
+            .expect("a detected cycle yields a return target");
+        let cycle_names = cycle
+            .iter()
+            .map(|edge| edge.target)
+            .collect::<IndexSet<_>>();
+        let chain = self.format_chain(&cycle, flaw);
 
-        let related_def = if scc.len() > 1 {
-            self.find_def_info_containing(scc, primary)
+        let related_def = if cycle_names.len() > 1 {
+            self.find_def_info_containing(&cycle_names, primary)
         } else {
             None
         };
 
-        let mut builder = self.diag.report(kind, primary);
+        let mut builder = self.diag.report(flaw.diagnostic_kind(), primary);
 
         for (span, msg) in chain {
             builder = builder.related_to(span, msg);
@@ -190,36 +189,65 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             builder = builder.related_to(span, msg);
         }
 
+        builder = match flaw {
+            RecursionFlaw::NoEscape if cycle_names.len() == 1 => builder.hint(format!(
+                "add an alternative to `{}` that does not reference `{}`",
+                return_target, return_target
+            )),
+            RecursionFlaw::NoEscape => builder.hint(format!(
+                "add an alternative to {} that does not reference any definition in this cycle",
+                format_definition_choices(&cycle_names)
+            )),
+            RecursionFlaw::NoProgress => builder.hint(format!(
+                "make every path through this cycle match a syntax-tree node before it returns to `{}`",
+                return_target
+            )),
+        };
+
         builder.emit();
     }
 
-    fn find_def_info_containing(&self, scc: &[&str], primary: Span) -> Option<(Span, String)> {
+    fn find_def_info_containing(
+        &self,
+        cycle_names: &IndexSet<&str>,
+        primary: Span,
+    ) -> Option<(Span, String)> {
         // A range is only meaningfully contained by a body in the SAME source: two
         // files' bodies can share numeric offsets, so a source-blind containment
         // test would attribute the cycle to whichever file happens to be checked
         // first. Match the source before comparing offsets.
-        let name = scc.iter().copied().find(|name| {
+        let name = cycle_names.iter().copied().find(|name| {
             self.symbol_table
                 .definition(name)
                 .is_some_and(|(def_source, body)| {
                     def_source == primary.source && body.text_range().contains_range(primary.range)
                 })
         })?;
-        let (source_id, def) = self.find_def_by_name(name)?;
-        let n = def.name()?;
         Some((
-            Span::new(source_id, n.text_range()),
+            self.symbol_table.definition_span(name)?,
             format!("{} is defined here", name),
         ))
     }
+}
 
-    fn find_def_by_name(&self, name: &str) -> Option<(SourceId, Def)> {
-        self.ast_map.iter().find_map(|(source_id, ast)| {
-            ast.defs()
-                .find(|d| d.name().map(|n| n.text() == name).unwrap_or(false))
-                .map(|def| (*source_id, def))
-        })
+#[derive(Clone, Copy)]
+struct CycleEdge<'a> {
+    span: Span,
+    target: &'a str,
+}
+
+fn format_definition_choices(names: &IndexSet<&str>) -> String {
+    let mut names = names
+        .iter()
+        .map(|name| format!("`{name}`"))
+        .collect::<Vec<_>>();
+    let last = names
+        .pop()
+        .expect("a recursive cycle contains at least one definition");
+    if names.is_empty() {
+        return last;
     }
+    format!("{} or {last}", names.join(", "))
 }
 
 struct CycleFinder<'a, 'q> {
@@ -234,7 +262,7 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
     fn find(
         nodes: &[&'q str],
         adj: &'a IndexMap<&'q str, Vec<(&'q str, Span)>>,
-    ) -> Option<Vec<(Span, &'q str)>> {
+    ) -> Option<Vec<CycleEdge<'q>>> {
         let mut finder = Self {
             adj,
             visited: IndexSet::new(),
@@ -251,7 +279,7 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
         None
     }
 
-    fn dfs(&mut self, current: &'q str) -> Option<Vec<(Span, &'q str)>> {
+    fn dfs(&mut self, current: &'q str) -> Option<Vec<CycleEdge<'q>>> {
         if self.on_path.contains_key(current) {
             return None;
         }
@@ -269,9 +297,15 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
                 if let Some(&start_index) = self.on_path.get(target) {
                     let mut chain = Vec::new();
                     for i in start_index..self.path.len() - 1 {
-                        chain.push((self.edges[i], self.path[i + 1]));
+                        chain.push(CycleEdge {
+                            span: self.edges[i],
+                            target: self.path[i + 1],
+                        });
                     }
-                    chain.push((*span, *target));
+                    chain.push(CycleEdge {
+                        span: *span,
+                        target,
+                    });
                     return Some(chain);
                 }
 

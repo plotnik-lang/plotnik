@@ -12,6 +12,7 @@ error: infinite recursion: cycle makes no progress
   |          references itself
   |
 help: match at least one syntax-tree node before recursing
+help: make every path through this cycle match a syntax-tree node before it returns to `E`
 -------------------- SYMBOLS ---------------------
 E
   E (cycle)

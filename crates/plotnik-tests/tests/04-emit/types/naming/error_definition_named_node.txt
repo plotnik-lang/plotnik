@@ -4,6 +4,6 @@ error: type name `Node` is already used for a different type
  --> query.ptk:1:1
   |
 1 | Node = (program (expression_statement) @x)
-  | ^^^^
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: `Node` is the builtin node type name

@@ -8,7 +8,7 @@ error: definition must be named
 1 | (first)
   | ^^^^^^^
   |
-help: give it a name like `Name = (first)`
+help: add a PascalCase definition name and `=` before `(first)`
 
 error: definition must be named
  --> query.ptk:3:1
@@ -16,4 +16,4 @@ error: definition must be named
 3 | (last)
   | ^^^^^^
   |
-help: give it a name like `Name = (last)`
+help: add a PascalCase definition name and `=` before `(last)`

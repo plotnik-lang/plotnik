@@ -6,14 +6,16 @@ Q = (program
 )
 ------------------ DIAGNOSTICS -------------------
 error: capture `@dup` already defined in this scope
- --> query.ptk:4:5
+ --> query.ptk:4:18
   |
+3 |     (identifier) @dup
+  |                  ---- first captured here
 4 |     (identifier) @dup
-  |     ^^^^^^^^^^^^^^^^^
+  |                  ^^^^
   |
 help: rename one capture, or use labeled alternatives to preserve which alternative matched
 
-error: capture type `bool` requires a value that may be absent; this capture is always present
+error: capture type `bool` requires a value that may be absent. This capture is always present
  --> query.ptk:5:11
   |
 5 |   ) @flag :: bool

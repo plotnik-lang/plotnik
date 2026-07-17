@@ -3,9 +3,11 @@ Q = (type_alias_declaration
 )
 ------------------- INPUT (ts) -------------------
 ------------------ DIAGNOSTICS -------------------
-error: `identifier` can't be the value of `name`
+error: `identifier` is not valid for grammar field `name` of `type_alias_declaration`
  --> query.ptk:2:10
   |
+1 | Q = (type_alias_declaration
+  |      ---------------------- `type_alias_declaration` starts here
 2 |   name: (identifier) @name
   |   ----   ^^^^^^^^^^
   |   |

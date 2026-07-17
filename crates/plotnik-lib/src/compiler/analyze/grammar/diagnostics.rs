@@ -19,14 +19,16 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         let mut builder = self
             .diag
             .report(DiagnosticKind::GrammarFieldNotOnNodeKind, span)
-            .detail(field_name)
-            .related_to(parent_span, format!("on `{}`", parent_name));
+            .detail(format!(
+                "`{field_name}` is not a grammar field of `{parent_name}`"
+            ))
+            .related_to(parent_span, format!("`{parent_name}` starts here"));
 
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no grammar fields", parent_name));
         } else {
             if let Some(similar) = find_similar(field_name, &valid_fields) {
-                builder = builder.fix(format!("did you mean `{}`?", similar), similar);
+                builder = builder.fix(format!("replace with `{similar}`"), similar);
             }
             builder = builder.hint(format!(
                 "valid grammar fields for `{}`: {}",
@@ -54,8 +56,10 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
 
         self.diag
             .report(DiagnosticKind::InvalidChildType, span)
-            .detail(child_name)
-            .related_to(parent_span, format!("on `{}`", parent_name))
+            .detail(format!(
+                "`{child_name}` cannot be an unlabeled child of `{parent_name}`"
+            ))
+            .related_to(parent_span, format!("`{parent_name}` starts here"))
             .hint(hint)
             .emit();
     }
@@ -69,7 +73,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .detail(&parent_name)
             .related_to(parent_span, format!("`{}`", parent_name))
             .hint(format!(
-                "a leaf token's content is its text — match it directly `({0})` or by value `({0} == \"foo\")`",
+                "a leaf token's content is its text. Match `({0})` directly or add a text predicate to `({0})`",
                 parent_name
             ))
             .emit();
@@ -102,7 +106,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .collect::<Vec<_>>()
             .join(", ");
         format!(
-            "`{}` has no unlabeled children — use its grammar fields: {}",
+            "`{}` has no unlabeled children. Use its grammar fields: {}",
             parent_name, rendered
         )
     }
@@ -125,15 +129,20 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn emit_invalid_field_value(
         &mut self,
         span: Span,
-        message: String,
+        value: &str,
         ctx: &ParentNode,
         field: &FieldRef,
     ) {
         let hint = self.field_value_hint(ctx.id(), field.id, field.name);
+        let parent_name = ctx.name(self.grammar);
         self.diag
             .report(DiagnosticKind::InvalidGrammarFieldChildKind, span)
-            .detail(message)
+            .detail(format!(
+                "{value} is not valid for grammar field `{}` of `{parent_name}`",
+                field.name
+            ))
             .related_to(field.span, format!("grammar field `{}`", field.name))
+            .related_to(ctx.span(), format!("`{parent_name}` starts here"))
             .hint(hint)
             .emit();
     }
@@ -159,7 +168,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 .find_map(|&id| self.grammar.node_kind(id))
                 .unwrap_or("…");
             return format!(
-                "`{0}` accepts only literal tokens — write `{0}: \"{1}\"`",
+                "`{0}` accepts only literal tokens. Write `{0}: \"{1}\"`",
                 field_name, example
             );
         }
@@ -182,10 +191,6 @@ pub(super) fn format_list(items: &[&str], max_items: usize) -> String {
             .iter()
             .map(|s| format!("`{}`", s))
             .collect();
-        format!(
-            "{}, ... ({} more)",
-            shown.join(", "),
-            items.len() - max_items
-        )
+        format!("{}, … ({} more)", shown.join(", "), items.len() - max_items)
     }
 }

@@ -6,7 +6,7 @@ error: definition must be named
 1 | (identifier) @foo . (other)
   | ^^^^^^^^^^^^^^^^^
   |
-help: give it a name like `Name = (identifier) @foo`
+help: add a PascalCase definition name and `=` before `(identifier) @foo`
 
 error: definition must be named
  --> query.ptk:1:19
@@ -14,7 +14,7 @@ error: definition must be named
 1 | (identifier) @foo . (other)
   |                   ^
   |
-help: give it a name like `Name = .`
+help: add a PascalCase definition name and `=` before `.`
 
 error: definition must be named
  --> query.ptk:1:21
@@ -22,4 +22,4 @@ error: definition must be named
 1 | (identifier) @foo . (other)
   |                     ^^^^^^^
   |
-help: give it a name like `Name = (other)`
+help: add a PascalCase definition name and `=` before `(other)`

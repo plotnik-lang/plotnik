@@ -7,10 +7,16 @@ Q = (program
   (A)* @xs
 )
 ------------------ DIAGNOSTICS -------------------
-error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
+error: `@xs` cannot collect `(A)*` because one repetition does not produce one node or value
  --> query.ptk:7:3
   |
-7 |   (A)* @xs
-  |   ^^^^
+1 | / A = {
+2 | |   (expression_statement)
+3 | |   (statement_block (A))?
+4 | | }
+  | |_- `A` is defined here
+...
+7 |     (A)* @xs
+  |     ^^^^
   |
-help: add internal captures: `{(a) @a (b) @b}* @items`
+help: make each repetition produce a record by changing `(expression_statement)` to `(expression_statement) @xs_item` in definition `A`

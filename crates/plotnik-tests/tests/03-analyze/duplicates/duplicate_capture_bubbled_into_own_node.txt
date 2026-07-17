@@ -5,6 +5,8 @@ Q = (foo
 error: capture `@x` already defined in this scope
  --> query.ptk:3:3
   |
+2 |   (a) @x
+  |       -- first captured here
 3 | ) @x
   |   ^^
   |

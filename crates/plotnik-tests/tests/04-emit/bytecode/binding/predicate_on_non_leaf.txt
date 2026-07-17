@@ -1,9 +1,11 @@
 Q = (function_declaration == "foo")
 ------------------ DIAGNOSTICS -------------------
-error: predicates match text content, but this node can contain children
+error: predicate `function_declaration == "foo"` cannot test `function_declaration` because this node kind can contain children
  --> query.ptk:1:27
   |
 1 | Q = (function_declaration == "foo")
-  |                           ^^^^^^^^
+  |      -------------------- ^^^^^^^^
+  |      |
+  |      `function_declaration` starts here
   |
-help: predicates match text content; apply them to a leaf node or an anonymous node like `"foo"`
+help: move `== "foo"` to a leaf child of `function_declaration`, or match a literal token directly

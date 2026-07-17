@@ -2,6 +2,7 @@ use std::fmt::Write as _;
 
 use crate::compiler::test_utils::colliding_node_kind_grammar;
 use crate::compiler::{Query, QueryBuilder, SourceMap, SourcePath};
+use crate::core::grammar::{Grammar, raw::RawGrammar};
 
 fn assert_binds_colliding_node_kinds(files: &[(&str, &str)]) {
     let grammar = colliding_node_kind_grammar();
@@ -83,4 +84,42 @@ fn deep_violation_in_alternation_does_not_reject_query() {
     Query::expect_valid_binding(
         r"Q = [(call_expression function: (member_expression object: (number))) (identifier)]",
     );
+}
+
+#[test]
+fn root_anchoring_lint_names_the_selected_grammar_root() {
+    let raw = RawGrammar::from_json(
+        r#"{
+            "name": "distinct_root",
+            "rules": {
+                "compilation_unit": {
+                    "type": "SYMBOL",
+                    "name": "identifier"
+                },
+                "identifier": {
+                    "type": "PATTERN",
+                    "value": "[a-z]+"
+                }
+            }
+        }"#,
+    )
+    .expect("synthetic grammar fixture");
+    let grammar = Grammar::from_raw(&raw).expect("synthetic grammar metadata");
+    let analyzed = QueryBuilder::new(SourceMap::from_inline(
+        "Standalone = (identifier) @identifier",
+    ))
+    .with_strict_lints(true)
+    .analyze()
+    .expect("query analysis completes");
+
+    let bound = analyzed.bind(&grammar);
+    let rendered = bound.dump_diagnostics();
+
+    assert!(
+        rendered.contains(
+            "entry point `Standalone` cannot match the `compilation_unit` syntax-tree root"
+        ),
+        "{rendered}"
+    );
+    assert!(!rendered.contains("`program`"), "{rendered}");
 }

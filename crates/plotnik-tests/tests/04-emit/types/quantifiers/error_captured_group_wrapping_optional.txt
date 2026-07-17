@@ -4,7 +4,7 @@ Q = (program
   } @x
 )
 ------------------ DIAGNOSTICS -------------------
-error: this group doesn't match exactly one node, so there is no single node to bind
+error: `@x` cannot capture `{ (debugger_statement)? }` because the grouped pattern does not match exactly one node
  --> query.ptk:2:3
   |
 2 | /   {
@@ -12,4 +12,5 @@ error: this group doesn't match exactly one node, so there is no single node to 
 4 | |   } @x
   | |___^
   |
-help: capture individual nodes inside the group: `{(a) @a (b) @b} @x`
+help: make the captured pattern produce a record by changing `(debugger_statement)` to `(debugger_statement) @x_value`
+help: or remove `@x`

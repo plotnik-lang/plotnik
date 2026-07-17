@@ -7,7 +7,7 @@ Q = (program
   ]
 )
 ------------------ DIAGNOSTICS -------------------
-error: capture type `bool` requires a value that may be absent; this capture is always present
+error: capture type `bool` requires a value that may be absent. This capture is always present
  --> query.ptk:4:26
   |
 4 |       (identifier) @flag :: bool

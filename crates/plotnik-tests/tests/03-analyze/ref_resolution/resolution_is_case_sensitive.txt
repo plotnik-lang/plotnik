@@ -7,12 +7,11 @@ error: `FOO` is not defined
 2 | Q = (call (FOO))
   |            ^^^
   |
-help: did you mean `(Foo)`?
+help: replace with the defined reference `(Foo)`
   |
 2 - Q = (call (FOO))
 2 + Q = (call (Foo))
   |
-help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 -------------------- SYMBOLS ---------------------
 Foo
 Q

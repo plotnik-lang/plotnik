@@ -6,4 +6,4 @@ error: expected a string or regex after the operator
 1 | Q = (identifier == )
   |                    ^
   |
-help: e.g., `(identifier == "foo")` or `(identifier =~ /foo/)`
+help: use a quoted string after a string operator, or a regex after `=~` or `!~`

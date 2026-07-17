@@ -1,0 +1,18 @@
+Q = (program
+  {
+    (identifier == "a  b")
+    (number)
+  } @pair
+)
+------------------ DIAGNOSTICS -------------------
+error: `@pair` cannot capture `{ (identifier == "a  b") (number) }` because the grouped pattern does not match exactly one node
+ --> query.ptk:2:3
+  |
+2 | /   {
+3 | |     (identifier == "a  b")
+4 | |     (number)
+5 | |   } @pair
+  | |___^
+  |
+help: make the captured pattern produce a record by changing `(identifier == "a  b")` to `(identifier == "a  b") @pair_value`
+help: or remove `@pair`

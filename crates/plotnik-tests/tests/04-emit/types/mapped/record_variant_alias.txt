@@ -9,11 +9,14 @@ Q = (program
   (expression_statement (Expr) @expr)
 )
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@name` cannot capture `(Alias)` because `Alias` produces no result value
  --> query.ptk:4:7
   |
 1 | Alias = (identifier)
-  |         ------------ defined here
+  | -------------------- `Alias` is defined here
 ...
 4 |   Id: (Alias) @name :: Ident
   |       ^^^^^^^
+  |
+help: make `Alias` produce a result by changing `(identifier)` to `(identifier) @name_value` in definition `Alias`
+help: or remove `@name` and capture a node pattern directly

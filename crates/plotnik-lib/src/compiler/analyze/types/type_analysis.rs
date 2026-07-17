@@ -798,14 +798,9 @@ impl TypeAnalysisBuilder {
         &self.custom_capture_types
     }
 
-    pub fn record_pattern_result(
-        &mut self,
-        pattern: Pattern,
-        source: crate::compiler::diagnostics::source::SourceId,
-        shape: PatternShape,
-    ) {
+    pub fn record_pattern_result(&mut self, pattern: Pattern, shape: PatternShape) {
         if let Some(graph) = &mut self.raw_output_graph {
-            graph.record_pattern(pattern.clone(), source, &shape, &self.analysis);
+            graph.record_pattern(pattern.clone(), &shape, &self.analysis);
         }
         self.analysis.pattern_result.insert(pattern, shape);
     }

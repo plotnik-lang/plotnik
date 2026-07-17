@@ -4,7 +4,7 @@ Q = (program
   )+
 )
 ------------------ DIAGNOSTICS -------------------
-error: captures `@id` repeat with `+` but aren't collected into a list
+error: captures `@id` repeat with `+` but are not collected into a list
  --> query.ptk:2:3
   |
 2 | /   (expression_statement
@@ -12,5 +12,10 @@ error: captures `@id` repeat with `+` but aren't collected into a list
 4 | |   )+
   | |____^
   |
-help: add a repetition capture so each repeat becomes one record in a list: `(...)+ @items`
-help: or discard the captures if only the structure matters: `(...)+ @_`
+help: collect one record per repetition in `@items`
+  |
+2 |   (expression_statement
+3 |     (identifier) @id
+4 ~   )+ @items
+  |
+help: append `@_` instead if the repeated result should be discarded

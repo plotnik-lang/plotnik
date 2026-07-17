@@ -10,10 +10,16 @@ B = {
   (statement_block (A))?
 }
 ------------------ DIAGNOSTICS -------------------
-error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
- --> query.ptk:4:5
-  |
-4 |     (B)* @xs
-  |     ^^^^
-  |
-help: add internal captures: `{(a) @a (b) @b}* @items`
+error: `@xs` cannot collect `(B)*` because one repetition does not produce one node or value
+  --> query.ptk:4:5
+   |
+ 4 |       (B)* @xs
+   |       ^^^^
+...
+ 8 | / B = {
+ 9 | |   (debugger_statement)
+10 | |   (statement_block (A))?
+11 | | }
+   | |_- `B` is defined here
+   |
+help: make each repetition produce a record by changing `(debugger_statement)` to `(debugger_statement) @xs_item` in definition `B`

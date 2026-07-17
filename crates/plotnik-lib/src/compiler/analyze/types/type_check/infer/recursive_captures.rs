@@ -70,6 +70,13 @@ impl InferVisitor<'_, '_> {
                 if captured_pattern.capture().is_discard() {
                     return;
                 }
+                let Some(capture_token) = captured_pattern.capture().name() else {
+                    return;
+                };
+                let capture_name = self
+                    .ctx
+                    .interner
+                    .intern(capture_token.text().trim_start_matches('@'));
                 let Some(inner) = captured_pattern.inner() else {
                     return;
                 };
@@ -77,9 +84,9 @@ impl InferVisitor<'_, '_> {
                     Pattern::DefRef(_) => {
                         if let Some(shape) =
                             self.in_progress_target_shape(&inner, registration_order, captor_order)
-                            && !self.report_capture_on_match_only_ref(&inner, &shape)
+                            && !self.report_capture_on_match_only_ref(&inner, &shape, capture_name)
                         {
-                            self.report_capture_without_single_node(&inner, &shape);
+                            self.report_capture_without_single_node(&inner, &shape, capture_name);
                         }
                     }
                     Pattern::QuantifiedPattern(q) => {
@@ -91,7 +98,11 @@ impl InferVisitor<'_, '_> {
                                 captor_order,
                             )
                         {
-                            self.report_quantified_capture_without_single_node(q, &shape);
+                            self.report_quantified_capture_without_single_node(
+                                q,
+                                &shape,
+                                Some(capture_name),
+                            );
                         }
                     }
                     _ => {}

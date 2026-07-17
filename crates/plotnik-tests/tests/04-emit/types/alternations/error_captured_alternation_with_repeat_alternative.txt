@@ -5,7 +5,7 @@ Q = (program
   ] @x
 )
 ------------------ DIAGNOSTICS -------------------
-error: this alternation doesn't match exactly one node, so there is no single node to bind
+error: `@x` cannot capture `[ (expression_statement)+ (lexical_declaration) ]` because the alternation does not match exactly one node
  --> query.ptk:2:3
   |
 2 | /   [
@@ -14,4 +14,5 @@ error: this alternation doesn't match exactly one node, so there is no single no
 5 | |   ] @x
   | |___^
   |
-help: capture inside the alternatives, or drop this capture
+help: make the captured pattern produce a record by changing `(expression_statement)` to `(expression_statement) @x_value`
+help: or remove `@x`

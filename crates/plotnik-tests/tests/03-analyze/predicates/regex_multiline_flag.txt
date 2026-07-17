@@ -6,5 +6,5 @@ error: multiline mode is not supported because target engines disagree on line t
 1 | Q = (identifier =~ /(?m:^x$)/)
   |                       ^
   |
-help: spell line terminators explicitly; `^` and `$` always mean text start and end
+help: spell line terminators explicitly. `^` and `$` always mean text start and end
 -------------------- SYMBOLS ---------------------

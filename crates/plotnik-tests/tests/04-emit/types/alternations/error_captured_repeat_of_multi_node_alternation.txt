@@ -8,7 +8,7 @@ Q = (program
   ]* @items
 )
 ------------------ DIAGNOSTICS -------------------
-error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
+error: `@items` cannot collect `[ (expression_statement) { (lexical_declaration) (debugger_statement) } ]*` because one repetition does not produce one node or value
  --> query.ptk:2:3
   |
 2 | /   [
@@ -19,4 +19,4 @@ error: one repeat of this `*` group doesn't match exactly one node, so there is 
 8 | |   ]* @items
   | |____^
   |
-help: add internal captures: `{(a) @a (b) @b}* @items`
+help: make each repetition produce a record by changing `(expression_statement)` to `(expression_statement) @items_item`

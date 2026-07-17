@@ -8,12 +8,12 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 ------------------ DIAGNOSTICS -------------------
-error: capture `@value` has incompatible types across alternatives
+error: `@value` has incompatible types `{ comment: Node | null }` and `Node | null` across alternatives
  --> query.ptk:5:7
   |
 5 |     } @value :: bool
   |       ^^^^^^
 6 |     (identifier)? @value :: bool
-  |                   ------ and a different type here
+  |                   ------ `@value` has type `Node | null` here
   |
 help: make every alternative produce the same type, or label the alternatives for a variant type

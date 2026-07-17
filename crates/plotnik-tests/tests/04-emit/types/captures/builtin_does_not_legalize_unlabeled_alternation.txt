@@ -5,13 +5,13 @@ Q = [
   } @x :: text
 ]
 ------------------ DIAGNOSTICS -------------------
-error: capture `@x` has incompatible types across alternatives
+error: `@x` has incompatible types `Node` and `{ id: Node }` across alternatives
  --> query.ptk:2:16
   |
 2 |   (identifier) @x :: text
   |                ^^
 ...
 5 |   } @x :: text
-  |     -- and a different type here
+  |     -- `@x` has type `{ id: Node }` here
   |
 help: make every alternative produce the same type, or label the alternatives for a variant type

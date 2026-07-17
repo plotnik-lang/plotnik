@@ -5,18 +5,20 @@ MatchOnly = {
 
 Q = (call (MatchOnly) @v)
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@v` cannot capture `(MatchOnly)` because `MatchOnly` produces no result value
  --> query.ptk:6:11
   |
-1 |   MatchOnly = {
-  |  _____________-
+1 | / MatchOnly = {
 2 | |   (a)
 3 | |   (b)
 4 | | }
-  | |_- defined here
+  | |_- `MatchOnly` is defined here
 5 |
 6 |   Q = (call (MatchOnly) @v)
   |             ^^^^^^^^^^^
+  |
+help: make `MatchOnly` produce a result by changing `(a)` to `(a) @v_value` in definition `MatchOnly`
+help: or remove `@v` and capture a node pattern directly
 -------------------- SYMBOLS ---------------------
 MatchOnly
 Q

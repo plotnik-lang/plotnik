@@ -6,4 +6,4 @@ error: references cannot have supertypes
 1 | Q = (RefName#subtype)
   |             ^
   |
-help: supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`
+help: category refinement applies to node kinds, not definition references. Remove the refinement or apply it to a concrete node kind

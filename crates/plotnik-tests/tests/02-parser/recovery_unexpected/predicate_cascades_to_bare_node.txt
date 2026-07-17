@@ -6,7 +6,7 @@ error: Tree-sitter predicates are not supported
 1 | (a (#eq? @x "foo") b)
   |     ^^^^
   |
-help: use `(node == "x")`
+help: move `== "foo"` into the node pattern captured as `@x`
 
 error: node kinds must be parenthesized
  --> query.ptk:1:20

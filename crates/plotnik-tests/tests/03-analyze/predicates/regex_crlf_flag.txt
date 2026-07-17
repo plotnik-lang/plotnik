@@ -6,5 +6,5 @@ error: CRLF mode is not supported because target engines disagree on line termin
 1 | Q = (identifier =~ /(?R:.)/)
   |                       ^
   |
-help: spell line terminators explicitly; `^` and `$` always mean text start and end
+help: spell line terminators explicitly. `^` and `$` always mean text start and end
 -------------------- SYMBOLS ---------------------

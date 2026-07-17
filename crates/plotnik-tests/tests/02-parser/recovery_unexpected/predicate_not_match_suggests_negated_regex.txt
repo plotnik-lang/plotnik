@@ -6,4 +6,4 @@ error: Tree-sitter predicates are not supported
 1 | Q = #not-match?
   |     ^^^^^^^^^^^
   |
-help: use `(node !~ /re/)`
+help: `#not-match?` corresponds to `!~` inside a node pattern, but this call does not provide both a captured target and a compatible value

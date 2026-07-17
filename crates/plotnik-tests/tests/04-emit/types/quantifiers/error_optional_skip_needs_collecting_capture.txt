@@ -14,5 +14,11 @@ error: captures `@decl`, `@dbg` skip together with `?` but nothing collects them
 5 | |   }?
   | |____^
   |
-help: add an optional capture so the group becomes an option of one record: `{...}? @items`
-help: or discard the captures if only the structure matters: `{...}? @_`
+help: collect the optional record in `@items`
+  |
+2 |   {
+3 |     (lexical_declaration) @decl
+4 |     (debugger_statement) @dbg
+5 ~   }? @items
+  |
+help: append `@_` instead if the optional result should be discarded

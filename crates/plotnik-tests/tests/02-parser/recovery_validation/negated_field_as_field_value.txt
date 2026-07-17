@@ -6,4 +6,4 @@ error: a negated grammar field cannot be a grammar-field value
 1 | Q = (pair key: -value)
   |                ^^^^^^
   |
-help: a negated grammar field stands alone as a child: `(node -field)`
+help: move the negated grammar field out of the field value and make it a direct child of the enclosing node

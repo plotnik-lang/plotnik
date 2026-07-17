@@ -28,13 +28,21 @@ warning: alternative labels have no output effect here: captures from the altern
   |
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 
-warning: parenthesized sequences are Tree-sitter syntax
+warning: this parenthesized group uses Tree-sitter syntax for a sibling sequence
  --> query.ptk:3:10
   |
-3 |     Tag: (
-  |          ^
+3 |       Tag: (
+  |  __________^
+4 | |       (expression_statement) @a
+5 | |     ) @x
+  | |_____^
   |
-help: use `{(a) (b)}` to match a sequence of siblings
+help: replace the outer parentheses with braces
+  |
+3 ~     Tag: {
+4 +       (expression_statement) @a
+5 ~     } @x
+  |
 --------------------- OUTPUT ---------------------
 {
   "x": {

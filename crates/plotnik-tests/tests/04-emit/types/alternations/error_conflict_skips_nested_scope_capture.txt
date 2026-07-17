@@ -6,13 +6,13 @@ Q = [
   (number)* @x
 ]
 ------------------ DIAGNOSTICS -------------------
-error: capture `@x` has incompatible types across alternatives
+error: `@x` has incompatible types `Node | null` and `Node[]` across alternatives
  --> query.ptk:2:16
   |
 2 |   (identifier) @x
   |                ^^
 ...
 6 |   (number)* @x
-  |             -- and a different type here
+  |             -- `@x` has type `Node[]` here
   |
 help: make every alternative produce the same type, or label the alternatives for a variant type

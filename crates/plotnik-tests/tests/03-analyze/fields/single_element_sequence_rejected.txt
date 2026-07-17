@@ -8,6 +8,6 @@ error: grammar field `bar` cannot match a sequence
 2 |   bar: {(a)}
   |        ^^^^^
   |
-help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint
+help: a grammar field holds one child node. Match one pattern, or move the sequence outside the grammar-field constraint
 -------------------- SYMBOLS ---------------------
 Q

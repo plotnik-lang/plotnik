@@ -45,6 +45,14 @@ pub fn check_entry_points(
                     DiagnosticKind::NoEntryPoints,
                     Span::new(*source_id, name.text_range()),
                 )
+                .detail(format!(
+                    "`{}` cannot be an entry point because its body does not match exactly one root node",
+                    name.text()
+                ))
+                .hint(format!(
+                    "make `{}` match exactly one node, with any anchors or field constraints inside that node pattern",
+                    name.text()
+                ))
                 .emit();
             }
         }

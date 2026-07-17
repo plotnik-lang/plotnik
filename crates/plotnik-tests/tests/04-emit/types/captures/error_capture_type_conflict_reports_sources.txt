@@ -1,0 +1,14 @@
+Q = [
+  (identifier) @x :: text
+  (number) @x
+]
+------------------ DIAGNOSTICS -------------------
+error: `@x` has incompatible types `text` and `Node` across alternatives after applying capture types
+ --> query.ptk:3:12
+  |
+2 |   (identifier) @x :: text
+  |                ---------- `@x` has type `text` here
+3 |   (number) @x
+  |            ^^
+  |
+help: use the same capture type in every alternative, or label the alternatives to produce a variant

@@ -6,4 +6,4 @@ error: negated grammar fields cannot appear in sequences
 1 | Q = (pair {(string) -key})
   |                     ^^^^
   |
-help: a negated grammar field applies to the enclosing node; make it a direct child: `(node -field {...})`
+help: a negated grammar field applies to the enclosing node. Make it a direct child of that node

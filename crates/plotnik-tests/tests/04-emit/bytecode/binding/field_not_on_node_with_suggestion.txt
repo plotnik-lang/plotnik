@@ -2,15 +2,15 @@ Q = (function_declaration
   parameter: (formal_parameters) @params
 ) @fn
 ------------------ DIAGNOSTICS -------------------
-error: grammar field `parameter` is not valid on this node kind
+error: `parameter` is not a grammar field of `function_declaration`
  --> query.ptk:2:3
   |
 1 | Q = (function_declaration
-  |      -------------------- on `function_declaration`
+  |      -------------------- `function_declaration` starts here
 2 |   parameter: (formal_parameters) @params
   |   ^^^^^^^^^
   |
-help: did you mean `parameters`?
+help: replace with `parameters`
   |
 2 |   parameters: (formal_parameters) @params
   |            +

@@ -5,8 +5,8 @@ error: `A` is already defined
  --> query.ptk:2:1
   |
 1 | A = (leaf)
-  | - first defined here
+  | ---------- first defined here
 2 | A = (a (A))
-  | ^
+  | ^^^^^^^^^^^
 -------------------- SYMBOLS ---------------------
 A

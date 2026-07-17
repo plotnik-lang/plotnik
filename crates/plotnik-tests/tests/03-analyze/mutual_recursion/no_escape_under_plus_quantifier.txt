@@ -7,12 +7,12 @@ error: infinite recursion: no escape path
 1 | A = (foo (B)+)
   |           - references B (completing cycle)
 2 | B = (bar (A))
-  | -         ^
+  | ----------^--
   | |         |
   | |         references A
   | B is defined here
   |
-help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
+help: add an alternative to `A` or `B` that does not reference any definition in this cycle
 -------------------- SYMBOLS ---------------------
 A
   B

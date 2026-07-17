@@ -12,7 +12,7 @@ error: with the exact anchor (`.!`), the first child of `function_declaration` m
 2 |   (function_declaration .! (identifier))
   |    ^^^^^^^^^^^^^^^^^^^^
   |
-help: `.!` allows no syntax-tree node in its gap — not even an anonymous token or comment; the soft anchor `.` skips those: `(function_declaration . (identifier))`
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(function_declaration . (identifier))`
 
 error: a `binary_expression` has one `left`, but this pattern binds `left` 2 times
  --> query.ptk:3:4

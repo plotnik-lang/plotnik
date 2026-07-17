@@ -11,4 +11,4 @@ help: remove the children
 1 - Q = (ERROR (something))
 1 + Q = (ERROR )
   |
-help: `(ERROR)` matches any error node as a leaf; use `(MISSING "x")` to match a missing token
+help: `(ERROR)` matches any error node as a leaf. Use `MISSING` when matching a token inserted by parser recovery

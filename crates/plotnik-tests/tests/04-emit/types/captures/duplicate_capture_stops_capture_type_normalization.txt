@@ -7,6 +7,8 @@ Q = (program
 error: capture `@value` already defined in this scope
  --> query.ptk:4:5
   |
+3 |     (identifier) @value
+  |                  ------ first captured here
 4 |   ) @value :: bool
   |     ^^^^^^
   |

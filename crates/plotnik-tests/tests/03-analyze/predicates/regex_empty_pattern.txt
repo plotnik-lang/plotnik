@@ -6,5 +6,5 @@ error: empty regex pattern
 1 | Q = (identifier =~ //)
   |                    ^^
   |
-help: put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== "foo"`
+help: put a pattern between the slashes, or use a quoted value with a string predicate operator
 -------------------- SYMBOLS ---------------------

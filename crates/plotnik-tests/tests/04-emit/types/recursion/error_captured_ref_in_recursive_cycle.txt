@@ -10,15 +10,17 @@ B = {
   )? @s
 }
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@x` cannot capture `(A)` because `A` produces no result value
  --> query.ptk:9:5
   |
-1 |   A = {
-  |  _____-
+1 | / A = {
 2 | |   (expression_statement)
 3 | |   (statement_block (B))?
 4 | | }
-  | |_- defined here
+  | |_- `A` is defined here
 ...
 9 |       (A) @x
   |       ^^^
+  |
+help: make `A` produce a result by changing `(expression_statement)` to `(expression_statement) @x_value` in definition `A`
+help: or remove `@x` and capture a node pattern directly

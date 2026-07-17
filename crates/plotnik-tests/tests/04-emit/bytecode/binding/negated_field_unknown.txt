@@ -6,7 +6,7 @@ error: `nme` is not a valid grammar field
 1 | Q = (function_declaration -nme) @fn
   |                            ^^^
   |
-help: did you mean `name`?
+help: replace with `name`
   |
 1 | Q = (function_declaration -name) @fn
   |                             +

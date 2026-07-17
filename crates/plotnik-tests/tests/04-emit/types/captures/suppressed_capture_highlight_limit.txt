@@ -31,7 +31,7 @@ warning: capture type `text` replaces the record value captured by `@chunk` with
  9 |     (comment) @seven
    |               ------ this captured value is suppressed by `@chunk :: text`
 10 |     (comment) @eight
-   |               ------ this captured value is suppressed by `@chunk :: text`; 2 more captures not shown
+   |               ------ this captured value is suppressed by `@chunk :: text`. 2 more captures not shown
 ...
 13 |   } @chunk :: text
    |     ^^^^^^^^^^^^^^

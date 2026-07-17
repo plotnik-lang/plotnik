@@ -13,7 +13,7 @@ error: `-key` can never match
   |      |
   |      on `pair`
   |
-help: `-key` requires `key` to be absent, but every `pair` has one — drop `-key`
+help: `-key` requires `key` to be absent, but every `pair` has one. Drop `-key`
 
 error: `-value` can never match
  --> query.ptk:4:12
@@ -23,4 +23,4 @@ error: `-value` can never match
   |      |
   |      on `pair`
   |
-help: `-value` requires `value` to be absent, but every `pair` has one — drop `-value`
+help: `-value` requires `value` to be absent, but every `pair` has one. Drop `-value`

@@ -12,8 +12,11 @@ Q = (program
 error: type name `Foo` is already used for a different type
  --> query.ptk:9:11
   |
-1 | Foo = {
-  | --- already used here
+1 | / Foo = {
+2 | |   (expression_statement)
+3 | |   (debugger_statement)
+4 | | }
+  | |_- already used here
 ...
-9 |   } @x :: Foo
-  |           ^^^
+9 |     } @x :: Foo
+  |             ^^^

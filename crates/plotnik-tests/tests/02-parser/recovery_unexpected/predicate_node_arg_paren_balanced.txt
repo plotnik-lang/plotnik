@@ -6,4 +6,4 @@ error: Tree-sitter predicates are not supported
 1 | (call_expression (#eq? (identifier) @x))
   |                   ^^^^
   |
-help: use `(node == "x")`
+help: `#eq?` corresponds to `==` inside a node pattern, but this call does not provide both a captured target and a compatible value

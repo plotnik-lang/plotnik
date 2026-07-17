@@ -21,12 +21,12 @@ Q = (program
   )
 )
 ------------------ DIAGNOSTICS -------------------
-error: capture `@x` has incompatible types across alternatives
+error: `@x` has incompatible types `Row` and `Pair` across alternatives
   --> query.ptk:16:17
    |
 16 |           (Row) @x
    |                 ^^
 17 |           (Pair) @x
-   |                  -- and a different type here
+   |                  -- `@x` has type `Pair` here
    |
 help: make every alternative produce the same type, or label the alternatives for a variant type

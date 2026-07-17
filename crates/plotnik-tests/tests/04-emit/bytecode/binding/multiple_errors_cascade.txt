@@ -8,7 +8,7 @@ error: `function_declaraton` is not a valid node kind
 1 | Q = (function_declaraton
   |      ^^^^^^^^^^^^^^^^^^^
   |
-help: did you mean `function_declaration`?
+help: replace with `function_declaration`
   |
 1 | Q = (function_declaration
   |                       +
@@ -19,7 +19,7 @@ error: `nme` is not a valid grammar field
 2 |   nme: (identifer) @name
   |   ^^^
   |
-help: did you mean `name`?
+help: replace with `name`
   |
 2 |   name: (identifer) @name
   |    +
@@ -30,7 +30,7 @@ error: `identifer` is not a valid node kind
 2 |   nme: (identifer) @name
   |         ^^^^^^^^^
   |
-help: did you mean `identifier`?
+help: replace with `identifier`
   |
 2 |   nme: (identifier) @name
   |                +

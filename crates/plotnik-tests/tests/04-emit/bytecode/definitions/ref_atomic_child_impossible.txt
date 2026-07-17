@@ -7,15 +7,17 @@ Q = (program
   (expression_statement (Impossible) @expr)
 )
 ------------------ DIAGNOSTICS -------------------
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+error: `@expr` cannot capture `(Impossible)` because `Impossible` produces no result value
  --> query.ptk:7:25
   |
-1 |   Impossible = (binary_expression
-  |  ______________-
+1 | / Impossible = (binary_expression
 2 | |   right: (_)
 3 | |   left: (_)
 4 | | )
-  | |_- defined here
+  | |_- `Impossible` is defined here
 ...
 7 |     (expression_statement (Impossible) @expr)
   |                           ^^^^^^^^^^^^
+  |
+help: make `Impossible` produce a result by changing `(_)` to `(_) @expr_value` in definition `Impossible`
+help: or remove `@expr` and capture a node pattern directly

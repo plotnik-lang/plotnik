@@ -297,7 +297,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
      --> c.ptk:1:9
       |
     1 | C = (c (A))
-      | -       ^
+      | --------^--
       | |       |
       | |       references A
       | C is defined here
@@ -312,7 +312,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
     1 | B = (b (C))
       |         - references C (completing cycle)
       |
-    help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
+    help: add an alternative to `A`, `B` or `C` that does not reference any definition in this cycle
     ");
 }
 
@@ -336,7 +336,12 @@ fn compile_rejects_definition_with_positional_only_body() {
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no selectable entry point"), "{rendered}");
+    assert!(
+        rendered.contains(
+            "cannot be an entry point because its body does not match exactly one root node"
+        ),
+        "{rendered}"
+    );
 }
 
 #[test]
@@ -364,7 +369,12 @@ fn compile_flags_positional_only_definition_among_valid_definitions() {
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no selectable entry point"), "{rendered}");
+    assert!(
+        rendered.contains(
+            "cannot be an entry point because its body does not match exactly one root node"
+        ),
+        "{rendered}"
+    );
 }
 
 #[test]
@@ -401,7 +411,7 @@ fn multifile_bind_field_error_in_referenced_body_spans_two_files() {
     let res = bound.dump_diagnostics();
 
     insta::assert_snapshot!(res, @"
-    error: grammar field `name` is not valid on this node kind
+    error: `name` is not a grammar field of `call_expression`
      --> a.ptk:1:7
       |
     1 | Foo = name: (identifier)
@@ -410,7 +420,7 @@ fn multifile_bind_field_error_in_referenced_body_spans_two_files() {
      ::: b.ptk:1:8
       |
     1 | Bar = (call_expression (Foo))
-      |        --------------- on `call_expression`
+      |        --------------- `call_expression` starts here
       |
     help: valid grammar fields for `call_expression`: `arguments`, `function`, `optional_chain`
     ");
@@ -472,10 +482,12 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
 
     insta::assert_snapshot!(res, @"
     error: capture `@x` already defined in this scope
-     --> a.ptk:1:32
+     --> a.ptk:1:45
       |
     1 | Foo = (program (identifier) @x (identifier) @x)
-      |                                ^^^^^^^^^^^^^^^
+      |                             --              ^^
+      |                             |
+      |                             first captured here
       |
     help: rename one capture, or use labeled alternatives to preserve which alternative matched
     ");
@@ -687,11 +699,11 @@ fn multifile_field_with_ref_to_seq_error() {
     1 | Q = (call name: (X))
       |                 ^^^
       |
-     ::: defs.ptk:1:5
+     ::: defs.ptk:1:1
       |
     1 | X = {(a) (b)}
-      |     --------- defined here
+      | ------------- `X` is defined here
       |
-    help: a grammar field holds a single child node; match one pattern, or move the sequence outside the grammar-field constraint
+    help: a grammar field holds one child node. Match one pattern, or move the sequence outside the grammar-field constraint
     ");
 }

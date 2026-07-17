@@ -93,7 +93,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             )
             .detail(type_name);
         if let Some(similar) = suggestion {
-            builder = builder.fix(format!("did you mean `{}`?", similar), similar);
+            builder = builder.fix(format!("replace with `{similar}`"), similar);
         }
         builder.emit();
         None
@@ -158,7 +158,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .detail(field_name);
 
         if let Some(similar) = suggestion {
-            builder = builder.fix(format!("did you mean `{}`?", similar), similar);
+            builder = builder.fix(format!("replace with `{similar}`"), similar);
         }
         builder.emit();
     }
