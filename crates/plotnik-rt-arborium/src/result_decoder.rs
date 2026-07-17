@@ -314,13 +314,23 @@ fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
             | JournalEvent::RecordOpen
             | JournalEvent::VariantOpen(_)
             | JournalEvent::ScalarOpen => {
-                cur = outer
-                    .pop()
-                    .expect("open/close balance proven by the effect-stack validation");
+                cur = outer.pop().unwrap_or_else(|| {
+                    panic!(
+                        "result decoder found opening event {entry:?} at output index {i} without a \
+                         matching close event; semantic effect-stack validation admitted an \
+                         imbalanced journal"
+                    )
+                });
                 index[i] = cur;
             }
             _ => index[i] = cur,
         }
     }
+    assert!(
+        outer.is_empty(),
+        "result decoder reached the start of the output journal with {} unmatched close event(s); \
+         semantic effect-stack validation admitted an imbalanced journal",
+        outer.len()
+    );
     index
 }

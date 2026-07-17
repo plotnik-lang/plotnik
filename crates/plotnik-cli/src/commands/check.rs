@@ -4,7 +4,7 @@ use plotnik_lib::QueryBuilder;
 
 use super::lang_resolver::require_lang;
 use super::query_loader::load_query;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, write_stderr, writeln_stdout};
 
 pub struct CheckArgs {
     pub query_path: Option<PathBuf>,
@@ -43,11 +43,14 @@ pub fn run(args: CheckArgs) -> CliResult {
     if args.json {
         // Contract: on exit 0/1 stdout is a JSON array, `[]` when clean.
         // Exit 2 (couldn't answer) keeps text on stderr and emits no JSON.
-        println!("{}", diagnostics.render_json(source_map));
+        writeln_stdout(format_args!("{}", diagnostics.render_json(source_map)))?;
     } else if !valid || diagnostics.has_warnings() {
         // Warnings print even when the query is valid (like cargo check);
         // only a fully clean query stays silent.
-        eprint!("{}", diagnostics.render_colored(source_map, args.color));
+        write_stderr(format_args!(
+            "{}",
+            diagnostics.render_colored(source_map, args.color)
+        ))?;
     }
 
     if !valid {

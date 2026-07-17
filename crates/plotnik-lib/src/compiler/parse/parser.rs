@@ -381,7 +381,12 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     pub(super) fn exit_recursion(&mut self) {
-        self.depth = self.depth.saturating_sub(1);
+        self.depth = self.depth.checked_sub(1).unwrap_or_else(|| {
+            panic!(
+                "parser recursion depth underflow: `exit_recursion` was called without a \
+                     matching `enter_recursion`"
+            )
+        });
         self.reset_stall_guard();
     }
 
@@ -391,7 +396,12 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     pub(super) fn pop_delimiter(&mut self) {
-        self.delimiter_stack.pop();
+        self.delimiter_stack.pop().unwrap_or_else(|| {
+            panic!(
+                "parser delimiter stack underflow: `pop_delimiter` was called without a \
+                     matching `push_delimiter`"
+            )
+        });
     }
 
     /// Report an unclosed delimiter at EOF, pointing back at its opening token.

@@ -19,7 +19,9 @@
 
 use std::cell::Cell;
 
-/// A safe run exceeded one of its resolved ceilings.
+use crate::frame::CallFrameError;
+
+/// A safe run exceeded a configured limit or a fixed runtime capacity.
 ///
 /// The generated matchers' safe entry points report through this; the VM
 /// reports the same trips through its own `RuntimeError`. The wording of the
@@ -42,6 +44,8 @@ pub enum LimitExceeded {
     /// the native stack. Raise the module's `depth` policy — and run with a
     /// stack to match — if values this deep are expected.
     DecodeDepth(u64),
+    /// The source-driven call stack exceeded a fixed-width runtime capacity.
+    CallFrame(CallFrameError),
 }
 
 impl std::fmt::Display for LimitExceeded {
@@ -59,11 +63,18 @@ impl std::fmt::Display for LimitExceeded {
             LimitExceeded::DecodeDepth(max) => {
                 write!(f, "exceeded the decode depth limit of {max} nested values")
             }
+            LimitExceeded::CallFrame(error) => error.fmt(f),
         }
     }
 }
 
 impl std::error::Error for LimitExceeded {}
+
+impl From<CallFrameError> for LimitExceeded {
+    fn from(error: CallFrameError) -> Self {
+        Self::CallFrame(error)
+    }
+}
 
 pub struct DecodeDepth {
     max: Option<u64>,
@@ -79,7 +90,13 @@ impl DecodeDepth {
     }
 
     pub fn enter(&self) -> Result<DecodeDepthGuard<'_>, LimitExceeded> {
-        let next = self.current.get() + 1;
+        let current = self.current.get();
+        let next = current.checked_add(1).unwrap_or_else(|| {
+            panic!(
+                "result decoding depth overflowed u64 while entering a nested value: \
+                 current_depth={current}"
+            )
+        });
         if let Some(max) = self.max
             && next > max
         {

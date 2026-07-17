@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 use super::query_loader::load_query;
 use super::run_common;
 use super::runtime_report::render_runtime_error;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, writeln_stderr, writeln_stdout};
 
 const DEFAULT_MAX_RECORDS: usize = 65_536;
 
@@ -130,9 +130,9 @@ pub fn run(args: InspectArgs) -> CliResult {
     });
 
     if args.json {
-        println!("{}", bundle);
+        writeln_stdout(format_args!("{bundle}"))?;
     } else {
-        print_summary(&bundle, args.color);
+        print_summary(&bundle, args.color)?;
     }
 
     if diagnostics_have_errors {
@@ -347,7 +347,7 @@ fn runtime_error_value(error: &RuntimeError) -> Value {
     serde_json::from_str(&rendered).unwrap_or(Value::String(rendered))
 }
 
-fn print_summary(bundle: &Value, color: bool) {
+fn print_summary(bundle: &Value, color: bool) -> CliResult {
     let colors = Colors::new(color);
     let span_count = bundle
         .get("query_spans")
@@ -357,24 +357,25 @@ fn print_summary(bundle: &Value, color: bool) {
         .get("entry_points")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
-    println!("query spans: {span_count}");
-    println!("entry points: {entry_points}");
+    writeln_stdout(format_args!("query spans: {span_count}"))?;
+    writeln_stdout(format_args!("entry points: {entry_points}"))?;
     if let Some(error) = bundle.get("error") {
-        eprintln!("error: {error}");
+        writeln_stderr(format_args!("error: {error}"))?;
     }
     if let Some(result) = bundle.get("result")
         && !result.is_null()
     {
-        println!("result: {}", result);
+        writeln_stdout(format_args!("result: {result}"))?;
     }
     if let Some(diagnostics) = bundle.get("diagnostics").and_then(Value::as_array)
         && !diagnostics.is_empty()
     {
-        eprintln!(
+        writeln_stderr(format_args!(
             "{}diagnostics: {}{}",
             colors.dim,
             diagnostics.len(),
             colors.reset
-        );
+        ))?;
     }
+    Ok(())
 }

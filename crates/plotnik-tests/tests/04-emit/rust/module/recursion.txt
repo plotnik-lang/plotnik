@@ -362,6 +362,8 @@ mod matcher {
         Accept,
         /// The state failed; unwind the checkpoint stack.
         Backtrack,
+        /// Source-driven call state exceeded a fixed-width runtime capacity.
+        CallFrameError(rt::CallFrameError),
     }
 
     /// How the backtrack unwind resumed execution.
@@ -369,6 +371,7 @@ mod matcher {
         Resumed(u16),
         Accepted,
         NoMatch,
+        CallFrameError(rt::CallFrameError),
     }
 
     /// One dispatch loop serves every entry point; `entry` selects the wrapper.
@@ -427,10 +430,12 @@ mod matcher {
             match dispatch(&mut eng, source, ip) {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => return Ok(Some(eng.into_journal())),
+                Flow::CallFrameError(error) => return Err(error.into()),
                 Flow::Backtrack => match backtrack(&mut eng, source) {
                     Unwound::Resumed(next) => ip = next,
                     Unwound::Accepted => return Ok(Some(eng.into_journal())),
                     Unwound::NoMatch => return Ok(None),
+                    Unwound::CallFrameError(error) => return Err(error.into()),
                 },
             }
         }
@@ -484,7 +489,9 @@ mod matcher {
                         policy: rt::SkipPolicy::Any,
                     },
                 ));
-                eng.enter_frame(S06_EXPR);
+                if let Err(error) = eng.enter_frame(S06_EXPR) {
+                    return Flow::CallFrameError(error);
+                }
                 Flow::Jump(S00_EXPR)
             }
             //   07   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  01
@@ -555,7 +562,9 @@ mod matcher {
                         policy: rt::SkipPolicy::Any,
                     },
                 ));
-                eng.enter_frame(S16_Q);
+                if let Err(error) = eng.enter_frame(S16_Q) {
+                    return Flow::CallFrameError(error);
+                }
                 Flow::Jump(S00_EXPR)
             }
             //   17                                        ▶
@@ -569,7 +578,9 @@ mod matcher {
             }
             //   18       (Expr)                           00 : 17
             S18_EXPR_EP => {
-                eng.enter_frame(S18_EXPR_EP);
+                if let Err(error) = eng.enter_frame(S18_EXPR_EP) {
+                    return Flow::CallFrameError(error);
+                }
                 Flow::Jump(S00_EXPR)
             }
             //   19                                        ▶
@@ -588,7 +599,9 @@ mod matcher {
             }
             //   21       (Q)                              11 : 20
             S21_Q_EP => {
-                eng.enter_frame(S21_Q_EP);
+                if let Err(error) = eng.enter_frame(S21_Q_EP) {
+                    return Flow::CallFrameError(error);
+                }
                 Flow::Jump(S11_Q)
             }
             //   22  -ε-  [RecordOpen]                     21
@@ -687,7 +700,9 @@ mod matcher {
                         cp.ip,
                         resume,
                     ));
-                    eng.enter_frame(resume.call_site);
+                    if let Err(error) = eng.enter_frame(resume.call_site) {
+                        return Unwound::CallFrameError(error);
+                    }
                     return Unwound::Resumed(resume.target);
                 }
 
@@ -696,6 +711,9 @@ mod matcher {
                 rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
                     Some(Flow::Jump(next)) => return Unwound::Resumed(next),
                     Some(Flow::Accept) => return Unwound::Accepted,
+                    Some(Flow::CallFrameError(error)) => {
+                        return Unwound::CallFrameError(error);
+                    }
                     Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
                     None => continue 'unwind,
                 },

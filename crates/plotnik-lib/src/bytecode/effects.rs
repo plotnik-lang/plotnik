@@ -107,19 +107,73 @@ impl EffectKind {
             Self::SpanStartAt | Self::SpanStart | Self::SpanEnd | Self::ScalarMark => {
                 EffectSuppression::Bypass
             }
-            _ => EffectSuppression::Output,
+            Self::Node
+            | Self::ListOpen
+            | Self::ArrayPush
+            | Self::ListClose
+            | Self::RecordOpen
+            | Self::RecordSet
+            | Self::RecordClose
+            | Self::VariantOpen
+            | Self::VariantClose
+            | Self::Absent
+            | Self::ScalarOpen
+            | Self::TextClose
+            | Self::BoolClose
+            | Self::NodeText
+            | Self::NodeBool
+            | Self::BoolValue => EffectSuppression::Output,
         }
     }
 
     pub fn reads_cursor(self) -> bool {
-        matches!(
-            self,
-            Self::Node | Self::SpanStartAt | Self::ScalarMark | Self::NodeText | Self::NodeBool
-        )
+        match self {
+            Self::Node | Self::SpanStartAt | Self::ScalarMark | Self::NodeText | Self::NodeBool => {
+                true
+            }
+            Self::ListOpen
+            | Self::ArrayPush
+            | Self::ListClose
+            | Self::RecordOpen
+            | Self::RecordSet
+            | Self::RecordClose
+            | Self::VariantOpen
+            | Self::VariantClose
+            | Self::Absent
+            | Self::SuppressBegin
+            | Self::SuppressEnd
+            | Self::SpanStart
+            | Self::SpanEnd
+            | Self::ScalarOpen
+            | Self::TextClose
+            | Self::BoolClose
+            | Self::BoolValue => false,
+        }
     }
 
     pub fn is_motion_barrier(self) -> bool {
-        matches!(self, Self::ScalarOpen | Self::TextClose | Self::BoolClose)
+        match self {
+            Self::ScalarOpen | Self::TextClose | Self::BoolClose => true,
+            Self::Node
+            | Self::ListOpen
+            | Self::ArrayPush
+            | Self::ListClose
+            | Self::RecordOpen
+            | Self::RecordSet
+            | Self::RecordClose
+            | Self::VariantOpen
+            | Self::VariantClose
+            | Self::Absent
+            | Self::SuppressBegin
+            | Self::SuppressEnd
+            | Self::SpanStartAt
+            | Self::SpanStart
+            | Self::SpanEnd
+            | Self::ScalarMark
+            | Self::NodeText
+            | Self::NodeBool
+            | Self::BoolValue => false,
+        }
     }
 
     pub fn frame_action(self) -> Option<FrameAction> {
@@ -132,7 +186,19 @@ impl EffectKind {
             Self::VariantClose => FrameAction::Close(ValueFrameKind::Variant),
             Self::ScalarOpen => FrameAction::Open(ValueFrameKind::Scalar),
             Self::TextClose | Self::BoolClose => FrameAction::Close(ValueFrameKind::Scalar),
-            _ => return None,
+            Self::Node
+            | Self::ArrayPush
+            | Self::RecordSet
+            | Self::Absent
+            | Self::SuppressBegin
+            | Self::SuppressEnd
+            | Self::SpanStartAt
+            | Self::SpanStart
+            | Self::SpanEnd
+            | Self::ScalarMark
+            | Self::NodeText
+            | Self::NodeBool
+            | Self::BoolValue => return None,
         };
         Some(action)
     }
@@ -144,7 +210,21 @@ impl EffectKind {
             Self::RecordSet | Self::VariantOpen => payload < member_count,
             Self::SpanStartAt | Self::SpanStart | Self::SpanEnd => payload < span_count,
             Self::BoolClose | Self::BoolValue => payload <= 1,
-            _ => payload == 0,
+            Self::Node
+            | Self::ListOpen
+            | Self::ArrayPush
+            | Self::ListClose
+            | Self::RecordOpen
+            | Self::RecordClose
+            | Self::VariantClose
+            | Self::Absent
+            | Self::SuppressBegin
+            | Self::SuppressEnd
+            | Self::ScalarOpen
+            | Self::ScalarMark
+            | Self::TextClose
+            | Self::NodeText
+            | Self::NodeBool => payload == 0,
         }
     }
 }

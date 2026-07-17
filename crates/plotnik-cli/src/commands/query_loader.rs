@@ -166,7 +166,12 @@ fn merge_declaration(
             "workspace shebangs disagree on {}: '{}' in '{}' vs '{}' in '{}'",
             what,
             existing,
-            origin.as_deref().unwrap_or("<unknown>"),
+            origin.as_deref().unwrap_or_else(|| {
+                panic!(
+                    "workspace merge state is inconsistent: existing {what} declaration \
+                         {existing:?} has no source file"
+                )
+            }),
             value,
             file,
         ))),

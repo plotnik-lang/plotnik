@@ -238,9 +238,25 @@ impl Header {
         let align = SECTION_ALIGN as u32;
         let mut starts = [0u32; SECTION_COUNT];
         let mut cursor = HEADER_SIZE as u32; // sections begin right after the header
-        for (start, size) in starts.iter_mut().zip(self.section_data_sizes()) {
+        for (index, (start, size)) in starts.iter_mut().zip(self.section_data_sizes()).enumerate() {
             *start = cursor;
-            cursor = align_up(cursor + size as u32, align);
+            if index + 1 < SECTION_COUNT {
+                let size = u32::try_from(size).unwrap_or_else(|_| {
+                    panic!(
+                        "bytecode header validation admitted section {index} with size {size}, \
+                         which exceeds the u32 format limit"
+                    )
+                });
+                cursor = align_up(
+                    cursor.checked_add(size).unwrap_or_else(|| {
+                        panic!(
+                            "bytecode header validation admitted section {index} whose end \
+                             overflows u32: start={cursor}, size={size}"
+                        )
+                    }),
+                    align,
+                );
+            }
         }
         SectionOffsets::from_starts(starts)
     }

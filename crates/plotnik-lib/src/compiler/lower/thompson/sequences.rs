@@ -783,14 +783,15 @@ impl NfaBuilder<'_> {
         entry: EntryObligation,
         targets: &ExitMap<Label>,
     ) -> Option<Label> {
-        debug_assert!(
+        assert!(
             self.ctx
                 .analysis
                 .type_analysis
                 .expect_pattern_result(&Pattern::QuantifiedPattern(quantified.clone()))
                 .flow
                 .is_no_value(),
-            "boundary quantifier lowering currently owns only transparent output"
+            "NFA boundary-quantifier lowering received a value-producing pattern; this path only \
+             supports transparent output"
         );
 
         let (inner, kind) = match classify_quantifier(quantified) {

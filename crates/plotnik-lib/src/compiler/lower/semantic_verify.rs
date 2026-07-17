@@ -66,6 +66,18 @@ pub(crate) enum SemanticVerifyError {
     Regex { pattern: String, error: String },
 }
 
+impl SemanticVerifyError {
+    pub(crate) fn is_query_rejection(&self) -> bool {
+        matches!(
+            self,
+            Self::StateLimit(_)
+                | Self::EntryPointLimit(_)
+                | Self::StateBudget(_)
+                | Self::Regex { .. }
+        )
+    }
+}
+
 pub(crate) fn verify(
     semantic: &SemanticNfa,
     schema: &ResultSchema<'_>,
@@ -618,10 +630,19 @@ impl<'a> Program<'a> {
                     if pending == PendingState::Full {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
-                    let summary = summaries
-                        .get(&call.target)
-                        .copied()
-                        .unwrap_or_else(DefSummary::unknown);
+                    let summary = match phase {
+                        VerifyPhase::Summarize => summaries
+                            .get(&call.target)
+                            .copied()
+                            .unwrap_or_else(DefSummary::unknown),
+                        VerifyPhase::Final => *summaries.get(&call.target).unwrap_or_else(|| {
+                            panic!(
+                                "final semantic verification reached call target {:?}, but the \
+                                     summary phase produced no callee summary for it",
+                                call.target
+                            )
+                        }),
+                    };
                     match stack.last() {
                         Some(kind)
                             if phase == VerifyPhase::Final

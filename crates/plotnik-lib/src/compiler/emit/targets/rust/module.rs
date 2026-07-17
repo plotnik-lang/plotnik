@@ -851,7 +851,12 @@ impl<'a> Generator<'a> {
             );
         }
 
-        let _ = writeln!(out, "            eng.enter_frame({state});");
+        let _ = writeln!(
+            out,
+            "            if let Err(error) = eng.enter_frame({state}) {{"
+        );
+        out.push_str("                return Flow::CallFrameError(error);\n");
+        out.push_str("            }\n");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
     }
@@ -860,7 +865,12 @@ impl<'a> Generator<'a> {
         let state = &self.state(state_plan.id).const_name;
         let target = &self.state(plan.target).const_name;
         let _ = writeln!(out, "        {state} => {{");
-        let _ = writeln!(out, "            eng.enter_frame({state});");
+        let _ = writeln!(
+            out,
+            "            if let Err(error) = eng.enter_frame({state}) {{"
+        );
+        out.push_str("                return Flow::CallFrameError(error);\n");
+        out.push_str("            }\n");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
     }
@@ -1309,6 +1319,8 @@ enum Flow {
     Accept,
     /// The state failed; unwind the checkpoint stack.
     Backtrack,
+    /// Source-driven call state exceeded a fixed-width runtime capacity.
+    CallFrameError(rt::CallFrameError),
 }
 
 /// How the backtrack unwind resumed execution.
@@ -1316,6 +1328,7 @@ enum Unwound {
     Resumed(u16),
     Accepted,
     NoMatch,
+    CallFrameError(rt::CallFrameError),
 }
 
 /// One dispatch loop serves every entry point; `entry` selects the wrapper.
@@ -1374,10 +1387,12 @@ fn run<
         match dispatch(&mut eng, source, ip) {
             Flow::Jump(next) => ip = next,
             Flow::Accept => return Ok(Some(eng.into_journal())),
+            Flow::CallFrameError(error) => return Err(error.into()),
             Flow::Backtrack => match backtrack(&mut eng, source) {
                 Unwound::Resumed(next) => ip = next,
                 Unwound::Accepted => return Ok(Some(eng.into_journal())),
                 Unwound::NoMatch => return Ok(None),
+                Unwound::CallFrameError(error) => return Err(error.into()),
             },
         }
     }
@@ -1534,7 +1549,9 @@ fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
                     cp.ip,
                     resume,
                 ));
-                eng.enter_frame(resume.call_site);
+                if let Err(error) = eng.enter_frame(resume.call_site) {
+                    return Unwound::CallFrameError(error);
+                }
                 return Unwound::Resumed(resume.target);
             }
 
@@ -1543,6 +1560,9 @@ fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
             rt::Resume::Match => match match_retry(eng, @SOURCE@, cp.ip) {
                 Some(Flow::Jump(next)) => return Unwound::Resumed(next),
                 Some(Flow::Accept) => return Unwound::Accepted,
+                Some(Flow::CallFrameError(error)) => {
+                    return Unwound::CallFrameError(error);
+                }
                 Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
                 None => continue 'unwind,
             },

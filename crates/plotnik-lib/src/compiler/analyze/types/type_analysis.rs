@@ -631,16 +631,30 @@ impl TypeAnalysisBuilder {
 
         // Preserve bytecode primitive numbering without treating no-value flow as a type.
         builder.analysis.types.push(TypeEntry::ReservedNoValue);
-        debug_assert_eq!(builder.analysis.types.len(), TYPE_NODE.0 as usize);
+        assert_eq!(
+            builder.analysis.types.len(),
+            TYPE_NODE.0 as usize,
+            "reserved type layout changed before interning `Node`; the bytecode primitive IDs \
+             require `Node` at TYPE_NODE"
+        );
 
         let node_id = builder.intern_type(TypeShape::Node);
-        debug_assert_eq!(node_id, TYPE_NODE);
+        assert_eq!(
+            node_id, TYPE_NODE,
+            "reserved type layout assigned `Node` the wrong bytecode primitive ID"
+        );
 
         let text_id = builder.intern_type(TypeShape::Text);
-        debug_assert_eq!(text_id, TYPE_TEXT);
+        assert_eq!(
+            text_id, TYPE_TEXT,
+            "reserved type layout assigned `text` the wrong bytecode primitive ID"
+        );
 
         let bool_id = builder.intern_type(TypeShape::Bool);
-        debug_assert_eq!(bool_id, TYPE_BOOL);
+        assert_eq!(
+            bool_id, TYPE_BOOL,
+            "reserved type layout assigned `bool` the wrong bytecode primitive ID"
+        );
 
         builder
     }

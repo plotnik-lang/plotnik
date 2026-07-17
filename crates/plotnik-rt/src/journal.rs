@@ -89,6 +89,11 @@ impl<'t> MatchJournal<'t> {
     /// Truncate to a saved watermark, rolling back events on backtrack.
     #[inline]
     pub fn truncate(&mut self, watermark: usize) {
+        assert!(
+            watermark <= self.0.len(),
+            "journal rollback watermark {watermark} exceeds the current journal length {}",
+            self.0.len()
+        );
         self.0.truncate(watermark);
     }
 

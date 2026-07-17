@@ -15,14 +15,15 @@ use plotnik_rt::PortId;
 use super::super::instructions::header_byte;
 use super::Instruction;
 
-/// One pre-decoded bytecode word. Interior words of a multi-word `Match` hold `Return`
-/// placeholders that are never addressed: load-time validation proves every
-/// jump target and successor lands on an instruction start.
+/// One pre-decoded bytecode word. Load-time validation proves every jump target
+/// and successor lands on an instruction start; `Interior` makes a violation
+/// fail loudly in release builds too.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum DecodedInstr {
     Match(DecodedMatch),
     Call(DecodedCall),
     Return(PortId),
+    Interior,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -88,7 +89,13 @@ pub(crate) struct DecodedProgram {
 impl DecodedProgram {
     #[inline]
     pub(crate) fn instruction_at(&self, addr: CodeAddr) -> DecodedInstr {
-        self.words[u16::from(addr) as usize]
+        let instruction = self.words[u16::from(addr) as usize];
+        assert!(
+            !matches!(instruction, DecodedInstr::Interior),
+            "decoded bytecode lookup addressed interior word {addr:?} of a multi-word instruction; \
+             validation must restrict control flow to instruction starts"
+        );
+        instruction
     }
 
     #[inline]
@@ -158,7 +165,7 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                 }));
                 // Interior words of a multi-word Match are never addressed.
                 for _ in 1..opcode.word_count() {
-                    program.words.push(DecodedInstr::Return(PortId::ZERO));
+                    program.words.push(DecodedInstr::Interior);
                 }
                 word_addr += opcode.word_count() as usize;
             }
@@ -174,7 +181,7 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                     returns_len: c.arity() as u8,
                 }));
                 for _ in 1..opcode.word_count() {
-                    program.words.push(DecodedInstr::Return(PortId::ZERO));
+                    program.words.push(DecodedInstr::Interior);
                 }
                 word_addr += opcode.word_count() as usize;
             }

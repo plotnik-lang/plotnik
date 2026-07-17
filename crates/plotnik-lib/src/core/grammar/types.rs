@@ -147,13 +147,16 @@ impl Grammar {
 
         let tables = GrammarTables {
             node_shapes,
-            symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases),
-            fields: derive_fields(&syntax_grammar, &inlines, &variable_summaries),
+            symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases)
+                .map_err(GrammarError::Analysis)?,
+            fields: derive_fields(&syntax_grammar, &inlines, &variable_summaries)
+                .map_err(GrammarError::Analysis)?,
         };
 
         let mut grammar =
             Self::from_tables(raw.name.clone(), tables).map_err(GrammarError::Analysis)?;
-        let structure = StructureTable::build(grammar_ctx, &grammar);
+        let structure =
+            StructureTable::build(grammar_ctx, &grammar).map_err(GrammarError::Analysis)?;
         grammar.structure = structure;
         let reachability = Reachability::compute(&grammar, &grammar.node_constraints);
         grammar.admissibility = AdmissibilityIndex::from_reachability(reachability);

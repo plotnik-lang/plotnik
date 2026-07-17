@@ -199,17 +199,31 @@ mod debug_impl {
         }
 
         if let Some(f) = m.node_field {
-            let name = ctx.analysis.grammar.field_name(f, ctx.analysis.interner);
-            ops.push(SemanticOp::Field(
-                name.unwrap_or_else(|| format!("field#{f}")),
-            ));
+            let name = ctx
+                .analysis
+                .grammar
+                .field_name(f, ctx.analysis.interner)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "semantic NFA verification found node field {f:?}, but the selected grammar \
+                         binding has no name for that field"
+                    )
+                });
+            ops.push(SemanticOp::Field(name.to_string()));
         }
 
         for &f in &m.neg_fields {
-            let name = ctx.analysis.grammar.field_name(f, ctx.analysis.interner);
-            ops.push(SemanticOp::NegField(
-                name.unwrap_or_else(|| format!("field#{f}")),
-            ));
+            let name = ctx
+                .analysis
+                .grammar
+                .field_name(f, ctx.analysis.interner)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "semantic NFA verification found negated field {f:?}, but the selected \
+                         grammar binding has no name for that field"
+                    )
+                });
+            ops.push(SemanticOp::NegField(name.to_string()));
         }
 
         if let Some(p) = &m.predicate {
@@ -378,11 +392,14 @@ mod debug_impl {
                 InstructionIR::Call(c) => {
                     // Record the callee by stable DefId (label-rename invariant); follow
                     // the return continuation rather than descending into the callee.
-                    let name = self
-                        .label_to_def
-                        .get(&c.target)
-                        .map(|def_id| format!("def#{}", def_id.index()))
-                        .unwrap_or_else(|| format!("label#{}", c.target.0));
+                    let def_id = self.label_to_def.get(&c.target).unwrap_or_else(|| {
+                        panic!(
+                            "semantic NFA verification found call target {:?}, but that label is \
+                                 not a definition-specialization entry",
+                            c.target
+                        )
+                    });
+                    let name = format!("def#{}", def_id.index());
                     NodeContribution {
                         see_through: false,
                         ops: vec![SemanticOp::Call(name)],

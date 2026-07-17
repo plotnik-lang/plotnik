@@ -8,7 +8,7 @@ use serde_json::{Map, Value, json};
 use super::lang_resolver::reconcile_lang;
 use super::query_loader::load_query;
 use super::run_common;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, write_stderr, write_stdout, writeln_stdout};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QueryView {
@@ -52,14 +52,14 @@ pub fn run(args: TreeArgs) -> CliResult {
     let mut declared_lang = None;
     if has_query {
         if show_headers {
-            println!("# {}", query_label(args.query_view));
+            writeln_stdout(format_args!("# {}", query_label(args.query_view)))?;
         }
         declared_lang = print_query_tree(&args)?;
     }
 
     if has_source {
         if show_headers {
-            println!("\n# Source syntax tree");
+            writeln_stdout(format_args!("\n# Source syntax tree"))?;
         }
         print_source_tree(&args, declared_lang.as_deref())?;
     }
@@ -77,7 +77,7 @@ fn query_label(view: QueryView) -> &'static str {
 /// Prints the selected query tree; returns the shebang-declared language, if any.
 fn print_query_tree(args: &TreeArgs) -> Result<Option<String>, CliError> {
     let (output, declared_lang) = render_query_tree(args)?;
-    print!("{output}");
+    write_stdout(format_args!("{output}"))?;
     Ok(declared_lang)
 }
 
@@ -96,12 +96,12 @@ fn render_query_tree(args: &TreeArgs) -> Result<(String, Option<String>), CliErr
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
     if query.diagnostics().has_errors() || query.diagnostics().has_warnings() {
-        eprint!(
+        write_stderr(format_args!(
             "{}",
             query
                 .diagnostics()
                 .render_colored(query.source_map(), args.color)
-        );
+        ))?;
     }
 
     let output = match args.query_view {
@@ -139,10 +139,10 @@ fn print_source_tree(args: &TreeArgs, declared_lang: Option<&str>) -> CliResult 
     )?;
     let tree = lang.parse_source(&source);
 
-    print!(
+    write_stdout(format_args!(
         "{}",
         dump_tree_text(&tree, &source, lang.grammar(), args.include_anonymous)
-    );
+    ))?;
 
     Ok(())
 }
@@ -163,9 +163,9 @@ fn print_json(args: &TreeArgs, has_query: bool, has_source: bool) -> CliResult {
         );
     }
 
-    println!(
+    writeln_stdout(format_args!(
         "{}",
         serde_json::to_string_pretty(&Value::Object(output)).expect("tree JSON serializes")
-    );
+    ))?;
     Ok(())
 }

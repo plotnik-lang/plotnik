@@ -52,9 +52,22 @@ impl TreeOpts {
             source_path,
             source_text: m.get_one::<String>("source_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
-            query_view: match m.get_one::<String>("query_view").map(String::as_str) {
-                Some("cst") => QueryView::Cst,
-                _ => QueryView::Ast,
+            query_view: match m
+                .get_one::<String>("query_view")
+                .unwrap_or_else(|| {
+                    panic!(
+                        "CLI argument state is inconsistent: clap omitted `query_view` despite its \
+                         declared `ast` default"
+                    )
+                })
+                .as_str()
+            {
+                "ast" => QueryView::Ast,
+                "cst" => QueryView::Cst,
+                value => unreachable!(
+                    "CLI argument state is inconsistent: clap accepted unsupported `query_view` \
+                     value {value:?}; expected `ast` or `cst`"
+                ),
             },
             include_anonymous: m.get_flag("include_anonymous"),
             json: m.get_flag("json"),
@@ -166,8 +179,13 @@ impl InferOpts {
             lang: m.get_one::<String>("lang").cloned(),
             format: m
                 .get_one::<String>("format")
-                .cloned()
-                .unwrap_or_else(|| "typescript".to_string()),
+                .unwrap_or_else(|| {
+                    panic!(
+                        "CLI argument state is inconsistent: clap omitted `format` despite its \
+                         declared `typescript` default"
+                    )
+                })
+                .clone(),
             include_points: m.get_flag("include_points"),
             no_node_type: m.get_flag("no_node_type"),
             no_export: m.get_flag("no_export"),

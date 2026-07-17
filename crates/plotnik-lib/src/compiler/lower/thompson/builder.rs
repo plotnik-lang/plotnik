@@ -151,10 +151,11 @@ impl<'a> NfaBuilder<'a> {
         }
 
         verify_fresh_build(&compiler.instructions);
-        debug_assert_eq!(
+        assert_eq!(
             compiler.label_origins.len(),
             compiler.next_label_id as usize,
-            "every label must be minted through fresh_label, or origins desync"
+            "NFA label provenance desynchronized: the origin count differs from the next label ID; \
+             every label must be minted through `fresh_label`"
         );
 
         NfaGraph {

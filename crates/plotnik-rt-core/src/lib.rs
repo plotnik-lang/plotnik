@@ -16,7 +16,7 @@ pub use checkpoint::{
     CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume,
 };
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
-pub use frame::{Frame, FrameArena, PortId};
+pub use frame::{CallFrameError, Frame, FrameArena, PortId};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
     DecodeDepth, GENERATED_NODE_VALUE_BYTES, Limit, LimitExceeded, ResolvedRuntimeLimits,

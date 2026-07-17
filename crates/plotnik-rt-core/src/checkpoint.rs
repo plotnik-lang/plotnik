@@ -196,17 +196,38 @@ impl CheckpointStack {
     }
 
     pub fn pop(&mut self) -> Option<Checkpoint> {
-        let cp = self.stack.pop()?;
-        debug_assert!(
+        assert!(
             self.snapshots.is_empty(),
-            "snapshot-aware pop is required once snapshots exist"
+            "checkpoint stack used `pop` while {} cursor snapshot metadata entries remain; \
+             snapshot-enabled execution must use `pop_with_snapshot`",
+            self.snapshots.len()
         );
+        let cp = self.stack.pop()?;
         self.max_frame_idx = self.stack.last().and_then(|c| c.max_frame_idx_below);
         Some(cp)
     }
 
     pub fn pop_with_snapshot(&mut self) -> Option<(Checkpoint, Option<NonZeroU64>)> {
-        let stack_index = self.stack.len().checked_sub(1)?;
+        let Some(stack_index) = self.stack.len().checked_sub(1) else {
+            assert!(
+                self.snapshots.is_empty(),
+                "checkpoint stack is empty, but {} cursor snapshot metadata entries remain; \
+                 snapshot metadata must be released with its checkpoint",
+                self.snapshots.len()
+            );
+            return None;
+        };
+        if let Some(snapshot) = self
+            .snapshots
+            .last()
+            .filter(|snapshot| snapshot.stack_index > stack_index)
+        {
+            panic!(
+                "cursor snapshot metadata points above the checkpoint stack: \
+                 snapshot_stack_index={}, top_checkpoint_index={stack_index}, snapshot_id={}",
+                snapshot.stack_index, snapshot.snapshot
+            );
+        }
         let cp = self.stack.pop()?;
         let snapshot = if self
             .snapshots

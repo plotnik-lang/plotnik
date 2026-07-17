@@ -519,7 +519,9 @@ impl Solve {
     }
 
     fn sat_value(&self, key: SatKey) -> bool {
-        self.sat.get(&key).copied().unwrap_or(false)
+        self.sat.get(&key).copied().unwrap_or_else(|| {
+            panic!("satisfiability solver read key {key:?} before `Solve::seed` initialized it")
+        })
     }
 
     /// Charge one unit of solver work, returning whether the caller may continue.
@@ -590,7 +592,9 @@ impl Solve {
     fn get_thread(&mut self, key: ThreadKey) -> StateSet {
         self.record_read(Key::Thread(key));
         self.seed(Key::Thread(key));
-        self.thread.get(&key).cloned().unwrap_or_default()
+        self.thread.get(&key).cloned().unwrap_or_else(|| {
+            panic!("satisfiability solver read thread {key:?} before `Solve::seed` initialized it")
+        })
     }
 
     fn recompute(&mut self, frozen: &Frozen, key: Key) -> bool {
@@ -605,7 +609,12 @@ impl Solve {
             }
             Key::Thread(k) => {
                 let computed = self.compute_thread(frozen, k);
-                let changed = self.thread.get(&k) != Some(&computed);
+                let changed = self.thread.get(&k).unwrap_or_else(|| {
+                    panic!(
+                        "satisfiability solver dequeued thread {k:?}, but its seeded state was \
+                             missing during recomputation"
+                    )
+                }) != &computed;
                 if changed {
                     self.thread.insert(k, computed);
                 }

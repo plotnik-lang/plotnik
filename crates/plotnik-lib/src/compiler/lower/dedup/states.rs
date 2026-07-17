@@ -166,6 +166,16 @@ fn plan_merges(instructions: &[InstructionIR], norm: SuccNorm) -> HashMap<Label,
 /// continuations and targets, and entry points themselves (a def or wrapper
 /// whose entry state was merged enters through the representative).
 fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
+    if let Some((&label, &representative)) = remap
+        .iter()
+        .find(|(_, representative)| remap.contains_key(representative))
+    {
+        panic!(
+            "NFA state deduplication produced a chained remap: {label:?} maps to \
+             {representative:?}, which is itself remapped; remaps must point directly to a final \
+             representative"
+        );
+    }
     let resolve = |label: Label| remap.get(&label).copied().unwrap_or(label);
 
     for instr in &mut nfa.instructions {

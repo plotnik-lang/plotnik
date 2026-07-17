@@ -1475,7 +1475,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // of those — and a value matching many nodes never is either.
         let core = Self::field_value_core(value.node());
         if matches!(core, Pattern::SeqPattern(_))
-            || self.core_root_extent(&core, &value_info) == RootExtent::Other
+            || self.core_root_extent(&core) == RootExtent::Other
         {
             self.report_field_requires_single_node(field.node(), value.node());
         }
@@ -1505,13 +1505,18 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     /// The root extent of an already-inferred field-value core. Its result was
     /// cached while inferring the value.
-    fn core_root_extent(&self, core: &Pattern, value_info: &PatternShape) -> RootExtent {
+    fn core_root_extent(&self, core: &Pattern) -> RootExtent {
         self.ctx
             .type_ctx
             .in_progress()
             .pattern_result(core)
-            .map(|info| info.root_extent)
-            .unwrap_or(value_info.root_extent)
+            .unwrap_or_else(|| {
+                panic!(
+                    "type inference stripped a field value to core pattern {core:?}, but no \
+                     inferred result was cached for that core"
+                )
+            })
+            .root_extent
     }
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {

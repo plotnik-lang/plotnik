@@ -136,7 +136,12 @@ impl NfaBuilder<'_> {
         // compiles like any node body, with `compile_seq_items` keeping the
         // last item's child search resumable so a lastness failure can retry.
         let up_nav = if has_trailing_anchor {
-            trailing_nav.unwrap_or(Nav::UpSkipTrivia(1))
+            trailing_nav.unwrap_or_else(|| {
+                panic!(
+                    "anchor lowering detected a trailing anchor without selecting its ascent \
+                     navigation"
+                )
+            })
         } else {
             Nav::Up(1)
         };

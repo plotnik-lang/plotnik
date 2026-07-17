@@ -105,6 +105,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
                     Err(RuntimeError::NoMatch) => "no-match",
                     Err(RuntimeError::OutOfFuel(_)) => "fuel",
                     Err(RuntimeError::MemoryLimitExceeded { .. }) => "memory",
+                    Err(RuntimeError::CallFrame(_)) => "call-frame",
                 }
             })
             .expect("spawn deep-backtrack thread");

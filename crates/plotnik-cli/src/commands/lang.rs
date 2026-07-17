@@ -1,15 +1,15 @@
 use plotnik_lib::grammar::{DEFAULT_WIDTH, DumpOptions};
 
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, write_stdout, writeln_stdout};
 use crate::language_registry;
 
 pub fn run_list() -> CliResult {
     for lang in language_registry::all() {
         let aliases: Vec<_> = lang.aliases().iter().skip(1).copied().collect();
         if aliases.is_empty() {
-            println!("{}", lang.name());
+            writeln_stdout(format_args!("{}", lang.name()))?;
         } else {
-            println!("{} ({})", lang.name(), aliases.join(", "));
+            writeln_stdout(format_args!("{} ({})", lang.name(), aliases.join(", ")))?;
         }
     }
 
@@ -25,7 +25,7 @@ pub fn run_dump(lang_name: &str, legend: bool, json: bool, width: Option<usize>)
             .raw()
             .to_json()
             .map_err(|e| CliError::fatal(e.to_string()))?;
-        println!("{raw}");
+        writeln_stdout(format_args!("{raw}"))?;
         return Ok(());
     }
 
@@ -33,7 +33,7 @@ pub fn run_dump(lang_name: &str, legend: bool, json: bool, width: Option<usize>)
         legend,
         width: width.unwrap_or(DEFAULT_WIDTH),
     };
-    print!("{}", lang.grammar().tree().dump(&options));
+    write_stdout(format_args!("{}", lang.grammar().tree().dump(&options)))?;
 
     Ok(())
 }

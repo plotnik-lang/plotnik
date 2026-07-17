@@ -17,6 +17,7 @@ use super::{
 
 const TREE_SITTER_PUBLIC_NAME_SEPARATOR: char = '\0';
 const FIRST_SYMBOL_POSITION_AFTER_END: usize = 1;
+const MAX_GRAMMAR_SYMBOL_ID: u16 = u16::MAX - 1;
 
 pub(super) struct LoweredGrammar {
     pub variables: Vec<Variable>,
@@ -281,20 +282,34 @@ pub(super) fn derive_fields(
     syntax_grammar: &SyntaxGrammar,
     inlines: &InlinedProductionMap,
     variable_info: &[node_shapes::VariableSummary],
-) -> Vec<FieldEntry> {
+) -> Result<Vec<FieldEntry>, String> {
     let mut field_names = BTreeSet::<String>::new();
     for_each_metadata_production(syntax_grammar, inlines, |production| {
         collect_field_names(production, syntax_grammar, variable_info, &mut field_names);
     });
 
-    field_names
+    if field_names.len() > usize::from(u16::MAX) {
+        return Err(format!(
+            "grammar defines {} fields, exceeding the bytecode limit of {}",
+            field_names.len(),
+            u16::MAX
+        ));
+    }
+
+    Ok(field_names
         .into_iter()
         .enumerate()
         .map(|(index, name)| FieldEntry {
-            id: u16::try_from(index + 1).expect("tree-sitter field IDs fit in u16"),
+            id: u16::try_from(index + 1).unwrap_or_else(|_| {
+                panic!(
+                    "grammar field validation admitted field index {}, which exceeds the u16 \
+                     format limit",
+                    index + 1
+                )
+            }),
             name,
         })
-        .collect()
+        .collect())
 }
 
 fn collect_field_names(
@@ -323,14 +338,14 @@ pub(super) fn derive_symbols(
     lexical_grammar: &LexicalGrammar,
     inlines: &InlinedProductionMap,
     default_aliases: &AliasMap,
-) -> Vec<NodeKindEntry> {
+) -> Result<Vec<NodeKindEntry>, String> {
     let ctx = GrammarContext {
         syntax: syntax_grammar,
         lexical: lexical_grammar,
         aliases: default_aliases,
     };
     let symbol_order = derive_symbol_order(syntax_grammar, lexical_grammar);
-    let symbol_ids = symbol_ids(&symbol_order);
+    let symbol_ids = symbol_ids(&symbol_order)?;
     let symbol_map = public_symbol_map(
         syntax_grammar,
         lexical_grammar,
@@ -366,21 +381,35 @@ pub(super) fn derive_symbols(
         });
     }
 
-    let first_alias_id = symbol_ids
-        .values()
-        .copied()
-        .max()
-        .expect("tree-sitter symbol order includes end symbol")
-        + 1;
+    let first_alias_id = symbol_ids.values().copied().max().unwrap_or_else(|| {
+        panic!(
+            "grammar lowering produced an empty symbol-ID map; the reserved end symbol must \
+                 always be present"
+        )
+    });
+    if usize::from(first_alias_id) + unique_aliases.len() > usize::from(MAX_GRAMMAR_SYMBOL_ID) {
+        return Err(format!(
+            "grammar defines {} symbols and aliases, exceeding the bytecode limit of \
+             {MAX_GRAMMAR_SYMBOL_ID}",
+            usize::from(first_alias_id) + unique_aliases.len()
+        ));
+    }
     for (index, alias) in unique_aliases.iter().enumerate() {
+        let offset = u16::try_from(index + 1).unwrap_or_else(|_| {
+            panic!(
+                "grammar alias validation admitted alias offset {}, which exceeds the u16 format \
+                 limit",
+                index + 1
+            )
+        });
         symbols.push(NodeKindEntry::alias(
-            first_alias_id + u16::try_from(index).expect("tree-sitter alias IDs fit in u16"),
+            first_alias_id + offset,
             public_node_kind(&alias.value),
             alias.is_named,
         ));
     }
 
-    symbols
+    Ok(symbols)
 }
 
 pub(super) fn public_node_kind(name: &str) -> String {
@@ -428,23 +457,38 @@ fn derive_symbol_order(
     symbols
 }
 
-fn symbol_ids(symbols: &[Symbol]) -> rustc_hash::FxHashMap<Symbol, u16> {
+fn symbol_ids(symbols: &[Symbol]) -> Result<rustc_hash::FxHashMap<Symbol, u16>, String> {
+    let symbol_count = symbols
+        .iter()
+        .filter(|&&symbol| symbol != Symbol::end())
+        .count();
+    if symbol_count > usize::from(MAX_GRAMMAR_SYMBOL_ID) {
+        return Err(format!(
+            "grammar defines {symbol_count} symbols, exceeding the bytecode limit of \
+             {MAX_GRAMMAR_SYMBOL_ID}"
+        ));
+    }
+
     let mut ids = rustc_hash::FxHashMap::default();
     ids.insert(Symbol::end(), 0);
 
-    let mut next_id = 1u16;
-    for symbol in symbols {
-        if *symbol == Symbol::end() {
-            continue;
-        }
-        ids.insert(*symbol, next_id);
-        next_id = next_id
-            .checked_add(1)
-            .expect("tree-sitter symbol IDs fit in u16");
+    for (index, symbol) in symbols
+        .iter()
+        .filter(|&&symbol| symbol != Symbol::end())
+        .enumerate()
+    {
+        let id = u16::try_from(index + 1).unwrap_or_else(|_| {
+            panic!(
+                "grammar symbol validation admitted symbol index {}, which exceeds the u16 format \
+                 limit",
+                index + 1
+            )
+        });
+        ids.insert(*symbol, id);
     }
 
     ids.insert(Symbol::end_of_nonterminal_extra(), 0);
-    ids
+    Ok(ids)
 }
 
 fn public_symbol_map(

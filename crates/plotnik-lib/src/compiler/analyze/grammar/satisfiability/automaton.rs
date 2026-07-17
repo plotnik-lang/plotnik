@@ -264,9 +264,17 @@ pub(super) fn build<'a>(
 
     let (has_trailing, trailing_nav) = builder.anchor_semantics.check_trailing_anchor(&items);
     let trailing_gap = if has_trailing {
-        trailing_nav
-            .and_then(GapClass::from_nav)
-            .unwrap_or(GapClass::Any)
+        let trailing_nav = trailing_nav.unwrap_or_else(|| {
+            panic!(
+                "anchor analysis reported a trailing anchor without selecting its ascent navigation"
+            )
+        });
+        GapClass::from_nav(trailing_nav).unwrap_or_else(|| {
+            panic!(
+                "anchor analysis selected non-sibling navigation {trailing_nav:?} for a trailing \
+                 anchor"
+            )
+        })
     } else {
         GapClass::Any
     };
@@ -465,10 +473,17 @@ impl<'a, 'b> Builder<'a, 'b> {
             // and let an exact anchor leak through the boundary.
             let gap = match (first, inherited_first_gap) {
                 (true, Some(g)) => g,
-                _ => satisfiability_gap(
-                    nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any),
-                    pattern,
-                ),
+                _ => {
+                    let gap = nav.map_or(GapClass::Any, |nav| {
+                        GapClass::from_nav(nav).unwrap_or_else(|| {
+                            panic!(
+                                "anchor analysis selected non-sibling navigation {nav:?} for a \
+                                 sequence gap"
+                            )
+                        })
+                    });
+                    satisfiability_gap(gap, pattern)
+                }
             };
             self.states[cur as usize].gap = gap;
             cur = self.emit_pattern(pattern, descent.bare(), cur);

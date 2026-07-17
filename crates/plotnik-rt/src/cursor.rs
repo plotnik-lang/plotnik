@@ -206,14 +206,15 @@ impl<'t> CursorWrapper<'t> {
         let pool = &mut self.snapshots;
 
         // Anything newer than `seq` belongs to checkpoints already popped
-        // (LIFO); their refs must have hit zero. Drain defensively so a
-        // bookkeeping slip degrades to fallback instead of a wrong restore.
+        // (LIFO); their refs must have hit zero.
         while let Some(back) = pool.live.back()
             && back.seq > seq
         {
-            debug_assert_eq!(
+            assert_eq!(
                 back.refs, 0,
-                "snapshot newer than the checkpoint being restored still referenced"
+                "snapshot pool found a newer snapshot still referenced while restoring an older \
+                 checkpoint: snapshot_seq={}, checkpoint_seq={seq}",
+                back.seq
             );
             let entry = pool.live.pop_back().expect("back exists");
             pool.free.push(entry.cursor);
@@ -228,10 +229,10 @@ impl<'t> CursorWrapper<'t> {
 
         if !cursor_is_at_index {
             self.cursor.reset_to(&back.cursor);
-            debug_assert_eq!(
+            assert_eq!(
                 self.cursor.descendant_index() as u32,
                 index,
-                "pooled snapshot restored the wrong cursor position"
+                "cursor snapshot {seq} restored a different descendant than its checkpoint recorded"
             );
         }
 
@@ -254,6 +255,12 @@ impl<'t> CursorWrapper<'t> {
             activated = self.record_wide_restore_miss();
         }
         self.cursor.goto_descendant(index as usize);
+        assert_eq!(
+            self.cursor.descendant_index() as u32,
+            index,
+            "cursor fallback restore did not reach the checkpoint descendant index; \
+             previous_descendant={current_index}"
+        );
         activated
     }
 
@@ -296,13 +303,10 @@ impl<'t> CursorWrapper<'t> {
     pub fn navigate(&mut self, nav: Nav) -> Option<SkipPolicy> {
         let moved = match nav {
             // Epsilon should never reach here - VM skips navigate for epsilon
-            Nav::Epsilon => {
-                debug_assert!(
-                    false,
-                    "navigate called with Epsilon - should be skipped by VM"
-                );
-                true
-            }
+            Nav::Epsilon => unreachable!(
+                "runtime cursor received `Nav::Epsilon`; executors must bypass cursor navigation \
+                 for epsilon transitions"
+            ),
             Nav::Stay | Nav::StayExact => true,
             Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => {
                 self.go_first_child()

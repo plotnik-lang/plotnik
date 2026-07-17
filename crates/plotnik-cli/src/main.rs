@@ -3,7 +3,7 @@ mod commands;
 mod error;
 mod language_registry;
 
-use std::io;
+use std::io::{self, Write as _};
 use std::process::ExitCode;
 
 use clap::ArgMatches;
@@ -12,7 +12,7 @@ use cli::{
     CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
     TreeOpts, build_cli, route_default_subcommand,
 };
-use error::CliResult;
+use error::{CliError, CliResult};
 
 fn main() -> ExitCode {
     // Die silently on closed pipes (`plotnik run … | head`) like standard Unix
@@ -77,7 +77,11 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
             let shell = *m
                 .get_one::<clap_complete::Shell>("shell")
                 .expect("shell is required");
-            clap_complete::generate(shell, &mut build_cli(), "plotnik", &mut io::stdout());
+            let mut output = Vec::new();
+            clap_complete::generate(shell, &mut build_cli(), "plotnik", &mut output);
+            io::stdout().lock().write_all(&output).map_err(|error| {
+                CliError::fatal(format!("failed to write completions: {error}"))
+            })?;
             Ok(())
         }
         _ => unreachable!("clap should have caught this"),
