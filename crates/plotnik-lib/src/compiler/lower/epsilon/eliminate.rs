@@ -260,13 +260,13 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
         }
     }
 
-    for entry in result.entry_point_wrappers.values_mut() {
+    for entry in result.entry_points.values_mut() {
         if let Some((target, effects)) =
-            InstrIndex::new(&result.instructions, &idx).see_through(*entry)
+            InstrIndex::new(&result.instructions, &idx).see_through(entry.target)
             && effects.is_empty()
-            && target != *entry
+            && target != entry.target
         {
-            *entry = target;
+            entry.target = target;
             changed = true;
         }
     }

@@ -1,18 +1,12 @@
 Q = (identifier) @identifier
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 6
+Q = 2
 
 [transitions]
 Q:
   1                                         ▶
   2   !   (identifier) [Node RecordSet(identifier)]  1
-
-Q (entry point):
-  3                                         ▶
-  4  -ε-  [RecordClose]                     3
-  5       (Q)                               2 : 4
-  6  -ε-  [RecordOpen]                      5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -34,10 +28,5 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0  -ε-  [RecordOpen]                      2
-  2       (@8)                              8 : 3
-  3  -ε-  [RecordClose]                     5
-  5                                         ▶
-  6                                         ▶
-  7  ...
-  8   !   (identifier) [Node RecordSet(M0)]  6
+  0   !   (identifier) [Node RecordSet(M0)]  2
+  2                                         ▶

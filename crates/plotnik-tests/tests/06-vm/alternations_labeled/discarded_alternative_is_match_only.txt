@@ -34,34 +34,24 @@ T0 = <NoValue>
 [type_names]
 
 [entry_points]
-Q = 00 :: T0
+Q = 0 :: T0
 
 [instructions]
 Q:
-  00       (@10)                            10 : 01
-  01                                        ▶
-  02   !   (expression_statement)           03
-  03  ─‣┘  _                                04
-  04                                        ▶
-  05  ──!  _                                02, 05
-  07  ...
-  08  └─!  _                                02, 05
-  10   !   (program)                        08
+  0   !   (program)                         1
+  1  └─!  _                                 3, 6
+  3   !   (expression_statement)            4
+  4  ─‣┘  _                                 5
+  5                                         ▶
+  6  ──!  _                                 3, 6
 --------------------- TRACE ----------------------
 Q:
-  00       (@10)                            10 : 01
-       ▶   (@10)
-
-@10:
-  10       (program)                        08
-       ●   program
-  08       _                                02, 05
-       ●   expression_statement
-  02       (expression_statement)           03
-       ●   expression_statement
-  03       _                                04
-       ●   program
-  04   ◀   (@10)                            
-
-Q:
-  01   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       _                                 03, 06
+      ●   expression_statement
+  3       (expression_statement)            04
+      ●   expression_statement
+  4       _                                 05
+      ●   program
+  5   ◀   (Q)                               ◼

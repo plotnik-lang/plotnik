@@ -9,14 +9,14 @@ use std::cell::Cell;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
+use crate::bytecode::{EffectKind, EntryBoundary, FrameAction, ValueFrameKind};
 use crate::compiler::analyze::result::{CaptureMember, CaptureMemberKind, ResultSchema};
 use crate::compiler::analyze::types::type_shape::CasePayload;
 use crate::compiler::ids::ResultMemberId;
 use crate::compiler::lower::boundary::ExitPort;
 use crate::compiler::lower::ir::{
-    CalleeEntryContract, DefRoute, EffectArg, EffectIR, InstructionIR, Label, NfaGraph, PortId,
-    ReturnIR, SemanticNfa,
+    CalleeEntryContract, DefRoute, DefSpecialization, EffectArg, EffectIR, EntryPointIR,
+    InstructionIR, Label, NfaGraph, PortId, ReturnIR, SemanticNfa,
 };
 
 const STATE_BUDGET: usize = 1 << 18;
@@ -85,9 +85,9 @@ pub(crate) fn verify(
     verify_state_count(semantic)?;
 
     let graph = semantic.raw();
-    if graph.entry_point_wrappers().len() > u16::MAX as usize {
+    if graph.entry_points().len() > u16::MAX as usize {
         return Err(SemanticVerifyError::EntryPointLimit(
-            graph.entry_point_wrappers().len(),
+            graph.entry_points().len(),
         ));
     }
     verify_regexes(graph)?;
@@ -292,6 +292,14 @@ impl<'a> Program<'a> {
                 )));
             }
         }
+        for entry in graph.entry_points().values() {
+            if !instructions.contains_key(&entry.target) {
+                return Err(SemanticVerifyError::Malformed(format!(
+                    "dangling entry point target {:?}",
+                    entry.target
+                )));
+            }
+        }
         let program = Self {
             graph,
             schema,
@@ -328,13 +336,11 @@ impl<'a> Program<'a> {
 
     fn verify_return_routes(&self) -> Result<(), SemanticVerifyError> {
         let mut cache = HashMap::new();
-        for &entry in self.graph.entry_point_wrappers().values() {
-            if !self
-                .return_contract(entry, &mut cache)
-                .is(ReturnPorts::dense(1), CalleeEntryContract::CallerOwned)
-            {
+        for (&def_id, entry) in self.graph.entry_points() {
+            let specialization = DefSpecialization::ordinary(def_id);
+            if self.graph.def_entries.get(&specialization) != Some(&entry.target) {
                 return Err(SemanticVerifyError::Malformed(format!(
-                    "entry point {entry:?} has the wrong return contract"
+                    "entry point for {def_id:?} does not target its ordinary definition body"
                 )));
             }
         }
@@ -419,12 +425,7 @@ impl<'a> Program<'a> {
     }
 
     fn verify_effects(&self) -> Result<(), SemanticVerifyError> {
-        let wrappers: Vec<Label> = self
-            .graph
-            .entry_point_wrappers()
-            .values()
-            .copied()
-            .collect();
+        let entry_points: Vec<EntryPointIR> = self.graph.entry_points().values().copied().collect();
         let mut definitions = Vec::new();
         let mut known = HashSet::new();
         let mut called = HashSet::new();
@@ -436,11 +437,11 @@ impl<'a> Program<'a> {
         let mut callers: HashMap<Label, Vec<Label>> = HashMap::new();
         let mut call_edges = HashSet::new();
 
-        for &entry in &wrappers {
-            if known.insert(entry) {
-                definitions.push(entry);
-                summaries.insert(entry, DefSummary::unknown());
-                enqueue(&mut queue, &mut queued, entry);
+        for entry in &entry_points {
+            if known.insert(entry.target) {
+                definitions.push(entry.target);
+                summaries.insert(entry.target, DefSummary::unknown());
+                enqueue(&mut queue, &mut queued, entry.target);
             }
         }
 
@@ -495,16 +496,29 @@ impl<'a> Program<'a> {
                 VerifyPhase::Final,
             )?;
         }
-        for entry in wrappers {
-            let wrapper = self.analyze_body(
-                &summaries,
-                entry,
-                BodyRole::from_called(called.contains(&entry)),
-                VerifyPhase::Final,
-            )?;
-            if wrapper.entry_tos != KS_ANY {
-                return Err(SemanticVerifyError::EffectStack(entry));
-            }
+        for entry in entry_points {
+            self.verify_entry_boundary(entry, summaries[&entry.target])?;
+        }
+        Ok(())
+    }
+
+    fn verify_entry_boundary(
+        &self,
+        entry: EntryPointIR,
+        summary: DefSummary,
+    ) -> Result<(), SemanticVerifyError> {
+        let accepts_caller_top = match entry.boundary {
+            EntryBoundary::Record => summary.entry_tos & KS_RECORD != 0,
+            EntryBoundary::Passthrough | EntryBoundary::Node => summary.entry_tos == KS_ANY,
+        };
+        if !accepts_caller_top {
+            return Err(SemanticVerifyError::EffectStack(entry.target));
+        }
+
+        if matches!(entry.boundary, EntryBoundary::Node | EntryBoundary::Record)
+            && summary.returns_pending == Some(true)
+        {
+            return Err(SemanticVerifyError::EffectStack(entry.target));
         }
         Ok(())
     }
@@ -948,75 +962,87 @@ impl<'a> Program<'a> {
     }
 
     fn verify_empty_path_cursor_reads(&self) -> Result<(), SemanticVerifyError> {
-        for entry in self.entries() {
-            let mut memo: HashMap<Label, bool> = HashMap::new();
-            let mut work = vec![(entry, true)];
-            while let Some((label, empty_path)) = work.pop() {
-                if let Some(seen_empty_path) = memo.get(&label)
-                    && (*seen_empty_path || !empty_path)
-                {
-                    continue;
-                }
-                memo.insert(label, empty_path);
-                match self.instructions[&label] {
-                    InstructionIR::Match(matched) => {
-                        let after = empty_path && matched.nav == plotnik_rt::Nav::Epsilon;
-                        if after
-                            && matched
+        for entry in self.graph.entry_points().values() {
+            self.verify_empty_path_cursor_reads_from(
+                entry.target,
+                entry.boundary == EntryBoundary::Node,
+            )?;
+        }
+        for &entry in self.graph.def_entries.values() {
+            self.verify_empty_path_cursor_reads_from(entry, false)?;
+        }
+        Ok(())
+    }
+
+    fn verify_empty_path_cursor_reads_from(
+        &self,
+        entry: Label,
+        boundary_reads_cursor: bool,
+    ) -> Result<(), SemanticVerifyError> {
+        let mut memo: HashMap<Label, bool> = HashMap::new();
+        let mut work = vec![(entry, true)];
+        while let Some((label, empty_path)) = work.pop() {
+            if let Some(seen_empty_path) = memo.get(&label)
+                && (*seen_empty_path || !empty_path)
+            {
+                continue;
+            }
+            memo.insert(label, empty_path);
+            match self.instructions[&label] {
+                InstructionIR::Match(matched) => {
+                    let after = empty_path && matched.nav == plotnik_rt::Nav::Epsilon;
+                    if after
+                        && (boundary_reads_cursor && matched.successors.is_empty()
+                            || matched
                                 .effects
                                 .iter()
-                                .any(|effect| effect.kind().reads_cursor())
-                        {
-                            return Err(SemanticVerifyError::EmptyPathCursorRead(label));
-                        }
-                        for successor in &matched.successors {
-                            work.push((*successor, after));
-                        }
+                                .any(|effect| effect.kind().reads_cursor()))
+                    {
+                        return Err(SemanticVerifyError::EmptyPathCursorRead(label));
                     }
-                    InstructionIR::Call(call) => {
-                        let Some(specialization) = self.graph.specialization_for_entry(call.target)
-                        else {
-                            return Err(SemanticVerifyError::Malformed(format!(
-                                "call {label:?} targets a non-definition entry {:?}",
-                                call.target
-                            )));
-                        };
-                        for (&continuation, &port) in
-                            call.returns.iter().zip(specialization.ports().ports())
-                        {
-                            work.push((
-                                continuation,
-                                if port.consumed() { false } else { empty_path },
-                            ));
-                        }
+                    for successor in &matched.successors {
+                        work.push((*successor, after));
                     }
-                    InstructionIR::Return(_) => {}
                 }
+                InstructionIR::Call(call) => {
+                    let Some(specialization) = self.graph.specialization_for_entry(call.target)
+                    else {
+                        return Err(SemanticVerifyError::Malformed(format!(
+                            "call {label:?} targets a non-definition entry {:?}",
+                            call.target
+                        )));
+                    };
+                    for (&continuation, &port) in
+                        call.returns.iter().zip(specialization.ports().ports())
+                    {
+                        work.push((
+                            continuation,
+                            if port.consumed() { false } else { empty_path },
+                        ));
+                    }
+                }
+                InstructionIR::Return(_) if boundary_reads_cursor && empty_path => {
+                    return Err(SemanticVerifyError::EmptyPathCursorRead(label));
+                }
+                InstructionIR::Return(_) => {}
             }
         }
         Ok(())
     }
 
-    fn entries(&self) -> impl Iterator<Item = Label> + '_ {
-        self.graph
-            .entry_point_wrappers
-            .values()
-            .chain(self.graph.def_entries.values())
-            .copied()
-    }
-
     fn depth_entries(&self) -> Vec<(Label, DefRoute, Vec<ExitPort>)> {
-        let wrappers = self
-            .graph
-            .entry_point_wrappers
-            .values()
-            .copied()
-            .map(|entry| (entry, DefRoute::Caller, vec![ExitPort::ConsumedOtherNone]));
+        let entry_points = self.graph.entry_points.values().map(|entry| {
+            (
+                entry.target,
+                DefRoute::Caller,
+                vec![ExitPort::ConsumedOtherNone],
+            )
+        });
         let definitions =
             self.graph.def_entries.iter().map(|(variant, &entry)| {
                 (entry, variant.route(), variant.ports().ports().to_vec())
             });
-        wrappers.chain(definitions).collect()
+        entry_points.chain(definitions).collect()
     }
 }
 

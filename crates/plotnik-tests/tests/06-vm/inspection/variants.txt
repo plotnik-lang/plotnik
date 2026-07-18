@@ -228,56 +228,43 @@ P12 ref        93..99  source_id=0  T3
 
 [instructions]
 Expr:
-  00       (@30)                            30 : 01
-  01                                        ▶
+  00  -ε-  [SpanStart#0]                    16, 24
 
 Q:
-  02  -ε-  [RecordOpen]                     04
-  04       (@34)                            34 : 05
-  05  -ε-  [RecordClose]                    07
-  07                                        ▶
-  08  └‣─  (@30)                            30 : 09
-  09  ─‣┘  _ [SpanStart#11 RecordSet(M4) SpanEnd#11 SpanEnd#12]  12
-  12  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  22
+  02   !   (program) [SpanStart#8 SpanStartAt#9]  04
+  04  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  06
+  06  └‣─  (Expr)                           00 : 08
+  07  ...
+  08  ─‣┘  _ [SpanStart#11 RecordSet(M4) SpanEnd#11 SpanEnd#12]  11
+  11  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  13
+  13                                        ▶
   14                                        ▶
   15  ...
   16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
-  22                                        ▶
+  22  ...
   23  ...
   24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
-  30  -ε-  [SpanStart#0]                    16, 24
-  32  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  08
-  34   !   (program) [SpanStart#8 SpanStartAt#9]  32
 --------------------- TRACE ----------------------
 Q:
-  02  -ε-  [RecordOpen]                     04
-  04       (@34)                            34 : 05
-       ▶   (@34)
-
-@34:
-  34       (program) [SpanStart#8 SpanStartAt#9]  32
+  02       (program) [SpanStart#8 SpanStartAt#9]  04
        ●   program
-  32       (expression_statement) [SpanStartAt#10 SpanStart#12]  08
+  04       (expression_statement) [SpanStartAt#10 SpanStart#12]  06
        ●   expression_statement
-  08       (@30)                            30 : 09
-       ▶   (@30)
+  06       (Expr)                           00 : 08
+       ▶   (Expr)
 
-@30:
-  30  -ε-  [SpanStart#0]                    16, 24
+Expr:
+  00  -ε-  [SpanStart#0]                    16, 24
   16       (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
        ○   number
-  30  ❮❮❮ 
+  00  ❮❮❮ 
   24       (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
        ●   number
-  14   ◀   (@30)                            
-
-@34:
-  09       _ [SpanStart#11 RecordSet(M4) SpanEnd#11 SpanEnd#12]  12
-       ●   expression_statement
-  12       _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  22
-       ●   program
-  22   ◀   (@34)                            
+  14   ◀   (Expr)                           
 
 Q:
-  05  -ε-  [RecordClose]                    07
-  07   ◀   (Q)                              ◼
+  08       _ [SpanStart#11 RecordSet(M4) SpanEnd#11 SpanEnd#12]  11
+       ●   expression_statement
+  11       _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  13
+       ●   program
+  13   ◀   (Q)                              ◼

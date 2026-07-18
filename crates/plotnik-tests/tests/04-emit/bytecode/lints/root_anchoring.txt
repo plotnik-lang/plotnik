@@ -17,9 +17,9 @@ warning: entry point `Bad` cannot match the `program` syntax-tree root
 help: make `Bad` start with a `program` node pattern because matching begins at the syntax-tree root
 ---------------------- NFA -----------------------
 [entry_points]
-Bad  = 27
-Leaf = 19
-Q    = 23
+Bad  = 15
+Leaf = 02
+Q    = 05
 
 [transitions]
 Leaf:
@@ -37,24 +37,6 @@ Q:
 Bad:
   14                                        ▶
   15   !   (identifier) [Node RecordSet(bad)]  14
-
-Leaf (entry point):
-  16                                        ▶
-  17  -ε-  [RecordClose]                    16
-  18       (Leaf)                           02 : 17
-  19  -ε-  [RecordOpen]                     18
-
-Q (entry point):
-  20                                        ▶
-  21  -ε-  [RecordClose]                    20
-  22       (Q)                              05 : 21
-  23  -ε-  [RecordOpen]                     22
-
-Bad (entry point):
-  24                                        ▶
-  25  -ε-  [RecordClose]                    24
-  26       (Bad)                            15 : 25
-  27  -ε-  [RecordOpen]                     26
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -85,36 +67,24 @@ N1: S5 → T2  ; Q
 N2: S6 → T3  ; Bad
 
 [entry_points]
-Bad  = 12 :: T3
+Bad  = 13 :: T3
 Leaf = 00 :: T1
-Q    = 06 :: T2
+Q    = 03 :: T2
 
 [instructions]
 Leaf:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (identifier) [Node RecordSet(M0)]  02
+  02                                        ▶
 
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@29)                            29 : 09
-  09  -ε-  [RecordClose]                    11
-  11                                        ▶
+  03   !   (program)                        04
+  04  └‣─  (expression_statement) [RecordOpen]  06
+  06  └‣─  (Leaf)                           00 : 08
+  07  ...
+  08  -ε-  [RecordClose]                    10
+  10  ─‣┘² _ [RecordSet(M1)]                12
+  12                                        ▶
 
 Bad:
-  12  -ε-  [RecordOpen]                     14
-  14       (@32)                            32 : 16
+  13   !   (identifier) [Node RecordSet(M2)]  15
   15                                        ▶
-  16  -ε-  [RecordClose]                    18
-  18                                        ▶
-  19  -ε-  [RecordClose]                    21
-  21  ─‣┘² _ [RecordSet(M1)]                15
-  23                                        ▶
-  24   !   (identifier) [Node RecordSet(M0)]  23
-  26  └‣─  (@24)                            24 : 19
-  27  └‣─  (expression_statement) [RecordOpen]  26
-  29   !   (program)                        27
-  30                                        ▶
-  31  ...
-  32   !   (identifier) [Node RecordSet(M2)]  30

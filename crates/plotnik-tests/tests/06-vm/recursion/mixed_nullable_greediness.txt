@@ -103,10 +103,9 @@ Q = 00 :: T8
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@87)                            87 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (program)                        01
+  01  -ε-  [ScalarOpen]                     03
+  03       (@80)                            80 : 22 / 24
   06  -ε-  [TextClose RecordSet(M7)]        08
   08  ─‣┘  _                                09
   09                                        ▶
@@ -153,20 +152,12 @@ Q:
   77  └─!  _                                73, 75
   79  ...
   80  -ε-                                   68, 27, 77
-  82       (@80)                            80 : 22 / 24
-  85  -ε-  [ScalarOpen]                     82
-  87   !   (program)                        85
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@87)                            87 : 03
-       ▶   (@87)
-
-@87:
-  87       (program)                        85
+  00       (program)                        01
        ●   program
-  85  -ε-  [ScalarOpen]                     82
-  82       (@80)                            80 : 22 / 24
+  01  -ε-  [ScalarOpen]                     03
+  03       (@80)                            80 : 22 / 24
        ▶   (@80)
 
 @80:
@@ -241,7 +232,7 @@ Q:
   60  -ε-  [SuppressEnd]                    26
   26   ◀   (@80)                            
 
-@87:
+Q:
   22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
@@ -272,7 +263,7 @@ Q:
   60  -ε-  [SuppressEnd]                    26
   26   ◀   (@80)                            
 
-@87:
+Q:
   22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
@@ -297,7 +288,7 @@ Q:
   60  -ε-  [SuppressEnd]                    26
   26   ◀   (@80)                            
 
-@87:
+Q:
   22  -ε-  [TextClose RecordSet(M6)]        20
   20  -ε-  [ScalarOpen]                     16, 18
   16       (comment) [ScalarMark] == "//b"  06
@@ -307,8 +298,4 @@ Q:
   06  -ε-  [TextClose RecordSet(M7)]        08
   08       _                                09
        ●   program
-  09   ◀   (@87)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  09   ◀   (Q)                              ◼

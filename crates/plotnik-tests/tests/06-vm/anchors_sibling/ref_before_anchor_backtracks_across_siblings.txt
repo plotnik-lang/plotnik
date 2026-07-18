@@ -54,82 +54,67 @@ Q     = 02 :: T2
 
 [instructions]
 Comma:
-  00       (@12)                            12 : 01
+  00   !   ","                              01
   01                                        ▶
 
 Q:
-  02  -ε-  [RecordOpen]                     04
-  04       (@23)                            23 : 05
-  05  -ε-  [RecordClose]                    07
-  07                                        ▶
-  08  ─◦─  (string) [Node RecordSet(M0)]    10
-  10  ─‣┘³ _                                13
-  11                                        ▶
-  12   !   ","                              11
-  13                                        ▶
-  14                                        ▶
-  15   !   ","                              14
-  16  ──!  _                                15, 16
-  18  └─!  _                                15, 16
-  20       (@18)                            18 : 08
-  21  └‣─  (array)                          20
-  22  └‣─  (expression_statement)           21
-  23   !   (program)                        22
+  02   !   (program)                        03
+  03  └‣─  (expression_statement)           04
+  04  └‣─  (array)                          05
+  05       (@14)                            14 : 06
+  06  ─◦─  (string) [Node RecordSet(M0)]    08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10                                        ▶
+  11   !   ","                              10
+  12  ──!  _                                11, 12
+  14  └─!  _                                11, 12
 --------------------- TRACE ----------------------
 Q:
-  02  -ε-  [RecordOpen]                     04
-  04       (@23)                            23 : 05
-       ▶   (@23)
-
-@23:
-  23       (program)                        22
+  02       (program)                        03
        ●   program
-  22       (expression_statement)           21
+  03       (expression_statement)           04
        ●   expression_statement
-  21       (array)                          20
+  04       (array)                          05
        ●   array
-  20       (@18)                            18 : 08
-       ▶   (@18)
+  05       (@14)                            14 : 06
+       ▶   (@14)
 
-@18:
-  18       _                                15, 16
+@14:
+  14       _                                11, 12
        ●   [
-  15       ","                              14
+  11       ","                              10
        ○   [
-  18  ❮❮❮ 
-  16       _                                15, 16
+  14  ❮❮❮ 
+  12       _                                11, 12
        ●   number
-  15       ","                              14
+  11       ","                              10
        ○   number
-  16  ❮❮❮ 
-  16       _                                15, 16
+  12  ❮❮❮ 
+  12       _                                11, 12
        ●   ,
-  15       ","                              14
+  11       ","                              10
        ●   ,
-  14   ◀   (@18)                            
-
-@23:
-  08       (string) [Node RecordSet(M0)]    10
-       ○   number
-  16  ❮❮❮ 
-  16       _                                15, 16
-       ●   number
-  15       ","                              14
-       ○   number
-  16  ❮❮❮ 
-  16       _                                15, 16
-       ●   ,
-  15       ","                              14
-       ●   ,
-  14   ◀   (@18)                            
-
-@23:
-  08       (string) [Node RecordSet(M0)]    10
-       ●   string
-  10       _                                13
-       ●   program
-  13   ◀   (@23)                            
+  10   ◀   (@14)                            
 
 Q:
-  05  -ε-  [RecordClose]                    07
-  07   ◀   (Q)                              ◼
+  06       (string) [Node RecordSet(M0)]    08
+       ○   number
+  12  ❮❮❮ 
+  12       _                                11, 12
+       ●   number
+  11       ","                              10
+       ○   number
+  12  ❮❮❮ 
+  12       _                                11, 12
+       ●   ,
+  11       ","                              10
+       ●   ,
+  10   ◀   (@14)                            
+
+Q:
+  06       (string) [Node RecordSet(M0)]    08
+       ●   string
+  08       _                                09
+       ●   program
+  09   ◀   (Q)                              ◼

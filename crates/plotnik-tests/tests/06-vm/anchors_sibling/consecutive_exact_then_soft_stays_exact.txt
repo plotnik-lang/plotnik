@@ -42,56 +42,45 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ...
-  07  ...
-  08  ──!  (identifier) [Node RecordSet(M0)] == "b"  11
-  11  ─‣┘³ _                                12
-  12                                        ▶
-  13   !   "["                              08
-  14  ──!  _                                13, 14
-  16  └─!  _                                13, 14
-  18  └‣─  (array)                          16
-  19  └‣─  (expression_statement)           18
-  20   !   (program)                        19
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                10, 11
+  05  ──!  (identifier) [Node RecordSet(M0)] == "b"  08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10   !   "["                              05
+  11  ──!  _                                10, 11
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        19
+  00       (program)                        01
        ●   program
-  19       (expression_statement)           18
+  01       (expression_statement)           02
        ●   expression_statement
-  18       (array)                          16
+  02       (array)                          03
        ●   array
-  16       _                                13, 14
+  03       _                                10, 11
        ●   [
-  13       "["                              08
+  10       "["                              05
        ●   [
-  08       (identifier) [Node RecordSet(M0)] == "b"  11
+  05       (identifier) [Node RecordSet(M0)] == "b"  08
        ○   comment
-  16  ❮❮❮ 
-  14       _                                13, 14
+  03  ❮❮❮ 
+  11       _                                10, 11
        ●   comment
-  13       "["                              08
+  10       "["                              05
        ○   comment
-  14  ❮❮❮ 
-  14       _                                13, 14
+  11  ❮❮❮ 
+  11       _                                10, 11
        ●   identifier
-  13       "["                              08
+  10       "["                              05
        ○   identifier
-  14  ❮❮❮ 
-  14       _                                13, 14
+  11  ❮❮❮ 
+  11       _                                10, 11
        ●   ]
-  13       "["                              08
+  10       "["                              05
        ○   ]
-  14  ❮❮❮ 
-  14       _                                13, 14
-  18  ❮❮❮ 
-  19  ❮❮❮ 
+  11  ❮❮❮ 
+  11       _                                10, 11
+  02  ❮❮❮ 
+  01  ❮❮❮ 

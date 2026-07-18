@@ -24,25 +24,16 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0       (@5)                              5 : 1
-  1                                         ▶
-  2  └‣─  (expression_statement)            3
-  3  ─‣┘  _                                 4
-  4                                         ▶
-  5   !   (program)                         2
+  0   !   (program)                         1
+  1  └‣─  (expression_statement)            2
+  2  ─‣┘  _                                 3
+  3                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  0       (@5)                              05 : 01
-      ▶   (@5)
-
-@5:
-  5       (program)                         02
+  0       (program)                         01
       ●   program
-  2       (expression_statement)            03
+  1       (expression_statement)            02
       ●   expression_statement
-  3       _                                 04
+  2       _                                 03
       ●   program
-  4   ◀   (@5)                              
-
-Q:
-  1   ◀   (Q)                               ◼
+  3   ◀   (Q)                               ◼

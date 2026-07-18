@@ -42,46 +42,37 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  !─┘  _                                06
-  08  └─!  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
-  11  ──!  (debugger_statement) [Node RecordSet(M1)]  07
-  13   !   (lexical_declaration) [Node RecordSet(M0)]  11
-  15  ...
-  16  ──!  _                                13, 16
-  18  └─!  _                                13, 16
-  20   !   (program)                        18, 08
+  00   !   (program)                        14, 04
+  02                                        ▶
+  03  !─┘  _                                02
+  04  └─!  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  03
+  07  ...
+  08  ──!  (debugger_statement) [Node RecordSet(M1)]  03
+  10   !   (lexical_declaration) [Node RecordSet(M0)]  08
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        18, 08
+  00       (program)                        14, 04
        ●   program
-  18       _                                13, 16
+  14       _                                10, 12
        ●   lexical_declaration
-  13       (lexical_declaration) [Node RecordSet(M0)]  11
+  10       (lexical_declaration) [Node RecordSet(M0)]  08
        ●   lexical_declaration
-  11       (debugger_statement) [Node RecordSet(M1)]  07
+  08       (debugger_statement) [Node RecordSet(M1)]  03
        ○   comment
-  18  ❮❮❮ 
-  16       _                                13, 16
+  14  ❮❮❮ 
+  12       _                                10, 12
        ●   comment
-  13       (lexical_declaration) [Node RecordSet(M0)]  11
+  10       (lexical_declaration) [Node RecordSet(M0)]  08
        ○   comment
-  16  ❮❮❮ 
-  16       _                                13, 16
+  12  ❮❮❮ 
+  12       _                                10, 12
        ●   debugger_statement
-  13       (lexical_declaration) [Node RecordSet(M0)]  11
+  10       (lexical_declaration) [Node RecordSet(M0)]  08
        ○   debugger_statement
-  16  ❮❮❮ 
-  16       _                                13, 16
-  20  ❮❮❮ 
-  08       (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  12  ❮❮❮ 
+  12       _                                10, 12
+  00  ❮❮❮ 
+  04       (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  03
        ○   lexical_declaration

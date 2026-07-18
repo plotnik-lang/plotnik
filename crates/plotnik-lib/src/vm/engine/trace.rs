@@ -531,7 +531,7 @@ impl Tracer for PrintTracer<'_> {
                 self.add_instruction(ip, symbol, &content, &successors);
             }
             Instruction::Call(c) => {
-                let name = self.def_ref_name(CodeAddr::from(u16::from(c.target)));
+                let name = self.def_ref_name(c.target);
                 let content = self.format_def_ref(&name);
                 let returns = c
                     .returns()

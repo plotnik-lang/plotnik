@@ -1,7 +1,7 @@
 Q = (statement_block .! "{")
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 7
+Q = 2
 
 [transitions]
 Q:
@@ -9,10 +9,6 @@ Q:
   2   !   (statement_block)                 5
   4  ─‣┘  _                                 1
   5  └─!  "{"                               4
-
-Q (entry point):
-  6                                         ▶
-  7       (Q)                               2 : 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -32,9 +28,7 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0       (@5)                              5 : 1
-  1                                         ▶
-  2  └─!  "{"                               3
-  3  ─‣┘  _                                 4
-  4                                         ▶
-  5   !   (statement_block)                 2
+  0   !   (statement_block)                 1
+  1  └─!  "{"                               2
+  2  ─‣┘  _                                 3
+  3                                         ▶

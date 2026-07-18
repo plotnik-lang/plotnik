@@ -84,56 +84,41 @@ Q = 00 :: T6
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@33)                            33 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08   !   (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  18
-  11   !   (number) [VariantOpen(M5) VariantClose]  18
-  13  ──!  _                                08, 11, 13
-  15  ...
-  16  └─!  _                                08, 11, 13
-  18  ─‣┘² _ [RecordSet(M7)]                06
-  20  ─‣─  (expression_statement)           16
-  21   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  30
-  24   !   (number) [VariantOpen(M2) VariantClose]  30
-  26  ──!  _                                21, 24, 26
-  28  └─!  _                                21, 24, 26
-  30  ─‣┘  _ [RecordSet(M6)]                20
-  32  └‣─  (expression_statement)           28
-  33   !   (program)                        32
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └─!  _                                17, 20, 22
+  04                                        ▶
+  05   !   (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  14
+  08   !   (number) [VariantOpen(M5) VariantClose]  14
+  10  ──!  _                                05, 08, 10
+  12  └─!  _                                05, 08, 10
+  14  ─‣┘² _ [RecordSet(M7)]                04
+  16  ─‣─  (expression_statement)           12
+  17   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  24
+  20   !   (number) [VariantOpen(M2) VariantClose]  24
+  22  ──!  _                                17, 20, 22
+  24  ─‣┘  _ [RecordSet(M6)]                16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@33)                            33 : 03
-       ▶   (@33)
-
-@33:
-  33       (program)                        32
+  00       (program)                        01
        ●   program
-  32       (expression_statement)           28
+  01       (expression_statement)           02
        ●   expression_statement
-  28       _                                21, 24, 26
+  02       _                                17, 20, 22
        ●   identifier
-  21       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  30
+  17       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  24
        ●   identifier
-  30       _ [RecordSet(M6)]                20
+  24       _ [RecordSet(M6)]                16
        ●   expression_statement
-  20       (expression_statement)           16
+  16       (expression_statement)           12
        ●   expression_statement
-  16       _                                08, 11, 13
+  12       _                                05, 08, 10
        ●   number
-  08       (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  18
+  05       (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  14
        ○   number
-  16  ❮❮❮ 
-  11       (number) [VariantOpen(M5) VariantClose]  18
+  12  ❮❮❮ 
+  08       (number) [VariantOpen(M5) VariantClose]  14
        ●   number
-  18       _ [RecordSet(M7)]                06
+  14       _ [RecordSet(M7)]                04
        ●   program
-  06   ◀   (@33)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  04   ◀   (Q)                              ◼

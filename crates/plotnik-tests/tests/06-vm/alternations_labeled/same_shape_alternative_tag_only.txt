@@ -58,46 +58,34 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─‣┘  _ [VariantClose]                 08
-  08  ─‣┘  _ [RecordSet(M3)]                10
-  10                                        ▶
-  11  └‣─  (identifier) [Node RecordSet(M0)]  06
-  13   !   (expression_statement) [VariantOpen(M1)]  11
-  15  └‣─  (string)                         06
-  16   !   (expression_statement) [VariantOpen(M2)]  15
-  18  ──!  _                                13, 16, 18
-  20  └─!  _                                13, 16, 18
-  22   !   (program)                        20
+  00   !   (program)                        01
+  01  └─!  _                                10, 13, 16
+  03  ─‣┘  _ [VariantClose]                 05
+  05  ─‣┘  _ [RecordSet(M3)]                07
+  07                                        ▶
+  08  └‣─  (identifier) [Node RecordSet(M0)]  03
+  10   !   (expression_statement) [VariantOpen(M1)]  08
+  12  └‣─  (string)                         03
+  13   !   (expression_statement) [VariantOpen(M2)]  12
+  15  ...
+  16  ──!  _                                10, 13, 16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        20
+  00       (program)                        01
        ●   program
-  20       _                                13, 16, 18
+  01       _                                10, 13, 16
        ●   expression_statement
-  13       (expression_statement) [VariantOpen(M1)]  11
+  10       (expression_statement) [VariantOpen(M1)]  08
        ●   expression_statement
-  11       (identifier) [Node RecordSet(M0)]  06
+  08       (identifier) [Node RecordSet(M0)]  03
        ○   string
-  20  ❮❮❮ 
-  16       (expression_statement) [VariantOpen(M2)]  15
+  01  ❮❮❮ 
+  13       (expression_statement) [VariantOpen(M2)]  12
        ●   expression_statement
-  15       (string)                         06
+  12       (string)                         03
        ●   string
-  06       _ [VariantClose]                 08
+  03       _ [VariantClose]                 05
        ●   expression_statement
-  08       _ [RecordSet(M3)]                10
+  05       _ [RecordSet(M3)]                07
        ●   program
-  10   ◀   (@22)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  07   ◀   (Q)                              ◼

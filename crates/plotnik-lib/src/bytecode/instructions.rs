@@ -802,7 +802,7 @@ pub struct Call {
     pub ownership: CallOwnership,
     pub nav: Nav,
     pub node_field: Option<NodeFieldId>,
-    pub target: SuccessorAddr,
+    pub target: CodeAddr,
     returns: [Option<SuccessorAddr>; CALL_MAX_RETURNS],
     returns_len: u8,
     consumed_mask: u8,
@@ -815,7 +815,7 @@ impl Call {
         node_field: Option<NodeFieldId>,
         return_addrs: &[SuccessorAddr],
         consumed_mask: u8,
-        target: SuccessorAddr,
+        target: CodeAddr,
     ) -> Self {
         assert!(
             (1..=CALL_MAX_RETURNS).contains(&return_addrs.len()),
@@ -912,7 +912,7 @@ impl Call {
                     node_field,
                     &[successor_addr(4)],
                     consumed_mask,
-                    successor_addr(6),
+                    CodeAddr::from(u16::from_le_bytes([bytes[6], bytes[7]])),
                 )
             }
             Opcode::CallN => {
@@ -927,7 +927,7 @@ impl Call {
                     node_field,
                     &return_addrs,
                     bytes[7],
-                    successor_addr(4),
+                    CodeAddr::from(u16::from_le_bytes([bytes[4], bytes[5]])),
                 )
             }
             _ => unreachable!("Call::from_bytes requires Call1 or CallN"),

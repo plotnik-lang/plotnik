@@ -57,38 +57,28 @@ Q = 00 :: T5
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) [Node RecordSet(M0)]  08
-  08  ─‣┘  _ [RecordClose RecordSet(M1)]    11
-  10                                        ▶
-  11  -ε-  [RecordClose ArrayPush]          20, 24
-  13   !   (expression_statement) [RecordOpen]  06
-  15  ...
-  16  ──!  _                                13, 16
-  18   !   _ [RecordOpen]                   13, 16
-  20  ──!  _                                18, 20
-  22  └─!  _ [ListOpen]                     18, 20
-  24  ─‣┘  _ [ListClose RecordSet(M2)]      10
-  26   !   (program)                        22
+  00   !   (program)                        01
+  01  └─!  _ [ListOpen]                     14, 16
+  03  └‣─  (identifier) [Node RecordSet(M0)]  05
+  05  ─‣┘  _ [RecordClose RecordSet(M1)]    08
+  07                                        ▶
+  08  -ε-  [RecordClose ArrayPush]          16, 18
+  10   !   (expression_statement) [RecordOpen]  03
+  12  ──!  _                                10, 12
+  14   !   _ [RecordOpen]                   10, 12
+  16  ──!  _                                14, 16
+  18  ─‣┘  _ [ListClose RecordSet(M2)]      07
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-       ▶   (@26)
-
-@26:
-  26       (program)                        22
+  00       (program)                        01
        ●   program
-  22       _ [ListOpen]                     18, 20
+  01       _ [ListOpen]                     14, 16
        ●   debugger_statement
-  18       _ [RecordOpen]                   13, 16
+  14       _ [RecordOpen]                   10, 12
        ●   debugger_statement
-  13       (expression_statement) [RecordOpen]  06
+  10       (expression_statement) [RecordOpen]  03
        ○   debugger_statement
-  18  ❮❮❮ 
-  16       _                                13, 16
-  22  ❮❮❮ 
-  20       _                                18, 20
+  14  ❮❮❮ 
+  12       _                                10, 12
+  01  ❮❮❮ 
+  16       _                                14, 16

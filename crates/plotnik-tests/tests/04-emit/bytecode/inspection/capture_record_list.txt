@@ -6,7 +6,7 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 23
+Q = 02
 
 [transitions]
 Q:
@@ -21,12 +21,6 @@ Q:
   13  ──!  _                                08, 13
   14  └─!  _                                08, 13
   19  -ε-  [ListOpen]                       14, 05
-
-Q (entry point):
-  20                                        ▶
-  21  -ε-  [RecordClose]                    20
-  22       (Q)                              02 : 21
-  23  -ε-  [RecordOpen]                     22
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -67,24 +61,16 @@ P7 pattern    47..59  source_id=0
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@35)                            35 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ──!  _                                21, 06
-  08  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
-  12  ─‣┘  _ [SpanEnd#4]                    19
-  14                                        ▶
-  15  ...
-  16  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
-  19  -ε-  [RecordClose ArrayPush]          06, 32
-  21   !   (function_declaration) [RecordOpen SpanStartAt#4]  08
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  -ε-  [ListOpen SpanStart#3]           20, 11
+  04  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  08
+  08  ─‣┘  _ [SpanEnd#4]                    14
+  10                                        ▶
+  11  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  14  -ε-  [RecordClose ArrayPush]          18, 24
+  16   !   (function_declaration) [RecordOpen SpanStartAt#4]  04
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
+  22  ...
   23  ...
-  24  └─!  _                                21, 06
-  26  -ε-  [ListOpen SpanStart#3]           24, 16
-  28  ...
-  29  ...
-  30  ...
-  31  ...
-  32  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
-  35   !   (program) [SpanStart#0 SpanStartAt#1]  26
+  24  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10

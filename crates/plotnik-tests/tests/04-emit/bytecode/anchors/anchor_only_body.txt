@@ -1,17 +1,13 @@
 Q = (program .)
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 5
+Q = 2
 
 [transitions]
 Q:
   1                                         ▶
   2   !   (program)                         3
   3  └•┘  _                                 1
-
-Q (entry point):
-  4                                         ▶
-  5       (Q)                               2 : 4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -30,8 +26,6 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0       (@4)                              4 : 1
-  1                                         ▶
+  0   !   (program)                         1
+  1  └•┘  _                                 2
   2                                         ▶
-  3  └•┘  _                                 2
-  4   !   (program)                         3

@@ -47,52 +47,39 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@17)                            17 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ──!  (number) [Node RecordSet(M0)]    08
-  08  ─‣┘³ _                                09
-  09                                        ▶
-  10   !   ","                              06
-  11  ──!  _                                10, 11
-  13  └─!  _                                10, 11
-  15  └‣─  (array)                          13
-  16  └‣─  (expression_statement)           15
-  17   !   (program)                        16
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                09, 10
+  05  ──!  (number) [Node RecordSet(M0)]    07
+  07  ─‣┘³ _                                08
+  08                                        ▶
+  09   !   ","                              05
+  10  ──!  _                                09, 10
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@17)                            17 : 03
-       ▶   (@17)
-
-@17:
-  17       (program)                        16
+  00       (program)                        01
        ●   program
-  16       (expression_statement)           15
+  01       (expression_statement)           02
        ●   expression_statement
-  15       (array)                          13
+  02       (array)                          03
        ●   array
-  13       _                                10, 11
+  03       _                                09, 10
        ●   [
-  10       ","                              06
+  09       ","                              05
        ○   [
-  13  ❮❮❮ 
-  11       _                                10, 11
+  03  ❮❮❮ 
+  10       _                                09, 10
        ●   number
-  10       ","                              06
+  09       ","                              05
        ○   number
-  11  ❮❮❮ 
-  11       _                                10, 11
+  10  ❮❮❮ 
+  10       _                                09, 10
        ●   ,
-  10       ","                              06
+  09       ","                              05
        ●   ,
-  06       (number) [Node RecordSet(M0)]    08
+  05       (number) [Node RecordSet(M0)]    07
        ●   number
-  08       _                                09
+  07       _                                08
        ●   program
-  09   ◀   (@17)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  08   ◀   (Q)                              ◼

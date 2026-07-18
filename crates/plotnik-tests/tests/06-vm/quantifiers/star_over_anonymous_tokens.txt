@@ -52,76 +52,63 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  -ε-  [ListOpen]                       12, 06
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘² _                                06
-  08  -ε-  [ListClose RecordSet(M0)]        07
-  10   !   "," [Node ArrayPush]             12, 18
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
-  16  -ε-  [ListOpen]                       14, 08
-  18  ─‣┘  _ [ListClose RecordSet(M0)]      07
-  20  └‣─  (array)                          16
-  21  └‣─  (expression_statement)           20
-  22   !   (program)                        21
+  06  -ε-  [ListClose RecordSet(M0)]        16
+  08   !   "," [Node ArrayPush]             10, 14
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14  ─‣┘  _ [ListClose RecordSet(M0)]      16
+  16  ─‣┘² _                                05
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        21
+  00       (program)                        01
        ●   program
-  21       (expression_statement)           20
+  01       (expression_statement)           02
        ●   expression_statement
-  20       (array)                          16
+  02       (array)                          03
        ●   array
-  16  -ε-  [ListOpen]                       14, 08
-  14       _                                10, 12
+  03  -ε-  [ListOpen]                       12, 06
+  12       _                                08, 10
        ●   [
-  10       "," [Node ArrayPush]             12, 18
+  08       "," [Node ArrayPush]             10, 14
        ○   [
-  14  ❮❮❮ 
-  12       _                                10, 12
+  12  ❮❮❮ 
+  10       _                                08, 10
        ●   number
-  10       "," [Node ArrayPush]             12, 18
+  08       "," [Node ArrayPush]             10, 14
        ○   number
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   ,
-  10       "," [Node ArrayPush]             12, 18
-       ●   ,
-  12       _                                10, 12
-       ●   number
-  10       "," [Node ArrayPush]             12, 18
-       ○   number
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   ,
-  10       "," [Node ArrayPush]             12, 18
-       ●   ,
-  12       _                                10, 12
-       ●   number
-  10       "," [Node ArrayPush]             12, 18
-       ○   number
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   ]
-  10       "," [Node ArrayPush]             12, 18
-       ○   ]
-  12  ❮❮❮ 
-  12       _                                10, 12
   10  ❮❮❮ 
-  18       _ [ListClose RecordSet(M0)]      07
+  10       _                                08, 10
+       ●   ,
+  08       "," [Node ArrayPush]             10, 14
+       ●   ,
+  10       _                                08, 10
+       ●   number
+  08       "," [Node ArrayPush]             10, 14
+       ○   number
+  10  ❮❮❮ 
+  10       _                                08, 10
+       ●   ,
+  08       "," [Node ArrayPush]             10, 14
+       ●   ,
+  10       _                                08, 10
+       ●   number
+  08       "," [Node ArrayPush]             10, 14
+       ○   number
+  10  ❮❮❮ 
+  10       _                                08, 10
+       ●   ]
+  08       "," [Node ArrayPush]             10, 14
+       ○   ]
+  10  ❮❮❮ 
+  10       _                                08, 10
+  08  ❮❮❮ 
+  14       _ [ListClose RecordSet(M0)]      16
        ●   array
-  07       _                                06
+  16       _                                05
        ●   program
-  06   ◀   (@22)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

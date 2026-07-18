@@ -48,44 +48,33 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@34)                            34 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                07, 22
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  07
-  11  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  07
+  06  ─‣┘³ _                                05
+  07   !   "["                              24
+  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  06
+  11  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  06
   14                                        ▶
   15                                        ▶ p1
   16   !   (identifier) == "a"              14
   18  ──!  _                                16, 18
   20  -ε-                                   18, 15
-  22  ...
-  23  ...
+  22  ──!  _                                07, 22
   24       (@20)                            20 : 08 / 11
-  27   !   "["                              24
-  28  ──!  _                                27, 28
-  30  └─!  _                                27, 28
-  32  └‣─  (array)                          30
-  33  └‣─  (expression_statement)           32
-  34   !   (program)                        33
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@34)                            34 : 03
-       ▶   (@34)
-
-@34:
-  34       (program)                        33
+  00       (program)                        01
        ●   program
-  33       (expression_statement)           32
+  01       (expression_statement)           02
        ●   expression_statement
-  32       (array)                          30
+  02       (array)                          03
        ●   array
-  30       _                                27, 28
+  03       _                                07, 22
        ●   [
-  27       "["                              24
+  07       "["                              24
        ●   [
   24       (@20)                            20 : 08 / 11
        ▶   (@20)
@@ -114,29 +103,29 @@ Q:
   20  ❮❮❮ 
   15   ◀   (@20)                            p1
 
-@34:
-  11       (identifier) [Node RecordSet(M0)] == "b"  07
-  30  ❮❮❮ 
-  28       _                                27, 28
+Q:
+  11       (identifier) [Node RecordSet(M0)] == "b"  06
+  03  ❮❮❮ 
+  22       _                                07, 22
        ●   identifier
-  27       "["                              24
+  07       "["                              24
        ○   identifier
-  28  ❮❮❮ 
-  28       _                                27, 28
+  22  ❮❮❮ 
+  22       _                                07, 22
        ●   ,
-  27       "["                              24
+  07       "["                              24
        ○   ,
-  28  ❮❮❮ 
-  28       _                                27, 28
+  22  ❮❮❮ 
+  22       _                                07, 22
        ●   identifier
-  27       "["                              24
+  07       "["                              24
        ○   identifier
-  28  ❮❮❮ 
-  28       _                                27, 28
+  22  ❮❮❮ 
+  22       _                                07, 22
        ●   ]
-  27       "["                              24
+  07       "["                              24
        ○   ]
-  28  ❮❮❮ 
-  28       _                                27, 28
-  32  ❮❮❮ 
-  33  ❮❮❮ 
+  22  ❮❮❮ 
+  22       _                                07, 22
+  02  ❮❮❮ 
+  01  ❮❮❮ 

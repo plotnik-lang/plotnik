@@ -41,48 +41,35 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier)                     08
-  07  ─‣┘  _                                12
-  08  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   07
-  10  └‣─  (number)                         11
-  11  ─‣┘  _                                07
-  12                                        ▶
-  13   !   (expression_statement)           06
-  14   !   (expression_statement) [BoolValue(0) RecordSet(M0)]  10
-  16  ──!  _                                13, 14, 16
-  18  └─!  _                                13, 14, 16
-  20   !   (program)                        18
+  00   !   (program)                        01
+  01  └─!  _                                09, 10, 12
+  03  └‣─  (identifier)                     04
+  04  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   14
+  06  └‣─  (number)                         07
+  07  ─‣┘  _                                14
+  08                                        ▶
+  09   !   (expression_statement)           03
+  10   !   (expression_statement) [BoolValue(0) RecordSet(M0)]  06
+  12  ──!  _                                09, 10, 12
+  14  ─‣┘  _                                08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        18
+  00       (program)                        01
        ●   program
-  18       _                                13, 14, 16
+  01       _                                09, 10, 12
        ●   expression_statement
-  13       (expression_statement)           06
+  09       (expression_statement)           03
        ●   expression_statement
-  06       (identifier)                     08
+  03       (identifier)                     04
        ○   number
        ○   ;
-  18  ❮❮❮ 
-  14       (expression_statement) [BoolValue(0) RecordSet(M0)]  10
+  01  ❮❮❮ 
+  10       (expression_statement) [BoolValue(0) RecordSet(M0)]  06
        ●   expression_statement
-  10       (number)                         11
+  06       (number)                         07
        ●   number
-  11       _                                07
+  07       _                                14
        ●   expression_statement
-  07       _                                12
+  14       _                                08
        ●   program
-  12   ◀   (@20)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  08   ◀   (Q)                              ◼

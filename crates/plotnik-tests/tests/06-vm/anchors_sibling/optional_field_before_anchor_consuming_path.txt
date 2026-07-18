@@ -50,49 +50,35 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─•─  arguments: (arguments) [Node RecordSet(M0)]  08
-  08  ─‣┘³ _                                09
-  09                                        ▶
-  10   !   optional_chain: (optional_chain)  06
-  11  ──!  _                                10, 11
-  13   !   (identifier)                     11, 06
-  15  ...
-  16  ─‣─  function: _                      13, 16
-  18  └‣─  function: _                      13, 16
-  20  └‣─  (call_expression)                18
-  21  └‣─  (expression_statement)           20
-  22   !   (program)                        21
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (call_expression)                03
+  03  └‣─  function: _                      12, 14
+  05  ─•─  arguments: (arguments) [Node RecordSet(M0)]  07
+  07  ─‣┘³ _                                08
+  08                                        ▶
+  09   !   optional_chain: (optional_chain)  05
+  10  ──!  _                                09, 10
+  12   !   (identifier)                     10, 05
+  14  ─‣─  function: _                      12, 14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        21
+  00       (program)                        01
        ●   program
-  21       (expression_statement)           20
+  01       (expression_statement)           02
        ●   expression_statement
-  20       (call_expression)                18
+  02       (call_expression)                03
        ●   call_expression
-  18       function: _                      13, 16
+  03       function: _                      12, 14
        ●   identifier
-  13       (identifier)                     11, 06
+  12       (identifier)                     10, 05
        ●   identifier
-  11       _                                10, 11
+  10       _                                09, 10
        ●   optional_chain
-  10       optional_chain: (optional_chain)  06
+  09       optional_chain: (optional_chain)  05
        ●   optional_chain
-  06       arguments: (arguments) [Node RecordSet(M0)]  08
+  05       arguments: (arguments) [Node RecordSet(M0)]  07
        ●   arguments
-  08       _                                09
+  07       _                                08
        ●   program
-  09   ◀   (@22)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  08   ◀   (Q)                              ◼

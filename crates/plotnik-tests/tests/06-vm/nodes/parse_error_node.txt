@@ -31,33 +31,20 @@ M0: S1 → T0  ; err: <Node>
 N0: S2 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@10)                            10 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (ERROR) [Node RecordSet(M0)]     08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10   !   (program)                        06
+  0   !   (program)                         1
+  1  └‣─  (ERROR) [Node RecordSet(M0)]      3
+  3  ─‣┘  _                                 4
+  4                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@10)                            10 : 03
-       ▶   (@10)
-
-@10:
-  10       (program)                        06
-       ●   program
-  06       (ERROR) [Node RecordSet(M0)]     08
-       ●   ERROR
-  08       _                                09
-       ●   program
-  09   ◀   (@10)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       (ERROR) [Node RecordSet(M0)]      03
+      ●   ERROR
+  3       _                                 04
+      ●   program
+  4   ◀   (Q)                               ◼

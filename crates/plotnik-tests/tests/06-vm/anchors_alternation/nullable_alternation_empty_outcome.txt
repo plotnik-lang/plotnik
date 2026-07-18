@@ -55,17 +55,17 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@38)                            38 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                30, 14
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  07
-  11  ─•─  (identifier) [Node RecordSet(M0)] == "b"  07
-  14  ...
-  15  ...
-  16  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  07
+  06  ─‣┘³ _                                05
+  07  ...
+  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  06
+  11  ─•─  (identifier) [Node RecordSet(M0)] == "b"  06
+  14  ──!  _                                30, 14
+  16  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  06
   19   !   (identifier) == "a"              11
   21  ──!  _                                19, 21
   23  ...
@@ -73,25 +73,15 @@ Q:
   26   !   (identifier) == "x"              08
   28  ──!  _                                24, 26, 28
   30   !   "["                              28, 16
-  32  ──!  _                                30, 32
-  34  └─!  _                                30, 32
-  36  └‣─  (array)                          34
-  37  └‣─  (expression_statement)           36
-  38   !   (program)                        37
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@38)                            38 : 03
-       ▶   (@38)
-
-@38:
-  38       (program)                        37
+  00       (program)                        01
        ●   program
-  37       (expression_statement)           36
+  01       (expression_statement)           02
        ●   expression_statement
-  36       (array)                          34
+  02       (array)                          03
        ●   array
-  34       _                                30, 32
+  03       _                                30, 14
        ●   [
   30       "["                              28, 16
        ●   [
@@ -124,12 +114,8 @@ Q:
   28  ❮❮❮ 
   28       _                                24, 26, 28
   30  ❮❮❮ 
-  16       (identifier) [Node RecordSet(M0)] == "b"  07
+  16       (identifier) [Node RecordSet(M0)] == "b"  06
        ●   identifier
-  07       _                                06
+  06       _                                05
        ●   program
-  06   ◀   (@38)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

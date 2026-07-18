@@ -7,22 +7,16 @@ Q = (array
 ) @a
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 12
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (array) [Node RecordSet(a)]      04
-  04  └‣─  (array) [Node RecordSet(b)]      06
-  06  └‣─  (array) [Node RecordSet(c)]      08
-  07  ─‣┘³ _                                01
-  08  └‣─  (identifier) [Node RecordSet(d)]  07
-
-Q (entry point):
-  09                                        ▶
-  10  -ε-  [RecordClose]                    09
-  11       (Q)                              02 : 10
-  12  -ε-  [RecordOpen]                     11
+  1                                         ▶
+  2   !   (array) [Node RecordSet(a)]       4
+  4  └‣─  (array) [Node RecordSet(b)]       6
+  6  └‣─  (array) [Node RecordSet(c)]       8
+  7  ─‣┘³ _                                 1
+  8  └‣─  (identifier) [Node RecordSet(d)]  7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -48,17 +42,13 @@ M3: S4 → T0  ; d: <Node>
 N0: S5 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@14)                            14 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) [Node RecordSet(M3)]  08
-  08  ─‣┘³ _                                09
-  09                                        ▶
-  10  └‣─  (array) [Node RecordSet(M2)]     06
-  12  └‣─  (array) [Node RecordSet(M1)]     10
-  14   !   (array) [Node RecordSet(M0)]     12
+  0   !   (array) [Node RecordSet(M0)]      2
+  2  └‣─  (array) [Node RecordSet(M1)]      4
+  4  └‣─  (array) [Node RecordSet(M2)]      6
+  6  └‣─  (identifier) [Node RecordSet(M3)]  8
+  8  ─‣┘³ _                                 9
+  9                                         ▶

@@ -8,7 +8,7 @@ Q = (program
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 15
+Q = 02
 
 [transitions]
 Q:
@@ -21,12 +21,6 @@ Q:
   09  └‣─  (binary_expression)              11
   10  ─‣┘³ _                                04
   11  └‣─  (identifier) [Node RecordSet(l)]  10
-
-Q (entry point):
-  12                                        ▶
-  13  -ε-  [RecordClose]                    12
-  14       (Q)                              02 : 13
-  15  -ε-  [RecordOpen]                     14
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -56,16 +50,13 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─‣─  (debugger_statement) [Node RecordSet(M1)]  08
-  08  ─‣┘  _                                12
-  09  └‣─  (identifier) [Node RecordSet(M0)]  11
-  11  ─‣┘³ _                                06
-  12                                        ▶
-  13  └‣─  (binary_expression)              09
-  14  └‣─  (parenthesized_expression)       13
-  15  └‣─  (expression_statement)           14
-  16   !   (program)                        15
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (parenthesized_expression)       03
+  03  └‣─  (binary_expression)              04
+  04  └‣─  (identifier) [Node RecordSet(M0)]  06
+  06  ─‣┘³ _                                08
+  07  ...
+  08  ─‣─  (debugger_statement) [Node RecordSet(M1)]  10
+  10  ─‣┘  _                                11
+  11                                        ▶

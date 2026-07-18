@@ -38,73 +38,62 @@ N0: S2 → T1  ; A
 
 [entry_points]
 A = 00 :: T1
-Q = 02 :: T0
+Q = 03 :: T0
 
 [instructions]
 A:
-  00       (@05)                            05 : 01
-  01                                        ▶
+  00   !   (expression_statement) [VariantOpen(M0) VariantClose]  02
+  02                                        ▶
 
 Q:
-  02       (@20)                            20 : 03
-  03                                        ▶
-  04                                        ▶
-  05   !   (expression_statement) [VariantOpen(M0) VariantClose]  04
-  07                                        ▶
-  08  └•─  (debugger_statement)             15
-  09  ─•─  (debugger_statement)             15
-  10  -ε-  [SuppressEnd]                    09, 16
-  12   !   (@05)                            05 : 10
-  13  -ε-  [SuppressBegin]                  12
-  15  ─‣┘  _                                07
-  16  ──!  _                                13, 16
-  18  └─!  _                                13, 16
-  20   !   (program)                        08, 18
+  03   !   (program)                        06, 16
+  05                                        ▶
+  06  └•─  (debugger_statement)             15
+  07  ─•─  (debugger_statement)             15
+  08  -ε-  [SuppressEnd]                    07, 13
+  10   !   (A)                              00 : 08
+  11  -ε-  [SuppressBegin]                  10
+  13  ──!  _                                11, 13
+  15  ─‣┘  _                                05
+  16  └─!  _                                11, 13
 --------------------- TRACE ----------------------
 Q:
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        08, 18
+  03       (program)                        06, 16
        ●   program
-  08       (debugger_statement)             15
+  06       (debugger_statement)             15
        ○   expression_statement
-  20  ❮❮❮ 
-  18       _                                13, 16
+  03  ❮❮❮ 
+  16       _                                11, 13
        ●   expression_statement
-  13  -ε-  [SuppressBegin]                  12
-  12       (@05)                            05 : 10
-       ▶   (@05)
+  11  -ε-  [SuppressBegin]                  10
+  10       (A)                              00 : 08
+       ▶   (A)
 
-@05:
-  05       (expression_statement) [VariantOpen(M0) VariantClose]  04
+A:
+  00       (expression_statement) [VariantOpen(M0) VariantClose]  02
        ●   expression_statement
-  04   ◀   (@05)                            
-
-@20:
-  10  -ε-  [SuppressEnd]                    09, 16
-  09       (debugger_statement)             15
-       ○   expression_statement
-  10  ❮❮❮ 
-  16       _                                13, 16
-       ●   expression_statement
-  13  -ε-  [SuppressBegin]                  12
-  12       (@05)                            05 : 10
-       ▶   (@05)
-
-@05:
-  05       (expression_statement) [VariantOpen(M0) VariantClose]  04
-       ●   expression_statement
-  04   ◀   (@05)                            
-
-@20:
-  10  -ε-  [SuppressEnd]                    09, 16
-  09       (debugger_statement)             15
-       ●   debugger_statement
-  15       _                                07
-       ●   program
-  07   ◀   (@20)                            
+  02   ◀   (A)                              
 
 Q:
-  03   ◀   (Q)                              ◼
+  08  -ε-  [SuppressEnd]                    07, 13
+  07       (debugger_statement)             15
+       ○   expression_statement
+  08  ❮❮❮ 
+  13       _                                11, 13
+       ●   expression_statement
+  11  -ε-  [SuppressBegin]                  10
+  10       (A)                              00 : 08
+       ▶   (A)
+
+A:
+  00       (expression_statement) [VariantOpen(M0) VariantClose]  02
+       ●   expression_statement
+  02   ◀   (A)                              
+
+Q:
+  08  -ε-  [SuppressEnd]                    07, 13
+  07       (debugger_statement)             15
+       ●   debugger_statement
+  15       _                                05
+       ●   program
+  05   ◀   (Q)                              ◼

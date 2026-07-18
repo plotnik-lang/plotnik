@@ -1,7 +1,7 @@
 Q = (debugger_statement (_))
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 6
+Q = 2
 
 [transitions]
 Q:
@@ -9,10 +9,6 @@ Q:
   2   !   (debugger_statement)              4
   3  ─‣┘  _                                 1
   4  └‣─  (_)                               3
-
-Q (entry point):
-  5                                         ▶
-  6       (Q)                               2 : 5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -31,9 +27,7 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0       (@5)                              5 : 1
-  1                                         ▶
-  2  └‣─  (_)                               3
-  3  ─‣┘  _                                 4
-  4                                         ▶
-  5   !   (debugger_statement)              2
+  0   !   (debugger_statement)              1
+  1  └‣─  (_)                               2
+  2  ─‣┘  _                                 3
+  3                                         ▶

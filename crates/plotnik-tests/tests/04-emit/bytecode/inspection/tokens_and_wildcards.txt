@@ -14,7 +14,7 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 18
+Q = 02
 
 [transitions]
 Q:
@@ -31,10 +31,6 @@ Q:
   12   !   _                                05
   15  ──!  _                                06, 11, 12, 15
   16  └─!  _                                06, 11, 12, 15
-
-Q (entry point):
-  17                                        ▶
-  18       (Q)                              02 : 17
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -72,21 +68,18 @@ P12 pattern    137..138  source_id=0
 
 [instructions]
 Q:
-  00       (@30)                            30 : 01
-  01                                        ▶
-  02  ─‣─  (_) [SpanStartAt#8 SpanEnd#8]    04
-  04  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  06
-  06  ─‣┘  _                                08
-  07  ...
-  08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  10                                        ▶
-  11  ─‣─  "+" [SpanStartAt#7 SpanEnd#7]    02
-  13  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  11
-  15  ...
-  16   !   (binary_expression) [SpanStart#3 SpanStart#4 SpanStartAt#5]  13
-  18   !   (_) [SpanStart#3 SpanStart#9 SpanStartAt#10 SpanEnd#10 SpanEnd#9 SpanEnd#3]  06
-  21   !   _ [SpanStart#3 SpanStart#11 SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#3]  06
-  24  ──!  _                                16, 18, 21, 24
-  26  └─!  _                                16, 18, 21, 24
-  28  └‣─  (expression_statement) [SpanStartAt#2]  26
-  30   !   (program) [SpanStart#0 SpanStartAt#1]  28
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  └‣─  (expression_statement) [SpanStartAt#2]  04
+  04  └─!  _                                18, 20, 24, 27
+  06  ─‣─  (_) [SpanStartAt#8 SpanEnd#8]    08
+  08  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  10
+  10  ─‣┘  _                                11
+  11  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
+  13                                        ▶
+  14  ─‣─  "+" [SpanStartAt#7 SpanEnd#7]    06
+  16  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  14
+  18   !   (binary_expression) [SpanStart#3 SpanStart#4 SpanStartAt#5]  16
+  20   !   (_) [SpanStart#3 SpanStart#9 SpanStartAt#10 SpanEnd#10 SpanEnd#9 SpanEnd#3]  10
+  23  ...
+  24   !   _ [SpanStart#3 SpanStart#11 SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#3]  10
+  27  ──!  _                                18, 20, 24, 27

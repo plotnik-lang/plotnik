@@ -62,39 +62,27 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─•─  (debugger_statement) [Node RecordSet(M2)]  08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10  ─•─  (empty_statement) [Node RecordSet(M1)]  06
-  12   !   (lexical_declaration) [Node RecordSet(M0)]  10
-  14  ──!  _                                12, 14
-  16  └─!  _                                12, 14
-  18   !   (program)                        16
+  00   !   (program)                        01
+  01  └─!  _                                10, 12
+  03  ─•─  (debugger_statement) [Node RecordSet(M2)]  05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  ─•─  (empty_statement) [Node RecordSet(M1)]  03
+  10   !   (lexical_declaration) [Node RecordSet(M0)]  08
+  12  ──!  _                                10, 12
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-       ▶   (@18)
-
-@18:
-  18       (program)                        16
+  00       (program)                        01
        ●   program
-  16       _                                12, 14
+  01       _                                10, 12
        ●   lexical_declaration
-  12       (lexical_declaration) [Node RecordSet(M0)]  10
+  10       (lexical_declaration) [Node RecordSet(M0)]  08
        ●   lexical_declaration
-  10       (empty_statement) [Node RecordSet(M1)]  06
+  08       (empty_statement) [Node RecordSet(M1)]  03
        ●   empty_statement
-  06       (debugger_statement) [Node RecordSet(M2)]  08
+  03       (debugger_statement) [Node RecordSet(M2)]  05
        ●   debugger_statement
-  08       _                                09
+  05       _                                06
        ●   program
-  09   ◀   (@18)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼

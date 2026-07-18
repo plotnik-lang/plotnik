@@ -351,7 +351,7 @@ pub struct Call {
     pub nav: Nav,
     pub node_field: Option<NonZeroU16>,
     pub next: SuccessorAddr,      // return address
-    pub target: SuccessorAddr,    // callee entry
+    pub target: CodeAddr,         // callee entry
 }
 ```
 

@@ -48,34 +48,25 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@21)                            21 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (call_expression)                03
+  03  └‣─  arguments: (arguments)           14, 06
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘⁴ _                                06
+  06  └‣─  ";"                              11
+  07  ─‣┘⁴ _                                05
   08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  07
   11  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  07
   14  └‣─  (identifier) == "a"              08
-  16  └‣─  ";"                              11
-  17  └‣─  arguments: (arguments)           14, 16
-  19  └‣─  (call_expression)                17
-  20  └‣─  (expression_statement)           19
-  21   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@21)                            21 : 03
-       ▶   (@21)
-
-@21:
-  21       (program)                        20
+  00       (program)                        01
        ●   program
-  20       (expression_statement)           19
+  01       (expression_statement)           02
        ●   expression_statement
-  19       (call_expression)                17
+  02       (call_expression)                03
        ●   call_expression
-  17       arguments: (arguments)           14, 16
+  03       arguments: (arguments)           14, 06
        ○   identifier
        ●   arguments
   14       (identifier) == "a"              08
@@ -87,8 +78,8 @@ Q:
        ○   ,
        ○   ,
        ○   )
-  17  ❮❮❮ 
-  16       ";"                              11
+  03  ❮❮❮ 
+  06       ";"                              11
        ○   (
        ○   identifier
        ○   ,
@@ -96,6 +87,6 @@ Q:
        ○   ,
        ○   identifier
        ○   )
-  17  ❮❮❮ 
-  19  ❮❮❮ 
-  20  ❮❮❮ 
+  03  ❮❮❮ 
+  02  ❮❮❮ 
+  01  ❮❮❮ 

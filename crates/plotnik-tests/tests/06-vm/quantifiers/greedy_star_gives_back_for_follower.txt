@@ -57,53 +57,41 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08  └‣─  (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  11  ─‣─  (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  14   !   (expression_statement) [Node ArrayPush]  16, 11
-  16  ──!  _                                14, 16
-  18  └─!  _                                14, 16
-  20  -ε-  [ListOpen]                       18, 08
-  22   !   (program)                        20
+  00   !   (program)                        01
+  01  -ε-  [ListOpen]                       16, 04
+  03                                        ▶
+  04  └‣─  (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  07  ─‣┘  _                                03
+  08  ─‣─  (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  11   !   (expression_statement) [Node ArrayPush]  13, 08
+  13  ──!  _                                11, 13
+  15  ...
+  16  └─!  _                                11, 13
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        20
+  00       (program)                        01
        ●   program
-  20  -ε-  [ListOpen]                       18, 08
-  18       _                                14, 16
+  01  -ε-  [ListOpen]                       16, 04
+  16       _                                11, 13
        ●   expression_statement
-  14       (expression_statement) [Node ArrayPush]  16, 11
+  11       (expression_statement) [Node ArrayPush]  13, 08
        ●   expression_statement
-  16       _                                14, 16
+  13       _                                11, 13
        ●   expression_statement
-  14       (expression_statement) [Node ArrayPush]  16, 11
+  11       (expression_statement) [Node ArrayPush]  13, 08
        ●   expression_statement
-  16       _                                14, 16
+  13       _                                11, 13
        ●   expression_statement
-  14       (expression_statement) [Node ArrayPush]  16, 11
+  11       (expression_statement) [Node ArrayPush]  13, 08
        ●   expression_statement
-  16       _                                14, 16
-  14  ❮❮❮ 
-  11       (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  16  ❮❮❮ 
-  16       _                                14, 16
-  14  ❮❮❮ 
-  11       (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  13       _                                11, 13
+  11  ❮❮❮ 
+  08       (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  13  ❮❮❮ 
+  13       _                                11, 13
+  11  ❮❮❮ 
+  08       (expression_statement) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
        ●   expression_statement
-  07       _                                06
+  07       _                                03
        ●   program
-  06   ◀   (@22)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  03   ◀   (Q)                              ◼

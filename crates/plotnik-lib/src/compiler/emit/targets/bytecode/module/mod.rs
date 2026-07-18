@@ -105,15 +105,19 @@ impl<'a> EmitPipeline<'a> {
                 self.types
                     .resolve_output(output, self.input.type_analysis, self.type_layout)?;
 
-            let target = self
+            let entry = self
                 .ir
-                .entry_point_wrappers()
+                .entry_points()
                 .get(&def_id)
-                .and_then(|label| self.layout.code_addrs().get(label))
-                .copied()
                 .expect("entry point must have compiled target");
+            let target = self
+                .layout
+                .code_addrs()
+                .get(&entry.target)
+                .copied()
+                .expect("entry point target must have a code address");
 
-            entry_points.push(EntryPoint::new(name, target, result_type));
+            entry_points.push(EntryPoint::new(name, target, result_type, entry.boundary));
         }
 
         self.strings.validate()?;
@@ -379,7 +383,7 @@ fn emit_entry_points(entry_points: &[EntryPoint]) -> Vec<u8> {
         bytes.extend_from_slice(&u16::from(ep.name()).to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());
         bytes.extend_from_slice(&u16::from(ep.result_type()).to_le_bytes());
-        bytes.extend_from_slice(&0u16.to_le_bytes()); // _pad is always 0
+        bytes.extend_from_slice(&ep.boundary().to_u16().to_le_bytes());
     }
     bytes
 }

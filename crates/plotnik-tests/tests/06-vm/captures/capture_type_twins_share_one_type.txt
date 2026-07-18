@@ -73,41 +73,29 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@17)                            17 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) [RecordOpen Node RecordSet(M1)]  08
-  08  ─‣┘² _ [RecordClose RecordSet(M3)]    14
-  10  └‣─  (identifier) [RecordOpen Node RecordSet(M0)]  12
-  12  ─‣┘  _ [RecordClose RecordSet(M2)]    15
-  14                                        ▶
-  15  ─‣─  (expression_statement)           06
-  16  └‣─  (expression_statement)           10
-  17   !   (program)                        16
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (identifier) [RecordOpen Node RecordSet(M0)]  04
+  04  ─‣┘  _ [RecordClose RecordSet(M2)]    06
+  06  ─‣─  (expression_statement)           08
+  07  ...
+  08  └‣─  (identifier) [RecordOpen Node RecordSet(M1)]  10
+  10  ─‣┘² _ [RecordClose RecordSet(M3)]    12
+  12                                        ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@17)                            17 : 03
-       ▶   (@17)
-
-@17:
-  17       (program)                        16
+  00       (program)                        01
        ●   program
-  16       (expression_statement)           10
+  01       (expression_statement)           02
        ●   expression_statement
-  10       (identifier) [RecordOpen Node RecordSet(M0)]  12
+  02       (identifier) [RecordOpen Node RecordSet(M0)]  04
        ●   identifier
-  12       _ [RecordClose RecordSet(M2)]    15
+  04       _ [RecordClose RecordSet(M2)]    06
        ●   expression_statement
-  15       (expression_statement)           06
+  06       (expression_statement)           08
        ●   expression_statement
-  06       (identifier) [RecordOpen Node RecordSet(M1)]  08
+  08       (identifier) [RecordOpen Node RecordSet(M1)]  10
        ●   identifier
-  08       _ [RecordClose RecordSet(M3)]    14
+  10       _ [RecordClose RecordSet(M3)]    12
        ●   program
-  14   ◀   (@17)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  12   ◀   (Q)                              ◼

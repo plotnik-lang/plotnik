@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use indexmap::IndexMap;
 
-use crate::bytecode::{Labeling as SpanLabeling, Nav, SpanKind};
+use crate::bytecode::{EntryBoundary, Labeling as SpanLabeling, Nav, SpanKind};
 use crate::compiler::analyze::boundary::BoundaryAnalyzer;
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
@@ -12,8 +12,8 @@ use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::boundary::ExitMap;
 use crate::compiler::lower::ir::{
-    CalleeEntry, DefBodyMode, DefOutputMode, DefSpecialization, EffectIR, InstructionIR, Label,
-    LabelOrigin, NfaGraph, ReturnAddr, ReturnIR,
+    DefBodyMode, DefOutputMode, DefSpecialization, EffectIR, EntryPointIR, InstructionIR, Label,
+    LabelOrigin, NfaGraph, ReturnIR,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
 use crate::compiler::lower::verify::verify_fresh_build;
@@ -139,15 +139,18 @@ impl<'a> NfaBuilder<'a> {
         let mut compiler = NfaBuilder::new(ctx);
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
-        for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
-            compiler.ensure_def_specialization(DefSpecialization::ordinary(def_id));
-        }
-
-        let mut entry_point_wrappers = IndexMap::new();
-        for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
-            compiler.current_origin = Some(LabelOrigin::Wrapper(def_id));
-            let wrapper = compiler.emit_entry_point_wrapper(def_id);
-            entry_point_wrappers.insert(def_id, wrapper);
+        let mut entry_points = IndexMap::new();
+        for (def_id, output) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
+            let target = compiler.ensure_def_specialization(DefSpecialization::ordinary(def_id));
+            let output_shape = output
+                .value()
+                .map(|type_id| ctx.analysis.type_analysis.expect_type_shape(type_id));
+            let boundary = match output_shape {
+                Some(TypeShape::Record(_)) => EntryBoundary::Record,
+                Some(TypeShape::Node) => EntryBoundary::Node,
+                _ => EntryBoundary::Passthrough,
+            };
+            entry_points.insert(def_id, EntryPointIR { target, boundary });
         }
 
         verify_fresh_build(&compiler.instructions);
@@ -161,44 +164,9 @@ impl<'a> NfaBuilder<'a> {
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
-            entry_point_wrappers,
+            entry_points,
             spans: compiler.spans,
             label_origins: compiler.label_origins,
-        }
-    }
-
-    fn emit_entry_point_wrapper(&mut self, def_id: DefId) -> Label {
-        let return_label = self.fresh_label();
-        self.instructions.push(ReturnIR::new(return_label).into());
-
-        let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let output_shape = output
-            .value()
-            .map(|type_id| self.ctx.analysis.type_analysis.expect_type_shape(type_id));
-        let wraps_record = matches!(output_shape, Some(TypeShape::Record(_)));
-
-        let after_body = if wraps_record {
-            self.emit_record_close(return_label)
-        } else if matches!(output_shape, Some(TypeShape::Node)) {
-            self.emit_effects_epsilon(
-                return_label,
-                vec![EffectIR::node()],
-                CaptureEffects::default(),
-            )
-        } else {
-            return_label
-        };
-        let call = self.emit_call(
-            Nav::Stay,
-            None,
-            ReturnAddr(after_body),
-            CalleeEntry(self.def_entries[&DefSpecialization::ordinary(def_id)]),
-        );
-
-        if wraps_record {
-            self.emit_record_open(call)
-        } else {
-            call
         }
     }
 

@@ -4,8 +4,7 @@
 //! in label space, keeping the resolution the wire format erases: symbolic labels
 //! instead of packed code addresses, definition-name section headers from label
 //! provenance (`Name (consuming):` for the guarded-recursion body variant,
-//! `Name (entry point):` for wrappers), real member names on
-//! `RecordSet`/`VariantOpen`,
+//! real member names on `RecordSet`/`VariantOpen`,
 //! callee names on calls (`(Name+)` marks a consuming-body callee), and inline
 //! predicate text — the IR has no string table to index into.
 
@@ -86,7 +85,7 @@ impl<'a> NfaDumper<'a> {
 
     pub(crate) fn def_name_of(&self, label: Label) -> &str {
         match self.origin_of(label) {
-            LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id),
+            LabelOrigin::Def(id) => self.def_name(id),
             LabelOrigin::DefSpecialization { def_id, .. } => self.def_name(def_id),
         }
     }
@@ -108,9 +107,9 @@ impl NfaDumper<'_> {
 
         let mut entries: Vec<(&str, Label)> = self
             .graph
-            .entry_point_wrappers()
+            .entry_points()
             .iter()
-            .map(|(&def_id, &label)| (self.def_name(def_id), label))
+            .map(|(&def_id, entry)| (self.def_name(def_id), entry.target))
             .collect();
         entries.sort_by_key(|(name, _)| *name);
 
@@ -171,7 +170,6 @@ impl NfaDumper<'_> {
             origin @ LabelOrigin::DefSpecialization { .. } => {
                 format!("{}:", self.specialization_name(origin))
             }
-            LabelOrigin::Wrapper(id) => format!("{} (entry point):", self.def_name(id)),
         }
     }
 
@@ -405,7 +403,7 @@ impl NfaDumper<'_> {
     /// allocated the target label names the callee.
     fn callee_name(&self, target: Label) -> String {
         match self.origin_of(target) {
-            LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id).to_string(),
+            LabelOrigin::Def(id) => self.def_name(id).to_string(),
             origin @ LabelOrigin::DefSpecialization { .. } => self.specialization_name(origin),
         }
     }

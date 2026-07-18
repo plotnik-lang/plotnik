@@ -121,10 +121,9 @@ P7 pattern    21..30  source_id=0
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  02
+  02  -ε-  [ScalarOpen SpanStart#4]         04
+  04  -ε-  [SpanStart#6]                    21, 14
   06  -ε-  [TextClose RecordSet(M0) SpanEnd#2]  08
   08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
   10                                        ▶
@@ -133,32 +132,19 @@ Q:
   16   !   (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
   19  ──!  _                                16, 19
   21  └─!  _                                16, 19
-  23  ...
-  24  -ε-  [SpanStart#6]                    21, 14
-  26  -ε-  [ScalarOpen SpanStart#4]         24
-  28   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-       ▶   (@28)
-
-@28:
-  28       (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
+  00       (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  02
        ●   program
-  26  -ε-  [ScalarOpen SpanStart#4]         24
-  24  -ε-  [SpanStart#6]                    21, 14
+  02  -ε-  [ScalarOpen SpanStart#4]         04
+  04  -ε-  [SpanStart#6]                    21, 14
   21       _                                16, 19
        ●   expression_statement
   16       (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
        ○   expression_statement
   21  ❮❮❮ 
   19       _                                16, 19
-  24  ❮❮❮ 
+  04  ❮❮❮ 
   14  -ε-  [SpanEnd#6 SpanEnd#4]            11
   11  -ε-  [TextClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  10   ◀   (@28)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  10   ◀   (Q)                              ◼

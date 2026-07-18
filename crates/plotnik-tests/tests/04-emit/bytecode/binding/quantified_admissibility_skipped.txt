@@ -1,20 +1,16 @@
 Q = (statement_block (identifier)?)
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 10
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (statement_block)                07, 01
-  03  ─‣┘  _                                01
-  04   !   (identifier)                     03
-  06  ──!  _                                04, 06
-  07  └─!  _                                04, 06
-
-Q (entry point):
-  09                                        ▶
-  10       (Q)                              02 : 09
+  1                                         ▶
+  2   !   (statement_block)                 7, 1
+  3  ─‣┘  _                                 1
+  4   !   (identifier)                      3
+  6  ──!  _                                 4, 6
+  7  └─!  _                                 4, 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -30,16 +26,14 @@ T0 = <NoValue>
 [type_names]
 
 [entry_points]
-Q = 00 :: T0
+Q = 0 :: T0
 
 [instructions]
 Q:
-  00       (@10)                            10 : 01
-  01                                        ▶
-  02   !   (identifier)                     03
-  03  ─‣┘  _                                04
-  04                                        ▶
-  05  ──!  _                                02, 05
-  07  ...
-  08  └─!  _                                02, 05
-  10   !   (statement_block)                08, 04
+  0   !   (statement_block)                 8, 4
+  2   !   (identifier)                      3
+  3  ─‣┘  _                                 4
+  4                                         ▶
+  5  ──!  _                                 2, 5
+  7  ...
+  8  └─!  _                                 2, 5

@@ -53,83 +53,66 @@ N1: S4 → T3  ; Q
 
 [entry_points]
 Nested = 00 :: T2
-Q      = 06 :: T3
+Q      = 03 :: T3
 
 [instructions]
 Nested:
-  00  -ε-  [RecordOpen]                     02
-  02       (@27)                            27 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (call_expression)                01
+  01  └‣─  function: _                      14, 19
 
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@32)                            32 : 09
-  09  -ε-  [RecordClose]                    11
-  11                                        ▶
-  12  -ε-  [RecordClose]                    14
-  14  ─‣┘² _ [RecordSet(M1)]                28
-  16                                        ▶
-  17   !   (identifier) [Node RecordSet(M0)]  26
-  19  -ε-  [SuppressEnd]                    26
-  21   !   (@27)                            27 : 19
-  22  -ε-  [Absent RecordSet(M0) SuppressBegin]  21
-  24  └‣─  function: _                      17, 22
-  26  ─‣┘  _                                16
-  27   !   (call_expression)                24
-  28                                        ▶
-  29  └‣─  (@27)                            27 : 12
-  30  └‣─  (expression_statement) [RecordOpen]  29
-  32   !   (program)                        30
+  03   !   (program)                        04
+  04  └‣─  (expression_statement) [RecordOpen]  06
+  06  └‣─  (Nested)                         00 : 08
+  07  ─‣┘  _                                13
+  08  -ε-  [RecordClose]                    10
+  10  ─‣┘² _ [RecordSet(M1)]                12
+  12                                        ▶
+  13                                        ▶
+  14   !   (identifier) [Node RecordSet(M0)]  07
+  16  -ε-  [SuppressEnd]                    07
+  18   !   (Nested)                         00 : 16
+  19  -ε-  [Absent RecordSet(M0) SuppressBegin]  18
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@32)                            32 : 09
-       ▶   (@32)
-
-@32:
-  32       (program)                        30
+  03       (program)                        04
        ●   program
-  30       (expression_statement) [RecordOpen]  29
+  04       (expression_statement) [RecordOpen]  06
        ●   expression_statement
-  29       (@27)                            27 : 12
-       ▶   (@27)
+  06       (Nested)                         00 : 08
+       ▶   (Nested)
 
-@27:
-  27       (call_expression)                24
+Nested:
+  00       (call_expression)                01
        ●   call_expression
-  24       function: _                      17, 22
+  01       function: _                      14, 19
        ●   call_expression
-  17       (identifier) [Node RecordSet(M0)]  26
+  14       (identifier) [Node RecordSet(M0)]  07
        ○   call_expression
-  24  ❮❮❮ 
-  22  -ε-  [Absent RecordSet(M0) SuppressBegin]  21
-  21       (@27)                            27 : 19
-       ▶   (@27)
+  01  ❮❮❮ 
+  19  -ε-  [Absent RecordSet(M0) SuppressBegin]  18
+  18       (Nested)                         00 : 16
+       ▶   (Nested)
 
-@27:
-  27       (call_expression)                24
+Nested:
+  00       (call_expression)                01
        ●   call_expression
-  24       function: _                      17, 22
+  01       function: _                      14, 19
        ●   identifier
-  17       (identifier) [Node RecordSet(M0)]  26
+  14       (identifier) [Node RecordSet(M0)]  07
        ●   identifier
-  26       _                                16
+  07       _                                13
        ●   call_expression
-  16   ◀   (@27)                            
+  13   ◀   (Nested)                         
 
-@27:
-  19  -ε-  [SuppressEnd]                    26
-  26       _                                16
+Nested:
+  16  -ε-  [SuppressEnd]                    07
+  07       _                                13
        ●   call_expression
-  16   ◀   (@27)                            
-
-@32:
-  12  -ε-  [RecordClose]                    14
-  14       _ [RecordSet(M1)]                28
-       ●   program
-  28   ◀   (@32)                            
+  13   ◀   (Nested)                         
 
 Q:
-  09  -ε-  [RecordClose]                    11
-  11   ◀   (Q)                              ◼
+  08  -ε-  [RecordClose]                    10
+  10       _ [RecordSet(M1)]                12
+       ●   program
+  12   ◀   (Q)                              ◼

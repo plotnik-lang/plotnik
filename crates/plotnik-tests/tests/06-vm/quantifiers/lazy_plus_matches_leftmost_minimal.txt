@@ -39,38 +39,24 @@ M0: S1 → T1  ; d: T1
 N0: S2 → T2  ; Q
 
 [entry_points]
-Q = 00 :: T2
+Q = 0 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08   !   (lexical_declaration) [Node ArrayPush]  14, 10
-  10  ──!  _                                08, 10
-  12  └─!  _ [ListOpen]                     08, 10
-  14  ─‣┘  _ [ListClose RecordSet(M0)]      06
-  16   !   (program)                        12
+  0   !   (program)                         1
+  1  └─!  _ [ListOpen]                      4, 6
+  3                                         ▶
+  4   !   (lexical_declaration) [Node ArrayPush]  8, 6
+  6  ──!  _                                 4, 6
+  8  ─‣┘  _ [ListClose RecordSet(M0)]       3
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-       ▶   (@16)
-
-@16:
-  16       (program)                        12
-       ●   program
-  12       _ [ListOpen]                     08, 10
-       ●   lexical_declaration
-  08       (lexical_declaration) [Node ArrayPush]  14, 10
-       ●   lexical_declaration
-  14       _ [ListClose RecordSet(M0)]      06
-       ●   program
-  06   ◀   (@16)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       _ [ListOpen]                      04, 06
+      ●   lexical_declaration
+  4       (lexical_declaration) [Node ArrayPush]  08, 06
+      ●   lexical_declaration
+  8       _ [ListClose RecordSet(M0)]       03
+      ●   program
+  3   ◀   (Q)                               ◼

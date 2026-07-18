@@ -42,34 +42,21 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@21)                            21 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07   !   (expression_statement)           20
-  08  ──!  _                                07, 08
-  10   !   _ [Absent RecordSet(M0)]         07, 08
-  12  -ε-  [Absent RecordSet(M0)]           06
-  14   !   (debugger_statement) [Node RecordSet(M0)]  20
-  16  ──!  _                                10, 14, 16
-  18  └─!  _                                10, 14, 16
-  20  ─‣┘  _                                06
-  21   !   (program)                        18, 12
+  00   !   (program)                        14, 08
+  02                                        ▶
+  03   !   (expression_statement)           16
+  04  ──!  _                                03, 04
+  06   !   _ [Absent RecordSet(M0)]         03, 04
+  08  -ε-  [Absent RecordSet(M0)]           02
+  10   !   (debugger_statement) [Node RecordSet(M0)]  16
+  12  ──!  _                                06, 10, 12
+  14  └─!  _                                06, 10, 12
+  16  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@21)                            21 : 03
-       ▶   (@21)
-
-@21:
-  21       (program)                        18, 12
+  00       (program)                        14, 08
        ●   program
-  18       _                                10, 14, 16
-  21  ❮❮❮ 
-  12  -ε-  [Absent RecordSet(M0)]           06
-  06   ◀   (@21)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  14       _                                06, 10, 12
+  00  ❮❮❮ 
+  08  -ε-  [Absent RecordSet(M0)]           02
+  02   ◀   (Q)                              ◼

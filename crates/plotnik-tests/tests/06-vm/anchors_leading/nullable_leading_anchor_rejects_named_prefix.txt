@@ -41,35 +41,26 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@19)                            19 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  └•─  (identifier) [Node RecordSet(M0)] == "b"  07
-  11  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  07
-  14  └•─  (identifier) == "a"              11
-  16  └‣─  (array)                          14, 08
-  18  └‣─  (expression_statement)           16
-  19   !   (program)                        18
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          11, 05
+  04                                        ▶
+  05  └•─  (identifier) [Node RecordSet(M0)] == "b"  13
+  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  13
+  11  └•─  (identifier) == "a"              08
+  13  ─‣┘³ _                                04
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@19)                            19 : 03
-       ▶   (@19)
-
-@19:
-  19       (program)                        18
+  00       (program)                        01
        ●   program
-  18       (expression_statement)           16
+  01       (expression_statement)           02
        ●   expression_statement
-  16       (array)                          14, 08
+  02       (array)                          11, 05
        ●   array
-  14       (identifier) == "a"              11
+  11       (identifier) == "a"              08
        ○   [
-  16  ❮❮❮ 
-  08       (identifier) [Node RecordSet(M0)] == "b"  07
+  02  ❮❮❮ 
+  05       (identifier) [Node RecordSet(M0)] == "b"  13
        ○   [
-  16  ❮❮❮ 
-  18  ❮❮❮ 
+  02  ❮❮❮ 
+  01  ❮❮❮ 

@@ -52,43 +52,30 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  -ε-  [TextClose RecordSet(M0)]        08
-  08  ─‣┘  _                                12
-  09  └‣─  (identifier) [ScalarMark]        11
-  11  ─‣┘  _                                06
-  12                                        ▶
-  13  ─‣─  (expression_statement) [ScalarMark]  09
-  15  ...
-  16  └‣─  (comment) [ScalarMark]           13
-  18  -ε-  [ScalarOpen]                     16
-  20   !   (program)                        18
+  00   !   (program)                        01
+  01  -ε-  [ScalarOpen]                     03
+  03  └‣─  (comment) [ScalarMark]           05
+  05  ─‣─  (expression_statement) [ScalarMark]  08
+  07  ...
+  08  └‣─  (identifier) [ScalarMark]        10
+  10  ─‣┘  _                                11
+  11  -ε-  [TextClose RecordSet(M0)]        13
+  13  ─‣┘  _                                14
+  14                                        ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        18
+  00       (program)                        01
        ●   program
-  18  -ε-  [ScalarOpen]                     16
-  16       (comment) [ScalarMark]           13
+  01  -ε-  [ScalarOpen]                     03
+  03       (comment) [ScalarMark]           05
        ●   comment
-  13       (expression_statement) [ScalarMark]  09
+  05       (expression_statement) [ScalarMark]  08
        ●   expression_statement
-  09       (identifier) [ScalarMark]        11
+  08       (identifier) [ScalarMark]        10
        ●   identifier
-  11       _                                06
+  10       _                                11
        ●   expression_statement
-  06  -ε-  [TextClose RecordSet(M0)]        08
-  08       _                                12
+  11  -ε-  [TextClose RecordSet(M0)]        13
+  13       _                                14
        ●   program
-  12   ◀   (@20)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  14   ◀   (Q)                              ◼

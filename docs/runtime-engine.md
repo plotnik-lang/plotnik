@@ -198,17 +198,20 @@ Non-inspection lowering has no consumer for boolean source provenance, so it
 emits `BoolValue(true)` for a present value instead of `NodeBool` or a balanced
 boolean frame. Inspection lowering retains the provenance-carrying forms.
 
-## Entry Point Wrappers
+## Entry Point Boundaries
 
-Every entry point targets a wrapper compiled for that definition's result shape.
-Wrappers call the definition body and add only the effects needed to expose the
-entry point value:
+Every entry point targets its ordinary definition body directly and carries the
+result effects owned by the execution boundary:
 
-- Record result: `RecordOpen`, call body, `RecordClose`, return.
-- Node result: call body, `Node`, return.
-- Option, list, variant, or leaf result: call body, return; the body already
-  produces the pending value.
-- Match-only output: call body, return; materialization produces `null`.
+- Record result: emit `RecordOpen` before dispatch and `RecordClose` after the
+  top-level return.
+- Node result: emit `Node` after the top-level return.
+- Option, list, variant, or leaf result: pass through the pending value produced
+  by the body.
+- Match-only output: no boundary effect; materialization produces `null`.
+
+Ordinary and recursive calls to the same definition target use normal call
+frames and never apply entry boundary effects.
 
 ## Materialization
 

@@ -51,43 +51,31 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─•─  (expression_statement) [Node RecordSet(M1)]  08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10   !   (lexical_declaration) [Node RecordSet(M0)]  06
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
-  16   !   (program)                        14
+  00   !   (program)                        01
+  01  └─!  _                                08, 10
+  03  ─•─  (expression_statement) [Node RecordSet(M1)]  05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08   !   (lexical_declaration) [Node RecordSet(M0)]  03
+  10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-       ▶   (@16)
-
-@16:
-  16       (program)                        14
+  00       (program)                        01
        ●   program
-  14       _                                10, 12
+  01       _                                08, 10
        ●   lexical_declaration
-  10       (lexical_declaration) [Node RecordSet(M0)]  06
+  08       (lexical_declaration) [Node RecordSet(M0)]  03
        ●   lexical_declaration
-  06       (expression_statement) [Node RecordSet(M1)]  08
+  03       (expression_statement) [Node RecordSet(M1)]  05
        ○   lexical_declaration
-  14  ❮❮❮ 
-  12       _                                10, 12
+  01  ❮❮❮ 
+  10       _                                08, 10
        ●   lexical_declaration
-  10       (lexical_declaration) [Node RecordSet(M0)]  06
+  08       (lexical_declaration) [Node RecordSet(M0)]  03
        ●   lexical_declaration
-  06       (expression_statement) [Node RecordSet(M1)]  08
+  03       (expression_statement) [Node RecordSet(M1)]  05
        ●   expression_statement
-  08       _                                09
+  05       _                                06
        ●   program
-  09   ◀   (@16)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼

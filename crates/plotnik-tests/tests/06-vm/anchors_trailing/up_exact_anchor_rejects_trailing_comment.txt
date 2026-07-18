@@ -31,42 +31,36 @@ Q = 00 :: T0
 
 [instructions]
 Q:
-  00       (@13)                            13 : 01
-  01                                        ▶
-  02  !─┘  _                                03
-  03  ─‣┘  _                                04
-  04                                        ▶
-  05   !   (identifier) == "a"              02
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └─!  _                                08, 10
+  04  !─┘  _                                05
+  05  ─‣┘  _                                06
+  06                                        ▶
   07  ...
-  08  ──!  _                                05, 08
-  10  └─!  _                                05, 08
-  12  └‣─  (expression_statement)           10
-  13   !   (program)                        12
+  08   !   (identifier) == "a"              04
+  10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (@13)                            13 : 01
-       ▶   (@13)
-
-@13:
-  13       (program)                        12
+  00       (program)                        01
        ●   program
-  12       (expression_statement)           10
+  01       (expression_statement)           02
        ●   expression_statement
-  10       _                                05, 08
+  02       _                                08, 10
        ●   identifier
-  05       (identifier) == "a"              02
+  08       (identifier) == "a"              04
        ●   identifier
-  02       _                                03
-  10  ❮❮❮ 
-  08       _                                05, 08
+  04       _                                05
+  02  ❮❮❮ 
+  10       _                                08, 10
        ●   comment
-  05       (identifier) == "a"              02
+  08       (identifier) == "a"              04
        ○   comment
-  08  ❮❮❮ 
-  08       _                                05, 08
+  10  ❮❮❮ 
+  10       _                                08, 10
        ●   ;
-  05       (identifier) == "a"              02
+  08       (identifier) == "a"              04
        ○   ;
-  08  ❮❮❮ 
-  08       _                                05, 08
-  12  ❮❮❮ 
+  10  ❮❮❮ 
+  10       _                                08, 10
+  01  ❮❮❮ 

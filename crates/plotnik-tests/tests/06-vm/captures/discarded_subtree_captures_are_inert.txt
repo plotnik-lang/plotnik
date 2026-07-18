@@ -43,39 +43,26 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) [Node RecordSet(M0)]  08
-  08  ─‣┘  _                                12, 15
-  10                                        ▶
-  11   !   (debugger_statement)             15
-  12  ──!  _                                11, 12
-  14  └‣─  (expression_statement)           06
-  15  ─‣┘  _                                10
-  16   !   (program)                        14
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (identifier) [Node RecordSet(M0)]  04
+  04  ─‣┘  _                                08, 10
+  06                                        ▶
+  07   !   (debugger_statement)             10
+  08  ──!  _                                07, 08
+  10  ─‣┘  _                                06
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-       ▶   (@16)
-
-@16:
-  16       (program)                        14
+  00       (program)                        01
        ●   program
-  14       (expression_statement)           06
+  01       (expression_statement)           02
        ●   expression_statement
-  06       (identifier) [Node RecordSet(M0)]  08
+  02       (identifier) [Node RecordSet(M0)]  04
        ●   identifier
-  08       _                                12, 15
+  04       _                                08, 10
        ●   expression_statement
-  12       _                                11, 12
-  08  ❮❮❮ 
-  15       _                                10
+  08       _                                07, 08
+  04  ❮❮❮ 
+  10       _                                06
        ●   program
-  10   ◀   (@16)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼

@@ -50,83 +50,68 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@36)                            36 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                10
-  08  └‣─  (expression_statement) [Node RecordSet(M0)]  23
-  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  23
-  12  └•─  (debugger_statement)             07
-  13  ─‣─  (debugger_statement)             07
-  14                                        ▶
-  15                                        ▶ p1
-  16  └•─  (debugger_statement)             21
-  17  ─‣─  (debugger_statement)             21
-  18       (@24)                            24 : 17 / 16
-  21  ─‣┘  _                                14
-  22  └•─  (statement_block)                18
-  23  ─‣┘  _                                06
-  24  -ε-                                   22, 15
-  26       (@24)                            24 : 13 / 12
-  29   !   (statement_block)                26
-  30  ...
-  31  ...
-  32  ──!  _                                29, 32
-  34  └─!  _                                29, 32
-  36   !   (program)                        34, 08
+  00   !   (program)                        27, 03
+  02                                        ▶
+  03  └‣─  (expression_statement) [Node RecordSet(M0)]  29
+  05  ─‣─  (expression_statement) [Node RecordSet(M0)]  29
+  07  └•─  (debugger_statement)             23
+  08  ─‣─  (debugger_statement)             23
+  09                                        ▶
+  10                                        ▶ p1
+  11  └•─  (debugger_statement)             16
+  12  ─‣─  (debugger_statement)             16
+  13       (@18)                            18 : 12 / 11
+  16  ─‣┘  _                                09
+  17  └•─  (statement_block)                13
+  18  -ε-                                   17, 10
+  20       (@18)                            18 : 08 / 07
+  23  ─‣┘  _                                05
+  24   !   (statement_block)                20
+  25  ──!  _                                24, 25
+  27  └─!  _                                24, 25
+  29  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@36)                            36 : 03
-       ▶   (@36)
-
-@36:
-  36       (program)                        34, 08
+  00       (program)                        27, 03
        ●   program
-  34       _                                29, 32
+  27       _                                24, 25
        ●   statement_block
-  29       (statement_block)                26
+  24       (statement_block)                20
        ●   statement_block
-  26       (@24)                            24 : 13 / 12
-       ▶   (@24)
+  20       (@18)                            18 : 08 / 07
+       ▶   (@18)
 
-@24:
-  24  -ε-                                   22, 15
-  22       (statement_block)                18
+@18:
+  18  -ε-                                   17, 10
+  17       (statement_block)                13
        ○   {
        ●   statement_block
-  18       (@24)                            24 : 17 / 16
-       ▶   (@24)
+  13       (@18)                            18 : 12 / 11
+       ▶   (@18)
 
-@24:
-  24  -ε-                                   22, 15
-  22       (statement_block)                18
+@18:
+  18  -ε-                                   17, 10
+  17       (statement_block)                13
        ○   {
        ○   debugger_statement
-  24  ❮❮❮ 
-  15   ◀   (@24)                            p1
+  18  ❮❮❮ 
+  10   ◀   (@18)                            p1
 
-@24:
-  16       (debugger_statement)             21
+@18:
+  11       (debugger_statement)             16
        ○   {
        ●   debugger_statement
-  21       _                                14
+  16       _                                09
        ●   statement_block
-  14   ◀   (@24)                            
-
-@36:
-  13       (debugger_statement)             07
-       ●   debugger_statement
-  07       _                                10
-       ●   statement_block
-  10       (expression_statement) [Node RecordSet(M0)]  23
-       ●   expression_statement
-  23       _                                06
-       ●   program
-  06   ◀   (@36)                            
+  09   ◀   (@18)                            
 
 Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  08       (debugger_statement)             23
+       ●   debugger_statement
+  23       _                                05
+       ●   statement_block
+  05       (expression_statement) [Node RecordSet(M0)]  29
+       ●   expression_statement
+  29       _                                02
+       ●   program
+  02   ◀   (Q)                              ◼

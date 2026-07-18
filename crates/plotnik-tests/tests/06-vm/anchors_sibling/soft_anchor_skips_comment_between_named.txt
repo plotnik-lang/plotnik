@@ -54,44 +54,31 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─•─  (identifier) [Node RecordSet(M1)]  08
-  08  ─‣┘³ _                                09
-  09                                        ▶
-  10   !   (identifier) [Node RecordSet(M0)]  06
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
-  16  └‣─  (binary_expression)              14
-  17  └‣─  (expression_statement)           16
-  18   !   (program)                        17
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (binary_expression)              03
+  03  └─!  _                                09, 11
+  05  ─•─  (identifier) [Node RecordSet(M1)]  07
+  07  ─‣┘³ _                                08
+  08                                        ▶
+  09   !   (identifier) [Node RecordSet(M0)]  05
+  11  ──!  _                                09, 11
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-       ▶   (@18)
-
-@18:
-  18       (program)                        17
+  00       (program)                        01
        ●   program
-  17       (expression_statement)           16
+  01       (expression_statement)           02
        ●   expression_statement
-  16       (binary_expression)              14
+  02       (binary_expression)              03
        ●   binary_expression
-  14       _                                10, 12
+  03       _                                09, 11
        ●   identifier
-  10       (identifier) [Node RecordSet(M0)]  06
+  09       (identifier) [Node RecordSet(M0)]  05
        ●   identifier
-  06       (identifier) [Node RecordSet(M1)]  08
+  05       (identifier) [Node RecordSet(M1)]  07
        ○   +
        ○   comment
        ●   identifier
-  08       _                                09
+  07       _                                08
        ●   program
-  09   ◀   (@18)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  08   ◀   (Q)                              ◼

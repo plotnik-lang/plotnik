@@ -5,7 +5,7 @@ Q = (statement_block
 ) @block
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 8
+Q = 2
 
 [transitions]
 Q:
@@ -13,12 +13,6 @@ Q:
   2   !   (statement_block) [Node RecordSet(block)]  4
   3  ─‣┘  _                                 1
   4  └‣─  (function_declaration)            3
-
-Q (entry point):
-  5                                         ▶
-  6  -ε-  [RecordClose]                     5
-  7       (Q)                               2 : 6
-  8  -ε-  [RecordOpen]                      7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -38,15 +32,11 @@ M0: S1 → T0  ; block: <Node>
 N0: S2 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@09)                            09 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (function_declaration)           07
-  07  ─‣┘  _                                08
-  08                                        ▶
-  09   !   (statement_block) [Node RecordSet(M0)]  06
+  0   !   (statement_block) [Node RecordSet(M0)]  2
+  2  └‣─  (function_declaration)            3
+  3  ─‣┘  _                                 4
+  4                                         ▶

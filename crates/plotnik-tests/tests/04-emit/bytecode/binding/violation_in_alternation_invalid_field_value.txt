@@ -4,7 +4,7 @@ Q = [
 ]
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 8
+Q = 0
 
 [transitions]
 Q:
@@ -14,10 +14,6 @@ Q:
   3  ─‣┘  _                                 1
   4  └‣─  name: (number)                    3
   5   !   (identifier)                      1
-
-Q (entry point):
-  7                                         ▶
-  8       (Q)                               0 : 7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -39,12 +35,9 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0       (@8)                              8 : 1
-  1                                         ▶
+  0  -ε-                                    5, 6
   2  └‣─  name: (number)                    3
   3  ─‣┘  _                                 4
   4                                         ▶
   5   !   (function_declaration)            2
   6   !   (identifier)                      4
-  7  ...
-  8  -ε-                                    5, 6

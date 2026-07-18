@@ -2,29 +2,17 @@ Foo = (identifier) @id
 Bar = (string) @str
 ---------------------- NFA -----------------------
 [entry_points]
-Bar = 13
-Foo = 09
+Bar = 5
+Foo = 2
 
 [transitions]
 Foo:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(id)]  01
+  1                                         ▶
+  2   !   (identifier) [Node RecordSet(id)]  1
 
 Bar:
-  04                                        ▶
-  05   !   (string) [Node RecordSet(str)]   04
-
-Foo (entry point):
-  06                                        ▶
-  07  -ε-  [RecordClose]                    06
-  08       (Foo)                            02 : 07
-  09  -ε-  [RecordOpen]                     08
-
-Bar (entry point):
-  10                                        ▶
-  11  -ε-  [RecordClose]                    10
-  12       (Bar)                            05 : 11
-  13  -ε-  [RecordOpen]                     12
+  4                                         ▶
+  5   !   (string) [Node RecordSet(str)]    4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -49,22 +37,14 @@ N0: S3 → T1  ; Foo
 N1: S4 → T2  ; Bar
 
 [entry_points]
-Bar = 06 :: T2
-Foo = 00 :: T1
+Bar = 3 :: T2
+Foo = 0 :: T1
 
 [instructions]
 Foo:
-  00  -ε-  [RecordOpen]                     02
-  02       (@13)                            13 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  0   !   (identifier) [Node RecordSet(M0)]  2
+  2                                         ▶
 
 Bar:
-  06  -ε-  [RecordOpen]                     08
-  08       (@16)                            16 : 09
-  09  -ε-  [RecordClose]                    11
-  11                                        ▶
-  12                                        ▶
-  13   !   (identifier) [Node RecordSet(M0)]  12
-  15                                        ▶
-  16   !   (string) [Node RecordSet(M1)]    15
+  3   !   (string) [Node RecordSet(M1)]     5
+  5                                         ▶

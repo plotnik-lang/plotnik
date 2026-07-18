@@ -46,68 +46,56 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └─!  _                                07, 16
+  03  !─┘  _                                04
+  04  ─‣┘  _                                06
   05                                        ▶
-  06  !─┘  _                                07
-  07  ─‣┘  _                                09
-  08                                        ▶
-  09  !─┘  _                                08
-  10   !   (identifier) [Node RecordSet(M0)]  06
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
-  16  └‣─  (binary_expression)              14
-  17   !   (expression_statement)           16
-  18  ──!  _                                17, 18
-  20  └─!  _                                17, 18
-  22   !   (program)                        20
+  06  !─┘  _                                05
+  07   !   (expression_statement)           14
+  08   !   (identifier) [Node RecordSet(M0)]  03
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14  └‣─  (binary_expression)              12
+  15  ...
+  16  ──!  _                                07, 16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        20
+  00       (program)                        01
        ●   program
-  20       _                                17, 18
+  01       _                                07, 16
        ●   expression_statement
-  17       (expression_statement)           16
+  07       (expression_statement)           14
        ●   expression_statement
-  16       (binary_expression)              14
+  14       (binary_expression)              12
        ○   identifier
        ○   ;
-  20  ❮❮❮ 
-  18       _                                17, 18
+  01  ❮❮❮ 
+  16       _                                07, 16
        ●   expression_statement
-  17       (expression_statement)           16
+  07       (expression_statement)           14
        ●   expression_statement
-  16       (binary_expression)              14
+  14       (binary_expression)              12
        ●   binary_expression
-  14       _                                10, 12
+  12       _                                08, 10
        ●   identifier
-  10       (identifier) [Node RecordSet(M0)]  06
+  08       (identifier) [Node RecordSet(M0)]  03
        ●   identifier
-  06       _                                07
-  14  ❮❮❮ 
-  12       _                                10, 12
-       ●   +
-  10       (identifier) [Node RecordSet(M0)]  06
-       ○   +
+  03       _                                04
   12  ❮❮❮ 
-  12       _                                10, 12
+  10       _                                08, 10
+       ●   +
+  08       (identifier) [Node RecordSet(M0)]  03
+       ○   +
+  10  ❮❮❮ 
+  10       _                                08, 10
        ●   identifier
-  10       (identifier) [Node RecordSet(M0)]  06
+  08       (identifier) [Node RecordSet(M0)]  03
        ●   identifier
-  06       _                                07
+  03       _                                04
        ●   binary_expression
-  07       _                                09
+  04       _                                06
        ●   expression_statement
-  09       _                                08
+  06       _                                05
        ●   program
-  08   ◀   (@22)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

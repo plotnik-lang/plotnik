@@ -63,7 +63,7 @@ pub(crate) struct DecodedCall {
     pub(crate) ownership: CallOwnership,
     pub(crate) nav: Nav,
     pub(crate) node_field: Option<NodeFieldId>,
-    pub(crate) target: SuccessorAddr,
+    pub(crate) target: CodeAddr,
     returns_base: u32,
     returns_len: u8,
 }

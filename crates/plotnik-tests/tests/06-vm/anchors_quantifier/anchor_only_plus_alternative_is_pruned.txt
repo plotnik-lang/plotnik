@@ -51,77 +51,61 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@31)                            31 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ──!  _                                13, 06
-  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  11
-  11  ─‣┘³ _                                12
-  12                                        ▶
-  13   !   "ERROR"                          06, 08
-  15  ...
-  16   !   _                                13, 06
-  18   !   (identifier) == "a"              08
-  20  ──!  _                                16, 18, 20
-  22  ...
-  23  ...
-  24   !   "["                              20
-  25  ──!  _                                24, 25
-  27  └─!  _                                24, 25
-  29  └‣─  (array)                          27
-  30  └‣─  (expression_statement)           29
-  31   !   (program)                        30
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                20, 21
+  05  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10   !   "ERROR"                          12, 05
+  12  ──!  _                                10, 12
+  14   !   _                                10, 12
+  16   !   (identifier) == "a"              05
+  18  ──!  _                                14, 16, 18
+  20   !   "["                              18
+  21  ──!  _                                20, 21
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@31)                            31 : 03
-       ▶   (@31)
-
-@31:
-  31       (program)                        30
+  00       (program)                        01
        ●   program
-  30       (expression_statement)           29
+  01       (expression_statement)           02
        ●   expression_statement
-  29       (array)                          27
+  02       (array)                          03
        ●   array
-  27       _                                24, 25
+  03       _                                20, 21
        ●   [
-  24       "["                              20
+  20       "["                              18
        ●   [
-  20       _                                16, 18, 20
+  18       _                                14, 16, 18
        ●   identifier
-  16       _                                13, 06
+  14       _                                10, 12
        ●   identifier
-  13       "ERROR"                          06, 08
+  10       "ERROR"                          12, 05
        ○   identifier
-  16  ❮❮❮ 
-  06       _                                13, 06
+  14  ❮❮❮ 
+  12       _                                10, 12
        ●   ,
-  13       "ERROR"                          06, 08
+  10       "ERROR"                          12, 05
        ○   ,
-  06  ❮❮❮ 
-  06       _                                13, 06
+  12  ❮❮❮ 
+  12       _                                10, 12
        ●   identifier
-  13       "ERROR"                          06, 08
+  10       "ERROR"                          12, 05
        ○   identifier
-  06  ❮❮❮ 
-  06       _                                13, 06
+  12  ❮❮❮ 
+  12       _                                10, 12
        ●   ]
-  13       "ERROR"                          06, 08
+  10       "ERROR"                          12, 05
        ○   ]
-  06  ❮❮❮ 
-  06       _                                13, 06
-  20  ❮❮❮ 
-  18       (identifier) == "a"              08
+  12  ❮❮❮ 
+  12       _                                10, 12
+  18  ❮❮❮ 
+  16       (identifier) == "a"              05
        ●   identifier
-  08       (identifier) [Node RecordSet(M0)] == "b"  11
+  05       (identifier) [Node RecordSet(M0)] == "b"  08
        ○   ,
        ●   identifier
-  11       _                                12
+  08       _                                09
        ●   program
-  12   ◀   (@31)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  09   ◀   (Q)                              ◼

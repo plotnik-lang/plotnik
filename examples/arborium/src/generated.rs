@@ -168,32 +168,18 @@ mod matcher {
 
     // Dense runtime state ids, in NFA label order.
     // Standalone:
-    const S01_STANDALONE: u16 = 0;
-    const S02_STANDALONE: u16 = 1;
-    const S04_STANDALONE: u16 = 2;
-    const S05_STANDALONE: u16 = 3;
-    const S06_STANDALONE: u16 = 4;
-    const S07_STANDALONE_EP: u16 = 5;
-    const S08_STANDALONE_EP: u16 = 6;
-    const S09_STANDALONE_EP: u16 = 7;
-    const S10_STANDALONE_EP: u16 = 8;
-
-    /// Resolve a callee-local return port through the immutable call-site map.
-    #[inline]
-    fn call_return(call_site: u16, port: rt::PortId) -> u16 {
-        match (call_site, port.to_byte()) {
-            (S09_STANDALONE_EP, 0) => S08_STANDALONE_EP,
-            _ => unreachable!(
-                "call site {call_site} has no return port {}",
-                port.to_byte()
-            ),
-        }
-    }
+    const S1_STANDALONE: u16 = 0;
+    const S2_STANDALONE: u16 = 1;
+    const S4_STANDALONE: u16 = 2;
+    const S5_STANDALONE: u16 = 3;
+    const S6_STANDALONE: u16 = 4;
 
     /// Match the `Standalone` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn standalone_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
-        let outcome = run::<false, false, true>(tree, source, S10_STANDALONE_EP, NO_LIMITS);
+        let entry = S2_STANDALONE;
+        let boundary = EntryBoundary::new(true, false);
+        let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
@@ -202,12 +188,52 @@ mod matcher {
         tree: &'t rt::Tree,
         source: &str,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        run::<true, true, true>(tree, source, S10_STANDALONE_EP, resolved_limits(tree))
+        run::<true, true, true>(
+            tree,
+            source,
+            S2_STANDALONE,
+            EntryBoundary::new(true, false),
+            resolved_limits(tree),
+        )
     }
 
     /// Whether `Standalone` accepts under [`LIMITS`] without recording output events.
     pub(super) fn standalone_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
-        Ok(run::<true, true, false>(tree, source, S10_STANDALONE_EP, resolved_limits(tree))?.is_some())
+        Ok(run::<true, true, false>(
+            tree,
+            source,
+            S2_STANDALONE,
+            EntryBoundary::new(true, false),
+            resolved_limits(tree),
+        )?
+        .is_some())
+    }
+    #[derive(Clone, Copy)]
+    struct EntryBoundary {
+        record: bool,
+        node: bool,
+    }
+
+    impl EntryBoundary {
+        const fn new(record: bool, node: bool) -> Self {
+            Self { record, node }
+        }
+
+        fn begin(self, eng: &mut rt::Engine<'_>) {
+            if self.record {
+                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
+            }
+        }
+
+        fn finish(self, eng: &mut rt::Engine<'_>) {
+            if self.node {
+                let _ = eng.emit_output_event(|cursor| rt::JournalEvent::Node(cursor.node()));
+                return;
+            }
+            if self.record {
+                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
+            }
+        }
     }
 
     /// What a dispatched state hands back to the driver loop.
@@ -218,8 +244,6 @@ mod matcher {
         Accept,
         /// The state failed; unwind the checkpoint stack.
         Backtrack,
-        /// Source-driven call state exceeded a fixed-width runtime capacity.
-        CallFrameError(rt::CallFrameError),
     }
 
     /// How the backtrack unwind resumed execution.
@@ -227,10 +251,10 @@ mod matcher {
         Resumed(u16),
         Accepted,
         NoMatch,
-        CallFrameError(rt::CallFrameError),
     }
 
-    /// One dispatch loop serves every entry point; `entry` selects the wrapper.
+    /// One dispatch loop serves every entry point; `entry` selects the definition
+    /// body and `boundary` supplies its root result effects.
     /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
@@ -247,6 +271,7 @@ mod matcher {
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
+        boundary: EntryBoundary,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         verify_language(tree);
@@ -255,6 +280,7 @@ mod matcher {
         } else {
             rt::Engine::new_match_only(tree.walk())
         };
+        boundary.begin(&mut eng);
         let mut fuel_used: u64 = 0;
         let mut ip = entry;
         loop {
@@ -285,13 +311,17 @@ mod matcher {
             }
             match dispatch(&mut eng, source, ip) {
                 Flow::Jump(next) => ip = next,
-                Flow::Accept => return Ok(Some(eng.into_journal())),
-                Flow::CallFrameError(error) => return Err(error.into()),
+                Flow::Accept => {
+                    boundary.finish(&mut eng);
+                    return Ok(Some(eng.into_journal()));
+                }
                 Flow::Backtrack => match backtrack(&mut eng, source) {
                     Unwound::Resumed(next) => ip = next,
-                    Unwound::Accepted => return Ok(Some(eng.into_journal())),
+                    Unwound::Accepted => {
+                        boundary.finish(&mut eng);
+                        return Ok(Some(eng.into_journal()));
+                    }
                     Unwound::NoMatch => return Ok(None),
-                    Unwound::CallFrameError(error) => return Err(error.into()),
                 },
             }
         }
@@ -299,29 +329,22 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   01                                        ▶
-            S01_STANDALONE => {
-                if eng.frames_empty() {
-                    Flow::Accept
-                } else {
-                    let call_site = eng.exit_frame();
-                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
-                }
-            }
-            //   02   !   (program)                        04
-            S02_STANDALONE => 'state: {
-                if !cand_s02_standalone(eng) {
+            //   1                                         ▶
+            S1_STANDALONE => Flow::Accept,
+            //   2   !   (program)                         4
+            S2_STANDALONE => 'state: {
+                if !cand_s2_standalone(eng) {
                     break 'state Flow::Backtrack;
                 }
-                Flow::Jump(S04_STANDALONE)
+                Flow::Jump(S4_STANDALONE)
             }
-            //   04  └‣─  (expression_statement)           06
-            S04_STANDALONE => 'state: {
+            //   4  └‣─  (expression_statement)            6
+            S4_STANDALONE => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
                 }
                 loop {
-                    if cand_s04_standalone(eng) {
+                    if cand_s4_standalone(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -331,25 +354,25 @@ mod matcher {
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
-                        S04_STANDALONE,
+                        S4_STANDALONE,
                     ));
                 }
-                finish_s04_standalone(eng)
+                finish_s4_standalone(eng)
             }
-            //   05  ─‣┘² _                                01
-            S05_STANDALONE => 'state: {
+            //   5  ─‣┘² _                                 1
+            S5_STANDALONE => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                Flow::Jump(S01_STANDALONE)
+                Flow::Jump(S1_STANDALONE)
             }
-            //   06  └‣─  (identifier) [Node RecordSet(id)]  05
-            S06_STANDALONE => 'state: {
+            //   6  └‣─  (identifier) [Node RecordSet(id)]  5
+            S6_STANDALONE => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
                 }
                 loop {
-                    if cand_s06_standalone(eng) {
+                    if cand_s6_standalone(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -359,44 +382,18 @@ mod matcher {
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
-                        S06_STANDALONE,
+                        S6_STANDALONE,
                     ));
                 }
-                finish_s06_standalone(eng)
-            }
-            //   07                                        ▶
-            S07_STANDALONE_EP => {
-                if eng.frames_empty() {
-                    Flow::Accept
-                } else {
-                    let call_site = eng.exit_frame();
-                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
-                }
-            }
-            //   08  -ε-  [RecordClose]                    07
-            S08_STANDALONE_EP => {
-                eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
-                Flow::Jump(S07_STANDALONE_EP)
-            }
-            //   09       (Standalone)                     02 : 08
-            S09_STANDALONE_EP => {
-                if let Err(error) = eng.enter_frame(S09_STANDALONE_EP) {
-                    return Flow::CallFrameError(error);
-                }
-                Flow::Jump(S02_STANDALONE)
-            }
-            //   10  -ε-  [RecordOpen]                     09
-            S10_STANDALONE_EP => {
-                eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
-                Flow::Jump(S09_STANDALONE_EP)
+                finish_s6_standalone(eng)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
         }
     }
 
-    /// `S02_STANDALONE` candidate: `(program)`.
+    /// `S2_STANDALONE` candidate: `(program)`.
     #[inline]
-    fn cand_s02_standalone(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s2_standalone(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (program)
         if node.kind_id() != 134 || !node.is_named() {
@@ -405,9 +402,9 @@ mod matcher {
         true
     }
 
-    /// `S04_STANDALONE` candidate: `(expression_statement)`.
+    /// `S4_STANDALONE` candidate: `(expression_statement)`.
     #[inline]
-    fn cand_s04_standalone(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s4_standalone(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (expression_statement)
         if node.kind_id() != 150 || !node.is_named() {
@@ -416,9 +413,9 @@ mod matcher {
         true
     }
 
-    /// `S06_STANDALONE` candidate: `(identifier)`.
+    /// `S6_STANDALONE` candidate: `(identifier)`.
     #[inline]
-    fn cand_s06_standalone(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s6_standalone(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (identifier)
         if node.kind_id() != 1 || !node.is_named() {
@@ -427,22 +424,22 @@ mod matcher {
         true
     }
 
-    /// `S04_STANDALONE` post-acceptance: effects, then successor dispatch. Shared by the dispatch
+    /// `S4_STANDALONE` post-acceptance: effects, then successor dispatch. Shared by the dispatch
     /// path and the match-retry resume, so a retried candidate emits exactly
     /// what the original acceptance would have emitted.
     #[inline]
-    fn finish_s04_standalone(_eng: &mut rt::Engine<'_>) -> Flow {
-        Flow::Jump(S06_STANDALONE)
+    fn finish_s4_standalone(_eng: &mut rt::Engine<'_>) -> Flow {
+        Flow::Jump(S6_STANDALONE)
     }
 
-    /// `S06_STANDALONE` post-acceptance: effects, then successor dispatch. Shared by the dispatch
+    /// `S6_STANDALONE` post-acceptance: effects, then successor dispatch. Shared by the dispatch
     /// path and the match-retry resume, so a retried candidate emits exactly
     /// what the original acceptance would have emitted.
     #[inline]
-    fn finish_s06_standalone(eng: &mut rt::Engine<'_>) -> Flow {
+    fn finish_s6_standalone(eng: &mut rt::Engine<'_>) -> Flow {
         eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
         eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(id)
-        Flow::Jump(S05_STANDALONE)
+        Flow::Jump(S5_STANDALONE)
     }
 
     /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
@@ -458,42 +455,13 @@ mod matcher {
             match cp.resume {
                 rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
-                // Call retry: advance to the next candidate satisfying the field
-                // constraint, then re-enter the callee. Exhausted siblings keep
-                // unwinding to an earlier checkpoint.
-                rt::Resume::Call(resume) => {
-                    if !eng.cursor_mut().continue_search(resume.policy) {
-                        continue 'unwind;
-                    }
-                    if let Some(field_id) = resume.field {
-                        loop {
-                            if eng.cursor().field_id() == Some(field_id) {
-                                break;
-                            }
-                            if !eng.cursor_mut().continue_search(resume.policy) {
-                                continue 'unwind;
-                            }
-                        }
-                    }
-                    eng.push_checkpoint(rt::Checkpoint::call_retry(
-                        eng.checkpoint_state(),
-                        cp.ip,
-                        resume,
-                    ));
-                    if let Err(error) = eng.enter_frame(resume.call_site) {
-                        return Unwound::CallFrameError(error);
-                    }
-                    return Unwound::Resumed(resume.target);
-                }
+                rt::Resume::Call(_) => unreachable!("matcher has no call checkpoints"),
 
                 // Match retry: advance past the accepted-but-failed candidate and
                 // re-run that state's sibling search from there.
                 rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
                     Some(Flow::Jump(next)) => return Unwound::Resumed(next),
                     Some(Flow::Accept) => return Unwound::Accepted,
-                    Some(Flow::CallFrameError(error)) => {
-                        return Unwound::CallFrameError(error);
-                    }
                     Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
                     None => continue 'unwind,
                 },
@@ -503,12 +471,12 @@ mod matcher {
 
     fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
         match ip {
-            S04_STANDALONE => {
+            S4_STANDALONE => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
                 loop {
-                    if cand_s04_standalone(eng) {
+                    if cand_s4_standalone(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -518,17 +486,17 @@ mod matcher {
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
-                        S04_STANDALONE,
+                        S4_STANDALONE,
                     ));
                 }
-                Some(finish_s04_standalone(eng))
+                Some(finish_s4_standalone(eng))
             }
-            S06_STANDALONE => {
+            S6_STANDALONE => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
                 loop {
-                    if cand_s06_standalone(eng) {
+                    if cand_s6_standalone(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -538,10 +506,10 @@ mod matcher {
                 if rt::SkipPolicy::Any.admits(eng.node_class()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
-                        S06_STANDALONE,
+                        S6_STANDALONE,
                     ));
                 }
-                Some(finish_s06_standalone(eng))
+                Some(finish_s6_standalone(eng))
             }
             _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
         }

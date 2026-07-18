@@ -40,44 +40,29 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@32)                            32 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08  -ε-  [Absent RecordSet(M0)]           06
-  10   !   (debugger_statement) [Node RecordSet(M0)]  07
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
-  16  -ε-  [Absent RecordSet(M0)]           07
-  18   !   (empty_statement)                12, 16
-  20  ──!  _                                18, 20
-  22  └─!  _                                18, 20
-  24   !   (expression_statement)           20, 12, 16
-  26  ──!  _                                24, 26
-  28  └─!  _                                24, 26
-  30  ...
-  31  ...
-  32   !   (program)                        28, 22, 14, 08
+  00   !   (program)                        24, 18, 10, 03
+  02                                        ▶
+  03  -ε-  [Absent RecordSet(M0)]           02
+  05   !   (debugger_statement) [Node RecordSet(M0)]  07
+  07  ─‣┘  _                                02
+  08  ──!  _                                05, 08
+  10  └─!  _                                05, 08
+  12  -ε-  [Absent RecordSet(M0)]           07
+  14   !   (empty_statement)                08, 12
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
+  20   !   (expression_statement)           16, 08, 12
+  22  ──!  _                                20, 22
+  24  └─!  _                                20, 22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@32)                            32 : 03
-       ▶   (@32)
-
-@32:
-  32       (program)                        28, 22, 14, 08
+  00       (program)                        24, 18, 10, 03
        ●   program
-  28       _                                24, 26
-  32  ❮❮❮ 
-  22       _                                18, 20
-  32  ❮❮❮ 
-  14       _                                10, 12
-  32  ❮❮❮ 
-  08  -ε-  [Absent RecordSet(M0)]           06
-  06   ◀   (@32)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  24       _                                20, 22
+  00  ❮❮❮ 
+  18       _                                14, 16
+  00  ❮❮❮ 
+  10       _                                05, 08
+  00  ❮❮❮ 
+  03  -ε-  [Absent RecordSet(M0)]           02
+  02   ◀   (Q)                              ◼

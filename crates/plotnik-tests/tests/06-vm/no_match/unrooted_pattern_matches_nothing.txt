@@ -29,19 +29,9 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0  -ε-  [RecordOpen]                      2
-  2       (@8)                              8 : 3
-  3  -ε-  [RecordClose]                     5
-  5                                         ▶
-  6                                         ▶
-  7  ...
-  8   !   (identifier) [Node RecordSet(M0)]  6
+  0   !   (identifier) [Node RecordSet(M0)]  2
+  2                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  0  -ε-  [RecordOpen]                      02
-  2       (@8)                              08 : 03
-      ▶   (@8)
-
-@8:
-  8       (identifier) [Node RecordSet(M0)]  06
+  0       (identifier) [Node RecordSet(M0)]  02
       ○   program

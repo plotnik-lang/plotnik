@@ -23,7 +23,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use crate::bytecode::{EffectKind, PredicateOp};
+use crate::bytecode::{EffectKind, EntryBoundary, PredicateOp};
 use crate::compiler::emit::plan::{
     CallPlan, CheckPlan, CodegenPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, PredicatePlan,
     PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
@@ -122,7 +122,6 @@ impl RustRepresentation {
                 let suffix = match state.origin {
                     StateOrigin::Definition => "",
                     StateOrigin::ConsumingDefinition => "_plus",
-                    StateOrigin::EntryPoint => "_ep",
                 };
                 StateInfo {
                     id: state.id.raw(),
@@ -183,6 +182,7 @@ struct Generator<'a> {
     plan: &'a CodegenPlan<'a>,
     limits: RustLimits,
     rust: RustRepresentation,
+    has_calls: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -200,11 +200,17 @@ impl<'a> Generator<'a> {
             decode_depth: config.decode_depth,
         };
         let rust = RustRepresentation::from_plan(plan.matcher());
+        let has_calls = plan
+            .matcher()
+            .states()
+            .iter()
+            .any(|state| matches!(state.kind, StatePlanKind::Call(_)));
         Self {
             config,
             plan,
             limits,
             rust,
+            has_calls,
         }
     }
 
@@ -258,9 +264,11 @@ impl<'a> Generator<'a> {
         self.field_consts(&mut machinery);
         self.regex_statics(&mut machinery);
         self.state_consts(&mut machinery);
-        self.call_return_fn(&mut machinery);
+        if self.has_calls {
+            self.call_return_fn(&mut machinery);
+        }
         self.entry_fns(&mut machinery);
-        machinery.push_str(DRIVER_SKELETON);
+        self.driver_fn(&mut machinery);
         self.dispatch_fn(&mut machinery);
         self.cand_fns(&mut machinery);
         self.finish_fns(&mut machinery);
@@ -491,12 +499,18 @@ impl<'a> Generator<'a> {
                 .def_name_sym(entry.definition);
             let has_decoder = self.plan.decode().item(name).has_decoder();
             let info = self.state(entry.entry);
+            let boundary = match entry.boundary {
+                EntryBoundary::Passthrough => "EntryBoundary::new(false, false)",
+                EntryBoundary::Node => "EntryBoundary::new(false, true)",
+                EntryBoundary::Record => "EntryBoundary::new(true, false)",
+            };
             let subs = [
                 ("DEF", def),
                 ("JOURNAL_FN", &journal_fn_name(def)),
                 ("LIMITED_JOURNAL_FN", &limited_journal_fn_name(def)),
                 ("MATCHES_FN", &matches_fn_name(def)),
                 ("ENTRY", info.const_name.as_str()),
+                ("BOUNDARY", boundary),
                 ("FUEL_METERED", fuel_metered),
                 ("MEMORY_METERED", memory_metered),
                 ("SAFE_LIMITS", safe_limits),
@@ -510,6 +524,38 @@ impl<'a> Generator<'a> {
             out.push('\n');
             splice(out, "", LIMITED_MATCHES_ENTRY_FN, &subs);
         }
+    }
+
+    fn driver_fn(&self, out: &mut String) {
+        let (
+            flow_call_error_variant,
+            unwound_call_error_variant,
+            flow_call_error_arm,
+            unwound_call_error_arm,
+        ) = if self.has_calls {
+            (
+                concat!(
+                    "\n    /// Source-driven call state exceeded a fixed-width runtime capacity.\n",
+                    "    CallFrameError(rt::CallFrameError),"
+                ),
+                "\n    CallFrameError(rt::CallFrameError),",
+                "\n            Flow::CallFrameError(error) => return Err(error.into()),",
+                "\n                Unwound::CallFrameError(error) => return Err(error.into()),",
+            )
+        } else {
+            ("", "", "", "")
+        };
+        splice(
+            out,
+            "",
+            DRIVER_SKELETON,
+            &[
+                ("FLOW_CALL_ERROR_VARIANT", flow_call_error_variant),
+                ("UNWOUND_CALL_ERROR_VARIANT", unwound_call_error_variant),
+                ("FLOW_CALL_ERROR_ARM", flow_call_error_arm),
+                ("UNWOUND_CALL_ERROR_ARM", unwound_call_error_arm),
+            ],
+        );
     }
 
     fn dispatch_fn(&self, out: &mut String) {
@@ -538,10 +584,15 @@ impl<'a> Generator<'a> {
                         format!("panic!(\"entry point returned through nonzero port {port}\")")
                     };
                     let port = port.to_string();
+                    let template = if self.has_calls {
+                        RETURN_ARM
+                    } else {
+                        RETURN_ARM_NO_CALLS
+                    };
                     splice(
                         out,
                         "        ",
-                        RETURN_ARM,
+                        template,
                         &[
                             ("STATE", &self.state(state.id).const_name),
                             ("PORT", &port),
@@ -1042,8 +1093,22 @@ impl<'a> Generator<'a> {
         } else {
             "_source"
         };
+        let (call_resume, match_retry_call_error) = if self.has_calls {
+            (BACKTRACK_CALL_RESUME, MATCH_RETRY_CALL_ERROR)
+        } else {
+            (BACKTRACK_CALL_RESUME_UNREACHABLE, "")
+        };
         out.push('\n');
-        splice(out, "", BACKTRACK_SKELETON, &[("SOURCE", source_arg)]);
+        splice(
+            out,
+            "",
+            BACKTRACK_SKELETON,
+            &[
+                ("SOURCE", source_arg),
+                ("CALL_RESUME", call_resume),
+                ("MATCH_RETRY_CALL_ERROR", match_retry_call_error),
+            ],
+        );
     }
 
     /// Per-state match-retry: advance past the accepted-but-failed candidate,
@@ -1283,7 +1348,9 @@ const JOURNAL_ENTRY_FN: &str = r#"
 /// Match the `@DEF@` entry point against `tree`. `Some` carries the committed
 /// match journal — the same event sequence the VM commits for this query.
 pub fn @JOURNAL_FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
-    let outcome = run::<false, false, true>(tree, source, @ENTRY@, NO_LIMITS);
+    let entry = @ENTRY@;
+    let boundary = @BOUNDARY@;
+    let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
     outcome.expect("an unmetered run cannot exceed a limit")
 }
 "#;
@@ -1299,18 +1366,59 @@ pub(super) fn @LIMITED_JOURNAL_FN@<'t>(
     tree: &'t rt::Tree,
     source: &str,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    run::<@FUEL_METERED@, @MEMORY_METERED@, true>(tree, source, @ENTRY@, @SAFE_LIMITS@)
+    run::<@FUEL_METERED@, @MEMORY_METERED@, true>(
+        tree,
+        source,
+        @ENTRY@,
+        @BOUNDARY@,
+        @SAFE_LIMITS@,
+    )
 }
 "#;
 
 const LIMITED_MATCHES_ENTRY_FN: &str = r#"
 /// Whether `@DEF@` accepts under [`LIMITS`] without recording output events.
 pub(super) fn @MATCHES_FN@(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
-    Ok(run::<@FUEL_METERED@, @MEMORY_METERED@, false>(tree, source, @ENTRY@, @SAFE_LIMITS@)?.is_some())
+    Ok(run::<@FUEL_METERED@, @MEMORY_METERED@, false>(
+        tree,
+        source,
+        @ENTRY@,
+        @BOUNDARY@,
+        @SAFE_LIMITS@,
+    )?
+    .is_some())
 }
 "#;
 
 const DRIVER_SKELETON: &str = r#"
+#[derive(Clone, Copy)]
+struct EntryBoundary {
+    record: bool,
+    node: bool,
+}
+
+impl EntryBoundary {
+    const fn new(record: bool, node: bool) -> Self {
+        Self { record, node }
+    }
+
+    fn begin(self, eng: &mut rt::Engine<'_>) {
+        if self.record {
+            let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
+        }
+    }
+
+    fn finish(self, eng: &mut rt::Engine<'_>) {
+        if self.node {
+            let _ = eng.emit_output_event(|cursor| rt::JournalEvent::Node(cursor.node()));
+            return;
+        }
+        if self.record {
+            let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
+        }
+    }
+}
+
 /// What a dispatched state hands back to the driver loop.
 enum Flow {
     /// Continue at this state.
@@ -1318,20 +1426,18 @@ enum Flow {
     /// The entry point accepted; the match journal is committed.
     Accept,
     /// The state failed; unwind the checkpoint stack.
-    Backtrack,
-    /// Source-driven call state exceeded a fixed-width runtime capacity.
-    CallFrameError(rt::CallFrameError),
+    Backtrack,@FLOW_CALL_ERROR_VARIANT@
 }
 
 /// How the backtrack unwind resumed execution.
 enum Unwound {
     Resumed(u16),
     Accepted,
-    NoMatch,
-    CallFrameError(rt::CallFrameError),
+    NoMatch,@UNWOUND_CALL_ERROR_VARIANT@
 }
 
-/// One dispatch loop serves every entry point; `entry` selects the wrapper.
+/// One dispatch loop serves every entry point; `entry` selects the definition
+/// body and `boundary` supplies its root result effects.
 /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
 /// independently: each folds away when its resource is unbounded, so a fully
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
@@ -1348,6 +1454,7 @@ fn run<
     tree: &'t rt::Tree,
     source: &str,
     entry: u16,
+    boundary: EntryBoundary,
     limits: rt::ResolvedRuntimeLimits,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
     verify_language(tree);
@@ -1356,6 +1463,7 @@ fn run<
     } else {
         rt::Engine::new_match_only(tree.walk())
     };
+    boundary.begin(&mut eng);
     let mut fuel_used: u64 = 0;
     let mut ip = entry;
     loop {
@@ -1386,13 +1494,17 @@ fn run<
         }
         match dispatch(&mut eng, source, ip) {
             Flow::Jump(next) => ip = next,
-            Flow::Accept => return Ok(Some(eng.into_journal())),
-            Flow::CallFrameError(error) => return Err(error.into()),
+            Flow::Accept => {
+                boundary.finish(&mut eng);
+                return Ok(Some(eng.into_journal()));
+            }@FLOW_CALL_ERROR_ARM@
             Flow::Backtrack => match backtrack(&mut eng, source) {
                 Unwound::Resumed(next) => ip = next,
-                Unwound::Accepted => return Ok(Some(eng.into_journal())),
-                Unwound::NoMatch => return Ok(None),
-                Unwound::CallFrameError(error) => return Err(error.into()),
+                Unwound::Accepted => {
+                    boundary.finish(&mut eng);
+                    return Ok(Some(eng.into_journal()));
+                }
+                Unwound::NoMatch => return Ok(None),@UNWOUND_CALL_ERROR_ARM@
             },
         }
     }
@@ -1505,6 +1617,10 @@ const RETURN_ARM: &str = r#"
 }
 "#;
 
+const RETURN_ARM_NO_CALLS: &str = r#"
+@STATE@ => @TOP_LEVEL@,
+"#;
+
 const FINISH_FN_OPEN: &str = r#"
 /// `@STATE@` post-acceptance: effects, then successor dispatch. Shared by the dispatch
 /// path and the match-retry resume, so a retried candidate emits exactly
@@ -1527,7 +1643,22 @@ fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
         match cp.resume {
             rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
-            // Call retry: advance to the next candidate satisfying the field
+@CALL_RESUME@
+
+            // Match retry: advance past the accepted-but-failed candidate and
+            // re-run that state's sibling search from there.
+            rt::Resume::Match => match match_retry(eng, @SOURCE@, cp.ip) {
+                Some(Flow::Jump(next)) => return Unwound::Resumed(next),
+                Some(Flow::Accept) => return Unwound::Accepted,@MATCH_RETRY_CALL_ERROR@
+                Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
+                None => continue 'unwind,
+            },
+        }
+    }
+}
+"#;
+
+const BACKTRACK_CALL_RESUME: &str = r#"            // Call retry: advance to the next candidate satisfying the field
             // constraint, then re-enter the callee. Exhausted siblings keep
             // unwinding to an earlier checkpoint.
             rt::Resume::Call(resume) => {
@@ -1553,23 +1684,15 @@ fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
                     return Unwound::CallFrameError(error);
                 }
                 return Unwound::Resumed(resume.target);
-            }
+            }"#;
 
-            // Match retry: advance past the accepted-but-failed candidate and
-            // re-run that state's sibling search from there.
-            rt::Resume::Match => match match_retry(eng, @SOURCE@, cp.ip) {
-                Some(Flow::Jump(next)) => return Unwound::Resumed(next),
-                Some(Flow::Accept) => return Unwound::Accepted,
+const BACKTRACK_CALL_RESUME_UNREACHABLE: &str =
+    r#"            rt::Resume::Call(_) => unreachable!("matcher has no call checkpoints"),"#;
+
+const MATCH_RETRY_CALL_ERROR: &str = r#"
                 Some(Flow::CallFrameError(error)) => {
                     return Unwound::CallFrameError(error);
-                }
-                Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
-                None => continue 'unwind,
-            },
-        }
-    }
-}
-"#;
+                }"#;
 
 const MATCH_RETRY_OPEN: &str = r#"
 fn match_retry<'t>(@ENG@: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Option<Flow> {

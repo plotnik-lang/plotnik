@@ -20,8 +20,8 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Q     = 47
-Value = 43
+Q     = 07
+Value = 00
 
 [transitions]
 Value:
@@ -47,16 +47,6 @@ Q:
   34   !   (expression_statement)           36, 21
   36  ──!  _                                34, 36
   37  └─!  _                                34, 36
-
-Value (entry point):
-  42                                        ▶
-  43       (Value)                          00 : 42
-
-Q (entry point):
-  44                                        ▶
-  45  -ε-  [RecordClose]                    44
-  46       (Q)                              07 : 45
-  47  -ε-  [RecordOpen]                     46
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -137,37 +127,30 @@ P26 pattern    243..251  source_id=0
 
 [instructions]
 Value:
-  00       (@30)                            30 : 01
-  01                                        ▶
+  00  -ε-  [SpanStart#0]                    16, 24
 
 Q:
-  02  -ε-  [RecordOpen]                     04
-  04       (@68)                            68 : 05
-  05  -ε-  [RecordClose]                    07
+  02   !   (program) [SpanStart#8 SpanStartAt#9 SpanStart#10]  04
+  04  -ε-  [SpanStart#11]                   22, 13
+  06  ─‣┘  _                                08
   07                                        ▶
-  08  ─‣┘  _                                09
-  09  ─‣┘  _ [SpanEnd#15 SpanEnd#14]        11
-  11  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  14
-  13                                        ▶
-  14                                        ▶
-  15  ...
-  16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
-  22  ...
-  23  ...
-  24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  13
-  30  -ε-  [SpanStart#0]                    16, 24
-  32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21 SpanEnd#20]  08
-  35   !   (@30)                            30 : 32
+  08  ─‣┘  _ [SpanEnd#15 SpanEnd#14]        10
+  10  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  07
+  12                                        ▶
+  13  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
+  16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
+  22  └─!  _                                59, 54
+  24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  12
+  30  ...
+  31  ...
+  32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21 SpanEnd#20]  06
+  35   !   (Value)                          00 : 32
   36  -ε-  [SpanStart#20 SpanStart#21 SpanStart#22 Absent RecordSet(M6) SpanStart#23 SuppressBegin]  35
   39  ...
-  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node RecordSet(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  08
+  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node RecordSet(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  06
   46  ─‣─  value: _                         36, 40
   48  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 Node RecordSet(M5) SpanEnd#16 SpanEnd#19 SpanEnd#18]  46
   52  └‣─  (variable_declarator) [SpanStartAt#15]  48
-  54  ──!  _                                62, 54
-  56  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
-  59  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
-  62   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  54, 59
-  64  └─!  _                                62, 54
-  66  -ε-  [SpanStart#11]                   64, 56
-  68   !   (program) [SpanStart#8 SpanStartAt#9 SpanStart#10]  66
+  54  ──!  _                                59, 54
+  56  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
+  59   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  54, 56

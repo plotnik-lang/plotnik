@@ -80,7 +80,7 @@ mod debug_impl {
     use std::collections::{HashMap, HashSet};
     use std::hash::{Hash, Hasher};
 
-    use crate::bytecode::{EffectKind, Nav};
+    use crate::bytecode::{EffectKind, EntryBoundary, Nav};
     use indexmap::IndexMap;
 
     use crate::compiler::ids::DefId;
@@ -147,7 +147,7 @@ mod debug_impl {
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum WalkRoot {
-        EntryPoint(DefId),
+        EntryPoint(DefId, EntryBoundary),
         Def(DefSpecialization),
     }
 
@@ -635,7 +635,7 @@ mod debug_impl {
 
         for (root, entry) in entries(nfa) {
             let (route, ports) = match &root {
-                WalkRoot::EntryPoint(_) => (DefRoute::Caller, vec![ExitPort::ConsumedOtherNone]),
+                WalkRoot::EntryPoint(..) => (DefRoute::Caller, vec![ExitPort::ConsumedOtherNone]),
                 WalkRoot::Def(specialization) => (
                     specialization.route(),
                     specialization.ports().ports().to_vec(),
@@ -654,8 +654,23 @@ mod debug_impl {
         let instr_map: HashMap<Label, &InstructionIR> =
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
 
-        for (root, entry) in entries(nfa) {
-            check_empty_root(root, entry, &instr_map, nfa)?;
+        for (&def_id, entry) in &nfa.entry_points {
+            check_empty_root(
+                WalkRoot::EntryPoint(def_id, entry.boundary),
+                entry.target,
+                entry.boundary == EntryBoundary::Node,
+                &instr_map,
+                nfa,
+            )?;
+        }
+        for (specialization, &entry) in &nfa.def_entries {
+            check_empty_root(
+                WalkRoot::Def(specialization.clone()),
+                entry,
+                false,
+                &instr_map,
+                nfa,
+            )?;
         }
         Ok(())
     }
@@ -683,6 +698,7 @@ mod debug_impl {
     fn check_empty_root(
         root: WalkRoot,
         entry: Label,
+        boundary_reads_cursor: bool,
         instr_map: &HashMap<Label, &InstructionIR>,
         nfa: &NfaGraph,
     ) -> Result<(), String> {
@@ -706,7 +722,8 @@ mod debug_impl {
                 InstructionIR::Match(m) => {
                     let after_nav_empty = empty_path && m.nav == Nav::Epsilon;
                     if after_nav_empty
-                        && m.effects.iter().any(|effect| effect.kind().reads_cursor())
+                        && (boundary_reads_cursor && m.successors.is_empty()
+                            || m.effects.iter().any(|effect| effect.kind().reads_cursor()))
                     {
                         return Err(format!(
                             "{root:?}: cursor-reading effect at {:?} is reachable without a consumed node",
@@ -734,6 +751,12 @@ mod debug_impl {
                             if port.consumed() { false } else { empty_path },
                         ));
                     }
+                }
+                InstructionIR::Return(r) if boundary_reads_cursor && empty_path => {
+                    return Err(format!(
+                        "{root:?}: entry Node effect at {:?} is reachable without a consumed node",
+                        r.label
+                    ));
                 }
                 InstructionIR::Return(_) => {}
             }
@@ -844,8 +867,8 @@ mod debug_impl {
 
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = Vec::new();
-        for (&def_id, &label) in &nfa.entry_point_wrappers {
-            v.push((WalkRoot::EntryPoint(def_id), label));
+        for (&def_id, entry) in &nfa.entry_points {
+            v.push((WalkRoot::EntryPoint(def_id, entry.boundary), entry.target));
         }
         for (specialization, &label) in &nfa.def_entries {
             v.push((WalkRoot::Def(specialization.clone()), label));
@@ -938,7 +961,7 @@ mod debug_impl {
         let mut before = snapshot(nfa, ctx);
         pass(nfa);
         before.fingerprints.retain(|(root, _, _)| match root {
-            WalkRoot::EntryPoint(_) => true,
+            WalkRoot::EntryPoint(..) => true,
             WalkRoot::Def(specialization) => nfa.def_entries.contains_key(specialization),
         });
         verify_after_pass(name, &before, nfa, ctx);

@@ -77,37 +77,24 @@ N0: S3 → T1  ; QX
 N1: S4 → T2  ; Q
 
 [entry_points]
-Q = 00 :: T2
+Q = 0 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@15)                            15 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  08
-  08  ─‣┘  _ [RecordClose RecordSet(M1)]    10
-  10                                        ▶
-  11  ──!  _                                06, 11
-  13  └─!  _                                06, 11
-  15   !   (program)                        13
+  0   !   (program)                         1
+  1  └─!  _                                 3, 8
+  3   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  5
+  5  ─‣┘  _ [RecordClose RecordSet(M1)]     7
+  7                                         ▶
+  8  ──!  _                                 3, 8
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@15)                            15 : 03
-       ▶   (@15)
-
-@15:
-  15       (program)                        13
-       ●   program
-  13       _                                06, 11
-       ●   expression_statement
-  06       (expression_statement) [RecordOpen Node RecordSet(M0)]  08
-       ●   expression_statement
-  08       _ [RecordClose RecordSet(M1)]    10
-       ●   program
-  10   ◀   (@15)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       _                                 03, 08
+      ●   expression_statement
+  3       (expression_statement) [RecordOpen Node RecordSet(M0)]  05
+      ●   expression_statement
+  5       _ [RecordClose RecordSet(M1)]     07
+      ●   program
+  7   ◀   (Q)                               ◼

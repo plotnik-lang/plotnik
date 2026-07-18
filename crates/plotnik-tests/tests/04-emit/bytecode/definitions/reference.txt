@@ -2,32 +2,20 @@ Inner = (identifier) @name
 Q = (expression_statement (Inner) @item)
 ---------------------- NFA -----------------------
 [entry_points]
-Inner = 14
-Q     = 18
+Inner = 2
+Q     = 5
 
 [transitions]
 Inner:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  1                                         ▶
+  2   !   (identifier) [Node RecordSet(name)]  1
 
 Q:
-  04                                        ▶
-  05   !   (expression_statement) [RecordOpen]  09
-  06  ─‣┘  _ [RecordSet(item)]              04
-  08  -ε-  [RecordClose]                    06
-  09  └‣─  (Inner)                          02 : 08
-
-Inner (entry point):
-  11                                        ▶
-  12  -ε-  [RecordClose]                    11
-  13       (Inner)                          02 : 12
-  14  -ε-  [RecordOpen]                     13
-
-Q (entry point):
-  15                                        ▶
-  16  -ε-  [RecordClose]                    15
-  17       (Q)                              05 : 16
-  18  -ε-  [RecordOpen]                     17
+  4                                         ▶
+  5   !   (expression_statement) [RecordOpen]  9
+  6  ─‣┘  _ [RecordSet(item)]               4
+  8  -ε-  [RecordClose]                     6
+  9  └‣─  (Inner)                           2 : 8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -53,24 +41,16 @@ N1: S4 → T2  ; Q
 
 [entry_points]
 Inner = 00 :: T1
-Q     = 06 :: T2
+Q     = 03 :: T2
 
 [instructions]
 Inner:
-  00  -ε-  [RecordOpen]                     02
-  02       (@17)                            17 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (identifier) [Node RecordSet(M0)]  02
+  02                                        ▶
 
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@21)                            21 : 09
-  09  -ε-  [RecordClose]                    11
-  11                                        ▶
-  12  -ε-  [RecordClose]                    14
-  14  ─‣┘  _ [RecordSet(M1)]                19
-  16                                        ▶
-  17   !   (identifier) [Node RecordSet(M0)]  16
-  19                                        ▶
-  20  └‣─  (@17)                            17 : 12
-  21   !   (expression_statement) [RecordOpen]  20
+  03   !   (expression_statement) [RecordOpen]  05
+  05  └‣─  (Inner)                          00 : 06
+  06  -ε-  [RecordClose]                    08
+  08  ─‣┘  _ [RecordSet(M1)]                10
+  10                                        ▶

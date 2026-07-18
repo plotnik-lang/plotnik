@@ -56,45 +56,33 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@27)                            27 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘² _                                06
-  08   !   (identifier) [Node ArrayPush]    10, 14
-  10  ──!  _                                08, 10
-  12  └─!  _ [ListOpen]                     08, 10
-  14  ─‣┘² _ [ListClose RecordSet(M0)]      07
-  16  └‣─  (arguments)                      12
-  17   !   (call_expression) [Absent RecordSet(M1)]  16
-  19   !   (identifier) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  22  ──!  _                                17, 19, 22
-  24  └─!  _                                17, 19, 22
-  26  └‣─  (expression_statement)           24
-  27   !   (program)                        26
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └─!  _                                16, 18, 21
+  04                                        ▶
+  05   !   (identifier) [Node ArrayPush]    08, 12
+  07  ─‣┘² _                                04
+  08  ──!  _                                05, 08
+  10  └─!  _ [ListOpen]                     05, 08
+  12  ─‣┘² _ [ListClose RecordSet(M0)]      07
+  14  └‣─  (arguments)                      10
+  15  ...
+  16   !   (call_expression) [Absent RecordSet(M1)]  14
+  18   !   (identifier) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  21  ──!  _                                16, 18, 21
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@27)                            27 : 03
-       ▶   (@27)
-
-@27:
-  27       (program)                        26
+  00       (program)                        01
        ●   program
-  26       (expression_statement)           24
+  01       (expression_statement)           02
        ●   expression_statement
-  24       _                                17, 19, 22
+  02       _                                16, 18, 21
        ●   identifier
-  17       (call_expression) [Absent RecordSet(M1)]  16
+  16       (call_expression) [Absent RecordSet(M1)]  14
        ○   identifier
-  24  ❮❮❮ 
-  19       (identifier) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  02  ❮❮❮ 
+  18       (identifier) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
        ●   identifier
-  07       _                                06
+  07       _                                04
        ●   program
-  06   ◀   (@27)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  04   ◀   (Q)                              ◼

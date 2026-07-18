@@ -6,23 +6,17 @@ Q = (expression_statement
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 13
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (expression_statement)           09
-  03  ─‣┘  _                                01
-  04   !   (identifier) [Node RecordSet(x)]  03
-  05   !   (number) [Node RecordSet(x)]     03
-  08  ──!  _                                04, 05, 08
-  09  └─!  _                                04, 05, 08
-
-Q (entry point):
-  10                                        ▶
-  11  -ε-  [RecordClose]                    10
-  12       (Q)                              02 : 11
-  13  -ε-  [RecordOpen]                     12
+  1                                         ▶
+  2   !   (expression_statement)            9
+  3  ─‣┘  _                                 1
+  4   !   (identifier) [Node RecordSet(x)]  3
+  5   !   (number) [Node RecordSet(x)]      3
+  8  ──!  _                                 4, 5, 8
+  9  └─!  _                                 4, 5, 8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -47,14 +41,10 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08   !   (identifier) [Node RecordSet(M0)]  07
-  10   !   (number) [Node RecordSet(M0)]    07
-  12  ──!  _                                08, 10, 12
-  14  └─!  _                                08, 10, 12
-  16   !   (expression_statement)           14
+  00   !   (expression_statement)           01
+  01  └─!  _                                04, 06, 08
+  03                                        ▶
+  04   !   (identifier) [Node RecordSet(M0)]  10
+  06   !   (number) [Node RecordSet(M0)]    10
+  08  ──!  _                                04, 06, 08
+  10  ─‣┘  _                                03

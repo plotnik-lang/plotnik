@@ -5,23 +5,17 @@ Q = (binary_expression
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 12
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (binary_expression)              08
-  03  ─‣┘  _                                01
-  04  ─◦─  (identifier)                     03
-  05   !   "+" [Node RecordSet(op)]         04
-  07  ──!  _                                05, 07
-  08  └─!  _                                05, 07
-
-Q (entry point):
-  09                                        ▶
-  10  -ε-  [RecordClose]                    09
-  11       (Q)                              02 : 10
-  12  -ε-  [RecordOpen]                     11
+  1                                         ▶
+  2   !   (binary_expression)               8
+  3  ─‣┘  _                                 1
+  4  ─◦─  (identifier)                      3
+  5   !   "+" [Node RecordSet(op)]          4
+  7  ──!  _                                 5, 7
+  8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -42,18 +36,14 @@ M0: S1 → T0  ; op: <Node>
 N0: S2 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@15)                            15 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─◦─  (identifier)                     07
-  07  ─‣┘  _                                08
-  08                                        ▶
-  09   !   "+" [Node RecordSet(M0)]         06
-  11  ──!  _                                09, 11
-  13  └─!  _                                09, 11
-  15   !   (binary_expression)              13
+  0   !   (binary_expression)               1
+  1  └─!  _                                 6, 8
+  3  ─◦─  (identifier)                      4
+  4  ─‣┘  _                                 5
+  5                                         ▶
+  6   !   "+" [Node RecordSet(M0)]          3
+  8  ──!  _                                 6, 8

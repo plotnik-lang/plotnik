@@ -89,53 +89,38 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@29)                            29 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  ─‣─  (identifier) [Node RecordSet(M1) VariantClose] == "b"  14
-  11  ─•─  (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  08
-  14  ─‣┘³ _ [RecordSet(M6)]                06
-  16  ─‣─  (identifier) [Node RecordSet(M2) VariantClose] == "b"  14
-  19  ─◦─  "," [VariantOpen(M5) Node RecordSet(M3)]  16
-  21   !   (identifier) == "p"              11, 19
-  23  ...
-  24  ──!  _                                21, 24
-  26  └‣─  "["                              24
-  27  └‣─  (array)                          26
-  28  └‣─  (expression_statement)           27
-  29   !   (program)                        28
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └‣─  "["                              18
+  04                                        ▶
+  05  ─‣─  (identifier) [Node RecordSet(M1) VariantClose] == "b"  20
+  08  ─•─  (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  05
+  11  ─‣─  (identifier) [Node RecordSet(M2) VariantClose] == "b"  20
+  14  ─◦─  "," [VariantOpen(M5) Node RecordSet(M3)]  11
+  16   !   (identifier) == "p"              08, 14
+  18  ──!  _                                16, 18
+  20  ─‣┘³ _ [RecordSet(M6)]                04
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@29)                            29 : 03
-       ▶   (@29)
-
-@29:
-  29       (program)                        28
+  00       (program)                        01
        ●   program
-  28       (expression_statement)           27
+  01       (expression_statement)           02
        ●   expression_statement
-  27       (array)                          26
+  02       (array)                          03
        ●   array
-  26       "["                              24
+  03       "["                              18
        ●   [
-  24       _                                21, 24
+  18       _                                16, 18
        ●   identifier
-  21       (identifier) == "p"              11, 19
+  16       (identifier) == "p"              08, 14
        ●   identifier
-  11       (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  08
+  08       (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  05
        ○   ,
        ●   identifier
-  08       (identifier) [Node RecordSet(M1) VariantClose] == "b"  14
+  05       (identifier) [Node RecordSet(M1) VariantClose] == "b"  20
        ○   ,
        ●   identifier
-  14       _ [RecordSet(M6)]                06
+  20       _ [RecordSet(M6)]                04
        ●   program
-  06   ◀   (@29)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  04   ◀   (Q)                              ◼

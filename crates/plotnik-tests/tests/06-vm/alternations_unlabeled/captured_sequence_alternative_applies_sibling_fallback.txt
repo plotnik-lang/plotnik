@@ -72,35 +72,22 @@ Q = 00 :: T5
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
+  00   !   (program)                        01
+  01  └─!  _ [RecordOpen]                   04, 08, 11
+  03                                        ▶
+  04   !   (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  13
   07  ...
-  08   !   (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  18
-  11   !   (comment) [Absent RecordSet(M1) Node RecordSet(M2)]  18
-  14  ──!  _                                08, 11, 14
-  16  └─!  _ [RecordOpen]                   08, 11, 14
-  18  ─‣┘  _ [RecordClose RecordSet(M3)]    06
-  20   !   (program)                        16
+  08   !   (comment) [Absent RecordSet(M1) Node RecordSet(M2)]  13
+  11  ──!  _                                04, 08, 11
+  13  ─‣┘  _ [RecordClose RecordSet(M3)]    03
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        16
+  00       (program)                        01
        ●   program
-  16       _ [RecordOpen]                   08, 11, 14
+  01       _ [RecordOpen]                   04, 08, 11
        ●   expression_statement
-  08       (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  18
+  04       (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  13
        ●   expression_statement
-  18       _ [RecordClose RecordSet(M3)]    06
+  13       _ [RecordClose RecordSet(M3)]    03
        ●   program
-  06   ◀   (@20)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  03   ◀   (Q)                              ◼

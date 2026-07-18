@@ -6,22 +6,16 @@ Q = (pair
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 12
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (pair)                           08
-  03  ─‣┘  _ [RecordSet(kind)]              01
-  05   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  03
-  06   !   (number) [VariantOpen(B) VariantClose]  03
-  08  └‣─  key: _                           05, 06
-
-Q (entry point):
-  09                                        ▶
-  10  -ε-  [RecordClose]                    09
-  11       (Q)                              02 : 10
-  12  -ε-  [RecordOpen]                     11
+  1                                         ▶
+  2   !   (pair)                            8
+  3  ─‣┘  _ [RecordSet(kind)]               1
+  5   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  3
+  6   !   (number) [VariantOpen(B) VariantClose]  3
+  8  └‣─  key: _                            5, 6
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -58,15 +52,10 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
+  00   !   (pair)                           01
+  01  └‣─  key: _                           04, 08
+  03                                        ▶
+  04   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  10
   07  ...
-  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  16
-  11   !   (number) [VariantOpen(M2) VariantClose]  16
-  13  └‣─  key: _                           08, 11
-  15  ...
-  16  ─‣┘  _ [RecordSet(M3)]                06
-  18   !   (pair)                           13
+  08   !   (number) [VariantOpen(M2) VariantClose]  10
+  10  ─‣┘  _ [RecordSet(M3)]                03

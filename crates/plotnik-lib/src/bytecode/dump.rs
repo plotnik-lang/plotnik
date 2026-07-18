@@ -89,10 +89,8 @@ impl DumpContext {
         }
     }
 
-    fn label_for(&self, addr: SuccessorAddr) -> Option<&str> {
-        self.addr_labels
-            .get(&CodeAddr::from(u16::from(addr)))
-            .map(|s| s.as_str())
+    fn label_for(&self, addr: CodeAddr) -> Option<&str> {
+        self.addr_labels.get(&addr).map(|s| s.as_str())
     }
 }
 
@@ -547,7 +545,7 @@ impl DumpFormatter<'_> {
 
     fn format_addr(&self, addr: SuccessorAddr) -> String {
         let c = &self.ctx.colors;
-        if let Some(label) = self.ctx.label_for(addr) {
+        if let Some(label) = self.ctx.label_for(CodeAddr::from(u16::from(addr))) {
             format!("▶({}{}{})", c.blue, label, c.reset)
         } else {
             format!("{:0w$}", u16::from(addr), w = self.addr_width)

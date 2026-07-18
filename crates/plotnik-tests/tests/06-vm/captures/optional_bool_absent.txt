@@ -34,38 +34,23 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        08, 10
+  02   !   (expression_statement)           03
+  03  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   05
   05                                        ▶
-  06   !   (expression_statement)           08
-  07  ...
-  08  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   10
-  10                                        ▶
-  11  ──!  _                                06, 11
-  13  └─!  _                                06, 11
-  15  ...
-  16  -ε-  [BoolValue(0) RecordSet(M0)]     10
-  18   !   (program)                        13, 16
+  06  ──!  _                                02, 06
+  08  └─!  _                                02, 06
+  10  -ε-  [BoolValue(0) RecordSet(M0)]     05
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-       ▶   (@18)
-
-@18:
-  18       (program)                        13, 16
+  00       (program)                        08, 10
        ●   program
-  13       _                                06, 11
+  08       _                                02, 06
        ●   comment
-  06       (expression_statement)           08
+  02       (expression_statement)           03
        ○   comment
-  13  ❮❮❮ 
-  11       _                                06, 11
-  18  ❮❮❮ 
-  16  -ε-  [BoolValue(0) RecordSet(M0)]     10
-  10   ◀   (@18)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
+  08  ❮❮❮ 
+  06       _                                02, 06
+  00  ❮❮❮ 
+  10  -ε-  [BoolValue(0) RecordSet(M0)]     05
   05   ◀   (Q)                              ◼
