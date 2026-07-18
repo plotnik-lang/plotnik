@@ -84,45 +84,35 @@ Q = 00 :: T5
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@42)                            42 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                14, 34
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─‣─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  07
-  11  ─•─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  07
-  14  ...
-  15  ...
-  16  ─◦─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  07
+  06  ─‣┘³ _                                05
+  07  ...
+  08  ─‣─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
+  11  ─•─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
+  14   !   "["                              32, 26
+  16  ─◦─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
   19   !   (identifier) [Node RecordSet(M0) VariantClose] == "a"  11
   22  ──!  _                                19, 22
   24   !   _ [VariantOpen(M2)]              19, 22
   26  -ε-  [VariantOpen(M2) Absent RecordSet(M0) VariantClose]  16
   29   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose] == "x"  08
   32  ──!  _                                24, 29, 32
-  34   !   "["                              32, 26
-  36  ──!  _                                34, 36
-  38  └─!  _                                34, 36
-  40  └‣─  (array)                          38
-  41  └‣─  (expression_statement)           40
-  42   !   (program)                        41
+  34  ──!  _                                14, 34
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@42)                            42 : 03
-       ▶   (@42)
-
-@42:
-  42       (program)                        41
+  00       (program)                        01
        ●   program
-  41       (expression_statement)           40
+  01       (expression_statement)           02
        ●   expression_statement
-  40       (array)                          38
+  02       (array)                          03
        ●   array
-  38       _                                34, 36
+  03       _                                14, 34
        ●   [
-  34       "["                              32, 26
+  14       "["                              32, 26
        ●   [
   32       _                                24, 29, 32
        ●   identifier
@@ -148,13 +138,9 @@ Q:
   32  ❮❮❮ 
   29       (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose] == "x"  08
        ●   identifier
-  08       (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  07
+  08       (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
        ○   ,
        ●   identifier
-  07       _                                06
+  06       _                                05
        ●   program
-  06   ◀   (@42)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

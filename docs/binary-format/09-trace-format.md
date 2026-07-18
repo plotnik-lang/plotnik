@@ -30,8 +30,8 @@ Instruction lines are the same shape as `dump`:
   06   ◀   (?)
 ```
 
-`(?)` is a call to an internal wrapper/body label that has no user definition
-name. Returns show `◀`; top-level return shows `◼`.
+`(?)` is a call to an internal body label that has no user definition name.
+Returns show `◀`; top-level return shows `◼`.
 
 ## Sub-Lines
 
@@ -81,37 +81,25 @@ Trace with `-v --no-result`:
 
 ```text
 Value:
-  00  -ε-  [RecordOpen]                     02
        ⬥   RecordOpen
-  02       (?)                              18 : 03
-       ▶   (?)
-
-?:
-  --------------------------------------------
-  18       (document)                       16
+  00       (document)                       01
        !   document
        ●   document 42
-  16       _                                08, 11, 14
-      └‣─  number
+  01       _                                04, 08, 11
+      └─!  number
        ●   number 42
-  --------------------------------------------
-  08       (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  04       (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
        !   number
        ●   number 42
        ⬥   Absent
        ⬥   RecordSet "s"
        ⬥   Node
        ⬥   RecordSet "n"
-  --------------------------------------------
-  07       _                                06
+  07       _                                03
       ─‣┘  document
        ●   document 42
-  06   ◀   (?)
-
-Value:
-  03  -ε-  [RecordClose]                    05
+  03   ◀   (Value)                          ◼
        ⬥   RecordClose
-  05   ◀   (Value)                          ◼
 ```
 
 Default verbosity hides navigation and effect sub-lines but keeps match

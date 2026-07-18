@@ -87,14 +87,15 @@ Q = 00 :: T6
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@68)                            68 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                07, 61
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─‣─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
-  11  ─•─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+  06  ─‣┘³ _                                05
+  07   !   "["                              58
+  08  ─‣─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
+  11  ─•─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
   14                                        ▶
   15                                        ▶ p1
   16                                        ▶ p2
@@ -120,28 +121,18 @@ Q:
   55  ...
   56  -ε-                                   51, 53
   58       (@56)                            56 : 08 / 11 / 08
-  61   !   "["                              58
-  62  ──!  _                                61, 62
-  64  └─!  _                                61, 62
-  66  └‣─  (array)                          64
-  67  └‣─  (expression_statement)           66
-  68   !   (program)                        67
+  61  ──!  _                                07, 61
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@68)                            68 : 03
-       ▶   (@68)
-
-@68:
-  68       (program)                        67
+  00       (program)                        01
        ●   program
-  67       (expression_statement)           66
+  01       (expression_statement)           02
        ●   expression_statement
-  66       (array)                          64
+  02       (array)                          03
        ●   array
-  64       _                                61, 62
+  03       _                                07, 61
        ●   [
-  61       "["                              58
+  07       "["                              58
        ●   [
   58       (@56)                            56 : 08 / 11 / 08
        ▶   (@56)
@@ -169,8 +160,8 @@ Q:
 @56:
   15   ◀   (@56)                            p1
 
-@68:
-  11       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+Q:
+  11       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
        ○   ,
   37  ❮❮❮ 
   35       _                                32, 35
@@ -445,15 +436,11 @@ Q:
   53  -ε-  [Absent]                         16
   16   ◀   (@56)                            p2
 
-@68:
-  08       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+Q:
+  08       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
        ○   ,
        ○   ,
        ●   identifier
-  07       _                                06
+  06       _                                05
        ●   program
-  06   ◀   (@68)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

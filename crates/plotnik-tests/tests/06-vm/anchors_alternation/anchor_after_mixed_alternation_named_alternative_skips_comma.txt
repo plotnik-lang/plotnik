@@ -62,46 +62,33 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (call_expression)                03
+  03  └‣─  arguments: (arguments)           10, 12
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘⁴ _                                06
-  08  ─•─  (identifier) [Node RecordSet(M1)]  07
-  10  ─◦─  (identifier) [Node RecordSet(M1)]  07
-  12  └‣─  (identifier) [Node RecordSet(M0)]  08
-  14  └‣─  ";" [Absent RecordSet(M0)]       10
-  16  └‣─  arguments: (arguments)           12, 14
-  18  └‣─  (call_expression)                16
-  19  └‣─  (expression_statement)           18
-  20   !   (program)                        19
+  06  ─•─  (identifier) [Node RecordSet(M1)]  14
+  08  ─◦─  (identifier) [Node RecordSet(M1)]  14
+  10  └‣─  (identifier) [Node RecordSet(M0)]  06
+  12  └‣─  ";" [Absent RecordSet(M0)]       08
+  14  ─‣┘⁴ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        19
+  00       (program)                        01
        ●   program
-  19       (expression_statement)           18
+  01       (expression_statement)           02
        ●   expression_statement
-  18       (call_expression)                16
+  02       (call_expression)                03
        ●   call_expression
-  16       arguments: (arguments)           12, 14
+  03       arguments: (arguments)           10, 12
        ○   identifier
        ●   arguments
-  12       (identifier) [Node RecordSet(M0)]  08
+  10       (identifier) [Node RecordSet(M0)]  06
        ○   (
        ●   identifier
-  08       (identifier) [Node RecordSet(M1)]  07
+  06       (identifier) [Node RecordSet(M1)]  14
        ○   ,
        ●   identifier
-  07       _                                06
+  14       _                                05
        ●   program
-  06   ◀   (@20)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

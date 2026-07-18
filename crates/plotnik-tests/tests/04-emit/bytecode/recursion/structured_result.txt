@@ -13,8 +13,8 @@ Test = (program
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Expr = 21
-Test = 25
+Expr = 00
+Test = 14
 
 [transitions]
 Expr:
@@ -34,16 +34,6 @@ Test:
   16  └‣─  (expression_statement)           19
   17  ─‣┘² _ [RecordSet(expr)]              13
   19  └‣─  (Expr)                           00 : 17
-
-Expr (entry point):
-  20                                        ▶
-  21       (Expr)                           00 : 20
-
-Test (entry point):
-  22                                        ▶
-  23  -ε-  [RecordClose]                    22
-  24       (Test)                           14 : 23
-  25  -ε-  [RecordOpen]                     24
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -88,25 +78,19 @@ Test = 02 :: T4
 
 [instructions]
 Expr:
-  00       (@26)                            26 : 01
-  01                                        ▶
+  00  -ε-                                   16, 14
 
 Test:
-  02  -ε-  [RecordOpen]                     04
-  04       (@29)                            29 : 05
-  05  -ε-  [RecordClose]                    07
+  02   !   (program)                        03
+  03  └‣─  (expression_statement)           04
+  04  └‣─  (Expr)                           00 : 05
+  05  ─‣┘² _ [RecordSet(M5)]                07
   07                                        ▶
-  08  └‣─  (@26)                            26 : 09
+  08  └‣─  (Expr)                           00 : 09
   09  ─‣┘  _ [RecordSet(M2)]                11
-  11  ─‣┘  _ [VariantClose]                 16
-  13  └‣─  (@26)                            26 : 14
-  14  ─‣┘² _ [RecordSet(M5)]                23
-  16                                        ▶
-  17   !   (number) [VariantOpen(M3) Node RecordSet(M0) VariantClose]  16
-  20  ─‣─  arguments: (arguments)           08
-  21  └‣─  function: (identifier) [Node RecordSet(M1)]  20
-  23                                        ▶
-  24   !   (call_expression) [VariantOpen(M4)]  21
-  26  -ε-                                   17, 24
-  28  └‣─  (expression_statement)           13
-  29   !   (program)                        28
+  11  ─‣┘  _ [VariantClose]                 13
+  13                                        ▶
+  14   !   (call_expression) [VariantOpen(M4)]  20
+  16   !   (number) [VariantOpen(M3) Node RecordSet(M0) VariantClose]  13
+  19  ─‣─  arguments: (arguments)           08
+  20  └‣─  function: (identifier) [Node RecordSet(M1)]  19

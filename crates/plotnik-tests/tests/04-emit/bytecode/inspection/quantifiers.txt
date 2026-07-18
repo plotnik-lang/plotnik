@@ -22,11 +22,11 @@ Funcs = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Funcs = 95
-Lazy  = 91
-Many  = 83
-Maybe = 79
-Some  = 87
+Funcs = 58
+Lazy  = 42
+Many  = 12
+Maybe = 02
+Some  = 28
 
 [transitions]
 Maybe:
@@ -78,36 +78,6 @@ Funcs:
   69  ──!  _                                64, 69
   70  └─!  _                                64, 69
   75  -ε-  [ListOpen]                       70, 61
-
-Maybe (entry point):
-  76                                        ▶
-  77  -ε-  [RecordClose]                    76
-  78       (Maybe)                          02 : 77
-  79  -ε-  [RecordOpen]                     78
-
-Many (entry point):
-  80                                        ▶
-  81  -ε-  [RecordClose]                    80
-  82       (Many)                           12 : 81
-  83  -ε-  [RecordOpen]                     82
-
-Some (entry point):
-  84                                        ▶
-  85  -ε-  [RecordClose]                    84
-  86       (Some)                           28 : 85
-  87  -ε-  [RecordOpen]                     86
-
-Lazy (entry point):
-  88                                        ▶
-  89  -ε-  [RecordClose]                    88
-  90       (Lazy)                           42 : 89
-  91  -ε-  [RecordOpen]                     90
-
-Funcs (entry point):
-  92                                        ▶
-  93  -ε-  [RecordClose]                    92
-  94       (Funcs)                          58 : 93
-  95  -ε-  [RecordOpen]                     94
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -156,11 +126,11 @@ N4: S09 → T08  ; FuncsFuncs
 N5: S10 → T10  ; Funcs
 
 [entry_points]
-Funcs = 024 :: T10
-Lazy  = 019 :: T07
-Many  = 006 :: T04
-Maybe = 000 :: T02
-Some  = 012 :: T06
+Funcs = 16 :: T10
+Lazy  = 12 :: T07
+Many  = 04 :: T04
+Maybe = 00 :: T02
+Some  = 08 :: T06
 
 [spans]
 P00 def        0..50  source_id=0  T02
@@ -194,81 +164,56 @@ P27 pattern    260..272  source_id=0
 
 [instructions]
 Maybe:
-  000  -ε-  [RecordOpen]                    002
-  002       (@058)                          058 : 003
-  003  -ε-  [RecordClose]                   005
-  005                                       ▶
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  -ε-  [SpanStart#3]                    37, 32
 
 Many:
-  006  -ε-  [RecordOpen]                    008
-  008       (@077)                          077 : 009
-  009  -ε-  [RecordClose]                   011
-  011                                       ▶
+  04   !   (program) [SpanStart#5 SpanStartAt#6]  06
+  06  -ε-  [ListOpen SpanStart#8]           50, 41
 
 Some:
-  012  -ε-  [RecordOpen]                    014
-  014       (@091)                          091 : 016
-  015                                       ▶
-  016  -ε-  [RecordClose]                   018
-  018                                       ▶
+  08   !   (program) [SpanStart#10 SpanStartAt#11]  10
+  10  └─!  _ [ListOpen SpanStart#13]        56, 59
 
 Lazy:
-  019  -ε-  [RecordOpen]                    021
-  021       (@112)                          112 : 022
-  022  -ε-  [RecordClose]                   015
+  12   !   (program) [SpanStart#15 SpanStartAt#16]  14
+  14  -ε-  [ListOpen SpanStart#18]          65, 74
 
 Funcs:
-  024  -ε-  [RecordOpen]                    026
-  026       (@128)                          128 : 027
-  027  -ε-  [RecordClose]                   029
-  029                                       ▶
-  030                                       ▶
-  031  ...
-  032   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  035
-  035  ─‣┘  _ [SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
-  037  ─‣┘  _ [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  114
-  040  └‣─  name: (identifier) [SpanStart#26 SpanStartAt#27 SpanStart#25 Node RecordSet(M4) SpanEnd#25 SpanEnd#27 SpanEnd#26]  044
-  044  ─‣┘  _ [SpanEnd#24]                  118
-  046  ...
-  047  ...
-  048  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2 SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
-  051  ──!  _                               032, 051
-  053  └─!  _                               032, 051
-  055  ...
-  056  -ε-  [SpanStart#3]                   053, 048
-  058   !   (program) [SpanStart#0 SpanStartAt#1]  056
-  060                                       ▶
-  061  -ε-  [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
-  064   !   (expression_statement) [SpanStartAt#9 Node ArrayPush SpanEnd#9]  067, 074
-  067  ──!  _                               064, 067
-  069  └─!  _                               064, 067
-  071  ...
-  072  -ε-  [ListOpen SpanStart#8]          069, 061
-  074  ─‣┘  _ [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
-  077   !   (program) [SpanStart#5 SpanStartAt#6]  072
-  079                                       ▶
-  080   !   (expression_statement) [SpanStartAt#14 Node ArrayPush SpanEnd#14]  083, 088
-  083  ──!  _                               080, 083
-  085  └─!  _ [ListOpen SpanStart#13]       080, 083
-  087  ...
-  088  ─‣┘  _ [SpanEnd#13 ListClose SpanStart#12 RecordSet(M2) SpanEnd#12 SpanEnd#11 SpanEnd#10]  079
-  091   !   (program) [SpanStart#10 SpanStartAt#11]  085
-  093                                       ▶
-  094  ──!  _                               120, 094
-  096  -ε-  [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
-  099   !   (expression_statement) [SpanStartAt#19 Node ArrayPush SpanEnd#19]  108, 102
-  102  ──!  _                               099, 102
-  104  └─!  _                               099, 102
-  106  -ε-  [ListOpen SpanStart#18]         096, 104
-  108  ─‣┘  _ [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
-  111  ...
-  112   !   (program) [SpanStart#15 SpanStartAt#16]  106
-  114                                       ▶
-  115  -ε-  [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  114
-  118  -ε-  [RecordClose ArrayPush]         094, 037
-  120   !   (function_declaration) [RecordOpen SpanStartAt#24]  040
-  122  └─!  _                               120, 094
-  124  -ε-  [ListOpen SpanStart#23]         122, 115
-  126  ...
-  127  ...
-  128   !   (program) [SpanStart#20 SpanStartAt#21]  124
+  16   !   (program) [SpanStart#20 SpanStartAt#21]  18
+  18  -ε-  [ListOpen SpanStart#23]          90, 80
+  20   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  24
+  23                                        ▶
+  24  ─‣┘  _ [SpanEnd#3 SpanEnd#1 SpanEnd#0]  23
+  26  └‣─  name: (identifier) [SpanStart#26 SpanStartAt#27 SpanStart#25 Node RecordSet(M4) SpanEnd#25 SpanEnd#27 SpanEnd#26]  30
+  30  ─‣┘  _ [SpanEnd#24]                   83
+  32  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2 SpanEnd#3 SpanEnd#1 SpanEnd#0]  23
+  35  ──!  _                                20, 35
+  37  └─!  _                                20, 35
+  39  ...
+  40                                        ▶
+  41  -ε-  [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  40
+  44   !   (expression_statement) [SpanStartAt#9 Node ArrayPush SpanEnd#9]  48, 52
+  47  ...
+  48  ──!  _                                44, 48
+  50  └─!  _                                44, 48
+  52  ─‣┘  _ [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  40
+  55                                        ▶
+  56   !   (expression_statement) [SpanStartAt#14 Node ArrayPush SpanEnd#14]  59, 61
+  59  ──!  _                                56, 59
+  61  ─‣┘  _ [SpanEnd#13 ListClose SpanStart#12 RecordSet(M2) SpanEnd#12 SpanEnd#11 SpanEnd#10]  55
+  64                                        ▶
+  65  -ε-  [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  64
+  68   !   (expression_statement) [SpanStartAt#19 Node ArrayPush SpanEnd#19]  76, 72
+  71  ...
+  72  ──!  _                                68, 72
+  74  └─!  _                                68, 72
+  76  ─‣┘  _ [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  64
+  79                                        ▶
+  80  -ε-  [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  79
+  83  -ε-  [RecordClose ArrayPush]          88, 92
+  85   !   (function_declaration) [RecordOpen SpanStartAt#24]  26
+  87  ...
+  88  ──!  _                                85, 88
+  90  └─!  _                                85, 88
+  92  ─‣┘  _ [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  79

@@ -53,56 +53,40 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@32)                            32 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  07
-  11  ─‣─  (debugger_statement) [Node RecordSet(M2)]  07
-  13   !   (empty_statement) [Node RecordSet(M1)]  11
-  15  ...
-  16  ──!  _                                13, 16
-  18  └─!  _                                13, 16
-  20  -ε-  [Absent RecordSet(M1)]           11
-  22  -ε-  [Absent RecordSet(M0)]           18, 08
-  24   !   (expression_statement) [Node RecordSet(M0)]  16, 20
-  26  ──!  _                                24, 26
-  28  └─!  _                                24, 26
-  30  ...
-  31  ...
-  32   !   (program)                        28, 22
+  00   !   (program)                        22, 16
+  02                                        ▶
+  03  └‣─  (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  24
+  06  ─‣─  (debugger_statement) [Node RecordSet(M2)]  24
+  08   !   (empty_statement) [Node RecordSet(M1)]  06
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14  -ε-  [Absent RecordSet(M1)]           06
+  16  -ε-  [Absent RecordSet(M0)]           12, 03
+  18   !   (expression_statement) [Node RecordSet(M0)]  10, 14
+  20  ──!  _                                18, 20
+  22  └─!  _                                18, 20
+  24  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@32)                            32 : 03
-       ▶   (@32)
-
-@32:
-  32       (program)                        28, 22
+  00       (program)                        22, 16
        ●   program
-  28       _                                24, 26
+  22       _                                18, 20
        ●   debugger_statement
-  24       (expression_statement) [Node RecordSet(M0)]  16, 20
+  18       (expression_statement) [Node RecordSet(M0)]  10, 14
        ○   debugger_statement
-  28  ❮❮❮ 
-  26       _                                24, 26
-  32  ❮❮❮ 
-  22  -ε-  [Absent RecordSet(M0)]           18, 08
-  18       _                                13, 16
-       ●   debugger_statement
-  13       (empty_statement) [Node RecordSet(M1)]  11
-       ○   debugger_statement
-  18  ❮❮❮ 
-  16       _                                13, 16
   22  ❮❮❮ 
-  08       (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  07
+  20       _                                18, 20
+  00  ❮❮❮ 
+  16  -ε-  [Absent RecordSet(M0)]           12, 03
+  12       _                                08, 10
        ●   debugger_statement
-  07       _                                06
+  08       (empty_statement) [Node RecordSet(M1)]  06
+       ○   debugger_statement
+  12  ❮❮❮ 
+  10       _                                08, 10
+  16  ❮❮❮ 
+  03       (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  24
+       ●   debugger_statement
+  24       _                                02
        ●   program
-  06   ◀   (@32)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  02   ◀   (Q)                              ◼

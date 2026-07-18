@@ -43,77 +43,69 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─•┘² _                                07
-  07  ─‣┘² _                                08
-  08                                        ▶
-  09   !   (pair) [Node RecordSet(M0)]      06
-  11  ──!  _                                09, 11
-  13  └─!  _                                09, 11
-  15   !   (object)                         13
-  16  ──!  _                                15, 16
-  18  └─!  _                                15, 16
-  20  └‣─  (array)                          18
-  21  └‣─  (expression_statement)           20
-  22   !   (program)                        21
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                14, 16
+  05  ─•┘² _                                06
+  06  ─‣┘² _                                07
+  07                                        ▶
+  08   !   (pair) [Node RecordSet(M0)]      05
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14   !   (object)                         12
+  15  ...
+  16  ──!  _                                14, 16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        21
+  00       (program)                        01
        ●   program
-  21       (expression_statement)           20
+  01       (expression_statement)           02
        ●   expression_statement
-  20       (array)                          18
+  02       (array)                          03
        ●   array
-  18       _                                15, 16
+  03       _                                14, 16
        ●   [
-  15       (object)                         13
+  14       (object)                         12
        ○   [
-  18  ❮❮❮ 
-  16       _                                15, 16
+  03  ❮❮❮ 
+  16       _                                14, 16
        ●   object
-  15       (object)                         13
+  14       (object)                         12
        ●   object
-  13       _                                09, 11
+  12       _                                08, 10
        ●   {
-  09       (pair) [Node RecordSet(M0)]      06
+  08       (pair) [Node RecordSet(M0)]      05
        ○   {
-  13  ❮❮❮ 
-  11       _                                09, 11
+  12  ❮❮❮ 
+  10       _                                08, 10
        ●   pair
-  09       (pair) [Node RecordSet(M0)]      06
+  08       (pair) [Node RecordSet(M0)]      05
        ●   pair
-  06       _                                07
-  11  ❮❮❮ 
-  11       _                                09, 11
+  05       _                                06
+  10  ❮❮❮ 
+  10       _                                08, 10
        ●   }
-  09       (pair) [Node RecordSet(M0)]      06
+  08       (pair) [Node RecordSet(M0)]      05
        ○   }
-  11  ❮❮❮ 
-  11       _                                09, 11
+  10  ❮❮❮ 
+  10       _                                08, 10
   16  ❮❮❮ 
-  16       _                                15, 16
+  16       _                                14, 16
        ●   ,
-  15       (object)                         13
+  14       (object)                         12
        ○   ,
   16  ❮❮❮ 
-  16       _                                15, 16
+  16       _                                14, 16
        ●   identifier
-  15       (object)                         13
+  14       (object)                         12
        ○   identifier
   16  ❮❮❮ 
-  16       _                                15, 16
+  16       _                                14, 16
        ●   ]
-  15       (object)                         13
+  14       (object)                         12
        ○   ]
   16  ❮❮❮ 
-  16       _                                15, 16
-  20  ❮❮❮ 
-  21  ❮❮❮ 
+  16       _                                14, 16
+  02  ❮❮❮ 
+  01  ❮❮❮ 

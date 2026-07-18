@@ -75,93 +75,80 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@36)                            36 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  -ε-  [ListOpen]                       26, 06
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘² _                                06
-  08  -ε-  [ListClose RecordSet(M2)]        07
-  10  -ε-  [RecordClose ArrayPush]          26, 32
-  12   !   (identifier) [Node RecordSet(M0)]  10
-  14  ──!  _                                12, 14
-  16   !   _ [Absent RecordSet(M1)]         12, 14
-  18   !   (number) [Node RecordSet(M1)]    10
-  20  ──!  _                                18, 20
-  22   !   _ [Absent RecordSet(M0)]         18, 20
-  24  -ε-  [RecordOpen]                     16, 22
-  26  ──!  _                                24, 26
-  28  └─!  _                                24, 26
-  30  -ε-  [ListOpen]                       28, 08
-  32  ─‣┘  _ [ListClose RecordSet(M2)]      07
-  34  └‣─  (array)                          30
-  35  └‣─  (expression_statement)           34
-  36   !   (program)                        35
+  06  -ε-  [ListClose RecordSet(M2)]        30
+  08  -ε-  [RecordClose ArrayPush]          24, 28
+  10   !   (identifier) [Node RecordSet(M0)]  08
+  12  ──!  _                                10, 12
+  14   !   _ [Absent RecordSet(M1)]         10, 12
+  16   !   (number) [Node RecordSet(M1)]    08
+  18  ──!  _                                16, 18
+  20   !   _ [Absent RecordSet(M0)]         16, 18
+  22  -ε-  [RecordOpen]                     14, 20
+  24  ──!  _                                22, 24
+  26  └─!  _                                22, 24
+  28  ─‣┘  _ [ListClose RecordSet(M2)]      30
+  30  ─‣┘² _                                05
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@36)                            36 : 03
-       ▶   (@36)
-
-@36:
-  36       (program)                        35
+  00       (program)                        01
        ●   program
-  35       (expression_statement)           34
+  01       (expression_statement)           02
        ●   expression_statement
-  34       (array)                          30
+  02       (array)                          03
        ●   array
-  30  -ε-  [ListOpen]                       28, 08
-  28       _                                24, 26
+  03  -ε-  [ListOpen]                       26, 06
+  26       _                                22, 24
        ●   [
-  24  -ε-  [RecordOpen]                     16, 22
-  16       _ [Absent RecordSet(M1)]         12, 14
+  22  -ε-  [RecordOpen]                     14, 20
+  14       _ [Absent RecordSet(M1)]         10, 12
        ●   [
-  12       (identifier) [Node RecordSet(M0)]  10
+  10       (identifier) [Node RecordSet(M0)]  08
        ○   [
-  16  ❮❮❮ 
-  14       _                                12, 14
+  14  ❮❮❮ 
+  12       _                                10, 12
        ●   identifier
-  12       (identifier) [Node RecordSet(M0)]  10
+  10       (identifier) [Node RecordSet(M0)]  08
        ●   identifier
-  10  -ε-  [RecordClose ArrayPush]          26, 32
-  26       _                                24, 26
+  08  -ε-  [RecordClose ArrayPush]          24, 28
+  24       _                                22, 24
        ●   ,
-  24  -ε-  [RecordOpen]                     16, 22
-  16       _ [Absent RecordSet(M1)]         12, 14
+  22  -ε-  [RecordOpen]                     14, 20
+  14       _ [Absent RecordSet(M1)]         10, 12
        ●   ,
-  12       (identifier) [Node RecordSet(M0)]  10
+  10       (identifier) [Node RecordSet(M0)]  08
        ○   ,
-  16  ❮❮❮ 
-  14       _                                12, 14
+  14  ❮❮❮ 
+  12       _                                10, 12
        ●   identifier
-  12       (identifier) [Node RecordSet(M0)]  10
+  10       (identifier) [Node RecordSet(M0)]  08
        ●   identifier
-  10  -ε-  [RecordClose ArrayPush]          26, 32
-  26       _                                24, 26
+  08  -ε-  [RecordClose ArrayPush]          24, 28
+  24       _                                22, 24
        ●   ]
-  24  -ε-  [RecordOpen]                     16, 22
-  16       _ [Absent RecordSet(M1)]         12, 14
+  22  -ε-  [RecordOpen]                     14, 20
+  14       _ [Absent RecordSet(M1)]         10, 12
        ●   ]
-  12       (identifier) [Node RecordSet(M0)]  10
+  10       (identifier) [Node RecordSet(M0)]  08
        ○   ]
-  16  ❮❮❮ 
-  14       _                                12, 14
-  24  ❮❮❮ 
-  22       _ [Absent RecordSet(M0)]         18, 20
-       ●   ]
-  18       (number) [Node RecordSet(M1)]    10
-       ○   ]
+  14  ❮❮❮ 
+  12       _                                10, 12
   22  ❮❮❮ 
-  20       _                                18, 20
-  26  ❮❮❮ 
-  26       _                                24, 26
-  10  ❮❮❮ 
-  32       _ [ListClose RecordSet(M2)]      07
+  20       _ [Absent RecordSet(M0)]         16, 18
+       ●   ]
+  16       (number) [Node RecordSet(M1)]    08
+       ○   ]
+  20  ❮❮❮ 
+  18       _                                16, 18
+  24  ❮❮❮ 
+  24       _                                22, 24
+  08  ❮❮❮ 
+  28       _ [ListClose RecordSet(M2)]      30
        ●   array
-  07       _                                06
+  30       _                                05
        ●   program
-  06   ◀   (@36)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

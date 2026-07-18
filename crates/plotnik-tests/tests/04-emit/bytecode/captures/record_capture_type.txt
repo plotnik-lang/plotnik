@@ -3,18 +3,12 @@ Q = {
 } @outer :: FunctionInfo
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 8
+Q = 3
 
 [transitions]
 Q:
   1                                         ▶
   3   !   (identifier) [RecordOpen Node RecordSet(fn) RecordClose RecordSet(outer)]  1
-
-Q (entry point):
-  5                                         ▶
-  6  -ε-  [RecordClose]                     5
-  7       (Q)                               3 : 6
-  8  -ε-  [RecordOpen]                      7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -38,14 +32,9 @@ N0: S3 → T1  ; FunctionInfo
 N1: S4 → T2  ; Q
 
 [entry_points]
-Q = 00 :: T2
+Q = 0 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@08)                            08 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  06
+  0   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  3
+  3                                         ▶

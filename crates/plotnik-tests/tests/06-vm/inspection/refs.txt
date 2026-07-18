@@ -124,7 +124,7 @@ N0: S2 → T2  ; Name
 
 [entry_points]
 Name = 00 :: T2
-Q    = 06 :: T0
+Q    = 05 :: T0
 
 [spans]
 P0 def        0..25  source_id=0  T2
@@ -137,49 +137,34 @@ P6 ref        61..67  source_id=0  T2
 
 [instructions]
 Name:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  04                                        ▶
 
 Q:
-  06       (@24)                            24 : 07
-  07                                        ▶
-  08  └‣─  (@16)                            16 : 09
-  09  ─‣┘  _ [SuppressEnd SpanEnd#6]        11
-  11  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
-  13                                        ▶
-  14                                        ▶
-  15  ...
-  16   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  13
-  20  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  08
-  22  ...
-  23  ...
-  24   !   (program) [SpanStart#3 SpanStartAt#4]  20
+  05   !   (program) [SpanStart#3 SpanStartAt#4]  08
+  07  ...
+  08  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  10
+  10  └‣─  (Name)                           00 : 11
+  11  ─‣┘  _ [SuppressEnd SpanEnd#6]        13
+  13  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
+  15                                        ▶
 --------------------- TRACE ----------------------
 Q:
-  06       (@24)                            24 : 07
-       ▶   (@24)
-
-@24:
-  24       (program) [SpanStart#3 SpanStartAt#4]  20
+  05       (program) [SpanStart#3 SpanStartAt#4]  08
        ●   program
-  20       (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  08
+  08       (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  10
        ●   expression_statement
-  08       (@16)                            16 : 09
-       ▶   (@16)
+  10       (Name)                           00 : 11
+       ▶   (Name)
 
-@16:
-  16       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  13
+Name:
+  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
        ●   identifier
-  13   ◀   (@16)                            
-
-@24:
-  09       _ [SuppressEnd SpanEnd#6]        11
-       ●   expression_statement
-  11       _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
-       ●   program
-  14   ◀   (@24)                            
+  04   ◀   (Name)                           
 
 Q:
-  07   ◀   (Q)                              ◼
+  11       _ [SuppressEnd SpanEnd#6]        13
+       ●   expression_statement
+  13       _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
+       ●   program
+  15   ◀   (Q)                              ◼

@@ -50,57 +50,43 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) [NodeText RecordSet(M1)]  08
-  08  ─‣┘  _                                09
-  09  ─‣┘  _                                10
-  10                                        ▶
-  11  └‣─  (expression_statement) [ListClose RecordSet(M0)]  06
-  13  ─‣─  (expression_statement) [ListClose RecordSet(M0)]  06
-  15  ...
-  16   !   (comment) [NodeText ArrayPush]   18, 13
-  18  ──!  _                                16, 18
-  20  └─!  _                                16, 18
-  22  -ε-  [ListOpen]                       20, 11
-  24   !   (program)                        22
+  00   !   (program)                        01
+  01  -ε-  [ListOpen]                       16, 08
+  03  └‣─  (identifier) [NodeText RecordSet(M1)]  05
+  05  ─‣┘  _                                06
+  06  ─‣┘  _                                07
+  07                                        ▶
+  08  └‣─  (expression_statement) [ListClose RecordSet(M0)]  03
+  10  ─‣─  (expression_statement) [ListClose RecordSet(M0)]  03
+  12   !   (comment) [NodeText ArrayPush]   14, 10
+  14  ──!  _                                12, 14
+  16  └─!  _                                12, 14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-       ▶   (@24)
-
-@24:
-  24       (program)                        22
+  00       (program)                        01
        ●   program
-  22  -ε-  [ListOpen]                       20, 11
-  20       _                                16, 18
+  01  -ε-  [ListOpen]                       16, 08
+  16       _                                12, 14
        ●   comment
-  16       (comment) [NodeText ArrayPush]   18, 13
+  12       (comment) [NodeText ArrayPush]   14, 10
        ●   comment
-  18       _                                16, 18
+  14       _                                12, 14
        ●   comment
-  16       (comment) [NodeText ArrayPush]   18, 13
+  12       (comment) [NodeText ArrayPush]   14, 10
        ●   comment
-  18       _                                16, 18
+  14       _                                12, 14
        ●   expression_statement
-  16       (comment) [NodeText ArrayPush]   18, 13
+  12       (comment) [NodeText ArrayPush]   14, 10
        ○   expression_statement
-  18  ❮❮❮ 
-  18       _                                16, 18
-  16  ❮❮❮ 
-  13       (expression_statement) [ListClose RecordSet(M0)]  06
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (expression_statement) [ListClose RecordSet(M0)]  03
        ●   expression_statement
-  06       (identifier) [NodeText RecordSet(M1)]  08
+  03       (identifier) [NodeText RecordSet(M1)]  05
        ●   identifier
-  08       _                                09
+  05       _                                06
        ●   expression_statement
-  09       _                                10
+  06       _                                07
        ●   program
-  10   ◀   (@24)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  07   ◀   (Q)                              ◼

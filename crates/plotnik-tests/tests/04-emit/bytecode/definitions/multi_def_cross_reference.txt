@@ -11,9 +11,9 @@ Assignment = (assignment_expression
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Assignment = 24
-Expression = 20
-Ident      = 18
+Assignment = 10
+Expression = 03
+Ident      = 02
 
 [transitions]
 Ident:
@@ -32,22 +32,6 @@ Assignment:
   11  ─‣┘  _ [RecordSet(value)]             09
   13  ─‣─  right: (Expression)              03 : 11
   14  └‣─  left: (identifier) [Node RecordSet(target)]  13
-
-Ident (entry point):
-  15                                        ▶
-  16  -ε-  [RecordClose]                    15
-  17       (Ident)                          02 : 16
-  18  -ε-  [RecordOpen]                     17
-
-Expression (entry point):
-  19                                        ▶
-  20       (Expression)                     03 : 19
-
-Assignment (entry point):
-  21                                        ▶
-  22  -ε-  [RecordClose]                    21
-  23       (Assignment)                     10 : 22
-  24  -ε-  [RecordOpen]                     23
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -88,36 +72,24 @@ N1: S07 → T4  ; Expression
 N2: S08 → T5  ; Assignment
 
 [entry_points]
-Assignment = 08 :: T5
-Expression = 06 :: T4
+Assignment = 05 :: T5
+Expression = 03 :: T4
 Ident      = 00 :: T1
 
 [instructions]
 Ident:
-  00  -ε-  [RecordOpen]                     02
-  02       (@19)                            19 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (identifier) [Node RecordSet(M0)]  02
+  02                                        ▶
 
 Expression:
-  06       (@30)                            30 : 07
-  07                                        ▶
+  03  -ε-                                   13, 16
 
 Assignment:
-  08  -ε-  [RecordOpen]                     10
-  10       (@34)                            34 : 11
-  11  -ε-  [RecordClose]                    13
-  13                                        ▶
-  14  ─‣─  right: (@30)                     30 : 16
-  15  ...
-  16  ─‣┘  _ [RecordSet(M5)]                22
-  18                                        ▶
-  19   !   (identifier) [Node RecordSet(M0)]  18
-  21                                        ▶
-  22                                        ▶
-  23  ...
-  24   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  21
-  27   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose]  21
-  30  -ε-                                   24, 27
-  32  └‣─  left: (identifier) [Node RecordSet(M6)]  14
-  34   !   (assignment_expression)          32
+  05   !   (assignment_expression)          06
+  06  └‣─  left: (identifier) [Node RecordSet(M6)]  08
+  08  ─‣─  right: (Expression)              03 : 09
+  09  ─‣┘  _ [RecordSet(M5)]                11
+  11                                        ▶
+  12                                        ▶
+  13   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+  16   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose]  12

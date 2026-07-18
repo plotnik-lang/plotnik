@@ -136,30 +136,26 @@ S6 "string"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:2  ; { n, s }
-T2 = Option(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { n, s }
 
 [type_members]
-M0: S1 → T2  ; n: T2
-M1: S2 → T2  ; s: T2
+M0: S1 → T1  ; n: T1
+M1: S2 → T1  ; s: T1
 
 [type_names]
-N0: S3 → T1  ; Value
+N0: S3 → T2  ; Value
 
 [entry_points]
-Value = 00 :: T1
+Value = 00 :: T2
 
 [instructions]
 Value:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08   !   (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
-  11   !   (string) [Absent RecordSet(M0) Node RecordSet(M1)]  07
-  14  ─‣─  _                                08, 11, 14
-  16  └‣─  _                                08, 11, 14
-  18   !   (document)                       16
+  00   !   (document)                       01
+  01  └─!  _                                04, 08, 11
+  03                                        ▶
+  04   !   (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  07  ─‣┘  _                                03
+  08   !   (string) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  11  ──!  _                                04, 08, 11
 ```

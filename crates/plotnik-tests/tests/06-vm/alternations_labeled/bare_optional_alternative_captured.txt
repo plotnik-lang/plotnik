@@ -53,44 +53,31 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06   !   (identifier) [Node RecordSet(M0)]  08
-  08  ─‣┘  _ [VariantClose RecordSet(M2)]   10
-  10                                        ▶
-  11  ──!  _                                06, 11
-  13   !   _ [VariantOpen(M1)]              06, 11
+  00   !   (program)                        18, 12
+  02   !   (identifier) [Node RecordSet(M0)]  04
+  04  ─‣┘  _ [VariantClose RecordSet(M2)]   06
+  06                                        ▶
+  07  ...
+  08  ──!  _                                02, 08
+  10   !   _ [VariantOpen(M1)]              02, 08
+  12  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  06
   15  ...
-  16  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  10
-  19  ──!  _                                13, 19
-  21  └─!  _                                13, 19
-  23  ...
-  24   !   (program)                        21, 16
+  16  ──!  _                                10, 16
+  18  └─!  _                                10, 16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-       ▶   (@24)
-
-@24:
-  24       (program)                        21, 16
+  00       (program)                        18, 12
        ●   program
-  21       _                                13, 19
+  18       _                                10, 16
        ●   lexical_declaration
-  13       _ [VariantOpen(M1)]              06, 11
+  10       _ [VariantOpen(M1)]              02, 08
        ●   lexical_declaration
-  06       (identifier) [Node RecordSet(M0)]  08
+  02       (identifier) [Node RecordSet(M0)]  04
        ○   lexical_declaration
-  13  ❮❮❮ 
-  11       _                                06, 11
-  21  ❮❮❮ 
-  19       _                                13, 19
-  24  ❮❮❮ 
-  16  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  10
-  10   ◀   (@24)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  10  ❮❮❮ 
+  08       _                                02, 08
+  18  ❮❮❮ 
+  16       _                                10, 16
+  00  ❮❮❮ 
+  12  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  06
+  06   ◀   (Q)                              ◼

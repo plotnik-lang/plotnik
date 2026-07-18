@@ -21,6 +21,7 @@ struct BlockArena {
 /// A 64-byte cache-line block.
 struct Block {
     placements: Vec<Placement>,
+    reserved: u8,
     used: u8,
 }
 
@@ -33,9 +34,14 @@ struct Placement {
 
 impl Block {
     fn new() -> Self {
+        Self::with_reserved_prefix(0)
+    }
+
+    fn with_reserved_prefix(bytes: u8) -> Self {
         Self {
             placements: Vec::new(),
-            used: 0,
+            reserved: bytes,
+            used: bytes,
         }
     }
 
@@ -95,7 +101,7 @@ impl BlockArena {
         let old_placement = block.placements.remove(pos);
         block.used -= old_placement.size;
 
-        let mut offset = 0u8;
+        let mut offset = block.reserved;
         for p in &mut block.placements {
             p.offset = offset;
             offset += p.size;
@@ -254,8 +260,16 @@ impl CacheAligned {
 
         let chains = extract_chains(&graph, instructions, entries);
         let ordered = order_chains(chains, entries);
+        let successor_targets: HashSet<Label> = instructions
+            .iter()
+            .flat_map(InstructionIR::successors)
+            .copied()
+            .collect();
+        let reserve_zero = entries
+            .first()
+            .is_some_and(|entry| successor_targets.contains(entry));
 
-        let mut layout = LayoutBuilder::new(&label_to_instr);
+        let mut layout = LayoutBuilder::new(&label_to_instr, reserve_zero);
         layout.place_chains(&ordered);
         layout.pack_successors();
         layout.finish()
@@ -271,10 +285,20 @@ struct LayoutBuilder<'a> {
 }
 
 impl<'a> LayoutBuilder<'a> {
-    fn new(label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>) -> Self {
+    fn new(label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>, reserve_zero: bool) -> Self {
+        let mut arena = BlockArena::new();
+        if reserve_zero {
+            // Entry and call targets may use address zero, but Match successors
+            // and call continuations encode zero as terminal. Keep the first
+            // entry nonzero only when it is also reached through one of those
+            // successor operands.
+            arena
+                .blocks
+                .push(Block::with_reserved_prefix(BYTECODE_WORD_SIZE as u8));
+        }
         Self {
             label_to_instr,
-            arena: BlockArena::new(),
+            arena,
         }
     }
 

@@ -275,7 +275,7 @@ N1: S5 → T2  ; Q
 
 [entry_points]
 Name = 00 :: T1
-Q    = 06 :: T2
+Q    = 05 :: T2
 
 [spans]
 P00 def        0..25  source_id=0  T1
@@ -293,74 +293,54 @@ P11 ref        111..117  source_id=0  T1
 
 [instructions]
 Name:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  04                                        ▶
 
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@43)                            43 : 09
-  09  -ε-  [RecordClose]                    11
-  11                                        ▶
+  05   !   (program) [SpanStart#3 SpanStartAt#4]  08
+  07  ...
+  08  └‣─  (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  11
+  11  └‣─  (Name)                           00 : 12
   12  -ε-  [RecordClose]                    16
-  14                                        ▶
-  15  ...
-  16  ─‣┘  _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  19
-  19  ─‣┘  _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
-  22  -ε-  [RecordClose]                    24
-  24  ─‣┘  _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  33
-  27                                        ▶
-  28   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
-  32  └‣─  (@28)                            28 : 12
-  33  ─‣─  (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  32
-  36  └‣─  (@28)                            28 : 22
-  37  ...
-  38  ...
-  39  ...
-  40  └‣─  (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  36
-  43   !   (program) [SpanStart#3 SpanStartAt#4]  40
+  14  -ε-  [RecordClose]                    24
+  16  ─‣┘  _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  19
+  19  ─‣─  (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  22
+  22  └‣─  (Name)                           00 : 14
+  23                                        ▶
+  24  ─‣┘  _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  27
+  27  ─‣┘  _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  23
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@43)                            43 : 09
-       ▶   (@43)
-
-@43:
-  43       (program) [SpanStart#3 SpanStartAt#4]  40
+  05       (program) [SpanStart#3 SpanStartAt#4]  08
        ●   program
-  40       (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  36
+  08       (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  11
        ●   expression_statement
-  36       (@28)                            28 : 22
-       ▶   (@28)
+  11       (Name)                           00 : 12
+       ▶   (Name)
 
-@28:
-  28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
+Name:
+  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
        ●   identifier
-  27   ◀   (@28)                            
-
-@43:
-  22  -ε-  [RecordClose]                    24
-  24       _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  33
-       ●   expression_statement
-  33       (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  32
-       ●   expression_statement
-  32       (@28)                            28 : 12
-       ▶   (@28)
-
-@28:
-  28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
-       ●   identifier
-  27   ◀   (@28)                            
-
-@43:
-  12  -ε-  [RecordClose]                    16
-  16       _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  19
-       ●   expression_statement
-  19       _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
-       ●   program
-  14   ◀   (@43)                            
+  04   ◀   (Name)                           
 
 Q:
-  09  -ε-  [RecordClose]                    11
-  11   ◀   (Q)                              ◼
+  12  -ε-  [RecordClose]                    16
+  16       _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  19
+       ●   expression_statement
+  19       (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  22
+       ●   expression_statement
+  22       (Name)                           00 : 14
+       ▶   (Name)
+
+Name:
+  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+       ●   identifier
+  04   ◀   (Name)                           
+
+Q:
+  14  -ε-  [RecordClose]                    24
+  24       _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  27
+       ●   expression_statement
+  27       _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  23
+       ●   program
+  23   ◀   (Q)                              ◼

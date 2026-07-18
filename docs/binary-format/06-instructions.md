@@ -7,10 +7,11 @@ The Instructions section stores VM instructions in 8-byte bytecode words. A
 instructions_offset + CodeAddr * 8
 ```
 
-`CodeAddr(0)` is a valid instruction address, including as an entry point target.
-In an encoded successor operand, raw `0` may instead mean terminal; non-terminal
-successors decode as `SuccessorAddr`, which cannot contain zero. Call targets and
-return addresses are always nonzero.
+`CodeAddr(0)` is a valid instruction address, including for entry points and
+call targets. Match successors and call continuations use `SuccessorAddr`
+operands, where raw `0` means terminal or unused; those targets must therefore
+be nonzero. Layout leaves word zero as padding only when its first entry is also
+referenced through a `SuccessorAddr`.
 
 Multi-word `Match` and `CallN` instructions occupy consecutive bytecode words. For example,
 `Match32` at address 5 occupies words 5 through 8, and the next instruction
@@ -210,7 +211,7 @@ struct Call1 {
     nav: u8,
     node_field: u16, // 0 = no field constraint
     next: u16,       // SuccessorAddr: return address
-    target: u16,     // SuccessorAddr: callee entry
+    target: u16,     // CodeAddr: callee entry
 }
 ```
 
@@ -232,7 +233,7 @@ struct CallN {
     header: u8,
     nav: u8,
     node_field: u16, // 0 = no field constraint
-    target: u16,     // SuccessorAddr: callee entry
+    target: u16,     // CodeAddr: callee entry
     arity: u8,       // 2..=8
     consumed_mask: u8,
     returns: [u16; 8],
@@ -285,7 +286,7 @@ The loader verifies:
   optional field, dense arity, and per-port cursor contract;
 - callee ports are dense, every call supplies exactly the callee arity, calls
   to one specialized target agree on entry ownership and port behavior, and
-  entry point wrappers use the caller-owned contract and return through port 0 only;
+  entry point definitions use the caller-owned contract and return through port 0 only;
 - every accepted output-event path keeps the materializer stack balanced;
 - suppression effects cannot underflow their depth and finish balanced;
 - the committed match journal cannot underflow or mis-nest the inspection span

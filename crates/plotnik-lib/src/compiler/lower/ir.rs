@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::bytecode::{CodeAddr, EffectKind, Nav, PredicateOp, select_match_opcode};
+use crate::bytecode::{CodeAddr, EffectKind, EntryBoundary, Nav, PredicateOp, select_match_opcode};
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::boundary::BoundaryState;
@@ -1024,8 +1024,13 @@ pub(crate) enum LabelOrigin {
         source: SourceMode,
         route: DefRoute,
     },
-    /// Allocated for this definition's entry point wrapper.
-    Wrapper(DefId),
+}
+
+/// One selectable definition and the result effects owned by its execution boundary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct EntryPointIR {
+    pub(crate) target: Label,
+    pub(crate) boundary: EntryBoundary,
 }
 
 /// Compiled query IR plus entry labels produced by the compile stage.
@@ -1034,8 +1039,8 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for every emitted definition specialization.
     pub(in crate::compiler::lower) def_entries: IndexMap<DefSpecialization, Label>,
-    /// Entry labels for each emitted entry point wrapper, in definition order.
-    pub(in crate::compiler::lower) entry_point_wrappers: IndexMap<DefId, Label>,
+    /// Selectable definitions in source order.
+    pub(in crate::compiler::lower) entry_points: IndexMap<DefId, EntryPointIR>,
     /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
     /// Origin per label id (index = `Label.0`), recorded at allocation.
@@ -1047,8 +1052,8 @@ impl NfaGraph {
         &self.instructions
     }
 
-    pub(crate) fn entry_point_wrappers(&self) -> &IndexMap<DefId, Label> {
-        &self.entry_point_wrappers
+    pub(crate) fn entry_points(&self) -> &IndexMap<DefId, EntryPointIR> {
+        &self.entry_points
     }
 
     pub(crate) fn specialization_for_entry(&self, entry: Label) -> Option<&DefSpecialization> {

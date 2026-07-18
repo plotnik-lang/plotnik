@@ -45,59 +45,46 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@25)                            25 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  -ε-  [ListClose]                      08
-  08  ─‣┘  _ [RecordSet(M0)]                15
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  -ε-  [ListOpen]                       18, 11
+  05  -ε-  [ListClose]                      08
+  07  ─‣┘² _                                10
+  08  ─‣┘  _ [RecordSet(M0)]                07
   10                                        ▶
-  11  -ε-  [ListClose RecordSet(M0)]        15
-  13   !   (identifier) [Node ArrayPush]    16, 06
-  15  ─‣┘² _                                10
+  11  -ε-  [ListClose RecordSet(M0)]        07
+  13   !   (identifier) [Node ArrayPush]    16, 05
+  15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  -ε-  [ListOpen]                       18, 11
-  22  └‣─  (array)                          20
-  23  ...
-  24  └‣─  (expression_statement)           22
-  25   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@25)                            25 : 03
-       ▶   (@25)
-
-@25:
-  25       (program)                        24
+  00       (program)                        01
        ●   program
-  24       (expression_statement)           22
+  01       (expression_statement)           02
        ●   expression_statement
-  22       (array)                          20
+  02       (array)                          03
        ●   array
-  20  -ε-  [ListOpen]                       18, 11
+  03  -ε-  [ListOpen]                       18, 11
   18       _                                13, 16
        ●   [
-  13       (identifier) [Node ArrayPush]    16, 06
+  13       (identifier) [Node ArrayPush]    16, 05
        ○   [
   18  ❮❮❮ 
   16       _                                13, 16
        ●   number
-  13       (identifier) [Node ArrayPush]    16, 06
+  13       (identifier) [Node ArrayPush]    16, 05
        ○   number
   16  ❮❮❮ 
   16       _                                13, 16
        ●   ]
-  13       (identifier) [Node ArrayPush]    16, 06
+  13       (identifier) [Node ArrayPush]    16, 05
        ○   ]
   16  ❮❮❮ 
   16       _                                13, 16
-  20  ❮❮❮ 
-  11  -ε-  [ListClose RecordSet(M0)]        15
-  15       _                                10
+  03  ❮❮❮ 
+  11  -ε-  [ListClose RecordSet(M0)]        07
+  07       _                                10
        ●   program
-  10   ◀   (@25)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  10   ◀   (Q)                              ◼

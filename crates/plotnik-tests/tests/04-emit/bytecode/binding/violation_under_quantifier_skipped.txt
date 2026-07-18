@@ -5,7 +5,7 @@ Q = (program
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 22
+Q = 02
 
 [transitions]
 Q:
@@ -20,12 +20,6 @@ Q:
   12  ──!  _                                07, 12
   13  └─!  _                                07, 12
   18  -ε-  [ListOpen]                       13, 05
-
-Q (entry point):
-  19                                        ▶
-  20  -ε-  [RecordClose]                    19
-  21       (Q)                              02 : 20
-  22  -ε-  [RecordOpen]                     21
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -51,19 +45,14 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  -ε-  [ListOpen]                       14, 06
+  03  └‣─  (class_declaration)              04
+  04  ─‣┘  _                                08
   05                                        ▶
-  06  └‣─  (class_declaration)              07
-  07  ─‣┘  _                                11
-  08                                        ▶
-  09  -ε-  [ListClose RecordSet(M0)]        08
-  11  -ε-  [ArrayPush]                      16, 22
-  13   !   (function_declaration) [Node]    06
-  15  ...
-  16  ──!  _                                13, 16
-  18  └─!  _                                13, 16
-  20  -ε-  [ListOpen]                       18, 09
-  22  ─‣┘  _ [ListClose RecordSet(M0)]      08
-  24   !   (program)                        20
+  06  -ε-  [ListClose RecordSet(M0)]        05
+  08  -ε-  [ArrayPush]                      12, 16
+  10   !   (function_declaration) [Node]    03
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
+  16  ─‣┘  _ [ListClose RecordSet(M0)]      05

@@ -46,48 +46,34 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  -ε-  [ListClose RecordSet(M0)]        06
-  10   !   (lexical_declaration) [Node ArrayPush]  12, 18
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
-  16  -ε-  [ListOpen]                       14, 08
-  18  ─‣┘  _ [ListClose RecordSet(M0)]      06
-  20   !   (program)                        16
+  00   !   (program)                        01
+  01  -ε-  [ListOpen]                       10, 04
+  03                                        ▶
+  04  -ε-  [ListClose RecordSet(M0)]        03
+  06   !   (lexical_declaration) [Node ArrayPush]  08, 12
+  08  ──!  _                                06, 08
+  10  └─!  _                                06, 08
+  12  ─‣┘  _ [ListClose RecordSet(M0)]      03
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        16
+  00       (program)                        01
        ●   program
-  16  -ε-  [ListOpen]                       14, 08
-  14       _                                10, 12
+  01  -ε-  [ListOpen]                       10, 04
+  10       _                                06, 08
        ●   lexical_declaration
-  10       (lexical_declaration) [Node ArrayPush]  12, 18
+  06       (lexical_declaration) [Node ArrayPush]  08, 12
        ●   lexical_declaration
-  12       _                                10, 12
+  08       _                                06, 08
        ●   expression_statement
-  10       (lexical_declaration) [Node ArrayPush]  12, 18
+  06       (lexical_declaration) [Node ArrayPush]  08, 12
        ○   expression_statement
-  12  ❮❮❮ 
-  12       _                                10, 12
+  08  ❮❮❮ 
+  08       _                                06, 08
        ●   lexical_declaration
-  10       (lexical_declaration) [Node ArrayPush]  12, 18
+  06       (lexical_declaration) [Node ArrayPush]  08, 12
        ●   lexical_declaration
-  12       _                                10, 12
-  10  ❮❮❮ 
-  18       _ [ListClose RecordSet(M0)]      06
+  08       _                                06, 08
+  06  ❮❮❮ 
+  12       _ [ListClose RecordSet(M0)]      03
        ●   program
-  06   ◀   (@20)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  03   ◀   (Q)                              ◼

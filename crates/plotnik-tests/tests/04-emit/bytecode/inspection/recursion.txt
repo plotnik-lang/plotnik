@@ -9,7 +9,7 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 64
+Q = 02
 
 [transitions]
 Q:
@@ -45,12 +45,6 @@ Q:
   54       (Expr (split, routed Down))      26 : 23 / 25
   58  ──!  _                                12, 21, 58
   59  └─!  _                                12, 21, 58
-
-Q (entry point):
-  61                                        ▶
-  62  -ε-  [RecordClose]                    61
-  63       (Q)                              02 : 62
-  64  -ε-  [RecordOpen]                     63
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -98,46 +92,41 @@ P12 ref        114..120  source_id=0  T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@88)                            88 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (program) [SpanStart#8 SpanStartAt#9]  02
+  02  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  04
+  04  -ε-  [SpanStart#0]                    38, 18
   06                                        ▶
   07  ...
-  08   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  82
+  08   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  80
   11  ──!  _                                08, 11
   13   !   _ [SpanStart#3]                  08, 11
   15  ...
   16  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0)]  13
-  18  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
-  24  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  82
+  18  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  54
+  24  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  80
   27                                        ▶
   28                                        ▶ p1
   29   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  27
   32  ──!  _                                29, 32
   34   !   _ [SpanStart#3]                  29, 32
   36  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0)]  34
-  38  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  06
+  38  └─!  _                                16, 72, 75
   40  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  28
   44  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  27
   47  ...
   48       (@64)                            64 : 51 / 44
   51  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  27
-  54  ...
-  55  ...
+  54  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  06
   56   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 VariantOpen(M1) SpanStartAt#6 SpanStart#7 SuppressBegin]  48
   59  ──!  _                                36, 56, 59
   61  └─!  _                                36, 56, 59
   63  ...
   64  -ε-  [SpanStart#0]                    61, 40
   66       (@64)                            64 : 69 / 24
-  69  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  82
+  69  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  80
   72   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 VariantOpen(M1) SpanStartAt#6 SpanStart#7 SuppressBegin]  66
   75  ──!  _                                16, 72, 75
-  77  └─!  _                                16, 72, 75
+  77  ...
+  78  ...
   79  ...
-  80  -ε-  [SpanStart#0]                    77, 18
-  82  ─‣┘  _ [SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
-  85  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  80
-  87  ...
-  88   !   (program) [SpanStart#8 SpanStartAt#9]  85
+  80  ─‣┘  _ [SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  54

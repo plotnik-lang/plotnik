@@ -7,23 +7,17 @@ Q = (program
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 12
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (program)                        08
-  03  ─‣┘  _                                01
-  04  ─•─  (function_declaration) [Node RecordSet(f)]  03
-  05   !   (comment) [Node RecordSet(c)]    04
-  07  ──!  _                                05, 07
-  08  └─!  _                                05, 07
-
-Q (entry point):
-  09                                        ▶
-  10  -ε-  [RecordClose]                    09
-  11       (Q)                              02 : 10
-  12  -ε-  [RecordOpen]                     11
+  1                                         ▶
+  2   !   (program)                         8
+  3  ─‣┘  _                                 1
+  4  ─•─  (function_declaration) [Node RecordSet(f)]  3
+  5   !   (comment) [Node RecordSet(c)]     4
+  7  ──!  _                                 5, 7
+  8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -50,14 +44,11 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─•─  (function_declaration) [Node RecordSet(M1)]  08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10   !   (comment) [Node RecordSet(M0)]   06
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
-  16   !   (program)                        14
+  00   !   (program)                        01
+  01  └─!  _                                08, 10
+  03  ─•─  (function_declaration) [Node RecordSet(M1)]  05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08   !   (comment) [Node RecordSet(M0)]   03
+  10  ──!  _                                08, 10

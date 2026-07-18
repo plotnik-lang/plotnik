@@ -100,148 +100,133 @@ Q     = 02 :: T5
 
 [instructions]
 Entry:
-  00       (@19)                            19 : 01
-  01                                        ▶
+  00  -ε-                                   13, 16
 
 Q:
-  02  -ε-  [RecordOpen]                     04
-  04       (@36)                            36 : 05
-  05  -ε-  [RecordClose]                    07
-  07                                        ▶
+  02   !   (program)                        03
+  03  └‣─  (expression_statement)           04
+  04  └‣─  (array)                          05
+  05  -ε-  [ListOpen]                       27, 20
+  07  ─‣┘² _                                19
   08  -ε-  [ListClose]                      10
-  10  ─‣┘  _ [RecordSet(M4)]                31
+  10  ─‣┘  _ [RecordSet(M4)]                07
   12                                        ▶
   13   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
   16   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-  19  -ε-                                   13, 16
-  21                                        ▶
-  22  -ε-  [ListClose RecordSet(M4)]        31
-  24  -ε-  [ArrayPush]                      27, 08
-  26   !   (@19)                            19 : 24
-  27  ──!  _                                26, 27
-  29  └─!  _                                26, 27
-  31  ─‣┘² _                                21
-  32  -ε-  [ListOpen]                       29, 22
-  34  └‣─  (array)                          32
-  35  └‣─  (expression_statement)           34
-  36   !   (program)                        35
+  19                                        ▶
+  20  -ε-  [ListClose RecordSet(M4)]        07
+  22  -ε-  [ArrayPush]                      25, 08
+  24   !   (Entry)                          00 : 22
+  25  ──!  _                                24, 25
+  27  └─!  _                                24, 25
 --------------------- TRACE ----------------------
 Q:
-  02  -ε-  [RecordOpen]                     04
-  04       (@36)                            36 : 05
-       ▶   (@36)
-
-@36:
-  36       (program)                        35
+  02       (program)                        03
        ●   program
-  35       (expression_statement)           34
+  03       (expression_statement)           04
        ●   expression_statement
-  34       (array)                          32
+  04       (array)                          05
        ●   array
-  32  -ε-  [ListOpen]                       29, 22
-  29       _                                26, 27
+  05  -ε-  [ListOpen]                       27, 20
+  27       _                                24, 25
        ●   [
-  26       (@19)                            19 : 24
-       ▶   (@19)
+  24       (Entry)                          00 : 22
+       ▶   (Entry)
 
-@19:
-  19  -ε-                                   13, 16
+Entry:
+  00  -ε-                                   13, 16
   13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
        ○   [
-  19  ❮❮❮ 
+  00  ❮❮❮ 
   16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
        ○   [
-  29  ❮❮❮ 
-  27       _                                26, 27
-       ●   identifier
-  26       (@19)                            19 : 24
-       ▶   (@19)
-
-@19:
-  19  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ●   identifier
-  12   ◀   (@19)                            
-
-@36:
-  24  -ε-  [ArrayPush]                      27, 08
-  27       _                                26, 27
-       ●   ,
-  26       (@19)                            19 : 24
-       ▶   (@19)
-
-@19:
-  19  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   ,
-  19  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ○   ,
   27  ❮❮❮ 
-  27       _                                26, 27
-       ●   number
-  26       (@19)                            19 : 24
-       ▶   (@19)
-
-@19:
-  19  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   number
-  19  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ●   number
-  12   ◀   (@19)                            
-
-@36:
-  24  -ε-  [ArrayPush]                      27, 08
-  27       _                                26, 27
-       ●   ,
-  26       (@19)                            19 : 24
-       ▶   (@19)
-
-@19:
-  19  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   ,
-  19  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ○   ,
-  27  ❮❮❮ 
-  27       _                                26, 27
+  25       _                                24, 25
        ●   identifier
-  26       (@19)                            19 : 24
-       ▶   (@19)
+  24       (Entry)                          00 : 22
+       ▶   (Entry)
 
-@19:
-  19  -ε-                                   13, 16
+Entry:
+  00  -ε-                                   13, 16
   13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
        ●   identifier
-  12   ◀   (@19)                            
-
-@36:
-  24  -ε-  [ArrayPush]                      27, 08
-  27       _                                26, 27
-       ●   ]
-  26       (@19)                            19 : 24
-       ▶   (@19)
-
-@19:
-  19  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   ]
-  19  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ○   ]
-  27  ❮❮❮ 
-  27       _                                26, 27
-  24  ❮❮❮ 
-  08  -ε-  [ListClose]                      10
-  10       _ [RecordSet(M4)]                31
-       ●   array
-  31       _                                21
-       ●   program
-  21   ◀   (@36)                            
+  12   ◀   (Entry)                          
 
 Q:
-  05  -ε-  [RecordClose]                    07
-  07   ◀   (Q)                              ◼
+  22  -ε-  [ArrayPush]                      25, 08
+  25       _                                24, 25
+       ●   ,
+  24       (Entry)                          00 : 22
+       ▶   (Entry)
+
+Entry:
+  00  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   ,
+  00  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ○   ,
+  25  ❮❮❮ 
+  25       _                                24, 25
+       ●   number
+  24       (Entry)                          00 : 22
+       ▶   (Entry)
+
+Entry:
+  00  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   number
+  00  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ●   number
+  12   ◀   (Entry)                          
+
+Q:
+  22  -ε-  [ArrayPush]                      25, 08
+  25       _                                24, 25
+       ●   ,
+  24       (Entry)                          00 : 22
+       ▶   (Entry)
+
+Entry:
+  00  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   ,
+  00  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ○   ,
+  25  ❮❮❮ 
+  25       _                                24, 25
+       ●   identifier
+  24       (Entry)                          00 : 22
+       ▶   (Entry)
+
+Entry:
+  00  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ●   identifier
+  12   ◀   (Entry)                          
+
+Q:
+  22  -ε-  [ArrayPush]                      25, 08
+  25       _                                24, 25
+       ●   ]
+  24       (Entry)                          00 : 22
+       ▶   (Entry)
+
+Entry:
+  00  -ε-                                   13, 16
+  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
+       ○   ]
+  00  ❮❮❮ 
+  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+       ○   ]
+  25  ❮❮❮ 
+  25       _                                24, 25
+  22  ❮❮❮ 
+  08  -ε-  [ListClose]                      10
+  10       _ [RecordSet(M4)]                07
+       ●   array
+  07       _                                19
+       ●   program
+  19   ◀   (Q)                              ◼

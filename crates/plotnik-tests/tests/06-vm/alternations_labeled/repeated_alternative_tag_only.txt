@@ -51,51 +51,37 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  -ε-  [VariantClose]                   22
-  10   !   (expression_statement)           12, 08
-  12  ──!  _                                10, 12
-  14   !   _ [VariantOpen(M0)]              10, 12
-  16   !   (debugger_statement) [VariantOpen(M1) VariantClose]  22
-  18  ──!  _                                14, 16, 18
-  20  └─!  _                                14, 16, 18
-  22  ─‣┘  _ [RecordSet(M2)]                06
-  24   !   (program)                        20
+  00   !   (program)                        01
+  01  └─!  _                                10, 12, 14
+  03                                        ▶
+  04  -ε-  [VariantClose]                   16
+  06   !   (expression_statement)           08, 04
+  08  ──!  _                                06, 08
+  10   !   _ [VariantOpen(M0)]              06, 08
+  12   !   (debugger_statement) [VariantOpen(M1) VariantClose]  16
+  14  ──!  _                                10, 12, 14
+  16  ─‣┘  _ [RecordSet(M2)]                03
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-       ▶   (@24)
-
-@24:
-  24       (program)                        20
+  00       (program)                        01
        ●   program
-  20       _                                14, 16, 18
+  01       _                                10, 12, 14
        ●   expression_statement
-  14       _ [VariantOpen(M0)]              10, 12
+  10       _ [VariantOpen(M0)]              06, 08
        ●   expression_statement
-  10       (expression_statement)           12, 08
+  06       (expression_statement)           08, 04
        ●   expression_statement
-  12       _                                10, 12
+  08       _                                06, 08
        ●   expression_statement
-  10       (expression_statement)           12, 08
+  06       (expression_statement)           08, 04
        ●   expression_statement
-  12       _                                10, 12
+  08       _                                06, 08
        ●   expression_statement
-  10       (expression_statement)           12, 08
+  06       (expression_statement)           08, 04
        ●   expression_statement
-  12       _                                10, 12
-  10  ❮❮❮ 
-  08  -ε-  [VariantClose]                   22
-  22       _ [RecordSet(M2)]                06
+  08       _                                06, 08
+  06  ❮❮❮ 
+  04  -ε-  [VariantClose]                   16
+  16       _ [RecordSet(M2)]                03
        ●   program
-  06   ◀   (@24)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  03   ◀   (Q)                              ◼

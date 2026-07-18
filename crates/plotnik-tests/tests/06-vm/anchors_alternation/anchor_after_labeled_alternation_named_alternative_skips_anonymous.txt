@@ -60,41 +60,28 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@19)                            19 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─•─  (identifier) [RecordSet(M2)]     07
-  10  ─◦─  (identifier) [RecordSet(M2)]     07
-  12  └‣─  (number) [VariantOpen(M0) VariantClose]  08
-  14  └‣─  "+" [VariantOpen(M1) VariantClose]  10
-  16  └‣─  (binary_expression)              12, 14
-  18  └‣─  (expression_statement)           16
-  19   !   (program)                        18
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (binary_expression)              10, 12
+  04                                        ▶
+  05  ─•─  (identifier) [RecordSet(M2)]     07
+  07  ─‣┘³ _                                04
+  08  ─◦─  (identifier) [RecordSet(M2)]     07
+  10  └‣─  (number) [VariantOpen(M0) VariantClose]  05
+  12  └‣─  "+" [VariantOpen(M1) VariantClose]  08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@19)                            19 : 03
-       ▶   (@19)
-
-@19:
-  19       (program)                        18
+  00       (program)                        01
        ●   program
-  18       (expression_statement)           16
+  01       (expression_statement)           02
        ●   expression_statement
-  16       (binary_expression)              12, 14
+  02       (binary_expression)              10, 12
        ●   binary_expression
-  12       (number) [VariantOpen(M0) VariantClose]  08
+  10       (number) [VariantOpen(M0) VariantClose]  05
        ●   number
-  08       (identifier) [RecordSet(M2)]     07
+  05       (identifier) [RecordSet(M2)]     07
        ○   *
        ●   identifier
-  07       _                                06
+  07       _                                04
        ●   program
-  06   ◀   (@19)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  04   ◀   (Q)                              ◼

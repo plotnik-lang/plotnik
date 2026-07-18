@@ -52,42 +52,35 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@38)                            38 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) == "foo"            08
-  08  ─‣┘  _                                09
-  09  ─‣┘  _                                10
-  10                                        ▶
-  11  └─!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
-  14  ─•─  (expression_statement) [Node RecordSet(M2)]  06
-  16  -ε-  [ListClose RecordSet(M1)]        14
-  18  └─!  (debugger_statement) [Node ArrayPush]  20, 16
-  20  ──!  (debugger_statement) [Node ArrayPush]  20, 16
-  22  -ε-  [ListOpen]                       18, 11
-  24  ──!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
-  27  -ε-  [ListOpen]                       20, 24
-  29  -ε-  [Absent RecordSet(M0)]           22
+  00   !   (program)                        22, 29
+  02  └‣─  (identifier) == "foo"            04
+  04  ─‣┘  _                                05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  └─!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
+  11  ─•─  (expression_statement) [Node RecordSet(M2)]  02
+  13  -ε-  [ListClose RecordSet(M1)]        11
+  15  ...
+  16  └─!  (debugger_statement) [Node ArrayPush]  18, 13
+  18  ──!  (debugger_statement) [Node ArrayPush]  18, 13
+  20  -ε-  [ListOpen]                       16, 08
+  22  └─!  _                                32, 34
+  24  ──!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
+  27  -ε-  [ListOpen]                       18, 24
+  29  -ε-  [Absent RecordSet(M0)]           20
   31  ...
   32   !   (lexical_declaration) [Node RecordSet(M0)]  27
   34  ──!  _                                32, 34
-  36  └─!  _                                32, 34
-  38   !   (program)                        36, 29
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@38)                            38 : 03
-       ▶   (@38)
-
-@38:
-  38       (program)                        36, 29
+  00       (program)                        22, 29
        ●   program
-  36       _                                32, 34
+  22       _                                32, 34
        ●   comment
   32       (lexical_declaration) [Node RecordSet(M0)]  27
        ○   comment
-  36  ❮❮❮ 
+  22  ❮❮❮ 
   34       _                                32, 34
        ●   debugger_statement
   32       (lexical_declaration) [Node RecordSet(M0)]  27
@@ -99,11 +92,11 @@ Q:
        ○   expression_statement
   34  ❮❮❮ 
   34       _                                32, 34
-  38  ❮❮❮ 
-  29  -ε-  [Absent RecordSet(M0)]           22
-  22  -ε-  [ListOpen]                       18, 11
-  18       (debugger_statement) [Node ArrayPush]  20, 16
+  00  ❮❮❮ 
+  29  -ε-  [Absent RecordSet(M0)]           20
+  20  -ε-  [ListOpen]                       16, 08
+  16       (debugger_statement) [Node ArrayPush]  18, 13
        ○   comment
-  22  ❮❮❮ 
-  11       (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
+  20  ❮❮❮ 
+  08       (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
        ○   comment

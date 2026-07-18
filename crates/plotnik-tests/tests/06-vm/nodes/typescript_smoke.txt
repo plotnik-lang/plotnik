@@ -54,47 +54,34 @@ M1: S02 → T0  ; prop: <Node>
 N0: S03 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@15)                            15 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  name: (property_identifier) [Node RecordSet(M1)]  08
-  08  ─‣┘⁴ _                                09
-  09                                        ▶
-  10  └‣─  (property_signature)             06
-  11  ─‣─  body: (interface_body)           10
-  12  └‣─  name: (type_identifier) [Node RecordSet(M0)]  11
-  14  └‣─  (interface_declaration)          12
-  15   !   (program)                        14
+  0   !   (program)                         1
+  1  └‣─  (interface_declaration)           2
+  2  └‣─  name: (type_identifier) [Node RecordSet(M0)]  4
+  4  ─‣─  body: (interface_body)            5
+  5  └‣─  (property_signature)              6
+  6  └‣─  name: (property_identifier) [Node RecordSet(M1)]  8
+  8  ─‣┘⁴ _                                 9
+  9                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@15)                            15 : 03
-       ▶   (@15)
-
-@15:
-  15       (program)                        14
-       ●   program
-  14       (interface_declaration)          12
-       ●   interface_declaration
-  12       name: (type_identifier) [Node RecordSet(M0)]  11
-       ○   interface
-       ●   type_identifier
-  11       body: (interface_body)           10
-       ●   interface_body
-  10       (property_signature)             06
-       ○   {
-       ●   property_signature
-  06       name: (property_identifier) [Node RecordSet(M1)]  08
-       ●   property_identifier
-  08       _                                09
-       ●   program
-  09   ◀   (@15)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       (interface_declaration)           02
+      ●   interface_declaration
+  2       name: (type_identifier) [Node RecordSet(M0)]  04
+      ○   interface
+      ●   type_identifier
+  4       body: (interface_body)            05
+      ●   interface_body
+  5       (property_signature)              06
+      ○   {
+      ●   property_signature
+  6       name: (property_identifier) [Node RecordSet(M1)]  08
+      ●   property_identifier
+  8       _                                 09
+      ●   program
+  9   ◀   (Q)                               ◼

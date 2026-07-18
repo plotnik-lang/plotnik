@@ -4,7 +4,7 @@ Q = (program (Used))
 --------------------- INPUT ----------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 20
+Q = 02
 
 [transitions]
 Q:
@@ -21,10 +21,6 @@ Used:
 
 Q:
   17  └‣─  (Used)                           11 : 03
-
-Q (entry point):
-  19                                        ▶
-  20       (Q)                              02 : 19
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -48,8 +44,7 @@ Q = 00 :: T0
 
 [instructions]
 Q:
-  00       (@16)                            16 : 01
-  01                                        ▶
+  00   !   (program) [SuppressBegin]        02
   02  └‣─  (@14)                            14 : 03
   03  ─‣┘  _ [SuppressEnd]                  05
   05                                        ▶
@@ -59,4 +54,3 @@ Q:
   10   !   (comment) [Node ArrayPush]       12, 08
   12  ──!  _                                10, 12
   14   !   _ [ListOpen]                     10, 12
-  16   !   (program) [SuppressBegin]        02

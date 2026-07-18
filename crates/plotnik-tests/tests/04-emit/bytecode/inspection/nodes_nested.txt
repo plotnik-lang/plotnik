@@ -9,23 +9,17 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 13
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (program)                        04
-  04  └‣─  (expression_statement)           06
-  06  └‣─  (binary_expression)              09
-  07  ─‣┘³ _                                01
-  08  ─‣─  right: (identifier) [Node RecordSet(right)]  07
-  09  └‣─  left: (identifier) [Node RecordSet(left)]  08
-
-Q (entry point):
-  10                                        ▶
-  11  -ε-  [RecordClose]                    10
-  12       (Q)                              02 : 11
-  13  -ε-  [RecordOpen]                     12
+  1                                         ▶
+  2   !   (program)                         4
+  4  └‣─  (expression_statement)            6
+  6  └‣─  (binary_expression)               9
+  7  ─‣┘³ _                                 1
+  8  ─‣─  right: (identifier) [Node RecordSet(right)]  7
+  9  └‣─  left: (identifier) [Node RecordSet(left)]  8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -65,20 +59,13 @@ P9 pattern    104..116  source_id=0
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  16
-  08  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  12
-  12  ─‣┘  _                                13
-  13  ─‣┘  _ [SpanEnd#3]                    06
-  15  ...
-  16                                        ▶
-  17  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  08
-  21  ...
-  22  ...
-  23  ...
-  24  └‣─  (binary_expression) [SpanStartAt#3]  17
-  26  └‣─  (expression_statement) [SpanStartAt#2]  24
-  28   !   (program) [SpanStart#0 SpanStartAt#1]  26
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  └‣─  (expression_statement) [SpanStartAt#2]  04
+  04  └‣─  (binary_expression) [SpanStartAt#3]  08
+  06  ─‣┘  _                                16
+  07  ...
+  08  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  12
+  12  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  06
+  16  ─‣┘  _ [SpanEnd#3]                    18
+  18  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  20
+  20                                        ▶

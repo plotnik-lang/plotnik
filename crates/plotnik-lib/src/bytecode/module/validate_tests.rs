@@ -61,8 +61,14 @@ const SPLIT_CALL_QUERY: &str = indoc! {r#"
 "#};
 
 const ROUTED_CALL_QUERY: &str = indoc! {r#"
+    B = (expression_statement)
     A = (statement_block (A)+ (identifier))?
-    Q = (program (A) (expression_statement) @e)
+    Q = (program (B) (A) (expression_statement) @e)
+"#};
+
+const CALLER_OWNED_CALL_QUERY: &str = indoc! {r#"
+    Body = (expression_statement)
+    Q = (program (Body))
 "#};
 
 const BOUNDARY_NAV_CALL_QUERY: &str = indoc! {r#"
@@ -103,9 +109,9 @@ fn assert_linear_body_analyses(stage: &str, analyses: usize) {
 
 #[test]
 fn many_callable_definitions_load_without_global_fixpoint_rescans() {
-    // Every selectable definition emits both a wrapper and a called body. This
-    // shape used to spend quadratic time deduplicating roots and repeatedly
-    // rescanning the whole definition set as body summaries became known.
+    // This wide public-root shape used to spend quadratic time deduplicating
+    // roots and repeatedly rescanning the whole definition set as body
+    // summaries became known.
     let mut query = String::new();
     for index in 0..MANY_DEFINITIONS {
         writeln!(query, "Query{index} = (identifier)").expect("writing to a string succeeds");
@@ -1026,6 +1032,17 @@ fn forged_entry_point_into_instruction_interior_is_rejected() {
 }
 
 #[test]
+fn entry_and_call_targets_may_address_word_zero() {
+    let bytes = emit_bytes(CALLER_OWNED_CALL_QUERY);
+    let module = Module::load_compiler_output(&bytes).expect("compiler output validates");
+    let first_entry = module.entry_points().get(0);
+    let call = first_call(&bytes, false);
+
+    assert_eq!(first_entry.target(), CodeAddr::ZERO);
+    assert_eq!(raw_call_target(&bytes, call), 0);
+}
+
+#[test]
 fn forged_record_set_to_array_push_is_rejected() {
     // Swap an executed `RecordSet` for `ArrayPush`. A validated representation
     // would accept it, then the materializer would panic because the builder on
@@ -1046,9 +1063,8 @@ fn forged_record_set_to_array_push_is_rejected() {
 #[test]
 fn forged_scalar_capture_record_set_to_array_push_is_rejected() {
     // The minimal case: a scalar record whose only effect is a `RecordSet` into
-    // the entry point wrapper's root record. Forged to `ArrayPush`, the body now
-    // demands a List top while the wrapper hands it a Record — caught when the entry point
-    // wrapper is checked as a root.
+    // the entry boundary's root record. Forged to `ArrayPush`, the body demands
+    // a List while the entry supplies a Record.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
     let slot = first_effect_op(&bytes, |op| op == EffectKind::RecordSet as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::ArrayPush));
@@ -1128,10 +1144,15 @@ fn forged_data_variant_case_without_data_is_rejected() {
 
 #[test]
 fn forged_dropped_scope_close_is_rejected() {
-    // Turn a `RecordClose` into a no-op `Node`: the record's `RecordOpen` is
-    // never closed, so the body returns with an open frame — the materializer
-    // would leave the builder stack unbalanced. Rejected as a non-neutral body.
-    let mut bytes = emit_bytes(RECORD_QUERY);
+    // Turn a repeated capture's `RecordClose` into a `Node`: its per-item
+    // `RecordOpen` is never closed, so the body returns with an open frame.
+    let mut bytes = emit_bytes(indoc! {r#"
+        Q = (program
+          (function_declaration
+            name: (identifier) @name
+          )* @funcs
+        )
+    "#});
     let slot = first_effect_op(&bytes, |op| op == EffectKind::RecordClose as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Node));
     reseal(&mut bytes);
@@ -1198,26 +1219,11 @@ fn last_return_addr(bytes: &[u8]) -> CodeAddr {
     found.expect("no Return in the instruction stream")
 }
 
-/// Byte offset of the `n`th (0-based) effect slot whose opcode satisfies `want`.
-fn nth_effect_op(bytes: &[u8], n: usize, want: impl Fn(u16) -> bool) -> usize {
-    effect_slots(bytes)
-        .into_iter()
-        .filter(|&off| {
-            want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> EFFECT_PAYLOAD_BITS)
-        })
-        .nth(n)
-        .expect("no matching effect slot in the instruction stream")
-}
-
 #[test]
-fn forged_accept_inside_called_def_is_rejected() {
+fn forged_returnless_entry_body_is_rejected() {
     // Zero the `next` of the Match8 that flows into the definition body's
-    // `Return`, turning it into a terminal (accepting) match. A successor-less
-    // match accepts the whole run from any call depth, so the wrapper's root
-    // `RecordOpen` would still be open in the committed log and the
-    // materializer's end-of-log balance assert would panic. The body is locally
-    // balanced at that point — only the rule that called bodies must not
-    // contain accepts catches it.
+    // `Return`, turning it into a terminal accepting match. Entry definitions
+    // must retain their declared Return contract.
     let mut bytes = emit_bytes(r#"Q = (program (expression_statement (identifier) @name))"#);
 
     let def_return = last_return_addr(&bytes);
@@ -1241,85 +1247,24 @@ fn forged_accept_inside_called_def_is_rejected() {
     reseal(&mut bytes);
 
     let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged accept inside a called body must be rejected");
-    // Return-route validation rejects the now-returnless callee before the
-    // effect-stack pass reaches the open wrapper frame.
+        .expect_err("forged returnless entry body must be rejected");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
 
 #[test]
-fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
-    // A definition body applies `RecordSet` to its capture below entry, into the frame its
-    // wrapper opened. Retarget that write: swap the wrapper's root
-    // `RecordOpen`/`RecordClose` for `VariantOpen`/`VariantClose` on a no-payload
-    // (tag-only) member borrowed from the other entry point. The callee's
-    // below-entry `RecordSet` then lands data on a no-payload case — invisible to the
-    // wrapper's own walk, because the write happens inside the callee. Only a
-    // call site that forks on the callee's may-write (`record_sets_caller_top`)
-    // rejects it; stale payload-field state would let it load and mis-materialize.
-    let mut bytes = emit_bytes(indoc! {r#"
-        A = (program [T: (comment)] @e)
-        Z = (program (function_declaration) @fn)
-    "#});
-
-    let no_payload_member = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
-        let types = m.types();
-        (0..m.header().type_members_count)
-            .find(|&i| {
-                types
-                    .get(types.member_type_id(i as usize))
-                    .is_some_and(|def| {
-                        matches!(def.decode(), TypeDefKind::Primitive(TypeKind::NoValue))
-                    })
-            })
-            .expect("query must emit a no-payload variant member")
-    };
-
-    // Both wrappers precede the bodies and only wrappers open frames, so slot
-    // order is A's pair then Z's pair; forge Z's.
-    let open_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::RecordOpen as u16);
-    let close_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::RecordClose as u16);
-    bytes[open_slot..open_slot + 2].copy_from_slice(&effect_word_with_payload(
-        EffectKind::VariantOpen,
-        no_payload_member,
-    ));
-    bytes[close_slot..close_slot + 2].copy_from_slice(&effect_word(EffectKind::VariantClose));
-    reseal(&mut bytes);
-
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged no-payload case callee write must be rejected");
-    assert!(
-        matches!(err, ModuleError::EffectStackImbalance(_)),
-        "expected EffectStackImbalance, got {err:?}"
-    );
-}
-
-#[test]
-fn forged_record_wrapper_without_root_frame_is_rejected() {
-    // A record-producing entry point wrapper opens a root `RecordOpen` before calling the
-    // body, so the body always has a Record to apply `RecordSet` to. Neutralize
-    // `RecordOpen` and its matching `RecordClose` (turn both into no-op `Absent`s)
-    // and lie that the result type is scalar: the entry's `RecordSet` would then hit
-    // the materializer's scalar root frame and panic. The wrapper has no caller,
-    // so a requirement bubbling out of it must be rejected, not silently dropped.
+fn forged_record_entry_without_root_boundary_is_rejected() {
+    // A record entry supplies the root frame its body's `RecordSet` effects
+    // target. Forging the boundary to Passthrough must be rejected at load.
     let mut bytes = emit_bytes(r#"Q = (_) @x"#);
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .entry_points as usize;
-    let record_open_slot = first_effect_op(&bytes, |op| op == EffectKind::RecordOpen as u16);
-    let record_close_slot = first_effect_op(&bytes, |op| op == EffectKind::RecordClose as u16);
-
-    let absent = effect_word(EffectKind::Absent);
-    bytes[record_open_slot..record_open_slot + 2].copy_from_slice(&absent);
-    bytes[record_close_slot..record_close_slot + 2].copy_from_slice(&absent);
-    // Result type T1 (record) -> T0 (scalar <Node>): the root frame is now a Scalar.
-    bytes[ep_off + 4..ep_off + 6].copy_from_slice(&0u16.to_le_bytes());
+    bytes[ep_off + 6..ep_off + 8].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged rootless wrapper must be rejected");
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("forged rootless entry boundary must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1400,6 +1345,8 @@ fn forged_calln_invalid_nav_target_and_return_are_rejected() {
         let off = first_instr(&bytes, |opcode| opcode == Opcode::CallN as u8);
         if byte == 1 {
             bytes[off + byte] = 0x80;
+        } else if byte == 4 {
+            bytes[off + byte..off + byte + 2].copy_from_slice(&u16::MAX.to_le_bytes());
         } else {
             bytes[off + byte..off + byte + 2].copy_from_slice(&0u16.to_le_bytes());
         }
@@ -1457,7 +1404,7 @@ fn forged_callee_owned_call1_invalid_nav_and_targets_are_rejected() {
 
 #[test]
 fn forged_caller_owned_empty_call1_is_rejected() {
-    let mut bytes = emit_bytes(RECORD_QUERY);
+    let mut bytes = emit_bytes(CALLER_OWNED_CALL_QUERY);
     let off = first_call(&bytes, false);
     bytes[off] &= !(0b10 << 4);
     reseal(&mut bytes);
@@ -1494,7 +1441,7 @@ fn forged_caller_and_callee_owned_call_target_mismatches_are_rejected() {
 
 #[test]
 fn forged_single_call_ownership_mismatch_is_rejected() {
-    let mut bytes = emit_bytes(RECORD_QUERY);
+    let mut bytes = emit_bytes(CALLER_OWNED_CALL_QUERY);
     let call = first_call(&bytes, false);
     let target = raw_call_target(&bytes, call);
     assert_eq!(calls_to_target(&bytes, target), 1);
@@ -1674,19 +1621,17 @@ fn forged_out_of_range_entry_point_target_is_rejected() {
 }
 
 #[test]
-fn forged_nonzero_entry_point_pad_is_rejected() {
-    // Bytes 6-7 of the 8-byte entry point are reserved `_pad`; `from_bytes` drops
-    // them, so a forged non-zero pad must be rejected at load, not ignored.
+fn forged_invalid_entry_point_boundary_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .entry_points as usize;
-    bytes[ep_off + 6..ep_off + 8].copy_from_slice(&1u16.to_le_bytes());
+    bytes[ep_off + 6..ep_off + 8].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged entry point pad must be rejected");
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("forged entry point boundary must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidEntryPoint(_)),
         "expected InvalidEntryPoint, got {err:?}"
@@ -1959,12 +1904,11 @@ fn match_header(opcode: u8) -> u8 {
 fn load_walks_past_extended_match_payload() {
     // A Match16 (opcode 0x1) occupies two words. Its interior payload word
     // (address 1) is poisoned with an invalid opcode nibble: a correct
-    // `addr += word_count` walk advances from address 0 straight to address 2 and
-    // never inspects it, so the representation still validates. A buggy walk that advanced
-    // one word at a time would land on the poison and false-reject.
+    // `addr += word_count` walk advances from the instruction at address 0
+    // straight to address 2 without inspecting its payload as an instruction.
     let mut instructions = [0u8; BYTECODE_WORD_SIZE * 2];
     instructions[0] = match_header(0x1);
-    instructions[BYTECODE_WORD_SIZE] = 0xF; // interior payload, not an instruction boundary
+    instructions[BYTECODE_WORD_SIZE] = 0xF;
     let bytes = module_with_instructions(&instructions, 2);
 
     let module =

@@ -47,42 +47,29 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        14, 10
+  02   !   (identifier) [Node RecordSet(M0)]  04
+  04  ─‣┘  _                                05
   05                                        ▶
-  06   !   (identifier) [Node RecordSet(M0)]  08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10  ──!  _                                06, 10
-  12   !   _                                06, 10
-  14  -ε-  [Absent RecordSet(M0)]           09
-  16  ──!  _                                12, 16
-  18  └─!  _                                12, 16
-  20   !   (program)                        18, 14
+  06  ──!  _                                02, 06
+  08   !   _                                02, 06
+  10  -ε-  [Absent RecordSet(M0)]           05
+  12  ──!  _                                08, 12
+  14  └─!  _                                08, 12
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        18, 14
+  00       (program)                        14, 10
        ●   program
-  18       _                                12, 16
+  14       _                                08, 12
        ●   lexical_declaration
-  12       _                                06, 10
+  08       _                                02, 06
        ●   lexical_declaration
-  06       (identifier) [Node RecordSet(M0)]  08
+  02       (identifier) [Node RecordSet(M0)]  04
        ○   lexical_declaration
-  12  ❮❮❮ 
-  10       _                                06, 10
-  18  ❮❮❮ 
-  16       _                                12, 16
-  20  ❮❮❮ 
-  14  -ε-  [Absent RecordSet(M0)]           09
-  09   ◀   (@20)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
+  08  ❮❮❮ 
+  06       _                                02, 06
+  14  ❮❮❮ 
+  12       _                                08, 12
+  00  ❮❮❮ 
+  10  -ε-  [Absent RecordSet(M0)]           05
   05   ◀   (Q)                              ◼

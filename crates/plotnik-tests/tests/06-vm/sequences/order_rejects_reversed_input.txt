@@ -35,30 +35,21 @@ M1: S2 → T0  ; b: <Node>
 N0: S3 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@12)                            12 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─‣─  (expression_statement) [Node RecordSet(M1)]  08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10  └‣─  (lexical_declaration) [Node RecordSet(M0)]  06
-  12   !   (program)                        10
+  0   !   (program)                         1
+  1  └‣─  (lexical_declaration) [Node RecordSet(M0)]  3
+  3  ─‣─  (expression_statement) [Node RecordSet(M1)]  5
+  5  ─‣┘  _                                 6
+  6                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@12)                            12 : 03
-       ▶   (@12)
-
-@12:
-  12       (program)                        10
-       ●   program
-  10       (lexical_declaration) [Node RecordSet(M0)]  06
-       ○   expression_statement
-       ●   lexical_declaration
-  06       (expression_statement) [Node RecordSet(M1)]  08
-  10  ❮❮❮ 
+  0       (program)                         01
+      ●   program
+  1       (lexical_declaration) [Node RecordSet(M0)]  03
+      ○   expression_statement
+      ●   lexical_declaration
+  3       (expression_statement) [Node RecordSet(M1)]  05
+  1  ❮❮❮ 

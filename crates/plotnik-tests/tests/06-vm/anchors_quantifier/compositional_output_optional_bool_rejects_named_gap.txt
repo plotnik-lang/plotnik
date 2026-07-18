@@ -54,84 +54,74 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@34)                            34 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                14, 26
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─‣─  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  07
-  11  ─•─  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  07
-  14  ...
-  15  ...
-  16  ──!  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  07
+  06  ─‣┘³ _                                05
+  07  ...
+  08  ─‣─  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
+  11  ─•─  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
+  14   !   "["                              19, 21, 24
+  16  ──!  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
   19  ──!  (identifier) [BoolValue(1)] == "a"  11
   21  ──!  (identifier) [BoolValue(1)] == "x"  08
   23  ...
   24  -ε-  [BoolValue(0)]                   16
-  26   !   "["                              19, 21, 24
-  28  ──!  _                                26, 28
-  30  └─!  _                                26, 28
-  32  └‣─  (array)                          30
-  33  └‣─  (expression_statement)           32
-  34   !   (program)                        33
+  26  ──!  _                                14, 26
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@34)                            34 : 03
-       ▶   (@34)
-
-@34:
-  34       (program)                        33
+  00       (program)                        01
        ●   program
-  33       (expression_statement)           32
+  01       (expression_statement)           02
        ●   expression_statement
-  32       (array)                          30
+  02       (array)                          03
        ●   array
-  30       _                                26, 28
+  03       _                                14, 26
        ●   [
-  26       "["                              19, 21, 24
+  14       "["                              19, 21, 24
        ●   [
   19       (identifier) [BoolValue(1)] == "a"  11
        ●   identifier
-  11       (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  07
+  11       (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
        ○   ,
-  26  ❮❮❮ 
+  14  ❮❮❮ 
   21       (identifier) [BoolValue(1)] == "x"  08
-  26  ❮❮❮ 
+  14  ❮❮❮ 
   24  -ε-  [BoolValue(0)]                   16
-  16       (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  07
-  30  ❮❮❮ 
-  28       _                                26, 28
+  16       (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
+  03  ❮❮❮ 
+  26       _                                14, 26
        ●   identifier
-  26       "["                              19, 21, 24
+  14       "["                              19, 21, 24
        ○   identifier
-  28  ❮❮❮ 
-  28       _                                26, 28
+  26  ❮❮❮ 
+  26       _                                14, 26
        ●   ,
-  26       "["                              19, 21, 24
+  14       "["                              19, 21, 24
        ○   ,
-  28  ❮❮❮ 
-  28       _                                26, 28
+  26  ❮❮❮ 
+  26       _                                14, 26
        ●   identifier
-  26       "["                              19, 21, 24
+  14       "["                              19, 21, 24
        ○   identifier
-  28  ❮❮❮ 
-  28       _                                26, 28
+  26  ❮❮❮ 
+  26       _                                14, 26
        ●   ,
-  26       "["                              19, 21, 24
+  14       "["                              19, 21, 24
        ○   ,
-  28  ❮❮❮ 
-  28       _                                26, 28
+  26  ❮❮❮ 
+  26       _                                14, 26
        ●   identifier
-  26       "["                              19, 21, 24
+  14       "["                              19, 21, 24
        ○   identifier
-  28  ❮❮❮ 
-  28       _                                26, 28
+  26  ❮❮❮ 
+  26       _                                14, 26
        ●   ]
-  26       "["                              19, 21, 24
+  14       "["                              19, 21, 24
        ○   ]
-  28  ❮❮❮ 
-  28       _                                26, 28
-  32  ❮❮❮ 
-  33  ❮❮❮ 
+  26  ❮❮❮ 
+  26       _                                14, 26
+  02  ❮❮❮ 
+  01  ❮❮❮ 

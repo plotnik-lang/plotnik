@@ -77,17 +77,17 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@54)                            54 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                45, 14
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─‣─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
-  11  ─•─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
-  14  ...
-  15  ...
-  16  ─◦─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  06  ─‣┘³ _                                05
+  07  ...
+  08  ─‣─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
+  11  ─•─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
+  14  ──!  _                                45, 14
+  16  ─◦─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
   19                                        ▶
   20                                        ▶ p1
   21                                        ▶ p2
@@ -102,26 +102,15 @@ Q:
   40  -ε-                                   37, 32
   42       (@40)                            40 : 08 / 11 / 16
   45   !   "[" [RecordOpen]                 42
-  47  ...
-  48  ──!  _                                45, 48
-  50  └─!  _                                45, 48
-  52  └‣─  (array)                          50
-  53  └‣─  (expression_statement)           52
-  54   !   (program)                        53
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@54)                            54 : 03
-       ▶   (@54)
-
-@54:
-  54       (program)                        53
+  00       (program)                        01
        ●   program
-  53       (expression_statement)           52
+  01       (expression_statement)           02
        ●   expression_statement
-  52       (array)                          50
+  02       (array)                          03
        ●   array
-  50       _                                45, 48
+  03       _                                45, 14
        ●   [
   45       "[" [RecordOpen]                 42
        ●   [
@@ -140,14 +129,10 @@ Q:
   22  -ε-  [Absent RecordSet(M1)]           20
   20   ◀   (@40)                            p1
 
-@54:
-  11       (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+Q:
+  11       (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
        ○   ,
        ●   identifier
-  07       _                                06
+  06       _                                05
        ●   program
-  06   ◀   (@54)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

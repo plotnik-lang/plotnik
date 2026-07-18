@@ -23,7 +23,7 @@ struct EntryPoint {
     name: u16,          // StringId
     target: u16,        // CodeAddr (into Instructions section)
     result_type: u16,   // TypeId
-    _pad: u16,          // Padding to 8 bytes
+    boundary: u16,      // EntryBoundary
 }
 ```
 
@@ -31,10 +31,11 @@ struct EntryPoint {
 
 - **name**: The selectable definition name (e.g., "Func", "Class"). `StringId`.
 - **target**: The instruction address (`CodeAddr`) where execution begins for
-  this definition. It points at the definition's entry point wrapper in the
-  **Instructions** section.
+  this definition's ordinary body in the **Instructions** section.
 - **result_type**: The `TypeId` of the structure produced by this query definition.
-- **\_pad**: Reserved for alignment. Must be zero; loaders reject a non-zero pad.
+- **boundary**: Result effects owned by the entry rather than the shared body:
+  `0` = passthrough, `1` = capture the current node after success, `2` = open
+  and close a root record around execution. Other values are invalid.
 
 ### Usage
 
@@ -42,5 +43,6 @@ When the user runs a query with a specific entry point (e.g., `--entry Func`), t
 
 1. Scans the entry points table, resolving each `name` ID to string content for comparison.
 2. Sets the initial instruction pointer (`IP`) to `target`.
-3. Executes the wrapper and definition body in the VM.
-4. Validates that the resulting value matches `result_type`.
+3. Applies the boundary prologue, if any, and executes the definition body.
+4. On top-level return, applies the boundary finalizer and commits the result.
+5. Validates that the resulting value matches `result_type`.

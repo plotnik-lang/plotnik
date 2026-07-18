@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use plotnik_rt::{Nav, SkipPolicy};
 use regex_syntax::hir::Hir;
 
-use crate::bytecode::{EffectKind, NodeKindConstraint, PredicateOp};
+use crate::bytecode::{EffectKind, EntryBoundary, NodeKindConstraint, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
@@ -47,7 +47,6 @@ impl RegexId {
 pub(crate) enum StateOrigin {
     Definition,
     ConsumingDefinition,
-    EntryPoint,
 }
 
 #[derive(Clone, Debug)]
@@ -234,6 +233,7 @@ pub(crate) struct EntryPlan {
     pub(crate) definition: DefId,
     pub(crate) name: String,
     pub(crate) entry: StateId,
+    pub(crate) boundary: EntryBoundary,
 }
 
 #[derive(Clone, Debug)]
@@ -274,14 +274,15 @@ impl MatcherPlan {
             })
             .collect::<BTreeMap<_, _>>();
         let entry_points = graph
-            .entry_point_wrappers()
+            .entry_points()
             .iter()
-            .map(|(&definition, &label)| {
+            .map(|(&definition, entry)| {
                 let symbol = artifacts.dependency_analysis.def_name_sym(definition);
                 EntryPlan {
                     definition,
                     name: artifacts.interner.resolve(symbol).to_string(),
-                    entry: resolve_state(&ids, label),
+                    entry: resolve_state(&ids, entry.target),
+                    boundary: entry.boundary,
                 }
             })
             .collect();
@@ -390,7 +391,6 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
                     StateOrigin::Definition
                 }
             }
-            LabelOrigin::Wrapper(_) => StateOrigin::EntryPoint,
         };
         let kind = match instruction {
             InstructionIR::Match(instruction) => self.match_state(instruction),

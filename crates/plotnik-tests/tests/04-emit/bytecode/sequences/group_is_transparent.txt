@@ -6,7 +6,7 @@ Q = (array
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 7
+Q = 2
 
 [transitions]
 Q:
@@ -15,10 +15,6 @@ Q:
   3  ─‣┘  _                                 1
   4  ─‣─  (number)                          3
   5  └‣─  (identifier)                      4
-
-Q (entry point):
-  6                                         ▶
-  7       (Q)                               2 : 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -39,10 +35,8 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0       (@6)                              6 : 1
-  1                                         ▶
+  0   !   (array)                           1
+  1  └‣─  (identifier)                      2
   2  ─‣─  (number)                          3
   3  ─‣┘  _                                 4
   4                                         ▶
-  5  └‣─  (identifier)                      2
-  6   !   (array)                           5

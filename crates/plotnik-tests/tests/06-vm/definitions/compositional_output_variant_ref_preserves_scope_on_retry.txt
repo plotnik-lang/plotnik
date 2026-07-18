@@ -89,17 +89,18 @@ Q = 00 :: T5
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@66)                            66 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                14, 59
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─‣─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
-  11  ─•─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
-  14  ...
+  06  ─‣┘³ _                                05
+  07  ...
+  08  ─‣─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
+  11  ─•─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
+  14   !   "["                              56
   15  ...
-  16  ─◦─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+  16  ─◦─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
   19                                        ▶
   20                                        ▶ p1
   21                                        ▶ p2
@@ -120,28 +121,18 @@ Q:
   53  -ε-                                   51, 44
   55  ...
   56       (@53)                            53 : 08 / 11 / 16
-  59   !   "["                              56
-  60  ──!  _                                59, 60
-  62  └─!  _                                59, 60
-  64  └‣─  (array)                          62
-  65  └‣─  (expression_statement)           64
-  66   !   (program)                        65
+  59  ──!  _                                14, 59
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@66)                            66 : 03
-       ▶   (@66)
-
-@66:
-  66       (program)                        65
+  00       (program)                        01
        ●   program
-  65       (expression_statement)           64
+  01       (expression_statement)           02
        ●   expression_statement
-  64       (array)                          62
+  02       (array)                          03
        ●   array
-  62       _                                59, 60
+  03       _                                14, 59
        ●   [
-  59       "["                              56
+  14       "["                              56
        ●   [
   56       (@53)                            53 : 08 / 11 / 16
        ▶   (@53)
@@ -161,8 +152,8 @@ Q:
   22  -ε-  [Absent RecordSet(M1) VariantClose]  20
   20   ◀   (@53)                            p1
 
-@66:
-  11       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+Q:
+  11       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
        ○   ,
   40  ❮❮❮ 
   37       _                                34, 37
@@ -324,14 +315,10 @@ Q:
        ●   identifier
   19   ◀   (@53)                            
 
-@66:
-  08       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  07
+Q:
+  08       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
        ○   ,
        ●   identifier
-  07       _                                06
+  06       _                                05
        ●   program
-  06   ◀   (@66)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

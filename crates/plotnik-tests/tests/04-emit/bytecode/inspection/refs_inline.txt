@@ -9,7 +9,7 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 29
+Q = 02
 
 [transitions]
 Q:
@@ -30,12 +30,6 @@ Q:
   22  ──!  _                                20, 22
   23  └─!  _                                20, 22
   25  -ε-  [RecordOpen]                     23, 19
-
-Q (entry point):
-  26                                        ▶
-  27  -ε-  [RecordClose]                    26
-  28       (Q)                              02 : 27
-  29  -ε-  [RecordOpen]                     28
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -83,11 +77,9 @@ P12 ref        122..133  source_id=0  T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@56)                            56 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ...
+  00   !   (program) [SpanStart#4 SpanStartAt#5]  02
+  02  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 RecordOpen SpanStart#0]  05
+  05  -ε-  [SpanStart#2]                    46, 40
   07  ...
   08   !   (identifier) [SpanStartAt#3 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  12
   12  ─‣┘  _ [RecordClose SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  37
@@ -104,9 +96,3 @@ Q:
   40  -ε-  [SpanStart#1 Absent RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 RecordClose SpanStart#8 RecordSet(M1) SpanEnd#8 SpanEnd#9]  34
   44  ──!  _                                16, 44
   46  └─!  _                                16, 44
-  48  -ε-  [SpanStart#2]                    46, 40
-  50  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 RecordOpen SpanStart#0]  48
-  53  ...
-  54  ...
-  55  ...
-  56   !   (program) [SpanStart#4 SpanStartAt#5]  50

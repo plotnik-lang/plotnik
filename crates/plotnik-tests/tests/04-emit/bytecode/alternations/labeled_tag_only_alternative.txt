@@ -6,7 +6,7 @@ Q = (expression_statement
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 14
+Q = 02
 
 [transitions]
 Q:
@@ -17,12 +17,6 @@ Q:
   06   !   (number) [VariantOpen(B) VariantClose]  03
   09  ──!  _                                05, 06, 09
   10  └─!  _                                05, 06, 09
-
-Q (entry point):
-  11                                        ▶
-  12  -ε-  [RecordClose]                    11
-  13       (Q)                              02 : 12
-  14  -ε-  [RecordOpen]                     13
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -58,16 +52,11 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
+  00   !   (expression_statement)           01
+  01  └─!  _                                04, 08, 10
+  03                                        ▶
+  04   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  12
   07  ...
-  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  18
-  11   !   (number) [VariantOpen(M2) VariantClose]  18
-  13  ──!  _                                08, 11, 13
-  15  ...
-  16  └─!  _                                08, 11, 13
-  18  ─‣┘  _ [RecordSet(M3)]                06
-  20   !   (expression_statement)           16
+  08   !   (number) [VariantOpen(M2) VariantClose]  12
+  10  ──!  _                                04, 08, 10
+  12  ─‣┘  _ [RecordSet(M3)]                03

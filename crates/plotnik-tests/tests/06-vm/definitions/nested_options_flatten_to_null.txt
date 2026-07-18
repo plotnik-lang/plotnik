@@ -57,63 +57,49 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@29)                            29 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  └‣─  (number) [Absent RecordSet(M0) Node RecordSet(M1)]  07
-  11  ─‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  07
-  13  -ε-  [Absent]                         11
-  15  ...
-  16   !   (identifier) [Node]              11
-  18  ──!  _                                16, 18
-  20   !   _                                16, 18
-  22  ──!  _                                20, 13, 22
-  24  └─!  _                                20, 13, 22
-  26  └‣─  (array)                          24, 08
-  28  └‣─  (expression_statement)           26
-  29   !   (program)                        28
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          20, 05
+  04                                        ▶
+  05  └‣─  (number) [Absent RecordSet(M0) Node RecordSet(M1)]  22
+  08  ─‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  22
+  10  -ε-  [Absent]                         08
+  12   !   (identifier) [Node]              08
+  14  ──!  _                                12, 14
+  16   !   _                                12, 14
+  18  ──!  _                                16, 10, 18
+  20  └─!  _                                16, 10, 18
+  22  ─‣┘³ _                                04
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@29)                            29 : 03
-       ▶   (@29)
-
-@29:
-  29       (program)                        28
+  00       (program)                        01
        ●   program
-  28       (expression_statement)           26
+  01       (expression_statement)           02
        ●   expression_statement
-  26       (array)                          24, 08
+  02       (array)                          20, 05
        ●   array
-  24       _                                20, 13, 22
+  20       _                                16, 10, 18
        ●   [
-  20       _                                16, 18
+  16       _                                12, 14
        ●   [
-  16       (identifier) [Node]              11
+  12       (identifier) [Node]              08
        ○   [
-  20  ❮❮❮ 
-  18       _                                16, 18
+  16  ❮❮❮ 
+  14       _                                12, 14
        ●   number
-  16       (identifier) [Node]              11
+  12       (identifier) [Node]              08
        ○   number
-  18  ❮❮❮ 
-  18       _                                16, 18
+  14  ❮❮❮ 
+  14       _                                12, 14
        ●   ]
-  16       (identifier) [Node]              11
+  12       (identifier) [Node]              08
        ○   ]
-  18  ❮❮❮ 
-  18       _                                16, 18
-  24  ❮❮❮ 
-  13  -ε-  [Absent]                         11
-  11       (number) [RecordSet(M0) Node RecordSet(M1)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  20  ❮❮❮ 
+  10  -ε-  [Absent]                         08
+  08       (number) [RecordSet(M0) Node RecordSet(M1)]  22
        ●   number
-  07       _                                06
+  22       _                                04
        ●   program
-  06   ◀   (@29)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  04   ◀   (Q)                              ◼

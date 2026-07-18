@@ -118,38 +118,22 @@ P5 pattern    41..53  source_id=0
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ...
-  07  ...
-  08  └‣─  (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  11
-  11  ─‣┘  _                                12
-  12  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
-  14                                        ▶
-  15  ...
-  16  └‣─  (expression_statement) [SpanStartAt#2]  08
-  18   !   (program) [SpanStart#0 SpanStartAt#1]  16
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  └‣─  (expression_statement) [SpanStartAt#2]  04
+  04  └‣─  (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  07
+  07  ─‣┘  _                                08
+  08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  10                                        ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-       ▶   (@18)
-
-@18:
-  18       (program) [SpanStart#0 SpanStartAt#1]  16
+  00       (program) [SpanStart#0 SpanStartAt#1]  02
        ●   program
-  16       (expression_statement) [SpanStartAt#2]  08
+  02       (expression_statement) [SpanStartAt#2]  04
        ●   expression_statement
-  08       (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  11
+  04       (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  07
        ●   identifier
-  11       _                                12
+  07       _                                08
        ●   expression_statement
-  12       _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  08       _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
        ●   program
-  14   ◀   (@18)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  10   ◀   (Q)                              ◼

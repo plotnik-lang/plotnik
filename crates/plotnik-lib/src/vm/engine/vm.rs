@@ -4,7 +4,7 @@ use tree_sitter::Tree;
 
 use crate::bytecode::{
     CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind,
-    EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp, SuccessorAddr,
+    EntryBoundary, EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp,
 };
 
 use crate::core::NodeFieldId;
@@ -136,6 +136,8 @@ impl<'t> VM<'t> {
         if T::ENABLED {
             tracer.trace_enter_entry_point(self.ip);
         }
+        let boundary = entry_point.boundary();
+        self.begin_entry(boundary, tracer);
 
         let mut peak_live_heap_bytes = self.engine.heap_bytes();
 
@@ -200,6 +202,7 @@ impl<'t> VM<'t> {
             match result {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
                 Err(Signal::Flow(ControlFlow::Accept)) => {
+                    self.finish_entry(boundary, tracer);
                     let stats = self.finish_stats(&mut peak_live_heap_bytes);
                     return (Ok(self.engine.into_journal()), stats);
                 }
@@ -209,6 +212,21 @@ impl<'t> VM<'t> {
                 }
             }
         }
+    }
+
+    fn begin_entry<T: Tracer>(&mut self, boundary: EntryBoundary, tracer: &mut T) {
+        if boundary == EntryBoundary::Record {
+            self.emit_effect(Effect::new(EffectKind::RecordOpen, 0), tracer);
+        }
+    }
+
+    fn finish_entry<T: Tracer>(&mut self, boundary: EntryBoundary, tracer: &mut T) {
+        let kind = match boundary {
+            EntryBoundary::Passthrough => return,
+            EntryBoundary::Node => EffectKind::Node,
+            EntryBoundary::Record => EffectKind::RecordClose,
+        };
+        self.emit_effect(Effect::new(kind, 0), tracer);
     }
 
     fn finish_stats(&self, peak_live_heap_bytes: &mut u64) -> RunStats {
@@ -504,15 +522,15 @@ impl<'t> VM<'t> {
     /// Push a frame for `target`, retaining the immutable call-site map token.
     fn enter_callee<T: Tracer>(
         &mut self,
-        target: SuccessorAddr,
+        target: CodeAddr,
         call_site: CodeAddr,
         tracer: &mut T,
     ) -> Result<(), RuntimeError> {
         self.engine.enter_frame(u16::from(call_site))?;
         if T::ENABLED {
-            tracer.trace_call(CodeAddr::from(u16::from(target)));
+            tracer.trace_call(target);
         }
-        self.ip = CodeAddr::from(u16::from(target));
+        self.ip = target;
         Ok(())
     }
 
@@ -675,8 +693,7 @@ impl<'t> VM<'t> {
                         tracer.trace_checkpoint_created(CodeAddr::from(cp.ip));
                     }
                     if let Err(error) = self.enter_callee(
-                        SuccessorAddr::try_from(resume.target)
-                            .expect("validated call target is non-zero"),
+                        CodeAddr::from(resume.target),
                         CodeAddr::from(resume.call_site),
                         tracer,
                     ) {

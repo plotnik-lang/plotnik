@@ -51,72 +51,58 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─•┘³ _                                07
-  07  ─‣┘² _                                08
-  08                                        ▶
-  09   !   (number) [Node RecordSet(M0)]    06
-  11  ──!  _                                09, 11
-  13  └─!  _                                09, 11
-  15   !   (array)                          13
-  16  ──!  _                                15, 16
-  18  └─!  _                                15, 16
-  20   !   (array)                          18
-  21  ──!  _                                20, 21
-  23  ...
-  24  └─!  _                                20, 21
-  26  └‣─  (array)                          24
-  27  └‣─  (expression_statement)           26
-  28   !   (program)                        27
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                15, 20
+  05  ─•┘³ _                                06
+  06  ─‣┘² _                                07
+  07                                        ▶
+  08   !   (number) [Node RecordSet(M0)]    05
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14   !   (array)                          12
+  15   !   (array)                          18
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
+  20  ──!  _                                15, 20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-       ▶   (@28)
-
-@28:
-  28       (program)                        27
+  00       (program)                        01
        ●   program
-  27       (expression_statement)           26
+  01       (expression_statement)           02
        ●   expression_statement
-  26       (array)                          24
+  02       (array)                          03
        ●   array
-  24       _                                20, 21
+  03       _                                15, 20
        ●   [
-  20       (array)                          18
+  15       (array)                          18
        ○   [
-  24  ❮❮❮ 
-  21       _                                20, 21
+  03  ❮❮❮ 
+  20       _                                15, 20
        ●   array
-  20       (array)                          18
+  15       (array)                          18
        ●   array
-  18       _                                15, 16
+  18       _                                14, 16
        ●   [
-  15       (array)                          13
+  14       (array)                          12
        ○   [
   18  ❮❮❮ 
-  16       _                                15, 16
+  16       _                                14, 16
        ●   array
-  15       (array)                          13
+  14       (array)                          12
        ●   array
-  13       _                                09, 11
+  12       _                                08, 10
        ●   [
-  09       (number) [Node RecordSet(M0)]    06
+  08       (number) [Node RecordSet(M0)]    05
        ○   [
-  13  ❮❮❮ 
-  11       _                                09, 11
+  12  ❮❮❮ 
+  10       _                                08, 10
        ●   number
-  09       (number) [Node RecordSet(M0)]    06
+  08       (number) [Node RecordSet(M0)]    05
        ●   number
-  06       _                                07
+  05       _                                06
        ●   array
-  07       _                                08
+  06       _                                07
        ●   program
-  08   ◀   (@28)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  07   ◀   (Q)                              ◼

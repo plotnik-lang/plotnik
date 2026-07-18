@@ -142,16 +142,16 @@ checks uphold the no-panic guarantee. Validation runs in this order:
    symbol, type, member, and regex pattern names) must address a real string-table
    entry (`1..str_table_count`), so the `NonZeroU16` accessors never panic.
 10. **Instructions** — the instruction stream is walked twice. Pass 1 decodes each
-    instruction's fixed-size slot, validating opcode, segment, nav, node kind,
-    effect opcodes, `RecordSet`/`VariantOpen` member operands, and predicate operands, and
-    rejecting any zero successor; it records each instruction start and must tile
-    the section exactly. Pass 2 requires every jump target (successor, call
-    next/target) to land on a recorded instruction start. This
+    instruction's fixed-size slot, validating opcode, segment, nav, node kind, effect opcodes,
+    `RecordSet`/`VariantOpen` member operands, and predicate operands, and rejecting
+    any zero `SuccessorAddr`; it records each instruction start and must tile the
+    section exactly. Pass 2 requires every jump target (successor, call continuation/target)
+    to land on a recorded instruction start. This
     makes every lazy `decode_instruction` / view / materializer access panic-free.
 11. **Entry points** — each `target` must land on a recorded instruction start
-    (not merely in range — an entry point into the interior of a multi-word
-    instruction would start decoding mid-instruction) and `result_type` must
-    address a real TypeDef.
+    (not merely be in range — an entry point into the interior of a multi-word
+    instruction would start decoding mid-instruction), `result_type` must address
+    a real TypeDef, and the boundary mode must be known.
 12. **Effect stack** — an interprocedural walk of the committed-effect order
     (across `Call`/`Return`, under the suppression filter) proves no path can
     drive the materializer's builder stack (`ArrayPush`/`RecordSet`/`ListClose`/

@@ -51,42 +51,29 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08   !   (variable_declarator) [Node ArrayPush]  10, 14
-  10  ──!  _                                08, 10
-  12  └─!  _ [ListOpen]                     08, 10
-  14  ─‣┘  _ [ListClose RecordSet(M0)]      07
-  16   !   (lexical_declaration) [Absent RecordSet(M1)]  12
-  18   !   (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  21  ──!  _                                16, 18, 21
-  23  ...
-  24  └─!  _                                16, 18, 21
-  26   !   (program)                        24
+  00   !   (program)                        01
+  01  └─!  _                                12, 16, 19
+  03                                        ▶
+  04   !   (variable_declarator) [Node ArrayPush]  06, 10
+  06  ──!  _                                04, 06
+  08  └─!  _ [ListOpen]                     04, 06
+  10  ─‣┘  _ [ListClose RecordSet(M0)]      14
+  12   !   (lexical_declaration) [Absent RecordSet(M1)]  08
+  14  ─‣┘  _                                03
+  15  ...
+  16   !   (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  14
+  19  ──!  _                                12, 16, 19
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-       ▶   (@26)
-
-@26:
-  26       (program)                        24
+  00       (program)                        01
        ●   program
-  24       _                                16, 18, 21
+  01       _                                12, 16, 19
        ●   expression_statement
-  16       (lexical_declaration) [Absent RecordSet(M1)]  12
+  12       (lexical_declaration) [Absent RecordSet(M1)]  08
        ○   expression_statement
-  24  ❮❮❮ 
-  18       (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  01  ❮❮❮ 
+  16       (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  14
        ●   expression_statement
-  07       _                                06
+  14       _                                03
        ●   program
-  06   ◀   (@26)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  03   ◀   (Q)                              ◼

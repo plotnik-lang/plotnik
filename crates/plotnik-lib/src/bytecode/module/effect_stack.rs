@@ -25,9 +25,9 @@
 //! materializer's pending-value register is full. Tracking span *ids* (not just
 //! a depth) proves every `SpanEnd` closes the span the matching bracket opened,
 //! so inspection extraction can assert pairing instead of re-validating. The
-//! walk starts from each entry point wrapper and follows `Match` successors,
-//! descending through `Call` and resuming at its return address — exactly the
-//! edge set that orders effects at runtime.
+//! walk starts from each entry definition and follows `Match` successors,
+//! descending through `Call` and resuming at its return address. Entry-owned
+//! record/node effects are modeled around the resulting definition summary.
 //!
 //! ## Why state *sets* (collecting semantics)
 //!
@@ -75,8 +75,8 @@
 //! summary instead of inlining, which both terminates and stays sound. The
 //! summaries are computed by a monotone fixpoint (a callee that reads its
 //! caller's top before pushing propagates the constraint up to its own
-//! callers), then a final pass checks every call site and every entry point
-//! wrapper against the stabilized summaries.
+//! callers), then a final pass checks every call site and every entry boundary
+//! against the stabilized summaries.
 //!
 //! `record_sets_caller_top` exists because a below-entry `RecordSet` mutates state the
 //! caller's walk otherwise cannot see: setting a field on the caller's *variant*
@@ -87,11 +87,9 @@
 //! panic past the check.
 //!
 //! A successor-less `Match` accepts the *whole run* from any call depth,
-//! freezing the log with every caller frame still open. Inside an entry point
-//! wrapper the local stack is the global stack, so the existing exit check is
-//! exact; inside a body reachable through `Call` the caller's frames are
-//! invisible here, so such accepts are rejected outright — the compiler ends
-//! every definition body with `Return` and only accepts at wrapper level.
+//! freezing the log with every caller frame still open. Inside a body reachable
+//! through `Call` the caller's frames are invisible here, so such accepts are
+//! rejected outright — the compiler ends every definition body with `Return`.
 //!
 //! Net-neutrality, no popping below entry, and suppression balance are not
 //! assumed — they are verified, so a malformed body is rejected
@@ -113,7 +111,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{Instruction, Module, ModuleError};
 use crate::bytecode::{
-    CodeAddr, Effect, EffectKind, FrameAction, TypeDefKind, TypeKind, ValueFrameKind,
+    CodeAddr, Effect, EffectKind, EntryBoundary, FrameAction, TypeDefKind, TypeKind, ValueFrameKind,
 };
 
 /// Builder frames the materializer pushes. The root/result frame can be a
@@ -328,19 +326,22 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
         )?;
     }
 
-    // ...and every entry point wrapper. A wrapper has no caller, so a residual
-    // caller-top constraint means some effect would read below the frames the
-    // wrapper itself opened and hit the materializer's result root frame.
+    // Entry boundaries supply the root frame/effect that used to be executable
+    // wrapper instructions.
     for entry_point in entry_points.iter() {
         let target = entry_point.target();
-        let wrapper = analyze(
-            module,
-            &summaries,
-            target,
-            BodyRole::from_called(called.contains(&target)),
-            VerifyPhase::Final,
-        )?;
-        if wrapper.entry_tos != KS_ANY {
+        let summary = summaries[&target];
+        let boundary = entry_point.boundary();
+        let accepts_caller_top = match boundary {
+            EntryBoundary::Record => summary.entry_tos & KS_RECORD != 0,
+            EntryBoundary::Passthrough | EntryBoundary::Node => summary.entry_tos == KS_ANY,
+        };
+        if !accepts_caller_top {
+            return Err(ModuleError::EffectStackImbalance(target));
+        }
+        if matches!(boundary, EntryBoundary::Node | EntryBoundary::Record)
+            && summary.returns_pending == Some(true)
+        {
             return Err(ModuleError::EffectStackImbalance(target));
         }
     }
@@ -600,10 +601,9 @@ fn analyze(
                     )?;
                 }
                 if m.succ_count() == 0 {
-                    // A successor-less match accepts the whole run. At wrapper
-                    // level the local stack is the global stack, so balance
-                    // here is exact; under a `Call` the caller's frames are
-                    // still open in the log, so this is never sound.
+                    // A successor-less match accepts the whole run. Under a
+                    // `Call`, caller frames are still open in the log, so this
+                    // is never sound.
                     if role == BodyRole::Called {
                         return Err(ModuleError::EffectStackImbalance(addr));
                     }
@@ -651,7 +651,7 @@ impl CallRoute {
     fn from_instruction(instruction: Instruction<'_>) -> Option<Self> {
         match instruction {
             Instruction::Call(call) => Some(Self {
-                target: CodeAddr::from(u16::from(call.target)),
+                target: call.target,
                 returns: call
                     .returns()
                     .map(|addr| CodeAddr::from(u16::from(addr)))

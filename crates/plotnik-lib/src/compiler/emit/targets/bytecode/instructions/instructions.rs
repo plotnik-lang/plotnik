@@ -110,7 +110,7 @@ fn resolve_call(c: &CallIR, nfa: &NfaGraph, map: &BTreeMap<Label, CodeAddr>) -> 
     let successor_addr = |label: Label| {
         SuccessorAddr::try_from(label.resolve(map)).expect("successor address must be non-zero")
     };
-    let target = successor_addr(c.target);
+    let target = c.target.resolve(map);
     let specialization = nfa
         .specialization_for_entry(c.target)
         .expect("calls target definition specializations");

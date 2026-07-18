@@ -57,48 +57,35 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (lexical_declaration)            02
+  02  └‣─  (variable_declarator)            03
+  03  └‣─  name: (identifier) [Node RecordSet(M0)]  10, 06
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  -ε-  [Absent RecordSet(M1)]           07
-  10   !   value: (number) [Node RecordSet(M1)]  07
-  12  ──!  _                                10, 12
-  14  └‣─  name: (identifier) [Node RecordSet(M0)]  12, 08
-  16  └‣─  (variable_declarator)            14
-  17  └‣─  (lexical_declaration)            16
-  18   !   (program)                        17
+  06  -ε-  [Absent RecordSet(M1)]           12
+  08   !   value: (number) [Node RecordSet(M1)]  12
+  10  ──!  _                                08, 10
+  12  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-       ▶   (@18)
-
-@18:
-  18       (program)                        17
+  00       (program)                        01
        ●   program
-  17       (lexical_declaration)            16
+  01       (lexical_declaration)            02
        ●   lexical_declaration
-  16       (variable_declarator)            14
+  02       (variable_declarator)            03
        ○   let
        ●   variable_declarator
-  14       name: (identifier) [Node RecordSet(M0)]  12, 08
+  03       name: (identifier) [Node RecordSet(M0)]  10, 06
        ●   identifier
-  12       _                                10, 12
+  10       _                                08, 10
        ●   =
-  10       value: (number) [Node RecordSet(M1)]  07
+  08       value: (number) [Node RecordSet(M1)]  12
        ○   =
-  12  ❮❮❮ 
-  12       _                                10, 12
+  10  ❮❮❮ 
+  10       _                                08, 10
        ●   number
-  10       value: (number) [Node RecordSet(M1)]  07
+  08       value: (number) [Node RecordSet(M1)]  12
        ●   number
-  07       _                                06
+  12       _                                05
        ●   program
-  06   ◀   (@18)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

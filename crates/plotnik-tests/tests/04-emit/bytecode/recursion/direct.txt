@@ -7,21 +7,17 @@ Expr = [
 ]
 ---------------------- NFA -----------------------
 [entry_points]
-Expr = 11
+Expr = 0
 
 [transitions]
 Expr:
-  00  -ε-                                   02, 03
-  01                                        ▶
-  02   !   (number) [VariantOpen(Lit) Node RecordSet(value) VariantClose]  01
-  03   !   (call_expression) [VariantOpen(Rec)]  08
-  05  ─‣┘  _ [RecordSet(inner) VariantClose]  01
-  07  ─‣─  arguments: (Expr)                00 : 05
-  08  └‣─  function: (identifier) [Node RecordSet(fn)]  07
-
-Expr (entry point):
-  10                                        ▶
-  11       (Expr)                           00 : 10
+  0  -ε-                                    2, 3
+  1                                         ▶
+  2   !   (number) [VariantOpen(Lit) Node RecordSet(value) VariantClose]  1
+  3   !   (call_expression) [VariantOpen(Rec)]  8
+  5  ─‣┘  _ [RecordSet(inner) VariantClose]  1
+  7  ─‣─  arguments: (Expr)                 0 : 5
+  8  └‣─  function: (identifier) [Node RecordSet(fn)]  7
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -58,15 +54,10 @@ Expr = 00 :: T3
 
 [instructions]
 Expr:
-  00       (@16)                            16 : 01
-  01                                        ▶
-  02  ─‣─  arguments: (@16)                 16 : 03
+  00  -ε-                                   08, 06
+  02  ─‣─  arguments: (Expr)                00 : 03
   03  ─‣┘  _ [RecordSet(M2) VariantClose]   05
   05                                        ▶
-  06  ...
-  07  ...
+  06   !   (call_expression) [VariantOpen(M4)]  11
   08   !   (number) [VariantOpen(M3) Node RecordSet(M0) VariantClose]  05
   11  └‣─  function: (identifier) [Node RecordSet(M1)]  02
-  13   !   (call_expression) [VariantOpen(M4)]  11
-  15  ...
-  16  -ε-                                   08, 13

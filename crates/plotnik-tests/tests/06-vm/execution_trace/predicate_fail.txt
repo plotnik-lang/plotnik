@@ -28,15 +28,6 @@ export interface Q {
     {
       "ip": 0,
       "event": {
-        "kind": "instruction"
-      },
-      "query_span_id": null,
-      "node": null,
-      "journal_len": 0
-    },
-    {
-      "ip": 0,
-      "event": {
         "kind": "journal_event",
         "event": "RecordOpen"
       },
@@ -45,7 +36,7 @@ export interface Q {
       "journal_len": 1
     },
     {
-      "ip": 2,
+      "ip": 0,
       "event": {
         "kind": "instruction"
       },
@@ -54,26 +45,7 @@ export interface Q {
       "journal_len": 1
     },
     {
-      "ip": 2,
-      "event": {
-        "kind": "call",
-        "target": 18
-      },
-      "query_span_id": null,
-      "node": null,
-      "journal_len": 1
-    },
-    {
-      "ip": 18,
-      "event": {
-        "kind": "instruction"
-      },
-      "query_span_id": null,
-      "node": null,
-      "journal_len": 1
-    },
-    {
-      "ip": 18,
+      "ip": 0,
       "event": {
         "kind": "nav"
       },
@@ -86,7 +58,7 @@ export interface Q {
       "journal_len": 1
     },
     {
-      "ip": 18,
+      "ip": 0,
       "event": {
         "kind": "match_ok"
       },
@@ -99,7 +71,7 @@ export interface Q {
       "journal_len": 1
     },
     {
-      "ip": 18,
+      "ip": 0,
       "event": {
         "kind": "journal_event",
         "event": "SpanStart#0"
@@ -109,7 +81,7 @@ export interface Q {
       "journal_len": 2
     },
     {
-      "ip": 18,
+      "ip": 0,
       "event": {
         "kind": "journal_event",
         "event": "SpanStartAt#1"
@@ -123,7 +95,7 @@ export interface Q {
       "journal_len": 3
     },
     {
-      "ip": 16,
+      "ip": 2,
       "event": {
         "kind": "instruction"
       },
@@ -132,7 +104,7 @@ export interface Q {
       "journal_len": 3
     },
     {
-      "ip": 16,
+      "ip": 2,
       "event": {
         "kind": "nav"
       },
@@ -145,7 +117,7 @@ export interface Q {
       "journal_len": 3
     },
     {
-      "ip": 16,
+      "ip": 2,
       "event": {
         "kind": "match_ok"
       },
@@ -158,7 +130,7 @@ export interface Q {
       "journal_len": 3
     },
     {
-      "ip": 16,
+      "ip": 2,
       "event": {
         "kind": "checkpoint_new"
       },
@@ -167,7 +139,7 @@ export interface Q {
       "journal_len": 3
     },
     {
-      "ip": 16,
+      "ip": 2,
       "event": {
         "kind": "journal_event",
         "event": "SpanStartAt#2"
@@ -181,7 +153,7 @@ export interface Q {
       "journal_len": 4
     },
     {
-      "ip": 8,
+      "ip": 4,
       "event": {
         "kind": "instruction"
       },
@@ -190,7 +162,7 @@ export interface Q {
       "journal_len": 4
     },
     {
-      "ip": 8,
+      "ip": 4,
       "event": {
         "kind": "nav"
       },
@@ -203,7 +175,7 @@ export interface Q {
       "journal_len": 4
     },
     {
-      "ip": 8,
+      "ip": 4,
       "event": {
         "kind": "predicate_fail"
       },
@@ -216,10 +188,10 @@ export interface Q {
       "journal_len": 4
     },
     {
-      "ip": 8,
+      "ip": 4,
       "event": {
         "kind": "backtrack",
-        "to_record": 13
+        "to_record": 10
       },
       "query_span_id": 1,
       "node": null,
@@ -260,15 +232,9 @@ P4 pattern    41..60  source_id=0
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ...
-  07  ...
-  08  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4] == "y"  12
-  12  ─‣┘  _                                13
-  13  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  15
-  15                                        ▶
-  16  └‣─  (expression_statement) [SpanStartAt#2]  08
-  18   !   (program) [SpanStart#0 SpanStartAt#1]  16
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  └‣─  (expression_statement) [SpanStartAt#2]  04
+  04  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4] == "y"  08
+  08  ─‣┘  _                                09
+  09  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  11
+  11                                        ▶

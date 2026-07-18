@@ -42,36 +42,23 @@ M1: S2 → T0  ; id: <Node>
 N0: S3 → T2  ; Q
 
 [entry_points]
-Q = 00 :: T2
+Q = 0 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@12)                            12 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) [Node RecordSet(M1)]  08
-  08  ─‣┘² _ [NodeText RecordSet(M0)]       10
-  10                                        ▶
-  11  └‣─  (expression_statement)           06
-  12   !   (program)                        11
+  0   !   (program)                         1
+  1  └‣─  (expression_statement)            2
+  2  └‣─  (identifier) [Node RecordSet(M1)]  4
+  4  ─‣┘² _ [NodeText RecordSet(M0)]        6
+  6                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@12)                            12 : 03
-       ▶   (@12)
-
-@12:
-  12       (program)                        11
-       ●   program
-  11       (expression_statement)           06
-       ●   expression_statement
-  06       (identifier) [Node RecordSet(M1)]  08
-       ●   identifier
-  08       _ [NodeText RecordSet(M0)]       10
-       ●   program
-  10   ◀   (@12)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       (expression_statement)            02
+      ●   expression_statement
+  2       (identifier) [Node RecordSet(M1)]  04
+      ●   identifier
+  4       _ [NodeText RecordSet(M0)]        06
+      ●   program
+  6   ◀   (Q)                               ◼

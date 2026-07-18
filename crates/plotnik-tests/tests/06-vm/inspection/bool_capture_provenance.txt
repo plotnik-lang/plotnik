@@ -102,39 +102,25 @@ P5 pattern    15..37  source_id=0
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ...
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  -ε-  [SpanStart#2]                    13, 16
+  04   !   (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  08
   07  ...
-  08   !   (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  11
-  11  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          13
-  13                                        ▶
-  14  ──!  _                                08, 14
-  16  └─!  _                                08, 14
-  18  -ε-  [BoolValue(0) RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
-  21  -ε-  [SpanStart#2]                    16, 18
-  23  ...
-  24   !   (program) [SpanStart#0 SpanStartAt#1]  21
+  08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
+  10                                        ▶
+  11  ──!  _                                04, 11
+  13  └─!  _                                04, 11
+  15  ...
+  16  -ε-  [BoolValue(0) RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-       ▶   (@24)
-
-@24:
-  24       (program) [SpanStart#0 SpanStartAt#1]  21
+  00       (program) [SpanStart#0 SpanStartAt#1]  02
        ●   program
-  21  -ε-  [SpanStart#2]                    16, 18
-  16       _                                08, 14
+  02  -ε-  [SpanStart#2]                    13, 16
+  13       _                                04, 11
        ●   expression_statement
-  08       (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  11
+  04       (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  08
        ●   expression_statement
-  11       _ [SpanEnd#1 SpanEnd#0]          13
+  08       _ [SpanEnd#1 SpanEnd#0]          10
        ●   program
-  13   ◀   (@24)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  10   ◀   (Q)                              ◼

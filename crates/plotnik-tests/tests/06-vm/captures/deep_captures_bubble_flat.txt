@@ -52,49 +52,36 @@ M1: S02 → T0  ; retval: <Node>
 N0: S03 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@15)                            15 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (number) [Node RecordSet(M1)]    08
-  08  ─‣┘⁴ _                                09
-  09                                        ▶
-  10  └‣─  (return_statement)               06
-  11  ─‣─  body: (statement_block)          10
-  12  └‣─  name: (identifier) [Node RecordSet(M0)]  11
-  14  └‣─  (function_declaration)           12
-  15   !   (program)                        14
+  0   !   (program)                         1
+  1  └‣─  (function_declaration)            2
+  2  └‣─  name: (identifier) [Node RecordSet(M0)]  4
+  4  ─‣─  body: (statement_block)           5
+  5  └‣─  (return_statement)                6
+  6  └‣─  (number) [Node RecordSet(M1)]     8
+  8  ─‣┘⁴ _                                 9
+  9                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@15)                            15 : 03
-       ▶   (@15)
-
-@15:
-  15       (program)                        14
-       ●   program
-  14       (function_declaration)           12
-       ●   function_declaration
-  12       name: (identifier) [Node RecordSet(M0)]  11
-       ○   function
-       ●   identifier
-  11       body: (statement_block)          10
-       ○   formal_parameters
-       ●   statement_block
-  10       (return_statement)               06
-       ○   {
-       ●   return_statement
-  06       (number) [Node RecordSet(M1)]    08
-       ○   return
-       ●   number
-  08       _                                09
-       ●   program
-  09   ◀   (@15)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       (function_declaration)            02
+      ●   function_declaration
+  2       name: (identifier) [Node RecordSet(M0)]  04
+      ○   function
+      ●   identifier
+  4       body: (statement_block)           05
+      ○   formal_parameters
+      ●   statement_block
+  5       (return_statement)                06
+      ○   {
+      ●   return_statement
+  6       (number) [Node RecordSet(M1)]     08
+      ○   return
+      ●   number
+  8       _                                 09
+      ●   program
+  9   ◀   (Q)                               ◼

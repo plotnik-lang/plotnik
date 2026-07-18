@@ -62,14 +62,15 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@62)                            62 : 03
-  03  -ε-  [RecordClose]                    05
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _                                07, 56
   05                                        ▶
-  06                                        ▶
-  07  ─‣┘³ _                                06
-  08  ─‣─  (identifier) [ListClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
-  11  ─•─  (identifier) [ListClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  06  ─‣┘³ _                                05
+  07   !   "["                              53
+  08  ─‣─  (identifier) [ListClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
+  11  ─•─  (identifier) [ListClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
   14  -ε-  [RecordClose ArrayPush]          42, 08
   16  -ε-  [RecordClose ArrayPush]          51, 11
   18   !   (identifier) [Node RecordSet(M1)] == "x"  14
@@ -90,28 +91,19 @@ Q:
   48  ─•─  (identifier) [Node RecordSet(M0)] == "a"  28, 26
   51  -ε-  [RecordOpen]                     48, 44
   53  ──!  _ [ListOpen]                     40, 42
-  55   !   "["                              53
-  56  ──!  _                                55, 56
-  58  └─!  _                                55, 56
-  60  └‣─  (array)                          58
-  61  └‣─  (expression_statement)           60
-  62   !   (program)                        61
+  55  ...
+  56  ──!  _                                07, 56
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@62)                            62 : 03
-       ▶   (@62)
-
-@62:
-  62       (program)                        61
+  00       (program)                        01
        ●   program
-  61       (expression_statement)           60
+  01       (expression_statement)           02
        ●   expression_statement
-  60       (array)                          58
+  02       (array)                          03
        ●   array
-  58       _                                55, 56
+  03       _                                07, 56
        ●   [
-  55       "["                              53
+  07       "["                              53
        ●   [
   53       _ [ListOpen]                     40, 42
        ●   identifier
@@ -132,7 +124,7 @@ Q:
   44       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  14
        ○   ,
   16  ❮❮❮ 
-  11       (identifier) [ListClose RecordSet(M2) Node RecordSet(M3)] == "b"  07
+  11       (identifier) [ListClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
        ○   ,
   37  ❮❮❮ 
   35       _                                32, 35
@@ -363,37 +355,37 @@ Q:
   21       _                                18, 21
   42  ❮❮❮ 
   42       _                                40, 42
-  58  ❮❮❮ 
-  56       _                                55, 56
+  03  ❮❮❮ 
+  56       _                                07, 56
        ●   identifier
-  55       "["                              53
+  07       "["                              53
        ○   identifier
   56  ❮❮❮ 
-  56       _                                55, 56
+  56       _                                07, 56
        ●   ,
-  55       "["                              53
+  07       "["                              53
        ○   ,
   56  ❮❮❮ 
-  56       _                                55, 56
+  56       _                                07, 56
        ●   identifier
-  55       "["                              53
+  07       "["                              53
        ○   identifier
   56  ❮❮❮ 
-  56       _                                55, 56
+  56       _                                07, 56
        ●   ,
-  55       "["                              53
+  07       "["                              53
        ○   ,
   56  ❮❮❮ 
-  56       _                                55, 56
+  56       _                                07, 56
        ●   identifier
-  55       "["                              53
+  07       "["                              53
        ○   identifier
   56  ❮❮❮ 
-  56       _                                55, 56
+  56       _                                07, 56
        ●   ]
-  55       "["                              53
+  07       "["                              53
        ○   ]
   56  ❮❮❮ 
-  56       _                                55, 56
-  60  ❮❮❮ 
-  61  ❮❮❮ 
+  56       _                                07, 56
+  02  ❮❮❮ 
+  01  ❮❮❮ 

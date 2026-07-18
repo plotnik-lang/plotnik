@@ -4,22 +4,16 @@ Q = [
 ]
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 10
+Q = 0
 
 [transitions]
 Q:
-  00  -ε-                                   02, 05
-  01                                        ▶
-  02   !   (function_declaration) [Absent RecordSet(id) Node RecordSet(fn)]  04
-  03  ─‣┘  _                                01
-  04  └‣─  (program)                        03
-  05   !   (identifier) [Absent RecordSet(fn) Node RecordSet(id)]  01
-
-Q (entry point):
-  07                                        ▶
-  08  -ε-  [RecordClose]                    07
-  09       (Q)                              00 : 08
-  10  -ε-  [RecordOpen]                     09
+  0  -ε-                                    2, 5
+  1                                         ▶
+  2   !   (function_declaration) [Absent RecordSet(id) Node RecordSet(fn)]  4
+  3  ─‣┘  _                                 1
+  4  └‣─  (program)                         3
+  5   !   (identifier) [Absent RecordSet(fn) Node RecordSet(id)]  1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -47,14 +41,9 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (program)                        07
-  07  ─‣┘  _                                08
-  08                                        ▶
-  09   !   (function_declaration) [Absent RecordSet(M1) Node RecordSet(M0)]  06
-  12   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  08
-  15  ...
-  16  -ε-                                   09, 12
+  00  -ε-                                   05, 08
+  02  └‣─  (program)                        03
+  03  ─‣┘  _                                04
+  04                                        ▶
+  05   !   (function_declaration) [Absent RecordSet(M1) Node RecordSet(M0)]  02
+  08   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  04

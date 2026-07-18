@@ -1,9 +1,8 @@
 //! Dead code elimination pass.
 //!
 //! Removes unreachable instructions and definition specializations after epsilon
-//! elimination. Reachability starts at wrappers for exported entry points; a
-//! call reaches both
-//! its return continuations and its callee body.
+//! elimination. Reachability starts at exported definition entries; a call
+//! reaches both its return continuations and its callee body.
 
 use std::collections::HashSet;
 
@@ -24,7 +23,11 @@ fn compute_reachable(nfa: &NfaGraph) -> HashSet<Label> {
         .collect();
 
     let mut reachable = HashSet::new();
-    let mut queue: Vec<Label> = nfa.entry_point_wrappers.values().copied().collect();
+    let mut queue: Vec<Label> = nfa
+        .entry_points
+        .values()
+        .map(|entry| entry.target)
+        .collect();
 
     while let Some(label) = queue.pop() {
         if !reachable.insert(label) {

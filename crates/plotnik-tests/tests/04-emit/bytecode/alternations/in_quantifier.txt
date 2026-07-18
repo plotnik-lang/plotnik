@@ -8,7 +8,7 @@ Q = (object
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 24
+Q = 02
 
 [transitions]
 Q:
@@ -23,12 +23,6 @@ Q:
   14  ──!  _                                12, 14
   15  └─!  _                                12, 14
   20  -ε-  [ListOpen]                       15, 05
-
-Q (entry point):
-  21                                        ▶
-  22  -ε-  [RecordClose]                    21
-  23       (Q)                              02 : 22
-  24  -ε-  [RecordOpen]                     23
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -72,21 +66,14 @@ Q = 00 :: T6
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@30)                            30 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  -ε-  [ListClose RecordSet(M5)]        06
-  10  -ε-  [RecordClose ArrayPush]          21, 28
-  12   !   (pair) [VariantOpen(M2) Node RecordSet(M0) VariantClose RecordSet(M4)]  10
-  15  ...
-  16   !   (shorthand_property_identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  10
-  19  -ε-  [RecordOpen]                     12, 16
-  21  ──!  _                                19, 21
-  23  ...
-  24  └─!  _                                19, 21
-  26  -ε-  [ListOpen]                       24, 08
-  28  ─‣┘  _ [ListClose RecordSet(M5)]      06
-  30   !   (object)                         26
+  00   !   (object)                         01
+  01  -ε-  [ListOpen]                       18, 04
+  03                                        ▶
+  04  -ε-  [ListClose RecordSet(M5)]        03
+  06  -ε-  [RecordClose ArrayPush]          16, 20
+  08   !   (pair) [VariantOpen(M2) Node RecordSet(M0) VariantClose RecordSet(M4)]  06
+  11   !   (shorthand_property_identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  06
+  14  -ε-  [RecordOpen]                     08, 11
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
+  20  ─‣┘  _ [ListClose RecordSet(M5)]      03

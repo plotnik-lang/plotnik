@@ -46,48 +46,33 @@ M0: S2 → T0  ; frag: <Node>
 N0: S3 → T1  ; Q
 
 [entry_points]
-Q = 00 :: T1
+Q = 0 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ...
-  07  ...
-  08  └‣─  (string_fragment) [Node RecordSet(M0)] == "a\nb"  11
-  11  ─‣┘⁴ _                                12
-  12                                        ▶
-  13  └‣─  value: (template_string)         08
-  14  └‣─  (variable_declarator)            13
-  15  └‣─  (lexical_declaration)            14
-  16   !   (program)                        15
+  0   !   (program)                         1
+  1  └‣─  (lexical_declaration)             2
+  2  └‣─  (variable_declarator)             3
+  3  └‣─  value: (template_string)          4
+  4  └‣─  (string_fragment) [Node RecordSet(M0)] == "a\nb"  7
+  7  ─‣┘⁴ _                                 8
+  8                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-       ▶   (@16)
-
-@16:
-  16       (program)                        15
-       ●   program
-  15       (lexical_declaration)            14
-       ●   lexical_declaration
-  14       (variable_declarator)            13
-       ○   const
-       ●   variable_declarator
-  13       value: (template_string)         08
-       ○   identifier
-       ○   =
-       ●   template_string
-  08       (string_fragment) [Node RecordSet(M0)] == "a\nb"  11
-       ○   `
-       ●   string_fragment
-  11       _                                12
-       ●   program
-  12   ◀   (@16)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  0       (program)                         01
+      ●   program
+  1       (lexical_declaration)             02
+      ●   lexical_declaration
+  2       (variable_declarator)             03
+      ○   const
+      ●   variable_declarator
+  3       value: (template_string)          04
+      ○   identifier
+      ○   =
+      ●   template_string
+  4       (string_fragment) [Node RecordSet(M0)] == "a\nb"  07
+      ○   `
+      ●   string_fragment
+  7       _                                 08
+      ●   program
+  8   ◀   (Q)                               ◼

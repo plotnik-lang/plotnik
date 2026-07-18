@@ -38,70 +38,58 @@ N0: S2 → T1  ; A
 
 [entry_points]
 A = 00 :: T1
-Q = 02 :: T0
+Q = 03 :: T0
 
 [instructions]
 A:
-  00       (@08)                            08 : 01
-  01                                        ▶
+  00   !   (expression_statement) [VariantOpen(M0) VariantClose]  02
+  02                                        ▶
 
 Q:
-  02       (@20)                            20 : 03
-  03                                        ▶
-  04  ─•─  (debugger_statement)             05
-  05  ─‣┘  _                                07
-  06                                        ▶
-  07                                        ▶
-  08   !   (expression_statement) [VariantOpen(M0) VariantClose]  06
-  10  -ε-  [SuppressEnd]                    04, 16
-  12   !   (@08)                            08 : 10
-  13  -ε-  [SuppressBegin]                  12
-  15  ...
-  16  ──!  _                                13, 16
-  18  └─!  _                                13, 16
-  20   !   (program)                        18
+  03   !   (program)                        04
+  04  └─!  _                                12, 14
+  06  ─•─  (debugger_statement)             07
+  07  ─‣┘  _                                08
+  08                                        ▶
+  09  -ε-  [SuppressEnd]                    06, 14
+  11   !   (A)                              00 : 09
+  12  -ε-  [SuppressBegin]                  11
+  14  ──!  _                                12, 14
 --------------------- TRACE ----------------------
 Q:
-  02       (@20)                            20 : 03
-       ▶   (@20)
-
-@20:
-  20       (program)                        18
+  03       (program)                        04
        ●   program
-  18       _                                13, 16
+  04       _                                12, 14
        ●   expression_statement
-  13  -ε-  [SuppressBegin]                  12
-  12       (@08)                            08 : 10
-       ▶   (@08)
+  12  -ε-  [SuppressBegin]                  11
+  11       (A)                              00 : 09
+       ▶   (A)
 
-@08:
-  08       (expression_statement) [VariantOpen(M0) VariantClose]  06
+A:
+  00       (expression_statement) [VariantOpen(M0) VariantClose]  02
        ●   expression_statement
-  06   ◀   (@08)                            
-
-@20:
-  10  -ε-  [SuppressEnd]                    04, 16
-  04       (debugger_statement)             05
-       ○   expression_statement
-  10  ❮❮❮ 
-  16       _                                13, 16
-       ●   expression_statement
-  13  -ε-  [SuppressBegin]                  12
-  12       (@08)                            08 : 10
-       ▶   (@08)
-
-@08:
-  08       (expression_statement) [VariantOpen(M0) VariantClose]  06
-       ●   expression_statement
-  06   ◀   (@08)                            
-
-@20:
-  10  -ε-  [SuppressEnd]                    04, 16
-  04       (debugger_statement)             05
-       ●   debugger_statement
-  05       _                                07
-       ●   program
-  07   ◀   (@20)                            
+  02   ◀   (A)                              
 
 Q:
-  03   ◀   (Q)                              ◼
+  09  -ε-  [SuppressEnd]                    06, 14
+  06       (debugger_statement)             07
+       ○   expression_statement
+  09  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12  -ε-  [SuppressBegin]                  11
+  11       (A)                              00 : 09
+       ▶   (A)
+
+A:
+  00       (expression_statement) [VariantOpen(M0) VariantClose]  02
+       ●   expression_statement
+  02   ◀   (A)                              
+
+Q:
+  09  -ε-  [SuppressEnd]                    06, 14
+  06       (debugger_statement)             07
+       ●   debugger_statement
+  07       _                                08
+       ●   program
+  08   ◀   (Q)                              ◼

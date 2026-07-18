@@ -50,39 +50,27 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  -ε-  [TextClose RecordSet(M0)]        08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10  -ε-  [TextClose RecordSet(M0)]        09
-  12   !   (expression_statement) [ScalarMark]  06
-  14  ──!  _                                12, 14
-  16  └─!  _                                12, 14
-  18   !   (comment) [ScalarMark]           14, 06
-  20  ──!  _                                18, 20
-  22  └─!  _                                18, 20
-  24  -ε-  [ScalarOpen]                     22, 16, 10
-  26   !   (program)                        24
+  00   !   (program)                        01
+  01  -ε-  [ScalarOpen]                     20, 14, 08
+  03  -ε-  [TextClose RecordSet(M0)]        05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  -ε-  [TextClose RecordSet(M0)]        06
+  10   !   (expression_statement) [ScalarMark]  03
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
+  16   !   (comment) [ScalarMark]           12, 03
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-       ▶   (@26)
-
-@26:
-  26       (program)                        24
+  00       (program)                        01
        ●   program
-  24  -ε-  [ScalarOpen]                     22, 16, 10
-  22       _                                18, 20
-  24  ❮❮❮ 
-  16       _                                12, 14
-  24  ❮❮❮ 
-  10  -ε-  [TextClose RecordSet(M0)]        09
-  09   ◀   (@26)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  01  -ε-  [ScalarOpen]                     20, 14, 08
+  20       _                                16, 18
+  01  ❮❮❮ 
+  14       _                                10, 12
+  01  ❮❮❮ 
+  08  -ε-  [TextClose RecordSet(M0)]        06
+  06   ◀   (Q)                              ◼

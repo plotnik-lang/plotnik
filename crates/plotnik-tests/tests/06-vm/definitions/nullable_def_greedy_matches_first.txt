@@ -44,38 +44,24 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08  └‣─  (expression_statement) [Node RecordSet(M0)]  07
-  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  07
-  12   !   (expression_statement)           10
-  13  ──!  _                                12, 13
-  15  ...
-  16  └─!  _                                12, 13
-  18   !   (program)                        16, 08
+  00   !   (program)                        10, 03
+  02                                        ▶
+  03  └‣─  (expression_statement) [Node RecordSet(M0)]  12
+  05  ─‣─  (expression_statement) [Node RecordSet(M0)]  12
+  07   !   (expression_statement)           05
+  08  ──!  _                                07, 08
+  10  └─!  _                                07, 08
+  12  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-       ▶   (@18)
-
-@18:
-  18       (program)                        16, 08
+  00       (program)                        10, 03
        ●   program
-  16       _                                12, 13
+  10       _                                07, 08
        ●   expression_statement
-  12       (expression_statement)           10
+  07       (expression_statement)           05
        ●   expression_statement
-  10       (expression_statement) [Node RecordSet(M0)]  07
+  05       (expression_statement) [Node RecordSet(M0)]  12
        ●   expression_statement
-  07       _                                06
+  12       _                                02
        ●   program
-  06   ◀   (@18)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  02   ◀   (Q)                              ◼

@@ -8,8 +8,8 @@ Rec = [
 Q = (Rec)
 ---------------------- NFA -----------------------
 [entry_points]
-Q   = 19
-Rec = 17
+Q   = 11
+Rec = 00
 
 [transitions]
 Rec:
@@ -27,14 +27,6 @@ Q:
   12                                        ▶
   13  -ε-  [SuppressEnd]                    12
   14   !   (Rec)                            00 : 13
-
-Rec (entry point):
-  16                                        ▶
-  17       (Rec)                            00 : 16
-
-Q (entry point):
-  18                                        ▶
-  19       (Q)                              11 : 18
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -70,24 +62,18 @@ Rec = 00 :: T4
 
 [instructions]
 Rec:
-  00       (@19)                            19 : 01
-  01                                        ▶
+  00  -ε-                                   16, 18
 
 Q:
-  02       (@25)                            25 : 03
-  03                                        ▶
-  04  └‣─  (@19)                            19 : 05
-  05  ─‣┘  _ [RecordSet(M0)]                08
-  07  ...
-  08  ─‣┘  _ [VariantClose]                 10
-  10                                        ▶
-  11  └‣─  (expression_statement)           04
-  12   !   (program) [VariantOpen(M2)]      11
-  14  ...
+  02  -ε-  [SuppressBegin]                  04
+  04   !   (Rec)                            00 : 05
+  05  -ε-  [SuppressEnd]                    07
+  07                                        ▶
+  08  └‣─  (Rec)                            00 : 09
+  09  ─‣┘  _ [RecordSet(M0)]                11
+  11  ─‣┘  _ [VariantClose]                 13
+  13                                        ▶
+  14  └‣─  (expression_statement)           08
   15  ...
-  16   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  10
-  19  -ε-                                   12, 16
-  21                                        ▶
-  22  -ε-  [SuppressEnd]                    21
-  24   !   (@19)                            19 : 22
-  25  -ε-  [SuppressBegin]                  24
+  16   !   (program) [VariantOpen(M2)]      14
+  18   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  13

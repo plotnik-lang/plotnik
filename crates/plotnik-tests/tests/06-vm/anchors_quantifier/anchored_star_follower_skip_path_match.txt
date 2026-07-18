@@ -71,72 +71,61 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@34)                            34 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  └‣─  (identifier) == "foo"            08
-  08  ─‣┘  _                                09
-  09  ─‣┘  _                                10
-  10                                        ▶
-  11  └•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
-  14  ─•─  (expression_statement) [Node RecordSet(M2)]  06
-  16  -ε-  [ListClose RecordSet(M1)]        14
-  18  └•─  (debugger_statement) [Node ArrayPush]  20, 16
-  20  ─•─  (debugger_statement) [Node ArrayPush]  20, 16
-  22  -ε-  [ListOpen]                       18, 11
-  24  -ε-  [ListOpen]                       20, 16
-  26  -ε-  [Absent RecordSet(M0)]           22
-  28   !   (lexical_declaration) [Node RecordSet(M0)]  24
-  30  ──!  _                                28, 30
-  32  └─!  _                                28, 30
-  34   !   (program)                        32, 26
+  00   !   (program)                        30, 24
+  02  └‣─  (identifier) == "foo"            04
+  04  ─‣┘  _                                05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  └•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
+  11  ─•─  (expression_statement) [Node RecordSet(M2)]  02
+  13  -ε-  [ListClose RecordSet(M1)]        11
+  15  ...
+  16  └•─  (debugger_statement) [Node ArrayPush]  18, 13
+  18  ─•─  (debugger_statement) [Node ArrayPush]  18, 13
+  20  -ε-  [ListOpen]                       16, 08
+  22  -ε-  [ListOpen]                       18, 13
+  24  -ε-  [Absent RecordSet(M0)]           20
+  26   !   (lexical_declaration) [Node RecordSet(M0)]  22
+  28  ──!  _                                26, 28
+  30  └─!  _                                26, 28
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@34)                            34 : 03
-       ▶   (@34)
-
-@34:
-  34       (program)                        32, 26
+  00       (program)                        30, 24
        ●   program
-  32       _                                28, 30
+  30       _                                26, 28
        ●   debugger_statement
-  28       (lexical_declaration) [Node RecordSet(M0)]  24
-       ○   debugger_statement
-  32  ❮❮❮ 
-  30       _                                28, 30
-       ●   debugger_statement
-  28       (lexical_declaration) [Node RecordSet(M0)]  24
+  26       (lexical_declaration) [Node RecordSet(M0)]  22
        ○   debugger_statement
   30  ❮❮❮ 
-  30       _                                28, 30
-       ●   expression_statement
-  28       (lexical_declaration) [Node RecordSet(M0)]  24
-       ○   expression_statement
-  30  ❮❮❮ 
-  30       _                                28, 30
-  34  ❮❮❮ 
-  26  -ε-  [Absent RecordSet(M0)]           22
-  22  -ε-  [ListOpen]                       18, 11
-  18       (debugger_statement) [Node ArrayPush]  20, 16
+  28       _                                26, 28
        ●   debugger_statement
-  20       (debugger_statement) [Node ArrayPush]  20, 16
-       ●   debugger_statement
-  20       (debugger_statement) [Node ArrayPush]  20, 16
-       ○   expression_statement
-  20  ❮❮❮ 
-  16  -ε-  [ListClose RecordSet(M1)]        14
-  14       (expression_statement) [Node RecordSet(M2)]  06
+  26       (lexical_declaration) [Node RecordSet(M0)]  22
+       ○   debugger_statement
+  28  ❮❮❮ 
+  28       _                                26, 28
        ●   expression_statement
-  06       (identifier) == "foo"            08
+  26       (lexical_declaration) [Node RecordSet(M0)]  22
+       ○   expression_statement
+  28  ❮❮❮ 
+  28       _                                26, 28
+  00  ❮❮❮ 
+  24  -ε-  [Absent RecordSet(M0)]           20
+  20  -ε-  [ListOpen]                       16, 08
+  16       (debugger_statement) [Node ArrayPush]  18, 13
+       ●   debugger_statement
+  18       (debugger_statement) [Node ArrayPush]  18, 13
+       ●   debugger_statement
+  18       (debugger_statement) [Node ArrayPush]  18, 13
+       ○   expression_statement
+  18  ❮❮❮ 
+  13  -ε-  [ListClose RecordSet(M1)]        11
+  11       (expression_statement) [Node RecordSet(M2)]  02
+       ●   expression_statement
+  02       (identifier) == "foo"            04
        ●   identifier
-  08       _                                09
+  04       _                                05
        ●   expression_statement
-  09       _                                10
+  05       _                                06
        ●   program
-  10   ◀   (@34)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼

@@ -66,45 +66,33 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─‣─  (expression_statement) [Node RecordSet(M1)]  08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10   !   (expression_statement) [Node RecordSet(M0)]  06
-  12  ─‣─  (expression_statement) [Node RecordSet(M0)]  06
-  14   !   (comment)                        12
+  00   !   (program)                        01
+  01  └─!  _                                16, 08, 18
+  03  ─‣─  (expression_statement) [Node RecordSet(M1)]  05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08   !   (expression_statement) [Node RecordSet(M0)]  03
+  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  03
+  12   !   (comment)                        10
+  13  ──!  _                                12, 13
   15  ...
-  16  ──!  _                                14, 16
-  18   !   _                                14, 16
-  20  ──!  _                                18, 10, 20
-  22  └─!  _                                18, 10, 20
-  24   !   (program)                        22
+  16   !   _                                12, 13
+  18  ──!  _                                16, 08, 18
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-       ▶   (@24)
-
-@24:
-  24       (program)                        22
+  00       (program)                        01
        ●   program
-  22       _                                18, 10, 20
+  01       _                                16, 08, 18
        ●   comment
-  18       _                                14, 16
+  16       _                                12, 13
        ●   comment
-  14       (comment)                        12
+  12       (comment)                        10
        ●   comment
-  12       (expression_statement) [Node RecordSet(M0)]  06
+  10       (expression_statement) [Node RecordSet(M0)]  03
        ●   expression_statement
-  06       (expression_statement) [Node RecordSet(M1)]  08
+  03       (expression_statement) [Node RecordSet(M1)]  05
        ●   expression_statement
-  08       _                                09
+  05       _                                06
        ●   program
-  09   ◀   (@24)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼

@@ -60,41 +60,27 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─‣┘  _                                13
-  07  ...
-  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
-  11  ─‣┘  _ [RecordSet(M2)]                06
-  13                                        ▶
-  14  -ε-  [Absent RecordSet(M2)]           06
-  16  ──!  _                                08, 16
-  18  └─!  _                                08, 16
-  20  └‣─  (expression_statement)           18, 14
-  22   !   (program)                        20
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           13, 09
+  03   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  06
+  06  ─‣┘  _ [RecordSet(M2)]                15
+  08                                        ▶
+  09  -ε-  [Absent RecordSet(M2)]           15
+  11  ──!  _                                03, 11
+  13  └─!  _                                03, 11
+  15  ─‣┘  _                                08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        20
+  00       (program)                        01
        ●   program
-  20       (expression_statement)           18, 14
+  01       (expression_statement)           13, 09
        ●   expression_statement
-  18       _                                08, 16
+  13       _                                03, 11
        ●   identifier
-  08       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
+  03       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  06
        ●   identifier
-  11       _ [RecordSet(M2)]                06
+  06       _ [RecordSet(M2)]                15
        ●   expression_statement
-  06       _                                13
+  15       _                                08
        ●   program
-  13   ◀   (@22)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  08   ◀   (Q)                              ◼

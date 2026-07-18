@@ -41,22 +41,16 @@ Q = 00 :: T0
 
 [instructions]
 Q:
-  00       (@12)                            12 : 01
-  01                                        ▶
+  00   !   (program)                        10, 02
   02                                        ▶
   03   !   (expression_statement)           08, 07
   05   !   (lexical_declaration)            08, 07
   07  ─‣┘  _                                02
   08  ──!  _                                03, 05, 08
   10  └─!  _                                03, 05, 08
-  12   !   (program)                        10, 02
 --------------------- TRACE ----------------------
 Q:
-  00       (@12)                            12 : 01
-       ▶   (@12)
-
-@12:
-  12       (program)                        10, 02
+  00       (program)                        10, 02
        ●   program
   10       _                                03, 05, 08
        ●   expression_statement
@@ -73,7 +67,4 @@ Q:
   05  ❮❮❮ 
   07       _                                02
        ●   program
-  02   ◀   (@12)                            
-
-Q:
-  01   ◀   (Q)                              ◼
+  02   ◀   (Q)                              ◼

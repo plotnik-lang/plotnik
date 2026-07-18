@@ -4,7 +4,7 @@ Q = (array
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 18
+Q = 02
 
 [transitions]
 Q:
@@ -16,12 +16,6 @@ Q:
   07   !   (identifier)                     09, 05
   09  ──!  _                                07, 09
   10  └─!  _                                07, 09
-
-Q (entry point):
-  15                                        ▶
-  16  -ε-  [RecordClose]                    15
-  17       (Q)                              02 : 16
-  18  -ε-  [RecordOpen]                     17
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -46,15 +40,11 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08  └‣─  (number) [Node RecordSet(M0)]    07
-  10  ─‣─  (number) [Node RecordSet(M0)]    07
-  12   !   (identifier)                     14, 10
-  14  ──!  _                                12, 14
-  16  └─!  _                                12, 14
-  18   !   (array)                          16, 08
+  00   !   (array)                          12, 03
+  02                                        ▶
+  03  └‣─  (number) [Node RecordSet(M0)]    07
+  05  ─‣─  (number) [Node RecordSet(M0)]    07
+  07  ─‣┘  _                                02
+  08   !   (identifier)                     10, 05
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10

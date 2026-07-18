@@ -66,43 +66,28 @@ Q = 00 :: T6
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@40)                            40 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                06
-  08   !   (comment) [Node RecordSet(M0) RecordClose RecordSet(M2)]  07
-  11  ──!  _                                08, 11
-  13   !   _ [RecordOpen]                   08, 11
-  15  ...
-  16  -ε-  [Absent RecordSet(M3)]           13
-  18  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  06
-  21   !   (identifier) [Node RecordSet(M1) RecordClose RecordSet(M3)]  07
-  24  ──!  _                                21, 24
-  26   !   _ [RecordOpen]                   21, 24
-  28  -ε-  [Absent RecordSet(M2)]           26
-  30  ...
+  00   !   (program)                        32, 12, 26
+  02                                        ▶
+  03   !   (comment) [Node RecordSet(M0) RecordClose RecordSet(M2)]  15
+  06  ──!  _                                03, 06
+  08   !   _ [RecordOpen]                   03, 06
+  10  -ε-  [Absent RecordSet(M3)]           08
+  12  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  02
+  15  ─‣┘  _                                02
+  16   !   (identifier) [Node RecordSet(M1) RecordClose RecordSet(M3)]  15
+  19  ──!  _                                16, 19
+  21   !   _ [RecordOpen]                   16, 19
+  23  ...
+  24  -ε-  [Absent RecordSet(M2)]           21
+  26  -ε-  [Absent RecordSet(M2) RecordOpen Absent RecordSet(M1) RecordClose RecordSet(M3)]  02
+  29  ──!  _                                10, 24, 29
   31  ...
-  32  -ε-  [Absent RecordSet(M2) RecordOpen Absent RecordSet(M1) RecordClose RecordSet(M3)]  06
-  35  ──!  _                                16, 28, 35
-  37  └─!  _                                16, 28, 35
-  39  ...
-  40   !   (program)                        37, 18, 32
+  32  └─!  _                                10, 24, 29
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@40)                            40 : 03
-       ▶   (@40)
-
-@40:
-  40       (program)                        37, 18, 32
+  00       (program)                        32, 12, 26
        ●   program
-  37       _                                16, 28, 35
-  40  ❮❮❮ 
-  18  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  06
-  06   ◀   (@40)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  32       _                                10, 24, 29
+  00  ❮❮❮ 
+  12  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  02
+  02   ◀   (Q)                              ◼

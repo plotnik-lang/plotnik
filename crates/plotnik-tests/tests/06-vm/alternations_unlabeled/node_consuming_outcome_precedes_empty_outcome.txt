@@ -50,56 +50,42 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                14
-  08   !   (number) [Node RecordSet(M0)]    07
-  10  ──!  _                                08, 10
-  12   !   _ [Absent RecordSet(M1)]         08, 10
-  14  ─‣┘  _                                06
-  15  ...
-  16  -ε-  [Absent RecordSet(M1) Absent RecordSet(M0)]  14
-  19   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  07
-  22  ──!  _                                12, 19, 22
-  24  └─!  _                                12, 19, 22
-  26  └‣─  (expression_statement)           24, 16
-  28   !   (program)                        26
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           18, 10
+  03                                        ▶
+  04   !   (number) [Node RecordSet(M0)]    20
+  06  ──!  _                                04, 06
+  08   !   _ [Absent RecordSet(M1)]         04, 06
+  10  -ε-  [Absent RecordSet(M1) Absent RecordSet(M0)]  21
+  13   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  20
+  16  ──!  _                                08, 13, 16
+  18  └─!  _                                08, 13, 16
+  20  ─‣┘  _                                21
+  21  ─‣┘  _                                03
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@28)                            28 : 03
-       ▶   (@28)
-
-@28:
-  28       (program)                        26
+  00       (program)                        01
        ●   program
-  26       (expression_statement)           24, 16
+  01       (expression_statement)           18, 10
        ●   expression_statement
-  24       _                                12, 19, 22
+  18       _                                08, 13, 16
        ●   identifier
-  12       _ [Absent RecordSet(M1)]         08, 10
+  08       _ [Absent RecordSet(M1)]         04, 06
        ●   identifier
-  08       (number) [Node RecordSet(M0)]    07
+  04       (number) [Node RecordSet(M0)]    20
        ○   identifier
-  12  ❮❮❮ 
-  10       _                                08, 10
+  08  ❮❮❮ 
+  06       _                                04, 06
        ●   ;
-  08       (number) [Node RecordSet(M0)]    07
+  04       (number) [Node RecordSet(M0)]    20
        ○   ;
-  10  ❮❮❮ 
-  10       _                                08, 10
-  24  ❮❮❮ 
-  19       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  06  ❮❮❮ 
+  06       _                                04, 06
+  18  ❮❮❮ 
+  13       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  20
        ●   identifier
-  07       _                                14
+  20       _                                21
        ●   expression_statement
-  14       _                                06
+  21       _                                03
        ●   program
-  06   ◀   (@28)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  03   ◀   (Q)                              ◼

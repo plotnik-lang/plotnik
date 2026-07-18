@@ -48,46 +48,30 @@ N1: S4 → T2  ; Q
 
 [entry_points]
 Other = 00 :: T1
-Q     = 06 :: T2
+Q     = 05 :: T2
 
 [instructions]
 Other:
-  00  -ε-  [RecordOpen]                     02
-  02       (@19)                            19 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (program)                        01
+  01  └‣─  (function_declaration) [Node RecordSet(M0)]  03
+  03  ─‣┘  _                                04
+  04                                        ▶
 
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@22)                            22 : 09
-  09  -ε-  [RecordClose]                    11
+  05   !   (program)                        06
+  06  └‣─  (expression_statement)           08
+  07  ...
+  08  └‣─  (identifier) [Node RecordSet(M1)]  10
+  10  ─‣┘² _                                11
   11                                        ▶
-  12  └‣─  (function_declaration) [Node RecordSet(M0)]  14
-  14  ─‣┘  _                                15
-  15                                        ▶
-  16  └‣─  (identifier) [Node RecordSet(M1)]  18
-  18  ─‣┘² _                                20
-  19   !   (program)                        12
-  20                                        ▶
-  21  └‣─  (expression_statement)           16
-  22   !   (program)                        21
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@22)                            22 : 09
-       ▶   (@22)
-
-@22:
-  22       (program)                        21
+  05       (program)                        06
        ●   program
-  21       (expression_statement)           16
+  06       (expression_statement)           08
        ●   expression_statement
-  16       (identifier) [Node RecordSet(M1)]  18
+  08       (identifier) [Node RecordSet(M1)]  10
        ●   identifier
-  18       _                                20
+  10       _                                11
        ●   program
-  20   ◀   (@22)                            
-
-Q:
-  09  -ε-  [RecordClose]                    11
   11   ◀   (Q)                              ◼

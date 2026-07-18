@@ -66,63 +66,49 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ─‣┘  _ [ListClose RecordSet(M1)]      12
-  08  └‣─  (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
-  11  ─‣┘  _                                16
-  12                                        ▶
-  13  -ε-  [ListClose RecordSet(M1)]        12
-  15  ...
-  16  -ε-  [RecordClose ArrayPush]          20, 06
-  18   !   (expression_statement) [RecordOpen]  08
-  20  ──!  _                                18, 20
-  22  └─!  _                                18, 20
-  24  -ε-  [ListOpen]                       22, 13
-  26   !   (program)                        24
+  00   !   (program)                        01
+  01  -ε-  [ListOpen]                       16, 08
+  03  └‣─  (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  06
+  06  ─‣┘  _                                10
+  07                                        ▶
+  08  -ε-  [ListClose RecordSet(M1)]        07
+  10  -ε-  [RecordClose ArrayPush]          14, 18
+  12   !   (expression_statement) [RecordOpen]  03
+  14  ──!  _                                12, 14
+  16  └─!  _                                12, 14
+  18  ─‣┘  _ [ListClose RecordSet(M1)]      07
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@26)                            26 : 03
-       ▶   (@26)
-
-@26:
-  26       (program)                        24
+  00       (program)                        01
        ●   program
-  24  -ε-  [ListOpen]                       22, 13
-  22       _                                18, 20
+  01  -ε-  [ListOpen]                       16, 08
+  16       _                                12, 14
        ●   expression_statement
-  18       (expression_statement) [RecordOpen]  08
+  12       (expression_statement) [RecordOpen]  03
        ●   expression_statement
-  08       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
+  03       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  06
        ●   identifier
-  11       _                                16
+  06       _                                10
        ●   expression_statement
-  16  -ε-  [RecordClose ArrayPush]          20, 06
-  20       _                                18, 20
+  10  -ε-  [RecordClose ArrayPush]          14, 18
+  14       _                                12, 14
        ●   expression_statement
-  18       (expression_statement) [RecordOpen]  08
+  12       (expression_statement) [RecordOpen]  03
        ●   expression_statement
-  08       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
+  03       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  06
        ○   ;
-  20  ❮❮❮ 
-  20       _                                18, 20
+  14  ❮❮❮ 
+  14       _                                12, 14
        ●   expression_statement
-  18       (expression_statement) [RecordOpen]  08
+  12       (expression_statement) [RecordOpen]  03
        ●   expression_statement
-  08       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  11
+  03       (identifier) [Node RecordSet(M0)] =~ /^\p{Lu}$/  06
        ●   identifier
-  11       _                                16
+  06       _                                10
        ●   expression_statement
-  16  -ε-  [RecordClose ArrayPush]          20, 06
-  20       _                                18, 20
-  16  ❮❮❮ 
-  06       _ [ListClose RecordSet(M1)]      12
+  10  -ε-  [RecordClose ArrayPush]          14, 18
+  14       _                                12, 14
+  10  ❮❮❮ 
+  18       _ [ListClose RecordSet(M1)]      07
        ●   program
-  12   ◀   (@26)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  07   ◀   (Q)                              ◼

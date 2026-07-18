@@ -17,19 +17,13 @@ Q = {
 }
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 20
+Q = 0
 
 [transitions]
 Q:
-  00  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  09
-  01                                        ▶
-  09   !   (identifier) [RecordOpen Node RecordSet(a) RecordClose RecordSet(b) RecordClose RecordSet(c) RecordClose RecordSet(d) RecordClose RecordSet(e) RecordClose RecordSet(f) RecordClose RecordSet(g) RecordClose RecordSet(h)]  01
-
-Q (entry point):
-  17                                        ▶
-  18  -ε-  [RecordClose]                    17
-  19       (Q)                              00 : 18
-  20  -ε-  [RecordOpen]                     19
+  0  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  9
+  1                                         ▶
+  9   !   (identifier) [RecordOpen Node RecordSet(a) RecordClose RecordSet(b) RecordClose RecordSet(c) RecordClose RecordSet(d) RecordClose RecordSet(e) RecordClose RecordSet(f) RecordClose RecordSet(g) RecordClose RecordSet(h)]  1
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -87,12 +81,11 @@ Q = 00 :: T8
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
+  00  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  08
+  03                                        ▶
+  04  ...
+  05  ...
+  06  ...
   07  ...
-  08  -ε-  [RecordClose RecordSet(M7)]      06
-  10   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1) RecordClose RecordSet(M2) RecordClose RecordSet(M3) RecordClose RecordSet(M4) RecordClose RecordSet(M5) RecordClose RecordSet(M6)]  08
-  16  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  10
+  08   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1) RecordClose RecordSet(M2) RecordClose RecordSet(M3) RecordClose RecordSet(M4) RecordClose RecordSet(M5) RecordClose RecordSet(M6)]  14
+  14  -ε-  [RecordClose RecordSet(M7)]      03

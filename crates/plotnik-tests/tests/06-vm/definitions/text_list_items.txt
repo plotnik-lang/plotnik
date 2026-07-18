@@ -46,45 +46,31 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  -ε-  [ListClose]                      08
-  08  ─‣┘  _ [RecordSet(M0)]                10
-  10                                        ▶
-  11  -ε-  [ListClose RecordSet(M0)]        10
-  13   !   (comment) [NodeText ArrayPush]   16, 06
-  15  ...
-  16  ──!  _                                13, 16
-  18  └─!  _                                13, 16
-  20  -ε-  [ListOpen]                       18, 11
-  22   !   (program)                        20
+  00   !   (program)                        01
+  01  -ε-  [ListOpen]                       14, 08
+  03  -ε-  [ListClose]                      05
+  05  ─‣┘  _ [RecordSet(M0)]                07
+  07                                        ▶
+  08  -ε-  [ListClose RecordSet(M0)]        07
+  10   !   (comment) [NodeText ArrayPush]   12, 03
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@22)                            22 : 03
-       ▶   (@22)
-
-@22:
-  22       (program)                        20
+  00       (program)                        01
        ●   program
-  20  -ε-  [ListOpen]                       18, 11
-  18       _                                13, 16
+  01  -ε-  [ListOpen]                       14, 08
+  14       _                                10, 12
        ●   comment
-  13       (comment) [NodeText ArrayPush]   16, 06
+  10       (comment) [NodeText ArrayPush]   12, 03
        ●   comment
-  16       _                                13, 16
+  12       _                                10, 12
        ●   comment
-  13       (comment) [NodeText ArrayPush]   16, 06
+  10       (comment) [NodeText ArrayPush]   12, 03
        ●   comment
-  16       _                                13, 16
-  13  ❮❮❮ 
-  06  -ε-  [ListClose]                      08
-  08       _ [RecordSet(M0)]                10
+  12       _                                10, 12
+  10  ❮❮❮ 
+  03  -ε-  [ListClose]                      05
+  05       _ [RecordSet(M0)]                07
        ●   program
-  10   ◀   (@22)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  07   ◀   (Q)                              ◼

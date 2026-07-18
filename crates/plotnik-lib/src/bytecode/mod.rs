@@ -45,6 +45,7 @@ pub(crate) use constants::{
     VERSION,
 };
 pub(crate) use effects::{Effect, EffectKind, EffectSuppression, FrameAction, ValueFrameKind};
+pub(crate) use entry_point::EntryBoundary;
 pub(crate) use format::{
     LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };

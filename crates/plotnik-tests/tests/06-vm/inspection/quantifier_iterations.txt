@@ -171,48 +171,34 @@ P4 pattern    15..37  source_id=0
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
-  11   !   (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  14, 20
-  14  ──!  _                                11, 14
-  16  └─!  _                                11, 14
-  18  -ε-  [ListOpen SpanStart#3]           16, 08
-  20  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
-  23  ...
-  24   !   (program) [SpanStart#0 SpanStartAt#1]  18
+  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  02  -ε-  [ListOpen SpanStart#3]           13, 05
+  04                                        ▶
+  05  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
+  08   !   (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
+  11  ──!  _                                08, 11
+  13  └─!  _                                08, 11
+  15  ...
+  16  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@24)                            24 : 03
-       ▶   (@24)
-
-@24:
-  24       (program) [SpanStart#0 SpanStartAt#1]  18
+  00       (program) [SpanStart#0 SpanStartAt#1]  02
        ●   program
-  18  -ε-  [ListOpen SpanStart#3]           16, 08
-  16       _                                11, 14
+  02  -ε-  [ListOpen SpanStart#3]           13, 05
+  13       _                                08, 11
        ●   expression_statement
-  11       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  14, 20
+  08       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
        ●   expression_statement
-  14       _                                11, 14
+  11       _                                08, 11
        ●   expression_statement
-  11       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  14, 20
+  08       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
        ●   expression_statement
-  14       _                                11, 14
+  11       _                                08, 11
        ●   expression_statement
-  11       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  14, 20
+  08       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
        ●   expression_statement
-  14       _                                11, 14
-  11  ❮❮❮ 
-  20       _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
+  11       _                                08, 11
+  08  ❮❮❮ 
+  16       _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
        ●   program
-  06   ◀   (@24)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  04   ◀   (Q)                              ◼

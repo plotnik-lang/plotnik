@@ -4,21 +4,17 @@ Q = [
 ]
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 10
+Q = 0
 
 [transitions]
 Q:
-  00  -ε-                                   02, 05
-  01                                        ▶
-  02   !   (object)                         04
-  03  ─‣┘  _                                01
-  04  └‣─  (pair)                           03
-  05   !   (object)                         07
-  07  └‣─  (spread_element)                 03
-
-Q (entry point):
-  09                                        ▶
-  10       (Q)                              00 : 09
+  0  -ε-                                    2, 5
+  1                                         ▶
+  2   !   (object)                          4
+  3  ─‣┘  _                                 1
+  4  └‣─  (pair)                            3
+  5   !   (object)                          7
+  7  └‣─  (spread_element)                  3
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -39,12 +35,10 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0       (@8)                              8 : 1
-  1                                         ▶
+  0  -ε-                                    5, 7
   2                                         ▶
   3  └‣─  (pair)                            4
   4  ─‣┘  _                                 2
   5   !   (object)                          3
   6  └‣─  (spread_element)                  4
   7   !   (object)                          6
-  8  -ε-                                    5, 7

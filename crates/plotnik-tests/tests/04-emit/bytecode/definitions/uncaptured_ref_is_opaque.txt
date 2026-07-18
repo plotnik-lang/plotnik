@@ -2,29 +2,19 @@ Inner = (identifier) @name
 Q = (expression_statement (Inner))
 ---------------------- NFA -----------------------
 [entry_points]
-Inner = 13
-Q     = 15
+Inner = 2
+Q     = 5
 
 [transitions]
 Inner:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  1                                         ▶
+  2   !   (identifier) [Node RecordSet(name)]  1
 
 Q:
-  04                                        ▶
-  05   !   (expression_statement) [SuppressBegin]  08
-  06  ─‣┘  _ [SuppressEnd]                  04
-  08  └‣─  (Inner)                          02 : 06
-
-Inner (entry point):
-  10                                        ▶
-  11  -ε-  [RecordClose]                    10
-  12       (Inner)                          02 : 11
-  13  -ε-  [RecordOpen]                     12
-
-Q (entry point):
-  14                                        ▶
-  15       (Q)                              05 : 14
+  4                                         ▶
+  5   !   (expression_statement) [SuppressBegin]  8
+  6  ─‣┘  _ [SuppressEnd]                   4
+  8  └‣─  (Inner)                           2 : 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -46,23 +36,16 @@ M0: S1 → T1  ; name: <Node>
 N0: S2 → T2  ; Inner
 
 [entry_points]
-Inner = 00 :: T2
-Q     = 06 :: T0
+Inner = 0 :: T2
+Q     = 3 :: T0
 
 [instructions]
 Inner:
-  00  -ε-  [RecordOpen]                     02
-  02       (@12)                            12 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  0   !   (identifier) [Node RecordSet(M0)]  2
+  2                                         ▶
 
 Q:
-  06       (@16)                            16 : 07
-  07                                        ▶
-  08  └‣─  (@12)                            12 : 09
-  09  ─‣┘  _ [SuppressEnd]                  14
-  11                                        ▶
-  12   !   (identifier) [Node RecordSet(M0)]  11
-  14                                        ▶
-  15  ...
-  16   !   (expression_statement) [SuppressBegin]  08
+  3   !   (expression_statement) [SuppressBegin]  5
+  5  └‣─  (Inner)                           0 : 6
+  6  ─‣┘  _ [SuppressEnd]                   8
+  8                                         ▶

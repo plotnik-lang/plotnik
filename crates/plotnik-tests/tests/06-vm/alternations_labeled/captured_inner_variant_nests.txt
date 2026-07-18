@@ -70,35 +70,20 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  ...
-  07  ...
-  08   !   (expression_statement) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
-  11  ─‣┘  _ [RecordSet(M2)]                13
-  13                                        ▶
-  14  ──!  _                                08, 14
-  16  └─!  _                                08, 14
-  18   !   (program)                        16
+  00   !   (program)                        01
+  01  └─!  _                                03, 09
+  03   !   (expression_statement) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  06
+  06  ─‣┘  _ [RecordSet(M2)]                08
+  08                                        ▶
+  09  ──!  _                                03, 09
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@18)                            18 : 03
-       ▶   (@18)
-
-@18:
-  18       (program)                        16
+  00       (program)                        01
        ●   program
-  16       _                                08, 14
+  01       _                                03, 09
        ●   expression_statement
-  08       (expression_statement) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
+  03       (expression_statement) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  06
        ●   expression_statement
-  11       _ [RecordSet(M2)]                13
+  06       _ [RecordSet(M2)]                08
        ●   program
-  13   ◀   (@18)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  08   ◀   (Q)                              ◼

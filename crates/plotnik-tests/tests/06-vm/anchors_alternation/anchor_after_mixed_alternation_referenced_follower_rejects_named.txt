@@ -56,68 +56,57 @@ N1: S05 → T2  ; Q
 
 [entry_points]
 B = 00 :: T1
-Q = 06 :: T2
+Q = 04 :: T2
 
 [instructions]
 B:
-  00  -ε-  [RecordOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (identifier) [Node RecordSet(M0)] == "b"  03
+  03                                        ▶
 
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@38)                            38 : 09
-  09  -ε-  [RecordClose]                    11
-  11                                        ▶
-  12  -ε-  [RecordClose RecordSet(M1)]      14
-  14  ─‣┘⁴ _                                19
-  15                                        ▶
-  16   !   (identifier) [Node RecordSet(M0)] == "b"  15
-  19                                        ▶
+  04   !   (program)                        05
+  05  └‣─  (expression_statement)           06
+  06  └‣─  (call_expression)                08
+  07  ...
+  08  └‣─  arguments: (arguments)           25, 27
+  10  -ε-  [RecordClose RecordSet(M1)]      12
+  12  ─‣┘⁴ _                                13
+  13                                        ▶
+  14                                        ▶
+  15  ...
+  16  ─•─  (identifier) [Node RecordSet(M0)] == "b"  14
+  19       (@16)                            16 : 10
   20                                        ▶
-  21  ─•─  (identifier) [Node RecordSet(M0)] == "b"  20
-  24       (@21)                            21 : 12
-  25                                        ▶
-  26  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  25
-  29       (@26)                            26 : 12
-  30  └‣─  (identifier) [RecordOpen] == "a"  24
-  32  └‣─  ";" [RecordOpen]                 29
-  34  └‣─  arguments: (arguments)           30, 32
-  36  └‣─  (call_expression)                34
-  37  └‣─  (expression_statement)           36
-  38   !   (program)                        37
+  21  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  20
+  24       (@21)                            21 : 10
+  25  └‣─  (identifier) [RecordOpen] == "a"  19
+  27  └‣─  ";" [RecordOpen]                 24
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [RecordOpen]                     08
-  08       (@38)                            38 : 09
-       ▶   (@38)
-
-@38:
-  38       (program)                        37
+  04       (program)                        05
        ●   program
-  37       (expression_statement)           36
+  05       (expression_statement)           06
        ●   expression_statement
-  36       (call_expression)                34
+  06       (call_expression)                08
        ●   call_expression
-  34       arguments: (arguments)           30, 32
+  08       arguments: (arguments)           25, 27
        ○   identifier
        ●   arguments
-  30       (identifier) [RecordOpen] == "a"  24
+  25       (identifier) [RecordOpen] == "a"  19
        ○   (
        ●   identifier
-  24       (@21)                            21 : 12
-       ▶   (@21)
+  19       (@16)                            16 : 10
+       ▶   (@16)
 
-@21:
-  21       (identifier) [Node RecordSet(M0)] == "b"  20
+@16:
+  16       (identifier) [Node RecordSet(M0)] == "b"  14
        ○   ,
-  30  ❮❮❮ 
+  25  ❮❮❮ 
        ○   ,
        ○   ,
        ○   )
-  34  ❮❮❮ 
-  32       ";" [RecordOpen]                 29
+  08  ❮❮❮ 
+  27       ";" [RecordOpen]                 24
        ○   (
        ○   identifier
        ○   ,
@@ -125,6 +114,6 @@ Q:
        ○   ,
        ○   identifier
        ○   )
-  34  ❮❮❮ 
-  36  ❮❮❮ 
-  37  ❮❮❮ 
+  08  ❮❮❮ 
+  06  ❮❮❮ 
+  05  ❮❮❮ 

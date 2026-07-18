@@ -574,8 +574,6 @@ impl Module {
         let entry_points = self.entry_points();
         let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
-        let storage: &[u8] = &self.storage;
-        let base = self.offsets.entry_points as usize;
         for i in 0..entry_points.len() {
             let invalid = || ModuleError::InvalidEntryPoint(i);
             let ep = entry_points.get(i);
@@ -593,9 +591,7 @@ impl Module {
                 return Err(invalid());
             }
 
-            // Bytes 6-7 are the reserved `_pad`; `EntryPoint::from_bytes` discards
-            // them, so a malformed non-zero pad would otherwise pass unnoticed.
-            if read_u16_le(storage, base + i * 8 + 6) != 0 {
+            if ep.try_boundary().is_none() {
                 return Err(invalid());
             }
         }
@@ -622,7 +618,7 @@ impl Module {
             let words = match self.decode_instruction(addr) {
                 Instruction::Match(m) => m.word_count(),
                 Instruction::Call(c) => {
-                    let target = CodeAddr::from(u16::from(c.target));
+                    let target = c.target;
                     let route = DepthRoute::from_call(c);
                     if let Some(expected) = roots.insert(target, route)
                         && expected != route
@@ -664,7 +660,7 @@ impl Module {
             let words = match self.decode_instruction(addr) {
                 Instruction::Match(matched) => matched.word_count(),
                 Instruction::Call(call) => {
-                    let target = CodeAddr::from(u16::from(call.target));
+                    let target = call.target;
                     if !self
                         .return_contract(target, &mut cache)
                         .is(ReturnPorts::dense(call.arity()), call.callee_contract())
@@ -983,7 +979,7 @@ impl Module {
                     }
                     let next = read_operand_u16(storage, instr_off + 4)?;
                     let target = read_operand_u16(storage, instr_off + 6)?;
-                    if next == 0 || target == 0 {
+                    if next == 0 {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
                     targets.push(CodeAddr::from(next));
@@ -1002,7 +998,7 @@ impl Module {
                     }
                     let target = read_operand_u16(storage, instr_off + 4)?;
                     let arity = usize::from(read_u8(instr_off + 6)?);
-                    if !(2..=usize::from(PortId::COUNT)).contains(&arity) || target == 0 {
+                    if !(2..=usize::from(PortId::COUNT)).contains(&arity) {
                         return Err(ModuleError::MalformedInstructionStream);
                     }
                     let consumed_mask = read_u8(instr_off + 7)?;

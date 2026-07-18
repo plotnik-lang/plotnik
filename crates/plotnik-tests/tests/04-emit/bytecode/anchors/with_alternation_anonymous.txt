@@ -5,21 +5,17 @@ Q = (binary_expression
 )
 ---------------------- NFA -----------------------
 [entry_points]
-Q = 10
+Q = 2
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (binary_expression)              08
-  03  ─‣┘  _                                01
-  04  ─◦─  "+"                              03
-  05   !   (identifier)                     04
-  07  ──!  _                                05, 07
-  08  └─!  _                                05, 07
-
-Q (entry point):
-  09                                        ▶
-  10       (Q)                              02 : 09
+  1                                         ▶
+  2   !   (binary_expression)               8
+  3  ─‣┘  _                                 1
+  4  ─◦─  "+"                               3
+  5   !   (identifier)                      4
+  7  ──!  _                                 5, 7
+  8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -36,16 +32,15 @@ T0 = <NoValue>
 [type_names]
 
 [entry_points]
-Q = 00 :: T0
+Q = 0 :: T0
 
 [instructions]
 Q:
-  00       (@10)                            10 : 01
-  01                                        ▶
-  02  ─◦─  "+"                              03
-  03  ─‣┘  _                                04
-  04                                        ▶
-  05   !   (identifier)                     02
-  06  ──!  _                                05, 06
-  08  └─!  _                                05, 06
-  10   !   (binary_expression)              08
+  0   !   (binary_expression)               1
+  1  └─!  _                                 6, 8
+  3  ─◦─  "+"                               4
+  4  ─‣┘  _                                 5
+  5                                         ▶
+  6   !   (identifier)                      3
+  7  ...
+  8  ──!  _                                 6, 8

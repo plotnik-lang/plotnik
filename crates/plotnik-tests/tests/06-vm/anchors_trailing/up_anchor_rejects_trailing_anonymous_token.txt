@@ -23,40 +23,34 @@ T0 = <NoValue>
 [type_names]
 
 [entry_points]
-Q = 00 :: T0
+Q = 0 :: T0
 
 [instructions]
 Q:
-  00       (@11)                            11 : 01
-  01                                        ▶
-  02  ─◦┘  _                                03
-  03  ─‣┘  _                                04
-  04                                        ▶
-  05   !   "debugger"                       02
-  06  ──!  _                                05, 06
-  08  └─!  _                                05, 06
-  10  └‣─  (debugger_statement)             08
-  11   !   (program)                        10
+  0   !   (program)                         1
+  1  └‣─  (debugger_statement)              2
+  2  └─!  _                                 7, 8
+  4  ─◦┘  _                                 5
+  5  ─‣┘  _                                 6
+  6                                         ▶
+  7   !   "debugger"                        4
+  8  ──!  _                                 7, 8
 --------------------- TRACE ----------------------
 Q:
-  00       (@11)                            11 : 01
-       ▶   (@11)
-
-@11:
-  11       (program)                        10
-       ●   program
-  10       (debugger_statement)             08
-       ●   debugger_statement
-  08       _                                05, 06
-       ●   debugger
-  05       "debugger"                       02
-       ●   debugger
-  02       _                                03
-  08  ❮❮❮ 
-  06       _                                05, 06
-       ●   ;
-  05       "debugger"                       02
-       ○   ;
-  06  ❮❮❮ 
-  06       _                                05, 06
-  10  ❮❮❮ 
+  0       (program)                         01
+      ●   program
+  1       (debugger_statement)              02
+      ●   debugger_statement
+  2       _                                 07, 08
+      ●   debugger
+  7       "debugger"                        04
+      ●   debugger
+  4       _                                 05
+  2  ❮❮❮ 
+  8       _                                 07, 08
+      ●   ;
+  7       "debugger"                        04
+      ○   ;
+  8  ❮❮❮ 
+  8       _                                 07, 08
+  1  ❮❮❮ 

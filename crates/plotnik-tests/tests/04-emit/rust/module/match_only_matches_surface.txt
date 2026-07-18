@@ -107,31 +107,53 @@ mod matcher {
     // Probe:
     const S1_PROBE: u16 = 0;
     const S2_PROBE: u16 = 1;
-    const S3_PROBE_EP: u16 = 2;
-    const S4_PROBE_EP: u16 = 3;
-
-    /// Resolve a callee-local return port through the immutable call-site map.
-    #[inline]
-    fn call_return(call_site: u16, port: rt::PortId) -> u16 {
-        match (call_site, port.to_byte()) {
-            (S4_PROBE_EP, 0) => S3_PROBE_EP,
-            _ => unreachable!(
-                "call site {call_site} has no return port {}",
-                port.to_byte()
-            ),
-        }
-    }
 
     /// Match the `Probe` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn probe_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
-        let outcome = run::<false, false, true>(tree, source, S4_PROBE_EP, NO_LIMITS);
+        let entry = S2_PROBE;
+        let boundary = EntryBoundary::new(false, false);
+        let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
     /// Whether `Probe` accepts under [`LIMITS`] without recording output events.
     pub(super) fn probe_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
-        Ok(run::<true, true, false>(tree, source, S4_PROBE_EP, resolved_limits(tree))?.is_some())
+        Ok(run::<true, true, false>(
+            tree,
+            source,
+            S2_PROBE,
+            EntryBoundary::new(false, false),
+            resolved_limits(tree),
+        )?
+        .is_some())
+    }
+    #[derive(Clone, Copy)]
+    struct EntryBoundary {
+        record: bool,
+        node: bool,
+    }
+
+    impl EntryBoundary {
+        const fn new(record: bool, node: bool) -> Self {
+            Self { record, node }
+        }
+
+        fn begin(self, eng: &mut rt::Engine<'_>) {
+            if self.record {
+                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
+            }
+        }
+
+        fn finish(self, eng: &mut rt::Engine<'_>) {
+            if self.node {
+                let _ = eng.emit_output_event(|cursor| rt::JournalEvent::Node(cursor.node()));
+                return;
+            }
+            if self.record {
+                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
+            }
+        }
     }
 
     /// What a dispatched state hands back to the driver loop.
@@ -142,8 +164,6 @@ mod matcher {
         Accept,
         /// The state failed; unwind the checkpoint stack.
         Backtrack,
-        /// Source-driven call state exceeded a fixed-width runtime capacity.
-        CallFrameError(rt::CallFrameError),
     }
 
     /// How the backtrack unwind resumed execution.
@@ -151,10 +171,10 @@ mod matcher {
         Resumed(u16),
         Accepted,
         NoMatch,
-        CallFrameError(rt::CallFrameError),
     }
 
-    /// One dispatch loop serves every entry point; `entry` selects the wrapper.
+    /// One dispatch loop serves every entry point; `entry` selects the definition
+    /// body and `boundary` supplies its root result effects.
     /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
@@ -171,6 +191,7 @@ mod matcher {
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
+        boundary: EntryBoundary,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         verify_language(tree);
@@ -179,6 +200,7 @@ mod matcher {
         } else {
             rt::Engine::new_match_only(tree.walk())
         };
+        boundary.begin(&mut eng);
         let mut fuel_used: u64 = 0;
         let mut ip = entry;
         loop {
@@ -209,13 +231,17 @@ mod matcher {
             }
             match dispatch(&mut eng, source, ip) {
                 Flow::Jump(next) => ip = next,
-                Flow::Accept => return Ok(Some(eng.into_journal())),
-                Flow::CallFrameError(error) => return Err(error.into()),
+                Flow::Accept => {
+                    boundary.finish(&mut eng);
+                    return Ok(Some(eng.into_journal()));
+                }
                 Flow::Backtrack => match backtrack(&mut eng, source) {
                     Unwound::Resumed(next) => ip = next,
-                    Unwound::Accepted => return Ok(Some(eng.into_journal())),
+                    Unwound::Accepted => {
+                        boundary.finish(&mut eng);
+                        return Ok(Some(eng.into_journal()));
+                    }
                     Unwound::NoMatch => return Ok(None),
-                    Unwound::CallFrameError(error) => return Err(error.into()),
                 },
             }
         }
@@ -224,36 +250,13 @@ mod matcher {
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
             //   1                                         ▶
-            S1_PROBE => {
-                if eng.frames_empty() {
-                    Flow::Accept
-                } else {
-                    let call_site = eng.exit_frame();
-                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
-                }
-            }
+            S1_PROBE => Flow::Accept,
             //   2   !   (program)                         1
             S2_PROBE => 'state: {
                 if !cand_s2_probe(eng) {
                     break 'state Flow::Backtrack;
                 }
                 Flow::Jump(S1_PROBE)
-            }
-            //   3                                         ▶
-            S3_PROBE_EP => {
-                if eng.frames_empty() {
-                    Flow::Accept
-                } else {
-                    let call_site = eng.exit_frame();
-                    Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
-                }
-            }
-            //   4       (Probe)                           2 : 3
-            S4_PROBE_EP => {
-                if let Err(error) = eng.enter_frame(S4_PROBE_EP) {
-                    return Flow::CallFrameError(error);
-                }
-                Flow::Jump(S2_PROBE)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
         }
@@ -283,42 +286,13 @@ mod matcher {
             match cp.resume {
                 rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
-                // Call retry: advance to the next candidate satisfying the field
-                // constraint, then re-enter the callee. Exhausted siblings keep
-                // unwinding to an earlier checkpoint.
-                rt::Resume::Call(resume) => {
-                    if !eng.cursor_mut().continue_search(resume.policy) {
-                        continue 'unwind;
-                    }
-                    if let Some(field_id) = resume.field {
-                        loop {
-                            if eng.cursor().field_id() == Some(field_id) {
-                                break;
-                            }
-                            if !eng.cursor_mut().continue_search(resume.policy) {
-                                continue 'unwind;
-                            }
-                        }
-                    }
-                    eng.push_checkpoint(rt::Checkpoint::call_retry(
-                        eng.checkpoint_state(),
-                        cp.ip,
-                        resume,
-                    ));
-                    if let Err(error) = eng.enter_frame(resume.call_site) {
-                        return Unwound::CallFrameError(error);
-                    }
-                    return Unwound::Resumed(resume.target);
-                }
+                rt::Resume::Call(_) => unreachable!("matcher has no call checkpoints"),
 
                 // Match retry: advance past the accepted-but-failed candidate and
                 // re-run that state's sibling search from there.
                 rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
                     Some(Flow::Jump(next)) => return Unwound::Resumed(next),
                     Some(Flow::Accept) => return Unwound::Accepted,
-                    Some(Flow::CallFrameError(error)) => {
-                        return Unwound::CallFrameError(error);
-                    }
                     Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
                     None => continue 'unwind,
                 },

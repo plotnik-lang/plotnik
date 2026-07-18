@@ -7,8 +7,8 @@ Collect = {
 Q = (array (Collect))
 ---------------------- NFA -----------------------
 [entry_points]
-Item = 21
-Q    = 23
+Item = 02
+Q    = 05
 
 [transitions]
 Item:
@@ -24,16 +24,6 @@ Q:
   10  -ε-  [SuppressBegin]                  09
   12  ──!  _                                10, 12
   13  └─!  _                                10, 12
-
-Item (entry point):
-  18                                        ▶
-  19  -ε-  [RecordClose]                    18
-  20       (Item)                           02 : 19
-  21  -ε-  [RecordOpen]                     20
-
-Q (entry point):
-  22                                        ▶
-  23       (Q)                              05 : 22
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -67,27 +57,19 @@ N2: S6 → T5  ; Collect
 
 [entry_points]
 Item = 00 :: T2
-Q    = 06 :: T0
+Q    = 03 :: T0
 
 [instructions]
 Item:
-  00  -ε-  [RecordOpen]                     02
-  02       (@09)                            09 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
+  00   !   (identifier) [Node RecordSet(M0)]  02
+  02                                        ▶
 
 Q:
-  06       (@24)                            24 : 07
-  07                                        ▶
-  08                                        ▶
-  09   !   (identifier) [Node RecordSet(M0)]  08
-  11                                        ▶
-  12  -ε-  [SuppressEnd]                    18, 15
-  14   !   (@09)                            09 : 12
-  15  ─‣┘  _                                11
-  16  -ε-  [SuppressBegin]                  14
-  18  ──!  _                                16, 18
-  20  └─!  _                                16, 18
-  22  ...
-  23  ...
-  24   !   (array)                          20, 11
+  03   !   (array)                          13, 05
+  05                                        ▶
+  06  -ε-  [SuppressEnd]                    11, 15
+  08   !   (Item)                           00 : 06
+  09  -ε-  [SuppressBegin]                  08
+  11  ──!  _                                09, 11
+  13  └─!  _                                09, 11
+  15  ─‣┘  _                                05

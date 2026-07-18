@@ -47,58 +47,46 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@38)                            38 : 03
-  03  -ε-  [RecordClose]                    05
-  05                                        ▶
-  06  -ε-  [ListClose RecordSet(M1)]        08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10  -ε-  [ListClose RecordSet(M1)]        09
-  12   !   (expression_statement) [Node ArrayPush]  14, 06
-  14  ──!  _                                12, 14
-  16  └─!  _                                12, 14
-  18  -ε-  [ListOpen]                       16, 10
-  20   !   (expression_statement) [Node ArrayPush]  22, 06
-  22  ──!  _                                20, 22
-  24  -ε-  [ListOpen]                       22, 06
-  26  -ε-  [ListClose RecordSet(M0)]        24
-  28  -ε-  [ListClose RecordSet(M0)]        18
-  30   !   (function_declaration) [Node ArrayPush]  32, 26
-  32  ──!  _                                30, 32
-  34  └─!  _                                30, 32
-  36  -ε-  [ListOpen]                       34, 28
-  38   !   (program)                        36
+  00   !   (program)                        01
+  01  -ε-  [ListOpen]                       32, 26
+  03  -ε-  [ListClose RecordSet(M1)]        05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  -ε-  [ListClose RecordSet(M1)]        06
+  10   !   (expression_statement) [Node ArrayPush]  12, 03
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
+  16  -ε-  [ListOpen]                       14, 08
+  18   !   (expression_statement) [Node ArrayPush]  20, 03
+  20  ──!  _                                18, 20
+  22  -ε-  [ListOpen]                       20, 03
+  24  -ε-  [ListClose RecordSet(M0)]        22
+  26  -ε-  [ListClose RecordSet(M0)]        16
+  28   !   (function_declaration) [Node ArrayPush]  30, 24
+  30  ──!  _                                28, 30
+  32  └─!  _                                28, 30
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [RecordOpen]                     02
-  02       (@38)                            38 : 03
-       ▶   (@38)
-
-@38:
-  38       (program)                        36
+  00       (program)                        01
        ●   program
-  36  -ε-  [ListOpen]                       34, 28
-  34       _                                30, 32
+  01  -ε-  [ListOpen]                       32, 26
+  32       _                                28, 30
        ●   expression_statement
-  30       (function_declaration) [Node ArrayPush]  32, 26
+  28       (function_declaration) [Node ArrayPush]  30, 24
        ○   expression_statement
-  34  ❮❮❮ 
-  32       _                                30, 32
-  36  ❮❮❮ 
-  28  -ε-  [ListClose RecordSet(M0)]        18
-  18  -ε-  [ListOpen]                       16, 10
-  16       _                                12, 14
+  32  ❮❮❮ 
+  30       _                                28, 30
+  01  ❮❮❮ 
+  26  -ε-  [ListClose RecordSet(M0)]        16
+  16  -ε-  [ListOpen]                       14, 08
+  14       _                                10, 12
        ●   expression_statement
-  12       (expression_statement) [Node ArrayPush]  14, 06
+  10       (expression_statement) [Node ArrayPush]  12, 03
        ●   expression_statement
-  14       _                                12, 14
-  12  ❮❮❮ 
-  06  -ε-  [ListClose RecordSet(M1)]        08
-  08       _                                09
+  12       _                                10, 12
+  10  ❮❮❮ 
+  03  -ε-  [ListClose RecordSet(M1)]        05
+  05       _                                06
        ●   program
-  09   ◀   (@38)                            
-
-Q:
-  03  -ε-  [RecordClose]                    05
-  05   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼
