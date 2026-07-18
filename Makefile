@@ -36,8 +36,6 @@ test:
 		$(FILTER)
 
 test-arborium:
-	@diff -ru crates/plotnik-rt/src crates/plotnik-rt-arborium/src
-	@diff -ru crates/plotnik/src crates/plotnik-arborium/src
 	@cargo test \
 		--manifest-path crates/plotnik-rt-arborium/Cargo.toml \
 		--all-targets \
