@@ -1,0 +1,9 @@
+B = (expression_statement (A))?
+A = (B)?
+-------------------- SYMBOLS ---------------------
+B
+  A
+    B (cycle)
+A
+  B
+    A (cycle)

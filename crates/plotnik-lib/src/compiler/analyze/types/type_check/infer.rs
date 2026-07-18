@@ -60,11 +60,11 @@ use crate::compiler::parse::ast::{
 
 mod diagnostics;
 mod flow;
-mod recursive_captures;
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferState<'a, 'd> {
     pub type_ctx: &'a mut TypeAnalysisBuilder,
+    deferred_checks: &'a mut Vec<DeferredCheck>,
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
     pub dependency_analysis: &'a DependencyAnalysis,
@@ -77,6 +77,28 @@ pub struct InferState<'a, 'd> {
 pub struct InferVisitor<'a, 'd> {
     ctx: InferState<'a, 'd>,
     source: SourceId,
+}
+
+/// Exact use sites whose answer depends on a declaration still open in this SCC.
+enum DeferredCheck {
+    Capture {
+        source: SourceId,
+        target: DefId,
+        inner: Pattern,
+        capture_name: Symbol,
+    },
+    QuantifiedCapture {
+        source: SourceId,
+        target: DefId,
+        quantifier: QuantifiedPattern,
+        capture_name: Symbol,
+    },
+    NullableRepeat {
+        source: SourceId,
+        target: DefId,
+        quantifier: QuantifiedPattern,
+        inner: Pattern,
+    },
 }
 
 /// Whether a quantifier contributes fields, materializes a captured value, is
@@ -463,12 +485,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .expect("definition root extents are precomputed before inference");
 
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
-            // A recursive target's result type is not known yet. Its
-            // no-value flow, however, is real as soon as the definition is
-            // registered: a completed match-only target must flow NoValue so
-            // the single-referent check sees it. A same-SCC target
-            // not yet registered is a pending value here; those capture
-            // sites are re-checked once the SCC completes.
+            // A completed match-only target already flows NoValue. A same-SCC
+            // target not yet registered flows a provisional reference; any
+            // capture check that depends on its final state is queued until
+            // the SCC seals.
             let resolved_output = self.ctx.type_ctx.in_progress().def_output(def_id);
             let flow = match resolved_output {
                 Some(DefinitionOutput::MatchOnly) => PatternFlow::NoValue,
@@ -707,12 +727,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         pattern: Pattern,
         alternatives: Vec<(Option<Pattern>, PatternShape)>,
     ) -> PatternShape {
-        match unify_alternative_flows(self.ctx.type_ctx, alternatives) {
+        let alternation_span = Span::new(self.source, pattern.syntax().text_range());
+        match unify_alternative_flows(self.ctx.type_ctx, alternatives, alternation_span) {
             Ok(Some(field_flow)) => PatternShape::fields(root_extent, field_flow),
             Ok(None) => PatternShape::new(root_extent, PatternFlow::NoValue),
             Err(error) => {
                 self.ctx.type_ctx.block_capture_producers(error.producers());
-                self.report_alternative_unify_error(pattern.syntax(), &error);
+                self.report_alternative_unify_error(&error);
                 PatternShape::new(root_extent, PatternFlow::NoValue)
             }
         }
@@ -785,6 +806,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Determine how the inner flow relates to the capture.
         let captured_inner = self.resolve_capture_inner(&inner, capture_name);
         let inner_info = captured_inner.info;
+        if let Some(target) = self.pending_reference_target(inner.node()) {
+            self.ctx.deferred_checks.push(DeferredCheck::Capture {
+                source: self.source,
+                target,
+                inner: inner.node().clone(),
+                capture_name,
+            });
+        }
 
         // A no-value inner that doesn't match exactly one node has no single node
         // for the capture to bind. Recover as `Node` — the error is already
@@ -1030,6 +1059,23 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         )
     }
 
+    fn pending_reference_target(&mut self, pattern: &Pattern) -> Option<DefId> {
+        let Pattern::DefRef(reference) = pattern else {
+            return None;
+        };
+        let name = reference.name()?;
+        let target = self
+            .ctx
+            .dependency_analysis
+            .def_id_for_name(self.ctx.interner, name.text())?;
+        self.ctx
+            .type_ctx
+            .in_progress()
+            .def_output(target)
+            .is_none()
+            .then_some(target)
+    }
+
     /// The capture's base type, before its custom capture type is applied.
     fn captured_base_type(
         &mut self,
@@ -1168,6 +1214,18 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             QuantifiedContext::Bare => self.infer_pattern(&inner),
         };
         let quantifier = self.quantifier_kind(quant.node());
+        if let QuantifiedContext::Captured(capture_name) = context
+            && let Some(target) = self.pending_reference_target(inner.node())
+        {
+            self.ctx
+                .deferred_checks
+                .push(DeferredCheck::QuantifiedCapture {
+                    source: self.source,
+                    target,
+                    quantifier: quant.node().clone(),
+                    capture_name,
+                });
+        }
 
         let mut result = match quantifier {
             QuantifierKind::Optional => match context {
@@ -1303,18 +1361,24 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if !self.ctx.nullable_defs.contains(&def_id) {
             return;
         }
-        // Mid-SCC targets have no registered output yet; the recursion checks
-        // own those cycles.
         let view = self.ctx.type_ctx.in_progress();
-        let wrapper_output = view
-            .def_output(def_id)
-            .and_then(DefinitionOutput::value)
-            .is_some_and(|output| {
-                matches!(
-                    view.type_shape(output),
-                    Some(TypeShape::Option(_) | TypeShape::List { .. })
-                )
-            });
+        let Some(output) = view.def_output(def_id) else {
+            self.ctx
+                .deferred_checks
+                .push(DeferredCheck::NullableRepeat {
+                    source: self.source,
+                    target: def_id,
+                    quantifier: quant.clone(),
+                    inner: element,
+                });
+            return;
+        };
+        let wrapper_output = output.value().is_some_and(|output| {
+            matches!(
+                view.type_shape(output),
+                Some(TypeShape::Option(_) | TypeShape::List { .. })
+            )
+        });
         if wrapper_output {
             self.report_nullable_repeat(quant, &element);
         }
@@ -1620,6 +1684,7 @@ impl StructuralFacts {
 pub(super) struct InferPass<'a, 'd> {
     ctx: TypeAnalysisBuilder,
     analysis: InferPassEnv<'a, 'd>,
+    deferred_checks: Vec<DeferredCheck>,
 }
 
 impl<'a, 'd> InferPass<'a, 'd> {
@@ -1627,6 +1692,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
         Self {
             ctx: TypeAnalysisBuilder::new(),
             analysis,
+            deferred_checks: Vec::new(),
         }
     }
 
@@ -1662,7 +1728,10 @@ impl<'a, 'd> InferPass<'a, 'd> {
 
         self.process_sccs();
         self.assert_all_definitions_processed();
-        self.check_in_progress_reference_captures();
+        assert!(
+            self.deferred_checks.is_empty(),
+            "every SCC must resolve its deferred semantic checks",
+        );
         self.ctx
     }
 
@@ -1673,6 +1742,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
     ) -> T {
         let state = InferState {
             type_ctx: &mut self.ctx,
+            deferred_checks: &mut self.deferred_checks,
             interner: self.analysis.interner,
             symbol_table: self.analysis.symbol_table,
             dependency_analysis: self.analysis.dependency_analysis,
@@ -1686,6 +1756,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
     /// Process definitions in SCC order (leaves first).
     fn process_sccs(&mut self) {
         for scc in self.analysis.dependency_analysis.sccs() {
+            self.ctx.begin_scc(scc);
             for &def_id in scc {
                 let def_name = self
                     .analysis
@@ -1695,7 +1766,94 @@ impl<'a, 'd> InferPass<'a, 'd> {
                 let source_id = self.analysis.dependency_analysis.def_source_id(def_id);
                 self.infer_and_register(def_id, &def_name, source_id);
             }
+            let deferred_errors = self.ctx.seal_scc();
+            for error in deferred_errors {
+                self.ctx.block_capture_producers(error.producers());
+                self.visit(error.fallback_span().source, |visitor| {
+                    visitor.report_alternative_unify_error(&error);
+                });
+            }
+            self.resolve_deferred_checks();
         }
+    }
+
+    fn resolve_deferred_checks(&mut self) {
+        for check in std::mem::take(&mut self.deferred_checks) {
+            match check {
+                DeferredCheck::Capture {
+                    source,
+                    target,
+                    inner,
+                    capture_name,
+                } => {
+                    let shape = self.resolved_reference_shape(target);
+                    self.visit(source, |visitor| {
+                        if !visitor.report_capture_on_match_only_ref(&inner, &shape, capture_name) {
+                            visitor.report_capture_without_single_node(
+                                &inner,
+                                &shape,
+                                capture_name,
+                            );
+                        }
+                    });
+                }
+                DeferredCheck::QuantifiedCapture {
+                    source,
+                    target,
+                    quantifier,
+                    capture_name,
+                } => {
+                    let shape = self.resolved_reference_shape(target);
+                    self.visit(source, |visitor| {
+                        visitor.report_quantified_capture_without_single_node(
+                            &quantifier,
+                            &shape,
+                            Some(capture_name),
+                        );
+                    });
+                }
+                DeferredCheck::NullableRepeat {
+                    source,
+                    target,
+                    quantifier,
+                    inner,
+                } => {
+                    let view = self.ctx.in_progress();
+                    let wrapper_output = view
+                        .def_output(target)
+                        .expect("sealed deferred-check target has an output")
+                        .value()
+                        .is_some_and(|output| {
+                            matches!(
+                                view.type_shape(output),
+                                Some(TypeShape::Option(_) | TypeShape::List { .. })
+                            )
+                        });
+                    if wrapper_output {
+                        self.visit(source, |visitor| {
+                            visitor.report_nullable_repeat(&quantifier, &inner);
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    fn resolved_reference_shape(&mut self, target: DefId) -> PatternShape {
+        let root_extent = self
+            .ctx
+            .def_root_extent(target)
+            .expect("definition root extents are precomputed before inference");
+        let output = self
+            .ctx
+            .in_progress()
+            .def_output(target)
+            .expect("sealed deferred-check target has an output");
+        let flow = match output {
+            DefinitionOutput::MatchOnly => PatternFlow::NoValue,
+            DefinitionOutput::Value(_) => PatternFlow::Value(self.ctx.definition_ref(target)),
+        };
+        PatternShape::new(root_extent, flow)
     }
 
     fn assert_all_definitions_processed(&mut self) {

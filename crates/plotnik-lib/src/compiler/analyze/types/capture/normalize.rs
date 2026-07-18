@@ -952,6 +952,13 @@ impl<'s, 'c, 'a, 'd> FieldFlowNormalizer<'s, 'c, 'a, 'd> {
                     previous_type = right_type;
                 }
                 Err(()) => {
+                    // Inference already reported the structural conflict that
+                    // blocked these producers; normalization must not cascade it.
+                    if field.producers.iter().any(|capture_id| {
+                        self.session.input.blocked_capture_ids.contains(capture_id)
+                    }) {
+                        continue;
+                    }
                     if !self
                         .reported_conflicts
                         .insert((name, previous_span, other_span))
