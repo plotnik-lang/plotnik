@@ -7,4 +7,4 @@ error: backreferences are not supported in regex
   |                        ^^
   |
 help: the portable regex subset excludes backreferences. Rewrite the pattern without `\1`
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

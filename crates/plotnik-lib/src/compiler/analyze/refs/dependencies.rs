@@ -5,115 +5,121 @@
 //! (leaves first), which is useful for passes that need to process dependencies
 //! before dependents (like type inference).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::core::Interner;
 use indexmap::{IndexMap, IndexSet};
 
-use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::analyze::names::CollectedDefinitions;
 use crate::compiler::diagnostics::Error;
 use crate::compiler::ids::DefId;
 use crate::compiler::limits::ReferenceLimits;
 use crate::compiler::parse::ast::{DefRef, Pattern};
 
-pub use super::dependency_analysis::DependencyAnalysis;
-use super::dependency_analysis::{DefInfo, DefinitionDependencies};
+use super::definition_graph::{Definition, DefinitionGraph};
 
-pub fn analyze_dependencies(
-    symbol_table: &SymbolTable,
+pub(in crate::compiler) fn build_definition_graph(
+    collected: CollectedDefinitions,
     interner: &mut Interner,
     limits: ReferenceLimits,
-) -> Result<DependencyAnalysis, Error> {
-    // `strongconnect` recurses one frame per edge it follows. A chain like
-    // `A = (B)`, `B = (C)`, … is flat source, so the parser cannot bound it; this
-    // analysis owns the corresponding stack ceiling.
-    let Some(sccs) = TarjanScc::find(symbol_table, limits.max_depth) else {
-        return Err(Error::RecursionLimitExceeded);
-    };
+) -> Result<DefinitionGraph, Error> {
+    let (sccs, ids_by_symbol, mut outgoing) = {
+        // `strongconnect` recurses one frame per edge it follows. A chain like
+        // `A = (B)`, `B = (C)`, … is flat source, so the parser cannot bound it;
+        // graph construction owns the corresponding stack ceiling.
+        let Some(topology) = TarjanScc::find(&collected, limits.max_depth) else {
+            return Err(Error::RecursionLimitExceeded);
+        };
 
-    // Tarjan runs `strongconnect` from every symbol-table key, so each def lands in
-    // exactly one SCC. Type inference leans on this: a def missing from the partition
-    // would never be processed in dependency order, breaking `infer_ref`'s guarantee
-    // that a non-recursive target is computed before its referrer.
-    assert!(
-        {
-            let mut seen = HashSet::new();
-            sccs.iter().flatten().all(|name| seen.insert(name.as_str()))
-                && seen.len() == symbol_table.count()
-        },
-        "every symbol-table definition must appear in exactly one SCC"
-    );
+        // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs).
+        let mut ids_by_symbol = HashMap::new();
+        let mut definition_count = 0usize;
+        let mut sccs = Vec::with_capacity(topology.sccs.len());
+        for scc in &topology.sccs {
+            let mut scc_ids = Vec::with_capacity(scc.len());
+            for &name in scc {
+                let symbol = interner.intern(name);
+                let def_id = DefId::from_raw(
+                    u32::try_from(definition_count).expect("definition count fits u32"),
+                );
+                ids_by_symbol.insert(symbol, def_id);
+                definition_count += 1;
+                scc_ids.push(def_id);
+            }
+            sccs.push(scc_ids);
+        }
 
-    // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs)
-    let mut def_ids_by_sym = HashMap::new();
-    let mut defs = Vec::new();
-    let mut recursive_defs = HashSet::new();
-    let mut scc_ids_by_def = Vec::with_capacity(sccs.len());
-
-    for scc in &sccs {
-        let mutually_recursive = scc.len() > 1;
-        let mut scc_ids = Vec::with_capacity(scc.len());
-        for name in scc {
-            let sym = interner.intern(name);
-            let source = symbol_table
-                .source_id(name)
-                .expect("Tarjan SCC member must exist in the symbol table");
-            let def_id = DefId::from_raw(defs.len() as u32);
-            def_ids_by_sym.insert(sym, def_id);
-            defs.push(DefInfo { name: sym, source });
-            scc_ids.push(def_id);
-
-            let self_recursive = symbol_table
-                .body(name)
-                .is_some_and(|body| super::collect::contains_ref(body, name));
-            if mutually_recursive || self_recursive {
-                recursive_defs.insert(def_id);
+        let mut outgoing = vec![Vec::new(); definition_count];
+        for (&name, references) in &topology.outgoing {
+            let owner_symbol = interner
+                .get(name)
+                .expect("definition name must already be interned");
+            let owner = ids_by_symbol
+                .get(&owner_symbol)
+                .copied()
+                .expect("definition name must have a DefId");
+            for &reference in references {
+                let symbol = interner
+                    .get(reference)
+                    .expect("defined reference must already be interned");
+                let target = ids_by_symbol
+                    .get(&symbol)
+                    .copied()
+                    .expect("defined reference must have a DefId");
+                outgoing[owner.index()].push(target);
             }
         }
-        scc_ids_by_def.push(scc_ids);
-    }
 
-    let mut outgoing = vec![Vec::new(); defs.len()];
-    for name in symbol_table.names() {
-        let body = symbol_table
-            .body(name)
-            .expect("symbol-table name must have a body");
-        let owner_sym = interner
-            .get(name)
-            .expect("definition name must already be interned");
-        let owner = def_ids_by_sym
-            .get(&owner_sym)
-            .copied()
-            .expect("definition name must have a DefId");
-        for ref_name in collect_defined_refs(body, symbol_table) {
-            let sym = interner
-                .get(ref_name)
-                .expect("defined reference must already be interned");
-            let def_id = def_ids_by_sym
-                .get(&sym)
-                .copied()
-                .expect("defined reference must have a DefId");
-            outgoing[owner.index()].push(def_id);
-        }
-    }
+        (sccs, ids_by_symbol, outgoing)
+    };
 
-    Ok(DependencyAnalysis::new(
-        scc_ids_by_def,
-        def_ids_by_sym,
-        defs,
-        recursive_defs,
-        DefinitionDependencies::new(outgoing),
+    let definition_count = ids_by_symbol.len();
+    let mut declaration_order = Vec::with_capacity(definition_count);
+    let mut definitions = std::iter::repeat_with(|| None)
+        .take(definition_count)
+        .collect::<Vec<_>>();
+    for (name, source, body) in collected.into_entries_in_declaration_order() {
+        let symbol = interner
+            .get(&name)
+            .expect("collected definition name must already be interned");
+        let def_id = *ids_by_symbol
+            .get(&symbol)
+            .expect("collected definition name must have a DefId");
+        declaration_order.push(def_id);
+        let outgoing_refs = std::mem::take(&mut outgoing[def_id.index()]);
+        let previous = definitions[def_id.index()].replace(Definition::new(
+            symbol,
+            source,
+            body,
+            outgoing_refs,
+        ));
+        assert!(
+            previous.is_none(),
+            "a DefId must own exactly one definition"
+        );
+    }
+    let definitions = definitions
+        .into_iter()
+        .map(|definition| definition.expect("every DefId must own a definition"))
+        .collect();
+
+    Ok(DefinitionGraph::new(
+        sccs,
+        ids_by_symbol,
+        definitions,
+        declaration_order,
     ))
 }
 
 struct TarjanScc<'a> {
-    symbol_table: &'a SymbolTable,
+    definitions: &'a CollectedDefinitions,
     index: usize,
     stack: Vec<&'a str>,
     on_stack: IndexSet<&'a str>,
     indices: IndexMap<&'a str, usize>,
     lowlinks: IndexMap<&'a str, usize>,
     sccs: Vec<Vec<&'a str>>,
+    outgoing: IndexMap<&'a str, IndexSet<&'a str>>,
     /// Recursion ceiling and current depth: an acyclic reference chain deeper than
     /// this would overflow the native stack, so we stop and flag it instead.
     max_depth: u32,
@@ -121,24 +127,33 @@ struct TarjanScc<'a> {
     depth_exceeded: bool,
 }
 
+struct DependencyTopology<'a> {
+    sccs: Vec<Vec<&'a str>>,
+    outgoing: IndexMap<&'a str, IndexSet<&'a str>>,
+}
+
 impl<'a> TarjanScc<'a> {
     /// Returns the SCCs, or `None` if an acyclic reference chain ran past `max_depth`
     /// (the caller rejects the query rather than risk a stack overflow).
-    fn find(symbol_table: &'a SymbolTable, max_depth: u32) -> Option<Vec<Vec<String>>> {
+    fn find(
+        definitions: &'a CollectedDefinitions,
+        max_depth: u32,
+    ) -> Option<DependencyTopology<'a>> {
         let mut finder = Self {
-            symbol_table,
+            definitions,
             index: 0,
             stack: Vec::new(),
             on_stack: IndexSet::new(),
             indices: IndexMap::new(),
             lowlinks: IndexMap::new(),
             sccs: Vec::new(),
+            outgoing: IndexMap::new(),
             max_depth,
             depth: 0,
             depth_exceeded: false,
         };
 
-        for name in symbol_table.names() {
+        for name in definitions.names_in_declaration_order() {
             if !finder.indices.contains_key(name as &str) {
                 finder.strongconnect(name);
                 if finder.depth_exceeded {
@@ -147,13 +162,10 @@ impl<'a> TarjanScc<'a> {
             }
         }
 
-        Some(
-            finder
-                .sccs
-                .into_iter()
-                .map(|scc| scc.into_iter().map(String::from).collect())
-                .collect(),
-        )
+        Some(DependencyTopology {
+            sccs: finder.sccs,
+            outgoing: finder.outgoing,
+        })
     }
 
     fn strongconnect(&mut self, name: &'a str) {
@@ -172,31 +184,34 @@ impl<'a> TarjanScc<'a> {
         self.stack.push(name);
         self.on_stack.insert(name);
 
-        if let Some(body) = self.symbol_table.body(name) {
-            let refs = collect_defined_refs(body, self.symbol_table);
-            for ref_name in refs {
-                if !self.indices.contains_key(ref_name) {
-                    self.strongconnect(ref_name);
-                    if self.depth_exceeded {
-                        self.depth -= 1;
-                        return;
-                    }
-                    let ref_lowlink = self.lowlinks[ref_name];
-                    let my_lowlink = self
-                        .lowlinks
-                        .get_mut(name)
-                        .expect("lowlink for name was inserted at the start of strongconnect");
-                    *my_lowlink = (*my_lowlink).min(ref_lowlink);
-                } else if self.on_stack.contains(ref_name) {
-                    let ref_index = self.indices[ref_name];
-                    let my_lowlink = self
-                        .lowlinks
-                        .get_mut(name)
-                        .expect("lowlink for name was inserted at the start of strongconnect");
-                    *my_lowlink = (*my_lowlink).min(ref_index);
+        let body = self
+            .definitions
+            .body(name)
+            .expect("collected definition name must have a body");
+        let references = collect_defined_refs(body, self.definitions);
+        for &reference in &references {
+            if !self.indices.contains_key(reference) {
+                self.strongconnect(reference);
+                if self.depth_exceeded {
+                    self.depth -= 1;
+                    return;
                 }
+                let reference_lowlink = self.lowlinks[reference];
+                let my_lowlink = self
+                    .lowlinks
+                    .get_mut(name)
+                    .expect("lowlink for name was inserted at the start of strongconnect");
+                *my_lowlink = (*my_lowlink).min(reference_lowlink);
+            } else if self.on_stack.contains(reference) {
+                let reference_index = self.indices[reference];
+                let my_lowlink = self
+                    .lowlinks
+                    .get_mut(name)
+                    .expect("lowlink for name was inserted at the start of strongconnect");
+                *my_lowlink = (*my_lowlink).min(reference_index);
             }
         }
+        self.outgoing.insert(name, references);
 
         if self.lowlinks[name] == self.indices[name] {
             let mut scc = Vec::new();
@@ -219,12 +234,12 @@ impl<'a> TarjanScc<'a> {
     }
 }
 
-/// Collect references to definitions within the symbol table.
+/// Collect references that resolve within the transient definition map.
 ///
 /// Returns only refs that point to defined names (filters out node kind references).
-pub(super) fn collect_defined_refs<'a>(
+fn collect_defined_refs<'a>(
     pattern: &Pattern,
-    symbol_table: &'a SymbolTable,
+    definitions: &'a CollectedDefinitions,
 ) -> IndexSet<&'a str> {
     let mut refs = IndexSet::new();
     for descendant in pattern.syntax().descendants() {
@@ -232,7 +247,7 @@ pub(super) fn collect_defined_refs<'a>(
             continue;
         };
         let Some(name_tok) = r.name() else { continue };
-        let Some(key) = symbol_table.defined_name(name_tok.text()) else {
+        let Some(key) = definitions.defined_name(name_tok.text()) else {
             continue;
         };
         refs.insert(key);

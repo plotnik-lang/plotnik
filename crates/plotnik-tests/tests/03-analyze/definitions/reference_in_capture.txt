@@ -1,6 +1,6 @@
 Expr = (expression) @expr
 Named = (Expr) @e
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Expr
 Named
   Expr

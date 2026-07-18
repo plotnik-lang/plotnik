@@ -26,7 +26,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
-use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::analyze::types::type_shape::TypeId;
 use crate::compiler::emit::plan::{
@@ -43,7 +43,7 @@ use super::entry_names::{limited_journal_fn_name, matches_fn_name};
 
 pub(super) struct DecoderGen<'m, 'a> {
     model: &'m TypeModel<'a>,
-    deps: &'a DependencyAnalysis,
+    definitions: &'a DefinitionGraph,
     interner: &'a Interner,
     decode: &'a ResultDecodePlan,
     tables: DecoderTables,
@@ -120,7 +120,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
 
         Self {
             model,
-            deps: schema.dependency_analysis(),
+            definitions: schema.definitions(),
             interner: schema.interner(),
             decode,
             tables,
@@ -168,7 +168,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     ) -> String {
         let mut out = String::new();
         for def_id in entry_points {
-            let name = self.deps.def_name_sym(def_id);
+            let name = self.definitions.definition(def_id).name();
             let def = self.interner.resolve(name).to_string();
             out.push('\n');
             let item = self.decode.item(name);

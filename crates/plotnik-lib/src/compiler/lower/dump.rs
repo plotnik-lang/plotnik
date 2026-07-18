@@ -174,7 +174,7 @@ impl NfaDumper<'_> {
     }
 
     fn def_name(&self, def_id: DefId) -> &str {
-        let sym = self.artifacts.dependency_analysis.def_name_sym(def_id);
+        let sym = self.artifacts.definitions.definition(def_id).name();
         self.artifacts.interner.resolve(sym)
     }
 

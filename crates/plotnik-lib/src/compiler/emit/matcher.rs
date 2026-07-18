@@ -277,7 +277,7 @@ impl MatcherPlan {
             .entry_points()
             .iter()
             .map(|(&definition, entry)| {
-                let symbol = artifacts.dependency_analysis.def_name_sym(definition);
+                let symbol = artifacts.definitions.definition(definition).name();
                 EntryPlan {
                     definition,
                     name: artifacts.interner.resolve(symbol).to_string(),

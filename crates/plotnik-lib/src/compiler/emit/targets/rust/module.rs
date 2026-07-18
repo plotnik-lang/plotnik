@@ -495,8 +495,9 @@ impl<'a> Generator<'a> {
             let name = self
                 .plan
                 .result()
-                .dependency_analysis()
-                .def_name_sym(entry.definition);
+                .definitions()
+                .definition(entry.definition)
+                .name();
             let has_decoder = self.plan.decode().item(name).has_decoder();
             let info = self.state(entry.entry);
             let boundary = match entry.boundary {

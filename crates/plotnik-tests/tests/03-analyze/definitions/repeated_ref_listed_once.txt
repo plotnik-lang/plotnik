@@ -1,7 +1,10 @@
-A = [
-  (x) @cap
-  (foo (A))
-]
+E = (e)
+
+Q = (call
+  (E)
+  (E)
+)
 ------------------ DEFINITIONS -------------------
-A
-  A (cycle)
+E
+Q
+  E

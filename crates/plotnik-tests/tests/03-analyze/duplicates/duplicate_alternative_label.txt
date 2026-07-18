@@ -10,5 +10,5 @@ error: alternative label `A` is already used in this alternation
   |   ^
   |
 help: each alternative label must be unique within an alternation
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Q

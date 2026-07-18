@@ -7,4 +7,4 @@ error: this word-boundary variant has no shared equivalent across target engines
   |                     ^^^^^^^^^^^^^^
   |
 help: use `\b` or `\B`, which Plotnik defines as ASCII word boundaries on every target
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

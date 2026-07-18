@@ -1,7 +1,7 @@
-//! Name-resolution pass: build the symbol table, then check references.
+//! Name-resolution pass: collect definitions, then check references.
 //!
 //! Two passes over every source:
-//! 1. Collect all `Name = pattern` definitions into a [`SymbolTable`].
+//! 1. Collect all `Name = pattern` definitions.
 //! 2. Check that every `(UpperIdent)` reference resolves to a definition.
 
 use crate::compiler::analyze::Located;
@@ -11,38 +11,39 @@ use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::parse::ast::{self, token_src};
 use crate::core::utils::find_similar;
 
-use super::symbol_table::{SymbolTable, SymbolTableBuilder};
+use super::CollectedDefinitions;
 
-pub fn resolve_names(validated: &ValidatedAst<'_>, diag: &mut Diagnostics) -> SymbolTable {
-    let mut builder = SymbolTableBuilder::new();
+pub(in crate::compiler) fn resolve_names(
+    validated: &ValidatedAst<'_>,
+    diag: &mut Diagnostics,
+) -> CollectedDefinitions {
+    let mut definitions = CollectedDefinitions::default();
 
     for (&source_id, ast) in validated.ast_map() {
         let src = validated.source_map().content(source_id);
         let mut resolver = DefCollector {
             src,
             diag: &mut *diag,
-            builder: &mut builder,
+            definitions: &mut definitions,
         };
         resolver.visit(&Located::new(source_id, ast.clone()));
     }
 
-    let symbol_table = builder.finish();
-
     for (&source_id, ast) in validated.ast_map() {
         let mut validator = ReferenceValidator {
             diag: &mut *diag,
-            symbol_table: &symbol_table,
+            definitions: &definitions,
         };
         validator.visit(&Located::new(source_id, ast.clone()));
     }
 
-    symbol_table
+    definitions
 }
 
 struct DefCollector<'q, 'd, 'a> {
     src: &'q str,
     diag: &'d mut Diagnostics,
-    builder: &'a mut SymbolTableBuilder,
+    definitions: &'a mut CollectedDefinitions,
 }
 
 impl Visitor for DefCollector<'_, '_, '_> {
@@ -57,25 +58,24 @@ impl Visitor for DefCollector<'_, '_, '_> {
         };
 
         let name = token_src(&token, self.src);
-        if self.builder.contains(name) {
-            let first = self.builder.definition_span(name);
-            let mut builder = self.diag.report(
-                DiagnosticKind::DuplicateDefinition,
-                def.span_of(def.node().syntax().text_range()),
-            );
-            if let Some(span) = first {
-                builder = builder.related_to(span, "first defined here");
-            }
-            builder.detail(name).emit();
+        if let Some(first) = self.definitions.definition_span(name) {
+            self.diag
+                .report(
+                    DiagnosticKind::DuplicateDefinition,
+                    def.span_of(def.node().syntax().text_range()),
+                )
+                .related_to(first, "first defined here")
+                .detail(name)
+                .emit();
         } else {
-            self.builder.insert(name, def.source(), body);
+            self.definitions.insert(name, def.source(), body);
         }
     }
 }
 
 struct ReferenceValidator<'d, 'a> {
     diag: &'d mut Diagnostics,
-    symbol_table: &'a SymbolTable,
+    definitions: &'a CollectedDefinitions,
 }
 
 impl Visitor for ReferenceValidator<'_, '_> {
@@ -85,11 +85,11 @@ impl Visitor for ReferenceValidator<'_, '_> {
         };
         let name = name_token.text();
 
-        if self.symbol_table.defined_name(name).is_some() {
+        if self.definitions.defined_name(name).is_some() {
             return;
         }
 
-        let candidates: Vec<&str> = self.symbol_table.names().collect();
+        let candidates: Vec<&str> = self.definitions.names_in_declaration_order().collect();
         let mut builder = self.diag.report(
             DiagnosticKind::UndefinedReference,
             r.span_of(name_token.text_range()),

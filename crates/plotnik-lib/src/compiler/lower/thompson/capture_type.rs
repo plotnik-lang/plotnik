@@ -755,19 +755,13 @@ impl CaptureTypeLowerer<'_, '_> {
             return self.guarded_reference(def_id, destination);
         }
 
-        let name = self.compiler.ctx.analysis.interner.resolve(
-            self.compiler
-                .ctx
-                .analysis
-                .dependency_analysis
-                .def_name_sym(def_id),
-        );
         let body = self
             .compiler
             .ctx
-            .symbol_table
-            .body(name)
-            .expect("analyzed definition has a body");
+            .analysis
+            .definitions
+            .definition(def_id)
+            .body();
         let output = self
             .compiler
             .ctx

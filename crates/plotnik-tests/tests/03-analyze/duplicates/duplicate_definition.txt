@@ -8,5 +8,5 @@ error: `Expr` is already defined
   | ------------------- first defined here
 2 | Expr = (other)
   | ^^^^^^^^^^^^^^
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Expr

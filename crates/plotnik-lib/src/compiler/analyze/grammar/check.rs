@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
+use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::token_src;
 use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
@@ -174,28 +175,29 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             Pattern::DefRef(r) => {
                 let name_token = r.name().expect("validated definition reference has a name");
                 let name = name_token.text();
-                // Validation is a pure function of `(name, ctx, participation)`, so caching it
+                let def_id = self
+                    .definitions
+                    .id_for_name(self.interner, name)
+                    .expect("admitted definition reference must resolve");
+                // Validation is a pure function of `(definition, ctx, participation)`, so caching it
                 // collapses diamond-shaped reference graphs that would otherwise be re-walked
                 // 2^depth times. `participation` is part of the key: a definition reached
                 // both inside and outside an alternation/quantifier must still be checked in
                 // its immediate context even after the deferred reach cached it. Cut cycles
                 // are never cached: they return below without reaching the `validated.insert`.
-                let key = (name.to_string(), ctx, participation);
+                let key = (def_id, ctx, participation);
                 if walk.validated.contains(&key) {
                     return;
                 }
-                if !walk.in_progress.insert(name.to_string()) {
+                if !walk.in_progress.insert(def_id) {
                     return;
                 }
-                let Some(target) = self.symbol_table.located_definition(name) else {
-                    walk.in_progress.remove(name);
-                    return;
-                };
+                let target = self.definitions.definition(def_id).located_body();
                 // The referenced definition may live in another workspace file; the
                 // target carries its own source, so its body is validated against the
                 // right content.
                 self.check_pattern_grammar(&target, ctx, participation, walk);
-                walk.in_progress.remove(name);
+                walk.in_progress.remove(&def_id);
                 walk.validated.insert(key);
             }
         }
@@ -207,7 +209,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         &self,
         located: &Located<Pattern>,
         grammar_root: NodeKindId,
-        seen_refs: &mut HashSet<String>,
+        seen_refs: &mut HashSet<DefId>,
     ) -> bool {
         match located.node() {
             Pattern::NamedNodePattern(node) => {
@@ -246,17 +248,15 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 let Some(name) = def_ref.name() else {
                     return true;
                 };
-                let name = name.text().to_string();
-                if !seen_refs.insert(name.clone()) {
+                let Some(def_id) = self.definitions.id_for_name(self.interner, name.text()) else {
+                    return true;
+                };
+                if !seen_refs.insert(def_id) {
                     return true;
                 }
-                let result = self
-                    .symbol_table
-                    .located_definition(&name)
-                    .is_none_or(|target| {
-                        self.pattern_can_match_root(&target, grammar_root, seen_refs)
-                    });
-                seen_refs.remove(&name);
+                let target = self.definitions.definition(def_id).located_body();
+                let result = self.pattern_can_match_root(&target, grammar_root, seen_refs);
+                seen_refs.remove(&def_id);
                 result
             }
             Pattern::SeqPattern(seq) => {
@@ -727,11 +727,11 @@ impl ParentNode {
 #[derive(Default)]
 pub(super) struct AdmissibilityWalkState {
     /// Definitions currently on the recursion stack — guards against cycles.
-    in_progress: HashSet<String>,
+    in_progress: HashSet<DefId>,
     /// Definitions already validated under a given context. A definition's
-    /// validation depends only on `(name, ctx, participation)`, so caching it keeps shared
+    /// validation depends only on `(DefId, ctx, participation)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
-    validated: HashSet<(String, Option<ParentNode>, Participation)>,
+    validated: HashSet<(DefId, Option<ParentNode>, Participation)>,
     /// Expanded bare-child admissibility sets by parent node kind.
     admissible_by_parent: HashMap<NodeKindId, HashSet<NodeKindId>>,
     /// Expanded field-value admissibility sets by `(parent, field)`.

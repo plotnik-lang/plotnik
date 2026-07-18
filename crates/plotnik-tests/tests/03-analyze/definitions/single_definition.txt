@@ -1,7 +1,3 @@
-A = [
-  (x) @cap
-  (foo (A))
-]
+Expr = (expression)
 ------------------ DEFINITIONS -------------------
-A
-  A (cycle)
+Expr

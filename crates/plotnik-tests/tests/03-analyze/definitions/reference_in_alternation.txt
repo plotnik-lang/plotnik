@@ -4,7 +4,7 @@ Value = [
   (Expr)
   (literal)
 ]
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Expr
 Value
   Expr

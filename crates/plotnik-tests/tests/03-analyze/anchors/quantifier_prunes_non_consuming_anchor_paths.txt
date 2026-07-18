@@ -22,7 +22,7 @@ Mixed = {
 }
 
 Q = (Mixed)
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Tail
 Discharge
   Tail

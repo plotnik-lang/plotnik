@@ -1,5 +1,5 @@
 use crate::compiler::analyze::grammar::GrammarBinding;
-use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::DefinitionFacts;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::DefinitionOutput;
@@ -12,7 +12,7 @@ pub(crate) struct AnalysisArtifacts<'a> {
     pub(crate) interner: &'a Interner,
     pub(crate) type_analysis: &'a TypeAnalysis,
     pub(crate) definition_facts: &'a DefinitionFacts,
-    pub(crate) dependency_analysis: &'a DependencyAnalysis,
+    pub(crate) definitions: &'a DefinitionGraph,
     pub(crate) grammar: &'a GrammarBinding,
 }
 

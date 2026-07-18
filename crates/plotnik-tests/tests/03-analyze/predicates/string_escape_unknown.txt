@@ -7,4 +7,4 @@ error: unknown escape sequence in string
   |                      ^^
   |
 help: supported escapes are `\n`, `\r`, `\t`, `\\`, `\"`, `\'`, and `\u{…}`. Write `\\` to match a literal backslash
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

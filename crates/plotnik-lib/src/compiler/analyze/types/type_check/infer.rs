@@ -42,8 +42,7 @@ use crate::compiler::analyze::types::type_shape::{
 use crate::compiler::analyze::types::{BuiltInCaptureType, CaptureFact, RawCaptureFact};
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::{DefinitionFacts, RootExtent};
 use crate::compiler::diagnostics::report::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
@@ -63,8 +62,7 @@ pub struct InferState<'a, 'd> {
     pub type_ctx: &'a mut TypeAnalysisBuilder,
     deferred_checks: &'a mut Vec<DeferredCheck>,
     pub interner: &'a mut Interner,
-    pub symbol_table: &'a SymbolTable,
-    pub dependency_analysis: &'a DependencyAnalysis,
+    pub definitions: &'a DefinitionGraph,
     pub definition_facts: &'a DefinitionFacts,
     pub(crate) diag: &'d mut Diagnostics,
 }
@@ -453,30 +451,22 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let Some(name_tok) = r.name() else {
             return PatternShape::no_value();
         };
-        let name = name_tok.text();
-        let name_sym = self.ctx.interner.intern(name);
 
-        // No definition: an undefined reference, already diagnosed upstream
-        // (`UndefinedReference`). Outside the trust boundary — answer with no value.
-        let Some(_body) = self.ctx.symbol_table.body(name) else {
+        // Undefined references are diagnosed before type inference.
+        let Some(def_id) = self
+            .ctx
+            .definitions
+            .id_for_name(self.ctx.interner, name_tok.text())
+        else {
             return PatternShape::no_value();
         };
-
-        // Every symbol-table definition is assigned a DefId during dependency
-        // analysis (each appears in exactly one SCC), so a defined ref always
-        // resolves — a miss is our bug.
-        let def_id = self
-            .ctx
-            .dependency_analysis
-            .def_id_for_sym(name_sym)
-            .expect("a defined reference has a DefId");
 
         // Root extent is precomputed to a fixpoint before inference, so every
         // reference — recursive ones included — delegates its target's extent
         // and the single-node checks stay sound through recursion.
         let root_extent = self.ctx.definition_facts.root_extent(def_id);
 
-        if self.ctx.dependency_analysis.is_recursive_def(def_id) {
+        if self.ctx.definitions.is_recursive(def_id) {
             // A completed match-only target already flows NoValue. A same-SCC
             // target not yet registered flows a provisional reference; any
             // capture check that depends on its final state is queued until
@@ -825,7 +815,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // lockstep.
         let mechanism = self.ctx.type_ctx.in_progress().capture_kind(
             inner.node(),
-            self.ctx.dependency_analysis,
+            self.ctx.definitions,
             self.ctx.interner,
         );
         let should_merge_fields =
@@ -1045,7 +1035,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn pattern_can_match_zero_nodes(&self, pattern: &Pattern) -> bool {
         self.ctx.definition_facts.pattern_is_nullable(
             pattern,
-            self.ctx.dependency_analysis,
+            self.ctx.definitions,
             self.ctx.interner,
         )
     }
@@ -1057,8 +1047,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let name = reference.name()?;
         let target = self
             .ctx
-            .dependency_analysis
-            .def_id_for_name(self.ctx.interner, name.text())?;
+            .definitions
+            .id_for_name(self.ctx.interner, name.text())?;
         self.ctx
             .type_ctx
             .in_progress()
@@ -1344,8 +1334,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         };
         let Some(def_id) = self
             .ctx
-            .dependency_analysis
-            .def_id_for_name(self.ctx.interner, name.text())
+            .definitions
+            .id_for_name(self.ctx.interner, name.text())
         else {
             return;
         };
@@ -1625,8 +1615,7 @@ pub(crate) fn definition_value_root(pattern: &Pattern) -> bool {
 
 pub(super) struct InferPassEnv<'a, 'd> {
     pub interner: &'a mut Interner,
-    pub symbol_table: &'a SymbolTable,
-    pub dependency_analysis: &'a DependencyAnalysis,
+    pub definitions: &'a DefinitionGraph,
     pub definition_facts: &'a DefinitionFacts,
     pub diag: &'d mut Diagnostics,
 }
@@ -1650,16 +1639,9 @@ impl<'a, 'd> InferPass<'a, 'd> {
     pub fn run(mut self) -> TypeAnalysisBuilder {
         self.ctx.declare_definitions(
             self.analysis
-                .dependency_analysis
-                .sccs()
-                .iter()
-                .flatten()
-                .map(|&def_id| {
-                    (
-                        def_id,
-                        self.analysis.dependency_analysis.def_name_sym(def_id),
-                    )
-                }),
+                .definitions
+                .ids_in_def_id_order()
+                .map(|def_id| (def_id, self.analysis.definitions.definition(def_id).name())),
         );
 
         self.process_sccs();
@@ -1680,8 +1662,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             type_ctx: &mut self.ctx,
             deferred_checks: &mut self.deferred_checks,
             interner: self.analysis.interner,
-            symbol_table: self.analysis.symbol_table,
-            dependency_analysis: self.analysis.dependency_analysis,
+            definitions: self.analysis.definitions,
             definition_facts: self.analysis.definition_facts,
             diag: &mut *self.analysis.diag,
         };
@@ -1691,16 +1672,10 @@ impl<'a, 'd> InferPass<'a, 'd> {
 
     /// Process definitions in SCC order (leaves first).
     fn process_sccs(&mut self) {
-        for scc in self.analysis.dependency_analysis.sccs() {
+        for scc in self.analysis.definitions.sccs() {
             self.ctx.begin_scc(scc);
             for &def_id in scc {
-                let def_name = self
-                    .analysis
-                    .interner
-                    .resolve(self.analysis.dependency_analysis.def_name_sym(def_id))
-                    .to_owned();
-                let source_id = self.analysis.dependency_analysis.def_source_id(def_id);
-                self.infer_and_register(def_id, &def_name, source_id);
+                self.infer_and_register(def_id);
             }
             let deferred_errors = self.ctx.seal_scc();
             for error in deferred_errors {
@@ -1790,31 +1765,21 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 
     fn assert_all_definitions_processed(&mut self) {
-        for name in self.analysis.symbol_table.names() {
-            let def_id = self
-                .analysis
-                .dependency_analysis
-                .def_id_for_name(self.analysis.interner, name)
-                .expect("dependency analysis must assign every definition a DefId");
+        for def_id in self.analysis.definitions.ids_in_def_id_order() {
             assert!(
                 self.ctx.in_progress().def_output(def_id).is_some(),
-                "dependency analysis must schedule every definition before type analysis",
+                "the definition graph must schedule every definition before type analysis",
             );
         }
     }
 
-    fn infer_and_register(&mut self, def_id: DefId, def_name: &str, source_id: SourceId) {
-        let body = self
-            .analysis
-            .symbol_table
-            .body(def_name)
-            .cloned()
-            .expect("symbol-table source entry must have a body");
+    fn infer_and_register(&mut self, def_id: DefId) {
+        let definition = self.analysis.definitions.definition(def_id);
+        let located_body = definition.located_body();
 
         // Infer this definition's body only; references into other definitions
         // resolve to their precomputed results.
-        let located_body = Located::new(source_id, body.clone());
-        let info = self.visit(source_id, |visitor| {
+        let info = self.visit(located_body.source(), |visitor| {
             visitor.infer_pattern_value(&located_body)
         });
 
@@ -1826,7 +1791,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             // is structural: no capture, no result value — the definition still
             // matches, like a capture-less regex.
             PatternFlow::Value(t) => {
-                if definition_value_root(&body) {
+                if definition_value_root(located_body.node()) {
                     DefinitionOutput::Value(*t)
                 } else {
                     DefinitionOutput::MatchOnly

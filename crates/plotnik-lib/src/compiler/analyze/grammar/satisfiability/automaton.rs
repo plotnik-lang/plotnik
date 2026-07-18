@@ -17,15 +17,16 @@ use rowan::TextRange;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass, has_direct_alternative_nav};
-use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
+use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
     self, AnonymousNodePattern, NamedNodePattern, Pattern, QuantifierKind, SeqItem, token_src,
 };
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::strings::unescape;
 use crate::core::grammar::Grammar;
-use crate::core::{NodeFieldId, NodeKindId};
+use crate::core::{Interner, NodeFieldId, NodeKindId};
 
 use super::node_constrains_children;
 
@@ -188,7 +189,8 @@ impl ChildAutomaton {
 #[derive(Clone, Copy)]
 pub(super) struct AutomatonContext<'a> {
     pub(super) grammar: &'a Grammar,
-    pub(super) symbol_table: &'a SymbolTable,
+    pub(super) interner: &'a Interner,
+    pub(super) definitions: &'a DefinitionGraph,
     pub(super) source_map: &'a SourceMap,
 }
 
@@ -310,9 +312,9 @@ struct Builder<'a, 'b> {
     /// Set when a resource ceiling (state cap or recursion depth) is hit — the query is
     /// rejected as too complex, not accepted. Construction short-circuits once it is set.
     too_complex: bool,
-    /// Definition names currently being inlined, to catch sibling-recursive refs
+    /// Definitions currently being inlined, to catch sibling-recursive refs
     /// that would splice siblings without bound.
-    ref_stack: Vec<String>,
+    ref_stack: Vec<DefId>,
     /// Native-recursion ceiling while inlining references. A long chain like
     /// `A = {(B)}`, `B = {(C)}`, … is flat source but recursive construction; left
     /// unbounded it overflows the stack.
@@ -624,24 +626,24 @@ impl<'a, 'b> Builder<'a, 'b> {
         let Some(name_token) = def_ref.name() else {
             return self.emit_single(ChildMatcher::unconstrained(descent.field), from);
         };
-        let name = name_token.text();
+        let def_id = self
+            .ctx
+            .definitions
+            .id_for_name(self.ctx.interner, name_token.text())
+            .expect("admitted definition reference must resolve");
         // A reference that splices siblings into the parent (`Seq = {(a) (Seq)}`) makes the
         // child language non-regular, so it cannot inline finitely. Rather than abandon the
         // whole automaton — which would erase the constraints the non-recursive prefix
         // already imposed, e.g. a leading anchor — over-approximate just the recursive tail:
         // a self-loop consuming any remaining sibling. The accepted language only grows
         // (rejection stays sound), while the first-child / anchor constraints still bind.
-        if self.ref_stack.iter().any(|n| n == name) {
+        if self.ref_stack.contains(&def_id) {
             self.states[from as usize]
                 .pattern_edges
                 .push((ChildMatcher::any_sibling(), from));
             return from;
         }
-        let target = self
-            .ctx
-            .symbol_table
-            .located_definition(name)
-            .expect("admitted definition reference must resolve");
+        let target = self.ctx.definitions.definition(def_id).located_body();
         let descent = descent.into_ref(target.source());
 
         // A reference to a single node is an atomic child: one matcher whose body is
@@ -653,7 +655,7 @@ impl<'a, 'b> Builder<'a, 'b> {
 
         // Otherwise the reference's body inlines its structure (an alternation of
         // kinds, a grouped sequence) directly into this position.
-        self.ref_stack.push(name.to_string());
+        self.ref_stack.push(def_id);
         let exit = self.emit_pattern(target.node(), descent, from);
         self.ref_stack.pop();
         exit

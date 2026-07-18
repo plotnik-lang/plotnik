@@ -56,15 +56,16 @@ impl InferVisitor<'_, '_> {
             return None;
         };
         let name = r.name()?;
-        let (source, body) = self.ctx.symbol_table.definition(name.text())?;
-        let span = self
+        let def_id = self
             .ctx
-            .symbol_table
-            .definition_span(name.text())
-            .expect("resolved definition has a declaration span");
+            .definitions
+            .id_for_name(self.ctx.interner, name.text())?;
+        let definition = self.ctx.definitions.definition(def_id);
+        let source = definition.source();
+        let body = definition.body();
         Some(ReferencedDefinition {
             name: name.text().to_string(),
-            span,
+            span: definition.span(),
             body_span: Span::new(source, body.text_range()),
             capture_target: first_result_capture_target(body),
         })

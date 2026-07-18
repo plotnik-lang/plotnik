@@ -1,9 +1,9 @@
-//! Reference analysis: dependency graph, recursion validation, ref collection.
+//! Reference analysis: dependency graph and recursion validation.
 
-pub mod collect;
-pub mod dependencies;
-pub mod dependency_analysis;
+mod definition_graph;
+mod dependencies;
 mod recursion;
 
-pub use dependency_analysis::DependencyAnalysis;
-pub use recursion::validate_recursion;
+pub(crate) use definition_graph::{DefinitionGraph, DefinitionReachability};
+pub(in crate::compiler) use dependencies::build_definition_graph;
+pub(in crate::compiler) use recursion::validate_recursion;

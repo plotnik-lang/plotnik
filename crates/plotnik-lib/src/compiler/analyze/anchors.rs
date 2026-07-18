@@ -12,9 +12,10 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use crate::bytecode::Nav;
-use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::analyze::refs::DefinitionGraph;
+use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{DefRef, Pattern, SeqItem};
-use crate::core::{NodeClass, SkipClass};
+use crate::core::{Interner, NodeClass, SkipClass};
 
 /// What a gap between two query patterns may skip over, projected from the same
 /// [`Nav`] codegen emits so the checker and the VM cannot drift.
@@ -112,12 +113,13 @@ impl GapClass {
 
 /// Classifies whether patterns may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {
-    symbol_table: &'a SymbolTable,
+    interner: &'a Interner,
+    definitions: &'a DefinitionGraph,
     /// Memoizes each definition's result so a reference-heavy DAG — an alternation
     /// referenced twice per level, say — is walked once per definition, not once per
     /// path: the difference between linear and exponential. Only path-independent
     /// results are stored; see [`AnonymousClassifier::classify_ref`].
-    cache: RefCell<HashMap<String, bool>>,
+    cache: RefCell<HashMap<DefId, bool>>,
 }
 
 /// Computes anchor-derived navigation with one anonymous-pattern cache.
@@ -145,9 +147,10 @@ pub(crate) fn has_direct_alternative_nav(pattern: &Pattern) -> bool {
 }
 
 impl<'a> AnonymousClassifier<'a> {
-    pub fn new(symbol_table: &'a SymbolTable) -> Self {
+    pub fn new(interner: &'a Interner, definitions: &'a DefinitionGraph) -> Self {
         Self {
-            symbol_table,
+            interner,
+            definitions,
             cache: RefCell::new(HashMap::new()),
         }
     }
@@ -160,7 +163,7 @@ impl<'a> AnonymousClassifier<'a> {
     /// Returns `(may_match, cut)`. `cut` is true when the walk broke a reference cycle:
     /// the answer then hinged on which names were already on the stack, so a `false`
     /// carrying it is not safe to memoize.
-    fn classify(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> (bool, bool) {
+    fn classify(&self, pattern: &Pattern, visited: &mut HashSet<DefId>) -> (bool, bool) {
         match pattern {
             Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => (true, false),
             Pattern::NamedNodePattern(_) => (false, false),
@@ -176,7 +179,7 @@ impl<'a> AnonymousClassifier<'a> {
     fn classify_opt(
         &self,
         pattern: Option<&Pattern>,
-        visited: &mut HashSet<String>,
+        visited: &mut HashSet<DefId>,
     ) -> (bool, bool) {
         pattern.map_or((false, false), |p| self.classify(p, visited))
     }
@@ -187,7 +190,7 @@ impl<'a> AnonymousClassifier<'a> {
     fn classify_any(
         &self,
         children: impl Iterator<Item = Pattern>,
-        visited: &mut HashSet<String>,
+        visited: &mut HashSet<DefId>,
     ) -> (bool, bool) {
         let mut cut = false;
         for child in children {
@@ -200,41 +203,40 @@ impl<'a> AnonymousClassifier<'a> {
         (false, cut)
     }
 
-    fn classify_ref(&self, r: &DefRef, visited: &mut HashSet<String>) -> (bool, bool) {
-        let Some(name_token) = r.name() else {
+    fn classify_ref(&self, r: &DefRef, visited: &mut HashSet<DefId>) -> (bool, bool) {
+        let Some(def_id) = r
+            .name()
+            .and_then(|name| self.definitions.id_for_name(self.interner, name.text()))
+        else {
             return (false, false);
         };
-        let name = name_token.text();
 
-        if let Some(&cached) = self.cache.borrow().get(name) {
+        if let Some(&cached) = self.cache.borrow().get(&def_id) {
             return (cached, false);
         }
-        if visited.contains(name) {
+        if !visited.insert(def_id) {
             // A reference cycle: going around it again adds nothing, but this `false`
             // holds only with the current ancestors on the stack, so flag it uncacheable.
             return (false, true);
         }
 
-        visited.insert(name.to_owned());
-        let (result, cut) = self
-            .symbol_table
-            .body(name)
-            .map_or((false, false), |body| self.classify(body, visited));
-        visited.remove(name);
+        let body = self.definitions.definition(def_id).body();
+        let (result, cut) = self.classify(body, visited);
+        visited.remove(&def_id);
 
         // A `true` is genuine no matter what was cut; a cut-free `false` is path-
         // independent. Either is sound to reuse for every later reference to this name.
         if result || !cut {
-            self.cache.borrow_mut().insert(name.to_owned(), result);
+            self.cache.borrow_mut().insert(def_id, result);
         }
         (result, cut)
     }
 }
 
 impl<'a> AnchorSemantics<'a> {
-    pub fn new(symbol_table: &'a SymbolTable) -> Self {
+    pub fn new(interner: &'a Interner, definitions: &'a DefinitionGraph) -> Self {
         Self {
-            classifier: AnonymousClassifier::new(symbol_table),
+            classifier: AnonymousClassifier::new(interner, definitions),
         }
     }
 

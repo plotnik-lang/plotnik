@@ -67,7 +67,7 @@ pub fn parse_section_header(line: &str) -> Option<String> {
             name.as_str(),
             "cst"
                 | "ast"
-                | "symbols"
+                | "definitions"
                 | "nfa"
                 | "bytecode"
                 | "mapped"

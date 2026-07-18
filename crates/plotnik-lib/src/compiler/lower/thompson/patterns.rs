@@ -415,8 +415,8 @@ impl NfaBuilder<'_> {
         let name_token = r.name().expect("validated reference must have a name");
         self.ctx
             .analysis
-            .dependency_analysis
-            .def_id_for_name(self.ctx.analysis.interner, name_token.text())
+            .definitions
+            .id_for_name(self.ctx.analysis.interner, name_token.text())
             .expect("analyzed reference must resolve to a definition")
     }
 
@@ -444,7 +444,7 @@ impl NfaBuilder<'_> {
     pub(super) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
         self.ctx.analysis.definition_facts.pattern_is_nullable(
             pattern,
-            self.ctx.analysis.dependency_analysis,
+            self.ctx.analysis.definitions,
             self.ctx.analysis.interner,
         )
     }
@@ -484,16 +484,7 @@ impl NfaBuilder<'_> {
             return pattern_owns_iteration(&inner);
         };
         let def_id = self.resolve_ref_def_id(r);
-        let name = self
-            .ctx
-            .analysis
-            .interner
-            .resolve(self.ctx.analysis.dependency_analysis.def_name_sym(def_id));
-        let body = self
-            .ctx
-            .symbol_table
-            .body(name)
-            .expect("analyzed definition has a body");
+        let body = self.ctx.analysis.definitions.definition(def_id).body();
         self.body_owns_iteration(body)
     }
 
@@ -890,16 +881,7 @@ impl NfaBuilder<'_> {
             return self.compile_ref_guarded_call(def_id, pattern_ctx, skip_exit);
         }
 
-        let name = self
-            .ctx
-            .analysis
-            .interner
-            .resolve(self.ctx.analysis.dependency_analysis.def_name_sym(def_id));
-        let body = self
-            .ctx
-            .symbol_table
-            .body(name)
-            .expect("analyzed definition has a body");
+        let body = self.ctx.analysis.definitions.definition(def_id).body();
 
         let def_output_id = self
             .ctx

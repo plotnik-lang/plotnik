@@ -27,4 +27,4 @@ error: empty `[]` matches nothing
   |   ^^
   |
 help: alternations must contain at least one alternative
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

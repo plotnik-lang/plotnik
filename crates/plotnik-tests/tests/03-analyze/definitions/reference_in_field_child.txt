@@ -1,6 +1,6 @@
 Expr = (expression)
 Call = (call_expression function: (Expr))
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Expr
 Call
   Expr

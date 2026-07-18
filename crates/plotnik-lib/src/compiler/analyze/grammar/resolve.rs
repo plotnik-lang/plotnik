@@ -1,5 +1,5 @@
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::visitor::{Visitor, walk};
+use crate::compiler::analyze::visitor::Visitor;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::token_src;
@@ -12,9 +12,9 @@ use super::bind::GrammarBinder;
 use super::utils::find_similar;
 
 impl<'a, 'q> GrammarBinder<'a, 'q> {
-    pub(super) fn resolve_symbols(&mut self, source: SourceId, root: &ast::Root) {
+    pub(super) fn resolve_symbols(&mut self, pattern: &Located<ast::Pattern>) {
         let mut resolver = GrammarSymbolResolver { binder: self };
-        resolver.visit(&Located::new(source, root.clone()));
+        resolver.visit_pattern(pattern);
     }
 
     fn resolve_named_node(&mut self, located: &Located<NamedNodePattern>) {
@@ -192,10 +192,6 @@ struct GrammarSymbolResolver<'l, 'a, 'q> {
 }
 
 impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
-    fn visit(&mut self, root: &Located<ast::Root>) {
-        walk(self, root);
-    }
-
     fn visit_named_node_pattern(&mut self, node: &Located<ast::NamedNodePattern>) {
         self.binder.resolve_named_node(node);
 

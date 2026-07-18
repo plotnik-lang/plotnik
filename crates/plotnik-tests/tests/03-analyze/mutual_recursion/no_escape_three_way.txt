@@ -16,7 +16,7 @@ error: infinite recursion: no escape path
   | C is defined here
   |
 help: add an alternative to `A`, `B` or `C` that does not reference any definition in this cycle
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 A
   B
     C

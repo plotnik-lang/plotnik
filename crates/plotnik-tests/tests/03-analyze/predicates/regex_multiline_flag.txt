@@ -7,4 +7,4 @@ error: multiline mode is not supported because target engines disagree on line t
   |                       ^
   |
 help: spell line terminators explicitly. `^` and `$` always mean text start and end
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

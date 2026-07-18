@@ -17,7 +17,7 @@
 //! | dir          | sections                                                                     |
 //! | ------------ | ---------------------------------------------------------------------------- |
 //! | `02-parser`  | cst, ast                                                                     |
-//! | `03-analyze` | symbols                                                                      |
+//! | `03-analyze` | definitions                                                                  |
 //! | `04-emit/bytecode` | nfa, bytecode                                                         |
 //! | `04-emit/types` | typescript, rust types (serde impls under a `serde/` folder)             |
 //! | `04-emit/rust/module` | generated Rust matcher module                                      |
@@ -260,12 +260,12 @@ fn render_frontend(query: &str, kind: FrontendMode) -> Result<Vec<GeneratedSecti
             out.push(GeneratedSection::new(SectionKind::Ast, analyzed.dump_ast()));
         }
         FrontendMode::Parser(_) => {}
-        // The symbol table is meaningful even with unresolved refs, so it renders
+        // The definition tree is meaningful even with unresolved refs, so it renders
         // alongside any error diagnostics rather than being suppressed.
         FrontendMode::Analyze => {
             out.push(GeneratedSection::new(
-                SectionKind::Symbols,
-                analyzed.dump_symbols(),
+                SectionKind::Definitions,
+                analyzed.dump_definitions(),
             ));
         }
     }

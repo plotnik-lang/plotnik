@@ -13,7 +13,7 @@ error: infinite recursion: no escape path
   | B is defined here
   |
 help: add an alternative to `A` or `B` that does not reference any definition in this cycle
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 A
   B
     A (cycle)

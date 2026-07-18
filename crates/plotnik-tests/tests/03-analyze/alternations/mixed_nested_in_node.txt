@@ -14,4 +14,4 @@ error: an alternation cannot mix labeled and unlabeled alternatives
   |     ^^^
   |
 help: either label every alternative or remove all labels
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

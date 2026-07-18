@@ -4,8 +4,7 @@
 //! lowering. Their definition-level answers are retained once per analyzed
 //! query so later phases never recompute the fixed points.
 
-use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{Pattern, QuantifierKind};
 use crate::core::Interner;
@@ -29,35 +28,21 @@ pub(crate) struct DefinitionFacts {
 impl DefinitionFacts {
     pub(crate) fn analyze(
         interner: &Interner,
-        symbol_table: &SymbolTable,
-        dependencies: &DependencyAnalysis,
+        definitions: &DefinitionGraph,
         anchor_contexts: &AnchorContextAnalysis<'_>,
     ) -> Self {
-        let definition_count = dependencies.sccs().iter().map(Vec::len).sum();
-        let mut facts = vec![None; definition_count];
-
-        for &def_id in dependencies.sccs().iter().flatten() {
-            let slot = facts
-                .get_mut(def_id.index())
-                .expect("dependency analysis assigns dense DefIds");
-            assert!(
-                slot.is_none(),
-                "every definition receives structural facts exactly once",
-            );
-            *slot = Some(DefinitionFact {
+        let mut facts = definitions
+            .ids_in_def_id_order()
+            .map(|def_id| DefinitionFact {
                 nullable: false,
                 root_extent: RootExtent::SingleNode,
                 requires_external_anchor_context: anchor_contexts
                     .definition_requires_external_context(def_id),
-            });
-        }
-        let mut facts = facts
-            .into_iter()
-            .map(|fact| fact.expect("structural facts must cover every admitted DefId"))
+            })
             .collect::<Vec<_>>();
 
-        compute_nullability(&mut facts, interner, symbol_table, dependencies);
-        compute_root_extents(&mut facts, interner, symbol_table, dependencies);
+        compute_nullability(&mut facts, interner, definitions);
+        compute_root_extents(&mut facts, interner, definitions);
 
         Self { facts }
     }
@@ -78,10 +63,10 @@ impl DefinitionFacts {
     pub(crate) fn pattern_is_nullable(
         &self,
         pattern: &Pattern,
-        dependencies: &DependencyAnalysis,
+        definitions: &DefinitionGraph,
         interner: &Interner,
     ) -> bool {
-        pattern_nullable(pattern, &self.facts, dependencies, interner)
+        pattern_nullable(pattern, &self.facts, definitions, interner)
     }
 
     fn fact(&self, def_id: DefId) -> &DefinitionFact {
@@ -98,21 +83,20 @@ fn fact(facts: &[DefinitionFact], def_id: DefId) -> &DefinitionFact {
 fn compute_nullability(
     facts: &mut [DefinitionFact],
     interner: &Interner,
-    symbol_table: &SymbolTable,
-    dependencies: &DependencyAnalysis,
+    definitions: &DefinitionGraph,
 ) {
     // `false` is the lattice bottom and insertion is monotone. Recursion
     // validation rejects non-consuming cycles, but the fixed point keeps this
     // analysis correct independently of that later admission rule.
-    for scc in dependencies.sccs() {
+    for scc in definitions.sccs() {
         loop {
             let mut changed = false;
             for &def_id in scc {
                 if fact(facts, def_id).nullable {
                     continue;
                 }
-                let body = definition_body(def_id, interner, symbol_table, dependencies);
-                if pattern_nullable(body, facts, dependencies, interner) {
+                let body = definitions.definition(def_id).body();
+                if pattern_nullable(body, facts, definitions, interner) {
                     facts[def_id.index()].nullable = true;
                     changed = true;
                 }
@@ -131,7 +115,7 @@ fn compute_nullability(
 fn pattern_nullable(
     pattern: &Pattern,
     facts: &[DefinitionFact],
-    dependencies: &DependencyAnalysis,
+    definitions: &DefinitionGraph,
     interner: &Interner,
 ) -> bool {
     match pattern {
@@ -149,27 +133,27 @@ fn pattern_nullable(
             match quantified.quantifier_kind() {
                 Some(QuantifierKind::Optional | QuantifierKind::ZeroOrMore) => true,
                 Some(QuantifierKind::OneOrMore) => false,
-                None => pattern_nullable(&inner, facts, dependencies, interner),
+                None => pattern_nullable(&inner, facts, definitions, interner),
             }
         }
         Pattern::CapturedPattern(capture) => capture
             .inner()
-            .is_some_and(|inner| pattern_nullable(&inner, facts, dependencies, interner)),
+            .is_some_and(|inner| pattern_nullable(&inner, facts, definitions, interner)),
         Pattern::SeqPattern(sequence) => sequence
             .children()
-            .all(|item| pattern_nullable(&item, facts, dependencies, interner)),
+            .all(|item| pattern_nullable(&item, facts, definitions, interner)),
         Pattern::Alternation(alternation) => {
             alternation.alternatives().any(|alternative| {
                 alternative
                     .body()
-                    .is_some_and(|body| pattern_nullable(&body, facts, dependencies, interner))
+                    .is_some_and(|body| pattern_nullable(&body, facts, definitions, interner))
             }) || alternation
                 .patterns()
-                .any(|pattern| pattern_nullable(&pattern, facts, dependencies, interner))
+                .any(|pattern| pattern_nullable(&pattern, facts, definitions, interner))
         }
         Pattern::DefRef(reference) => reference
             .name()
-            .and_then(|name| dependencies.def_id_for_name(interner, name.text()))
+            .and_then(|name| definitions.id_for_name(interner, name.text()))
             .is_some_and(|def_id| fact(facts, def_id).nullable),
     }
 }
@@ -177,17 +161,16 @@ fn pattern_nullable(
 fn compute_root_extents(
     facts: &mut [DefinitionFact],
     interner: &Interner,
-    symbol_table: &SymbolTable,
-    dependencies: &DependencyAnalysis,
+    definitions: &DefinitionGraph,
 ) {
     // SCC order is leaves first. `SingleNode` is the optimistic lattice bottom;
     // `combine` can only widen it to `NotSingleNode`.
-    for scc in dependencies.sccs() {
+    for scc in definitions.sccs() {
         loop {
             let mut changed = false;
             for &def_id in scc {
-                let body = definition_body(def_id, interner, symbol_table, dependencies);
-                let extent = pattern_root_extent(body, facts, dependencies, interner);
+                let body = definitions.definition(def_id).body();
+                let extent = pattern_root_extent(body, facts, definitions, interner);
                 let current = &mut facts[def_id.index()].root_extent;
                 if *current != extent {
                     *current = extent;
@@ -204,7 +187,7 @@ fn compute_root_extents(
 fn pattern_root_extent(
     pattern: &Pattern,
     facts: &[DefinitionFact],
-    dependencies: &DependencyAnalysis,
+    definitions: &DefinitionGraph,
     interner: &Interner,
 ) -> RootExtent {
     match pattern {
@@ -221,7 +204,7 @@ fn pattern_root_extent(
         }
         Pattern::CapturedPattern(capture) => {
             capture.inner().map_or(RootExtent::SingleNode, |inner| {
-                pattern_root_extent(&inner, facts, dependencies, interner)
+                pattern_root_extent(&inner, facts, definitions, interner)
             })
         }
         Pattern::SeqPattern(sequence) => {
@@ -232,19 +215,19 @@ fn pattern_root_extent(
             if children.next().is_some() {
                 return RootExtent::NotSingleNode;
             }
-            pattern_root_extent(&first, facts, dependencies, interner)
+            pattern_root_extent(&first, facts, definitions, interner)
         }
         Pattern::Alternation(alternation) => {
             let mut combined = RootExtent::SingleNode;
             for alternative in alternation.alternatives() {
                 if let Some(body) = alternative.body() {
                     combined =
-                        combined.combine(pattern_root_extent(&body, facts, dependencies, interner));
+                        combined.combine(pattern_root_extent(&body, facts, definitions, interner));
                 }
             }
             for pattern in alternation.patterns() {
                 combined =
-                    combined.combine(pattern_root_extent(&pattern, facts, dependencies, interner));
+                    combined.combine(pattern_root_extent(&pattern, facts, definitions, interner));
             }
             combined
         }
@@ -252,20 +235,8 @@ fn pattern_root_extent(
         // shape stays single-node to avoid cascading errors.
         Pattern::DefRef(reference) => reference
             .name()
-            .and_then(|name| dependencies.def_id_for_name(interner, name.text()))
+            .and_then(|name| definitions.id_for_name(interner, name.text()))
             .map(|def_id| fact(facts, def_id).root_extent)
             .unwrap_or(RootExtent::SingleNode),
     }
-}
-
-fn definition_body<'a>(
-    def_id: DefId,
-    interner: &Interner,
-    symbol_table: &'a SymbolTable,
-    dependencies: &DependencyAnalysis,
-) -> &'a Pattern {
-    let name = interner.resolve(dependencies.def_name_sym(def_id));
-    symbol_table
-        .body(name)
-        .expect("dependency analysis definitions have symbol-table bodies")
 }

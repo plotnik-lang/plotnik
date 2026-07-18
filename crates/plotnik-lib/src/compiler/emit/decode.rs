@@ -228,9 +228,9 @@ impl DecodePlanBuilder<'_, '_> {
 
     fn item_enters_depth(&self, name: Symbol) -> bool {
         self.schema
-            .deps
-            .def_id_for_sym(name)
-            .is_some_and(|definition| self.schema.deps.is_recursive_def(definition))
+            .definitions
+            .id_for_symbol(name)
+            .is_some_and(|definition| self.schema.definitions.is_recursive(definition))
     }
 
     fn item_is_fallible(&self, item: ResultItem) -> bool {
@@ -257,7 +257,7 @@ impl DecodePlanBuilder<'_, '_> {
                 self.schema
                     .types
                     .declaration_definition(*declaration)
-                    .is_some_and(|definition| self.schema.deps.is_recursive_def(definition))
+                    .is_some_and(|definition| self.schema.definitions.is_recursive(definition))
                     || self.type_reaches_recursive_ref(target, seen)
             }
             shape => shape

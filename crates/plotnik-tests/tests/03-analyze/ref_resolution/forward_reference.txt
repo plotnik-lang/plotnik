@@ -1,6 +1,6 @@
 Q = (call (Later))
 Later = (leaf)
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Q
   Later
 Later

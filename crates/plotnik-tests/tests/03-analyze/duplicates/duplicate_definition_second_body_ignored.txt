@@ -8,5 +8,5 @@ error: `A` is already defined
   | ---------- first defined here
 2 | A = (a (A))
   | ^^^^^^^^^^^
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 A

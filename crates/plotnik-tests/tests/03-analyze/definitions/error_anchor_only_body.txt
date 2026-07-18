@@ -7,4 +7,4 @@ error: `Q` cannot be an entry point because its body does not match exactly one 
   | ^
   |
 help: make `Q` match exactly one node, with any anchors or field constraints inside that node pattern
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

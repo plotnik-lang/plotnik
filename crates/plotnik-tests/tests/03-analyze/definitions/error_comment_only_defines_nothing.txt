@@ -7,4 +7,4 @@ error: query defines nothing
   | ^^^^^^^^^^^^^^^^^
   |
 help: add a definition, e.g. `Q = (identifier) @id`
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

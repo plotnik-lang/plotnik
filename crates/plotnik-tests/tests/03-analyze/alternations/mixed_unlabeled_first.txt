@@ -12,4 +12,4 @@ error: an alternation cannot mix labeled and unlabeled alternatives
   |   - labeled alternative here
   |
 help: either label every alternative or remove all labels
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
