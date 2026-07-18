@@ -35,8 +35,7 @@ impl CaptureProvenance {
         let mut field_flows = HashMap::new();
         for pattern in &pattern_order {
             let shape = types
-                .analysis
-                .pattern_result
+                .pattern_shapes
                 .get_mut(pattern)
                 .expect("inference order references an inferred pattern");
             if let Some(field_flow) = shape.field_flow.take() {

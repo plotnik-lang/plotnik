@@ -353,17 +353,17 @@ fn custom_capture_type_binding(
     let name = input.analysis.interner.get(&name.text()[1..])?;
     let written_name = capture.capture_type()?.name()?;
     let written_name = input.analysis.interner.get(written_name.text())?;
-    let shape = input
+    let flow = input
         .analysis
         .type_analysis
-        .expect_pattern_result(capture_pattern);
-    let PatternFlow::Fields(scope) = shape.flow else {
+        .expect_pattern_flow(capture_pattern);
+    let PatternFlow::Fields(scope) = flow else {
         return None;
     };
     let mut type_id = input
         .analysis
         .type_analysis
-        .expect_record_fields(scope)
+        .expect_record_fields(*scope)
         .get(&name)?
         .final_type;
 

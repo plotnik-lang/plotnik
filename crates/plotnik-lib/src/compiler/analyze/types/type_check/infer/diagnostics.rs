@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::compiler::analyze::types::RootExtent;
+use crate::compiler::analyze::shape::RootExtent;
 use crate::compiler::analyze::types::type_analysis::UnifyError;
 use crate::compiler::analyze::types::type_description::describe_type;
 use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape, TypeId};
@@ -79,7 +79,7 @@ impl InferVisitor<'_, '_> {
         capture_name: Option<Symbol>,
     ) {
         let capture_has_no_single_node =
-            inner_info.root_extent == RootExtent::Other && inner_info.flow.is_no_value();
+            inner_info.root_extent == RootExtent::NotSingleNode && inner_info.flow.is_no_value();
         if !capture_has_no_single_node {
             return;
         }
@@ -169,7 +169,7 @@ impl InferVisitor<'_, '_> {
         inner_info: &PatternShape,
         capture_name: Symbol,
     ) {
-        if inner_info.root_extent != RootExtent::Other || !inner_info.flow.is_no_value() {
+        if inner_info.root_extent != RootExtent::NotSingleNode || !inner_info.flow.is_no_value() {
             return;
         }
 

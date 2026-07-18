@@ -22,7 +22,7 @@
 //!   no output effect: captures from the alternatives merge into the enclosing
 //!   result, and a warning points at the ineffective labels.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
 
 use crate::core::{Interner, Symbol};
 use rowan::TextRange;
@@ -39,15 +39,12 @@ use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, ListMinimum, PatternFlow, PatternShape, QuantifierKind,
     RecordField, TYPE_NODE, TypeId, TypeShape,
 };
-use crate::compiler::analyze::types::{
-    BuiltInCaptureType, CaptureFact, RawCaptureFact, RootExtent,
-};
+use crate::compiler::analyze::types::{BuiltInCaptureType, CaptureFact, RawCaptureFact};
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::nullability::compute_nullable_defs;
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
+use crate::compiler::analyze::shape::{DefinitionFacts, RootExtent};
 use crate::compiler::diagnostics::report::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
@@ -68,8 +65,7 @@ pub struct InferState<'a, 'd> {
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
     pub dependency_analysis: &'a DependencyAnalysis,
-    /// Definitions whose body can match zero nodes (shared with lowering).
-    pub nullable_defs: &'a HashSet<DefId>,
+    pub definition_facts: &'a DefinitionFacts,
     pub(crate) diag: &'d mut Diagnostics,
 }
 
@@ -308,7 +304,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .ctx
             .type_ctx
             .in_progress()
-            .pattern_result(pattern.node())
+            .pattern_shape(pattern.node())
         {
             return info.clone();
         }
@@ -325,7 +321,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .ctx
             .type_ctx
             .in_progress()
-            .pattern_result(pattern.node())
+            .pattern_shape(pattern.node())
         {
             return info.clone();
         }
@@ -359,7 +355,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .ctx
             .type_ctx
             .in_progress()
-            .pattern_result(pattern.node())
+            .pattern_shape(pattern.node())
         {
             return info.clone();
         }
@@ -401,7 +397,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         self.ctx
             .type_ctx
-            .record_pattern_result(pattern.node().clone(), info.clone());
+            .record_pattern_shape(pattern.node().clone(), info.clone());
         info
     }
 
@@ -478,11 +474,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Root extent is precomputed to a fixpoint before inference, so every
         // reference — recursive ones included — delegates its target's extent
         // and the single-node checks stay sound through recursion.
-        let root_extent = self
-            .ctx
-            .type_ctx
-            .def_root_extent(def_id)
-            .expect("definition root extents are precomputed before inference");
+        let root_extent = self.ctx.definition_facts.root_extent(def_id);
 
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
             // A completed match-only target already flows NoValue. A same-SCC
@@ -568,7 +560,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         match children {
             [] => RootExtent::SingleNode,
             [child] => self.infer_pattern(child).root_extent,
-            _ => RootExtent::Other,
+            _ => RootExtent::NotSingleNode,
         }
     }
 
@@ -860,7 +852,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // invalidate their inferred contract.
         let inner_has_capture_error = !matches!(inner.node(), Pattern::QuantifiedPattern(_))
             && inner_info.flow.is_no_value()
-            && (inner_info.root_extent == RootExtent::Other
+            && (inner_info.root_extent == RootExtent::NotSingleNode
                 || matches!(inner.node(), Pattern::DefRef(_)));
         let owned_inner_error =
             mechanism != CaptureKind::Node && self.ctx.diag.error_count() != errors_before_capture;
@@ -1051,9 +1043,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn pattern_can_match_zero_nodes(&self, pattern: &Pattern) -> bool {
-        crate::compiler::analyze::nullability::pattern_nullable(
+        self.ctx.definition_facts.pattern_is_nullable(
             pattern,
-            self.ctx.nullable_defs,
             self.ctx.dependency_analysis,
             self.ctx.interner,
         )
@@ -1188,7 +1179,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         context: QuantifiedContext,
     ) -> PatternShape {
         let pattern = Pattern::QuantifiedPattern(quant.node().clone());
-        if let Some(info) = self.ctx.type_ctx.in_progress().pattern_result(&pattern) {
+        if let Some(info) = self.ctx.type_ctx.in_progress().pattern_shape(&pattern) {
             return info.clone();
         }
 
@@ -1298,7 +1289,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         // One match of a quantified pattern has variable top-level extent,
         // regardless of its element's extent.
-        result.root_extent = RootExtent::Other;
+        result.root_extent = RootExtent::NotSingleNode;
         result
     }
 
@@ -1358,7 +1349,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         else {
             return;
         };
-        if !self.ctx.nullable_defs.contains(&def_id) {
+        if !self.ctx.definition_facts.is_nullable(def_id) {
             return;
         }
         let view = self.ctx.type_ctx.in_progress();
@@ -1539,7 +1530,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // of those — and a value matching many nodes never is either.
         let core = Self::field_value_core(value.node());
         if matches!(core, Pattern::SeqPattern(_))
-            || self.core_root_extent(&core) == RootExtent::Other
+            || self.core_root_extent(&core) == RootExtent::NotSingleNode
         {
             self.report_field_requires_single_node(field.node(), value.node());
         }
@@ -1573,7 +1564,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         self.ctx
             .type_ctx
             .in_progress()
-            .pattern_result(core)
+            .pattern_shape(core)
             .unwrap_or_else(|| {
                 panic!(
                     "type inference stripped a field value to core pattern {core:?}, but no \
@@ -1636,48 +1627,8 @@ pub(super) struct InferPassEnv<'a, 'd> {
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
     pub dependency_analysis: &'a DependencyAnalysis,
-    pub structural_facts: &'a StructuralFacts,
+    pub definition_facts: &'a DefinitionFacts,
     pub diag: &'d mut Diagnostics,
-}
-
-/// Syntax-only fixpoints computed once before type inference. Capture-type
-/// normalization reads the builtin-only provenance projection and never
-/// recomputes them.
-pub(super) struct StructuralFacts {
-    nullable_defs: HashSet<DefId>,
-    definition_root_extents: HashMap<DefId, RootExtent>,
-    definition_requires_anchor_context: HashMap<DefId, bool>,
-}
-
-impl StructuralFacts {
-    pub fn analyze(
-        interner: &Interner,
-        symbol_table: &SymbolTable,
-        dependency_analysis: &DependencyAnalysis,
-        anchor_contexts: &AnchorContextAnalysis<'_>,
-    ) -> Self {
-        let definition_requires_anchor_context = dependency_analysis
-            .sccs()
-            .iter()
-            .flatten()
-            .copied()
-            .map(|def_id| {
-                (
-                    def_id,
-                    anchor_contexts.definition_requires_external_context(def_id),
-                )
-            })
-            .collect();
-        Self {
-            nullable_defs: compute_nullable_defs(interner, symbol_table, dependency_analysis),
-            definition_root_extents: super::root_extent::compute_definition_root_extents(
-                interner,
-                symbol_table,
-                dependency_analysis,
-            ),
-            definition_requires_anchor_context,
-        }
-    }
 }
 
 /// Orchestrates type inference across all definitions in dependency order.
@@ -1711,21 +1662,6 @@ impl<'a, 'd> InferPass<'a, 'd> {
                 }),
         );
 
-        // Definition root extents are a syntactic fixpoint, computed up front
-        // so references always report their target's real extent, including
-        // through recursion. Only result types need SCC deferral.
-        for (&def_id, &extent) in &self.analysis.structural_facts.definition_root_extents {
-            self.ctx.record_def_root_extent(def_id, extent);
-        }
-        for (&def_id, &requires_context) in &self
-            .analysis
-            .structural_facts
-            .definition_requires_anchor_context
-        {
-            self.ctx
-                .record_def_requires_anchor_context(def_id, requires_context);
-        }
-
         self.process_sccs();
         self.assert_all_definitions_processed();
         assert!(
@@ -1746,7 +1682,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             interner: self.analysis.interner,
             symbol_table: self.analysis.symbol_table,
             dependency_analysis: self.analysis.dependency_analysis,
-            nullable_defs: &self.analysis.structural_facts.nullable_defs,
+            definition_facts: self.analysis.definition_facts,
             diag: &mut *self.analysis.diag,
         };
         let mut visitor = InferVisitor::new(state, source);
@@ -1840,10 +1776,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 
     fn resolved_reference_shape(&mut self, target: DefId) -> PatternShape {
-        let root_extent = self
-            .ctx
-            .def_root_extent(target)
-            .expect("definition root extents are precomputed before inference");
+        let root_extent = self.analysis.definition_facts.root_extent(target);
         let output = self
             .ctx
             .in_progress()
@@ -1901,10 +1834,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             }
         };
         self.ctx.record_def_output(def_id, output);
-        let precomputed = self
-            .ctx
-            .def_root_extent(def_id)
-            .expect("definition root extents are precomputed before inference");
+        let precomputed = self.analysis.definition_facts.root_extent(def_id);
         assert_eq!(
             info.root_extent, precomputed,
             "definition root-extent pre-pass must agree with inference",

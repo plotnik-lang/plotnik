@@ -24,7 +24,6 @@ use super::boundary::{EntryObligation, NavigationContract};
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
 use super::scope::{CaptureExits, RecordScope, SkipExit};
-use crate::compiler::analyze::nullability::compute_nullable_defs;
 use crate::compiler::analyze::types::type_check::definition_value_root;
 
 /// NfaBuilder state for Thompson construction.
@@ -52,9 +51,6 @@ pub struct NfaBuilder<'a> {
     pub(super) suppress_depth: u32,
     /// Non-zero while explicit node-pattern matches contribute scalar provenance.
     source_mark_depth: u32,
-    /// Definitions whose body can match zero nodes; references to them are
-    /// inlined at the call site (see `nullability`).
-    pub(super) nullable_defs: HashSet<DefId>,
     /// Definitions whose body is currently being compiled (standalone or
     /// inlined). A nullable reference back into this set cannot inline again —
     /// it falls back to a guarded call (`compile_ref_guarded_call`).
@@ -83,11 +79,6 @@ impl<'a> NfaBuilder<'a> {
             scope_stack: Vec::new(),
             suppress_depth: 0,
             source_mark_depth: 0,
-            nullable_defs: compute_nullable_defs(
-                ctx.analysis.interner,
-                ctx.symbol_table,
-                ctx.analysis.dependency_analysis,
-            ),
             inline_stack: Vec::new(),
             spans: None,
         }
@@ -115,6 +106,10 @@ impl<'a> NfaBuilder<'a> {
         self.source_mark_depth > 0
     }
 
+    pub(super) fn definition_is_nullable(&self, def_id: DefId) -> bool {
+        self.ctx.analysis.definition_facts.is_nullable(def_id)
+    }
+
     pub(super) fn records_inspection(&self) -> bool {
         self.ctx.inspection
     }
@@ -140,7 +135,7 @@ impl<'a> NfaBuilder<'a> {
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
         let mut entry_points = IndexMap::new();
-        for (def_id, output) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
+        for (def_id, output) in ctx.analysis.iter_entry_point_outputs() {
             let target = compiler.ensure_def_specialization(DefSpecialization::ordinary(def_id));
             let output_shape = output
                 .value()
@@ -535,12 +530,7 @@ impl<'a> NfaBuilder<'a> {
                 // alternation has `Value(variant)` flow where its value is
                 // materialized; in a fields context, its captures merge. A
                 // discarded region compiles structurally without variant scopes.
-                let flow = &self
-                    .ctx
-                    .analysis
-                    .type_analysis
-                    .expect_pattern_result(pattern)
-                    .flow;
+                let flow = &self.ctx.analysis.type_analysis.expect_pattern_flow(pattern);
                 if ctx.needs_value()
                     && matches!(flow, PatternFlow::Value(_))
                     && !self.is_suppressed()

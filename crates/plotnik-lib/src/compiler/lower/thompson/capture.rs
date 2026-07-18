@@ -290,14 +290,9 @@ impl NfaBuilder<'_> {
 
         // Check the actual inferred type, not syntax. Compile runs after the type
         // analysis is frozen, so every pattern it visits has a recorded result.
-        let info = self
-            .ctx
-            .analysis
-            .type_analysis
-            .expect_pattern_result(element);
+        let flow = self.ctx.analysis.type_analysis.expect_pattern_flow(element);
 
-        !info
-            .flow
+        !flow
             .type_id()
             .map(|id| self.ctx.analysis.type_analysis.expect_type_shape(id))
             .is_some_and(|shape| matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)))
@@ -337,20 +332,19 @@ impl NfaBuilder<'_> {
 ///
 /// Variant types use VariantOpen/VariantClose instead (handled separately).
 pub fn needs_record_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
-    let info = type_ctx.expect_pattern_result(inner);
+    let flow = type_ctx.expect_pattern_flow(inner);
 
     // Must be a bubble (fields flow to parent scope)
-    if !info.flow.has_fields() {
+    if !flow.has_fields() {
         return false;
     }
 
-    info.flow
-        .type_id()
+    flow.type_id()
         .map(|id| type_ctx.expect_type_shape(id))
         .is_some_and(|shape| matches!(shape, TypeShape::Record(_)))
 }
 
 /// Get the element type ID for list-element scoping.
 pub fn element_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
-    type_ctx.expect_pattern_result(inner).flow.type_id()
+    type_ctx.expect_pattern_flow(inner).type_id()
 }

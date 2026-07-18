@@ -730,7 +730,7 @@ impl CaptureTypeLowerer<'_, '_> {
             unreachable!("only a definition reference needs output specialization")
         };
         let def_id = self.compiler.resolve_ref_def_id(reference);
-        if self.compiler.nullable_defs.contains(&def_id) {
+        if self.compiler.definition_is_nullable(def_id) {
             return self.nullable_reference(def_id, destination);
         }
 

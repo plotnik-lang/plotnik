@@ -293,8 +293,7 @@ impl NfaBuilder<'_> {
             self.ctx
                 .analysis
                 .type_analysis
-                .expect_pattern_result(alternation)
-                .flow
+                .expect_pattern_flow(alternation)
                 .type_id()
         };
         let merged_fields =
@@ -328,23 +327,18 @@ impl NfaBuilder<'_> {
             let completion_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
                 // Only bubbling fields count as provided; a `Value` alternative (a
                 // bare reference, suppressed) contributes nothing here.
-                let provided: HashSet<Symbol> = match &self
-                    .ctx
-                    .analysis
-                    .type_analysis
-                    .expect_pattern_result(&body)
-                    .flow
-                {
-                    PatternFlow::Fields(id) => self
-                        .ctx
-                        .analysis
-                        .type_analysis
-                        .expect_record_fields(*id)
-                        .keys()
-                        .copied()
-                        .collect(),
-                    _ => HashSet::new(),
-                };
+                let provided: HashSet<Symbol> =
+                    match &self.ctx.analysis.type_analysis.expect_pattern_flow(&body) {
+                        PatternFlow::Fields(id) => self
+                            .ctx
+                            .analysis
+                            .type_analysis
+                            .expect_record_fields(*id)
+                            .keys()
+                            .copied()
+                            .collect(),
+                        _ => HashSet::new(),
+                    };
                 self.merged_field_completion_effects(
                     field_completions.expect("merged alternation has field completions"),
                     fields,
@@ -510,8 +504,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&Pattern::Alternation(alternation.clone()))
-            .flow
+            .expect_pattern_flow(&Pattern::Alternation(alternation.clone()))
             .type_id()
             .expect("an analyzed labeled alternation must produce a variant type");
 

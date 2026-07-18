@@ -1,7 +1,7 @@
 //! `TypeAnalysis`: the frozen result of type inference.
 //!
 //! Holds the interned type registry, named type declarations, each definition's
-//! output and root extent, and the per-pattern inference results. It is built
+//! output, and each pattern's result flow. It is built
 //! incrementally by [`TypeAnalysisBuilder`] and frozen with
 //! [`TypeAnalysisBuilder::finish`]; past that boundary it is immutable and its
 //! accessors are trusted (a structural miss is a compiler bug, not a query
@@ -20,7 +20,7 @@ use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, ListMinimum, PatternFlow, PatternShape,
     RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
-use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
+use crate::compiler::analyze::types::{CaptureFact, FieldCompletions};
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::{DefId, TypeDeclId};
@@ -147,7 +147,7 @@ impl TypeRelation {
     }
 }
 
-/// Frozen registry of inferred types and per-definition / per-pattern results.
+/// Frozen registry of inferred types, definition outputs, and pattern flows.
 ///
 /// Constructed only via [`TypeAnalysisBuilder`]; the private fields and
 /// `#[non_exhaustive]` keep that the single entry point.
@@ -158,15 +158,7 @@ pub struct TypeAnalysis {
     declarations: Vec<TypeDeclarationEntry>,
     definition_declarations: BTreeMap<DefId, TypeDeclId>,
 
-    /// Each definition's static top-level extent.
-    def_root_extent: BTreeMap<DefId, RootExtent>,
-
-    /// Whether the definition exports a leading or trailing anchor obligation.
-    /// Such definitions remain reusable fragments even when they consume
-    /// exactly one root node: a contextless entry point cannot discharge them.
-    def_requires_anchor_context: BTreeMap<DefId, bool>,
-
-    pub(super) pattern_result: HashMap<Pattern, PatternShape>,
+    pattern_flows: HashMap<Pattern, PatternFlow>,
 
     /// Raw capture mechanism plus the optional built-in capture-type plan for
     /// every admitted regular capture occurrence.
@@ -494,13 +486,13 @@ impl TypeAnalysis {
         }
     }
 
-    pub fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
-        self.pattern_result.get(pattern)
+    pub fn pattern_flow(&self, pattern: &Pattern) -> Option<&PatternFlow> {
+        self.pattern_flows.get(pattern)
     }
 
-    pub fn expect_pattern_result(&self, pattern: &Pattern) -> &PatternShape {
-        self.pattern_result(pattern)
-            .expect("admitted pattern must have an inferred result")
+    pub fn expect_pattern_flow(&self, pattern: &Pattern) -> &PatternFlow {
+        self.pattern_flow(pattern)
+            .expect("admitted pattern must have an inferred flow")
     }
 
     pub fn capture_fact(&self, pattern: &Pattern) -> Option<&CaptureFact> {
@@ -533,27 +525,6 @@ impl TypeAnalysis {
             .expect("admitted definition must have an inferred output")
     }
 
-    pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
-        self.def_root_extent.get(&def_id).copied()
-    }
-
-    pub fn expect_def_root_extent(&self, def_id: DefId) -> RootExtent {
-        self.def_root_extent(def_id)
-            .expect("admitted definition must have an inferred root extent")
-    }
-
-    pub fn def_requires_anchor_context(&self, def_id: DefId) -> bool {
-        *self
-            .def_requires_anchor_context
-            .get(&def_id)
-            .expect("admitted definition must have an anchor-context classification")
-    }
-
-    pub fn is_selectable_definition(&self, def_id: DefId) -> bool {
-        self.expect_def_root_extent(def_id) == RootExtent::SingleNode
-            && !self.def_requires_anchor_context(def_id)
-    }
-
     /// Follow a `Ref` chain to the underlying materialized type; non-ref types
     /// resolve to themselves. The accessor type-table emission uses to map a
     /// query type to the concrete shape it stands for.
@@ -583,12 +554,6 @@ impl TypeAnalysis {
                     .expect("admitted definition output must be sealed");
                 (def_id, output)
             })
-    }
-
-    /// Iterate over selectable definition outputs in definition order.
-    pub fn iter_entry_point_outputs(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
-        self.iter_def_output()
-            .filter(|&(def_id, _)| self.is_selectable_definition(def_id))
     }
 
     /// Iterate generated and explicitly named structural bodies in `TypeId`
@@ -706,49 +671,15 @@ impl TypeAnalysis {
             }
         }
 
-        assert_eq!(
-            self.definition_declarations.len(),
-            self.def_root_extent.len(),
-            "definition output and root-extent tables must cover the same definitions",
-        );
-        assert_eq!(
-            self.definition_declarations.len(),
-            self.def_requires_anchor_context.len(),
-            "definition output and anchor-context tables must cover the same definitions",
-        );
-        for def_id in self.definition_declarations.keys() {
-            assert!(
-                self.def_root_extent.contains_key(def_id),
-                "every definition output must have an inferred root extent",
-            );
-            assert!(
-                self.def_requires_anchor_context.contains_key(def_id),
-                "every definition output must have an anchor-context classification",
-            );
-        }
-        for def_id in self.def_root_extent.keys() {
-            assert!(
-                self.definition_declarations.contains_key(def_id),
-                "every definition root extent must have an inferred output",
-            );
-        }
-        for def_id in self.def_requires_anchor_context.keys() {
-            assert!(
-                self.definition_declarations.contains_key(def_id),
-                "every anchor-context classification must have an inferred output",
-            );
-        }
-
-        for info in self.pattern_result.values() {
-            self.assert_flow_well_formed(&info.flow);
+        for flow in self.pattern_flows.values() {
+            self.assert_flow_well_formed(flow);
         }
 
         let field_alternations = self
-            .pattern_result
+            .pattern_flows
             .iter()
-            .filter(|(pattern, shape)| {
-                matches!(pattern, Pattern::Alternation(_))
-                    && matches!(&shape.flow, PatternFlow::Fields(_))
+            .filter(|(pattern, flow)| {
+                matches!(pattern, Pattern::Alternation(_)) && matches!(flow, PatternFlow::Fields(_))
             })
             .count();
         assert_eq!(
@@ -761,11 +692,10 @@ impl TypeAnalysis {
                 matches!(pattern, Pattern::Alternation(_)),
                 "field completions must belong to an alternation",
             );
-            let PatternFlow::Fields(type_id) = &self
-                .pattern_result
+            let PatternFlow::Fields(type_id) = self
+                .pattern_flows
                 .get(pattern)
                 .expect("field completions must belong to an admitted pattern")
-                .flow
             else {
                 panic!("field completions must belong to a field-producing alternation")
             };
@@ -818,6 +748,9 @@ impl TypeAnalysis {
 pub struct TypeAnalysisBuilder {
     pub(super) analysis: TypeAnalysis,
 
+    /// Full pattern inference state. Only the result flow survives freezing.
+    pub(super) pattern_shapes: HashMap<Pattern, PatternShape>,
+
     /// Reverse index for `intern_type` deduplication of leaf and wrapper shapes.
     /// Records and variant types are deliberately NOT deduplicated: they are nominal —
     /// two definitions with identical capture profiles are two distinct types,
@@ -858,6 +791,7 @@ struct DeferredUnification {
 
 pub(crate) struct TypeAnalysisView<'a> {
     pub(super) analysis: &'a TypeAnalysis,
+    pub(super) pattern_shapes: &'a HashMap<Pattern, PatternShape>,
 }
 
 impl TypeAnalysisView<'_> {
@@ -869,8 +803,8 @@ impl TypeAnalysisView<'_> {
         self.analysis.expect_record_fields(id)
     }
 
-    pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
-        self.analysis.pattern_result(pattern)
+    pub(crate) fn pattern_shape(&self, pattern: &Pattern) -> Option<&PatternShape> {
+        self.pattern_shapes.get(pattern)
     }
 
     pub(crate) fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
@@ -903,13 +837,12 @@ impl TypeAnalysisBuilder {
                 types: Vec::new(),
                 declarations: Vec::new(),
                 definition_declarations: BTreeMap::new(),
-                def_root_extent: BTreeMap::new(),
-                def_requires_anchor_context: BTreeMap::new(),
-                pattern_result: HashMap::new(),
+                pattern_flows: HashMap::new(),
                 capture_facts: HashMap::new(),
                 field_completions: HashMap::new(),
                 named_types: BTreeMap::new(),
             },
+            pattern_shapes: HashMap::new(),
             intern_index: HashMap::new(),
             type_provenance: HashMap::new(),
             custom_capture_types: Vec::new(),
@@ -953,7 +886,7 @@ impl TypeAnalysisBuilder {
 
     /// Freeze the accumulated state, dropping the inference-only scratch. Admits
     /// the result only after asserting it is internally consistent.
-    pub fn finish(self) -> TypeAnalysis {
+    pub fn finish(mut self) -> TypeAnalysis {
         assert!(
             self.open_scc.is_none(),
             "every SCC must be sealed before finish"
@@ -971,12 +904,16 @@ impl TypeAnalysisBuilder {
             "capture-type normalization must consume inference order",
         );
         assert!(
-            self.analysis
-                .pattern_result
+            self.pattern_shapes
                 .values()
                 .all(|shape| shape.field_flow.is_none()),
             "capture-type normalization must consume field provenance",
         );
+        self.analysis.pattern_flows = self
+            .pattern_shapes
+            .into_iter()
+            .map(|(pattern, shape)| (pattern, shape.flow))
+            .collect();
         self.analysis.assert_well_formed();
         self.analysis
     }
@@ -986,6 +923,7 @@ impl TypeAnalysisBuilder {
     pub(crate) fn in_progress(&self) -> TypeAnalysisView<'_> {
         TypeAnalysisView {
             analysis: &self.analysis,
+            pattern_shapes: &self.pattern_shapes,
         }
     }
 
@@ -1308,7 +1246,7 @@ impl TypeAnalysisBuilder {
                 *type_id = remap(*type_id);
             }
         }
-        for shape in self.analysis.pattern_result.values_mut() {
+        for shape in self.pattern_shapes.values_mut() {
             match &mut shape.flow {
                 PatternFlow::Value(type_id) | PatternFlow::Fields(type_id) => {
                     *type_id = remap(*type_id);
@@ -1468,11 +1406,11 @@ impl TypeAnalysisBuilder {
         &self.custom_capture_types
     }
 
-    pub fn record_pattern_result(&mut self, pattern: Pattern, shape: PatternShape) {
-        if !self.analysis.pattern_result.contains_key(&pattern) {
+    pub fn record_pattern_shape(&mut self, pattern: Pattern, shape: PatternShape) {
+        if !self.pattern_shapes.contains_key(&pattern) {
             self.pattern_order.push(pattern.clone());
         }
-        self.analysis.pattern_result.insert(pattern, shape);
+        self.pattern_shapes.insert(pattern, shape);
     }
 
     pub(super) fn record_capture(
@@ -1528,20 +1466,6 @@ impl TypeAnalysisBuilder {
         let provenance = std::mem::take(&mut self.capture_provenance);
         let pattern_order = std::mem::take(&mut self.pattern_order);
         provenance.normalize(pattern_order, self, interner, diagnostics);
-    }
-
-    pub fn record_def_root_extent(&mut self, def_id: DefId, extent: RootExtent) {
-        self.analysis.def_root_extent.insert(def_id, extent);
-    }
-
-    pub fn def_root_extent(&self, def_id: DefId) -> Option<RootExtent> {
-        self.analysis.def_root_extent(def_id)
-    }
-
-    pub fn record_def_requires_anchor_context(&mut self, def_id: DefId, requires_context: bool) {
-        self.analysis
-            .def_requires_anchor_context
-            .insert(def_id, requires_context);
     }
 
     /// Install the naming pass's result. Names must be complete and validated

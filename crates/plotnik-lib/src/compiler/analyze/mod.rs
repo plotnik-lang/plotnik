@@ -4,7 +4,6 @@ pub(crate) mod boundary;
 pub mod grammar;
 pub mod located;
 pub mod names;
-pub mod nullability;
 pub mod refs;
 pub mod result;
 pub mod shape;
