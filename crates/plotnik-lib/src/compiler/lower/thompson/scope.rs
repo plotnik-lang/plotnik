@@ -220,8 +220,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&inner)
-            .flow
+            .expect_pattern_flow(&inner)
             .type_id();
 
         let end_effects = ScopeCloseEffects {

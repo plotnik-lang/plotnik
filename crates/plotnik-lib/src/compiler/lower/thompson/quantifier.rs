@@ -267,8 +267,7 @@ impl NfaBuilder<'_> {
             self.ctx
                 .analysis
                 .type_analysis
-                .expect_pattern_result(&pattern)
-                .flow,
+                .expect_pattern_flow(&pattern),
             PatternFlow::Value(_)
         )
     }
@@ -388,8 +387,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(pattern)
-            .flow
+            .expect_pattern_flow(pattern)
             .clone();
         let shape = flow.type_id().map(|type_id| {
             (
@@ -1024,7 +1022,7 @@ impl NfaBuilder<'_> {
         // return address carries the consumed-candidate navigation).
         if let Pattern::DefRef(r) = pattern {
             let def_id = self.resolve_ref_def_id(r);
-            if self.nullable_defs.contains(&def_id) {
+            if self.definition_is_nullable(def_id) {
                 let pattern_ctx = PatternCtx {
                     exit: match_exit,
                     nav: nav_override,
@@ -1047,12 +1045,7 @@ impl NfaBuilder<'_> {
             };
             // Mirrors dispatch_pattern: only a labeled alternation whose value is
             // observed outside suppression emits variant events.
-            let flow = &self
-                .ctx
-                .analysis
-                .type_analysis
-                .expect_pattern_result(pattern)
-                .flow;
+            let flow = &self.ctx.analysis.type_analysis.expect_pattern_flow(pattern);
             return if pattern_ctx.needs_value()
                 && matches!(flow, PatternFlow::Value(_))
                 && !self.is_suppressed()
@@ -1203,8 +1196,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&inner)
-            .flow
+            .expect_pattern_flow(&inner)
             .type_id();
 
         let end_effects = ScopeCloseEffects {
@@ -1656,7 +1648,7 @@ impl NfaBuilder<'_> {
         let first_nav = nav_override.unwrap_or(Nav::Down);
         let iterate = if let Pattern::DefRef(r) = &element {
             let def_id = self.resolve_ref_def_id(r);
-            if self.nullable_defs.contains(&def_id) {
+            if self.definition_is_nullable(def_id) {
                 // An empty element match and a skip of the `?` both leave
                 // a null pending; funneling the inline skip into the match
                 // continuation keeps the two paths one value.

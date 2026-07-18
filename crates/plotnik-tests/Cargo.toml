@@ -54,6 +54,10 @@ name = "stack_safety"
 path = "tests/stack_safety.rs"
 
 [[test]]
+name = "entry_points"
+path = "tests/entry_points.rs"
+
+[[test]]
 name = "macro_tests"
 path = "tests/macro_tests.rs"
 

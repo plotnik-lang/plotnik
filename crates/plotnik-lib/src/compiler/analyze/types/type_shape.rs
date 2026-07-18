@@ -11,9 +11,9 @@ pub use crate::compiler::ids::TypeId;
 use crate::compiler::ids::TypeDeclId;
 use crate::core::Symbol;
 
-use super::RootExtent;
 use super::capture::InferredFieldFlow;
 use crate::bytecode::type_system::PrimitiveType;
+use crate::compiler::analyze::shape::RootExtent;
 pub use crate::compiler::parse::ast::QuantifierKind;
 
 pub(crate) const RESERVED_NO_VALUE_TYPE_ID: TypeId = TypeId(PrimitiveType::NoValue.index() as u32);

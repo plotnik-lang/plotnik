@@ -1,9 +1,8 @@
 //! Unified type checking pass.
 //!
-//! Computes static root extent and result flow in one traversal.
+//! Computes result flow while checking it against retained structural facts.
 
 mod infer;
-mod root_extent;
 mod unify;
 
 pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
@@ -12,7 +11,7 @@ pub(crate) use infer::definition_value_root;
 
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
+use crate::compiler::analyze::shape::DefinitionFacts;
 use crate::compiler::analyze::types::naming::{RawTypeNameValidator, TypeNamer};
 use crate::compiler::diagnostics::report::Diagnostics;
 
@@ -24,21 +23,14 @@ pub fn infer_types(
     interner: &mut Interner,
     symbol_table: &SymbolTable,
     dependency_analysis: &DependencyAnalysis,
+    definition_facts: &DefinitionFacts,
     diag: &mut Diagnostics,
 ) -> TypeAnalysis {
-    let anchor_contexts = AnchorContextAnalysis::new(interner, symbol_table, dependency_analysis);
-    let structural_facts = infer::StructuralFacts::analyze(
-        interner,
-        symbol_table,
-        dependency_analysis,
-        &anchor_contexts,
-    );
-
     let pass = infer::InferPassEnv {
         interner,
         symbol_table,
         dependency_analysis,
-        structural_facts: &structural_facts,
+        definition_facts,
         diag,
     };
     let mut types = infer::InferPass::new(pass).run();

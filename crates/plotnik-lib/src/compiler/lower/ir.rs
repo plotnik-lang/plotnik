@@ -1039,7 +1039,7 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for every emitted definition specialization.
     pub(in crate::compiler::lower) def_entries: IndexMap<DefSpecialization, Label>,
-    /// Selectable definitions in source order.
+    /// Selectable definitions in `DefId` order.
     pub(in crate::compiler::lower) entry_points: IndexMap<DefId, EntryPointIR>,
     /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,

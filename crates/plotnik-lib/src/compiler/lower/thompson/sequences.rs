@@ -719,8 +719,7 @@ impl NfaBuilder<'_> {
                     .ctx
                     .analysis
                     .type_analysis
-                    .expect_pattern_result(&inner)
-                    .flow
+                    .expect_pattern_flow(&inner)
                     .type_id();
                 let mut inner_targets = ExitMap::new();
                 for (port, &target) in targets.iter() {
@@ -753,11 +752,7 @@ impl NfaBuilder<'_> {
                 if mechanism == CaptureKind::PendingValue
                     && let Pattern::Alternation(alternation) = &inner
                     && matches!(
-                        self.ctx
-                            .analysis
-                            .type_analysis
-                            .expect_pattern_result(&inner)
-                            .flow,
+                        self.ctx.analysis.type_analysis.expect_pattern_flow(&inner),
                         PatternFlow::Value(_)
                     )
                 {
@@ -787,8 +782,7 @@ impl NfaBuilder<'_> {
             self.ctx
                 .analysis
                 .type_analysis
-                .expect_pattern_result(&Pattern::QuantifiedPattern(quantified.clone()))
-                .flow
+                .expect_pattern_flow(&Pattern::QuantifiedPattern(quantified.clone()))
                 .is_no_value(),
             "NFA boundary-quantifier lowering received a value-producing pattern; this path only \
              supports transparent output"
@@ -1059,15 +1053,14 @@ impl NfaBuilder<'_> {
                 .ctx
                 .analysis
                 .type_analysis
-                .expect_pattern_result(&alternation_pattern)
-                .flow
+                .expect_pattern_flow(&alternation_pattern)
             {
                 PatternFlow::Fields(id) => Some(id),
                 PatternFlow::NoValue | PatternFlow::Value(_) => None,
             }
         };
         let merged_fields =
-            alternation_type_id.map(|id| self.ctx.analysis.type_analysis.expect_record_fields(id));
+            alternation_type_id.map(|id| self.ctx.analysis.type_analysis.expect_record_fields(*id));
         let field_completions = alternation_type_id.map(|_| {
             self.ctx
                 .analysis
@@ -1104,23 +1097,18 @@ impl NfaBuilder<'_> {
 
             let mut pre = Vec::new();
             if let Some(fields) = merged_fields {
-                let provided: HashSet<_> = match &self
-                    .ctx
-                    .analysis
-                    .type_analysis
-                    .expect_pattern_result(&body)
-                    .flow
-                {
-                    PatternFlow::Fields(id) => self
-                        .ctx
-                        .analysis
-                        .type_analysis
-                        .expect_record_fields(*id)
-                        .keys()
-                        .copied()
-                        .collect(),
-                    PatternFlow::NoValue | PatternFlow::Value(_) => HashSet::new(),
-                };
+                let provided: HashSet<_> =
+                    match &self.ctx.analysis.type_analysis.expect_pattern_flow(&body) {
+                        PatternFlow::Fields(id) => self
+                            .ctx
+                            .analysis
+                            .type_analysis
+                            .expect_record_fields(*id)
+                            .keys()
+                            .copied()
+                            .collect(),
+                        PatternFlow::NoValue | PatternFlow::Value(_) => HashSet::new(),
+                    };
                 pre.extend(self.merged_field_completion_effects(
                     field_completions.expect("merged alternation has field completions"),
                     fields,
@@ -1169,8 +1157,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&alternation_pattern)
-            .flow
+            .expect_pattern_flow(&alternation_pattern)
             .type_id()
             .expect("an observed labeled alternation produces a variant type");
         let relation = self.boundary_relations.pattern(&alternation_pattern);
@@ -1470,8 +1457,7 @@ impl NfaBuilder<'_> {
                     .ctx
                     .analysis
                     .type_analysis
-                    .expect_pattern_result(pattern)
-                    .flow
+                    .expect_pattern_flow(pattern)
                     .is_no_value()
                 {
                     return false;

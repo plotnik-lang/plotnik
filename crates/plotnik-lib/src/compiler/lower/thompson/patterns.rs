@@ -437,14 +437,13 @@ impl NfaBuilder<'_> {
         let Pattern::DefRef(r) = &inner else {
             return false;
         };
-        self.nullable_defs.contains(&self.resolve_ref_def_id(r))
+        self.definition_is_nullable(self.resolve_ref_def_id(r))
     }
 
-    /// Whether a pattern can match zero nodes (see `analyze::nullability`).
+    /// Whether a pattern can match zero nodes.
     pub(super) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
-        crate::compiler::analyze::nullability::pattern_nullable(
+        self.ctx.analysis.definition_facts.pattern_is_nullable(
             pattern,
-            &self.nullable_defs,
             self.ctx.analysis.dependency_analysis,
             self.ctx.analysis.interner,
         )
@@ -515,8 +514,8 @@ impl NfaBuilder<'_> {
         field_override: Option<NodeFieldId>,
     ) -> Label {
         let def_id = self.resolve_ref_def_id(r);
-        if self.nullable_defs.contains(&def_id) {
-            // A nullable body has `RootExtent::Other`, which field values
+        if self.definition_is_nullable(def_id) {
+            // A nullable body has `RootExtent::NotSingleNode`, which field values
             // reject upstream ("field cannot match a sequence").
             assert!(
                 field_override.is_none(),
@@ -1409,8 +1408,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&req.inner)
-            .flow
+            .expect_pattern_flow(&req.inner)
             .has_fields();
         if inner_is_bubble {
             return self.compile_bubble_with_node_capture(req, exit);

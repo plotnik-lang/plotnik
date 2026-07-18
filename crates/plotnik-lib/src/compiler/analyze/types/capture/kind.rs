@@ -7,9 +7,13 @@
 //! reading the inner expression's already-inferred type, so both sides stay in
 //! lockstep.
 
+use std::collections::HashMap;
+
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisView};
-use crate::compiler::analyze::types::type_shape::{PatternFlow, QuantifierKind, TypeShape};
+use crate::compiler::analyze::types::type_shape::{
+    PatternFlow, PatternShape, QuantifierKind, TypeShape,
+};
 use crate::compiler::parse::ast::{Pattern, is_empty_group};
 use crate::core::Interner;
 
@@ -36,12 +40,12 @@ pub enum CaptureKind {
 
 /// Capture value-mechanism classification while analysis is in progress.
 impl TypeAnalysis {
-    fn classify(
-        &self,
+    fn classify<'a>(
+        &'a self,
         inner: &Pattern,
         deps: &DependencyAnalysis,
         interner: &Interner,
-        mode: CaptureLookupMode,
+        mode: CaptureLookupMode<'a>,
     ) -> CaptureKind {
         // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
         // constraint, so the value mechanism is that of `x`.
@@ -128,12 +132,12 @@ impl TypeAnalysis {
         self.ref_structured(pattern, deps, interner, CaptureLookupMode::Admitted)
     }
 
-    fn ref_structured(
-        &self,
+    fn ref_structured<'a>(
+        &'a self,
         pattern: &Pattern,
         deps: &DependencyAnalysis,
         interner: &Interner,
-        mode: CaptureLookupMode,
+        mode: CaptureLookupMode<'a>,
     ) -> bool {
         let Pattern::DefRef(r) = pattern else {
             return false;
@@ -175,7 +179,7 @@ impl TypeAnalysis {
         // During inference a same-SCC target is not registered yet. Fall back to
         // the reference's own inferred flow: a reference carries its target's
         // result as a pending value (`Value`), structured or not.
-        match self.pattern_result(pattern).map(|info| &info.flow) {
+        match mode.pattern_flow(self, pattern) {
             Some(PatternFlow::Value(t)) => self.is_structured_output(*t),
             _ => false,
         }
@@ -194,18 +198,22 @@ impl TypeAnalysisView<'_> {
         deps: &DependencyAnalysis,
         interner: &Interner,
     ) -> CaptureKind {
-        self.analysis
-            .classify(inner, deps, interner, CaptureLookupMode::InProgress)
+        self.analysis.classify(
+            inner,
+            deps,
+            interner,
+            CaptureLookupMode::InProgress(self.pattern_shapes),
+        )
     }
 }
 
 #[derive(Clone, Copy)]
-enum CaptureLookupMode {
+enum CaptureLookupMode<'a> {
     Admitted,
-    InProgress,
+    InProgress(&'a HashMap<Pattern, PatternShape>),
 }
 
-impl CaptureLookupMode {
+impl CaptureLookupMode<'_> {
     fn is_admitted(self) -> bool {
         matches!(self, Self::Admitted)
     }
@@ -213,7 +221,7 @@ impl CaptureLookupMode {
     fn recover<T>(self, message: &str, fallback: T) -> T {
         match self {
             Self::Admitted => panic!("{message}"),
-            Self::InProgress => fallback,
+            Self::InProgress(_) => fallback,
         }
     }
 
@@ -225,20 +233,24 @@ impl CaptureLookupMode {
             Self::Admitted => quant
                 .quantifier_kind()
                 .expect("admitted quantified pattern must have a quantifier operator"),
-            Self::InProgress => quant
+            Self::InProgress(_) => quant
                 .quantifier_kind()
                 .unwrap_or(QuantifierKind::ZeroOrMore),
         }
     }
+}
 
-    fn pattern_flow<'a>(
+impl<'a> CaptureLookupMode<'a> {
+    fn pattern_flow(
         self,
         analysis: &'a TypeAnalysis,
         pattern: &Pattern,
     ) -> Option<&'a PatternFlow> {
         match self {
-            Self::Admitted => Some(&analysis.expect_pattern_result(pattern).flow),
-            Self::InProgress => analysis.pattern_result(pattern).map(|info| &info.flow),
+            Self::Admitted => Some(analysis.expect_pattern_flow(pattern)),
+            Self::InProgress(pattern_shapes) => {
+                pattern_shapes.get(pattern).map(|shape| &shape.flow)
+            }
         }
     }
 }

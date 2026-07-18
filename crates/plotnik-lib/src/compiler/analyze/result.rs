@@ -408,15 +408,13 @@ impl ResultModel {
     pub(crate) fn from_artifacts(
         artifacts: AnalysisArtifacts<'_>,
     ) -> Result<Self, ResultSchemaError> {
-        Self::new(artifacts.type_analysis, artifacts.dependency_analysis)
-    }
-
-    pub(crate) fn new(
-        types: &TypeAnalysis,
-        deps: &DependencyAnalysis,
-    ) -> Result<Self, ResultSchemaError> {
-        let reachable_defs =
-            deps.reachable_from(types.iter_entry_point_outputs().map(|(def_id, _)| def_id));
+        let types = artifacts.type_analysis;
+        let deps = artifacts.dependency_analysis;
+        let reachable_defs = deps.reachable_from(
+            artifacts
+                .iter_entry_point_outputs()
+                .map(|(def_id, _)| def_id),
+        );
         let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
         let capture_layout = CaptureLayout::build(types, &collected_types.value_types)?;
         let type_layout = ResultTypeLayout::build(
@@ -440,7 +438,8 @@ impl ResultModel {
         }
         type_name_bindings.sort_by_key(|binding| (binding.type_id, binding.name));
         type_name_bindings.dedup();
-        let entry_point_items = ItemCollector::new(types, deps, &named_types).collect();
+        let entry_point_items = ItemCollector::new(types, deps, &named_types)
+            .collect(artifacts.iter_entry_point_outputs());
         let mut public_result_groups = BTreeMap::new();
         for item in entry_point_items
             .iter()
@@ -596,8 +595,11 @@ impl<'a> ItemCollector<'a> {
         }
     }
 
-    fn collect(mut self) -> Vec<ResultItem> {
-        for (def_id, output) in self.types.iter_entry_point_outputs() {
+    fn collect(
+        mut self,
+        entry_points: impl IntoIterator<Item = (DefId, DefinitionOutput)>,
+    ) -> Vec<ResultItem> {
+        for (def_id, output) in entry_points {
             let name = self.deps.def_name_sym(def_id);
             match output {
                 DefinitionOutput::MatchOnly => {
