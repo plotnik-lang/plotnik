@@ -10,11 +10,6 @@ use regex_automata::dfa::dense;
 use regex_automata::nfa::thompson;
 use regex_syntax::hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Look, Repetition};
 
-// The ECMA printer lands before the TypeScript backend so normalized HIR has a
-// real second consumer while its shape is still easy to change.
-#[allow(dead_code)]
-pub(crate) mod print;
-
 /// Resolve an analyzed pattern into the one semantic form every target uses.
 pub(crate) fn normalize(pattern: &str) -> Hir {
     let translated = regex_syntax::ParserBuilder::new()
