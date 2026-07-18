@@ -20,8 +20,8 @@ use super::{
 use plotnik_rt::RegexDfas;
 
 mod decoded;
-mod effect_stack;
 mod load;
+mod verify;
 
 pub(crate) use decoded::{
     DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedProgram,

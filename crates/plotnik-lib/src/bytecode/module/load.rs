@@ -16,15 +16,13 @@ use super::super::{
     HEADER_SIZE, MAX_SPANS, SECTION_ALIGN, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, SpanKind, VERSION,
 };
 use super::*;
-use crate::bytecode::CalleeContract;
 use crate::bytecode::predicate_op::PredicateOp;
 use plotnik_rt::{Nav, PortId};
-use std::collections::{HashMap, HashSet};
 
 /// Bytecode validation error.
 ///
-/// Every variant is raised at the trust boundary (this module and
-/// `effect_stack.rs`); the reader side never constructs one. Re-exported as
+/// Every variant is raised at the loader or matcher-verifier trust boundary;
+/// the reader side never constructs one. Re-exported as
 /// `super::ModuleError` for the rest of the crate.
 #[derive(Debug, thiserror::Error)]
 pub enum ModuleError {
@@ -80,92 +78,6 @@ pub enum ModuleError {
     SpanImbalance(CodeAddr),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct ReturnPorts(u8);
-
-impl ReturnPorts {
-    const NONE: Self = Self(0);
-
-    fn dense(arity: usize) -> Self {
-        Self(PortId::dense_mask(arity))
-    }
-
-    fn insert(&mut self, port: PortId) {
-        self.0 |= port.bit();
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct ReturnContract {
-    ports: ReturnPorts,
-    entry: Option<CalleeContract>,
-    mixed_entries: bool,
-}
-
-impl ReturnContract {
-    const NONE: Self = Self {
-        ports: ReturnPorts::NONE,
-        entry: None,
-        mixed_entries: false,
-    };
-
-    fn insert(&mut self, return_: Return) {
-        self.ports.insert(return_.port);
-        match self.entry {
-            None => self.entry = Some(return_.contract),
-            Some(entry) if entry != return_.contract => self.mixed_entries = true,
-            Some(_) => {}
-        }
-    }
-
-    fn is(self, ports: ReturnPorts, entry: CalleeContract) -> bool {
-        self.ports == ports && self.entry == Some(entry) && !self.mixed_entries
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct DepthRoute {
-    contract: CalleeContract,
-    arity: u8,
-    consumed_mask: u8,
-}
-
-impl DepthRoute {
-    fn entry_point() -> Self {
-        Self {
-            contract: CalleeContract::CallerOwned,
-            arity: 1,
-            consumed_mask: 1,
-        }
-    }
-
-    fn from_call(call: Call) -> Self {
-        Self {
-            contract: call.callee_contract(),
-            arity: call.arity() as u8,
-            consumed_mask: call.consumed_mask(),
-        }
-    }
-
-    fn expected_exit(self, port: PortId) -> Option<i32> {
-        if port.index() >= usize::from(self.arity) {
-            return None;
-        }
-        match self.contract {
-            CalleeContract::CallerOwned => Some(0),
-            CalleeContract::CalleeOwned { nav, .. } => Some(if self.consumed(port) {
-                nav.depth_delta()
-            } else {
-                0
-            }),
-        }
-    }
-
-    fn consumed(self, port: PortId) -> bool {
-        self.consumed_mask & port.bit() != 0
-    }
-}
-
 /// Round `value` up to the next multiple of `align` in `u64` (overflow-free).
 ///
 /// The `u64` width lets [`Module::validate_section_bounds`] re-derive the section
@@ -181,10 +93,6 @@ fn read_operand_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
         .get(off..off + 2)
         .map(|b| u16::from_le_bytes([b[0], b[1]]))
         .ok_or(ModuleError::MalformedInstructionStream)
-}
-
-fn call_word_count(call: Call) -> u16 {
-    if call.arity() == 1 { 1 } else { 3 }
 }
 
 fn is_call_nav(nav: Nav) -> bool {
@@ -274,11 +182,10 @@ impl Module {
     /// construction. It is not a substitute for structural validation, so a
     /// test buffer with a recomputed checksum must still fail the checks below;
     /// [`Self::validate_instructions`] therefore re-verifies the lazily-decoded
-    /// instruction stream structurally, and
-    /// [`validate_effect_stack`](super::effect_stack::validate_effect_stack)
-    /// proves no path can panic the materializer's builder stack or the VM's
-    /// suppression counter — so validated bytecode never panics on view/decode/VM
-    /// access even when compiler output is malformed.
+    /// instruction stream structurally. The shared matcher verifier then proves
+    /// return routing, cursor depth, and materializer-stack safety, so validated
+    /// bytecode never panics on view/decode/VM access even when compiler output
+    /// is malformed.
     fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
         // Reserved header bytes are not covered by the CRC; v6 fixes them at zero.
         if self.header._reserved != [0u8; 20] {
@@ -307,14 +214,9 @@ impl Module {
         self.validate_symbol_ids()?;
         let is_start = self.validate_instructions()?;
         self.validate_entry_points(&is_start)?;
-        self.validate_return_routes()?;
-        self.validate_depth_neutrality()?;
-        // Structural validity (every instruction decodes, every jump lands on a start)
-        // is now established, so the effect-stack walk can use the safe typed
-        // instruction API. This closes the last malformed-representation panic
-        // class: the materializer's builder-stack panics and the VM's
-        // suppression underflow.
-        super::effect_stack::validate_effect_stack(self)?;
+        // Structural validity is now established, so the target-neutral matcher
+        // verifier can safely project the typed instruction stream.
+        super::verify::validate(self)?;
         Ok((regex_dfas, is_start))
     }
 
@@ -595,174 +497,6 @@ impl Module {
                 return Err(invalid());
             }
         }
-        Ok(())
-    }
-
-    /// Every entry body and every per-port continuation observes the cursor
-    /// contract declared by its call site.
-    fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
-        let mut roots = HashMap::new();
-
-        for entry_point in self.entry_points().iter() {
-            let target = entry_point.target();
-            let route = DepthRoute::entry_point();
-            if let Some(expected) = roots.insert(target, route)
-                && expected != route
-            {
-                return Err(ModuleError::MalformedInstructionStream);
-            }
-        }
-
-        let mut addr = CodeAddr::ZERO;
-        while addr.get() < self.header.instruction_word_count {
-            let words = match self.decode_instruction(addr) {
-                Instruction::Match(m) => m.word_count(),
-                Instruction::Call(c) => {
-                    let target = c.target;
-                    let route = DepthRoute::from_call(c);
-                    if let Some(expected) = roots.insert(target, route)
-                        && expected != route
-                    {
-                        return Err(ModuleError::MalformedInstructionStream);
-                    }
-                    call_word_count(c)
-                }
-                Instruction::Return(_) => 1,
-            };
-            addr = addr
-                .checked_add(words)
-                .expect("validated instruction stream fits in u16 address space");
-        }
-
-        for (root, route) in roots {
-            self.validate_depth_root(root, route)?;
-        }
-        Ok(())
-    }
-
-    /// Calls and callees must agree on the exact dense port set carried by
-    /// their frames.
-    fn validate_return_routes(&self) -> Result<(), ModuleError> {
-        let mut cache = HashMap::new();
-
-        for entry_point in self.entry_points().iter() {
-            let target = entry_point.target();
-            if !self
-                .return_contract(target, &mut cache)
-                .is(ReturnPorts::dense(1), CalleeContract::CallerOwned)
-            {
-                return Err(ModuleError::MalformedInstructionStream);
-            }
-        }
-
-        let mut addr = CodeAddr::ZERO;
-        while addr.get() < self.header.instruction_word_count {
-            let words = match self.decode_instruction(addr) {
-                Instruction::Match(matched) => matched.word_count(),
-                Instruction::Call(call) => {
-                    let target = call.target;
-                    if !self
-                        .return_contract(target, &mut cache)
-                        .is(ReturnPorts::dense(call.arity()), call.callee_contract())
-                    {
-                        return Err(ModuleError::MalformedInstructionStream);
-                    }
-                    call_word_count(call)
-                }
-                Instruction::Return(_) => 1,
-            };
-            addr = addr
-                .checked_add(words)
-                .expect("validated instruction stream fits in u16 address space");
-        }
-        Ok(())
-    }
-
-    fn return_contract(
-        &self,
-        entry: CodeAddr,
-        cache: &mut HashMap<CodeAddr, ReturnContract>,
-    ) -> ReturnContract {
-        if let Some(&contract) = cache.get(&entry) {
-            return contract;
-        }
-
-        let mut contract = ReturnContract::NONE;
-        let mut seen = HashSet::new();
-        let mut work = vec![entry];
-        while let Some(addr) = work.pop() {
-            if !seen.insert(addr) {
-                continue;
-            }
-            match self.decode_instruction(addr) {
-                Instruction::Match(matched) => {
-                    work.extend(
-                        matched
-                            .successors()
-                            .map(|next| CodeAddr::from(u16::from(next))),
-                    );
-                }
-                Instruction::Call(call) => {
-                    work.extend(call.returns().map(|next| CodeAddr::from(u16::from(next))));
-                }
-                Instruction::Return(return_) => contract.insert(return_),
-            }
-        }
-        cache.insert(entry, contract);
-        contract
-    }
-
-    fn validate_depth_root(&self, entry: CodeAddr, route: DepthRoute) -> Result<(), ModuleError> {
-        let mut memo: HashMap<CodeAddr, i32> = HashMap::new();
-        let mut work = vec![(entry, 0i32)];
-
-        while let Some((addr, net)) = work.pop() {
-            if let Some(&seen) = memo.get(&addr) {
-                if seen == net {
-                    continue;
-                }
-                return Err(ModuleError::DepthImbalance(addr));
-            }
-            memo.insert(addr, net);
-
-            match self.decode_instruction(addr) {
-                Instruction::Return(return_) => {
-                    let Some(expected_exit) = route.expected_exit(return_.port) else {
-                        return Err(ModuleError::DepthImbalance(addr));
-                    };
-                    if net != expected_exit {
-                        return Err(ModuleError::DepthImbalance(addr));
-                    }
-                }
-                Instruction::Match(m) => {
-                    let next_net = net + m.nav.depth_delta();
-                    if m.succ_count() == 0 {
-                        let expected_exit = route
-                            .expected_exit(PortId::ZERO)
-                            .ok_or(ModuleError::DepthImbalance(addr))?;
-                        if next_net != expected_exit {
-                            return Err(ModuleError::DepthImbalance(addr));
-                        }
-                    } else {
-                        for succ in m.successors() {
-                            work.push((CodeAddr::from(u16::from(succ)), next_net));
-                        }
-                    }
-                }
-                Instruction::Call(c) => {
-                    for (index, continuation) in c.returns().enumerate() {
-                        let port = PortId::new(index as u8).expect("call arity is at most eight");
-                        let delta = if c.port_consumed(port) {
-                            c.nav.depth_delta()
-                        } else {
-                            0
-                        };
-                        work.push((CodeAddr::from(u16::from(continuation)), net + delta));
-                    }
-                }
-            }
-        }
-
         Ok(())
     }
 

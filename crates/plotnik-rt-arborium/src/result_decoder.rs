@@ -4,8 +4,8 @@
 //! per-type decoders then decode its logical output-event view once, on the winning
 //! path, into the query's typed result. [`ResultDecoder`] is the cursor those
 //! decoders share: it only knows the stream's vocabulary, while the decoders
-//! carry the schema (which entries are possible where — proven at emit by the
-//! same analysis the bytecode effect-stack validation checks).
+//! carry the schema (which entries are possible where — proven before target
+//! emission by shared matcher verification).
 //!
 //! Every miss here is emitter/decoder drift, not anything an input can cause,
 //! so misses panic with the position and the offending entry.
@@ -317,7 +317,7 @@ fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
                 cur = outer.pop().unwrap_or_else(|| {
                     panic!(
                         "result decoder found opening event {entry:?} at output index {i} without a \
-                         matching close event; semantic effect-stack validation admitted an \
+                         matching close event; matcher verification admitted an \
                          imbalanced journal"
                     )
                 });
@@ -329,7 +329,7 @@ fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
     assert!(
         outer.is_empty(),
         "result decoder reached the start of the output journal with {} unmatched close event(s); \
-         semantic effect-stack validation admitted an imbalanced journal",
+         matcher verification admitted an imbalanced journal",
         outer.len()
     );
     index
