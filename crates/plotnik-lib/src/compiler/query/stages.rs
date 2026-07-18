@@ -12,7 +12,7 @@ use crate::compiler::analyze::shape::validation::{
     AnchorValidationInput, ShapeValidationInput, validate_anchors, validate_ast,
 };
 use crate::compiler::analyze::types::check_entry_points;
-use crate::compiler::analyze::types::type_check::{self, RootExtent, TypeAnalysis};
+use crate::compiler::analyze::types::type_check::{self, TypeAnalysis};
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::emit::{
     BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
@@ -23,7 +23,7 @@ use crate::compiler::lower::ir::SemanticNfa;
 use crate::compiler::lower::semantic_verify;
 use crate::compiler::lower::spans::assign_spans;
 use crate::compiler::lower::{LowerInput, lower_semantic, pack_lowered};
-use crate::compiler::parse::{Root, SyntaxNode, parse_lossless};
+use crate::compiler::parse::{Root, parse_lossless};
 use crate::core::grammar::Grammar;
 use crate::core::{Colors, Interner};
 
@@ -262,30 +262,6 @@ impl Query {
 
     pub fn is_valid(&self) -> bool {
         self.analysis.is_some() && !self.parsed.diag.has_errors()
-    }
-
-    pub(crate) fn root_extent(&self, node: &SyntaxNode) -> Option<RootExtent> {
-        let analysis = self.analysis.as_ref()?;
-
-        use crate::compiler::parse::ast;
-
-        if let Some(pattern) = ast::Pattern::cast(node.clone()) {
-            return analysis.type_analysis.root_extent(&pattern);
-        }
-
-        if let Some(def) = ast::Def::cast(node.clone()) {
-            return def
-                .body()
-                .and_then(|body| analysis.type_analysis.root_extent(&body));
-        }
-
-        if let Some(alternative) = ast::Alternative::cast(node.clone()) {
-            return alternative
-                .body()
-                .and_then(|body| analysis.type_analysis.root_extent(&body));
-        }
-
-        None
     }
 
     pub(super) fn analysis(&self) -> Option<&Analysis> {

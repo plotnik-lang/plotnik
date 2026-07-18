@@ -521,12 +521,6 @@ impl TypeAnalysis {
             .expect("every field-producing alternation must have explicit field completions")
     }
 
-    pub fn root_extent(&self, pattern: &Pattern) -> Option<RootExtent> {
-        self.pattern_result
-            .get(pattern)
-            .map(|info| info.root_extent)
-    }
-
     pub fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
         let declaration = *self.definition_declarations.get(&def_id)?;
         self.declarations
