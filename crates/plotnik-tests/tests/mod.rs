@@ -460,7 +460,19 @@ fn emit_bytecode(
     } else {
         BytecodeConfig::new()
     };
-    compiled.emit(config).expect("bytecode emission answers")
+    let emission = compiled.emit(config).expect("bytecode emission answers");
+    if let Some(module) = emission.artifact() {
+        let analyzed = compiled.entry_point_names().collect::<Vec<_>>();
+        let emitted = module
+            .entry_point_names()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            emitted, analyzed,
+            "emitted module entry points must preserve the analyzed entry-point list",
+        );
+    }
+    emission
 }
 
 fn render_mapped(dts: &str, bindings: &[TypeScriptBinding]) -> String {
