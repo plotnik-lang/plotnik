@@ -6,7 +6,6 @@ mod infer;
 mod root_extent;
 mod unify;
 
-pub use crate::compiler::analyze::types::RootExtent;
 pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 pub use crate::core::Interner;
 pub(crate) use infer::definition_value_root;
