@@ -1,0 +1,34 @@
+A = (expression_statement
+  [
+    (identifier)
+    (C)
+  ]
+)?
+
+B = (expression_statement
+  [
+    (identifier)
+    (C)
+  ]
+)?
+
+C = [
+  (A) @x
+  (B) @x
+]
+-------------------- SYMBOLS ---------------------
+A
+  C
+    A (cycle)
+    B
+      C (cycle)
+B
+  C
+    A
+      C (cycle)
+    B (cycle)
+C
+  A
+    C (cycle)
+  B
+    C (cycle)

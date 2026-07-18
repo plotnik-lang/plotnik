@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use crate::compiler::analyze::types::RootExtent;
+use crate::compiler::analyze::types::type_analysis::UnifyError;
 use crate::compiler::analyze::types::type_description::describe_type;
 use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape, TypeId};
 use crate::compiler::diagnostics::report::DiagnosticKind;
@@ -12,7 +13,6 @@ use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 use crate::core::Symbol;
 use crate::core::utils::to_snake_case;
 
-use super::super::unify::UnifyError;
 use super::InferVisitor;
 
 struct ReferencedDefinition {
@@ -389,23 +389,20 @@ impl InferVisitor<'_, '_> {
         .emit();
     }
 
-    pub(super) fn report_alternative_unify_error(
-        &mut self,
-        alternation: &SyntaxNode,
-        err: &UnifyError,
-    ) {
+    pub(super) fn report_alternative_unify_error(&mut self, err: &UnifyError) {
         match err {
             UnifyError::IncompatibleFieldTypes {
                 field,
                 left_type,
                 right_type,
                 name_spans,
+                fallback_span,
                 ..
             } => {
                 let field_name = self.ctx.interner.resolve(*field).to_string();
                 let (primary, rest) = match name_spans.split_first() {
                     Some((first, rest)) => (first.0, rest),
-                    None => (Span::new(self.source, alternation.text_range()), &[][..]),
+                    None => (*fallback_span, &[][..]),
                 };
                 let left_type = self.describe_type(*left_type);
                 let right_type = self.describe_type(*right_type);
@@ -421,7 +418,9 @@ impl InferVisitor<'_, '_> {
                     })
                     .collect::<Vec<_>>();
                 let mut builder = self
-                    .report(DiagnosticKind::IncompatibleCaptureTypes, primary.range)
+                    .ctx
+                    .diag
+                    .report(DiagnosticKind::IncompatibleCaptureTypes, primary)
                     .detail(format!(
                         "`@{field_name}` has incompatible types `{left_type}` and `{right_type}` across alternatives"
                     ));

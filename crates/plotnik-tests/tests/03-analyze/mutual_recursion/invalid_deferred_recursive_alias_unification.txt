@@ -1,0 +1,44 @@
+A = (expression_statement
+  [
+    (identifier)
+    (C)
+  ]
+)?
+
+B = (expression_statement
+  [
+    (number)
+    (C)
+  ]
+)+
+
+C = [
+  (A) @x
+  (B) @x
+]
+------------------ DIAGNOSTICS -------------------
+error: `@x` has incompatible types `A` and `B` across alternatives
+  --> query.ptk:16:7
+   |
+16 |   (A) @x
+   |       ^^
+17 |   (B) @x
+   |       -- `@x` has type `B` here
+   |
+help: make every alternative produce the same type, or label the alternatives for a variant type
+-------------------- SYMBOLS ---------------------
+A
+  C
+    A (cycle)
+    B
+      C (cycle)
+B
+  C
+    A
+      C (cycle)
+    B (cycle)
+C
+  A
+    C (cycle)
+  B
+    C (cycle)

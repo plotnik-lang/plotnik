@@ -2,37 +2,21 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::compiler::analyze::types::capture::{CaptureId, InferredField, InferredFieldFlow};
-use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
+use crate::compiler::analyze::types::capture::{InferredField, InferredFieldFlow};
+use crate::compiler::analyze::types::type_analysis::{
+    TypeAnalysisBuilder, TypeUnification, UnifyError,
+};
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, PatternFlow, PatternShape, RecordField, TypeId, TypeShape,
+    ListMinimum, PatternFlow, PatternShape, RecordField, TypeShape,
 };
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
-#[derive(Clone, Debug)]
-pub(super) enum UnifyError {
-    IncompatibleFieldTypes {
-        field: Symbol,
-        left_type: TypeId,
-        right_type: TypeId,
-        name_spans: Vec<(Span, TypeId)>,
-        producers: BTreeSet<CaptureId>,
-    },
-}
-
-impl UnifyError {
-    pub(super) fn producers(&self) -> impl Iterator<Item = CaptureId> + '_ {
-        match self {
-            Self::IncompatibleFieldTypes { producers, .. } => producers.iter().copied(),
-        }
-    }
-}
-
 pub(super) fn unify_alternative_flows(
     ctx: &mut TypeAnalysisBuilder,
     alternatives: impl IntoIterator<Item = (Option<Pattern>, PatternShape)>,
+    fallback_span: Span,
 ) -> Result<Option<InferredFieldFlow>, UnifyError> {
     let mut merged = BTreeMap::new();
     let mut alternation_omissions = BTreeSet::new();
@@ -59,7 +43,7 @@ pub(super) fn unify_alternative_flows(
                     alternation_omissions
                         .extend(merged.keys().filter(|name| !fields.contains_key(name)));
                 }
-                merge_fields(ctx, &mut merged, fields, saw_alternative)?;
+                merge_fields(ctx, &mut merged, fields, saw_alternative, fallback_span)?;
             }
             None if saw_alternative => alternation_omissions.extend(merged.keys().copied()),
             None => {}
@@ -89,6 +73,7 @@ fn merge_fields(
     target: &mut BTreeMap<Symbol, InferredField>,
     source: BTreeMap<Symbol, InferredField>,
     relax_new: bool,
+    fallback_span: Span,
 ) -> Result<(), UnifyError> {
     let mut missing_names = target.keys().copied().collect::<BTreeSet<_>>();
 
@@ -104,7 +89,7 @@ fn merge_fields(
             continue;
         };
 
-        let field = merge_field(ctx, name, target_field, source_field)?;
+        let field = merge_field(ctx, name, target_field, source_field, fallback_span)?;
         target.insert(name, field);
     }
 
@@ -121,10 +106,11 @@ fn merge_field(
     name: Symbol,
     mut left: InferredField,
     right: InferredField,
+    fallback_span: Span,
 ) -> Result<InferredField, UnifyError> {
-    let final_type = match unify_type_ids(ctx, left.info.final_type, right.info.final_type) {
-        Ok(final_type) => final_type,
-        Err(()) => {
+    let final_type = match ctx.unify_types(left.info.final_type, right.info.final_type) {
+        TypeUnification::Unified(final_type) => final_type,
+        outcome @ (TypeUnification::Distinct | TypeUnification::Pending) => {
             let mut name_spans = left
                 .sources
                 .iter()
@@ -134,13 +120,21 @@ fn merge_field(
             name_spans.dedup();
             let mut producers = left.producers.clone();
             producers.extend(right.producers.iter().copied());
-            return Err(UnifyError::IncompatibleFieldTypes {
+            let error = UnifyError::IncompatibleFieldTypes {
                 field: name,
                 left_type: left.info.final_type,
                 right_type: right.info.final_type,
                 name_spans,
                 producers,
-            });
+                fallback_span,
+            };
+            match outcome {
+                TypeUnification::Pending => {
+                    ctx.defer_unification(left.info.final_type, right.info.final_type, error)
+                }
+                TypeUnification::Distinct => return Err(error),
+                TypeUnification::Unified(_) => unreachable!("matched a non-unified outcome"),
+            }
         }
     };
 
@@ -164,55 +158,4 @@ fn relax_record_field_for_absence(ctx: &mut TypeAnalysisBuilder, info: RecordFie
         return RecordField::new(list);
     }
     RecordField::new(ctx.intern_option(info.final_type))
-}
-
-fn unify_type_ids(ctx: &mut TypeAnalysisBuilder, a: TypeId, b: TypeId) -> Result<TypeId, ()> {
-    if ctx.types_structurally_equal(a, b) {
-        return Ok(a);
-    }
-
-    let a_shape = ctx
-        .in_progress()
-        .type_shape(a)
-        .cloned()
-        .expect("unified field type is registered");
-    let b_shape = ctx
-        .in_progress()
-        .type_shape(b)
-        .cloned()
-        .expect("unified field type is registered");
-
-    match (&a_shape, &b_shape) {
-        (TypeShape::Option(a_inner), TypeShape::Option(b_inner)) => {
-            let inner = unify_type_ids(ctx, *a_inner, *b_inner)?;
-            return Ok(ctx.intern_option(inner));
-        }
-        (TypeShape::Option(inner), _) => {
-            let inner = unify_type_ids(ctx, *inner, b)?;
-            return Ok(ctx.intern_option(inner));
-        }
-        (_, TypeShape::Option(inner)) => {
-            let inner = unify_type_ids(ctx, a, *inner)?;
-            return Ok(ctx.intern_option(inner));
-        }
-        _ => {}
-    }
-
-    if let (
-        TypeShape::List {
-            element: a_element,
-            minimum: a_minimum,
-        },
-        TypeShape::List {
-            element: b_element,
-            minimum: b_minimum,
-        },
-    ) = (&a_shape, &b_shape)
-        && a_minimum != b_minimum
-        && ctx.types_structurally_equal(*a_element, *b_element)
-    {
-        return Ok(if *a_minimum == ListMinimum::One { b } else { a });
-    }
-
-    Err(())
 }

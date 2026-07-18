@@ -10,13 +10,15 @@
 //! Definition matching identity remains owned by `DependencyAnalysis`. This
 //! artifact records the separate type declaration owned by each definition.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::types::capture::{CaptureId, CaptureObservation, CaptureProvenance};
+use crate::compiler::analyze::types::capture::{
+    CaptureId, CaptureObservation, CaptureProvenance, FieldSource,
+};
 use crate::compiler::analyze::types::type_shape::{
-    DefinitionOutput, PatternFlow, PatternShape, RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL,
-    TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
+    CasePayload, DefinitionOutput, ListMinimum, PatternFlow, PatternShape,
+    RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
 use crate::compiler::diagnostics::report::Diagnostics;
@@ -44,9 +46,105 @@ pub struct TypeDeclaration {
 
 #[derive(Clone, Debug)]
 struct TypeDeclarationEntry {
-    name: Symbol,
-    body: Option<TypeId>,
-    definition: Option<DefId>,
+    name: Option<Symbol>,
+    state: DeclarationState,
+    owner: DeclarationOwner,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DeclarationState {
+    Pending,
+    MatchOnly,
+    Value(TypeId),
+}
+
+impl DeclarationState {
+    fn from_output(output: DefinitionOutput) -> Self {
+        match output {
+            DefinitionOutput::MatchOnly => Self::MatchOnly,
+            DefinitionOutput::Value(type_id) => Self::Value(type_id),
+        }
+    }
+
+    fn output(self) -> Option<DefinitionOutput> {
+        match self {
+            Self::Pending => None,
+            Self::MatchOnly => Some(DefinitionOutput::MatchOnly),
+            Self::Value(type_id) => Some(DefinitionOutput::Value(type_id)),
+        }
+    }
+
+    fn value(self) -> Option<TypeId> {
+        match self {
+            Self::Value(type_id) => Some(type_id),
+            Self::Pending | Self::MatchOnly => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DeclarationOwner {
+    Definition(DefId),
+    CaptureType,
+    Inference,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TypeRelation {
+    Equal,
+    Distinct,
+    Pending,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum TypeUnification {
+    Unified(TypeId),
+    Distinct,
+    Pending,
+}
+
+#[derive(Clone, Debug)]
+pub(in crate::compiler::analyze::types) enum UnifyError {
+    IncompatibleFieldTypes {
+        field: Symbol,
+        left_type: TypeId,
+        right_type: TypeId,
+        name_spans: Vec<(Span, TypeId)>,
+        producers: BTreeSet<CaptureId>,
+        fallback_span: Span,
+    },
+}
+
+impl UnifyError {
+    pub(in crate::compiler::analyze::types) fn producers(
+        &self,
+    ) -> impl Iterator<Item = CaptureId> + '_ {
+        match self {
+            Self::IncompatibleFieldTypes { producers, .. } => producers.iter().copied(),
+        }
+    }
+
+    pub(in crate::compiler::analyze::types) fn fallback_span(&self) -> Span {
+        match self {
+            Self::IncompatibleFieldTypes { fallback_span, .. } => *fallback_span,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ComparisonOperand {
+    Type(TypeId),
+    Pending,
+}
+
+impl TypeRelation {
+    fn and(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Distinct, _) | (_, Self::Distinct) => Self::Distinct,
+            (Self::Pending, _) | (_, Self::Pending) => Self::Pending,
+            (Self::Equal, Self::Equal) => Self::Equal,
+        }
+    }
 }
 
 /// Frozen registry of inferred types and per-definition / per-pattern results.
@@ -59,11 +157,6 @@ pub struct TypeAnalysis {
     types: Vec<TypeEntry>,
     declarations: Vec<TypeDeclarationEntry>,
     definition_declarations: BTreeMap<DefId, TypeDeclId>,
-
-    /// Each definition's output, keyed by `DefId`. `BTreeMap` so iteration
-    /// is in `DefId` order — the SCC/emission order entry points rely on. Total
-    /// over every scheduled definition, including match-only definitions.
-    pub(super) def_output: BTreeMap<DefId, DefinitionOutput>,
 
     /// Each definition's static top-level extent.
     def_root_extent: BTreeMap<DefId, RootExtent>,
@@ -93,14 +186,58 @@ pub struct TypeAnalysis {
 enum TypeEntry {
     ReservedNoValue,
     Shape(TypeShape),
+    /// Provisional IDs can already occur in parent shapes when an SCC seals.
+    /// Redirects preserve those issued IDs while canonicalizing their meaning.
+    Redirect(TypeId),
+}
+
+fn remap_type_shape(shape: &mut TypeShape, mut remap: impl FnMut(TypeId) -> TypeId) {
+    match shape {
+        TypeShape::Record(fields) => {
+            for field in fields.values_mut() {
+                field.final_type = remap(field.final_type);
+            }
+        }
+        TypeShape::Variant(cases) => {
+            for payload in cases.values_mut() {
+                if let CasePayload::Record(type_id) = payload {
+                    *type_id = remap(*type_id);
+                }
+            }
+        }
+        TypeShape::List { element, .. } | TypeShape::Option(element) => {
+            *element = remap(*element);
+        }
+        TypeShape::Node | TypeShape::Text | TypeShape::Bool | TypeShape::Ref(_) => {}
+    }
 }
 
 impl TypeAnalysis {
     pub fn type_shape(&self, id: TypeId) -> Option<&TypeShape> {
-        match self.types.get(id.0 as usize)? {
-            TypeEntry::ReservedNoValue => None,
-            TypeEntry::Shape(shape) => Some(shape),
+        let mut current = id;
+        for _ in 0..=self.types.len() {
+            match self.types.get(current.0 as usize)? {
+                TypeEntry::ReservedNoValue => return None,
+                TypeEntry::Shape(shape) => return Some(shape),
+                TypeEntry::Redirect(target) => current = *target,
+            }
         }
+        panic!("type redirects must be acyclic")
+    }
+
+    fn canonical_type_id(&self, id: TypeId) -> TypeId {
+        let mut current = id;
+        for _ in 0..=self.types.len() {
+            match self
+                .types
+                .get(current.0 as usize)
+                .expect("canonicalized type id must be registered")
+            {
+                TypeEntry::ReservedNoValue | TypeEntry::Shape(_) => return current,
+                TypeEntry::Redirect(target) => current = *target,
+            }
+        }
+        panic!("type redirects must be acyclic")
     }
 
     pub fn expect_type_shape(&self, id: TypeId) -> &TypeShape {
@@ -108,91 +245,173 @@ impl TypeAnalysis {
             .expect("admitted type id must reference a registered type")
     }
 
-    /// Deep structural equality over the frozen type registry.
+    /// Coinductive structural comparison over the type graph.
     ///
-    /// Record and variant bodies mint a fresh id per occurrence, so two
-    /// structurally identical bodies can carry different ids. References to
-    /// declarations with record or variant bodies remain nominal; transparent
-    /// aliases compare through their bodies. `Ref` cuts recursion, so the walk
-    /// terminates on recursive types.
+    /// Transparent aliases compare through their bodies, while declarations
+    /// owning records or variants remain nominal. An open declaration yields
+    /// [`TypeRelation::Pending`] instead of being mistaken for a distinct type.
+    fn type_relation(&self, a: TypeId, b: TypeId) -> TypeRelation {
+        self.type_relation_inner(a, b, &mut HashSet::new())
+    }
+
     pub(crate) fn types_structurally_equal(&self, a: TypeId, b: TypeId) -> bool {
-        let a = self.transparent_alias_body(a);
-        let b = self.transparent_alias_body(b);
-        if a == b {
-            return true;
-        }
-
-        let (Some(shape_a), Some(shape_b)) = (self.type_shape(a), self.type_shape(b)) else {
-            return false;
-        };
-
-        match (shape_a, shape_b) {
-            (TypeShape::Record(fa), TypeShape::Record(fb)) => {
-                fa.len() == fb.len()
-                    && fa.iter().zip(fb.iter()).all(|((ka, ia), (kb, ib))| {
-                        ka == kb && self.types_structurally_equal(ia.final_type, ib.final_type)
-                    })
+        match self.type_relation(a, b) {
+            TypeRelation::Equal => true,
+            TypeRelation::Distinct => false,
+            TypeRelation::Pending => {
+                panic!("frozen type graph cannot contain pending declarations")
             }
-            (TypeShape::Variant(va), TypeShape::Variant(vb)) => {
-                va.len() == vb.len()
-                    && va.iter().zip(vb.iter()).all(|((ka, pa), (kb, pb))| {
-                        ka == kb
-                            && match (pa.type_id(), pb.type_id()) {
-                                (None, None) => true,
-                                (Some(a), Some(b)) => self.types_structurally_equal(a, b),
-                                _ => false,
-                            }
-                    })
-            }
-            (
-                TypeShape::List {
-                    element: ea,
-                    minimum: ma,
-                },
-                TypeShape::List {
-                    element: eb,
-                    minimum: mb,
-                },
-            ) => ma == mb && self.types_structurally_equal(*ea, *eb),
-            (TypeShape::Option(ia), TypeShape::Option(ib)) => {
-                self.types_structurally_equal(*ia, *ib)
-            }
-            _ => false,
         }
     }
 
-    fn transparent_alias_body(&self, mut type_id: TypeId) -> TypeId {
-        let mut seen = HashSet::new();
-        while let Some(TypeShape::Ref(declaration)) = self.type_shape(type_id) {
-            if !seen.insert(*declaration) {
-                return type_id;
+    fn type_relation_inner(
+        &self,
+        a: TypeId,
+        b: TypeId,
+        visiting: &mut HashSet<(TypeId, TypeId)>,
+    ) -> TypeRelation {
+        if a == b {
+            return TypeRelation::Equal;
+        }
+        if !visiting.insert((a, b)) {
+            return TypeRelation::Equal;
+        }
+
+        let result = match (self.comparison_operand(a), self.comparison_operand(b)) {
+            (ComparisonOperand::Pending, _) | (_, ComparisonOperand::Pending) => {
+                TypeRelation::Pending
             }
-            let Some(body) = self.declaration_body(*declaration) else {
-                return type_id;
+            (ComparisonOperand::Type(a), ComparisonOperand::Type(b)) if a == b => {
+                TypeRelation::Equal
+            }
+            (ComparisonOperand::Type(a), ComparisonOperand::Type(b)) => {
+                self.compare_resolved_types(a, b, visiting)
+            }
+        };
+
+        visiting.remove(&(a, b));
+        result
+    }
+
+    fn compare_resolved_types(
+        &self,
+        a: TypeId,
+        b: TypeId,
+        visiting: &mut HashSet<(TypeId, TypeId)>,
+    ) -> TypeRelation {
+        let (Some(shape_a), Some(shape_b)) = (self.type_shape(a), self.type_shape(b)) else {
+            return TypeRelation::Distinct;
+        };
+
+        match (shape_a, shape_b) {
+            (TypeShape::Node, TypeShape::Node)
+            | (TypeShape::Text, TypeShape::Text)
+            | (TypeShape::Bool, TypeShape::Bool) => TypeRelation::Equal,
+            (TypeShape::Record(a_fields), TypeShape::Record(b_fields)) => {
+                if a_fields.len() != b_fields.len() {
+                    return TypeRelation::Distinct;
+                }
+                a_fields.iter().zip(b_fields).fold(
+                    TypeRelation::Equal,
+                    |relation, ((a_name, a_field), (b_name, b_field))| {
+                        if a_name != b_name {
+                            return TypeRelation::Distinct;
+                        }
+                        relation.and(self.type_relation_inner(
+                            a_field.final_type,
+                            b_field.final_type,
+                            visiting,
+                        ))
+                    },
+                )
+            }
+            (TypeShape::Variant(a_cases), TypeShape::Variant(b_cases)) => {
+                if a_cases.len() != b_cases.len() {
+                    return TypeRelation::Distinct;
+                }
+                a_cases.iter().zip(b_cases).fold(
+                    TypeRelation::Equal,
+                    |relation, ((a_name, a_payload), (b_name, b_payload))| {
+                        if a_name != b_name {
+                            return TypeRelation::Distinct;
+                        }
+                        let payload_relation = match (a_payload.type_id(), b_payload.type_id()) {
+                            (None, None) => TypeRelation::Equal,
+                            (Some(a), Some(b)) => self.type_relation_inner(a, b, visiting),
+                            _ => TypeRelation::Distinct,
+                        };
+                        relation.and(payload_relation)
+                    },
+                )
+            }
+            (
+                TypeShape::List {
+                    element: a_element,
+                    minimum: a_minimum,
+                },
+                TypeShape::List {
+                    element: b_element,
+                    minimum: b_minimum,
+                },
+            ) => {
+                if a_minimum != b_minimum {
+                    return TypeRelation::Distinct;
+                }
+                self.type_relation_inner(*a_element, *b_element, visiting)
+            }
+            (TypeShape::Option(a_inner), TypeShape::Option(b_inner)) => {
+                self.type_relation_inner(*a_inner, *b_inner, visiting)
+            }
+            (TypeShape::Ref(a), TypeShape::Ref(b)) if a == b => TypeRelation::Equal,
+            _ => TypeRelation::Distinct,
+        }
+    }
+
+    fn comparison_operand(&self, mut type_id: TypeId) -> ComparisonOperand {
+        let mut seen = HashSet::new();
+        loop {
+            type_id = self.canonical_type_id(type_id);
+            let Some(TypeShape::Ref(declaration)) = self.type_shape(type_id) else {
+                return ComparisonOperand::Type(type_id);
             };
-            match self.type_shape(body) {
-                Some(TypeShape::Record(_) | TypeShape::Variant(_)) => return type_id,
-                Some(TypeShape::Ref(_)) => type_id = body,
-                Some(_) => return body,
-                None => return type_id,
+            if !seen.insert(*declaration) {
+                return ComparisonOperand::Type(type_id);
+            }
+            let entry = self
+                .declarations
+                .get(declaration.index())
+                .expect("compared reference target must be registered");
+            match entry.state {
+                DeclarationState::Pending => return ComparisonOperand::Pending,
+                DeclarationState::MatchOnly => type_id = TYPE_NODE,
+                DeclarationState::Value(body) => {
+                    if entry.owner != DeclarationOwner::Inference
+                        && matches!(
+                            self.type_shape(body),
+                            Some(TypeShape::Record(_) | TypeShape::Variant(_))
+                        )
+                    {
+                        return ComparisonOperand::Type(type_id);
+                    }
+                    type_id = body;
+                }
             }
         }
-        type_id
     }
 
     pub fn declaration(&self, id: TypeDeclId) -> Option<TypeDeclaration> {
         let entry = self.declarations.get(id.index())?;
         Some(TypeDeclaration {
             id,
-            name: entry.name,
-            body: entry.body?,
+            name: entry.name?,
+            body: entry.state.value()?,
         })
     }
 
     pub fn declaration_body(&self, id: TypeDeclId) -> Option<TypeId> {
         self.declarations
             .get(id.index())
-            .and_then(|entry| entry.body)
+            .and_then(|entry| entry.state.value())
     }
 
     pub fn declaration_name(&self, id: TypeDeclId) -> Symbol {
@@ -200,13 +419,19 @@ impl TypeAnalysis {
             .get(id.index())
             .expect("type declaration id must be registered")
             .name
+            .expect("named type declaration must have a name")
     }
 
     pub fn declaration_definition(&self, id: TypeDeclId) -> Option<DefId> {
-        self.declarations
+        match self
+            .declarations
             .get(id.index())
             .expect("type declaration id must be registered")
-            .definition
+            .owner
+        {
+            DeclarationOwner::Definition(def_id) => Some(def_id),
+            DeclarationOwner::CaptureType | DeclarationOwner::Inference => None,
+        }
     }
 
     pub fn definition_declaration(&self, def_id: DefId) -> TypeDeclId {
@@ -216,21 +441,22 @@ impl TypeAnalysis {
             .expect("every definition must own a type declaration slot")
     }
 
-    fn type_is_option(&self, mut type_id: TypeId) -> bool {
+    fn reachable_option(&self, mut type_id: TypeId) -> Option<TypeId> {
         let mut seen = HashSet::new();
-        while seen.insert(type_id) {
+        loop {
+            type_id = self.canonical_type_id(type_id);
+            if !seen.insert(type_id) {
+                return None;
+            }
             match self.type_shape(type_id) {
-                Some(TypeShape::Option(_)) => return true,
+                Some(TypeShape::Option(_)) => return Some(type_id),
                 Some(TypeShape::Ref(declaration)) => {
-                    let Some(target) = self.declaration_body(*declaration) else {
-                        return false;
-                    };
+                    let target = self.declaration_body(*declaration)?;
                     type_id = target;
                 }
-                _ => return false,
+                _ => return None,
             }
         }
-        false
     }
 
     /// Fields of the record a `Fields` flow points to.
@@ -302,7 +528,10 @@ impl TypeAnalysis {
     }
 
     pub fn def_output(&self, def_id: DefId) -> Option<DefinitionOutput> {
-        self.def_output.get(&def_id).copied()
+        let declaration = *self.definition_declarations.get(&def_id)?;
+        self.declarations
+            .get(declaration.index())
+            .and_then(|entry| entry.state.output())
     }
 
     pub fn expect_def_output(&self, def_id: DefId) -> DefinitionOutput {
@@ -351,7 +580,15 @@ impl TypeAnalysis {
     /// Iterate over all definition result types as `(DefId, TypeId)` in `DefId`
     /// order, which corresponds to SCC processing order (leaves first).
     pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
-        self.def_output.iter().map(|(&id, &output)| (id, output))
+        self.definition_declarations
+            .iter()
+            .map(|(&def_id, &declaration)| {
+                let output = self.declarations[declaration.index()]
+                    .state
+                    .output()
+                    .expect("admitted definition output must be sealed");
+                (def_id, output)
+            })
     }
 
     /// Iterate over selectable definition outputs in definition order.
@@ -392,29 +629,53 @@ impl TypeAnalysis {
             "TYPE_BOOL must be interned at its canonical id",
         );
 
-        for entry in &self.types {
-            let TypeEntry::Shape(shape) = entry else {
-                continue;
+        for (index, entry) in self.types.iter().enumerate() {
+            let shape = match entry {
+                TypeEntry::ReservedNoValue => continue,
+                TypeEntry::Redirect(target) => {
+                    self.assert_type_id_registered(*target, "redirect target type id out of range");
+                    assert_eq!(
+                        self.canonical_type_id(*target),
+                        *target,
+                        "sealed type redirects must point directly to canonical types",
+                    );
+                    continue;
+                }
+                TypeEntry::Shape(shape) => shape,
             };
             for child_id in shape.child_type_ids() {
                 self.assert_type_id_registered(child_id, "child type id out of range");
             }
 
             if let TypeShape::Option(inner) = shape {
-                assert!(!self.type_is_option(*inner), "Option must be idempotent",);
+                let outer = TypeId(u32::try_from(index).expect("type count fits u32"));
+                assert!(
+                    self.reachable_option(*inner)
+                        .is_none_or(|reachable| reachable == outer),
+                    "Option must be idempotent",
+                );
             }
 
             if let TypeShape::Ref(declaration) = shape {
+                let target = self
+                    .declarations
+                    .get(declaration.index())
+                    .expect("every Ref target must be a registered type declaration");
+                assert_ne!(
+                    target.owner,
+                    DeclarationOwner::Inference,
+                    "sealed inference references must redirect to their resolved types",
+                );
                 assert!(
-                    self.declarations.get(declaration.index()).is_some(),
-                    "every Ref target must be a registered type declaration",
+                    target.name.is_some(),
+                    "every sealed Ref target must have a public name",
                 );
             }
         }
 
-        for output in self.def_output.values() {
+        for (_, output) in self.iter_def_output() {
             if let DefinitionOutput::Value(type_id) = output {
-                self.assert_type_id_registered(*type_id, "definition result type id out of range");
+                self.assert_type_id_registered(type_id, "definition result type id out of range");
             }
         }
 
@@ -423,21 +684,45 @@ impl TypeAnalysis {
                 .declarations
                 .get(declaration.index())
                 .expect("definition declaration id must be registered");
-            assert_eq!(entry.definition, Some(def_id));
-            assert_eq!(entry.body, self.expect_def_output(def_id).value());
+            assert_eq!(entry.owner, DeclarationOwner::Definition(def_id));
+            assert!(
+                entry.state.output().is_some(),
+                "every definition declaration must be sealed",
+            );
+        }
+        for declaration in &self.declarations {
+            assert_ne!(
+                declaration.state,
+                DeclarationState::Pending,
+                "every type declaration must be sealed",
+            );
+            match declaration.owner {
+                DeclarationOwner::Definition(_) | DeclarationOwner::CaptureType => {
+                    assert!(
+                        declaration.name.is_some(),
+                        "public type declarations must retain their names",
+                    );
+                }
+                DeclarationOwner::Inference => {
+                    assert!(
+                        declaration.name.is_none(),
+                        "inference declarations are anonymous",
+                    );
+                }
+            }
         }
 
         assert_eq!(
-            self.def_output.len(),
+            self.definition_declarations.len(),
             self.def_root_extent.len(),
             "definition output and root-extent tables must cover the same definitions",
         );
         assert_eq!(
-            self.def_output.len(),
+            self.definition_declarations.len(),
             self.def_requires_anchor_context.len(),
             "definition output and anchor-context tables must cover the same definitions",
         );
-        for def_id in self.def_output.keys() {
+        for def_id in self.definition_declarations.keys() {
             assert!(
                 self.def_root_extent.contains_key(def_id),
                 "every definition output must have an inferred root extent",
@@ -449,13 +734,13 @@ impl TypeAnalysis {
         }
         for def_id in self.def_root_extent.keys() {
             assert!(
-                self.def_output.contains_key(def_id),
+                self.definition_declarations.contains_key(def_id),
                 "every definition root extent must have an inferred output",
             );
         }
         for def_id in self.def_requires_anchor_context.keys() {
             assert!(
-                self.def_output.contains_key(def_id),
+                self.definition_declarations.contains_key(def_id),
                 "every anchor-context classification must have an inferred output",
             );
         }
@@ -533,9 +818,9 @@ impl TypeAnalysis {
 /// Mutable accumulator that produces a [`TypeAnalysis`].
 ///
 /// Owns the in-progress artifact plus the scratch state inference needs but the
-/// frozen result does not: the intern-dedup index and the per-definition result
-/// memo. [`finish`](Self::finish) drops the scratch and hands back the frozen
-/// [`TypeAnalysis`].
+/// frozen result does not: interning indexes, the open SCC, and its deferred
+/// constraints. [`finish`](Self::finish) drops the scratch and hands back the
+/// frozen [`TypeAnalysis`].
 pub struct TypeAnalysisBuilder {
     pub(super) analysis: TypeAnalysis,
 
@@ -543,7 +828,8 @@ pub struct TypeAnalysisBuilder {
     /// Records and variant types are deliberately NOT deduplicated: they are nominal —
     /// two definitions with identical capture profiles are two distinct types,
     /// each carrying its own name. Scratch: the frozen result looks types up by
-    /// `TypeId`, never by shape.
+    /// `TypeId`, never by shape. SCC sealing redirects provisional IDs and
+    /// rebuilds this index from the canonical wrapper graph.
     intern_index: HashMap<TypeShape, TypeId>,
 
     /// Creation site of every fresh record/variant type, for naming-pass diagnostics.
@@ -563,6 +849,17 @@ pub struct TypeAnalysisBuilder {
     /// Raw naming failures gate capture-type normalization but have no meaning
     /// after the builder freezes the final public graph.
     pub(super) invalid_types: HashSet<TypeId>,
+
+    open_scc: Option<HashSet<DefId>>,
+    deferred_unifications: Vec<DeferredUnification>,
+}
+
+struct DeferredUnification {
+    declaration: TypeDeclId,
+    reference: TypeId,
+    left: TypeId,
+    right: TypeId,
+    error: UnifyError,
 }
 
 pub(crate) struct TypeAnalysisView<'a> {
@@ -612,7 +909,6 @@ impl TypeAnalysisBuilder {
                 types: Vec::new(),
                 declarations: Vec::new(),
                 definition_declarations: BTreeMap::new(),
-                def_output: BTreeMap::new(),
                 def_root_extent: BTreeMap::new(),
                 def_requires_anchor_context: BTreeMap::new(),
                 pattern_result: HashMap::new(),
@@ -627,6 +923,8 @@ impl TypeAnalysisBuilder {
             capture_provenance: CaptureProvenance::default(),
             pattern_order: Vec::new(),
             invalid_types: HashSet::new(),
+            open_scc: None,
+            deferred_unifications: Vec::new(),
         };
 
         // Preserve bytecode primitive numbering without treating no-value flow as a type.
@@ -663,6 +961,14 @@ impl TypeAnalysisBuilder {
     /// the result only after asserting it is internally consistent.
     pub fn finish(self) -> TypeAnalysis {
         assert!(
+            self.open_scc.is_none(),
+            "every SCC must be sealed before finish"
+        );
+        assert!(
+            self.deferred_unifications.is_empty(),
+            "every deferred type constraint must be resolved before finish",
+        );
+        assert!(
             self.capture_provenance.captures.is_empty(),
             "capture-type normalization must consume capture provenance",
         );
@@ -689,14 +995,219 @@ impl TypeAnalysisBuilder {
         }
     }
 
+    /// Open the boundary within which inference may observe pending declarations.
+    pub(super) fn begin_scc(&mut self, definitions: &[DefId]) {
+        assert!(
+            self.open_scc.is_none(),
+            "SCCs are sealed before the next opens"
+        );
+        assert!(
+            self.deferred_unifications.is_empty(),
+            "deferred constraints belong to exactly one SCC",
+        );
+        let definitions = definitions.iter().copied().collect::<HashSet<_>>();
+        assert!(
+            definitions.iter().all(|def_id| {
+                let declaration = self.analysis.definition_declaration(*def_id);
+                self.analysis.declarations[declaration.index()].state == DeclarationState::Pending
+            }),
+            "an SCC opens only while all of its definition outputs are pending",
+        );
+        self.open_scc = Some(definitions);
+    }
+
+    /// Resolve every order-dependent decision before later passes snapshot the graph.
+    pub(super) fn seal_scc(&mut self) -> Vec<UnifyError> {
+        let definitions = self
+            .open_scc
+            .take()
+            .expect("an SCC must be open before sealing");
+        assert!(
+            definitions.iter().all(|def_id| {
+                let declaration = self.analysis.definition_declaration(*def_id);
+                self.analysis.declarations[declaration.index()]
+                    .state
+                    .output()
+                    .is_some()
+            }),
+            "every definition output in an SCC must be registered before sealing",
+        );
+
+        let errors = self.resolve_deferred_unifications();
+        self.normalize_sealed_type_graph();
+        errors
+    }
+
+    fn resolve_deferred_unifications(&mut self) -> Vec<UnifyError> {
+        let constraints = std::mem::take(&mut self.deferred_unifications);
+        let mut errors = Vec::new();
+        let mut failed = HashSet::new();
+        for constraint in constraints {
+            let left_failed = self.type_depends_on_any(constraint.left, &failed);
+            let right_failed = self.type_depends_on_any(constraint.right, &failed);
+            let resolved = if left_failed || right_failed {
+                failed.insert(constraint.reference);
+                self.analysis.canonical_type_id(if left_failed {
+                    constraint.right
+                } else {
+                    constraint.left
+                })
+            } else {
+                match self.unify_types(constraint.left, constraint.right) {
+                    TypeUnification::Unified(type_id) => type_id,
+                    TypeUnification::Distinct => {
+                        failed.insert(constraint.reference);
+                        errors.push(constraint.error);
+                        self.analysis.canonical_type_id(constraint.left)
+                    }
+                    TypeUnification::Pending => {
+                        panic!("sealing an SCC must resolve every deferred type constraint")
+                    }
+                }
+            };
+            self.analysis.declarations[constraint.declaration.index()].state =
+                DeclarationState::Value(resolved);
+            self.redirect_type(constraint.reference, resolved);
+        }
+        errors
+    }
+
+    fn type_depends_on_any(&self, type_id: TypeId, targets: &HashSet<TypeId>) -> bool {
+        let mut pending = vec![type_id];
+        let mut seen = HashSet::new();
+        while let Some(type_id) = pending.pop() {
+            if targets.contains(&type_id) {
+                return true;
+            }
+            if !seen.insert(type_id) {
+                continue;
+            }
+            match self
+                .analysis
+                .types
+                .get(type_id.0 as usize)
+                .expect("deferred constraint type must be registered")
+            {
+                TypeEntry::ReservedNoValue => {}
+                TypeEntry::Redirect(target) => pending.push(*target),
+                TypeEntry::Shape(shape) => pending.extend(shape.child_type_ids()),
+            }
+        }
+        false
+    }
+
+    pub(super) fn unify_types(&mut self, a: TypeId, b: TypeId) -> TypeUnification {
+        match self.analysis.type_relation(a, b) {
+            TypeRelation::Equal => {
+                return TypeUnification::Unified(self.analysis.canonical_type_id(a));
+            }
+            TypeRelation::Pending => return TypeUnification::Pending,
+            TypeRelation::Distinct => {}
+        }
+
+        let (ComparisonOperand::Type(a), ComparisonOperand::Type(b)) = (
+            self.analysis.comparison_operand(a),
+            self.analysis.comparison_operand(b),
+        ) else {
+            return TypeUnification::Pending;
+        };
+        let a_shape = self
+            .analysis
+            .type_shape(a)
+            .cloned()
+            .expect("unified field type must be registered");
+        let b_shape = self
+            .analysis
+            .type_shape(b)
+            .cloned()
+            .expect("unified field type must be registered");
+
+        match (a_shape, b_shape) {
+            (TypeShape::Option(a_inner), TypeShape::Option(b_inner)) => {
+                self.unify_option_inners(a_inner, b_inner)
+            }
+            (TypeShape::Option(inner), _) => self.unify_option_inners(inner, b),
+            (_, TypeShape::Option(inner)) => self.unify_option_inners(a, inner),
+            (
+                TypeShape::List {
+                    element: a_element,
+                    minimum: a_minimum,
+                },
+                TypeShape::List {
+                    element: b_element,
+                    minimum: b_minimum,
+                },
+            ) if a_minimum != b_minimum => {
+                match self.analysis.type_relation(a_element, b_element) {
+                    TypeRelation::Equal => {
+                        TypeUnification::Unified(if a_minimum == ListMinimum::One { b } else { a })
+                    }
+                    TypeRelation::Pending => TypeUnification::Pending,
+                    TypeRelation::Distinct => TypeUnification::Distinct,
+                }
+            }
+            _ => TypeUnification::Distinct,
+        }
+    }
+
+    fn unify_option_inners(&mut self, a: TypeId, b: TypeId) -> TypeUnification {
+        match self.unify_types(a, b) {
+            TypeUnification::Unified(inner) => TypeUnification::Unified(self.intern_option(inner)),
+            TypeUnification::Distinct => TypeUnification::Distinct,
+            TypeUnification::Pending => TypeUnification::Pending,
+        }
+    }
+
+    pub(in crate::compiler::analyze::types) fn defer_unification(
+        &mut self,
+        left: TypeId,
+        right: TypeId,
+        error: UnifyError,
+    ) -> TypeId {
+        assert!(
+            self.open_scc.is_some(),
+            "type constraints are deferred only while an SCC is open",
+        );
+        let declaration = TypeDeclId::from_raw(
+            u32::try_from(self.analysis.declarations.len())
+                .expect("type declaration count fits u32"),
+        );
+        self.analysis.declarations.push(TypeDeclarationEntry {
+            name: None,
+            state: DeclarationState::Pending,
+            owner: DeclarationOwner::Inference,
+        });
+        let reference = self.intern_type(TypeShape::Ref(declaration));
+        self.deferred_unifications.push(DeferredUnification {
+            declaration,
+            reference,
+            left,
+            right,
+            error,
+        });
+        reference
+    }
+
+    fn redirect_type(&mut self, from: TypeId, to: TypeId) {
+        let to = self.analysis.canonical_type_id(to);
+        assert_ne!(from, to, "a type cannot redirect to itself");
+        let entry = self
+            .analysis
+            .types
+            .get_mut(from.0 as usize)
+            .expect("redirected type id must be registered");
+        *entry = TypeEntry::Redirect(to);
+    }
+
     /// Intern a type shape. Leaf and wrapper shapes deduplicate structurally;
     /// records and variant types always mint a fresh id (they are nominal — see the
     /// `intern_index` field docs).
-    pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
+    pub fn intern_type(&mut self, mut shape: TypeShape) -> TypeId {
+        self.canonicalize_shape(&mut shape);
         if let TypeShape::Option(inner) = &shape
-            && self.type_is_option(*inner)
+            && self.analysis.reachable_option(*inner).is_some()
         {
-            return *inner;
+            return self.analysis.canonical_type_id(*inner);
         }
 
         if matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)) {
@@ -706,7 +1217,7 @@ impl TypeAnalysisBuilder {
         }
 
         if let Some(&id) = self.intern_index.get(&shape) {
-            return id;
+            return self.analysis.canonical_type_id(id);
         }
 
         let id = TypeId(self.analysis.types.len() as u32);
@@ -715,23 +1226,171 @@ impl TypeAnalysisBuilder {
         id
     }
 
+    fn canonicalize_shape(&self, shape: &mut TypeShape) {
+        remap_type_shape(shape, |type_id| self.analysis.canonical_type_id(type_id));
+    }
+
     pub(super) fn type_shapes_snapshot(&self) -> Vec<Option<TypeShape>> {
         self.analysis
             .types
             .iter()
-            .map(|entry| match entry {
+            .enumerate()
+            .map(|(index, entry)| match entry {
                 TypeEntry::ReservedNoValue => None,
-                TypeEntry::Shape(shape) => Some(shape.clone()),
+                TypeEntry::Shape(_) | TypeEntry::Redirect(_) => self
+                    .analysis
+                    .type_shape(TypeId(u32::try_from(index).expect("type count fits u32")))
+                    .cloned(),
             })
             .collect()
     }
 
-    fn type_is_option(&self, type_id: TypeId) -> bool {
-        self.analysis.type_is_option(type_id)
-    }
-
     pub fn intern_option(&mut self, inner: TypeId) -> TypeId {
         self.intern_type(TypeShape::Option(inner))
+    }
+
+    /// Restore wrapper idempotence and interning uniqueness after redirects
+    /// reveal declaration bodies that were opaque while the SCC was open.
+    fn normalize_sealed_type_graph(&mut self) {
+        for _ in 0..=self.analysis.types.len() {
+            let options_changed = self.redirect_redundant_options();
+            self.remap_registered_type_ids();
+            let duplicates_changed = self.rebuild_intern_index();
+            if !options_changed && !duplicates_changed {
+                self.remap_registered_type_ids();
+                return;
+            }
+        }
+        panic!("sealed type canonicalization must converge")
+    }
+
+    /// Type IDs follow creation order, so processing options forwards preserves
+    /// one wrapper in a recursive wrapper cycle instead of redirecting the
+    /// entire cycle into references.
+    fn redirect_redundant_options(&mut self) -> bool {
+        let mut changed = false;
+        for index in 0..self.analysis.types.len() {
+            let outer = TypeId(u32::try_from(index).expect("type count fits u32"));
+            let Some(TypeEntry::Shape(TypeShape::Option(inner))) =
+                self.analysis.types.get(index).cloned()
+            else {
+                continue;
+            };
+            let Some(reachable) = self.analysis.reachable_option(inner) else {
+                continue;
+            };
+            if reachable == outer {
+                continue;
+            }
+
+            self.redirect_type(outer, inner);
+            changed = true;
+        }
+        changed
+    }
+
+    fn remap_registered_type_ids(&mut self) {
+        let canonical = (0..self.analysis.types.len())
+            .map(|index| {
+                self.analysis
+                    .canonical_type_id(TypeId(u32::try_from(index).expect("type count fits u32")))
+            })
+            .collect::<Vec<_>>();
+        let remap = |type_id: TypeId| {
+            *canonical
+                .get(type_id.0 as usize)
+                .expect("stored type id must be registered")
+        };
+
+        for entry in &mut self.analysis.types {
+            match entry {
+                TypeEntry::Shape(shape) => remap_type_shape(shape, remap),
+                TypeEntry::Redirect(target) => *target = remap(*target),
+                TypeEntry::ReservedNoValue => {}
+            }
+        }
+        for declaration in &mut self.analysis.declarations {
+            if let DeclarationState::Value(type_id) = &mut declaration.state {
+                *type_id = remap(*type_id);
+            }
+        }
+        for shape in self.analysis.pattern_result.values_mut() {
+            match &mut shape.flow {
+                PatternFlow::Value(type_id) | PatternFlow::Fields(type_id) => {
+                    *type_id = remap(*type_id);
+                }
+                PatternFlow::NoValue => {}
+            }
+            let Some(field_flow) = &mut shape.field_flow else {
+                continue;
+            };
+            field_flow.type_id = remap(field_flow.type_id);
+            for field in field_flow.fields.values_mut() {
+                field.info.final_type = remap(field.info.final_type);
+                for source in &mut field.sources {
+                    match source {
+                        FieldSource::Capture { info, .. } | FieldSource::Forwarded { info, .. } => {
+                            info.final_type = remap(info.final_type);
+                        }
+                    }
+                }
+            }
+        }
+        for occurrence in &mut self.custom_capture_types {
+            occurrence.type_id = remap(occurrence.type_id);
+        }
+
+        let mut provenance = std::mem::take(&mut self.type_provenance)
+            .into_iter()
+            .collect::<Vec<_>>();
+        provenance.sort_by_key(|&(type_id, _)| type_id);
+        for (type_id, span) in provenance {
+            self.type_provenance.entry(remap(type_id)).or_insert(span);
+        }
+
+        let mut capture_declarations = std::mem::take(&mut self.capture_type_declarations)
+            .into_iter()
+            .collect::<Vec<_>>();
+        capture_declarations.sort_by_key(|&(_, declaration)| declaration);
+        for ((name, body), declaration) in capture_declarations {
+            self.capture_type_declarations
+                .entry((name, remap(body)))
+                .or_insert(declaration);
+        }
+        self.invalid_types = std::mem::take(&mut self.invalid_types)
+            .into_iter()
+            .map(remap)
+            .collect();
+        for (type_id, name) in std::mem::take(&mut self.analysis.named_types) {
+            self.analysis
+                .named_types
+                .entry(remap(type_id))
+                .or_insert(name);
+        }
+    }
+
+    fn rebuild_intern_index(&mut self) -> bool {
+        let mut index = HashMap::new();
+        let mut redirects = Vec::new();
+        for (raw, entry) in self.analysis.types.iter().enumerate() {
+            let TypeEntry::Shape(shape) = entry else {
+                continue;
+            };
+            if matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)) {
+                continue;
+            }
+            let type_id = TypeId(u32::try_from(raw).expect("type count fits u32"));
+            if let Some(&existing) = index.get(shape) {
+                redirects.push((type_id, existing));
+            } else {
+                index.insert(shape.clone(), type_id);
+            }
+        }
+        for (duplicate, canonical) in &redirects {
+            self.redirect_type(*duplicate, *canonical);
+        }
+        self.intern_index = index;
+        !redirects.is_empty()
     }
 
     pub fn intern_record(&mut self, fields: BTreeMap<Symbol, RecordField>) -> TypeId {
@@ -741,8 +1400,12 @@ impl TypeAnalysisBuilder {
     pub(super) fn replace_record_fields(
         &mut self,
         type_id: TypeId,
-        fields: BTreeMap<Symbol, RecordField>,
+        mut fields: BTreeMap<Symbol, RecordField>,
     ) {
+        let type_id = self.analysis.canonical_type_id(type_id);
+        for field in fields.values_mut() {
+            field.final_type = self.analysis.canonical_type_id(field.final_type);
+        }
         let Some(TypeEntry::Shape(TypeShape::Record(current))) =
             self.analysis.types.get_mut(type_id.0 as usize)
         else {
@@ -762,9 +1425,9 @@ impl TypeAnalysisBuilder {
                     .expect("type declaration count fits u32"),
             );
             self.analysis.declarations.push(TypeDeclarationEntry {
-                name,
-                body: None,
-                definition: Some(def_id),
+                name: Some(name),
+                state: DeclarationState::Pending,
+                owner: DeclarationOwner::Definition(def_id),
             });
             self.analysis.definition_declarations.insert(def_id, id);
         }
@@ -784,9 +1447,9 @@ impl TypeAnalysisBuilder {
                 .expect("type declaration count fits u32"),
         );
         self.analysis.declarations.push(TypeDeclarationEntry {
-            name,
-            body: Some(body),
-            definition: None,
+            name: Some(name),
+            state: DeclarationState::Value(body),
+            owner: DeclarationOwner::CaptureType,
         });
         self.capture_type_declarations
             .insert((name, body), declaration);
@@ -847,9 +1510,20 @@ impl TypeAnalysisBuilder {
     }
 
     pub fn record_def_output(&mut self, def_id: DefId, output: DefinitionOutput) {
-        self.analysis.def_output.insert(def_id, output);
+        assert!(
+            self.open_scc
+                .as_ref()
+                .is_some_and(|definitions| definitions.contains(&def_id)),
+            "a definition output is registered only while its SCC is open",
+        );
         let declaration = self.analysis.definition_declaration(def_id);
-        self.analysis.declarations[declaration.index()].body = output.value();
+        let entry = &mut self.analysis.declarations[declaration.index()];
+        assert_eq!(
+            entry.state,
+            DeclarationState::Pending,
+            "a definition output is registered exactly once",
+        );
+        entry.state = DeclarationState::from_output(output);
     }
 
     pub(crate) fn normalize_capture_types(
