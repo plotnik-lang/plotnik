@@ -218,6 +218,8 @@ mod matcher {
         Accept,
         /// The state failed; unwind the checkpoint stack.
         Backtrack,
+        /// Source-driven call state exceeded a fixed-width runtime capacity.
+        CallFrameError(rt::CallFrameError),
     }
 
     /// How the backtrack unwind resumed execution.
@@ -225,6 +227,7 @@ mod matcher {
         Resumed(u16),
         Accepted,
         NoMatch,
+        CallFrameError(rt::CallFrameError),
     }
 
     /// One dispatch loop serves every entry point; `entry` selects the wrapper.
@@ -283,10 +286,12 @@ mod matcher {
             match dispatch(&mut eng, source, ip) {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => return Ok(Some(eng.into_journal())),
+                Flow::CallFrameError(error) => return Err(error.into()),
                 Flow::Backtrack => match backtrack(&mut eng, source) {
                     Unwound::Resumed(next) => ip = next,
                     Unwound::Accepted => return Ok(Some(eng.into_journal())),
                     Unwound::NoMatch => return Ok(None),
+                    Unwound::CallFrameError(error) => return Err(error.into()),
                 },
             }
         }
@@ -375,7 +380,9 @@ mod matcher {
             }
             //   09       (Standalone)                     02 : 08
             S09_STANDALONE_EP => {
-                eng.enter_frame(S09_STANDALONE_EP);
+                if let Err(error) = eng.enter_frame(S09_STANDALONE_EP) {
+                    return Flow::CallFrameError(error);
+                }
                 Flow::Jump(S02_STANDALONE)
             }
             //   10  -ε-  [RecordOpen]                     09
@@ -473,7 +480,9 @@ mod matcher {
                         cp.ip,
                         resume,
                     ));
-                    eng.enter_frame(resume.call_site);
+                    if let Err(error) = eng.enter_frame(resume.call_site) {
+                        return Unwound::CallFrameError(error);
+                    }
                     return Unwound::Resumed(resume.target);
                 }
 
@@ -482,6 +491,9 @@ mod matcher {
                 rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
                     Some(Flow::Jump(next)) => return Unwound::Resumed(next),
                     Some(Flow::Accept) => return Unwound::Accepted,
+                    Some(Flow::CallFrameError(error)) => {
+                        return Unwound::CallFrameError(error);
+                    }
                     Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
                     None => continue 'unwind,
                 },
