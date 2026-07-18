@@ -7,4 +7,4 @@ error: invalid unicode escape
   |                      ^^^^^^^^
   |
 help: write `\u{…}` with 1-6 hex digits naming a Unicode scalar value
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

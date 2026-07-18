@@ -24,7 +24,7 @@ error: infinite recursion: no escape path
    |         - references A
    |
 help: add an alternative to `D`, `A` or `C` that does not reference any definition in this cycle
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 A
   B
     D

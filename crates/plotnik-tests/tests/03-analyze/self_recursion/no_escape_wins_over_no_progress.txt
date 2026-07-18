@@ -9,6 +9,6 @@ error: infinite recursion: no escape path
   |       E references itself
   |
 help: add an alternative to `E` that does not reference `E`
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 E
   E (cycle)

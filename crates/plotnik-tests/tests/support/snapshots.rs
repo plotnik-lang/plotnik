@@ -191,7 +191,7 @@ impl SnapshotKind {
     pub fn legal_sections(self) -> &'static [SectionKind] {
         match self {
             Self::Parser { .. } => &[SectionKind::Diagnostics, SectionKind::Cst, SectionKind::Ast],
-            Self::Analyze => &[SectionKind::Diagnostics, SectionKind::Symbols],
+            Self::Analyze => &[SectionKind::Diagnostics, SectionKind::Definitions],
             Self::Bytecode { .. } => &[
                 SectionKind::Diagnostics,
                 SectionKind::Nfa,
@@ -238,7 +238,7 @@ pub(crate) enum SectionKind {
     Diagnostics,
     Cst,
     Ast,
-    Symbols,
+    Definitions,
     Nfa,
     Bytecode,
     TypeScript,
@@ -257,7 +257,7 @@ impl SectionKind {
             Self::Diagnostics => "diagnostics",
             Self::Cst => "cst",
             Self::Ast => "ast",
-            Self::Symbols => "symbols",
+            Self::Definitions => "definitions",
             Self::Nfa => "nfa",
             Self::Bytecode => "bytecode",
             Self::TypeScript => "typescript",
@@ -283,7 +283,7 @@ const ALL_SECTION_KINDS: &[SectionKind] = &[
     SectionKind::Diagnostics,
     SectionKind::Cst,
     SectionKind::Ast,
-    SectionKind::Symbols,
+    SectionKind::Definitions,
     SectionKind::Nfa,
     SectionKind::Bytecode,
     SectionKind::TypeScript,

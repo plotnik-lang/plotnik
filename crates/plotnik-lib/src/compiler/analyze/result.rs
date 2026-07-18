@@ -10,8 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use thiserror::Error;
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::refs::dependency_analysis::DefinitionReachability;
+use crate::compiler::analyze::refs::{DefinitionGraph, DefinitionReachability};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
@@ -393,7 +392,7 @@ pub(crate) struct ResultModel {
 #[derive(Clone, Copy)]
 pub(crate) struct ResultSchema<'a> {
     pub(crate) types: &'a TypeAnalysis,
-    pub(crate) deps: &'a DependencyAnalysis,
+    pub(crate) definitions: &'a DefinitionGraph,
     pub(crate) interner: &'a Interner,
     model: &'a ResultModel,
 }
@@ -409,8 +408,8 @@ impl ResultModel {
         artifacts: AnalysisArtifacts<'_>,
     ) -> Result<Self, ResultSchemaError> {
         let types = artifacts.type_analysis;
-        let deps = artifacts.dependency_analysis;
-        let reachable_defs = deps.reachable_from(
+        let definitions = artifacts.definitions;
+        let reachable_defs = definitions.reachable_from(
             artifacts
                 .iter_entry_point_outputs()
                 .map(|(def_id, _)| def_id),
@@ -432,13 +431,13 @@ impl ResultModel {
                 continue;
             };
             type_name_bindings.push(TypeNameBinding {
-                name: deps.def_name_sym(def_id),
+                name: definitions.definition(def_id).name(),
                 type_id: body,
             });
         }
         type_name_bindings.sort_by_key(|binding| (binding.type_id, binding.name));
         type_name_bindings.dedup();
-        let entry_point_items = ItemCollector::new(types, deps, &named_types)
+        let entry_point_items = ItemCollector::new(types, definitions, &named_types)
             .collect(artifacts.iter_entry_point_outputs());
         let mut public_result_groups = BTreeMap::new();
         for item in entry_point_items
@@ -479,7 +478,7 @@ impl ResultModel {
         ResultSchema::new(
             self,
             artifacts.type_analysis,
-            artifacts.dependency_analysis,
+            artifacts.definitions,
             artifacts.interner,
         )
     }
@@ -520,12 +519,12 @@ impl<'a> ResultSchema<'a> {
     pub(crate) fn new(
         model: &'a ResultModel,
         types: &'a TypeAnalysis,
-        deps: &'a DependencyAnalysis,
+        definitions: &'a DefinitionGraph,
         interner: &'a Interner,
     ) -> Self {
         Self {
             types,
-            deps,
+            definitions,
             interner,
             model,
         }
@@ -561,8 +560,8 @@ impl<'a> ResultSchema<'a> {
         self.model.public_result_group(item)
     }
 
-    pub(crate) fn dependency_analysis(&self) -> &DependencyAnalysis {
-        self.deps
+    pub(crate) fn definitions(&self) -> &DefinitionGraph {
+        self.definitions
     }
 
     pub(crate) fn interner(&self) -> &Interner {
@@ -572,7 +571,7 @@ impl<'a> ResultSchema<'a> {
 
 struct ItemCollector<'a> {
     types: &'a TypeAnalysis,
-    deps: &'a DependencyAnalysis,
+    definitions: &'a DefinitionGraph,
     named_types: &'a BTreeMap<TypeId, Symbol>,
     declared_names: HashSet<Symbol>,
     walked_types: HashSet<TypeId>,
@@ -582,12 +581,12 @@ struct ItemCollector<'a> {
 impl<'a> ItemCollector<'a> {
     fn new(
         types: &'a TypeAnalysis,
-        deps: &'a DependencyAnalysis,
+        definitions: &'a DefinitionGraph,
         named_types: &'a BTreeMap<TypeId, Symbol>,
     ) -> Self {
         Self {
             types,
-            deps,
+            definitions,
             named_types,
             declared_names: HashSet::new(),
             walked_types: HashSet::new(),
@@ -600,7 +599,7 @@ impl<'a> ItemCollector<'a> {
         entry_points: impl IntoIterator<Item = (DefId, DefinitionOutput)>,
     ) -> Vec<ResultItem> {
         for (def_id, output) in entry_points {
-            let name = self.deps.def_name_sym(def_id);
+            let name = self.definitions.definition(def_id).name();
             match output {
                 DefinitionOutput::MatchOnly => {
                     self.items.push(ResultItem::match_only_definition(name));

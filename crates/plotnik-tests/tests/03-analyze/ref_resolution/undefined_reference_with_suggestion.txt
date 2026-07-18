@@ -12,7 +12,7 @@ help: replace with the defined reference `(Expr)`
 2 - Q = (call_expression function: (Expl))
 2 + Q = (call_expression function: (Expr))
   |
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Expr
 Q
   Expl?

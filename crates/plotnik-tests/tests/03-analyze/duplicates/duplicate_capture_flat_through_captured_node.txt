@@ -15,5 +15,5 @@ error: capture `@x` already defined in this scope
   |       ^^
   |
 help: rename one capture, or use labeled alternatives to preserve which alternative matched
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Q

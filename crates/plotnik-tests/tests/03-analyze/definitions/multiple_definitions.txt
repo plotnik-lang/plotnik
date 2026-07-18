@@ -1,7 +1,7 @@
 Expr = (expression)
 Stmt = (statement)
 Decl = (declaration)
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Expr
 Stmt
 Decl

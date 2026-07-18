@@ -13,4 +13,4 @@ error: anchor needs an enclosing node
   |     ^
   |
 help: move the anchor and its neighboring pattern inside a named node
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

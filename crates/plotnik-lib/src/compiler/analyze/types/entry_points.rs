@@ -1,9 +1,7 @@
-//! Entry-point eligibility checks derived from inferred patterns.
+//! Entry-point admission checks.
 
-use std::collections::HashSet;
-
-use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::core::{Interner, Symbol};
+use crate::compiler::analyze::refs::DefinitionGraph;
+use crate::core::Interner;
 use indexmap::IndexMap;
 
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
@@ -11,36 +9,23 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::Root;
 
-use super::type_check::TypeAnalysis;
-
-/// Report every definition whose body never reached pattern analysis.
+/// Report every source definition whose body never became an admitted pattern.
 ///
 /// Positional assertions (`.`, `-field`, `.!`) are not patterns by themselves,
-/// so definitions containing only one are absent from
-/// `TypeAnalysis::iter_def_output()`. The AST is the source of truth for the
-/// original definition list, including definitions that never reached name
-/// resolution.
+/// so definitions containing only one are absent from the definition graph. The
+/// AST remains the source of truth for the original definition list.
 pub fn check_entry_points(
     ast_map: &IndexMap<SourceId, Root>,
     interner: &Interner,
-    type_analysis: &TypeAnalysis,
-    dependency_analysis: &DependencyAnalysis,
+    definitions: &DefinitionGraph,
     diag: &mut Diagnostics,
 ) {
-    let analyzed_defs: HashSet<Symbol> = type_analysis
-        .iter_def_output()
-        .map(|(def_id, _)| dependency_analysis.def_name_sym(def_id))
-        .collect();
-
     let mut any_defs = false;
     for (source_id, root) in ast_map {
         for def in root.defs() {
             any_defs = true;
             let Some(name) = def.name() else { continue };
-            let was_analyzed = interner
-                .get(name.text())
-                .is_some_and(|sym| analyzed_defs.contains(&sym));
-            if !was_analyzed {
+            if definitions.id_for_name(interner, name.text()).is_none() {
                 diag.report(
                     DiagnosticKind::NoEntryPoints,
                     Span::new(*source_id, name.text_range()),

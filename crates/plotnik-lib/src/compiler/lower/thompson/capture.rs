@@ -306,7 +306,7 @@ impl NfaBuilder<'_> {
         match pattern {
             Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(
                 pattern,
-                self.ctx.analysis.dependency_analysis,
+                self.ctx.analysis.definitions,
                 self.ctx.analysis.interner,
             ),
             Pattern::QuantifiedPattern(q) => q

@@ -12,7 +12,7 @@ help: replace with the defined reference `(Foo)`
 2 - Q = (call (FOO))
 2 + Q = (call (Foo))
   |
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Foo
 Q
   FOO?

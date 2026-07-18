@@ -19,7 +19,7 @@ error: `@v` cannot capture `(MatchOnly)` because `MatchOnly` produces no result 
   |
 help: make `MatchOnly` produce a result by changing `(a)` to `(a) @v_value` in definition `MatchOnly`
 help: or remove `@v` and capture a node pattern directly
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 MatchOnly
 Q
   MatchOnly

@@ -2,6 +2,6 @@ Expr = [
   (identifier)
   (call (Expr))
 ]
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Expr
   Expr (cycle)

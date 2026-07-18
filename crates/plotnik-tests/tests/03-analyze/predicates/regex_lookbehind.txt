@@ -7,4 +7,4 @@ error: lookahead/lookbehind is not supported in regex
   |                      ^^^
   |
 help: some target engines cannot match lookaround. Match the surrounding context with the query pattern instead
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

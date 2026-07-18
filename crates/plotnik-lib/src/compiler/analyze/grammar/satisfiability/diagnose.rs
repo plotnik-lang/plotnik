@@ -798,7 +798,7 @@ fn soft_anchor_skips_extras_only(
     ctx: AutomatonContext<'_>,
 ) -> bool {
     let items: Vec<_> = node.node().items().collect();
-    let semantics = AnchorSemantics::new(ctx.symbol_table);
+    let semantics = AnchorSemantics::new(ctx.interner, ctx.definitions);
     semantics
         .compute_nav_modes(&items, true)
         .into_iter()

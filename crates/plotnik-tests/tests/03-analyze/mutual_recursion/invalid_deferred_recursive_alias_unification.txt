@@ -26,7 +26,7 @@ error: `@x` has incompatible types `A` and `B` across alternatives
    |       -- `@x` has type `B` here
    |
 help: make every alternative produce the same type, or label the alternatives for a variant type
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 A
   C
     A (cycle)

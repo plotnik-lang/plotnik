@@ -1360,16 +1360,8 @@ impl NfaBuilder<'_> {
                 if !visited.insert(def_id) {
                     return false;
                 }
-                let name = self
-                    .ctx
-                    .analysis
-                    .interner
-                    .resolve(self.ctx.analysis.dependency_analysis.def_name_sym(def_id));
-                let result = self
-                    .ctx
-                    .symbol_table
-                    .body(name)
-                    .is_some_and(|body| self.boundary_sensitive_pattern(body, visited));
+                let body = self.ctx.analysis.definitions.definition(def_id).body();
+                let result = self.boundary_sensitive_pattern(body, visited);
                 visited.remove(&def_id);
                 result
             }
@@ -1425,17 +1417,12 @@ impl NfaBuilder<'_> {
                     // the component's body.
                     return true;
                 }
-                let name = self
-                    .ctx
-                    .analysis
-                    .interner
-                    .resolve(self.ctx.analysis.dependency_analysis.def_name_sym(def_id));
-                let supported = self.ctx.symbol_table.body(name).is_some_and(|body| {
-                    if definition_value_root(body) {
-                        return self.boundary_definition_value_supported(body, visited);
-                    }
+                let body = self.ctx.analysis.definitions.definition(def_id).body();
+                let supported = if definition_value_root(body) {
+                    self.boundary_definition_value_supported(body, visited)
+                } else {
                     self.boundary_pattern_supported(body, visited)
-                });
+                };
                 visited.remove(&def_id);
                 supported
             }

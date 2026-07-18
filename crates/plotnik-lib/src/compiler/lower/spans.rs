@@ -77,19 +77,13 @@ pub(crate) struct SpanAssignment {
 pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
     let reachable_defs = input.result.reachable_defs();
     let mut candidates = Vec::new();
-    for name in input.symbol_table.names() {
-        let def_id = input
-            .analysis
-            .dependency_analysis
-            .def_id_for_name(input.analysis.interner, name)
-            .expect("definition name must have a DefId");
+    for &def_id in input.analysis.definitions.ids_in_declaration_order() {
         if !reachable_defs.contains(def_id) {
             continue;
         }
-        let (source, body) = input
-            .symbol_table
-            .definition(name)
-            .expect("symbol-table name must have a definition");
+        let definition = input.analysis.definitions.definition(def_id);
+        let source = definition.source();
+        let body = definition.body();
         let def = body
             .syntax()
             .parent()
@@ -218,8 +212,8 @@ fn collect_pattern(
                 .expect("resolved reference must have a name");
             let target = input
                 .analysis
-                .dependency_analysis
-                .def_id_for_name(input.analysis.interner, name.text())
+                .definitions
+                .id_for_name(input.analysis.interner, name.text())
                 .expect("reference target must resolve");
             out.push(Candidate {
                 node: reference.syntax().clone(),

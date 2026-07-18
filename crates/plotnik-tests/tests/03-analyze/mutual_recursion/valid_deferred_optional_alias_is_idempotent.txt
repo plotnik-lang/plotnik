@@ -1,6 +1,6 @@
 B = (expression_statement (A))?
 A = (B)?
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 B
   A
     B (cycle)

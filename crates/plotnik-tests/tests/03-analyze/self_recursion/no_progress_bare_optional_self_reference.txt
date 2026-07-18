@@ -10,6 +10,6 @@ error: infinite recursion: cycle makes no progress
   |
 help: match at least one syntax-tree node before recursing
 help: make every path through this cycle match a syntax-tree node before it returns to `A`
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 A
   A (cycle)

@@ -10,8 +10,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use rowan::{TextRange, TextSize};
 
-use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{Pattern, QuantifierKind, SeqItem};
 use crate::core::Interner;
@@ -313,22 +312,16 @@ impl AnchorRangeRelation {
 /// Definition-level fixed point for exported anchor context.
 pub(crate) struct AnchorContextAnalysis<'a> {
     interner: &'a Interner,
-    symbol_table: &'a SymbolTable,
-    dependencies: &'a DependencyAnalysis,
-    definitions: HashMap<DefId, ContextRelation>,
+    definitions: &'a DefinitionGraph,
+    relations: HashMap<DefId, ContextRelation>,
 }
 
 impl<'a> AnchorContextAnalysis<'a> {
-    pub(crate) fn new(
-        interner: &'a Interner,
-        symbol_table: &'a SymbolTable,
-        dependencies: &'a DependencyAnalysis,
-    ) -> Self {
+    pub(crate) fn new(interner: &'a Interner, definitions: &'a DefinitionGraph) -> Self {
         let mut analysis = Self {
             interner,
-            symbol_table,
-            dependencies,
-            definitions: HashMap::new(),
+            definitions,
+            relations: HashMap::new(),
         };
         analysis.compute_definitions();
         analysis
@@ -341,26 +334,20 @@ impl<'a> AnchorContextAnalysis<'a> {
     /// Anchor tokens authored in `def_id` whose boundary can remain exposed
     /// after transparent wrapper and nullable-path composition.
     pub(crate) fn exported_anchor_ranges(&self, def_id: DefId) -> Vec<TextRange> {
-        let name = self
-            .interner
-            .resolve(self.dependencies.def_name_sym(def_id));
-        let body = self
-            .symbol_table
-            .body(name)
-            .expect("dependency analysis definitions have symbol-table bodies");
+        let body = self.definitions.definition(def_id).body();
         self.compute_anchor_ranges(body).exported_ranges()
     }
 
     fn definition(&self, def_id: DefId) -> &ContextRelation {
-        self.definitions
+        self.relations
             .get(&def_id)
             .expect("every analyzed definition has an anchor-context relation")
     }
 
     fn compute_definitions(&mut self) {
-        for scc in self.dependencies.sccs() {
+        for scc in self.definitions.sccs() {
             for &def_id in scc {
-                self.definitions
+                self.relations
                     .entry(def_id)
                     .or_insert_with(ContextRelation::impossible);
             }
@@ -368,16 +355,10 @@ impl<'a> AnchorContextAnalysis<'a> {
             loop {
                 let mut changed = false;
                 for &def_id in scc {
-                    let name = self
-                        .interner
-                        .resolve(self.dependencies.def_name_sym(def_id));
-                    let body = self
-                        .symbol_table
-                        .body(name)
-                        .expect("dependency analysis definitions have symbol-table bodies");
+                    let body = self.definitions.definition(def_id).body();
                     let relation = self.compute_pattern(body);
                     let current = self
-                        .definitions
+                        .relations
                         .get_mut(&def_id)
                         .expect("SCC definitions were initialized");
                     if *current != relation {
@@ -436,15 +417,15 @@ impl<'a> AnchorContextAnalysis<'a> {
                     .map_or(inner.clone(), |kind| inner.quantified(kind))
             }
             Pattern::DefRef(reference) => {
-                let Some(def_id) = reference.name().and_then(|name| {
-                    self.dependencies
-                        .def_id_for_name(self.interner, name.text())
-                }) else {
+                let Some(def_id) = reference
+                    .name()
+                    .and_then(|name| self.definitions.id_for_name(self.interner, name.text()))
+                else {
                     // Name resolution owns the diagnostic. Treat its recovery
                     // node as one consumer so a neighboring anchor is not hidden.
                     return ContextRelation::atom();
                 };
-                self.definitions.get(&def_id).cloned().unwrap_or_else(|| {
+                self.relations.get(&def_id).cloned().unwrap_or_else(|| {
                     panic!(
                         "anchor-context analysis resolved definition {def_id:?}, but its \
                              relation was not initialized before the reference was evaluated"
@@ -507,10 +488,10 @@ impl<'a> AnchorContextAnalysis<'a> {
                     .map_or(inner.clone(), |kind| inner.quantified(kind))
             }
             Pattern::DefRef(reference) => {
-                let Some(def_id) = reference.name().and_then(|name| {
-                    self.dependencies
-                        .def_id_for_name(self.interner, name.text())
-                }) else {
+                let Some(def_id) = reference
+                    .name()
+                    .and_then(|name| self.definitions.id_for_name(self.interner, name.text()))
+                else {
                     return AnchorRangeRelation::atom();
                 };
                 AnchorRangeRelation::from_context(self.definition(def_id))

@@ -4,8 +4,8 @@ use rowan::TextRange;
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::bind;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
-use crate::compiler::analyze::names::{SymbolTable, resolve_names};
-use crate::compiler::analyze::refs::{dependencies, validate_recursion};
+use crate::compiler::analyze::names::resolve_names;
+use crate::compiler::analyze::refs::{DefinitionGraph, build_definition_graph, validate_recursion};
 use crate::compiler::analyze::result::{ResultModel, ResultSchema};
 use crate::compiler::analyze::shape::DefinitionFacts;
 use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
@@ -149,61 +149,42 @@ impl QueryParsed {
         };
 
         let mut interner = Interner::new();
-        let symbol_table = resolve_names(&validated, &mut self.diag);
+        let collected_definitions = resolve_names(&validated, &mut self.diag);
 
         // A flat reference chain can recurse as deeply as a nested source tree, so it gets
         // an explicit stack-depth ceiling and the same fatal recursion-limit outcome.
-        let dependency_analysis = dependencies::analyze_dependencies(
-            &symbol_table,
+        let definitions = build_definition_graph(
+            collected_definitions,
             &mut interner,
             self.limits.references(),
         )?;
-        let anchor_contexts =
-            AnchorContextAnalysis::new(&interner, &symbol_table, &dependency_analysis);
+        let anchor_contexts = AnchorContextAnalysis::new(&interner, &definitions);
         let anchors_valid = validate_anchors(AnchorValidationInput {
             analysis: &anchor_contexts,
-            dependency_analysis: &dependency_analysis,
+            definitions: &definitions,
             diag: &mut self.diag,
         });
         if !anchors_valid {
             return Ok(Query::parsed_only(self));
         }
-        validate_recursion(
-            &dependency_analysis,
-            &symbol_table,
-            &interner,
-            &mut self.diag,
-        );
-        let definition_facts = DefinitionFacts::analyze(
-            &interner,
-            &symbol_table,
-            &dependency_analysis,
-            &anchor_contexts,
-        );
+        validate_recursion(&definitions, &interner, &mut self.diag);
+        let definition_facts = DefinitionFacts::analyze(&interner, &definitions, &anchor_contexts);
 
         let type_analysis = type_check::infer_types(
             &mut interner,
-            &symbol_table,
-            &dependency_analysis,
+            &definitions,
             &definition_facts,
             &mut self.diag,
         );
         if !self.diag.has_errors() {
-            check_entry_points(
-                validated.ast_map(),
-                &interner,
-                &type_analysis,
-                &dependency_analysis,
-                &mut self.diag,
-            );
+            check_entry_points(validated.ast_map(), &interner, &definitions, &mut self.diag);
         }
 
         let analysis = Analysis {
             interner,
-            symbol_table,
+            definitions,
             definition_facts,
             type_analysis,
-            dependency_analysis,
         };
 
         Ok(Query::analyzed(self, analysis))
@@ -242,10 +223,9 @@ pub(crate) struct AnalyzedQuery {
 
 pub(super) struct Analysis {
     pub(super) interner: Interner,
-    pub(super) symbol_table: SymbolTable,
+    pub(super) definitions: DefinitionGraph,
     pub(super) definition_facts: DefinitionFacts,
     pub(super) type_analysis: TypeAnalysis,
-    pub(super) dependency_analysis: dependencies::DependencyAnalysis,
 }
 
 impl Query {
@@ -320,9 +300,7 @@ impl Query {
             interner: &mut analyzed.analysis.interner,
             grammar,
             source_map: &analyzed.parsed.source_map,
-            ast_map: &analyzed.parsed.ast_map,
-            symbol_table: &analyzed.analysis.symbol_table,
-            dependency_analysis: &analyzed.analysis.dependency_analysis,
+            definitions: &analyzed.analysis.definitions,
             strict_lints: analyzed.parsed.strict_lints,
             satisfiability_limits: analyzed.parsed.limits.satisfiability(),
         }
@@ -356,12 +334,8 @@ impl AnalyzedQuery {
         &self.analysis.definition_facts
     }
 
-    pub(crate) fn symbol_table(&self) -> &SymbolTable {
-        &self.analysis.symbol_table
-    }
-
-    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
-        &self.analysis.dependency_analysis
+    pub(crate) fn definitions(&self) -> &DefinitionGraph {
+        &self.analysis.definitions
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -436,7 +410,6 @@ impl CompiledQuery {
         let input = LowerInput {
             analysis: bound.analysis_input(),
             result: self.result_model(),
-            symbol_table: bound.symbol_table(),
             inspection: config.inspection_enabled(),
         };
         let mut diagnostics = Diagnostics::new();
@@ -571,7 +544,7 @@ impl CompiledQuery {
                 .map(|(definition, _)| {
                     bound
                         .interner()
-                        .resolve(bound.dependency_analysis().def_name_sym(definition))
+                        .resolve(bound.definitions().definition(definition).name())
                         .to_string()
                 })
         })
@@ -640,7 +613,6 @@ impl BindOutcome {
         let input = LowerInput {
             analysis: bound.analysis_input(),
             result: &result,
-            symbol_table: bound.symbol_table(),
             inspection: false,
         };
         let lowered = pack_lowered(lower_semantic(&input), &input);
@@ -680,7 +652,6 @@ impl BindOutcome {
         let input = LowerInput {
             analysis: bound.analysis_input(),
             result: &result,
-            symbol_table: bound.symbol_table(),
             inspection: false,
         };
         let semantic_nfa = lower_semantic(&input);
@@ -802,12 +773,8 @@ impl BoundQuery {
         self.analyzed.definition_facts()
     }
 
-    pub(crate) fn symbol_table(&self) -> &SymbolTable {
-        self.analyzed.symbol_table()
-    }
-
-    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
-        self.analyzed.dependency_analysis()
+    pub(crate) fn definitions(&self) -> &DefinitionGraph {
+        self.analyzed.definitions()
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -839,7 +806,7 @@ impl BoundQuery {
             interner: self.interner(),
             type_analysis: self.type_analysis(),
             definition_facts: self.definition_facts(),
-            dependency_analysis: self.dependency_analysis(),
+            definitions: self.definitions(),
             grammar: self.grammar(),
         }
     }

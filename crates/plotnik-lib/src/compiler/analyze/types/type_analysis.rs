@@ -7,7 +7,7 @@
 //! accessors are trusted (a structural miss is a compiler bug, not a query
 //! condition).
 //!
-//! Definition matching identity remains owned by `DependencyAnalysis`. This
+//! Definition matching identity remains owned by `DefinitionGraph`. This
 //! artifact records the separate type declaration owned by each definition.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -566,7 +566,7 @@ impl TypeAnalysis {
     /// Admission check for [`TypeAnalysisBuilder::finish`]: the frozen result must
     /// be internally consistent before any trusting accessor reads it. Every
     /// failure here is a type-inference bug, not a query condition, so we assert
-    /// loudly — the same discipline `DependencyAnalysis::new` follows.
+    /// loudly — the same discipline `DefinitionGraph::new` follows.
     fn assert_well_formed(&self) {
         assert!(
             matches!(

@@ -5,4 +5,4 @@ error: invalid regex syntax: invalid character class range, the start must be <=
   |
 1 | Q = (identifier =~ /[z-a]/)
   |                      ^^^
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

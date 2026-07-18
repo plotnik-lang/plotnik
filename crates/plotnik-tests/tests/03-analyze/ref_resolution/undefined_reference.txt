@@ -7,6 +7,6 @@ error: `Undefined` is not defined
   |                                    ^^^^^^^^^
   |
 help: define `Undefined` before using `(Undefined)`, or change the reference to an existing definition
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Call
   Undefined?

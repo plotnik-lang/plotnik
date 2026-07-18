@@ -16,5 +16,5 @@ error: grammar field `bar` cannot match a sequence
   | |___^
   |
 help: a grammar field holds one child node. Match one pattern, or move the sequence outside the grammar-field constraint
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Q

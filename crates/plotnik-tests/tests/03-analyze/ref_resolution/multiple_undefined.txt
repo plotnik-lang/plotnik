@@ -39,7 +39,7 @@ help: replace with the defined reference `(Q)`
 4 -   (Z)
 4 +   (Q)
   |
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 Q
   X?
   Y?

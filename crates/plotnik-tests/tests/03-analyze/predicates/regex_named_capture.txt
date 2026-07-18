@@ -12,4 +12,4 @@ help: remove the named-capture marker
 1 + Q = (identifier =~ /(foo)/)
   |
 help: regex captures are inert in Plotnik. Capture the matched node outside the regex
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------

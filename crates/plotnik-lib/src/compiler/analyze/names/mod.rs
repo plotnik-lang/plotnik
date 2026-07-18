@@ -1,7 +1,7 @@
-//! Name resolution: build the symbol table from the validated AST.
+//! Name resolution: collect definitions and validate references.
 
-pub mod resolve;
-pub mod symbol_table;
+mod collected_definitions;
+mod resolve;
 
-pub use resolve::resolve_names;
-pub use symbol_table::SymbolTable;
+pub(in crate::compiler::analyze) use collected_definitions::CollectedDefinitions;
+pub(in crate::compiler) use resolve::resolve_names;

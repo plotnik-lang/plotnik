@@ -31,17 +31,15 @@ mod state_set;
 
 pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
 
-use indexmap::IndexMap;
-
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::diagnostics::report::Diagnostics;
-use crate::compiler::diagnostics::source::{SourceId, SourceMap};
+use crate::compiler::diagnostics::source::SourceMap;
 use crate::compiler::limits::SatisfiabilityLimits;
-use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern, Root, token_src};
+use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
-use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
+use crate::core::{Interner, NodeKindId};
 
 use super::participation::Participation;
 use automaton::AutomatonContext;
@@ -50,9 +48,9 @@ use engine::SatisfiabilitySolver;
 /// The threaded dependencies of the satisfiability pass.
 pub(super) struct SatisfiabilityInput<'a> {
     pub(super) grammar: &'a Grammar,
-    pub(super) symbol_table: &'a SymbolTable,
+    pub(super) interner: &'a Interner,
+    pub(super) definitions: &'a DefinitionGraph,
     pub(super) source_map: &'a SourceMap,
-    pub(super) ast_map: &'a IndexMap<SourceId, Root>,
     pub(super) limits: SatisfiabilityLimits,
 }
 
@@ -66,7 +64,8 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 
     let ctx = AutomatonContext {
         grammar: input.grammar,
-        symbol_table: input.symbol_table,
+        interner: input.interner,
+        definitions: input.definitions,
         source_map: input.source_map,
     };
 
@@ -83,25 +82,20 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
     // stance — so it is walked as `Required`. References are not followed: a node
     // used as a whole child is judged by the engine in context, and a referenced
     // definition is walked when the loop reaches its own entry.
-    for (&source, root) in input.ast_map {
-        for def in root.defs() {
-            let Some(body) = def.body() else {
-                continue;
-            };
-            let located = Located::new(source, body);
-            if reporter
-                .walk(&located, Participation::Required)
-                .should_stop()
-            {
-                return;
-            }
-            // A resource ceiling tripped mid-construction: the verdicts that follow
-            // would rest on an automaton we declined to finish, so stop and reject
-            // the whole query as too complex rather than report anything dubious.
-            if reporter.solver.is_too_complex() {
-                diagnose::report_too_complex(&located, reporter.diag);
-                return;
-            }
+    for &def_id in input.definitions.ids_in_declaration_order() {
+        let located = input.definitions.definition(def_id).located_body();
+        if reporter
+            .walk(&located, Participation::Required)
+            .should_stop()
+        {
+            return;
+        }
+        // A resource ceiling tripped mid-construction: the verdicts that follow
+        // would rest on an automaton we declined to finish, so stop and reject
+        // the whole query as too complex rather than report anything dubious.
+        if reporter.solver.is_too_complex() {
+            diagnose::report_too_complex(&located, reporter.diag);
+            return;
         }
     }
 }
@@ -325,7 +319,8 @@ impl Goal {
 
     fn from_def_ref(ctx: AutomatonContext<'_>, def_ref: &ast::DefRef) -> Option<Self> {
         let name = def_ref.name()?;
-        let target = ctx.symbol_table.located_definition(name.text())?;
+        let def_id = ctx.definitions.id_for_name(ctx.interner, name.text())?;
+        let target = ctx.definitions.definition(def_id).located_body();
         let Pattern::NamedNodePattern(node) = target.node() else {
             return None;
         };

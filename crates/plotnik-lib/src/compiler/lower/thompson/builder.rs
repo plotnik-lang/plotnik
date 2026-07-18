@@ -63,11 +63,10 @@ impl<'a> NfaBuilder<'a> {
     pub(in crate::compiler::lower) fn new(ctx: &'a LowerInput<'a>) -> Self {
         Self {
             ctx,
-            anchor_semantics: AnchorSemantics::new(ctx.symbol_table),
+            anchor_semantics: AnchorSemantics::new(ctx.analysis.interner, ctx.analysis.definitions),
             boundary_relations: BoundaryAnalyzer::new(
                 ctx.analysis.interner,
-                ctx.symbol_table,
-                ctx.analysis.dependency_analysis,
+                ctx.analysis.definitions,
             ),
             instructions: Vec::new(),
             next_label_id: 0,
@@ -231,14 +230,7 @@ impl<'a> NfaBuilder<'a> {
         entry_label: Label,
     ) {
         let def_id = specialization.def_id();
-        let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
-        let name = self.ctx.analysis.interner.resolve(name_sym);
-
-        let body = self
-            .ctx
-            .symbol_table
-            .body(name)
-            .expect("analyzed definition has a body");
+        let body = self.ctx.analysis.definitions.definition(def_id).body();
 
         if let Some(contract) = specialization.boundary_contract() {
             self.compile_boundary_def_specialization(specialization, body, contract, entry_label);

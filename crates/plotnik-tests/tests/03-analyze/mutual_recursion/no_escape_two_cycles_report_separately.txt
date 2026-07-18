@@ -28,7 +28,7 @@ error: infinite recursion: no escape path
   | D is defined here
   |
 help: add an alternative to `C` or `D` that does not reference any definition in this cycle
--------------------- SYMBOLS ---------------------
+------------------ DEFINITIONS -------------------
 A
   B
     A (cycle)

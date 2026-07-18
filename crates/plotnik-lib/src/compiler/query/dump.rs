@@ -15,7 +15,7 @@ impl Query {
         self.printer().dump()
     }
 
-    pub fn dump_symbols(&self) -> String {
+    pub fn dump_definitions(&self) -> String {
         self.printer().definitions_only(true).dump()
     }
 }

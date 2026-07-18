@@ -20,8 +20,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 
-use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
@@ -68,14 +67,10 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    pub(crate) fn assign(
-        mut self,
-        symbol_table: &SymbolTable,
-        dependency_analysis: &DependencyAnalysis,
-    ) {
+    pub(crate) fn assign(mut self, definitions: &DefinitionGraph) {
         self.reserve_builtins();
-        self.claim_definitions(symbol_table, dependency_analysis);
-        self.walk_definitions(dependency_analysis);
+        self.claim_definitions(definitions);
+        self.walk_definitions(definitions);
 
         self.ctx.set_named_types(self.names);
     }
@@ -94,16 +89,17 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
     /// Pass 1: every definition claims its declaration name. Definition names
     /// stay attached to their declarations rather than to an interned body
     /// shape; match-only definitions still reserve the name.
-    fn claim_definitions(&mut self, symbol_table: &SymbolTable, deps: &DependencyAnalysis) {
-        for &def_id in deps.sccs().iter().flatten() {
-            let name_sym = deps.def_name_sym(def_id);
+    fn claim_definitions(&mut self, definitions: &DefinitionGraph) {
+        for def_id in definitions.ids_in_def_id_order() {
+            let definition = definitions.definition(def_id);
+            let name_sym = definition.name();
             let output = self
                 .ctx
                 .in_progress()
                 .def_output(def_id)
                 .expect("every definition is inferred before naming");
 
-            let span = definition_span(symbol_table, self.interner, name_sym);
+            let span = Some(definition.span());
             let type_id = output.value();
 
             self.claim(name_sym, type_id, span);
@@ -111,8 +107,8 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
     }
 
     /// Pass 2: descend each definition's result, naming nested composites.
-    fn walk_definitions(&mut self, deps: &DependencyAnalysis) {
-        for &def_id in deps.sccs().iter().flatten() {
+    fn walk_definitions(&mut self, definitions: &DefinitionGraph) {
+        for def_id in definitions.ids_in_def_id_order() {
             let output = self
                 .ctx
                 .in_progress()
@@ -121,7 +117,10 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             let Some(output) = output.value() else {
                 continue;
             };
-            let name = self.interner.resolve(deps.def_name_sym(def_id)).to_owned();
+            let name = self
+                .interner
+                .resolve(definitions.definition(def_id).name())
+                .to_owned();
             self.walk_named(output, &name);
         }
     }
@@ -371,11 +370,7 @@ impl<'a> RawTypeNameValidator<'a> {
         Self { ctx, interner }
     }
 
-    pub(crate) fn validate(
-        self,
-        symbol_table: &SymbolTable,
-        dependency_analysis: &DependencyAnalysis,
-    ) {
+    pub(crate) fn validate(self, definitions: &DefinitionGraph) {
         let custom_capture_types = self
             .ctx
             .custom_capture_types()
@@ -391,17 +386,7 @@ impl<'a> RawTypeNameValidator<'a> {
             names: BTreeMap::new(),
         };
         validator.reserve_builtins();
-        validator.claim_definitions(symbol_table, dependency_analysis);
-        validator.walk_definitions(dependency_analysis);
+        validator.claim_definitions(definitions);
+        validator.walk_definitions(definitions);
     }
-}
-
-/// The complete declaration span of a definition.
-fn definition_span(
-    symbol_table: &SymbolTable,
-    interner: &Interner,
-    name_sym: Symbol,
-) -> Option<Span> {
-    let name = interner.resolve(name_sym);
-    symbol_table.definition_span(name)
 }

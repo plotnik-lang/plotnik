@@ -1,14 +1,17 @@
 //! AST/CST pretty-printer for debugging and test snapshots.
 
+use std::collections::BTreeSet;
 use std::fmt::Write;
 
 use indexmap::IndexSet;
 use rowan::NodeOrToken;
 
-use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::parse::ast::Capture;
+use crate::compiler::analyze::refs::DefinitionGraph;
+use crate::compiler::ids::DefId;
+use crate::compiler::parse::ast::{Capture, DefRef};
 use crate::compiler::parse::{self as ast, SyntaxNode};
 use crate::compiler::source::{SourceKind, SourceMap};
+use crate::core::Interner;
 
 use super::Query;
 
@@ -56,7 +59,7 @@ impl<'q> QueryPrinter<'q> {
 
     pub(crate) fn format(&self, w: &mut impl Write) -> std::fmt::Result {
         if self.definitions {
-            return self.format_symbols(w);
+            return self.format_definitions(w);
         }
 
         let source_map = self.query.source_map();
@@ -97,69 +100,72 @@ impl<'q> QueryPrinter<'q> {
                 .is_some_and(|s| !matches!(s.kind, SourceKind::Inline))
     }
 
-    fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
+    fn format_definitions(&self, w: &mut impl Write) -> std::fmt::Result {
         let Some(analysis) = self.query.analysis() else {
             return Ok(());
         };
-        let symbols = &analysis.symbol_table;
-        if symbols.is_empty() {
+        if analysis.definitions.ids_in_declaration_order().is_empty() {
             return Ok(());
         }
 
-        let defined: IndexSet<&str> = symbols.names().collect();
-
-        let mut writer = SymbolWriter::new(symbols, &defined, w);
-        for name in symbols.names() {
-            writer.format_symbol_tree(name, 0)?;
+        let mut writer = DefinitionWriter::new(&analysis.definitions, &analysis.interner, w);
+        for &def_id in analysis.definitions.ids_in_declaration_order() {
+            writer.format_definition_tree(def_id, 0)?;
         }
         Ok(())
     }
 }
 
-struct SymbolWriter<'w, 'a, W> {
-    symbols: &'a SymbolTable,
-    defined: &'a IndexSet<&'a str>,
-    visited: IndexSet<String>,
+struct DefinitionWriter<'w, 'a, W> {
+    definitions: &'a DefinitionGraph,
+    interner: &'a Interner,
+    active_path: IndexSet<DefId>,
     w: &'w mut W,
 }
 
-impl<'w, 'a, W: Write> SymbolWriter<'w, 'a, W> {
-    fn new(symbols: &'a SymbolTable, defined: &'a IndexSet<&'a str>, w: &'w mut W) -> Self {
+impl<'w, 'a, W: Write> DefinitionWriter<'w, 'a, W> {
+    fn new(definitions: &'a DefinitionGraph, interner: &'a Interner, w: &'w mut W) -> Self {
         Self {
-            symbols,
-            defined,
-            visited: IndexSet::new(),
+            definitions,
+            interner,
+            active_path: IndexSet::new(),
             w,
         }
     }
 
-    fn format_symbol_tree(&mut self, name: &str, depth: usize) -> std::fmt::Result {
+    fn format_definition_tree(&mut self, def_id: DefId, depth: usize) -> std::fmt::Result {
         let prefix = indent(depth);
+        let definition = self.definitions.definition(def_id);
+        let name = self.interner.resolve(definition.name());
 
-        if self.visited.contains(name) {
+        if self.active_path.contains(&def_id) {
             writeln!(self.w, "{}{} (cycle)", prefix, name)?;
             return Ok(());
         }
 
-        let is_broken = !self.defined.contains(name);
-        if is_broken {
-            writeln!(self.w, "{}{}?", prefix, name)?;
-            return Ok(());
-        }
-
         writeln!(self.w, "{}{}", prefix, name)?;
-        self.visited.insert(name.to_string());
+        self.active_path.insert(def_id);
 
-        if let Some(body) = self.symbols.body(name) {
-            let refs_set = crate::compiler::analyze::refs::collect::ref_names(body);
-            let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
-            refs.sort();
-            for r in refs {
-                self.format_symbol_tree(r, depth + 1)?;
+        let referenced_names = definition
+            .body()
+            .syntax()
+            .descendants()
+            .filter_map(DefRef::cast)
+            .filter_map(|reference| reference.name())
+            .map(|name| name.text().to_string())
+            .collect::<BTreeSet<_>>();
+        for referenced_name in referenced_names {
+            if let Some(referenced_id) = self
+                .definitions
+                .id_for_name(self.interner, &referenced_name)
+            {
+                self.format_definition_tree(referenced_id, depth + 1)?;
+            } else {
+                writeln!(self.w, "{}{}?", indent(depth + 1), referenced_name)?;
             }
         }
 
-        self.visited.shift_remove(name);
+        self.active_path.shift_remove(&def_id);
         Ok(())
     }
 }

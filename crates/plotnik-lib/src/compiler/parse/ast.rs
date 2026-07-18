@@ -9,8 +9,8 @@
 //! source `&'q str`. This is a rowan design: tokens store interned strings, not
 //! spans into the original source.
 //!
-//! When building data structures that need source-lifetime strings (e.g.,
-//! `SymbolTable<'q>`), use [`token_src`] instead of `token.text()`.
+//! When building data structures that need source-lifetime strings, use
+//! [`token_src`] instead of `token.text()`.
 
 use crate::compiler::parse::cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::TextRange;

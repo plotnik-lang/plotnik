@@ -99,7 +99,7 @@ impl<'a> EmitPipeline<'a> {
 
         let mut entry_points: Vec<EntryPoint> = Vec::new();
         for (def_id, output) in self.input.iter_entry_point_outputs() {
-            let name_sym = self.input.dependency_analysis.def_name_sym(def_id);
+            let name_sym = self.input.definitions.definition(def_id).name();
             let name = self.strings.intern(name_sym, self.input.interner)?;
             let result_type =
                 self.types

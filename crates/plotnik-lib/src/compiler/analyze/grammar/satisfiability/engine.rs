@@ -383,7 +383,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         Self {
             frozen: Frozen {
                 ctx,
-                anchor_semantics: AnchorSemantics::new(ctx.symbol_table),
+                anchor_semantics: AnchorSemantics::new(ctx.interner, ctx.definitions),
                 automata: Vec::new(),
                 table: automaton::PatternTable::default(),
                 facts,
