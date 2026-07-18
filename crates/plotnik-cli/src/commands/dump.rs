@@ -6,7 +6,7 @@ use plotnik_lib::bytecode::dump;
 use super::compile::compile_module;
 use super::lang_resolver::require_lang;
 use super::query_loader::load_query;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, write_stdout};
 
 pub struct DumpArgs {
     pub query_path: Option<PathBuf>,
@@ -26,7 +26,7 @@ pub fn run(args: DumpArgs) -> CliResult {
 
     let module = compile_module(loaded.sources, lang, args.color)?;
     let colors = Colors::new(args.color);
-    print!("{}", dump(&module, colors));
+    write_stdout(format_args!("{}", dump(&module, colors)))?;
 
     Ok(())
 }

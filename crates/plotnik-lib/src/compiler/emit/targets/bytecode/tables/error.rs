@@ -1,7 +1,5 @@
 //! Error types for bytecode emission.
 
-use crate::core::Symbol;
-
 use crate::bytecode::{EncodeError, MAX_SPANS};
 use crate::compiler::analyze::result::ResultSchemaError;
 
@@ -44,9 +42,15 @@ pub(in crate::compiler) enum EmitError {
     /// Too many inspection spans (exceeds the span-id payload budget).
     #[error("too many inspection spans: {0} (max {max})", max = EmitError::MAX_SPANS)]
     TooManySpans(usize),
-    /// String not found in interner.
-    #[error("string not found for symbol: {0:?}")]
-    StringNotFound(Symbol),
+    /// An inspection span references a source ID that does not fit the format.
+    #[error("inspection source id {0} exceeds the bytecode maximum of {max}", max = u16::MAX)]
+    SourceIdTooLarge(u32),
+    /// A variable-length bytecode section does not fit its u32 size/offset fields.
+    #[error("{section} is too large: {size} bytes (max {max})", max = u32::MAX)]
+    SectionTooLarge { section: &'static str, size: usize },
+    /// The complete bytecode module does not fit its u32 size field.
+    #[error("bytecode module is too large: {0} bytes (max {max})", max = u32::MAX)]
+    ModuleTooLarge(usize),
     /// Regex compilation failed.
     #[error("regex compile error for '{0}': {1}")]
     RegexCompile(String, String),
@@ -88,6 +92,9 @@ impl EmitError {
                 | Self::TooManyInstructionWords(_)
                 | Self::TooManyRegexes(_)
                 | Self::TooManySpans(_)
+                | Self::SourceIdTooLarge(_)
+                | Self::SectionTooLarge { .. }
+                | Self::ModuleTooLarge(_)
                 | Self::Encode(_)
         )
     }

@@ -24,9 +24,9 @@ pub(crate) fn normalize(pattern: &str) -> Hir {
         .parse(pattern)
         .expect("analyze validates regex syntax before normalization");
     let normalized = normalize_hir(&translated);
-    debug_assert!(
+    assert!(
         is_normalized(&normalized),
-        "regex normalization must eliminate target-dependent constructs"
+        "regex normalization left target-dependent constructs in pattern {pattern:?}"
     );
     normalized
 }

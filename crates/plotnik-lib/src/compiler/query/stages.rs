@@ -249,6 +249,11 @@ impl Query {
     }
 
     fn parsed_only(parsed: QueryParsed) -> Self {
+        assert!(
+            parsed.diag.has_errors(),
+            "query analysis produced no artifacts and no diagnostic; an early analysis exit must \
+             report the reason"
+        );
         Self {
             parsed,
             analysis: None,
@@ -287,15 +292,6 @@ impl Query {
         self.analysis.as_ref()
     }
 
-    #[cfg(test)]
-    pub(crate) fn symbol_table(&self) -> &SymbolTable {
-        &self
-            .analysis
-            .as_ref()
-            .expect("test query must be valid before inspecting symbols")
-            .symbol_table
-    }
-
     pub fn source_map(&self) -> &SourceMap {
         self.parsed.source_map()
     }
@@ -319,10 +315,13 @@ impl Query {
         }
 
         let Query { parsed, analysis } = self;
-        match analysis {
-            Some(analysis) => Ok(AnalyzedQuery { parsed, analysis }),
-            None => Err(Query::parsed_only(parsed)),
-        }
+        let analysis = analysis.unwrap_or_else(|| {
+            panic!(
+                "query state is inconsistent: semantic analysis produced neither diagnostics nor \
+                 analysis artifacts"
+            )
+        });
+        Ok(AnalyzedQuery { parsed, analysis })
     }
 
     pub(crate) fn bind(self, grammar: &Grammar) -> BindOutcome {
@@ -479,16 +478,15 @@ impl CompiledQuery {
                     self.bound.report_target_error(&mut diagnostics, error);
                     return Ok(Emission::failure(diagnostics));
                 }
-                return Err(crate::compiler::Error::CompilerInvariantViolation(
-                    error.to_string(),
-                ));
+                panic!(
+                    "bytecode emission rejected compiler-validated input with an internal error: \
+                     {error}"
+                );
             }
         };
-        let module = Module::load_compiler_output(&bytes).map_err(|error| {
-            crate::compiler::Error::CompilerInvariantViolation(format!(
-                "bytecode target failed module validation: {error}"
-            ))
-        })?;
+        let module = Module::load_compiler_output(&bytes).unwrap_or_else(|error| {
+            panic!("compiler-emitted bytecode failed immediate module validation: {error}")
+        });
         Ok(Emission::success(module, diagnostics))
     }
 
@@ -627,11 +625,6 @@ impl BindOutcome {
         matches!(self, BindOutcome::Bound(_))
     }
 
-    #[cfg(test)]
-    pub(crate) fn interner(&self) -> &Interner {
-        self.expect_bound().interner()
-    }
-
     pub fn source_map(&self) -> &SourceMap {
         match self {
             BindOutcome::Bound(query) => query.source_map(),
@@ -648,11 +641,6 @@ impl BindOutcome {
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
         self.definition_names_vec().into_iter()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn grammar(&self) -> &GrammarBinding {
-        self.expect_bound().grammar()
     }
 
     #[cfg(test)]
@@ -682,14 +670,11 @@ impl BindOutcome {
                 diagnostics,
             });
         };
-        if diagnostics.has_errors() {
-            return Ok(CompiledQuery {
-                bound: self,
-                result: None,
-                semantic_nfa: None,
-                diagnostics,
-            });
-        }
+        assert!(
+            !diagnostics.has_errors(),
+            "grammar binding returned a bound query together with error diagnostics; failed \
+             binding must not expose artifacts"
+        );
 
         let result = match ResultModel::from_artifacts(bound.analysis_input()) {
             Ok(result) => result,
@@ -712,10 +697,16 @@ impl BindOutcome {
         };
         let semantic_nfa = lower_semantic(&input);
         if let Err(error) = semantic_verify::verify(&semantic_nfa, &schema) {
-            debug_assert!(false, "semantic NFA verification failed: {error}");
-            return Err(crate::compiler::Error::CompilerInvariantViolation(
-                error.to_string(),
-            ));
+            if error.is_query_rejection() {
+                self.report_shared_limit_error(&mut diagnostics, error.to_string());
+                return Ok(CompiledQuery {
+                    bound: self,
+                    result: None,
+                    semantic_nfa: None,
+                    diagnostics,
+                });
+            }
+            panic!("lowered semantic NFA violated post-lowering verification: {error}");
         }
         Ok(CompiledQuery {
             bound: self,
@@ -730,12 +721,6 @@ impl BindOutcome {
             BindOutcome::Bound(query) => Some(query),
             BindOutcome::Invalid(_) => None,
         }
-    }
-
-    #[cfg(test)]
-    fn expect_bound(&self) -> &BoundQuery {
-        self.bound()
-            .expect("grammar-bound query data is only available after binding succeeds")
     }
 
     fn definition_names_vec(&self) -> Vec<String> {

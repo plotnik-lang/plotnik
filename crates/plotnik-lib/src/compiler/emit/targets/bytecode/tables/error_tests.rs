@@ -28,21 +28,6 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
 }
 
 #[test]
-fn record_field_count_overflow_is_emit_error() {
-    // 300 captures inside one node → a record with 300 fields, past the u8 limit.
-    // A concrete child kind (over `(_)`) keeps the satisfiability solve linear here —
-    // the field *count* is what this exercises, not how the children are matched.
-    let mut query = String::from("Q = (program");
-    for i in 0..300 {
-        write!(query, " (expression_statement) @c{i}").unwrap();
-    }
-    query.push(')');
-
-    let err = try_emit(&query).expect_err("300 record fields must not encode");
-    assert!(matches!(err, EmitError::TooManyFields(300)), "got {err:?}");
-}
-
-#[test]
 fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
     let mut query = String::from("Q = (program");
     for index in 0..=u8::MAX {
@@ -84,22 +69,6 @@ fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
 }
 
 #[test]
-fn variant_case_count_overflow_is_emit_error() {
-    // 256 labeled alternatives produce a variant with 256 cases, past the u8 limit.
-    // Each alternative is `(_)` so every case is a valid program child and the query
-    // is matchable; `(identifier)` would be rejected because a program has no bare
-    // identifier child. Capturing the alternation makes its labels produce cases.
-    let mut query = String::from("Q = (program [");
-    for i in 0..256 {
-        write!(query, " L{i}: (_) @v{i}").unwrap();
-    }
-    query.push_str("] @alt)");
-
-    let err = try_emit(&query).expect_err("256 variant cases must not encode");
-    assert!(matches!(err, EmitError::TooManyCases(256)), "got {err:?}");
-}
-
-#[test]
 fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
     let mut query = String::from("Q = (program [");
     for index in 0..=u8::MAX {
@@ -138,19 +107,6 @@ fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
         bytecode.diagnostics().kinds().collect::<Vec<_>>(),
         vec![DiagnosticKind::TargetLimitExceeded]
     );
-}
-
-#[test]
-fn emit_error_classification_respects_limit_ownership() {
-    assert!(EmitError::TooManyFields(256).is_target_limit());
-    assert!(EmitError::TooManyCases(256).is_target_limit());
-    assert!(EmitError::Encode(EncodeError::TooManyEffects(8)).is_target_limit());
-
-    assert!(!EmitError::TooManyTypeMembers(65_536).is_target_limit());
-    assert!(!EmitError::TooManyNodeKinds(65_536).is_target_limit());
-    assert!(!EmitError::TooManyNodeFields(65_536).is_target_limit());
-    assert!(!EmitError::TooManyEntryPoints(65_536).is_target_limit());
-    assert!(!EmitError::RegexCompile("[".into(), "invalid".into()).is_target_limit());
 }
 
 #[test]

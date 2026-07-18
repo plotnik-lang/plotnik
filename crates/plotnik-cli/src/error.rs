@@ -6,9 +6,41 @@
 //!
 //! Clap usage errors also exit with `2` (its default), keeping the contract whole.
 
+use std::fmt;
+use std::io::{self, Write as _};
 use std::process::ExitCode;
 
 pub type CliResult = Result<(), CliError>;
+
+pub fn write_stdout(args: fmt::Arguments<'_>) -> CliResult {
+    io::stdout()
+        .lock()
+        .write_fmt(args)
+        .map_err(|error| CliError::fatal(format!("failed to write stdout: {error}")))
+}
+
+pub fn writeln_stdout(args: fmt::Arguments<'_>) -> CliResult {
+    let mut stdout = io::stdout().lock();
+    stdout
+        .write_fmt(args)
+        .and_then(|()| stdout.write_all(b"\n"))
+        .map_err(|error| CliError::fatal(format!("failed to write stdout: {error}")))
+}
+
+pub fn write_stderr(args: fmt::Arguments<'_>) -> CliResult {
+    io::stderr()
+        .lock()
+        .write_fmt(args)
+        .map_err(|error| CliError::fatal(format!("failed to write stderr: {error}")))
+}
+
+pub fn writeln_stderr(args: fmt::Arguments<'_>) -> CliResult {
+    let mut stderr = io::stderr().lock();
+    stderr
+        .write_fmt(args)
+        .and_then(|()| stderr.write_all(b"\n"))
+        .map_err(|error| CliError::fatal(format!("failed to write stderr: {error}")))
+}
 
 #[derive(Debug)]
 pub enum CliError {
@@ -30,7 +62,7 @@ impl CliError {
             Self::No => ExitCode::from(1),
             Self::FatalRendered => ExitCode::from(2),
             Self::Fatal(msg) => {
-                eprintln!("error: {msg}");
+                let _ = writeln!(io::stderr().lock(), "error: {msg}");
                 ExitCode::from(2)
             }
         }

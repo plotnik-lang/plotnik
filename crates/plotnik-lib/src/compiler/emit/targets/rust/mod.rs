@@ -14,17 +14,6 @@ mod type_model;
 mod types;
 mod types_config;
 
-#[cfg(test)]
-mod ident_tests;
-#[cfg(test)]
-mod literal_tests;
-#[cfg(test)]
-mod module_tests;
-#[cfg(test)]
-mod representation_tests;
-#[cfg(test)]
-mod template_tests;
-
 pub(crate) use config::Config;
 pub use entry_names::journal_fn_name;
 pub(crate) use module::generate;

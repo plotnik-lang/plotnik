@@ -1,8 +1,6 @@
 use crate::compiler::diagnostics::{Diagnostics, Error, SourceId, SourceMap};
 use crate::compiler::parse::{ParseConfig, Root, parse_lossless};
 
-#[cfg(test)]
-use super::ir::FormatMetrics;
 use super::{model, render};
 
 pub type FormatResult<T> = Result<T, FormatError>;
@@ -54,20 +52,6 @@ pub fn format_query(source: &str) -> FormatResult<String> {
 
 pub(super) fn format_query_with_config(source: &str, config: ParseConfig) -> FormatResult<String> {
     format_query_impl(source, config).map(|(output, _)| output)
-}
-
-#[cfg(test)]
-pub(super) fn format_query_measured(
-    source: &str,
-    config: ParseConfig,
-) -> FormatResult<(String, FormatMetrics)> {
-    let (output, work) = format_query_impl(source, config)?;
-    let metrics = FormatMetrics {
-        work,
-        input_bytes: source.len(),
-        output_bytes: output.len(),
-    };
-    Ok((output, metrics))
 }
 
 fn format_query_impl(source: &str, config: ParseConfig) -> FormatResult<(String, usize)> {

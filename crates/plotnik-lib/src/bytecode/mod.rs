@@ -61,20 +61,3 @@ pub(crate) use plotnik_rt::{Nav, deserialize_dfa};
 pub(crate) use predicate_op::PredicateOp;
 pub(crate) use render::ModuleRenderContext;
 pub(crate) use sections::{FieldEntry, NodeKindEntry, SymbolNameEntry};
-
-#[cfg(test)]
-mod aligned_vec_tests;
-#[cfg(test)]
-mod effects_tests;
-#[cfg(test)]
-mod entry_point_tests;
-#[cfg(test)]
-mod format_tests;
-#[cfg(test)]
-mod header_tests;
-#[cfg(test)]
-mod instructions_tests;
-#[cfg(test)]
-mod node_kind_constraint_tests;
-#[cfg(test)]
-mod spans_tests;

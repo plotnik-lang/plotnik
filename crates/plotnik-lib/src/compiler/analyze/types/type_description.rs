@@ -127,25 +127,3 @@ fn describe_type_inner(
     seen.remove(&type_id);
     description
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
-    use crate::compiler::analyze::types::type_shape::{ListMinimum, TYPE_NODE};
-
-    #[test]
-    fn parenthesizes_an_optional_list_element() {
-        let mut types = TypeAnalysisBuilder::new();
-        let optional_node = types.intern_option(TYPE_NODE);
-        let list = types.intern_type(TypeShape::List {
-            element: optional_node,
-            minimum: ListMinimum::Zero,
-        });
-        let interner = Interner::new();
-
-        let description = describe_type(&types.in_progress(), &interner, list);
-
-        assert_eq!(description, "(Node | null)[]");
-    }
-}

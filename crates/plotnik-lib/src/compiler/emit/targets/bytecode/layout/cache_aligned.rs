@@ -75,18 +75,30 @@ impl BlockArena {
     }
 
     fn move_to(&mut self, label: Label, new_block_idx: usize, size: u8) {
-        if let Some(&old_block_idx) = self.label_to_block.get(&label)
-            && let block = &mut self.blocks[old_block_idx]
-            && let Some(pos) = block.placements.iter().position(|p| p.label == label)
-        {
-            let old_placement = block.placements.remove(pos);
-            block.used -= old_placement.size;
+        let old_block_idx = *self.label_to_block.get(&label).unwrap_or_else(|| {
+            panic!(
+                "cache-aligned layout tried to move instruction {label:?} to block \
+                     {new_block_idx}, but the instruction has no current block assignment"
+            )
+        });
+        let block = &mut self.blocks[old_block_idx];
+        let pos = block
+            .placements
+            .iter()
+            .position(|p| p.label == label)
+            .unwrap_or_else(|| {
+                panic!(
+                    "cache-aligned layout maps instruction {label:?} to block {old_block_idx}, but \
+                     that block has no matching placement"
+                )
+            });
+        let old_placement = block.placements.remove(pos);
+        block.used -= old_placement.size;
 
-            let mut offset = 0u8;
-            for p in &mut block.placements {
-                p.offset = offset;
-                offset += p.size;
-            }
+        let mut offset = 0u8;
+        for p in &mut block.placements {
+            p.offset = offset;
+            offset += p.size;
         }
 
         let offset = self.blocks[new_block_idx].place(label, size);
@@ -211,7 +223,12 @@ impl Graph {
         self.successors
             .get(&label)
             .map(|v| v.as_slice())
-            .unwrap_or(&[])
+            .unwrap_or_else(|| {
+                panic!(
+                    "cache-aligned layout requested successors for instruction {label:?}, but the \
+                     layout graph has no entry for that label"
+                )
+            })
     }
 
     fn predecessor_count(&self, label: Label) -> usize {
@@ -264,9 +281,12 @@ impl<'a> LayoutBuilder<'a> {
     fn place_chains(&mut self, chains: &[Vec<Label>]) {
         for chain in chains {
             for &label in chain {
-                let Some(instr) = self.label_to_instr.get(&label) else {
-                    continue;
-                };
+                let instr = self.label_to_instr.get(&label).unwrap_or_else(|| {
+                    panic!(
+                        "cache-aligned layout chain contains label {label:?}, but no instruction \
+                             has that label"
+                    )
+                });
                 let size = instr.size() as u8;
 
                 if self.arena.blocks.is_empty()
@@ -290,13 +310,20 @@ impl<'a> LayoutBuilder<'a> {
         let mut refs = BlockEdges::new();
 
         for (&label, &block_idx) in &self.arena.label_to_block {
-            let Some(instr) = self.label_to_instr.get(&label) else {
-                continue;
-            };
+            let instr = self.label_to_instr.get(&label).unwrap_or_else(|| {
+                panic!(
+                    "cache-aligned layout placed label {label:?} in block {block_idx}, but no \
+                         instruction has that label"
+                )
+            });
             for &succ in instr.successors() {
-                if let Some(&succ_block) = self.arena.label_to_block.get(&succ)
-                    && succ_block != block_idx
-                {
+                let succ_block = *self.arena.label_to_block.get(&succ).unwrap_or_else(|| {
+                    panic!(
+                        "cache-aligned layout placed instruction {label:?} in block \
+                             {block_idx}, but its successor {succ:?} has no block placement"
+                    )
+                });
+                if succ_block != block_idx {
                     refs.add_edge(block_idx, succ_block);
                 }
             }
@@ -315,14 +342,21 @@ impl<'a> LayoutBuilder<'a> {
         let mut candidates: Vec<(Label, usize, usize)> = Vec::new();
 
         for (&label, &block_idx) in &self.arena.label_to_block {
-            let Some(instr) = self.label_to_instr.get(&label) else {
-                continue;
-            };
+            let instr = self.label_to_instr.get(&label).unwrap_or_else(|| {
+                panic!(
+                    "cache-aligned layout placed label {label:?} in block {block_idx}, but no \
+                         instruction has that label"
+                )
+            });
 
             for &succ in instr.successors() {
-                if let Some(&succ_block) = self.arena.label_to_block.get(&succ)
-                    && succ_block > block_idx
-                {
+                let succ_block = *self.arena.label_to_block.get(&succ).unwrap_or_else(|| {
+                    panic!(
+                        "cache-aligned layout placed instruction {label:?} in block \
+                             {block_idx}, but its successor {succ:?} has no block placement"
+                    )
+                });
+                if succ_block > block_idx {
                     candidates.push((succ, succ_block, block_idx));
                 }
             }
@@ -331,13 +365,23 @@ impl<'a> LayoutBuilder<'a> {
         candidates.sort_by_key(|(_, succ_block, _)| std::cmp::Reverse(*succ_block));
 
         for (succ_label, _succ_block, pred_block) in candidates {
-            let Some(&current_block) = self.arena.label_to_block.get(&succ_label) else {
-                continue;
-            };
-
-            let Some(instr) = self.label_to_instr.get(&succ_label) else {
-                continue;
-            };
+            let current_block = *self
+                .arena
+                .label_to_block
+                .get(&succ_label)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "cache-aligned layout selected instruction {succ_label:?} as a packing \
+                         candidate from predecessor block {pred_block}, but the candidate lost its \
+                         block placement"
+                    )
+                });
+            let instr = self.label_to_instr.get(&succ_label).unwrap_or_else(|| {
+                panic!(
+                    "cache-aligned layout selected label {succ_label:?} as a packing candidate, \
+                         but no instruction has that label"
+                )
+            });
             let size = instr.size() as u8;
 
             // Prefer blocks that reference the predecessor block (cache locality)
@@ -347,9 +391,14 @@ impl<'a> LayoutBuilder<'a> {
             let best = (0..current_block)
                 .filter(|&c| self.arena.blocks[c].can_fit(size))
                 .max_by(|&a, &b| {
-                    scores[a]
-                        .partial_cmp(&scores[b])
-                        .unwrap_or(std::cmp::Ordering::Equal)
+                    scores[a].partial_cmp(&scores[b]).unwrap_or_else(|| {
+                        panic!(
+                            "cache-aligned layout cannot compare packing scores: block {a} has \
+                                 score {:?}, block {b} has score {:?}, candidate={succ_label:?}, \
+                                 predecessor_block={pred_block}",
+                            scores[a], scores[b]
+                        )
+                    })
                 });
 
             if let Some(candidate) = best {
@@ -416,10 +465,12 @@ fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label
 
     let (mut entry_chains, mut other_chains): (Vec<_>, Vec<_>) =
         chains.drain(..).partition(|chain| {
-            chain
-                .first()
-                .map(|l| entry_set.contains(l))
-                .unwrap_or(false)
+            entry_set.contains(chain.first().unwrap_or_else(|| {
+                panic!(
+                    "cache-aligned layout produced an empty instruction chain while \
+                             ordering entry points"
+                )
+            }))
         });
 
     // Sort other chains by size (descending) for better locality

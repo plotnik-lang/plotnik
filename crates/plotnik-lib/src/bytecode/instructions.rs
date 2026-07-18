@@ -7,8 +7,6 @@ use std::num::NonZeroU16;
 
 use crate::core::{NodeFieldId, ZeroIdError};
 
-#[cfg(test)]
-use super::constants::SECTION_ALIGN;
 use super::constants::{
     BYTECODE_WORD_SIZE, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SUCCESSORS,
 };
@@ -1072,11 +1070,4 @@ pub fn select_match_opcode(slots_needed: usize) -> Option<Opcode> {
     ]
     .into_iter()
     .find(|op| op.payload_slots() >= slots_needed)
-}
-
-/// Pad a size to the next multiple of SECTION_ALIGN (64 bytes).
-#[inline]
-#[cfg(test)]
-pub fn align_to_section(size: usize) -> usize {
-    (size + SECTION_ALIGN - 1) & !(SECTION_ALIGN - 1)
 }

@@ -125,7 +125,6 @@ pub enum DiagnosticKind {
     // Placed last (lowest priority): emission reports these only when no
     // earlier-stage error exists.
     TargetLimitExceeded,
-    CompilerInvariantViolation,
     NoEntryPoints,
     EmptyQuery,
 }
@@ -431,7 +430,6 @@ impl DiagnosticKind {
             Self::QueryTooComplex => "query too complex to compile",
             Self::MissingDefName => "definition must be named",
             Self::TargetLimitExceeded => "emission target limit exceeded",
-            Self::CompilerInvariantViolation => "compiler invariant violation",
             Self::NoEntryPoints => "query defines no selectable entry point",
             Self::EmptyQuery => "query defines nothing",
         }
@@ -496,8 +494,8 @@ impl DiagnosticKind {
             Self::DuplicateAlternativeLabel => {
                 "alternative label `{}` is already used in this alternation".to_string()
             }
-            // The detail (an `EmitError`/`ModuleError` Display) is already a complete message.
-            Self::TargetLimitExceeded | Self::CompilerInvariantViolation => "{}".to_string(),
+            // The `EmitError` detail is already a complete message.
+            Self::TargetLimitExceeded => "{}".to_string(),
             _ => format!("{}: {{}}", self.summary()),
         }
     }

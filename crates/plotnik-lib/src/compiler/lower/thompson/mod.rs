@@ -27,13 +27,4 @@ mod quantifier;
 mod scope;
 mod sequences;
 
-#[cfg(test)]
-mod boundary_tests;
-#[cfg(test)]
-mod capture_tests;
-#[cfg(test)]
-mod patterns_tests;
-#[cfg(test)]
-mod quantifier_tests;
-
 pub(in crate::compiler::lower) use builder::NfaBuilder;

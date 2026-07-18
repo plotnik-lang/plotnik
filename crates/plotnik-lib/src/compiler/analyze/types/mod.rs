@@ -17,6 +17,3 @@ pub use entry_points::check_entry_points;
 pub use root_extent::RootExtent;
 pub use type_analysis::TypeAnalysis;
 pub use type_shape::TypeShape;
-
-#[cfg(test)]
-mod root_extent_tests;

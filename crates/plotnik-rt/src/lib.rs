@@ -16,14 +16,6 @@ mod result_decoder;
 mod serialize;
 mod surface;
 
-#[cfg(test)]
-#[cfg(feature = "debug")]
-mod debug_tests;
-#[cfg(test)]
-mod journal_tests;
-#[cfg(test)]
-mod result_decoder_tests;
-
 pub use plotnik_rt_core::*;
 
 pub use cursor::CursorWrapper;

@@ -4,13 +4,6 @@ mod dispatch;
 mod limits;
 pub mod shebang;
 
-#[cfg(test)]
-mod dispatch_tests;
-#[cfg(test)]
-mod limits_tests;
-#[cfg(test)]
-mod shebang_tests;
-
 pub use commands::build_cli;
 pub use dispatch::{
     CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
@@ -41,10 +34,23 @@ pub enum ColorChoice {
 
 impl ColorChoice {
     pub fn from_matches(m: &clap::ArgMatches) -> Self {
-        match m.get_one::<String>("color").map(|s| s.as_str()) {
-            Some("always") => ColorChoice::Always,
-            Some("never") => ColorChoice::Never,
-            _ => ColorChoice::Auto,
+        match m
+            .get_one::<String>("color")
+            .unwrap_or_else(|| {
+                panic!(
+                    "CLI argument state is inconsistent: clap omitted `color` despite its declared \
+                     `auto` default"
+                )
+            })
+            .as_str()
+        {
+            "auto" => ColorChoice::Auto,
+            "always" => ColorChoice::Always,
+            "never" => ColorChoice::Never,
+            value => unreachable!(
+                "CLI argument state is inconsistent: clap accepted unsupported `color` value \
+                 {value:?}; expected `auto`, `always`, or `never`"
+            ),
         }
     }
 

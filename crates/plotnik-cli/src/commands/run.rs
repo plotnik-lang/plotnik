@@ -9,7 +9,7 @@ use plotnik_lib::{
 
 use super::run_common::{self, ExecPlan, ExecRequest};
 use super::runtime_report::render_runtime_error;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, writeln_stderr, writeln_stdout};
 
 pub struct RunArgs {
     pub query_path: Option<PathBuf>,
@@ -48,18 +48,18 @@ pub fn run(args: RunArgs) -> CliResult {
         let journal = match result {
             Ok(journal) => journal,
             Err(RuntimeError::NoMatch) => {
-                println!(
+                writeln_stdout(format_args!(
                     "{}",
                     serde_json::json!({
                         "result": null,
                         "error": "no match",
                         "run_stats": stats,
                     })
-                );
+                ))?;
                 return Err(CliError::No);
             }
             Err(e) => {
-                eprintln!("{}", render_runtime_error(&e, true));
+                writeln_stderr(format_args!("{}", render_runtime_error(&e, true)))?;
                 return Err(CliError::FatalRendered);
             }
         };
@@ -74,14 +74,14 @@ pub fn run(args: RunArgs) -> CliResult {
         );
         let result_provenance =
             (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, &module));
-        println!(
+        writeln_stdout(format_args!(
             "{}",
             serde_json::json!({
                 "result": result,
                 "result_provenance": result_provenance,
                 "run_stats": stats,
             })
-        );
+        ))?;
         return Ok(());
     }
 
@@ -89,11 +89,11 @@ pub fn run(args: RunArgs) -> CliResult {
         Ok(journal) => journal,
         Err(RuntimeError::NoMatch) => {
             // Zero matches must never be silent
-            eprintln!("no match");
+            writeln_stderr(format_args!("no match"))?;
             return Err(CliError::No);
         }
         Err(e) => {
-            eprintln!("{}", render_runtime_error(&e, args.json));
+            writeln_stderr(format_args!("{}", render_runtime_error(&e, args.json)))?;
             return Err(CliError::FatalRendered);
         }
     };
@@ -108,7 +108,7 @@ pub fn run(args: RunArgs) -> CliResult {
     );
 
     let output = value.format(args.pretty, colors);
-    println!("{}", output);
+    writeln_stdout(format_args!("{output}"))?;
 
     Ok(())
 }

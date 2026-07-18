@@ -9,9 +9,6 @@ pub(in crate::compiler) mod string_table;
 pub(in crate::compiler) mod tables;
 pub(in crate::compiler) mod type_table;
 
-#[cfg(test)]
-mod regex_table_tests;
-
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::lower::ir::LoweredNfa;

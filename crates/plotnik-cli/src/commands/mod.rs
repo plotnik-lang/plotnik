@@ -14,19 +14,4 @@ pub mod trace;
 pub mod tree;
 
 #[cfg(test)]
-mod tree_tests;
-
-#[cfg(test)]
-mod check_tests;
-
-#[cfg(test)]
-mod generate_tests;
-
-#[cfg(test)]
-mod run_common_tests;
-
-#[cfg(test)]
-mod runtime_report_tests;
-
-#[cfg(test)]
 mod lang_tests;

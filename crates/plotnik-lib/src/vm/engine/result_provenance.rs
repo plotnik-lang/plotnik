@@ -207,7 +207,21 @@ impl<'m> ProvenanceExtractor<'m> {
 
         assert!(
             self.open.is_empty(),
-            "provenance span stack must be empty after the match journal"
+            "provenance extraction finished with {} unclosed span frame(s) after consuming the \
+             match journal",
+            self.open.len()
+        );
+        assert!(
+            self.frames.is_empty(),
+            "provenance extraction finished with {} unclosed value frame(s) after consuming the \
+             match journal",
+            self.frames.len()
+        );
+        assert!(
+            self.scalar_frames.is_empty(),
+            "provenance extraction finished with {} unclosed scalar frame(s) after consuming the \
+             match journal",
+            self.scalar_frames.len()
         );
         self.entries
     }

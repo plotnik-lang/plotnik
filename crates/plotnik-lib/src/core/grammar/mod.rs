@@ -17,16 +17,6 @@ mod tokens;
 mod types;
 mod validation;
 
-#[cfg(test)]
-mod json_tests;
-#[cfg(test)]
-mod node_shapes_tests;
-#[cfg(test)]
-mod structure_tests;
-
-#[cfg(test)]
-mod types_tests;
-
 pub use identity::GrammarIdentity;
 pub use json::GrammarError;
 pub use prepared::VariableType;

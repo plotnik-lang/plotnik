@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
@@ -10,7 +9,7 @@ use clap::ValueEnum;
 use super::compile::{compile_query, compile_query_with_grammar};
 use super::lang_resolver::require_lang;
 use super::query_loader::load_query;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, write_stderr, write_stdout, writeln_stderr};
 use crate::language_registry;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
@@ -35,13 +34,11 @@ pub fn run(args: GenerateArgs) -> CliResult {
         fs::write(path, output).map_err(|error| {
             CliError::fatal(format!("failed to write '{}': {error}", path.display()))
         })?;
-        eprintln!("Wrote Rust matcher to {}", path.display());
+        writeln_stderr(format_args!("Wrote Rust matcher to {}", path.display()))?;
         return Ok(());
     }
 
-    io::stdout()
-        .write_all(output.as_bytes())
-        .map_err(|error| CliError::fatal(format!("failed to write generated matcher: {error}")))?;
+    write_stdout(format_args!("{output}"))?;
     Ok(())
 }
 
@@ -72,12 +69,12 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
                 .map_err(|error| CliError::fatal(error.to_string()))?;
             let has_errors = emission.diagnostics().has_errors();
             if !emission.diagnostics().is_empty() {
-                eprint!(
+                write_stderr(format_args!(
                     "{}",
                     emission
                         .diagnostics()
                         .render_colored(compiled.source_map(), args.color)
-                );
+                ))?;
             }
             if has_errors {
                 return Err(CliError::No);

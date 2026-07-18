@@ -1,5 +1,7 @@
 //! Runtime errors and control-flow signals for VM execution.
 
+use plotnik_runtime::CallFrameError;
+
 /// Errors during VM execution.
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
@@ -13,6 +15,9 @@ pub enum RuntimeError {
     /// reported alongside the ceiling to make the limit tunable.
     #[error("exceeded the memory limit of {limit} bytes (used {used} bytes)")]
     MemoryLimitExceeded { used: u64, limit: u64 },
+
+    #[error(transparent)]
+    CallFrame(#[from] CallFrameError),
 
     #[error("no match found")]
     NoMatch,

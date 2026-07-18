@@ -49,18 +49,6 @@ impl<'q> QueryPrinter<'q> {
         self
     }
 
-    #[cfg(test)]
-    pub(crate) fn with_root_extents(mut self, value: bool) -> Self {
-        self.root_extents = value;
-        self
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_spans(mut self, value: bool) -> Self {
-        self.spans = value;
-        self
-    }
-
     pub(crate) fn definitions_only(mut self, value: bool) -> Self {
         self.definitions = value;
         self

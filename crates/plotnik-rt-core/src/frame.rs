@@ -63,6 +63,11 @@ impl PortId {
     }
 }
 
+const _: () = assert!(
+    PortId::COUNT == u8::BITS as u8,
+    "`PortId::COUNT` must equal `u8::BITS` so the return-port universe exactly fills its wire mask"
+);
+
 impl From<PortId> for u8 {
     fn from(port: PortId) -> Self {
         port.to_byte()
@@ -82,6 +87,44 @@ pub struct Frame {
     /// Parent frame index (for cactus stack).
     pub parent: Option<u32>,
 }
+
+/// A source-driven call could not be represented by the runtime's frame state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CallFrameError {
+    ArenaCapacity {
+        call_site: u16,
+        existing_frames: usize,
+    },
+    RecursionDepth {
+        call_site: u16,
+        current_depth: u32,
+    },
+}
+
+impl std::fmt::Display for CallFrameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ArenaCapacity {
+                call_site,
+                existing_frames,
+            } => write!(
+                f,
+                "frame arena cannot allocate call site {call_site}: {existing_frames} existing \
+                 frames exceed the u32 index space"
+            ),
+            Self::RecursionDepth {
+                call_site,
+                current_depth,
+            } => write!(
+                f,
+                "runtime recursion depth overflowed u32 while entering call site {call_site}: \
+                 current_depth={current_depth}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CallFrameError {}
 
 /// Append-only arena for frames (cactus stack implementation).
 ///
@@ -104,14 +147,17 @@ impl FrameArena {
     }
 
     /// Push a new frame, returns its index.
-    pub fn push(&mut self, call_site: u16) -> u32 {
-        let idx = self.frames.len() as u32;
+    pub fn push(&mut self, call_site: u16) -> Result<u32, CallFrameError> {
+        let idx = u32::try_from(self.frames.len()).map_err(|_| CallFrameError::ArenaCapacity {
+            call_site,
+            existing_frames: self.frames.len(),
+        })?;
         self.frames.push(Frame {
             call_site,
             parent: self.current,
         });
         self.current = Some(idx);
-        idx
+        Ok(idx)
     }
 
     /// Pop the current frame, returning its executor-owned call-site token.
@@ -127,6 +173,13 @@ impl FrameArena {
     /// Restore frame state for backtracking.
     #[inline]
     pub fn restore(&mut self, frame_index: Option<u32>) {
+        if let Some(index) = frame_index.filter(|&index| index as usize >= self.frames.len()) {
+            panic!(
+                "backtracking tried to restore frame index {index}, but the arena contains only {} \
+                 frames",
+                self.frames.len()
+            );
+        }
         self.current = frame_index;
     }
 
@@ -172,7 +225,17 @@ impl FrameArena {
         };
 
         if let Some(high_water) = keep {
+            if high_water as usize >= self.frames.len() {
+                panic!(
+                    "frame pruning computed high-water index {high_water}, but the arena contains \
+                     only {} frames: current={:?}, checkpoint_max={max_frame_idx:?}",
+                    self.frames.len(),
+                    self.current
+                );
+            }
             self.frames.truncate(high_water as usize + 1);
+        } else {
+            self.frames.clear();
         }
     }
 }

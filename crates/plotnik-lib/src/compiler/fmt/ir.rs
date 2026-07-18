@@ -410,14 +410,6 @@ impl WorkCounter {
     }
 }
 
-#[cfg(test)]
-#[derive(Debug, Clone, Copy)]
-pub(super) struct FormatMetrics {
-    pub work: usize,
-    pub input_bytes: usize,
-    pub output_bytes: usize,
-}
-
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(super) struct Width(pub usize);
 

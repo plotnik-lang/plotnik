@@ -19,6 +19,8 @@
 //! `NoopTracer` ignores these calls (optimized away), while `PrintTracer`
 //! maintains parallel state for display purposes.
 
+use std::io::{self, Write as _};
+
 use tree_sitter::Node;
 
 use crate::bytecode::{
@@ -324,7 +326,12 @@ impl<'s> PrintTracer<'s> {
     }
 
     fn member_name(&self, idx: u16) -> &str {
-        self.render.member_name(idx).unwrap_or("?")
+        self.render.member_name(idx).unwrap_or_else(|| {
+            panic!(
+                "execution trace encountered effect member index {idx}, but the bytecode type \
+                     table has no member at that index"
+            )
+        })
     }
 
     /// The definition name for a call or entry target. Only entry points carry a
@@ -420,10 +427,12 @@ impl<'s> PrintTracer<'s> {
         self.render.trace_match_content(m)
     }
 
-    pub fn print(&self) {
+    pub fn print(&self) -> io::Result<()> {
+        let mut stdout = io::stdout().lock();
         for line in &self.lines {
-            println!("{}", line);
+            writeln!(stdout, "{line}")?;
         }
+        Ok(())
     }
 
     /// Render the accumulated trace as a single string — the buffer analogue of
@@ -692,7 +701,12 @@ impl Tracer for PrintTracer<'_> {
         // checkpoint's actual call path rather than only its depth, which can
         // shrink a trace stack but cannot reconstruct a popped callee name.
         self.call_stack = checkpoint.call_stack;
-        debug_assert_eq!(self.call_stack.len(), depth as usize + 1);
+        assert_eq!(
+            self.call_stack.len(),
+            depth as usize + 1,
+            "execution trace restored a call stack whose length disagrees with the runtime \
+             checkpoint depth"
+        );
         let line = format!(
             "  {:0aw$} {}",
             checkpoint.ip,

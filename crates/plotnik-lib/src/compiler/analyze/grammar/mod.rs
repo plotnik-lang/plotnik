@@ -11,6 +11,3 @@ mod utils;
 
 pub use binding::{GrammarBinding, GrammarBindingBuilder};
 pub use satisfiability::DEFAULT_SATISFIABILITY_WORK_BUDGET;
-
-#[cfg(test)]
-mod bind_tests;

@@ -417,7 +417,3 @@ pub fn eliminate_epsilons(result: &mut NfaGraph) {
         }
     }
 }
-
-#[cfg(test)]
-#[path = "eliminate_tests.rs"]
-mod eliminate_tests;

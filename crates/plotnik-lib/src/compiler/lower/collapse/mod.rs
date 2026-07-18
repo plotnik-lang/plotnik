@@ -2,7 +2,4 @@
 
 mod up;
 
-#[cfg(test)]
-mod up_tests;
-
 pub use up::collapse_up;

@@ -142,8 +142,8 @@ impl<'a> EmitPipeline<'a> {
         tables: &ModuleTables,
         instructions: &[u8],
     ) -> Result<Vec<u8>, EmitError> {
-        let (str_blob, str_table) = pool.emit_strings();
-        let (regex_blob, regex_table) = pool.emit_regexes();
+        let (str_blob, str_table) = pool.emit_strings()?;
+        let (regex_blob, regex_table) = pool.emit_regexes()?;
         let (type_defs_bytes, type_members_bytes, type_names_bytes) = pool.emit_types();
 
         let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds);
@@ -171,7 +171,8 @@ impl<'a> EmitPipeline<'a> {
         writer.emit_section(&spans_bytes);
 
         writer.finish_sections();
-        let total_size = writer.len() as u32;
+        let total_size =
+            u32::try_from(writer.len()).map_err(|_| EmitError::ModuleTooLarge(writer.len()))?;
         let str_table_count = checked_count(
             pool.string_count(),
             EmitError::MAX_STRINGS,
@@ -234,8 +235,20 @@ impl<'a> EmitPipeline<'a> {
             entry_points_count,
             instruction_word_count,
             spans_count,
-            str_blob_size: str_blob.len() as u32,
-            regex_blob_size: regex_blob.len() as u32,
+            str_blob_size: u32::try_from(str_blob.len()).unwrap_or_else(|_| {
+                panic!(
+                    "string-table emission returned a {}-byte blob after validating it against the \
+                     u32 bytecode limit",
+                    str_blob.len()
+                )
+            }),
+            regex_blob_size: u32::try_from(regex_blob.len()).unwrap_or_else(|_| {
+                panic!(
+                    "regex-table emission returned a {}-byte blob after validating it against the \
+                     u32 bytecode limit",
+                    regex_blob.len()
+                )
+            }),
             total_size,
             ..Default::default()
         };
@@ -271,8 +284,8 @@ impl<'a> EmitPipeline<'a> {
                 None => (SPAN_NO_BINDING, SPAN_NO_BINDING),
             };
 
-            let source_id =
-                u16::try_from(entry.source_id.0).expect("source id must fit in span entry");
+            let source_id = u16::try_from(entry.source_id.0)
+                .map_err(|_| EmitError::SourceIdTooLarge(entry.source_id.0))?;
             let span = SpanEntry {
                 source_id,
                 kind: entry.kind,

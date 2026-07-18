@@ -188,6 +188,13 @@ impl<'t> VM<'t> {
                 DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
                 DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
                 DecodedInstr::Return(port) => self.exec_return(port, module, tracer),
+                DecodedInstr::Interior => {
+                    unreachable!(
+                        "decoded bytecode lookup returned an interior word at instruction pointer \
+                         {:?} after `instruction_at` accepted the address",
+                        self.ip
+                    )
+                }
             };
 
             match result {
@@ -464,7 +471,7 @@ impl<'t> VM<'t> {
     ) -> Result<(), Signal> {
         let call_site = self.ip;
         if !c.caller_owned() {
-            self.enter_callee(c.target, call_site, tracer);
+            self.enter_callee(c.target, call_site, tracer)?;
             return Ok(());
         }
 
@@ -490,7 +497,7 @@ impl<'t> VM<'t> {
             }
         }
 
-        self.enter_callee(c.target, call_site, tracer);
+        self.enter_callee(c.target, call_site, tracer)?;
         Ok(())
     }
 
@@ -500,12 +507,13 @@ impl<'t> VM<'t> {
         target: SuccessorAddr,
         call_site: CodeAddr,
         tracer: &mut T,
-    ) {
+    ) -> Result<(), RuntimeError> {
+        self.engine.enter_frame(u16::from(call_site))?;
         if T::ENABLED {
             tracer.trace_call(CodeAddr::from(u16::from(target)));
         }
-        self.engine.enter_frame(u16::from(call_site));
         self.ip = CodeAddr::from(u16::from(target));
+        Ok(())
     }
 
     /// Navigate to a field and return the skip policy for retry support.
@@ -666,12 +674,14 @@ impl<'t> VM<'t> {
                     if T::ENABLED {
                         tracer.trace_checkpoint_created(CodeAddr::from(cp.ip));
                     }
-                    self.enter_callee(
+                    if let Err(error) = self.enter_callee(
                         SuccessorAddr::try_from(resume.target)
                             .expect("validated call target is non-zero"),
                         CodeAddr::from(resume.call_site),
                         tracer,
-                    );
+                    ) {
+                        return error.into();
+                    }
                     return ControlFlow::Backtracked.into();
                 }
 

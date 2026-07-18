@@ -10,7 +10,7 @@
 //! against VM output byte-for-byte.
 
 use serde::Serialize;
-use serde::ser::{SerializeSeq, Serializer};
+use serde::ser::{Error as _, SerializeSeq, Serializer};
 
 /// Serialization that needs the source text alongside the value.
 ///
@@ -51,9 +51,14 @@ impl SerializeWithSource for tree_sitter::Node<'_> {
     ) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
 
-        let text = source
-            .get(self.start_byte()..self.end_byte())
-            .expect("node span must lie within source on UTF-8 boundaries");
+        let start = self.start_byte();
+        let end = self.end_byte();
+        let text = source.get(start..end).ok_or_else(|| {
+            S::Error::custom(format_args!(
+                "node span {start}..{end} is not a valid UTF-8 slice of the supplied {}-byte source",
+                source.len()
+            ))
+        })?;
         let mut s = serializer.serialize_struct("Node", 3)?;
         s.serialize_field("kind", self.kind())?;
         s.serialize_field("text", text)?;

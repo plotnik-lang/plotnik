@@ -189,17 +189,6 @@ impl DependencyAnalysis {
         }
     }
 
-    #[cfg(test)]
-    pub(in crate::compiler) fn empty() -> Self {
-        Self::new(
-            Vec::new(),
-            HashMap::new(),
-            Vec::new(),
-            HashSet::new(),
-            DefinitionDependencies::new(Vec::new()),
-        )
-    }
-
     pub fn def_id_for_sym(&self, sym: Symbol) -> Option<DefId> {
         self.def_ids_by_sym.get(&sym).copied()
     }

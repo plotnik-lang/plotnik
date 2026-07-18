@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::{self, Write};
 use std::path::PathBuf;
 
 use plotnik_lib::{TypeScriptCodegenConfig, TypeScriptMatchOnlyType};
@@ -7,7 +6,7 @@ use plotnik_lib::{TypeScriptCodegenConfig, TypeScriptMatchOnlyType};
 use super::compile::compile_query;
 use super::lang_resolver::require_lang;
 use super::query_loader::load_query;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, write_stderr, write_stdout, writeln_stderr};
 
 pub struct InferArgs {
     pub query_path: Option<PathBuf>,
@@ -59,12 +58,12 @@ pub fn run(args: InferArgs) -> CliResult {
         .map_err(|error| CliError::fatal(error.to_string()))?;
     let has_errors = emission.diagnostics().has_errors();
     if !emission.diagnostics().is_empty() {
-        eprint!(
+        write_stderr(format_args!(
             "{}",
             emission
                 .diagnostics()
                 .render_colored(compiled.source_map(), args.color)
-        );
+        ))?;
     }
     if has_errors {
         return Err(CliError::No);
@@ -79,11 +78,13 @@ pub fn run(args: InferArgs) -> CliResult {
         fs::write(path, &output)
             .map_err(|e| CliError::fatal(format!("failed to write '{}': {}", path.display(), e)))?;
         let type_count = count_types(&output);
-        eprintln!("Wrote {} types to {}", type_count, path.display());
+        writeln_stderr(format_args!(
+            "Wrote {} types to {}",
+            type_count,
+            path.display()
+        ))?;
     } else {
-        io::stdout()
-            .write_all(output.as_bytes())
-            .expect("failed to write inferred types to stdout");
+        write_stdout(format_args!("{output}"))?;
     }
 
     Ok(())

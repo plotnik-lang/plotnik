@@ -9,7 +9,7 @@ use plotnik_lib::{
 
 use super::run_common::{self, ExecPlan, ExecRequest};
 use super::runtime_report::render_runtime_error;
-use crate::error::{CliError, CliResult};
+use crate::error::{CliError, CliResult, writeln_stderr, writeln_stdout};
 
 const DEFAULT_MAX_RECORDS: usize = 65_536;
 
@@ -50,19 +50,19 @@ pub fn run(args: TraceArgs) -> CliResult {
         let mut tracer = TraceRecorder::new(&module, DEFAULT_MAX_RECORDS);
         let (result, stats) = vm.execute_with_stats(&module, &entry_point, &mut tracer);
         let execution_trace = tracer.finish();
-        println!(
+        writeln_stdout(format_args!(
             "{}",
             serde_json::json!({
                 "execution_trace": execution_trace,
                 "run_stats": stats,
             })
-        );
+        ))?;
 
         return match result {
             Ok(_) => Ok(()),
             Err(RuntimeError::NoMatch) => Err(CliError::No),
             Err(e) => {
-                eprintln!("{}", render_runtime_error(&e, true));
+                writeln_stderr(format_args!("{}", render_runtime_error(&e, true)))?;
                 Err(CliError::FatalRendered)
             }
         };
@@ -76,20 +76,26 @@ pub fn run(args: TraceArgs) -> CliResult {
 
     let journal = match vm.execute_with(&module, &entry_point, &mut tracer) {
         Ok(journal) => {
-            tracer.print();
+            tracer
+                .print()
+                .map_err(|error| CliError::fatal(format!("failed to write trace: {error}")))?;
             journal
         }
         Err(RuntimeError::NoMatch) => {
-            tracer.print();
-            eprintln!("no match");
+            tracer
+                .print()
+                .map_err(|error| CliError::fatal(format!("failed to write trace: {error}")))?;
+            writeln_stderr(format_args!("no match"))?;
             return Err(CliError::No);
         }
         Err(e) => {
             // `--json` structures only this error (on stderr); the trace itself is
             // always the textual trace format on stdout. trace is a debug tool, not
             // a JSON producer, so the two streams stay separate by design.
-            tracer.print();
-            eprintln!("{}", render_runtime_error(&e, args.json));
+            tracer
+                .print()
+                .map_err(|error| CliError::fatal(format!("failed to write trace: {error}")))?;
+            writeln_stderr(format_args!("{}", render_runtime_error(&e, args.json)))?;
             return Err(CliError::FatalRendered);
         }
     };
@@ -98,7 +104,7 @@ pub fn run(args: TraceArgs) -> CliResult {
         return Ok(());
     }
 
-    println!("{}---{}", colors.dim, colors.reset);
+    writeln_stdout(format_args!("{}---{}", colors.dim, colors.reset))?;
     let value = materialize_verified(
         &source_code,
         &module,
@@ -108,7 +114,7 @@ pub fn run(args: TraceArgs) -> CliResult {
     );
 
     let output = value.format(true, colors);
-    println!("{}", output);
+    writeln_stdout(format_args!("{output}"))?;
 
     Ok(())
 }

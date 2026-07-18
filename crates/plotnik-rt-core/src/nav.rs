@@ -237,6 +237,11 @@ impl Nav {
     ///
     /// Panics if `self` is not an `Up*` nav; callers gate on [`Nav::up_level`].
     pub fn with_up_level(self, level: u8) -> Self {
+        assert!(
+            (1..=Self::MAX_UP_LEVEL).contains(&level),
+            "cannot change navigation {self:?} to ascent level {level}; valid levels are 1..={}",
+            Self::MAX_UP_LEVEL
+        );
         match self {
             Self::Up(_) => Self::Up(level),
             Self::UpSkipTrivia(_) => Self::UpSkipTrivia(level),
@@ -328,7 +333,7 @@ impl Nav {
     /// among positions is owned by the parent (quantifier skip-retry, sequence
     /// advancement). Strips the search loop from any nav variant.
     pub fn to_exact(self) -> Self {
-        match self {
+        let exact = match self {
             Self::Epsilon => Self::Epsilon,
             Self::Down | Self::DownSkip | Self::DownSkipExtras => Self::DownExact,
             Self::Next | Self::NextSkip | Self::NextSkipExtras => Self::NextExact,
@@ -343,6 +348,12 @@ impl Nav {
             | Self::ChildlessSkipTrivia
             | Self::ChildlessSkipExtras
             | Self::ChildlessExact => self,
-        }
+        };
+        assert!(
+            !exact.is_sibling_search(),
+            "exact-navigation conversion retained an engine-owned sibling search: \
+             input={self:?}, output={exact:?}"
+        );
+        exact
     }
 }

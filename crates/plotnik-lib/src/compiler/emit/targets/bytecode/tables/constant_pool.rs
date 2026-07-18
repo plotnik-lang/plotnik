@@ -2,7 +2,7 @@
 
 use crate::bytecode::StringId;
 
-use super::{RegexId, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
+use super::{EmitError, RegexId, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 
 #[derive(Clone, Copy)]
 pub(in crate::compiler::emit) struct ConstantPool<'a> {
@@ -32,11 +32,11 @@ impl<'a> ConstantPool<'a> {
         self.regexes.lookup(string_id)
     }
 
-    pub(in crate::compiler::emit) fn emit_strings(self) -> (Vec<u8>, Vec<u8>) {
+    pub(in crate::compiler::emit) fn emit_strings(self) -> Result<(Vec<u8>, Vec<u8>), EmitError> {
         self.strings.emit()
     }
 
-    pub(in crate::compiler::emit) fn emit_regexes(self) -> (Vec<u8>, Vec<u8>) {
+    pub(in crate::compiler::emit) fn emit_regexes(self) -> Result<(Vec<u8>, Vec<u8>), EmitError> {
         self.regexes.emit()
     }
 

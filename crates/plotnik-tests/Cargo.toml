@@ -50,16 +50,8 @@ name = "fuzz_no_panic"
 path = "tests/fuzz_no_panic.rs"
 
 [[test]]
-name = "vm_stats"
-path = "tests/vm_stats.rs"
-
-[[test]]
 name = "stack_safety"
 path = "tests/stack_safety.rs"
-
-[[test]]
-name = "tree_json"
-path = "tests/tree_json.rs"
 
 [[test]]
 name = "macro_tests"

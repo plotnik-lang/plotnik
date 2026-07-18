@@ -11,6 +11,8 @@ use super::{
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum InternSymbolsError {
+    #[error("A grammar must define a start rule.")]
+    MissingStartRule,
     #[error("A grammar's start rule must be visible.")]
     HiddenStartRule,
     #[error("Undefined symbol `{0}`")]
@@ -39,7 +41,10 @@ pub(super) fn intern_symbols(
 
     let interner = Interner::new(source_variables, external_rules);
 
-    if variable_type_for_name(&source_variables[0].name) == VariableType::Hidden {
+    let start_rule = source_variables
+        .first()
+        .ok_or(InternSymbolsError::MissingStartRule)?;
+    if variable_type_for_name(&start_rule.name) == VariableType::Hidden {
         Err(InternSymbolsError::HiddenStartRule)?;
     }
 

@@ -84,7 +84,7 @@ impl RegexTableBuilder {
 
     /// Returns `(blob_bytes, table_bytes)`.
     /// Table entry: `string_id (u16) | reserved (u16) | offset (u32)`.
-    pub fn emit(&self) -> (Vec<u8>, Vec<u8>) {
+    pub fn emit(&self) -> Result<(Vec<u8>, Vec<u8>), EmitError> {
         let mut blob = Vec::new();
         // One entry per pattern plus the trailing sentinel.
         let mut table = Vec::with_capacity((self.entries.len() + 1) * REGEX_TABLE_ENTRY_SIZE);
@@ -97,11 +97,9 @@ impl RegexTableBuilder {
             }
 
             let (string_id, offset) = if let Some(e) = entry {
+                let offset = blob_offset(blob.len())?;
                 blob.extend_from_slice(&e.dfa_bytes);
-                (
-                    u16::from(e.string_id),
-                    (blob.len() - e.dfa_bytes.len()) as u32,
-                )
+                (u16::from(e.string_id), offset)
             } else {
                 (0, 0)
             };
@@ -114,10 +112,17 @@ impl RegexTableBuilder {
         // Sentinel entry with blob end offset
         table.extend_from_slice(&0u16.to_le_bytes()); // string_id = 0
         table.extend_from_slice(&0u16.to_le_bytes()); // reserved
-        table.extend_from_slice(&(blob.len() as u32).to_le_bytes());
+        table.extend_from_slice(&blob_offset(blob.len())?.to_le_bytes());
 
-        (blob, table)
+        Ok((blob, table))
     }
+}
+
+fn blob_offset(size: usize) -> Result<u32, EmitError> {
+    u32::try_from(size).map_err(|_| EmitError::SectionTooLarge {
+        section: "regex blob",
+        size,
+    })
 }
 
 impl Default for RegexTableBuilder {

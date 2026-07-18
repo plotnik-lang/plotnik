@@ -444,10 +444,12 @@ impl<'a> AnchorContextAnalysis<'a> {
                     // node as one consumer so a neighboring anchor is not hidden.
                     return ContextRelation::atom();
                 };
-                self.definitions
-                    .get(&def_id)
-                    .cloned()
-                    .unwrap_or_else(ContextRelation::impossible)
+                self.definitions.get(&def_id).cloned().unwrap_or_else(|| {
+                    panic!(
+                        "anchor-context analysis resolved definition {def_id:?}, but its \
+                             relation was not initialized before the reference was evaluated"
+                    )
+                })
             }
         }
     }

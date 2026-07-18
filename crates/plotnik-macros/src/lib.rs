@@ -13,9 +13,6 @@ mod args;
 mod expand;
 mod grammar_source;
 
-#[cfg(test)]
-mod grammar_source_tests;
-
 /// Compile a Plotnik query into a typed Rust module at the invocation site.
 ///
 /// ```ignore

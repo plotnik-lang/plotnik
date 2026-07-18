@@ -74,6 +74,18 @@ impl CaptureEffects {
             "nest_scope expects scope-closing effect, got {:?}",
             close.kind()
         );
+        assert!(
+            matches!(
+                (open.kind(), close.kind()),
+                (EffectKind::RecordOpen, EffectKind::RecordClose)
+                    | (EffectKind::VariantOpen, EffectKind::VariantClose)
+                    | (EffectKind::ListOpen, EffectKind::ListClose)
+                    | (EffectKind::SuppressBegin, EffectKind::SuppressEnd)
+            ),
+            "capture lowering received mismatched scope effects: opening={:?}, closing={:?}",
+            open.kind(),
+            close.kind()
+        );
         self.pre.push(open);
         self.post.insert(0, close);
         self

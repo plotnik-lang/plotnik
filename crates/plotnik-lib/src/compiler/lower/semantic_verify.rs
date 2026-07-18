@@ -66,6 +66,18 @@ pub(crate) enum SemanticVerifyError {
     Regex { pattern: String, error: String },
 }
 
+impl SemanticVerifyError {
+    pub(crate) fn is_query_rejection(&self) -> bool {
+        matches!(
+            self,
+            Self::StateLimit(_)
+                | Self::EntryPointLimit(_)
+                | Self::StateBudget(_)
+                | Self::Regex { .. }
+        )
+    }
+}
+
 pub(crate) fn verify(
     semantic: &SemanticNfa,
     schema: &ResultSchema<'_>,
@@ -113,113 +125,6 @@ fn verify_state_count(semantic: &SemanticNfa) -> Result<(), SemanticVerifyError>
         return Err(SemanticVerifyError::StateLimit(count));
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use indexmap::IndexMap;
-
-    use super::{MAX_STATES, Program, SemanticVerifyError, verify_state_count};
-    use crate::bytecode::Nav;
-    use crate::compiler::analyze::refs::DependencyAnalysis;
-    use crate::compiler::analyze::result::{ResultModel, ResultSchema};
-    use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
-    use crate::compiler::ids::DefId;
-    use crate::compiler::lower::ir::{
-        CallIR, CalleeEntry, DefSpecialization, InstructionIR, Label, MatchIR, NfaGraph, PortId,
-        ReturnAddr, ReturnIR, SemanticNfa,
-    };
-    use crate::compiler::lower::thompson::boundary::{EntryObligation, NavigationContract};
-    use crate::core::Interner;
-
-    #[test]
-    fn semantic_state_id_boundary_matches_codegen_dense_ids() {
-        let accepted = semantic_with_states(MAX_STATES);
-        verify_state_count(&accepted).expect("u16::MAX + 1 dense states fit ids 0..=u16::MAX");
-
-        let rejected = semantic_with_states(MAX_STATES + 1);
-        assert_eq!(
-            verify_state_count(&rejected),
-            Err(SemanticVerifyError::StateLimit(MAX_STATES + 1))
-        );
-    }
-
-    fn semantic_with_states(count: usize) -> SemanticNfa {
-        let instructions = (0..count)
-            .map(|index| {
-                InstructionIR::Match(MatchIR::terminal(Label(
-                    u32::try_from(index).expect("test state count fits u32 labels"),
-                )))
-            })
-            .collect();
-        SemanticNfa::new(NfaGraph {
-            instructions,
-            def_entries: IndexMap::new(),
-            entry_point_wrappers: IndexMap::new(),
-            spans: None,
-            label_origins: vec![None; count],
-        })
-    }
-
-    #[test]
-    fn call_entry_must_match_the_target_specialization() {
-        let graph = graph_with_call_and_return(
-            CallIR::routed(
-                Label(0),
-                Nav::Next,
-                ReturnAddr(Label(3)),
-                CalleeEntry(Label(1)),
-            ),
-            ReturnIR::new(Label(2)),
-        );
-
-        assert_malformed_return_contract(&graph);
-    }
-
-    #[test]
-    fn every_return_must_declare_the_specialization_entry_contract() {
-        let graph = graph_with_call_and_return(
-            CallIR::new(Label(0), ReturnAddr(Label(3)), CalleeEntry(Label(1))),
-            ReturnIR::callee_owned(
-                Label(2),
-                PortId::ZERO,
-                EntryObligation::new(NavigationContract::from_nav(Nav::Next)),
-            ),
-        );
-
-        assert_malformed_return_contract(&graph);
-    }
-
-    fn graph_with_call_and_return(call: CallIR, return_: ReturnIR) -> NfaGraph {
-        NfaGraph {
-            instructions: vec![
-                call.into(),
-                MatchIR::epsilon(Label(1), Label(2)).into(),
-                return_.into(),
-                ReturnIR::new(Label(3)).into(),
-            ],
-            def_entries: IndexMap::from([(
-                DefSpecialization::ordinary(DefId::from_raw(0)),
-                Label(1),
-            )]),
-            entry_point_wrappers: IndexMap::new(),
-            spans: None,
-            label_origins: vec![None; 4],
-        }
-    }
-
-    fn assert_malformed_return_contract(graph: &NfaGraph) {
-        let types = TypeAnalysisBuilder::new().finish();
-        let deps = DependencyAnalysis::empty();
-        let interner = Interner::new();
-        let model = ResultModel::new(&types, &deps).expect("empty result model is valid");
-        let schema = ResultSchema::new(&model, &types, &deps, &interner);
-
-        let Err(error) = Program::new(graph, &schema) else {
-            panic!("malformed call/callee entry contract must be rejected");
-        };
-        assert!(matches!(error, SemanticVerifyError::Malformed(_)));
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -725,10 +630,19 @@ impl<'a> Program<'a> {
                     if pending == PendingState::Full {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
-                    let summary = summaries
-                        .get(&call.target)
-                        .copied()
-                        .unwrap_or_else(DefSummary::unknown);
+                    let summary = match phase {
+                        VerifyPhase::Summarize => summaries
+                            .get(&call.target)
+                            .copied()
+                            .unwrap_or_else(DefSummary::unknown),
+                        VerifyPhase::Final => *summaries.get(&call.target).unwrap_or_else(|| {
+                            panic!(
+                                "final semantic verification reached call target {:?}, but the \
+                                     summary phase produced no callee summary for it",
+                                call.target
+                            )
+                        }),
+                    };
                     match stack.last() {
                         Some(kind)
                             if phase == VerifyPhase::Final

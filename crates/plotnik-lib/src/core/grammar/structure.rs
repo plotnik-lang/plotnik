@@ -265,14 +265,14 @@ pub struct StructureTable {
 }
 
 impl StructureTable {
-    pub(super) fn build(ctx: GrammarContext<'_>, grammar: &Grammar) -> Self {
+    pub(super) fn build(ctx: GrammarContext<'_>, grammar: &Grammar) -> Result<Self, String> {
         let variables = ctx
             .syntax
             .variables
             .iter()
             .map(|variable| {
                 let name = public_node_kind(&variable.name);
-                SkeletonVariable {
+                Ok(SkeletonVariable {
                     id: resolve_visible_id(&name, variable.kind, grammar),
                     name,
                     kind: variable.kind,
@@ -284,13 +284,13 @@ impl StructureTable {
                                 .steps
                                 .iter()
                                 .map(|step| classify_step(step, ctx, grammar))
-                                .collect()
+                                .collect::<Result<Vec<_>, _>>()
                         })
-                        .collect(),
-                }
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
             })
-            .collect();
-        Self { variables }
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(Self { variables })
     }
 
     /// Distilled productions, positionally aligned with the grammar's syntax
@@ -367,7 +367,7 @@ fn classify_step(
     step: &ProductionStep,
     ctx: GrammarContext<'_>,
     grammar: &Grammar,
-) -> SkeletonStep {
+) -> Result<SkeletonStep, String> {
     // Fold the step's own alias and the grammar's default alias into one effective
     // child type, exactly as node-shape derivation does, so a default-aliased step
     // resolves to the same public kind here and there.
@@ -406,21 +406,18 @@ fn classify_step(
         VarId(index)
     });
 
-    // A step the grammar calls visible must resolve to an id or a body — a visible
-    // token has an id, a visible non-terminal has a body. A wholly-unknown visible
-    // step means the classifier has a gap; debug builds (incl. the corpus test that
-    // loads every grammar) catch it, release builds pay nothing.
-    debug_assert!(
-        !(variable_type.is_visible() && id.is_none() && body.is_none()),
-        "visible step (symbol index {}) resolved to neither id nor body",
-        step.symbol.index
-    );
+    if variable_type.is_visible() && id.is_none() && body.is_none() {
+        return Err(format!(
+            "visible production step {} resolves to neither a public node kind nor a rule body",
+            step.symbol.index
+        ));
+    }
 
-    SkeletonStep {
+    Ok(SkeletonStep {
         target: StepTarget { id, body },
         field: step
             .field_name
             .as_deref()
             .and_then(|name| grammar.resolve_field(name)),
-    }
+    })
 }

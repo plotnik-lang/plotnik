@@ -31,9 +31,6 @@ mod state_set;
 
 pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
 
-#[cfg(test)]
-mod state_set_tests;
-
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::Located;

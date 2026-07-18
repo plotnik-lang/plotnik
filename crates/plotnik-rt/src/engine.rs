@@ -17,8 +17,8 @@ use std::num::NonZeroU64;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::{
-    Checkpoint, CheckpointStack, CheckpointState, CursorWrapper, FrameArena, JournalEvent,
-    MatchJournal,
+    CallFrameError, Checkpoint, CheckpointStack, CheckpointState, CursorWrapper, FrameArena,
+    JournalEvent, MatchJournal,
 };
 
 /// Execution state shared by the bytecode VM and generated matchers.
@@ -40,6 +40,9 @@ pub struct Engine<'t> {
     /// `u32`-indexed frame arena. A `u16` was far too narrow (deep `@_`
     /// recursion overflowed it at 65_536).
     suppress_depth: u32,
+    /// Immutable suppression floor: zero for materializing runs, one for
+    /// match-only runs.
+    base_suppress_depth: u32,
     /// Number of non-suppressed `ScalarOpen`s on the current journal path.
     scalar_depth: u32,
     /// Whether the cursor's lazy snapshot pool has activated (see
@@ -70,6 +73,7 @@ impl<'t> Engine<'t> {
             journal: MatchJournal::new(),
             recursion_depth: 0,
             suppress_depth,
+            base_suppress_depth: suppress_depth,
             scalar_depth: 0,
             snapshot_cursor_active: false,
         }
@@ -106,6 +110,23 @@ impl<'t> Engine<'t> {
     /// Surrender the committed match journal after acceptance.
     #[inline]
     pub fn into_journal(self) -> MatchJournal<'t> {
+        assert!(
+            self.frames.is_empty(),
+            "runtime accepted a match with a live call frame: current_frame={:?}",
+            self.frames.current()
+        );
+        assert_eq!(
+            self.recursion_depth, 0,
+            "runtime accepted a match with nonzero recursion depth"
+        );
+        assert_eq!(
+            self.suppress_depth, self.base_suppress_depth,
+            "runtime accepted a match with unbalanced suppression effects"
+        );
+        assert_eq!(
+            self.scalar_depth, 0,
+            "runtime accepted a match with unclosed scalar output effects"
+        );
         self.journal
     }
 
@@ -161,6 +182,7 @@ impl<'t> Engine<'t> {
             journal,
             recursion_depth,
             suppress_depth,
+            base_suppress_depth: _, // immutable execution mode
             scalar_depth,
             // Deliberately outside `CheckpointState`:
             checkpoints: _, // the stack this checkpoint was just popped from
@@ -248,14 +270,22 @@ impl<'t> Engine<'t> {
 
     /// Enter a callee, retaining the executor-owned token that identifies the
     /// call's return map.
-    pub fn enter_frame(&mut self, call_site: u16) {
-        self.frames.push(call_site);
-        self.recursion_depth += 1;
+    pub fn enter_frame(&mut self, call_site: u16) -> Result<(), CallFrameError> {
+        let next_depth =
+            self.recursion_depth
+                .checked_add(1)
+                .ok_or(CallFrameError::RecursionDepth {
+                    call_site,
+                    current_depth: self.recursion_depth,
+                })?;
+        self.frames.push(call_site)?;
+        self.recursion_depth = next_depth;
         debug_assert_eq!(
             self.recursion_depth,
             self.frames.depth(),
             "recursion_depth desynced from frame stack after Call"
         );
+        Ok(())
     }
 
     /// Exit the current callee, returning its call-site token. The executor

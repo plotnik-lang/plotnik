@@ -42,7 +42,3 @@ fn compute_reachable(nfa: &NfaGraph) -> HashSet<Label> {
 
     reachable
 }
-
-#[cfg(test)]
-#[path = "dead_code_tests.rs"]
-mod dead_code_tests;

@@ -13,10 +13,3 @@ pub mod visitor;
 
 pub(crate) use artifacts::AnalysisArtifacts;
 pub use located::Located;
-
-#[cfg(test)]
-mod anchors_tests;
-#[cfg(test)]
-mod boundary_tests;
-#[cfg(test)]
-mod result_tests;

@@ -49,9 +49,12 @@ impl StringTableBuilder {
             return Ok(id);
         }
 
-        let text = interner
-            .try_resolve(sym)
-            .ok_or(EmitError::StringNotFound(sym))?;
+        let text = interner.try_resolve(sym).unwrap_or_else(|| {
+            panic!(
+                "bytecode string-table emission received symbol {sym:?}, but the query \
+                     interner cannot resolve it"
+            )
+        });
 
         let id = self.intern_str(text)?;
         self.mapping.insert(sym, id);
@@ -94,20 +97,27 @@ impl StringTableBuilder {
     }
 
     /// Returns `(blob_bytes, table_bytes)`.
-    pub fn emit(&self) -> (Vec<u8>, Vec<u8>) {
+    pub fn emit(&self) -> Result<(Vec<u8>, Vec<u8>), EmitError> {
         let mut blob = Vec::new();
         let mut offsets: Vec<u32> = Vec::with_capacity(self.strings.len() + 1);
 
         for s in &self.strings {
-            offsets.push(blob.len() as u32);
+            offsets.push(blob_offset(blob.len())?);
             blob.extend_from_slice(s.as_bytes());
         }
-        offsets.push(blob.len() as u32); // sentinel
+        offsets.push(blob_offset(blob.len())?); // sentinel
 
         let table_bytes: Vec<u8> = offsets.iter().flat_map(|o| o.to_le_bytes()).collect();
 
-        (blob, table_bytes)
+        Ok((blob, table_bytes))
     }
+}
+
+fn blob_offset(size: usize) -> Result<u32, EmitError> {
+    u32::try_from(size).map_err(|_| EmitError::SectionTooLarge {
+        section: "string blob",
+        size,
+    })
 }
 
 impl Default for StringTableBuilder {

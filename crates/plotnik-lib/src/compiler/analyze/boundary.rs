@@ -407,10 +407,12 @@ impl<'a> BoundaryAnalyzer<'a> {
                 }) else {
                     return BoundaryRelation::empty();
                 };
-                self.definitions
-                    .get(&def_id)
-                    .cloned()
-                    .unwrap_or_else(BoundaryRelation::empty)
+                self.definitions.get(&def_id).cloned().unwrap_or_else(|| {
+                    panic!(
+                        "boundary analysis resolved definition {def_id:?}, but its relation was \
+                             not initialized before the reference was evaluated"
+                    )
+                })
             }
         }
     }

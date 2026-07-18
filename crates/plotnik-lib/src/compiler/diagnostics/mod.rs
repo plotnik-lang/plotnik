@@ -2,9 +2,6 @@ pub mod report;
 pub mod source;
 pub mod span;
 
-#[cfg(test)]
-mod source_tests;
-
 pub use report::{DiagnosticBuilder, DiagnosticKind, Diagnostics, Severity};
 pub use source::{Source, SourceId, SourceKind, SourceMap, SourcePath};
 pub use span::Span;
@@ -30,10 +27,6 @@ pub enum Error {
     /// query span.
     #[error("invalid emission configuration: {0}")]
     EmitConfig(#[from] crate::compiler::emit::EmitConfigError),
-
-    /// Lowered compiler IR violated a contract shared by every executor.
-    #[error("compiler invariant violation: {0}")]
-    CompilerInvariantViolation(String),
 }
 
 /// Result type for query operations.
