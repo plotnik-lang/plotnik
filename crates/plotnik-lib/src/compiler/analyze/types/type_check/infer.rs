@@ -1622,7 +1622,7 @@ fn labeled_alternation_value_root(pattern: &Pattern) -> bool {
 /// Shared with lowering, which keys its pending-value emission on the same
 /// predicate: a `Value`-flow pattern emits producer effects only where a
 /// definition or capture materializes the value. Diverging answers
-/// would make the bytecode effect-stack verifier reject valid queries.
+/// would make the matcher verifier reject valid queries.
 pub(crate) fn definition_value_root(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Alternation(alternation) => alternation.labeling() == Labeling::Labeled,

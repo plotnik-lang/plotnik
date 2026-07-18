@@ -852,6 +852,14 @@ impl Call {
         usize::from(self.returns_len)
     }
 
+    pub(crate) fn word_count(self) -> u16 {
+        if self.arity() == 1 {
+            Opcode::Call1.word_count()
+        } else {
+            Opcode::CallN.word_count()
+        }
+    }
+
     pub fn returns(&self) -> impl ExactSizeIterator<Item = SuccessorAddr> + '_ {
         self.returns[..self.arity()]
             .iter()

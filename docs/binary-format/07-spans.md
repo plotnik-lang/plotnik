@@ -72,11 +72,11 @@ precisely the text it returns, a present boolean may carry its document range, a
 real empty span. This remains exact even when lower-priority pattern spans
 are degraded away.
 
-Construction-time effect-stack validation tracks span depth, including inside
-suppression scopes, so malformed bytecode with unbalanced span brackets is
-rejected before execution. Span effects are still recorded under runtime
-suppression: a bare `(Foo)` reference suppresses `Foo`'s result values but not
-its result-provenance span events.
+Construction-time matcher verification tracks the result-effect and span
+stacks, including inside suppression scopes, so malformed bytecode with
+unbalanced span brackets is rejected before execution. Span effects are still
+recorded under runtime suppression: a bare `(Foo)` reference suppresses `Foo`'s
+result values but not its result-provenance span events.
 
 ## Degradation
 

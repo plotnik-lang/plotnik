@@ -22,7 +22,7 @@ use crate::compiler::{
 };
 use indoc::indoc;
 
-use super::effect_stack::{
+use super::verify::{
     body_analyses as loader_body_analyses, reset_body_analyses as reset_loader_body_analyses,
 };
 use super::{Module, ModuleError, Opcode};
@@ -1046,7 +1046,7 @@ fn entry_and_call_targets_may_address_word_zero() {
 fn forged_record_set_to_array_push_is_rejected() {
     // Swap an executed `RecordSet` for `ArrayPush`. A validated representation
     // would accept it, then the materializer would panic because the builder on
-    // top is a Record, not a List. The effect-stack verifier rejects it at load.
+    // top is a Record, not a List. The matcher verifier rejects it at load.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = first_effect_op(&bytes, |op| op == EffectKind::RecordSet as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::ArrayPush));
