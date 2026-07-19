@@ -76,16 +76,17 @@ impl InferVisitor<'_, '_> {
         inner_info: &PatternShape,
         capture_name: Option<Symbol>,
     ) {
-        let capture_has_no_single_node =
-            inner_info.root_extent == RootExtent::NotSingleNode && inner_info.flow.is_no_value();
+        let inner = quant
+            .inner()
+            .expect("validated quantified pattern has an inner pattern");
+        let capture_has_no_single_node = self.ctx.pattern_facts.pattern_root_extent(&inner)
+            == RootExtent::NotSingleNode
+            && inner_info.flow.is_no_value();
         if !capture_has_no_single_node {
             return;
         }
 
         let op = self.quantifier_operator(quant);
-        let inner = quant
-            .inner()
-            .expect("validated quantified pattern has an inner pattern");
         let inner_text = inline_source(inner.syntax());
         let referenced_definition = self.referenced_definition(&inner);
         let (detail, hint) = if let Some(capture_name) = capture_name {
@@ -167,7 +168,9 @@ impl InferVisitor<'_, '_> {
         inner_info: &PatternShape,
         capture_name: Symbol,
     ) {
-        if inner_info.root_extent != RootExtent::NotSingleNode || !inner_info.flow.is_no_value() {
+        if self.ctx.pattern_facts.pattern_root_extent(inner) != RootExtent::NotSingleNode
+            || !inner_info.flow.is_no_value()
+        {
             return;
         }
 

@@ -88,6 +88,7 @@ impl PatternSummary {
     fn into_authored_pattern_facts(self) -> AuthoredPatternFacts {
         AuthoredPatternFacts {
             nullable: self.nullable,
+            root_extent: self.root_extent,
             boundary: self.boundary,
             may_match_anonymous_node: self.may_match_anonymous_node,
         }
@@ -103,6 +104,7 @@ struct DefinitionFacts {
 
 struct AuthoredPatternFacts {
     nullable: bool,
+    root_extent: RootExtent,
     boundary: BoundaryRelation,
     may_match_anonymous_node: bool,
 }
@@ -173,10 +175,6 @@ impl PatternFacts {
         self.definition(def_id).nullable
     }
 
-    pub(crate) fn definition_root_extent(&self, def_id: DefId) -> RootExtent {
-        self.definition(def_id).root_extent
-    }
-
     pub(crate) fn is_entry_point_eligible(&self, def_id: DefId) -> bool {
         let facts = self.definition(def_id);
         facts.root_extent == RootExtent::SingleNode
@@ -199,6 +197,10 @@ impl PatternFacts {
 
     pub(crate) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
         self.pattern(pattern).nullable
+    }
+
+    pub(crate) fn pattern_root_extent(&self, pattern: &Pattern) -> RootExtent {
+        self.pattern(pattern).root_extent
     }
 
     pub(crate) fn pattern_may_match_anonymous_node(&self, pattern: &Pattern) -> bool {

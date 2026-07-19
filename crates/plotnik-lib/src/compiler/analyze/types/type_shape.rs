@@ -1,8 +1,4 @@
 //! Core type definitions for the type checking pass.
-//!
-//! The type system tracks two orthogonal properties:
-//! - Root extent: whether a match has exactly one top-level node.
-//! - Pattern flow: what result data flows through an expression.
 
 use std::collections::BTreeMap;
 
@@ -13,7 +9,6 @@ use crate::core::Symbol;
 
 use super::capture::InferredFieldFlow;
 use crate::bytecode::type_system::PrimitiveType;
-use crate::compiler::analyze::shape::RootExtent;
 pub use crate::compiler::parse::ast::QuantifierKind;
 
 pub(crate) const RESERVED_NO_VALUE_TYPE_ID: TypeId = TypeId(PrimitiveType::NoValue.index() as u32);
@@ -185,28 +180,24 @@ impl PatternFlow {
     }
 }
 
-/// Combined root extent and result flow for a pattern.
+/// Inference-time result flow and field provenance for a pattern.
 #[derive(Clone, Debug)]
 pub struct PatternShape {
-    /// Whether one match has exactly one top-level syntax-tree node.
-    pub root_extent: RootExtent,
     /// What data flows through this expression.
     pub flow: PatternFlow,
     pub(super) field_flow: Option<InferredFieldFlow>,
 }
 
 impl PatternShape {
-    pub fn new(root_extent: RootExtent, flow: PatternFlow) -> Self {
+    pub fn new(flow: PatternFlow) -> Self {
         Self {
-            root_extent,
             flow,
             field_flow: None,
         }
     }
 
-    pub(super) fn fields(root_extent: RootExtent, field_flow: InferredFieldFlow) -> Self {
+    pub(super) fn fields(field_flow: InferredFieldFlow) -> Self {
         Self {
-            root_extent,
             flow: PatternFlow::Fields(field_flow.type_id),
             field_flow: Some(field_flow),
         }
@@ -214,7 +205,6 @@ impl PatternShape {
 
     pub fn no_value() -> Self {
         Self {
-            root_extent: RootExtent::SingleNode,
             flow: PatternFlow::NoValue,
             field_flow: None,
         }
