@@ -39,8 +39,8 @@ use crate::compiler::diagnostics::source::SourceMap;
 use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
+use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
-use crate::core::{Interner, NodeKindId};
 
 use super::participation::Participation;
 use automaton::AutomatonContext;
@@ -49,7 +49,6 @@ use engine::SatisfiabilitySolver;
 /// The threaded dependencies of the satisfiability pass.
 pub(super) struct SatisfiabilityInput<'a> {
     pub(super) grammar: &'a Grammar,
-    pub(super) interner: &'a Interner,
     pub(super) definitions: &'a DefinitionGraph,
     pub(super) pattern_facts: &'a PatternFacts,
     pub(super) source_map: &'a SourceMap,
@@ -66,7 +65,6 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 
     let ctx = AutomatonContext {
         grammar: input.grammar,
-        interner: input.interner,
         definitions: input.definitions,
         pattern_facts: input.pattern_facts,
         source_map: input.source_map,
@@ -321,8 +319,7 @@ impl Goal {
     }
 
     fn from_def_ref(ctx: AutomatonContext<'_>, def_ref: &ast::DefRef) -> Option<Self> {
-        let name = def_ref.name()?;
-        let def_id = ctx.definitions.id_for_name(ctx.interner, name.text())?;
+        let def_id = ctx.definitions.reference_target(def_ref)?;
         let target = ctx.definitions.definition(def_id).located_body();
         let Pattern::NamedNodePattern(node) = target.node() else {
             return None;

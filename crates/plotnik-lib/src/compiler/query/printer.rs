@@ -1,6 +1,6 @@
 //! AST/CST pretty-printer for debugging and test snapshots.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use indexmap::IndexSet;
@@ -146,19 +146,22 @@ impl<'w, 'a, W: Write> DefinitionWriter<'w, 'a, W> {
         writeln!(self.w, "{}{}", prefix, name)?;
         self.active_path.insert(def_id);
 
-        let referenced_names = definition
+        let mut references = BTreeMap::new();
+        for reference in definition
             .body()
             .syntax()
             .descendants()
             .filter_map(DefRef::cast)
-            .filter_map(|reference| reference.name())
-            .map(|name| name.text().to_string())
-            .collect::<BTreeSet<_>>();
-        for referenced_name in referenced_names {
-            if let Some(referenced_id) = self
-                .definitions
-                .id_for_name(self.interner, &referenced_name)
-            {
+        {
+            let Some(name) = reference.name() else {
+                continue;
+            };
+            references
+                .entry(name.text().to_string())
+                .or_insert_with(|| self.definitions.reference_target(&reference));
+        }
+        for (referenced_name, referenced_id) in references {
+            if let Some(referenced_id) = referenced_id {
                 self.format_definition_tree(referenced_id, depth + 1)?;
             } else {
                 writeln!(self.w, "{}{}?", indent(depth + 1), referenced_name)?;

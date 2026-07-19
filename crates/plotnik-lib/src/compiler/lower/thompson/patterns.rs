@@ -410,14 +410,8 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Resolve a reference to the `DefId` of its target definition.
-    pub(super) fn resolve_ref_def_id(&self, r: &ast::DefRef) -> DefId {
-        let name_token = r.name().expect("validated reference must have a name");
-        self.ctx
-            .analysis
-            .definitions
-            .id_for_name(self.ctx.analysis.interner, name_token.text())
-            .expect("analyzed reference must resolve to a definition")
+    pub(super) fn expect_reference_target(&self, r: &ast::DefRef) -> DefId {
+        self.ctx.analysis.definitions.expect_reference_target(r)
     }
 
     /// Whether this pattern is a reference (possibly captured) to a nullable
@@ -437,7 +431,7 @@ impl NfaBuilder<'_> {
         let Pattern::DefRef(r) = &inner else {
             return false;
         };
-        self.definition_is_nullable(self.resolve_ref_def_id(r))
+        self.definition_is_nullable(self.expect_reference_target(r))
     }
 
     /// Whether a pattern can match zero nodes.
@@ -479,7 +473,7 @@ impl NfaBuilder<'_> {
         let Pattern::DefRef(r) = &inner else {
             return pattern_owns_iteration(&inner);
         };
-        let def_id = self.resolve_ref_def_id(r);
+        let def_id = self.expect_reference_target(r);
         let body = self.ctx.analysis.definitions.definition(def_id).body();
         self.body_owns_iteration(body)
     }
@@ -500,7 +494,7 @@ impl NfaBuilder<'_> {
         ctx: PatternCtx,
         field_override: Option<NodeFieldId>,
     ) -> Label {
-        let def_id = self.resolve_ref_def_id(r);
+        let def_id = self.expect_reference_target(r);
         if self.definition_is_nullable(def_id) {
             // A nullable body has `RootExtent::NotSingleNode`, which field values
             // reject upstream ("field cannot match a sequence").

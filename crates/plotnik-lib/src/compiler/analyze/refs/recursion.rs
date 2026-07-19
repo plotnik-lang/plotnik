@@ -4,6 +4,8 @@
 //! - Escapable: at least one non-recursive path exists
 //! - Progressing: every recursive cycle matches a node before recursing
 
+use std::collections::HashMap;
+
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
@@ -78,7 +80,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         let has_escape = scc
             .iter()
             .map(|&def_id| self.definitions.definition(def_id).body())
-            .any(|body| pattern_has_escape(body, &scc_set, self.definitions, self.interner));
+            .any(|body| pattern_has_escape(body, &scc_set, self.definitions));
 
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
@@ -107,14 +109,18 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         for &def_id in nodes {
             let definition = self.definitions.definition(def_id);
             let source = definition.source();
+            let first_name_range_by_target = search_scope.first_ref_name_ranges(
+                source,
+                definition.body(),
+                domain,
+                self.definitions,
+            );
             let neighbors = domain
                 .iter()
                 .filter_map(|&target| {
-                    let target_name = self
-                        .interner
-                        .resolve(self.definitions.definition(target).name());
-                    search_scope
-                        .find_ref_range(source, definition.body(), target_name)
+                    first_name_range_by_target
+                        .get(&target)
+                        .copied()
                         .map(|range| (target, Span::new(source, range)))
                 })
                 .collect::<Vec<_>>();
@@ -315,41 +321,34 @@ fn pattern_has_escape(
     pattern: &Pattern,
     scc: &IndexSet<DefId>,
     definitions: &DefinitionGraph,
-    interner: &Interner,
 ) -> bool {
     match pattern {
-        Pattern::DefRef(r) => {
-            let Some(name_token) = r.name() else {
-                return true;
-            };
-            let Some(def_id) = definitions.id_for_name(interner, name_token.text()) else {
-                return true;
-            };
-            !scc.contains(&def_id)
-        }
+        Pattern::DefRef(r) => definitions
+            .reference_target(r)
+            .is_none_or(|def_id| !scc.contains(&def_id)),
         Pattern::NamedNodePattern(node) => {
             let children: Vec<_> = node.children().collect();
             children.is_empty()
                 || children
                     .iter()
-                    .all(|c| pattern_has_escape(c, scc, definitions, interner))
+                    .all(|c| pattern_has_escape(c, scc, definitions))
         }
         Pattern::Alternation(_) => pattern
             .children()
-            .any(|c| pattern_has_escape(&c, scc, definitions, interner)),
+            .any(|c| pattern_has_escape(&c, scc, definitions)),
         Pattern::SeqPattern(_) => pattern
             .children()
-            .all(|c| pattern_has_escape(&c, scc, definitions, interner)),
+            .all(|c| pattern_has_escape(&c, scc, definitions)),
         Pattern::QuantifiedPattern(q) => {
             if q.is_optional() {
                 return true;
             }
             let inner = q.inner().expect("quantified pattern has inner after parse");
-            pattern_has_escape(&inner, scc, definitions, interner)
+            pattern_has_escape(&inner, scc, definitions)
         }
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => pattern
             .children()
-            .all(|c| pattern_has_escape(&c, scc, definitions, interner)),
+            .all(|c| pattern_has_escape(&c, scc, definitions)),
         Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => true,
     }
 }
@@ -386,62 +385,71 @@ enum CycleSearchScope {
 }
 
 impl CycleSearchScope {
-    fn find_ref_range(
+    fn first_ref_name_ranges(
         self,
         source: SourceId,
         pattern: &Pattern,
-        target: &str,
-    ) -> Option<TextRange> {
-        let mut visitor = RefFinder {
-            target,
-            found: None,
-            mode: self,
+        candidate_targets: &IndexSet<DefId>,
+        definitions: &DefinitionGraph,
+    ) -> HashMap<DefId, TextRange> {
+        let mut visitor = FirstRefNameRangeCollector {
+            definitions,
+            candidate_targets,
+            first_name_range_by_target: HashMap::new(),
+            scope: self,
         };
         visitor.visit_pattern(&Located::new(source, pattern.clone()));
-        visitor.found
+        visitor.first_name_range_by_target
     }
 }
 
-struct RefFinder<'a> {
-    target: &'a str,
-    found: Option<TextRange>,
-    mode: CycleSearchScope,
+struct FirstRefNameRangeCollector<'a> {
+    definitions: &'a DefinitionGraph,
+    candidate_targets: &'a IndexSet<DefId>,
+    first_name_range_by_target: HashMap<DefId, TextRange>,
+    scope: CycleSearchScope,
 }
 
-impl Visitor for RefFinder<'_> {
+impl Visitor for FirstRefNameRangeCollector<'_> {
     fn visit_pattern(&mut self, pattern: &Located<Pattern>) {
-        if self.found.is_some() {
+        if self.first_name_range_by_target.len() == self.candidate_targets.len() {
             return;
         }
         walk_pattern(self, pattern);
     }
 
     fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
-        if self.mode == CycleSearchScope::BeforeProgress {
+        if self.scope == CycleSearchScope::BeforeProgress {
             return; // Matching this node establishes progress before any nested reference.
         }
         walk_named_node_pattern(self, node);
     }
 
     fn visit_def_ref(&mut self, r: &Located<DefRef>) {
-        if self.found.is_some() {
+        let Some(target) = self.definitions.reference_target(r.node()) else {
+            return;
+        };
+        if !self.candidate_targets.contains(&target)
+            || self.first_name_range_by_target.contains_key(&target)
+        {
             return;
         }
-        if let Some(name) = r.node().name()
-            && name.text() == self.target
-        {
-            self.found = Some(name.text_range());
-        }
+        let name = r
+            .node()
+            .name()
+            .expect("resolved definition reference has a name");
+        self.first_name_range_by_target
+            .insert(target, name.text_range());
     }
 
     fn visit_seq_pattern(&mut self, seq: &Located<SeqPattern>) {
         for child in seq.node().children() {
             let child = seq.wrap(child);
             self.visit_pattern(&child);
-            if self.found.is_some() {
+            if self.first_name_range_by_target.len() == self.candidate_targets.len() {
                 return;
             }
-            if self.mode == CycleSearchScope::BeforeProgress
+            if self.scope == CycleSearchScope::BeforeProgress
                 && pattern_guarantees_progress(child.node())
             {
                 return;

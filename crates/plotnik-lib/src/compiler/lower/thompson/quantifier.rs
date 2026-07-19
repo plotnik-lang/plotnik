@@ -385,7 +385,7 @@ impl NfaBuilder<'_> {
         destination: &[EffectIR],
     ) -> Option<Label> {
         if let Pattern::DefRef(reference) = pattern {
-            let def_id = self.resolve_ref_def_id(reference);
+            let def_id = self.expect_reference_target(reference);
             return self.compile_boundary_captured_ref_call(
                 def_id,
                 input,
@@ -1094,7 +1094,7 @@ impl NfaBuilder<'_> {
         // checkpoint-restored cursor (a call's empty return cannot — the
         // return address carries the consumed-candidate navigation).
         if let Pattern::DefRef(r) = pattern {
-            let def_id = self.resolve_ref_def_id(r);
+            let def_id = self.expect_reference_target(r);
             if self.definition_is_nullable(def_id) {
                 let pattern_ctx = PatternCtx {
                     exit: match_exit,
@@ -1720,7 +1720,7 @@ impl NfaBuilder<'_> {
 
         let first_nav = nav_override.unwrap_or(Nav::Down);
         let iterate = if let Pattern::DefRef(r) = &element {
-            let def_id = self.resolve_ref_def_id(r);
+            let def_id = self.expect_reference_target(r);
             if self.definition_is_nullable(def_id) {
                 // An empty element match and a skip of the `?` both leave
                 // a null pending; funneling the inline skip into the match

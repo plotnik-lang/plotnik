@@ -80,7 +80,6 @@ impl<'q> GrammarBindInput<'_, 'q> {
         super::satisfiability::check(
             super::satisfiability::SatisfiabilityInput {
                 grammar,
-                interner,
                 definitions,
                 pattern_facts,
                 source_map,

@@ -13,7 +13,6 @@ use rowan::{TextRange, TextSize};
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{Pattern, QuantifierKind, SeqItem};
-use crate::core::Interner;
 
 use super::PatternFacts;
 
@@ -328,17 +327,15 @@ pub(super) fn exported_anchor_ranges(
     pattern_facts: &PatternFacts,
     def_id: DefId,
     definitions: &DefinitionGraph,
-    interner: &Interner,
 ) -> Vec<TextRange> {
     let body = definitions.definition(def_id).body();
-    compute_anchor_ranges(body, pattern_facts, definitions, interner).exported_ranges()
+    compute_anchor_ranges(body, pattern_facts, definitions).exported_ranges()
 }
 
 fn compute_anchor_ranges(
     pattern: &Pattern,
     pattern_facts: &PatternFacts,
     definitions: &DefinitionGraph,
-    interner: &Interner,
 ) -> AnchorRangeRelation {
     match pattern {
         Pattern::NamedNodePattern(_)
@@ -347,12 +344,12 @@ fn compute_anchor_ranges(
         Pattern::CapturedPattern(capture) => capture
             .inner()
             .map_or_else(AnchorRangeRelation::identity, |inner| {
-                compute_anchor_ranges(&inner, pattern_facts, definitions, interner)
+                compute_anchor_ranges(&inner, pattern_facts, definitions)
             }),
         Pattern::FieldPattern(field) => field
             .value()
             .map_or_else(AnchorRangeRelation::identity, |value| {
-                compute_anchor_ranges(&value, pattern_facts, definitions, interner)
+                compute_anchor_ranges(&value, pattern_facts, definitions)
             }),
         Pattern::SeqPattern(sequence) => {
             let mut relation = AnchorRangeRelation::identity();
@@ -360,7 +357,7 @@ fn compute_anchor_ranges(
                 relation = relation.then(&match item {
                     SeqItem::Anchor(anchor) => AnchorRangeRelation::anchor(anchor.text_range()),
                     SeqItem::Pattern(pattern) => {
-                        compute_anchor_ranges(&pattern, pattern_facts, definitions, interner)
+                        compute_anchor_ranges(&pattern, pattern_facts, definitions)
                     }
                 });
             }
@@ -375,7 +372,6 @@ fn compute_anchor_ranges(
                     &alternative,
                     pattern_facts,
                     definitions,
-                    interner,
                 ));
             }
             if had_alternative {
@@ -388,16 +384,13 @@ fn compute_anchor_ranges(
             let Some(inner) = quantified.inner() else {
                 return AnchorRangeRelation::identity();
             };
-            let inner = compute_anchor_ranges(&inner, pattern_facts, definitions, interner);
+            let inner = compute_anchor_ranges(&inner, pattern_facts, definitions);
             quantified
                 .quantifier_kind()
                 .map_or(inner.clone(), |kind| inner.quantified(kind))
         }
         Pattern::DefRef(reference) => {
-            let Some(def_id) = reference
-                .name()
-                .and_then(|name| definitions.id_for_name(interner, name.text()))
-            else {
+            let Some(def_id) = definitions.reference_target(reference) else {
                 return AnchorRangeRelation::atom();
             };
             AnchorRangeRelation::from_anchor_context(

@@ -56,10 +56,7 @@ impl InferVisitor<'_, '_> {
             return None;
         };
         let name = r.name()?;
-        let def_id = self
-            .ctx
-            .definitions
-            .id_for_name(self.ctx.interner, name.text())?;
+        let def_id = self.ctx.definitions.reference_target(r)?;
         let definition = self.ctx.definitions.definition(def_id);
         let source = definition.source();
         let body = definition.body();

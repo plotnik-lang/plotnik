@@ -9,12 +9,10 @@ use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
-use crate::core::Interner;
 
 pub(crate) struct AnchorValidationInput<'a, 'd> {
     pub pattern_facts: &'a PatternFacts,
     pub definitions: &'a DefinitionGraph,
-    pub interner: &'a Interner,
     pub diag: &'d mut Diagnostics,
 }
 
@@ -37,10 +35,9 @@ pub(crate) fn validate_anchors(input: AnchorValidationInput<'_, '_>) -> bool {
         }
 
         let source = input.definitions.definition(def_id).source();
-        for range in
-            input
-                .pattern_facts
-                .exported_anchor_ranges(def_id, input.definitions, input.interner)
+        for range in input
+            .pattern_facts
+            .exported_anchor_ranges(def_id, input.definitions)
         {
             valid = false;
             input

@@ -15,7 +15,6 @@ use crate::compiler::analyze::types::type_shape::{
     PatternFlow, PatternShape, QuantifierKind, TypeShape,
 };
 use crate::compiler::parse::ast::{Pattern, is_empty_group};
-use crate::core::Interner;
 
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
@@ -44,7 +43,6 @@ impl TypeAnalysis {
         &'a self,
         inner: &Pattern,
         definitions: &DefinitionGraph,
-        interner: &Interner,
         mode: CaptureLookupMode<'a>,
     ) -> CaptureKind {
         // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
@@ -68,7 +66,7 @@ impl TypeAnalysis {
                             CaptureKind::Node,
                         );
                     };
-                    let kind = self.classify(&inner, definitions, interner, mode);
+                    let kind = self.classify(&inner, definitions, mode);
                     let inner_flow = mode.pattern_flow(self, &unwrap_field(&inner));
                     if kind == CaptureKind::Node
                         && matches!(inner_flow, Some(PatternFlow::Fields(_)))
@@ -84,7 +82,7 @@ impl TypeAnalysis {
         // its own Call/Return and record scoping. A reference to a node-valued or
         // match-only definition falls through to `Node` — its matched node is captured
         // directly.
-        if self.ref_structured(&pattern, definitions, interner, mode) {
+        if self.ref_structured(&pattern, definitions, mode) {
             return CaptureKind::Ref;
         }
 
@@ -123,29 +121,20 @@ impl TypeAnalysis {
     }
 
     /// Whether `pattern` is a reference to a definition that returns a structured type.
-    pub fn ref_returns_structured(
-        &self,
-        pattern: &Pattern,
-        definitions: &DefinitionGraph,
-        interner: &Interner,
-    ) -> bool {
-        self.ref_structured(pattern, definitions, interner, CaptureLookupMode::Admitted)
+    pub fn ref_returns_structured(&self, pattern: &Pattern, definitions: &DefinitionGraph) -> bool {
+        self.ref_structured(pattern, definitions, CaptureLookupMode::Admitted)
     }
 
     fn ref_structured<'a>(
         &'a self,
         pattern: &Pattern,
         definitions: &DefinitionGraph,
-        interner: &Interner,
         mode: CaptureLookupMode<'a>,
     ) -> bool {
         let Pattern::DefRef(r) = pattern else {
             return false;
         };
-        let Some(name) = r.name() else {
-            return mode.recover("admitted reference pattern must have a name", false);
-        };
-        let Some(def_id) = definitions.id_for_name(interner, name.text()) else {
+        let Some(def_id) = definitions.reference_target(r) else {
             return mode.recover("admitted reference must resolve to a definition", false);
         };
 
@@ -196,12 +185,10 @@ impl TypeAnalysisView<'_> {
         &self,
         inner: &Pattern,
         definitions: &DefinitionGraph,
-        interner: &Interner,
     ) -> CaptureKind {
         self.analysis.classify(
             inner,
             definitions,
-            interner,
             CaptureLookupMode::InProgress(self.pattern_shapes),
         )
     }
