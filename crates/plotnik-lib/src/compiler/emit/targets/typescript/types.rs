@@ -1,6 +1,6 @@
 //! TypeScript declarations rendered directly from target-neutral output facts.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::compiler::analyze::result::{
     CaptureMemberKind, CaptureScopeKind, ResultItem, ResultItemKind, ResultSchema,
@@ -42,7 +42,7 @@ pub(crate) fn emit_schema_mapped(
 struct SchemaEmitter<'a> {
     schema: &'a ResultSchema<'a>,
     config: Config,
-    items_by_name: HashMap<Symbol, ResultItem>,
+    item_names: HashSet<Symbol>,
     declared_names: HashSet<String>,
     needs_node_type: bool,
     sink: Sink<SemanticTag>,
@@ -51,15 +51,15 @@ struct SchemaEmitter<'a> {
 
 impl<'a> SchemaEmitter<'a> {
     fn new(schema: &'a ResultSchema<'a>, config: Config) -> Self {
-        let items_by_name = schema
+        let item_names = schema
             .entry_point_items()
             .iter()
-            .map(|item| (item.name, *item))
+            .map(|item| item.name)
             .collect();
         Self {
             schema,
             config,
-            items_by_name,
+            item_names,
             declared_names: HashSet::new(),
             needs_node_type: false,
             sink: Sink::new(),
@@ -233,7 +233,7 @@ impl<'a> SchemaEmitter<'a> {
     fn render_ty(&self, ty: TypeId) -> Sink<SemanticTag> {
         if !ty.is_builtin()
             && let Some(symbol) = self.schema.types.type_name_of(ty)
-            && self.items_by_name.contains_key(&symbol)
+            && self.item_names.contains(&symbol)
         {
             let mut out = Sink::new();
             out.styled(Style::Blue, &self.name(symbol));
