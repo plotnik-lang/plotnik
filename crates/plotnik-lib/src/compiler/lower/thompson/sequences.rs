@@ -315,7 +315,7 @@ impl NfaBuilder<'_> {
         capture: CaptureEffects,
         skip_exit: Option<SkipExit>,
     ) -> Label {
-        let relation = self.boundary_relations.items(items);
+        let relation = self.items_boundary_relation(items);
         let tail_effects = split_sequence_tail_effects(capture.post);
         let mut targets = ExitMap::new();
         for outcome in relation.outcomes(BoundaryState::START) {
@@ -446,7 +446,7 @@ impl NfaBuilder<'_> {
                 self.compile_boundary_items_to(ctx, item_index + 1, state, consumed, memo)
             }
             SeqItem::Pattern(pattern) => {
-                let relation = self.boundary_relations.pattern(pattern);
+                let relation = self.pattern_boundary_relation(pattern);
                 let outcomes: Vec<_> = relation.outcomes(state).iter().copied().collect();
                 let mut pattern_targets = ExitMap::new();
                 for outcome in &outcomes {
@@ -493,7 +493,7 @@ impl NfaBuilder<'_> {
         retry_suffix: bool,
     ) -> Option<Label> {
         if let Pattern::CapturedPattern(capture) = pattern {
-            let relation = self.boundary_relations.pattern(pattern);
+            let relation = self.pattern_boundary_relation(pattern);
             let captures_reference = capture
                 .inner()
                 .is_some_and(|inner| matches!(inner, Pattern::DefRef(_)));
@@ -504,7 +504,7 @@ impl NfaBuilder<'_> {
                 !outcome.consumed && targets.get(ExitPort::from_outcome(*outcome)).is_some()
             });
             if captures_reference
-                || !simple_boundary_routes(&relation, input)
+                || !simple_boundary_routes(relation, input)
                 || (admits_empty && !admits_consuming)
             {
                 return self.compile_boundary_capture(capture, input, entry, targets);
@@ -543,21 +543,21 @@ impl NfaBuilder<'_> {
         }
 
         if let Pattern::QuantifiedPattern(quantified) = pattern {
-            let relation = self.boundary_relations.pattern(pattern);
-            if !simple_boundary_routes(&relation, input) {
+            let relation = self.pattern_boundary_relation(pattern);
+            if !simple_boundary_routes(relation, input) {
                 return self
                     .compile_boundary_no_value_quantifier(quantified, input, entry, targets);
             }
         }
 
         if let Pattern::Alternation(alternation) = pattern {
-            let relation = self.boundary_relations.pattern(pattern);
-            if !simple_boundary_routes(&relation, input) {
+            let relation = self.pattern_boundary_relation(pattern);
+            if !simple_boundary_routes(relation, input) {
                 return self.compile_boundary_alternation(alternation, input, entry, targets);
             }
         }
 
-        let relation = self.boundary_relations.pattern(pattern);
+        let relation = self.pattern_boundary_relation(pattern);
         let outcomes: Vec<_> = relation.outcomes(input).iter().copied().collect();
         if !simple_boundary_outcomes(&outcomes) {
             return None;
@@ -787,7 +787,7 @@ impl NfaBuilder<'_> {
         targets: &ExitMap<Label>,
     ) -> Option<Label> {
         let alternation_pattern = Pattern::Alternation(alternation.clone());
-        let relation = self.boundary_relations.pattern(&alternation_pattern);
+        let relation = self.pattern_boundary_relation(&alternation_pattern);
         let first_classes: BTreeSet<_> = relation
             .outcomes(input)
             .iter()
@@ -836,7 +836,7 @@ impl NfaBuilder<'_> {
             let Some(body) = alternative.body() else {
                 continue;
             };
-            let body_relation = self.boundary_relations.pattern(&body);
+            let body_relation = self.pattern_boundary_relation(&body).clone();
             let mut consuming_targets = ExitMap::new();
             let mut empty_targets = ExitMap::new();
             let alternative_span = self.span_id(alternative.syntax(), SpanKind::Alternative);
@@ -924,7 +924,7 @@ impl NfaBuilder<'_> {
             .expect_pattern_flow(&alternation_pattern)
             .type_id()
             .expect("an observed labeled alternation produces a variant type");
-        let relation = self.boundary_relations.pattern(&alternation_pattern);
+        let relation = self.pattern_boundary_relation(&alternation_pattern);
         let first_classes: BTreeSet<_> = relation
             .outcomes(input)
             .iter()
@@ -976,7 +976,7 @@ impl NfaBuilder<'_> {
                 self.bind_span(span, SpanBindingIR::Member(case));
             }
 
-            let body_relation = self.boundary_relations.pattern(&body);
+            let body_relation = self.pattern_boundary_relation(&body).clone();
             let mut consuming_targets = ExitMap::new();
             let mut empty_targets = ExitMap::new();
             for outcome in body_relation.outcomes(input) {
@@ -1171,7 +1171,7 @@ impl NfaBuilder<'_> {
             }
             Pattern::DefRef(reference) => {
                 let def_id = self.resolve_ref_def_id(reference);
-                let relation = self.boundary_relations.definition(def_id);
+                let relation = self.definition_boundary_relation(def_id);
                 if BoundaryState::all().all(|input| simple_boundary_routes(relation, input)) {
                     return true;
                 }
@@ -1191,8 +1191,8 @@ impl NfaBuilder<'_> {
                 supported
             }
             Pattern::Alternation(alternation) => {
-                let relation = self.boundary_relations.pattern(pattern);
-                if BoundaryState::all().all(|input| simple_boundary_routes(&relation, input)) {
+                let relation = self.pattern_boundary_relation(pattern);
+                if BoundaryState::all().all(|input| simple_boundary_routes(relation, input)) {
                     return true;
                 }
                 alternation
@@ -1200,8 +1200,8 @@ impl NfaBuilder<'_> {
                     .all(|body| self.boundary_pattern_supported(&body, visited))
             }
             Pattern::QuantifiedPattern(quantified) => {
-                let relation = self.boundary_relations.pattern(pattern);
-                if BoundaryState::all().all(|input| simple_boundary_routes(&relation, input)) {
+                let relation = self.pattern_boundary_relation(pattern);
+                if BoundaryState::all().all(|input| simple_boundary_routes(relation, input)) {
                     return true;
                 }
                 if !self
@@ -1218,8 +1218,8 @@ impl NfaBuilder<'_> {
                     .is_some_and(|inner| self.boundary_pattern_supported(&inner, visited))
             }
             Pattern::CapturedPattern(captured_pattern) => {
-                let relation = self.boundary_relations.pattern(pattern);
-                if BoundaryState::all().all(|input| simple_boundary_routes(&relation, input)) {
+                let relation = self.pattern_boundary_relation(pattern);
+                if BoundaryState::all().all(|input| simple_boundary_routes(relation, input)) {
                     return true;
                 }
                 let Some(inner) = captured_pattern.inner() else {
@@ -1245,8 +1245,8 @@ impl NfaBuilder<'_> {
                     && self.boundary_pattern_supported(&value, visited)
             }),
             _ => {
-                let relation = self.boundary_relations.pattern(pattern);
-                BoundaryState::all().all(|input| simple_boundary_routes(&relation, input))
+                let relation = self.pattern_boundary_relation(pattern);
+                BoundaryState::all().all(|input| simple_boundary_routes(relation, input))
             }
         }
     }

@@ -43,7 +43,7 @@ use crate::compiler::analyze::types::{BuiltInCaptureType, CaptureFact, RawCaptur
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::refs::DefinitionGraph;
-use crate::compiler::analyze::shape::{DefinitionFacts, RootExtent};
+use crate::compiler::analyze::shape::{PatternFacts, RootExtent};
 use crate::compiler::diagnostics::report::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
@@ -63,7 +63,7 @@ pub struct InferState<'a, 'd> {
     deferred_checks: &'a mut Vec<DeferredCheck>,
     pub interner: &'a mut Interner,
     pub definitions: &'a DefinitionGraph,
-    pub definition_facts: &'a DefinitionFacts,
+    pub pattern_facts: &'a PatternFacts,
     pub(crate) diag: &'d mut Diagnostics,
 }
 
@@ -464,7 +464,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Root extent is precomputed to a fixpoint before inference, so every
         // reference — recursive ones included — delegates its target's extent
         // and the single-node checks stay sound through recursion.
-        let root_extent = self.ctx.definition_facts.root_extent(def_id);
+        let root_extent = self.ctx.pattern_facts.definition_root_extent(def_id);
 
         if self.ctx.definitions.is_recursive(def_id) {
             // A completed match-only target already flows NoValue. A same-SCC
@@ -1033,11 +1033,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn pattern_can_match_zero_nodes(&self, pattern: &Pattern) -> bool {
-        self.ctx.definition_facts.pattern_is_nullable(
-            pattern,
-            self.ctx.definitions,
-            self.ctx.interner,
-        )
+        self.ctx.pattern_facts.pattern_is_nullable(pattern)
     }
 
     fn pending_reference_target(&mut self, pattern: &Pattern) -> Option<DefId> {
@@ -1339,7 +1335,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         else {
             return;
         };
-        if !self.ctx.definition_facts.is_nullable(def_id) {
+        if !self.ctx.pattern_facts.definition_is_nullable(def_id) {
             return;
         }
         let view = self.ctx.type_ctx.in_progress();
@@ -1616,7 +1612,7 @@ pub(crate) fn definition_value_root(pattern: &Pattern) -> bool {
 pub(super) struct InferPassEnv<'a, 'd> {
     pub interner: &'a mut Interner,
     pub definitions: &'a DefinitionGraph,
-    pub definition_facts: &'a DefinitionFacts,
+    pub pattern_facts: &'a PatternFacts,
     pub diag: &'d mut Diagnostics,
 }
 
@@ -1663,7 +1659,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             deferred_checks: &mut self.deferred_checks,
             interner: self.analysis.interner,
             definitions: self.analysis.definitions,
-            definition_facts: self.analysis.definition_facts,
+            pattern_facts: self.analysis.pattern_facts,
             diag: &mut *self.analysis.diag,
         };
         let mut visitor = InferVisitor::new(state, source);
@@ -1751,7 +1747,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 
     fn resolved_reference_shape(&mut self, target: DefId) -> PatternShape {
-        let root_extent = self.analysis.definition_facts.root_extent(target);
+        let root_extent = self.analysis.pattern_facts.definition_root_extent(target);
         let output = self
             .ctx
             .in_progress()
@@ -1799,10 +1795,10 @@ impl<'a, 'd> InferPass<'a, 'd> {
             }
         };
         self.ctx.record_def_output(def_id, output);
-        let precomputed = self.analysis.definition_facts.root_extent(def_id);
+        let precomputed = self.analysis.pattern_facts.definition_root_extent(def_id);
         assert_eq!(
             info.root_extent, precomputed,
-            "definition root-extent pre-pass must agree with inference",
+            "retained definition root extent must agree with inference",
         );
     }
 }

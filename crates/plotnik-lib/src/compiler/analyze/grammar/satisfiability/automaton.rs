@@ -18,6 +18,7 @@ use rowan::TextRange;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass, has_direct_alternative_nav};
 use crate::compiler::analyze::refs::DefinitionGraph;
+use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
@@ -191,6 +192,7 @@ pub(super) struct AutomatonContext<'a> {
     pub(super) grammar: &'a Grammar,
     pub(super) interner: &'a Interner,
     pub(super) definitions: &'a DefinitionGraph,
+    pub(super) pattern_facts: &'a PatternFacts,
     pub(super) source_map: &'a SourceMap,
 }
 

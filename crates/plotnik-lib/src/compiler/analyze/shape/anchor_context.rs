@@ -6,7 +6,7 @@
 //! paths still require the caller's leading or trailing boundary after groups,
 //! references, nullable paths, alternations, and quantifiers have composed.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use rowan::{TextRange, TextSize};
 
@@ -15,19 +15,21 @@ use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{Pattern, QuantifierKind, SeqItem};
 use crate::core::Interner;
 
+use super::PatternFacts;
+
 /// One path-sensitive external-context outcome.
 ///
 /// `needs_left` and `needs_right` describe anchors that remain exposed at this
 /// pattern's boundaries. A consuming neighbor supplied by sequence composition
 /// discharges the corresponding need.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct ContextOutcome {
+pub(super) struct AnchorContextOutcome {
     consumed: bool,
     needs_left: bool,
     needs_right: bool,
 }
 
-impl ContextOutcome {
+impl AnchorContextOutcome {
     pub(super) const IDENTITY: Self = Self {
         consumed: false,
         needs_left: false,
@@ -56,36 +58,36 @@ impl ContextOutcome {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct ContextRelation {
-    outcomes: BTreeSet<ContextOutcome>,
+pub(super) struct AnchorContextRelation {
+    outcomes: BTreeSet<AnchorContextOutcome>,
 }
 
-impl ContextRelation {
-    fn impossible() -> Self {
+impl AnchorContextRelation {
+    pub(super) fn impossible() -> Self {
         Self {
             outcomes: BTreeSet::new(),
         }
     }
 
-    pub(super) fn singleton(outcome: ContextOutcome) -> Self {
+    pub(super) fn singleton(outcome: AnchorContextOutcome) -> Self {
         Self {
             outcomes: BTreeSet::from([outcome]),
         }
     }
 
     pub(super) fn identity() -> Self {
-        Self::singleton(ContextOutcome::IDENTITY)
+        Self::singleton(AnchorContextOutcome::IDENTITY)
     }
 
     pub(super) fn atom() -> Self {
-        Self::singleton(ContextOutcome::ATOM)
+        Self::singleton(AnchorContextOutcome::ATOM)
     }
 
     pub(super) fn anchor() -> Self {
-        Self::singleton(ContextOutcome::ANCHOR)
+        Self::singleton(AnchorContextOutcome::ANCHOR)
     }
 
-    fn union_with(&mut self, other: &Self) {
+    pub(super) fn union_with(&mut self, other: &Self) {
         self.outcomes.extend(other.outcomes.iter().copied());
     }
 
@@ -167,7 +169,12 @@ impl BoundaryAnchorRanges {
         }
     }
 
-    fn then(&self, prefix: ContextOutcome, next: &Self, suffix: ContextOutcome) -> Self {
+    fn then(
+        &self,
+        prefix: AnchorContextOutcome,
+        next: &Self,
+        suffix: AnchorContextOutcome,
+    ) -> Self {
         let mut combined = Self::default();
         combined.left.extend(self.left.iter().copied());
         if !prefix.consumed {
@@ -189,12 +196,12 @@ impl BoundaryAnchorRanges {
 
 /// Context outcomes annotated with authored anchors that remain exposed.
 ///
-/// Ranges are grouped by `ContextOutcome`: composition only consults that
+/// Ranges are grouped by `AnchorContextOutcome`: composition only consults that
 /// outcome's consumption flags, so merging ranges for equivalent outcomes
 /// preserves path sensitivity without retaining every syntactic path.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct AnchorRangeRelation {
-    outcomes: BTreeMap<ContextOutcome, BoundaryAnchorRanges>,
+    outcomes: BTreeMap<AnchorContextOutcome, BoundaryAnchorRanges>,
 }
 
 impl AnchorRangeRelation {
@@ -204,25 +211,31 @@ impl AnchorRangeRelation {
         }
     }
 
-    fn singleton(outcome: ContextOutcome, ranges: BoundaryAnchorRanges) -> Self {
+    fn singleton(outcome: AnchorContextOutcome, ranges: BoundaryAnchorRanges) -> Self {
         Self {
             outcomes: BTreeMap::from([(outcome, ranges)]),
         }
     }
 
     fn identity() -> Self {
-        Self::singleton(ContextOutcome::IDENTITY, BoundaryAnchorRanges::default())
+        Self::singleton(
+            AnchorContextOutcome::IDENTITY,
+            BoundaryAnchorRanges::default(),
+        )
     }
 
     pub(super) fn atom() -> Self {
-        Self::singleton(ContextOutcome::ATOM, BoundaryAnchorRanges::default())
+        Self::singleton(AnchorContextOutcome::ATOM, BoundaryAnchorRanges::default())
     }
 
     pub(super) fn anchor(range: TextRange) -> Self {
-        Self::singleton(ContextOutcome::ANCHOR, BoundaryAnchorRanges::anchor(range))
+        Self::singleton(
+            AnchorContextOutcome::ANCHOR,
+            BoundaryAnchorRanges::anchor(range),
+        )
     }
 
-    fn from_context(relation: &ContextRelation) -> Self {
+    fn from_anchor_context(relation: &AnchorContextRelation) -> Self {
         Self {
             outcomes: relation
                 .outcomes
@@ -309,204 +322,87 @@ impl AnchorRangeRelation {
     }
 }
 
-/// Definition-level fixed point for exported anchor context.
-pub(crate) struct AnchorContextAnalysis<'a> {
-    interner: &'a Interner,
-    definitions: &'a DefinitionGraph,
-    relations: HashMap<DefId, ContextRelation>,
+/// Anchor tokens authored in `def_id` whose boundary can remain exposed after
+/// transparent wrapper and nullable-path composition.
+pub(super) fn exported_anchor_ranges(
+    pattern_facts: &PatternFacts,
+    def_id: DefId,
+    definitions: &DefinitionGraph,
+    interner: &Interner,
+) -> Vec<TextRange> {
+    let body = definitions.definition(def_id).body();
+    compute_anchor_ranges(body, pattern_facts, definitions, interner).exported_ranges()
 }
 
-impl<'a> AnchorContextAnalysis<'a> {
-    pub(crate) fn new(interner: &'a Interner, definitions: &'a DefinitionGraph) -> Self {
-        let mut analysis = Self {
-            interner,
-            definitions,
-            relations: HashMap::new(),
-        };
-        analysis.compute_definitions();
-        analysis
-    }
-
-    pub(crate) fn definition_requires_external_context(&self, def_id: DefId) -> bool {
-        self.definition(def_id).requires_external_context()
-    }
-
-    /// Anchor tokens authored in `def_id` whose boundary can remain exposed
-    /// after transparent wrapper and nullable-path composition.
-    pub(crate) fn exported_anchor_ranges(&self, def_id: DefId) -> Vec<TextRange> {
-        let body = self.definitions.definition(def_id).body();
-        self.compute_anchor_ranges(body).exported_ranges()
-    }
-
-    fn definition(&self, def_id: DefId) -> &ContextRelation {
-        self.relations
-            .get(&def_id)
-            .expect("every analyzed definition has an anchor-context relation")
-    }
-
-    fn compute_definitions(&mut self) {
-        for scc in self.definitions.sccs() {
-            for &def_id in scc {
-                self.relations
-                    .entry(def_id)
-                    .or_insert_with(ContextRelation::impossible);
-            }
-
-            loop {
-                let mut changed = false;
-                for &def_id in scc {
-                    let body = self.definitions.definition(def_id).body();
-                    let relation = self.compute_pattern(body);
-                    let current = self
-                        .relations
-                        .get_mut(&def_id)
-                        .expect("SCC definitions were initialized");
-                    if *current != relation {
-                        *current = relation;
-                        changed = true;
+fn compute_anchor_ranges(
+    pattern: &Pattern,
+    pattern_facts: &PatternFacts,
+    definitions: &DefinitionGraph,
+    interner: &Interner,
+) -> AnchorRangeRelation {
+    match pattern {
+        Pattern::NamedNodePattern(_)
+        | Pattern::AnonymousNodePattern(_)
+        | Pattern::NodeWildcard(_) => AnchorRangeRelation::atom(),
+        Pattern::CapturedPattern(capture) => capture
+            .inner()
+            .map_or_else(AnchorRangeRelation::identity, |inner| {
+                compute_anchor_ranges(&inner, pattern_facts, definitions, interner)
+            }),
+        Pattern::FieldPattern(field) => field
+            .value()
+            .map_or_else(AnchorRangeRelation::identity, |value| {
+                compute_anchor_ranges(&value, pattern_facts, definitions, interner)
+            }),
+        Pattern::SeqPattern(sequence) => {
+            let mut relation = AnchorRangeRelation::identity();
+            for item in sequence.items() {
+                relation = relation.then(&match item {
+                    SeqItem::Anchor(anchor) => AnchorRangeRelation::anchor(anchor.text_range()),
+                    SeqItem::Pattern(pattern) => {
+                        compute_anchor_ranges(&pattern, pattern_facts, definitions, interner)
                     }
-                }
-                if !changed {
-                    break;
-                }
+                });
+            }
+            relation
+        }
+        Pattern::Alternation(alternation) => {
+            let mut relation = AnchorRangeRelation::impossible();
+            let mut had_alternative = false;
+            for alternative in alternation.patterns() {
+                had_alternative = true;
+                relation.union_with(&compute_anchor_ranges(
+                    &alternative,
+                    pattern_facts,
+                    definitions,
+                    interner,
+                ));
+            }
+            if had_alternative {
+                relation
+            } else {
+                AnchorRangeRelation::identity()
             }
         }
-    }
-
-    fn compute_pattern(&self, pattern: &Pattern) -> ContextRelation {
-        match pattern {
-            // A named node supplies both boundary contexts to everything in its
-            // child list, so none of its internal anchors escape the node.
-            Pattern::NamedNodePattern(_)
-            | Pattern::AnonymousNodePattern(_)
-            | Pattern::NodeWildcard(_) => ContextRelation::atom(),
-            Pattern::CapturedPattern(capture) => capture
-                .inner()
-                .map_or_else(ContextRelation::identity, |inner| {
-                    self.compute_pattern(&inner)
-                }),
-            Pattern::FieldPattern(field) => field
-                .value()
-                .map_or_else(ContextRelation::identity, |value| {
-                    self.compute_pattern(&value)
-                }),
-            Pattern::SeqPattern(sequence) => {
-                let items: Vec<_> = sequence.items().collect();
-                self.compute_items(&items)
-            }
-            Pattern::Alternation(alternation) => {
-                let mut relation = ContextRelation::impossible();
-                let mut had_alternative = false;
-                for alternative in alternation.patterns() {
-                    had_alternative = true;
-                    relation.union_with(&self.compute_pattern(&alternative));
-                }
-                if had_alternative {
-                    relation
-                } else {
-                    ContextRelation::identity()
-                }
-            }
-            Pattern::QuantifiedPattern(quantified) => {
-                let Some(inner) = quantified.inner() else {
-                    return ContextRelation::identity();
-                };
-                let inner = self.compute_pattern(&inner);
-                quantified
-                    .quantifier_kind()
-                    .map_or(inner.clone(), |kind| inner.quantified(kind))
-            }
-            Pattern::DefRef(reference) => {
-                let Some(def_id) = reference
-                    .name()
-                    .and_then(|name| self.definitions.id_for_name(self.interner, name.text()))
-                else {
-                    // Name resolution owns the diagnostic. Treat its recovery
-                    // node as one consumer so a neighboring anchor is not hidden.
-                    return ContextRelation::atom();
-                };
-                self.relations.get(&def_id).cloned().unwrap_or_else(|| {
-                    panic!(
-                        "anchor-context analysis resolved definition {def_id:?}, but its \
-                             relation was not initialized before the reference was evaluated"
-                    )
-                })
-            }
+        Pattern::QuantifiedPattern(quantified) => {
+            let Some(inner) = quantified.inner() else {
+                return AnchorRangeRelation::identity();
+            };
+            let inner = compute_anchor_ranges(&inner, pattern_facts, definitions, interner);
+            quantified
+                .quantifier_kind()
+                .map_or(inner.clone(), |kind| inner.quantified(kind))
         }
-    }
-
-    fn compute_items(&self, items: &[SeqItem]) -> ContextRelation {
-        let mut relation = ContextRelation::identity();
-        for item in items {
-            relation = relation.then(&match item {
-                SeqItem::Anchor(_) => ContextRelation::anchor(),
-                SeqItem::Pattern(pattern) => self.compute_pattern(pattern),
-            });
+        Pattern::DefRef(reference) => {
+            let Some(def_id) = reference
+                .name()
+                .and_then(|name| definitions.id_for_name(interner, name.text()))
+            else {
+                return AnchorRangeRelation::atom();
+            };
+            AnchorRangeRelation::from_anchor_context(
+                pattern_facts.definition_anchor_context(def_id),
+            )
         }
-        relation
-    }
-
-    fn compute_anchor_ranges(&self, pattern: &Pattern) -> AnchorRangeRelation {
-        match pattern {
-            Pattern::NamedNodePattern(_)
-            | Pattern::AnonymousNodePattern(_)
-            | Pattern::NodeWildcard(_) => AnchorRangeRelation::atom(),
-            Pattern::CapturedPattern(capture) => capture
-                .inner()
-                .map_or_else(AnchorRangeRelation::identity, |inner| {
-                    self.compute_anchor_ranges(&inner)
-                }),
-            Pattern::FieldPattern(field) => field
-                .value()
-                .map_or_else(AnchorRangeRelation::identity, |value| {
-                    self.compute_anchor_ranges(&value)
-                }),
-            Pattern::SeqPattern(sequence) => {
-                let items: Vec<_> = sequence.items().collect();
-                self.compute_anchor_range_items(&items)
-            }
-            Pattern::Alternation(alternation) => {
-                let mut relation = AnchorRangeRelation::impossible();
-                let mut had_alternative = false;
-                for alternative in alternation.patterns() {
-                    had_alternative = true;
-                    relation.union_with(&self.compute_anchor_ranges(&alternative));
-                }
-                if had_alternative {
-                    relation
-                } else {
-                    AnchorRangeRelation::identity()
-                }
-            }
-            Pattern::QuantifiedPattern(quantified) => {
-                let Some(inner) = quantified.inner() else {
-                    return AnchorRangeRelation::identity();
-                };
-                let inner = self.compute_anchor_ranges(&inner);
-                quantified
-                    .quantifier_kind()
-                    .map_or(inner.clone(), |kind| inner.quantified(kind))
-            }
-            Pattern::DefRef(reference) => {
-                let Some(def_id) = reference
-                    .name()
-                    .and_then(|name| self.definitions.id_for_name(self.interner, name.text()))
-                else {
-                    return AnchorRangeRelation::atom();
-                };
-                AnchorRangeRelation::from_context(self.definition(def_id))
-            }
-        }
-    }
-
-    fn compute_anchor_range_items(&self, items: &[SeqItem]) -> AnchorRangeRelation {
-        let mut relation = AnchorRangeRelation::identity();
-        for item in items {
-            relation = relation.then(&match item {
-                SeqItem::Anchor(anchor) => AnchorRangeRelation::anchor(anchor.text_range()),
-                SeqItem::Pattern(pattern) => self.compute_anchor_ranges(pattern),
-            });
-        }
-        relation
     }
 }

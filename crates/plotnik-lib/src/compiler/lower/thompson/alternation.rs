@@ -64,7 +64,7 @@ fn nav_for_alternative(
 ) -> Option<Nav> {
     let nav = exact_nav_for_alternative(first_nav, search_nav)?;
 
-    if !anchor_semantics.pattern_may_match_anonymous(Some(body)) {
+    if !anchor_semantics.pattern_may_match_anonymous_node(Some(body)) {
         return Some(nav);
     }
 
@@ -169,7 +169,7 @@ impl NfaBuilder<'_> {
                 .map(|b| {
                     b.body().is_some_and(|body| {
                         !pattern_owns_iteration(&body)
-                            && !anchor_semantics.pattern_may_match_anonymous(Some(&body))
+                            && !anchor_semantics.pattern_may_match_anonymous_node(Some(&body))
                     })
                 })
                 .collect()

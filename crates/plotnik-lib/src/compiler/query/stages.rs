@@ -7,8 +7,7 @@ use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::resolve_names;
 use crate::compiler::analyze::refs::{DefinitionGraph, build_definition_graph, validate_recursion};
 use crate::compiler::analyze::result::{ResultModel, ResultSchema};
-use crate::compiler::analyze::shape::DefinitionFacts;
-use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
+use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::analyze::shape::validation::{
     AnchorValidationInput, ShapeValidationInput, validate_anchors, validate_ast,
 };
@@ -158,24 +157,20 @@ impl QueryParsed {
             &mut interner,
             self.limits.references(),
         )?;
-        let anchor_contexts = AnchorContextAnalysis::new(&interner, &definitions);
+        let pattern_facts = PatternFacts::analyze(&interner, &definitions);
         let anchors_valid = validate_anchors(AnchorValidationInput {
-            analysis: &anchor_contexts,
+            pattern_facts: &pattern_facts,
             definitions: &definitions,
+            interner: &interner,
             diag: &mut self.diag,
         });
         if !anchors_valid {
             return Ok(Query::parsed_only(self));
         }
         validate_recursion(&definitions, &interner, &mut self.diag);
-        let definition_facts = DefinitionFacts::analyze(&interner, &definitions, &anchor_contexts);
 
-        let type_analysis = type_check::infer_types(
-            &mut interner,
-            &definitions,
-            &definition_facts,
-            &mut self.diag,
-        );
+        let type_analysis =
+            type_check::infer_types(&mut interner, &definitions, &pattern_facts, &mut self.diag);
         if !self.diag.has_errors() {
             check_entry_points(validated.ast_map(), &interner, &definitions, &mut self.diag);
         }
@@ -183,7 +178,7 @@ impl QueryParsed {
         let analysis = Analysis {
             interner,
             definitions,
-            definition_facts,
+            pattern_facts,
             type_analysis,
         };
 
@@ -224,7 +219,7 @@ pub(crate) struct AnalyzedQuery {
 pub(super) struct Analysis {
     pub(super) interner: Interner,
     pub(super) definitions: DefinitionGraph,
-    pub(super) definition_facts: DefinitionFacts,
+    pub(super) pattern_facts: PatternFacts,
     pub(super) type_analysis: TypeAnalysis,
 }
 
@@ -301,6 +296,7 @@ impl Query {
             grammar,
             source_map: &analyzed.parsed.source_map,
             definitions: &analyzed.analysis.definitions,
+            pattern_facts: &analyzed.analysis.pattern_facts,
             strict_lints: analyzed.parsed.strict_lints,
             satisfiability_limits: analyzed.parsed.limits.satisfiability(),
         }
@@ -330,8 +326,8 @@ impl AnalyzedQuery {
         &self.analysis.type_analysis
     }
 
-    pub(crate) fn definition_facts(&self) -> &DefinitionFacts {
-        &self.analysis.definition_facts
+    pub(crate) fn pattern_facts(&self) -> &PatternFacts {
+        &self.analysis.pattern_facts
     }
 
     pub(crate) fn definitions(&self) -> &DefinitionGraph {
@@ -769,8 +765,8 @@ impl BoundQuery {
         self.analyzed.type_analysis()
     }
 
-    pub(crate) fn definition_facts(&self) -> &DefinitionFacts {
-        self.analyzed.definition_facts()
+    pub(crate) fn pattern_facts(&self) -> &PatternFacts {
+        self.analyzed.pattern_facts()
     }
 
     pub(crate) fn definitions(&self) -> &DefinitionGraph {
@@ -805,7 +801,7 @@ impl BoundQuery {
         AnalysisArtifacts {
             interner: self.interner(),
             type_analysis: self.type_analysis(),
-            definition_facts: self.definition_facts(),
+            pattern_facts: self.pattern_facts(),
             definitions: self.definitions(),
             grammar: self.grammar(),
         }
