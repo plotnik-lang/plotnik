@@ -173,11 +173,9 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 self.check_pattern_grammar(&inner_located, ctx, inner_participation, walk);
             }
             Pattern::DefRef(r) => {
-                let name_token = r.name().expect("validated definition reference has a name");
-                let name = name_token.text();
                 let def_id = self
                     .definitions
-                    .id_for_name(self.interner, name)
+                    .reference_target(r)
                     .expect("admitted definition reference must resolve");
                 // Validation is a pure function of `(definition, ctx, participation)`, so caching it
                 // collapses diamond-shaped reference graphs that would otherwise be re-walked
@@ -245,10 +243,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 !saw_alternative
             }
             Pattern::DefRef(def_ref) => {
-                let Some(name) = def_ref.name() else {
-                    return true;
-                };
-                let Some(def_id) = self.definitions.id_for_name(self.interner, name.text()) else {
+                let Some(def_id) = self.definitions.reference_target(def_ref) else {
                     return true;
                 };
                 if !seen_refs.insert(def_id) {

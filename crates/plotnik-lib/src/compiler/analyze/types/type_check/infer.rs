@@ -448,16 +448,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// declaration must not acquire some other name merely because its shape
     /// happens to be interned with another type.
     fn infer_ref(&mut self, r: &DefRef) -> PatternShape {
-        let Some(name_tok) = r.name() else {
-            return PatternShape::no_value();
-        };
-
         // Undefined references are diagnosed before type inference.
-        let Some(def_id) = self
-            .ctx
-            .definitions
-            .id_for_name(self.ctx.interner, name_tok.text())
-        else {
+        let Some(def_id) = self.ctx.definitions.reference_target(r) else {
             return PatternShape::no_value();
         };
 
@@ -813,11 +805,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
         // the classifier with emission keeps the declared type and the effects in
         // lockstep.
-        let mechanism = self.ctx.type_ctx.in_progress().capture_kind(
-            inner.node(),
-            self.ctx.definitions,
-            self.ctx.interner,
-        );
+        let mechanism = self
+            .ctx
+            .type_ctx
+            .in_progress()
+            .capture_kind(inner.node(), self.ctx.definitions);
         let should_merge_fields =
             mechanism == CaptureKind::Node && matches!(&inner_info.flow, PatternFlow::Fields(_));
 
@@ -1040,11 +1032,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let Pattern::DefRef(reference) = pattern else {
             return None;
         };
-        let name = reference.name()?;
-        let target = self
-            .ctx
-            .definitions
-            .id_for_name(self.ctx.interner, name.text())?;
+        let target = self.ctx.definitions.reference_target(reference)?;
         self.ctx
             .type_ctx
             .in_progress()
@@ -1325,14 +1313,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let Pattern::DefRef(r) = &element else {
             return;
         };
-        let Some(name) = r.name() else {
-            return;
-        };
-        let Some(def_id) = self
-            .ctx
-            .definitions
-            .id_for_name(self.ctx.interner, name.text())
-        else {
+        let Some(def_id) = self.ctx.definitions.reference_target(r) else {
             return;
         };
         if !self.ctx.pattern_facts.definition_is_nullable(def_id) {

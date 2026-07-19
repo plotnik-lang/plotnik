@@ -207,14 +207,10 @@ fn collect_pattern(
             push_pattern(source, SpanKind::Pattern, wildcard.syntax(), out);
         }
         Pattern::DefRef(reference) => {
-            let name = reference
-                .name()
-                .expect("resolved reference must have a name");
             let target = input
                 .analysis
                 .definitions
-                .id_for_name(input.analysis.interner, name.text())
-                .expect("reference target must resolve");
+                .expect_reference_target(reference);
             out.push(Candidate {
                 node: reference.syntax().clone(),
                 source,

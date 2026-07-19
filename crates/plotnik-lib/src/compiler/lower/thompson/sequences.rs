@@ -538,7 +538,7 @@ impl NfaBuilder<'_> {
         }
 
         if let Pattern::DefRef(reference) = pattern {
-            let def_id = self.resolve_ref_def_id(reference);
+            let def_id = self.expect_reference_target(reference);
             return self.compile_boundary_ref_call(def_id, input, entry, targets);
         }
 
@@ -701,7 +701,7 @@ impl NfaBuilder<'_> {
         if mechanism == CaptureKind::Ref
             && let Pattern::DefRef(reference) = &inner
         {
-            let def_id = self.resolve_ref_def_id(reference);
+            let def_id = self.expect_reference_target(reference);
             return self.compile_boundary_captured_ref_call(
                 def_id,
                 input,
@@ -1120,7 +1120,7 @@ impl NfaBuilder<'_> {
                 self.boundary_sensitive_items_with_visited(&items, visited)
             }
             Pattern::DefRef(reference) => {
-                let def_id = self.resolve_ref_def_id(reference);
+                let def_id = self.expect_reference_target(reference);
                 if !visited.insert(def_id) {
                     return false;
                 }
@@ -1170,7 +1170,7 @@ impl NfaBuilder<'_> {
                 self.boundary_items_supported_with_visited(&items, visited)
             }
             Pattern::DefRef(reference) => {
-                let def_id = self.resolve_ref_def_id(reference);
+                let def_id = self.expect_reference_target(reference);
                 let relation = self.definition_boundary_relation(def_id);
                 if BoundaryState::all().all(|input| simple_boundary_routes(relation, input)) {
                     return true;

@@ -27,7 +27,7 @@ use crate::compiler::parse::ast::{
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::strings::unescape;
 use crate::core::grammar::Grammar;
-use crate::core::{Interner, NodeFieldId, NodeKindId};
+use crate::core::{NodeFieldId, NodeKindId};
 
 use super::node_constrains_children;
 
@@ -190,7 +190,6 @@ impl ChildAutomaton {
 #[derive(Clone, Copy)]
 pub(super) struct AutomatonContext<'a> {
     pub(super) grammar: &'a Grammar,
-    pub(super) interner: &'a Interner,
     pub(super) definitions: &'a DefinitionGraph,
     pub(super) pattern_facts: &'a PatternFacts,
     pub(super) source_map: &'a SourceMap,
@@ -625,14 +624,9 @@ impl<'a, 'b> Builder<'a, 'b> {
     }
 
     fn emit_def_ref(&mut self, def_ref: &ast::DefRef, descent: Descent, from: State) -> State {
-        let Some(name_token) = def_ref.name() else {
+        let Some(def_id) = self.ctx.definitions.reference_target(def_ref) else {
             return self.emit_single(ChildMatcher::unconstrained(descent.field), from);
         };
-        let def_id = self
-            .ctx
-            .definitions
-            .id_for_name(self.ctx.interner, name_token.text())
-            .expect("admitted definition reference must resolve");
         // A reference that splices siblings into the parent (`Seq = {(a) (Seq)}`) makes the
         // child language non-regular, so it cannot inline finitely. Rather than abandon the
         // whole automaton — which would erase the constraints the non-recursive prefix

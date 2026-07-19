@@ -23,7 +23,7 @@ pub(in crate::compiler) fn build_definition_graph(
     interner: &mut Interner,
     limits: ReferenceLimits,
 ) -> Result<DefinitionGraph, Error> {
-    let (sccs, ids_by_symbol, mut outgoing) = {
+    let (sccs, ids_by_symbol, mut outgoing, target_by_reference) = {
         // `strongconnect` recurses one frame per edge it follows. A chain like
         // `A = (B)`, `B = (C)`, … is flat source, so the parser cannot bound it;
         // graph construction owns the corresponding stack ceiling.
@@ -50,7 +50,8 @@ pub(in crate::compiler) fn build_definition_graph(
         }
 
         let mut outgoing = vec![Vec::new(); definition_count];
-        for (&name, references) in &topology.outgoing {
+        let mut target_by_reference = HashMap::new();
+        for (&name, occurrences_by_target_name) in &topology.outgoing {
             let owner_symbol = interner
                 .get(name)
                 .expect("definition name must already be interned");
@@ -58,19 +59,26 @@ pub(in crate::compiler) fn build_definition_graph(
                 .get(&owner_symbol)
                 .copied()
                 .expect("definition name must have a DefId");
-            for &reference in references {
+            for (&target_name, occurrences) in occurrences_by_target_name {
                 let symbol = interner
-                    .get(reference)
+                    .get(target_name)
                     .expect("defined reference must already be interned");
                 let target = ids_by_symbol
                     .get(&symbol)
                     .copied()
                     .expect("defined reference must have a DefId");
                 outgoing[owner.index()].push(target);
+                for reference in occurrences {
+                    let previous = target_by_reference.insert(reference.clone(), target);
+                    assert!(
+                        previous.is_none(),
+                        "an authored reference occurrence must have exactly one target"
+                    );
+                }
             }
         }
 
-        (sccs, ids_by_symbol, outgoing)
+        (sccs, ids_by_symbol, outgoing, target_by_reference)
     };
 
     let definition_count = ids_by_symbol.len();
@@ -108,6 +116,7 @@ pub(in crate::compiler) fn build_definition_graph(
         ids_by_symbol,
         definitions,
         declaration_order,
+        target_by_reference,
     ))
 }
 
@@ -119,7 +128,7 @@ struct TarjanScc<'a> {
     indices: IndexMap<&'a str, usize>,
     lowlinks: IndexMap<&'a str, usize>,
     sccs: Vec<Vec<&'a str>>,
-    outgoing: IndexMap<&'a str, IndexSet<&'a str>>,
+    outgoing: IndexMap<&'a str, ReferenceOccurrencesByTargetName<'a>>,
     /// Recursion ceiling and current depth: an acyclic reference chain deeper than
     /// this would overflow the native stack, so we stop and flag it instead.
     max_depth: u32,
@@ -129,8 +138,10 @@ struct TarjanScc<'a> {
 
 struct DependencyTopology<'a> {
     sccs: Vec<Vec<&'a str>>,
-    outgoing: IndexMap<&'a str, IndexSet<&'a str>>,
+    outgoing: IndexMap<&'a str, ReferenceOccurrencesByTargetName<'a>>,
 }
+
+type ReferenceOccurrencesByTargetName<'a> = IndexMap<&'a str, Vec<DefRef>>;
 
 impl<'a> TarjanScc<'a> {
     /// Returns the SCCs, or `None` if an acyclic reference chain ran past `max_depth`
@@ -188,22 +199,23 @@ impl<'a> TarjanScc<'a> {
             .definitions
             .body(name)
             .expect("collected definition name must have a body");
-        let references = collect_defined_refs(body, self.definitions);
-        for &reference in &references {
-            if !self.indices.contains_key(reference) {
-                self.strongconnect(reference);
+        let occurrences_by_target_name =
+            collect_defined_reference_occurrences(body, self.definitions);
+        for &target in occurrences_by_target_name.keys() {
+            if !self.indices.contains_key(target) {
+                self.strongconnect(target);
                 if self.depth_exceeded {
                     self.depth -= 1;
                     return;
                 }
-                let reference_lowlink = self.lowlinks[reference];
+                let reference_lowlink = self.lowlinks[target];
                 let my_lowlink = self
                     .lowlinks
                     .get_mut(name)
                     .expect("lowlink for name was inserted at the start of strongconnect");
                 *my_lowlink = (*my_lowlink).min(reference_lowlink);
-            } else if self.on_stack.contains(reference) {
-                let reference_index = self.indices[reference];
+            } else if self.on_stack.contains(target) {
+                let reference_index = self.indices[target];
                 let my_lowlink = self
                     .lowlinks
                     .get_mut(name)
@@ -211,7 +223,7 @@ impl<'a> TarjanScc<'a> {
                 *my_lowlink = (*my_lowlink).min(reference_index);
             }
         }
-        self.outgoing.insert(name, references);
+        self.outgoing.insert(name, occurrences_by_target_name);
 
         if self.lowlinks[name] == self.indices[name] {
             let mut scc = Vec::new();
@@ -237,11 +249,11 @@ impl<'a> TarjanScc<'a> {
 /// Collect references that resolve within the transient definition map.
 ///
 /// Returns only refs that point to defined names (filters out node kind references).
-fn collect_defined_refs<'a>(
+fn collect_defined_reference_occurrences<'a>(
     pattern: &Pattern,
     definitions: &'a CollectedDefinitions,
-) -> IndexSet<&'a str> {
-    let mut refs = IndexSet::new();
+) -> ReferenceOccurrencesByTargetName<'a> {
+    let mut occurrences_by_target_name = IndexMap::<_, Vec<_>>::new();
     for descendant in pattern.syntax().descendants() {
         let Some(r) = DefRef::cast(descendant) else {
             continue;
@@ -250,7 +262,7 @@ fn collect_defined_refs<'a>(
         let Some(key) = definitions.defined_name(name_tok.text()) else {
             continue;
         };
-        refs.insert(key);
+        occurrences_by_target_name.entry(key).or_default().push(r);
     }
-    refs
+    occurrences_by_target_name
 }

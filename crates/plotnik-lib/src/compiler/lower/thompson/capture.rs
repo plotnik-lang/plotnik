@@ -304,11 +304,11 @@ impl NfaBuilder<'_> {
     /// the structured result pending for `RecordSet` to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
-            Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(
-                pattern,
-                self.ctx.analysis.definitions,
-                self.ctx.analysis.interner,
-            ),
+            Pattern::DefRef(_) => self
+                .ctx
+                .analysis
+                .type_analysis
+                .ref_returns_structured(pattern, self.ctx.analysis.definitions),
             Pattern::QuantifiedPattern(q) => q
                 .inner()
                 .is_some_and(|i| self.is_ref_returning_structured(&i)),

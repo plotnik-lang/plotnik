@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::{SourceId, Span};
 use crate::compiler::ids::DefId;
-use crate::compiler::parse::ast::{self, Pattern};
+use crate::compiler::parse::ast::{self, DefRef, Pattern};
 use crate::core::{Interner, Symbol};
 
 pub(crate) struct Definition {
@@ -70,6 +70,8 @@ pub(crate) struct DefinitionGraph {
     definitions: Vec<Definition>,
     /// Definition declaration order across source-map order.
     declaration_order: Vec<DefId>,
+    /// The one resolved target for each authored reference occurrence.
+    target_by_reference: HashMap<DefRef, DefId>,
 }
 
 /// A stable definition subset. Membership is recorded densely; iteration is in
@@ -85,6 +87,7 @@ impl DefinitionGraph {
         ids_by_symbol: HashMap<Symbol, DefId>,
         mut definitions: Vec<Definition>,
         declaration_order: Vec<DefId>,
+        target_by_reference: HashMap<DefRef, DefId>,
     ) -> Self {
         let mut has_inbound = vec![false; definitions.len()];
         for definition in &definitions {
@@ -114,6 +117,7 @@ impl DefinitionGraph {
             ids_by_symbol,
             definitions,
             declaration_order,
+            target_by_reference,
         };
         graph.assert_well_formed();
         graph
@@ -169,6 +173,12 @@ impl DefinitionGraph {
                 "DefId index must point at its definition record",
             );
         }
+        assert!(
+            self.target_by_reference
+                .values()
+                .all(|target| target.index() < definition_count),
+            "every reference target must be an admitted definition"
+        );
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -197,6 +207,15 @@ impl DefinitionGraph {
 
     pub(crate) fn id_for_name(&self, interner: &Interner, name: &str) -> Option<DefId> {
         self.id_for_symbol(interner.get(name)?)
+    }
+
+    pub(crate) fn reference_target(&self, reference: &DefRef) -> Option<DefId> {
+        self.target_by_reference.get(reference).copied()
+    }
+
+    pub(crate) fn expect_reference_target(&self, reference: &DefRef) -> DefId {
+        self.reference_target(reference)
+            .expect("analyzed reference must resolve to a definition")
     }
 
     pub(crate) fn is_recursive(&self, id: DefId) -> bool {

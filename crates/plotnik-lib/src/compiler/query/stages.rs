@@ -157,11 +157,10 @@ impl QueryParsed {
             &mut interner,
             self.limits.references(),
         )?;
-        let pattern_facts = PatternFacts::analyze(&interner, &definitions);
+        let pattern_facts = PatternFacts::analyze(&definitions);
         let anchors_valid = validate_anchors(AnchorValidationInput {
             pattern_facts: &pattern_facts,
             definitions: &definitions,
-            interner: &interner,
             diag: &mut self.diag,
         });
         if !anchors_valid {

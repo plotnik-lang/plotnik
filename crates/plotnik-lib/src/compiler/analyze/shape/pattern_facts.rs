@@ -12,7 +12,6 @@ use crate::compiler::analyze::boundary::{BoundaryRelation, FirstClass, PendingAn
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{Pattern, QuantifierKind, SeqItem};
-use crate::core::Interner;
 
 use super::RootExtent;
 use super::anchor_context::{self, AnchorContextRelation};
@@ -115,7 +114,7 @@ pub(crate) struct PatternFacts {
 }
 
 impl PatternFacts {
-    pub(crate) fn analyze(interner: &Interner, definitions: &DefinitionGraph) -> Self {
+    pub(crate) fn analyze(definitions: &DefinitionGraph) -> Self {
         let mut definition_summaries = definitions
             .ids_in_def_id_order()
             .map(|_| PatternSummary::bottom())
@@ -129,8 +128,7 @@ impl PatternFacts {
                 let mut changed = false;
                 for &def_id in scc {
                     let body = definitions.definition(def_id).body();
-                    let next =
-                        summarize_pattern(body, &definition_summaries, definitions, interner, None);
+                    let next = summarize_pattern(body, &definition_summaries, definitions, None);
                     let current = definition_summary_mut(&mut definition_summaries, def_id);
                     if *current != next {
                         *current = next;
@@ -152,7 +150,6 @@ impl PatternFacts {
                 definitions.definition(def_id).body(),
                 &definition_summaries,
                 definitions,
-                interner,
                 &mut pattern_summaries,
             );
         }
@@ -196,9 +193,8 @@ impl PatternFacts {
         &self,
         def_id: DefId,
         definitions: &DefinitionGraph,
-        interner: &Interner,
     ) -> Vec<TextRange> {
-        anchor_context::exported_anchor_ranges(self, def_id, definitions, interner)
+        anchor_context::exported_anchor_ranges(self, def_id, definitions)
     }
 
     pub(crate) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
@@ -265,28 +261,15 @@ fn retain_pattern_summaries(
     pattern: &Pattern,
     definition_summaries: &[PatternSummary],
     definitions: &DefinitionGraph,
-    interner: &Interner,
     patterns: &mut HashMap<Pattern, PatternSummary>,
 ) {
     if patterns.contains_key(pattern) {
         return;
     }
     for child in pattern.children() {
-        retain_pattern_summaries(
-            &child,
-            definition_summaries,
-            definitions,
-            interner,
-            patterns,
-        );
+        retain_pattern_summaries(&child, definition_summaries, definitions, patterns);
     }
-    let summary = summarize_pattern(
-        pattern,
-        definition_summaries,
-        definitions,
-        interner,
-        Some(patterns),
-    );
+    let summary = summarize_pattern(pattern, definition_summaries, definitions, Some(patterns));
     patterns.insert(pattern.clone(), summary);
 }
 
@@ -294,56 +277,34 @@ fn summarize_child(
     pattern: &Pattern,
     definition_summaries: &[PatternSummary],
     definitions: &DefinitionGraph,
-    interner: &Interner,
     patterns: Option<&HashMap<Pattern, PatternSummary>>,
 ) -> PatternSummary {
     if let Some(summary) = patterns.and_then(|patterns| patterns.get(pattern)) {
         return summary.clone();
     }
-    summarize_pattern(
-        pattern,
-        definition_summaries,
-        definitions,
-        interner,
-        patterns,
-    )
+    summarize_pattern(pattern, definition_summaries, definitions, patterns)
 }
 
 fn summarize_pattern(
     pattern: &Pattern,
     definition_summaries: &[PatternSummary],
     definitions: &DefinitionGraph,
-    interner: &Interner,
     patterns: Option<&HashMap<Pattern, PatternSummary>>,
 ) -> PatternSummary {
     match pattern {
         Pattern::NamedNodePattern(_) => PatternSummary::atom(FirstClass::Named),
         Pattern::AnonymousNodePattern(_) => PatternSummary::atom(FirstClass::Anonymous),
         Pattern::NodeWildcard(_) => PatternSummary::atom(FirstClass::Either),
-        Pattern::CapturedPattern(capture) => {
-            capture
-                .inner()
-                .map_or_else(PatternSummary::recovery_identity, |inner| {
-                    summarize_child(
-                        &inner,
-                        definition_summaries,
-                        definitions,
-                        interner,
-                        patterns,
-                    )
-                })
-        }
+        Pattern::CapturedPattern(capture) => capture
+            .inner()
+            .map_or_else(PatternSummary::recovery_identity, |inner| {
+                summarize_child(&inner, definition_summaries, definitions, patterns)
+            }),
         Pattern::FieldPattern(field) => {
             let Some(value) = field.value() else {
                 return PatternSummary::recovery_identity();
             };
-            let mut summary = summarize_child(
-                &value,
-                definition_summaries,
-                definitions,
-                interner,
-                patterns,
-            );
+            let mut summary = summarize_child(&value, definition_summaries, definitions, patterns);
             // Field values are validated as exactly one node. Recovery keeps
             // their definition-level extent and nullability conservative.
             summary.nullable = false;
@@ -366,13 +327,8 @@ fn summarize_pattern(
                         });
                     }
                     SeqItem::Pattern(pattern) => {
-                        let child = summarize_child(
-                            &pattern,
-                            definition_summaries,
-                            definitions,
-                            interner,
-                            patterns,
-                        );
+                        let child =
+                            summarize_child(&pattern, definition_summaries, definitions, patterns);
                         summary.nullable &= child.nullable;
                         summary.root_extent = match pattern_count {
                             0 => child.root_extent,
@@ -392,8 +348,7 @@ fn summarize_pattern(
             let mut had_alternative = false;
             for body in alternation.patterns() {
                 had_alternative = true;
-                let child =
-                    summarize_child(&body, definition_summaries, definitions, interner, patterns);
+                let child = summarize_child(&body, definition_summaries, definitions, patterns);
                 summary.nullable |= child.nullable;
                 summary.root_extent = summary.root_extent.combine(child.root_extent);
                 summary.anchor_context.union_with(&child.anchor_context);
@@ -410,13 +365,7 @@ fn summarize_pattern(
             let Some(inner) = quantified.inner() else {
                 return PatternSummary::recovery_identity();
             };
-            let mut summary = summarize_child(
-                &inner,
-                definition_summaries,
-                definitions,
-                interner,
-                patterns,
-            );
+            let mut summary = summarize_child(&inner, definition_summaries, definitions, patterns);
             summary.root_extent = RootExtent::NotSingleNode;
             if let Some(kind) = quantified.quantifier_kind() {
                 summary.nullable =
@@ -427,10 +376,7 @@ fn summarize_pattern(
             summary
         }
         Pattern::DefRef(reference) => {
-            let Some(def_id) = reference
-                .name()
-                .and_then(|name| definitions.id_for_name(interner, name.text()))
-            else {
+            let Some(def_id) = definitions.reference_target(reference) else {
                 return PatternSummary::undefined_reference();
             };
             definition_summary(definition_summaries, def_id).clone()
