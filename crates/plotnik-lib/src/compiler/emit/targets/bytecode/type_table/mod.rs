@@ -44,10 +44,9 @@ fn build(
 ) -> Result<(), EmitError> {
     let type_analysis = schema.types;
     let type_layout = schema.type_layout();
-    let ordered_types = type_layout.value_types();
 
     emit_builtins(types, type_layout)?;
-    reserve_slots(types, ordered_types, type_layout)?;
+    reserve_slots(types, type_layout.value_types(), type_layout)?;
 
     let mut ctx = TypeEmitCtx {
         type_analysis,
@@ -55,7 +54,7 @@ fn build(
         interner: schema.interner,
         strings,
     };
-    fill_slots(types, ordered_types, schema.layout(), &mut ctx)?;
+    fill_slots(types, type_layout.value_types(), schema.layout(), &mut ctx)?;
     assert_eq!(
         usize::from(types.members_len()),
         schema.layout().member_count(),
@@ -73,7 +72,7 @@ fn emit_builtins(types: &mut TypeTableBuilder, layout: &ResultTypeLayout) -> Res
             TypeDef::builtin(TypeKind::NoValue),
         )?;
     }
-    for &builtin in layout.builtins() {
+    for builtin in layout.builtins() {
         let kind = match builtin {
             TYPE_NODE => TypeKind::Node,
             TYPE_TEXT => TypeKind::Text,
@@ -87,10 +86,10 @@ fn emit_builtins(types: &mut TypeTableBuilder, layout: &ResultTypeLayout) -> Res
 
 fn reserve_slots(
     types: &mut TypeTableBuilder,
-    ordered_types: &[TypeId],
+    ordered_types: impl IntoIterator<Item = TypeId>,
     layout: &ResultTypeLayout,
 ) -> Result<(), EmitError> {
-    for &type_id in ordered_types {
+    for type_id in ordered_types {
         types.push_result(layout.output_id(type_id), TypeDef::placeholder())?;
     }
     Ok(())
@@ -98,11 +97,11 @@ fn reserve_slots(
 
 fn fill_slots(
     types: &mut TypeTableBuilder,
-    ordered_types: &[TypeId],
+    ordered_types: impl IntoIterator<Item = TypeId>,
     layout: &CaptureLayout,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    for &type_id in ordered_types {
+    for type_id in ordered_types {
         emit_type_at_slot(types, type_id, layout, ctx)?;
     }
     Ok(())

@@ -5,8 +5,9 @@
 //! composite member slots are assigned here, before bytecode or any
 //! source backend chooses a representation.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
+use indexmap::IndexMap;
 use thiserror::Error;
 
 use crate::compiler::analyze::AnalysisArtifacts;
@@ -160,24 +161,18 @@ pub(crate) struct CaptureLayout {
 #[derive(Clone, Debug)]
 pub(crate) struct ResultTypeLayout {
     no_value: bool,
-    builtin_count: usize,
-    ordered_types: Vec<TypeId>,
-    output_ids: HashMap<TypeId, ResultTypeId>,
+    types: IndexMap<TypeId, ResultTypeId>,
 }
 
 impl ResultTypeLayout {
     fn build(no_value: bool, used_builtins: &HashSet<TypeId>, value_types: Vec<TypeId>) -> Self {
-        let mut ordered_types = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
+        let ordered_types = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
             .into_iter()
             .filter(|builtin| used_builtins.contains(builtin))
-            .collect::<Vec<_>>();
-        let builtin_count = ordered_types.len();
-        ordered_types.extend(value_types);
-
-        let output_ids = ordered_types
-            .iter()
+            .chain(value_types);
+        let types = ordered_types
             .enumerate()
-            .map(|(index, &type_id)| {
+            .map(|(index, type_id)| {
                 (
                     type_id,
                     ResultTypeId::from_raw(
@@ -187,16 +182,14 @@ impl ResultTypeLayout {
                 )
             })
             .collect();
-        Self {
-            no_value,
-            builtin_count,
-            ordered_types,
-            output_ids,
-        }
+        Self { no_value, types }
     }
 
-    pub(crate) fn builtins(&self) -> &[TypeId] {
-        &self.ordered_types[..self.builtin_count]
+    pub(crate) fn builtins(&self) -> impl Iterator<Item = TypeId> + '_ {
+        self.types
+            .keys()
+            .copied()
+            .take_while(|type_id| type_id.is_builtin())
     }
 
     pub(crate) fn has_no_value(&self) -> bool {
@@ -211,19 +204,22 @@ impl ResultTypeLayout {
         ResultTypeId::from_raw(0)
     }
 
-    pub(crate) fn value_types(&self) -> &[TypeId] {
-        &self.ordered_types[self.builtin_count..]
+    pub(crate) fn value_types(&self) -> impl Iterator<Item = TypeId> + '_ {
+        self.types
+            .keys()
+            .copied()
+            .skip_while(|type_id| type_id.is_builtin())
     }
 
     pub(crate) fn output_id(&self, type_id: TypeId) -> ResultTypeId {
         *self
-            .output_ids
+            .types
             .get(&type_id)
             .expect("reachable result type has a projected identity")
     }
 
     pub(crate) fn contains(&self, type_id: TypeId) -> bool {
-        self.output_ids.contains_key(&type_id)
+        self.types.contains_key(&type_id)
     }
 }
 
