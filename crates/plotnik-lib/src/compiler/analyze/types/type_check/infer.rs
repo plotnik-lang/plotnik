@@ -1,7 +1,7 @@
 //! Bottom-up type inference visitor.
 //!
-//! Traverses the AST and computes `PatternShape` (`RootExtent` plus
-//! `PatternFlow`) for each pattern.
+//! Traverses the AST and computes each pattern's result flow and inference-only
+//! field provenance. Grammar-independent matching shape lives in `PatternFacts`.
 //!
 //! # Output model
 //!
@@ -403,9 +403,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         match pattern.node() {
             Pattern::NamedNodePattern(n) => self.infer_named_node(&pattern.wrap(n.clone())),
             Pattern::AnonymousNodePattern(n) => self.infer_anonymous_node(n),
-            Pattern::NodeWildcard(_) => {
-                PatternShape::new(RootExtent::SingleNode, PatternFlow::NoValue)
-            }
+            Pattern::NodeWildcard(_) => PatternShape::new(PatternFlow::NoValue),
             Pattern::DefRef(r) => self.infer_ref(r),
             Pattern::SeqPattern(s) => self.infer_seq_pattern(&pattern.wrap(s.clone())),
             Pattern::Alternation(alternation) => match alternation.labeling() {
@@ -431,12 +429,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_named_node(&mut self, node: &Located<NamedNodePattern>) -> PatternShape {
         let children = node.node().children().map(|child| node.wrap(child));
         let merged = self.collect_child_fields(children);
-        self.merged_fields_shape(RootExtent::SingleNode, merged)
+        self.merged_fields_shape(merged)
     }
 
     /// Anonymous-node pattern or node wildcard: matches one position, produces nothing.
     fn infer_anonymous_node(&mut self, _node: &AnonymousNodePattern) -> PatternShape {
-        PatternShape::new(RootExtent::SingleNode, PatternFlow::NoValue)
+        PatternShape::new(PatternFlow::NoValue)
     }
 
     /// Reference: an opaque boundary producing the definition's result value.
@@ -453,11 +451,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             return PatternShape::no_value();
         };
 
-        // Root extent is precomputed to a fixpoint before inference, so every
-        // reference — recursive ones included — delegates its target's extent
-        // and the single-node checks stay sound through recursion.
-        let root_extent = self.ctx.pattern_facts.definition_root_extent(def_id);
-
         if self.ctx.definitions.is_recursive(def_id) {
             // A completed match-only target already flows NoValue. A same-SCC
             // target not yet registered flows a provisional reference; any
@@ -471,7 +464,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     PatternFlow::Value(ref_type)
                 }
             };
-            return PatternShape::new(root_extent, flow);
+            return PatternShape::new(flow);
         }
 
         let output =
@@ -485,17 +478,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 PatternFlow::Value(ref_type)
             }
         };
-        PatternShape::new(root_extent, flow)
+        PatternShape::new(flow)
     }
 
-    /// Sequence: root-extent aggregation and strict field merging.
+    /// Sequence: strict field merging.
     fn infer_seq_pattern(&mut self, seq: &Located<SeqPattern>) -> PatternShape {
-        let children: Vec<Located<Pattern>> = seq.node().children().map(|c| seq.wrap(c)).collect();
+        let children = seq.node().children().map(|child| seq.wrap(child));
+        let merged = self.collect_child_fields(children);
 
-        let root_extent = self.sequence_root_extent(&children);
-        let merged = self.collect_child_fields(children.iter().cloned());
-
-        self.merged_fields_shape(root_extent, merged)
+        self.merged_fields_shape(merged)
     }
 
     /// Merge the bubbling fields of a scope's children. A `Value` child does not
@@ -521,13 +512,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         merged_fields.into_fields()
     }
 
-    fn merged_fields_shape(
-        &mut self,
-        root_extent: RootExtent,
-        merged: BTreeMap<Symbol, InferredField>,
-    ) -> PatternShape {
+    fn merged_fields_shape(&mut self, merged: BTreeMap<Symbol, InferredField>) -> PatternShape {
         if merged.is_empty() {
-            return PatternShape::new(root_extent, PatternFlow::NoValue);
+            return PatternShape::new(PatternFlow::NoValue);
         }
         let record = self.ctx.type_ctx.intern_record(
             merged
@@ -535,15 +522,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 .map(|(&name, field)| (name, field.info))
                 .collect(),
         );
-        PatternShape::fields(root_extent, InferredFieldFlow::new(record, merged))
-    }
-
-    fn sequence_root_extent(&mut self, children: &[Located<Pattern>]) -> RootExtent {
-        match children {
-            [] => RootExtent::SingleNode,
-            [child] => self.infer_pattern(child).root_extent,
-            _ => RootExtent::NotSingleNode,
-        }
+        PatternShape::fields(InferredFieldFlow::new(record, merged))
     }
 
     fn infer_labeled_alternation(
@@ -563,7 +542,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
         let mut cases: BTreeMap<Symbol, CasePayload> = BTreeMap::new();
-        let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
             let label = alternative
@@ -575,9 +553,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // with fewer cases than the emitter expects. Reject them instead.
             if cases.contains_key(&label_sym) {
                 self.report_duplicate_case_label(label.text_range(), label.text());
-                if let Some(body_info) = self.infer_alternative_body(alternation, &alternative) {
-                    combined_extent = combined_extent.combine(body_info.root_extent);
-                }
+                self.infer_alternative_body(alternation, &alternative);
                 continue;
             }
 
@@ -587,12 +563,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 continue;
             };
 
-            combined_extent = combined_extent.combine(body_info.root_extent);
             cases.insert(label_sym, case_payload(&body_info.flow));
         }
 
         let variant_type = self.ctx.type_ctx.intern_type(TypeShape::Variant(cases));
-        PatternShape::new(combined_extent, PatternFlow::Value(variant_type))
+        PatternShape::new(PatternFlow::Value(variant_type))
     }
 
     fn infer_labeled_alternation_discarded(
@@ -601,16 +576,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ) -> PatternShape {
         self.check_duplicate_labels(alternation);
 
-        let mut combined_extent = RootExtent::SingleNode;
         for alternative in alternation.node().alternatives() {
             let Some(body) = alternative.body() else {
                 continue;
             };
-            let body_info = self.infer_pattern_discarded(&alternation.wrap(body));
-            combined_extent = combined_extent.combine(body_info.root_extent);
+            self.infer_pattern_discarded(&alternation.wrap(body));
         }
 
-        PatternShape::new(combined_extent, PatternFlow::NoValue)
+        PatternShape::no_value()
     }
 
     /// In a fields context, labels have no output effect. Warn, then merge the
@@ -623,7 +596,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         self.report_unused_alternative_labels(alternation.node());
 
         let mut alternatives = Vec::new();
-        let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
             let Some(body) = alternative.body() else {
@@ -631,12 +603,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 continue;
             };
             let body_info = self.infer_pattern(&alternation.wrap(body.clone()));
-            combined_extent = combined_extent.combine(body_info.root_extent);
             alternatives.push((Some(body), body_info));
         }
 
         let pattern = Pattern::Alternation(alternation.node().clone());
-        self.unify_alternation(combined_extent, pattern, alternatives)
+        self.unify_alternation(pattern, alternatives)
     }
 
     fn check_duplicate_labels(&mut self, alternation: &Located<AlternationPattern>) {
@@ -673,7 +644,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
         let mut alternatives = Vec::new();
-        let mut combined_extent = RootExtent::SingleNode;
 
         for alternative in alternation.node().alternatives() {
             let Some(body) = alternative.body() else {
@@ -681,34 +651,31 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 continue;
             };
             let info = self.infer_pattern(&alternation.wrap(body.clone()));
-            combined_extent = combined_extent.combine(info.root_extent);
             alternatives.push((Some(body), info));
         }
 
         for pattern in alternation.node().patterns() {
             let info = self.infer_pattern(&alternation.wrap(pattern.clone()));
-            combined_extent = combined_extent.combine(info.root_extent);
             alternatives.push((Some(pattern), info));
         }
 
         let pattern = Pattern::Alternation(alternation.node().clone());
-        self.unify_alternation(combined_extent, pattern, alternatives)
+        self.unify_alternation(pattern, alternatives)
     }
 
     fn unify_alternation(
         &mut self,
-        root_extent: RootExtent,
         pattern: Pattern,
         alternatives: Vec<(Option<Pattern>, PatternShape)>,
     ) -> PatternShape {
         let alternation_span = Span::new(self.source, pattern.syntax().text_range());
         match unify_alternative_flows(self.ctx.type_ctx, alternatives, alternation_span) {
-            Ok(Some(field_flow)) => PatternShape::fields(root_extent, field_flow),
-            Ok(None) => PatternShape::new(root_extent, PatternFlow::NoValue),
+            Ok(Some(field_flow)) => PatternShape::fields(field_flow),
+            Ok(None) => PatternShape::new(PatternFlow::NoValue),
             Err(error) => {
                 self.ctx.type_ctx.block_capture_producers(error.producers());
                 self.report_alternative_unify_error(&error);
-                PatternShape::new(root_extent, PatternFlow::NoValue)
+                PatternShape::new(PatternFlow::NoValue)
             }
         }
     }
@@ -728,14 +695,16 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // is still inferred for structural validation, but the explicit discard
         // needs neither an ineffective-label warning nor a collection boundary.
         if capture.is_discard() {
-            let info = match captured_pattern.inner() {
-                None => return PatternShape::no_value(),
+            match captured_pattern.inner() {
+                None => {}
                 Some(Pattern::QuantifiedPattern(q)) => {
-                    self.infer_quantified_pattern_in(&captured.wrap(q), QuantifiedContext::Discard)
+                    self.infer_quantified_pattern_in(&captured.wrap(q), QuantifiedContext::Discard);
                 }
-                Some(i) => self.infer_pattern_discarded(&captured.wrap(i)),
-            };
-            return PatternShape::new(info.root_extent, PatternFlow::NoValue);
+                Some(inner) => {
+                    self.infer_pattern_discarded(&captured.wrap(inner));
+                }
+            }
+            return PatternShape::no_value();
         }
 
         let Some(name_token) = capture.name() else {
@@ -773,7 +742,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 Span::new(captured.source(), name_token.text_range()),
                 Span::new(captured.source(), capture_range),
             );
-            return PatternShape::fields(RootExtent::SingleNode, field_flow);
+            return PatternShape::fields(field_flow);
         };
         let inner = captured.wrap(inner);
 
@@ -834,7 +803,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // invalidate their inferred contract.
         let inner_has_capture_error = !matches!(inner.node(), Pattern::QuantifiedPattern(_))
             && inner_info.flow.is_no_value()
-            && (inner_info.root_extent == RootExtent::NotSingleNode
+            && (self.ctx.pattern_facts.pattern_root_extent(inner.node())
+                == RootExtent::NotSingleNode
                 || matches!(inner.node(), Pattern::DefRef(_)));
         let owned_inner_error =
             mechanism != CaptureKind::Node && self.ctx.diag.error_count() != errors_before_capture;
@@ -874,7 +844,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Span::new(captured.source(), capture_range),
         );
 
-        PatternShape::fields(inner_info.root_extent, field_flow)
+        PatternShape::fields(field_flow)
     }
 
     /// `:: TypeName` — name a structured capture or alias its semantic leaf.
@@ -1192,7 +1162,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 });
         }
 
-        let mut result = match quantifier {
+        match quantifier {
             QuantifierKind::Optional => match context {
                 // A captured `?` of a multi-node no-value group has no single node
                 // to bind (or null), just like a captured repeat. Otherwise the
@@ -1220,10 +1190,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // is the option type itself, not a field-completion flag.
                 QuantifiedContext::DefinitionValue => {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
-                    PatternShape::new(
-                        RootExtent::SingleNode,
-                        PatternFlow::Value(self.ctx.type_ctx.intern_option(element)),
-                    )
+                    PatternShape::new(PatternFlow::Value(self.ctx.type_ctx.intern_option(element)))
                 }
             },
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
@@ -1243,28 +1210,21 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 }
                 if context == QuantifiedContext::DefinitionValue {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
-                    PatternShape::new(
-                        RootExtent::SingleNode,
-                        PatternFlow::Value(
-                            self.ctx
-                                .type_ctx
-                                .intern_type(TypeShape::List { element, minimum }),
-                        ),
-                    )
+                    PatternShape::new(PatternFlow::Value(
+                        self.ctx
+                            .type_ctx
+                            .intern_type(TypeShape::List { element, minimum }),
+                    ))
                 } else {
                     self.check_quantified_list_dimensionality(quant.node(), &inner_info, context);
-                    PatternShape::new(
-                        RootExtent::SingleNode,
-                        self.make_flow_list(inner_info.flow.clone(), minimum, context),
-                    )
+                    PatternShape::new(self.make_flow_list(
+                        inner_info.flow.clone(),
+                        minimum,
+                        context,
+                    ))
                 }
             }
-        };
-
-        // One match of a quantified pattern has variable top-level extent,
-        // regardless of its element's extent.
-        result.root_extent = RootExtent::NotSingleNode;
-        result
+        }
     }
 
     fn check_quantified_list_dimensionality(
@@ -1383,10 +1343,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ) -> PatternShape {
         match &source.flow {
             PatternFlow::NoValue => PatternShape::no_value(),
-            PatternFlow::Value(type_id) => PatternShape::new(
-                RootExtent::SingleNode,
-                PatternFlow::Value(self.ctx.type_ctx.intern_option(*type_id)),
-            ),
+            PatternFlow::Value(type_id) => PatternShape::new(PatternFlow::Value(
+                self.ctx.type_ctx.intern_option(*type_id),
+            )),
             PatternFlow::Fields(_) => {
                 let source_fields = source
                     .field_flow
@@ -1411,27 +1370,21 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                         .map(|(&name, field)| (name, field.info))
                         .collect(),
                 );
-                PatternShape::fields(
-                    RootExtent::SingleNode,
-                    InferredFieldFlow::new(record, fields),
-                )
+                PatternShape::fields(InferredFieldFlow::new(record, fields))
             }
         }
     }
 
     fn forward_shape(&self, source_pattern: Pattern, source: &PatternShape) -> PatternShape {
         match &source.flow {
-            PatternFlow::Fields(_) => PatternShape::fields(
-                source.root_extent,
-                InferredFieldFlow::forwarded(
-                    source_pattern,
-                    source
-                        .field_flow
-                        .as_ref()
-                        .expect("field-producing source retains provenance"),
-                ),
-            ),
-            _ => PatternShape::new(source.root_extent, source.flow.clone()),
+            PatternFlow::Fields(_) => PatternShape::fields(InferredFieldFlow::forwarded(
+                source_pattern,
+                source
+                    .field_flow
+                    .as_ref()
+                    .expect("field-producing source retains provenance"),
+            )),
+            _ => PatternShape::new(source.flow.clone()),
         }
     }
 
@@ -1497,14 +1450,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // of those — and a value matching many nodes never is either.
         let core = Self::field_value_core(value.node());
         if matches!(core, Pattern::SeqPattern(_))
-            || self.core_root_extent(&core) == RootExtent::NotSingleNode
+            || self.ctx.pattern_facts.pattern_root_extent(&core) == RootExtent::NotSingleNode
         {
             self.report_field_requires_single_node(field.node(), value.node());
         }
 
-        let mut result = self.forward_shape(value.node().clone(), &value_info);
-        result.root_extent = RootExtent::SingleNode;
-        result
+        self.forward_shape(value.node().clone(), &value_info)
     }
 
     /// The field value under its capture/quantifier wrappers. `f: (x)* @c`
@@ -1523,22 +1474,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 None => return core,
             }
         }
-    }
-
-    /// The root extent of an already-inferred field-value core. Its result was
-    /// cached while inferring the value.
-    fn core_root_extent(&self, core: &Pattern) -> RootExtent {
-        self.ctx
-            .type_ctx
-            .in_progress()
-            .pattern_shape(core)
-            .unwrap_or_else(|| {
-                panic!(
-                    "type inference stripped a field value to core pattern {core:?}, but no \
-                     inferred result was cached for that core"
-                )
-            })
-            .root_extent
     }
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
@@ -1728,7 +1663,6 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 
     fn resolved_reference_shape(&mut self, target: DefId) -> PatternShape {
-        let root_extent = self.analysis.pattern_facts.definition_root_extent(target);
         let output = self
             .ctx
             .in_progress()
@@ -1738,7 +1672,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             DefinitionOutput::MatchOnly => PatternFlow::NoValue,
             DefinitionOutput::Value(_) => PatternFlow::Value(self.ctx.definition_ref(target)),
         };
-        PatternShape::new(root_extent, flow)
+        PatternShape::new(flow)
     }
 
     fn assert_all_definitions_processed(&mut self) {
@@ -1776,10 +1710,5 @@ impl<'a, 'd> InferPass<'a, 'd> {
             }
         };
         self.ctx.record_def_output(def_id, output);
-        let precomputed = self.analysis.pattern_facts.definition_root_extent(def_id);
-        assert_eq!(
-            info.root_extent, precomputed,
-            "retained definition root extent must agree with inference",
-        );
     }
 }
