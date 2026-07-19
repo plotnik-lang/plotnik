@@ -89,14 +89,6 @@ impl<'a> NfaDumper<'a> {
             LabelOrigin::DefSpecialization { def_id, .. } => self.def_name(def_id),
         }
     }
-
-    pub(crate) fn effect_display(&self, e: &EffectIR) -> String {
-        self.effect(e)
-    }
-
-    pub(crate) fn node_pattern_display(&self, m: &MatchIR) -> String {
-        self.node_pattern(m)
-    }
 }
 
 impl NfaDumper<'_> {
@@ -268,7 +260,7 @@ impl NfaDumper<'_> {
         parts.join(" ")
     }
 
-    fn node_pattern(&self, m: &MatchIR) -> String {
+    pub(crate) fn node_pattern(&self, m: &MatchIR) -> String {
         let mut result = String::new();
 
         if let Some(field_id) = m.node_field {
@@ -300,7 +292,7 @@ impl NfaDumper<'_> {
         result
     }
 
-    fn effect(&self, e: &EffectIR) -> String {
+    pub(crate) fn effect(&self, e: &EffectIR) -> String {
         match e.kind() {
             EffectKind::Node => "Node".to_string(),
             EffectKind::ListOpen => "ListOpen".to_string(),

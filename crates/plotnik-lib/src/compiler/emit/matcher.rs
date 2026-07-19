@@ -423,7 +423,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             checks,
             effects,
             flow,
-            candidate_pattern: self.dumper.node_pattern_display(instruction),
+            candidate_pattern: self.dumper.node_pattern(instruction),
         })
     }
 
@@ -584,7 +584,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             .map(|effect| EffectPlan {
                 kind: effect.kind(),
                 payload: self.effect_payload(effect),
-                display: self.dumper.effect_display(effect),
+                display: self.dumper.effect(effect),
             })
             .collect()
     }
