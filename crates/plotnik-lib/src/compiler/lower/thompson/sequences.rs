@@ -17,7 +17,7 @@ use crate::compiler::ids::DefId;
 use crate::compiler::lower::boundary::{ExitMap, ExitPort};
 use crate::compiler::lower::ir::{EffectIR, Label, MatchIR, NodeKindConstraint};
 use crate::compiler::lower::spans::SpanBindingIR;
-use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, SeqItem};
+use crate::compiler::parse::ast::{self, Pattern, SeqItem};
 use crate::core::NodeKindId;
 
 use super::NfaBuilder;
@@ -27,8 +27,6 @@ use super::boundary::{
 };
 use super::capture::{CaptureEffects, PatternCtx, first_unmatched_close};
 use super::navigation::{is_down_nav, resumable_search_nav};
-use super::nfa_emit::{ForkTargets, Greediness};
-use super::quantifier::{QuantifierForm, classify_quantifier, quantifier_search_nav};
 use super::scope::{ScopeCloseEffects, SkipExit};
 
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
@@ -422,7 +420,7 @@ impl NfaBuilder<'_> {
         consumed: bool,
         memo: &mut BTreeMap<BoundaryMemoKey, Option<Label>>,
     ) -> Option<Label> {
-        let port = boundary_port(state, consumed);
+        let port = ExitPort::from_state(state, consumed);
         let memo_key = BoundaryMemoKey::new(item_index, port);
         if let Some(result) = memo.get(&memo_key) {
             return *result;
@@ -769,240 +767,6 @@ impl NfaBuilder<'_> {
                 unreachable!("a list capture is backed by a quantified pattern")
             }
         }
-    }
-
-    fn compile_boundary_no_value_quantifier(
-        &mut self,
-        quantified: &ast::QuantifiedPattern,
-        input: BoundaryState,
-        entry: EntryObligation,
-        targets: &ExitMap<Label>,
-    ) -> Option<Label> {
-        assert!(
-            self.ctx
-                .analysis
-                .type_analysis
-                .expect_pattern_flow(&Pattern::QuantifiedPattern(quantified.clone()))
-                .is_no_value(),
-            "NFA boundary-quantifier lowering received a value-producing pattern; this path only \
-             supports transparent output"
-        );
-
-        let (inner, kind) = match classify_quantifier(quantified) {
-            QuantifierForm::Empty => return targets.get(boundary_port(input, false)).copied(),
-            QuantifierForm::Plain(inner) => {
-                return self.compile_boundary_pattern_to(&inner, input, entry, targets, false);
-            }
-            QuantifierForm::Quantified { inner, kind } => (inner, kind),
-        };
-        let greediness = Greediness::from(kind);
-        match kind.kind() {
-            QuantifierKind::Optional => {
-                let inner_relation = self.boundary_relations.pattern(&inner);
-                let mut consuming_targets = ExitMap::new();
-                for outcome in inner_relation.outcomes(input) {
-                    if !outcome.consumed {
-                        continue;
-                    }
-                    let overall_port = boundary_port(outcome.state, true);
-                    if let Some(&target) = targets.get(overall_port) {
-                        consuming_targets.insert(ExitPort::from_outcome(*outcome), target);
-                    }
-                }
-                let iterate = if consuming_targets.is_empty() {
-                    None
-                } else {
-                    self.compile_boundary_iteration(&inner, input, entry, &consuming_targets)
-                };
-                let zero = targets.get(boundary_port(input, false)).copied();
-                match (iterate, zero) {
-                    (Some(iterate), Some(zero)) => Some(self.emit_fork_epsilon(
-                        ForkTargets {
-                            prefer: iterate,
-                            other: zero,
-                        },
-                        greediness,
-                    )),
-                    (Some(iterate), None) => Some(iterate),
-                    (None, Some(zero)) => Some(zero),
-                    (None, None) => None,
-                }
-            }
-            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                self.compile_boundary_loop(&inner, kind.kind(), greediness, input, entry, targets)
-            }
-        }
-    }
-
-    fn compile_boundary_loop(
-        &mut self,
-        inner: &Pattern,
-        kind: QuantifierKind,
-        greediness: Greediness,
-        input: BoundaryState,
-        entry: EntryObligation,
-        targets: &ExitMap<Label>,
-    ) -> Option<Label> {
-        let inner_relation = self.boundary_relations.pattern(inner);
-        let mut reachable = BTreeSet::new();
-        let mut pending = vec![input];
-        while let Some(state) = pending.pop() {
-            for outcome in inner_relation
-                .outcomes(state)
-                .iter()
-                .filter(|outcome| outcome.consumed)
-            {
-                let next = next_boundary_state(state, ExitPort::from_outcome(*outcome));
-                if reachable.insert(next) {
-                    pending.push(next);
-                }
-            }
-        }
-
-        let mut productive: BTreeSet<_> = reachable
-            .iter()
-            .copied()
-            .filter(|state| targets.get(boundary_port(*state, true)).is_some())
-            .collect();
-        loop {
-            let before = productive.len();
-            for state in &reachable {
-                if productive.contains(state) {
-                    continue;
-                }
-                let leads_to_productive = inner_relation
-                    .outcomes(*state)
-                    .iter()
-                    .filter(|outcome| outcome.consumed)
-                    .map(|outcome| next_boundary_state(*state, ExitPort::from_outcome(*outcome)))
-                    .any(|next| productive.contains(&next));
-                if leads_to_productive {
-                    productive.insert(*state);
-                }
-            }
-            if productive.len() == before {
-                break;
-            }
-        }
-
-        let loop_labels: BTreeMap<_, _> = productive
-            .iter()
-            .copied()
-            .map(|state| (state, self.fresh_label()))
-            .collect();
-        for state in productive.iter().copied() {
-            let mut repeat_targets = ExitMap::new();
-            for outcome in inner_relation
-                .outcomes(state)
-                .iter()
-                .filter(|outcome| outcome.consumed)
-            {
-                let next = next_boundary_state(state, ExitPort::from_outcome(*outcome));
-                if let Some(&target) = loop_labels.get(&next) {
-                    repeat_targets.insert(ExitPort::from_outcome(*outcome), target);
-                }
-            }
-            let repeat_entry = if repeat_targets.is_empty() {
-                None
-            } else {
-                let repeat_obligation = EntryObligation::new(NavigationContract::from_nav(
-                    entry.navigation().authored().sibling_continuation(),
-                ));
-                self.compile_boundary_iteration(inner, state, repeat_obligation, &repeat_targets)
-            };
-            let exit = targets.get(boundary_port(state, true)).copied();
-            let label = loop_labels[&state];
-            match (repeat_entry, exit) {
-                (Some(repeat), Some(exit)) => self.emit_fork_epsilon_at(
-                    label,
-                    ForkTargets {
-                        prefer: repeat,
-                        other: exit,
-                    },
-                    greediness,
-                ),
-                (Some(repeat), None) => self.emit_epsilon(label, vec![repeat]),
-                (None, Some(exit)) => self.emit_epsilon(label, vec![exit]),
-                (None, None) => {
-                    unreachable!("only productive quantifier states receive loop labels")
-                }
-            }
-        }
-
-        let mut first_targets = ExitMap::new();
-        for outcome in inner_relation
-            .outcomes(input)
-            .iter()
-            .filter(|outcome| outcome.consumed)
-        {
-            let next = next_boundary_state(input, ExitPort::from_outcome(*outcome));
-            if let Some(&target) = loop_labels.get(&next) {
-                first_targets.insert(ExitPort::from_outcome(*outcome), target);
-            }
-        }
-        let first = if first_targets.is_empty() {
-            None
-        } else {
-            self.compile_boundary_iteration(inner, input, entry, &first_targets)
-        };
-
-        if kind == QuantifierKind::OneOrMore {
-            return first;
-        }
-
-        let zero = targets.get(boundary_port(input, false)).copied();
-        match (first, zero) {
-            (Some(first), Some(zero)) => Some(self.emit_fork_epsilon(
-                ForkTargets {
-                    prefer: first,
-                    other: zero,
-                },
-                greediness,
-            )),
-            (Some(first), None) => Some(first),
-            (None, Some(zero)) => Some(zero),
-            (None, None) => None,
-        }
-    }
-
-    fn compile_boundary_iteration(
-        &mut self,
-        inner: &Pattern,
-        input: BoundaryState,
-        entry: EntryObligation,
-        targets: &ExitMap<Label>,
-    ) -> Option<Label> {
-        let relation = self.boundary_relations.pattern(inner);
-        let first_classes: BTreeSet<_> = relation
-            .outcomes(input)
-            .iter()
-            .filter(|outcome| {
-                outcome.consumed && targets.get(ExitPort::from_outcome(**outcome)).is_some()
-            })
-            .map(|outcome| outcome.first)
-            .collect();
-        let search_nav = if first_classes.len() == 1 {
-            let next_class = *first_classes
-                .first()
-                .expect("one first-consumer class was measured");
-            quantifier_search_nav(entry.resolve_nav(input, next_class))
-        } else {
-            None
-        };
-        let exact_entry = EntryObligation::new(NavigationContract::from_nav(Nav::StayExact));
-        let body_entry = if search_nav.is_some() {
-            self.compile_boundary_pattern_to(inner, input, exact_entry, targets, false)?
-        } else {
-            self.compile_boundary_pattern_to(inner, input, entry, targets, false)?
-        };
-
-        let Some(search_nav) = search_nav else {
-            return Some(body_entry);
-        };
-        if let Some(field) = entry.field() {
-            return Some(self.emit_position_search_with_field(search_nav, field, body_entry));
-        }
-        Some(self.emit_position_search(search_nav, body_entry))
     }
 
     /// Lower an alternation with one continuation map per operational outcome.
@@ -1645,18 +1409,6 @@ impl NfaBuilder<'_> {
         // Open the scope on a single entry epsilon every path crosses first.
         self.wrap_entry_pre(entry, capture.pre)
     }
-}
-
-fn boundary_port(state: BoundaryState, consumed: bool) -> ExitPort {
-    ExitPort::from_outcome(BoundaryOutcome {
-        state,
-        consumed,
-        first: if consumed {
-            state.previous
-        } else {
-            FirstClass::Empty
-        },
-    })
 }
 
 fn simple_boundary_routes(relation: &BoundaryRelation, input: BoundaryState) -> bool {

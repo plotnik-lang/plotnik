@@ -17,7 +17,9 @@ use super::NfaBuilder;
 use super::boundary::EntryObligation;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::nfa_emit::{ForkTargets, Greediness};
-use super::quantifier::{BoundaryIterationOutput, QuantifierForm, classify_quantifier};
+use super::quantifier::{
+    BoundaryIterationOutputMode, BoundaryOptionalOutput, QuantifierForm, classify_quantifier,
+};
 use super::scope::{CaptureExits, SkipExit};
 
 #[derive(Clone)]
@@ -175,12 +177,12 @@ impl<'a> NfaBuilder<'a> {
                 };
                 let QuantifierForm::Quantified {
                     inner: pattern,
-                    kind,
+                    operator,
                 } = classify_quantifier(quant)
                 else {
                     return false;
                 };
-                kind.kind() == QuantifierKind::Optional
+                operator.kind() == QuantifierKind::Optional
                     && self.boundary_capture_type_supported(&pattern, inner)
             }
             CaptureTypePlanKind::List { element } => {
@@ -189,13 +191,13 @@ impl<'a> NfaBuilder<'a> {
                 };
                 let QuantifierForm::Quantified {
                     inner: pattern,
-                    kind,
+                    operator,
                 } = classify_quantifier(quant)
                 else {
                     return false;
                 };
                 matches!(
-                    kind.kind(),
+                    operator.kind(),
                     QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
                 ) && self.boundary_capture_type_supported(&pattern, element)
             }
@@ -343,10 +345,10 @@ impl<'a> NfaBuilder<'a> {
         let Pattern::QuantifiedPattern(quant) = pattern else {
             return None;
         };
-        let QuantifierForm::Quantified { kind, .. } = classify_quantifier(quant) else {
+        let QuantifierForm::Quantified { inner, operator } = classify_quantifier(quant) else {
             return None;
         };
-        if kind.kind() != QuantifierKind::Optional {
+        if operator.kind() != QuantifierKind::Optional {
             return None;
         }
 
@@ -360,20 +362,23 @@ impl<'a> NfaBuilder<'a> {
             });
             final_targets.insert(port, final_target);
         }
-        let zero_effects = match option.mode {
+        let empty_effects = match option.mode {
             OptionMode::Preserve => vec![EffectIR::absent()],
             OptionMode::Bool => vec![EffectIR::bool_value(false)],
         };
-        let inner = self.compile_boundary_optional_output(
-            quant,
+        let inner = self.compile_boundary_optional(
+            &inner,
+            operator,
             input,
             entry,
             &final_targets,
-            BoundaryIterationOutput::CaptureType {
-                plan: option.inner,
-                destination: vec![],
+            BoundaryOptionalOutput {
+                iteration_mode: BoundaryIterationOutputMode::CaptureType {
+                    plan: option.inner,
+                    destination: vec![],
+                },
+                empty_effects,
             },
-            zero_effects,
         )?;
         Some(span.map_or(inner, |span| {
             self.wrap_entry_pre(inner, vec![EffectIR::span_start(span.0)])
@@ -392,11 +397,11 @@ impl<'a> NfaBuilder<'a> {
         let Pattern::QuantifiedPattern(quant) = pattern else {
             return None;
         };
-        let QuantifierForm::Quantified { kind, .. } = classify_quantifier(quant) else {
+        let QuantifierForm::Quantified { inner, operator } = classify_quantifier(quant) else {
             return None;
         };
         if !matches!(
-            kind.kind(),
+            operator.kind(),
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
         ) {
             return None;
@@ -423,12 +428,13 @@ impl<'a> NfaBuilder<'a> {
                 ),
             );
         }
-        let iterations = self.compile_boundary_loop_output(
-            quant,
+        let iterations = self.compile_boundary_loop(
+            &inner,
+            operator,
             input,
             entry,
             &closed_targets,
-            BoundaryIterationOutput::CaptureType {
+            BoundaryIterationOutputMode::CaptureType {
                 plan: element,
                 destination: vec![EffectIR::array_push()],
             },
@@ -635,10 +641,10 @@ impl CaptureTypeLowerer<'_, '_> {
         inner_plan: CaptureTypePlan,
         destination: ValueDestination,
     ) -> Label {
-        let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
+        let QuantifierForm::Quantified { inner, operator } = classify_quantifier(quant) else {
             unreachable!("an option capture-type plan wraps a `?` quantifier")
         };
-        assert_eq!(kind.kind(), QuantifierKind::Optional);
+        assert_eq!(operator.kind(), QuantifierKind::Optional);
 
         let (match_exit, skip_exit) = match self.exits {
             CaptureExits::Single(exit) => (exit, SkipExit::To(exit)),
@@ -680,7 +686,7 @@ impl CaptureTypeLowerer<'_, '_> {
                     prefer: matched,
                     other: skipped,
                 },
-                Greediness::from(kind),
+                Greediness::from(operator),
             ),
             None => matched,
         }
