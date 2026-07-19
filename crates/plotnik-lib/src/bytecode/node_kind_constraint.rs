@@ -2,8 +2,6 @@
 //!
 //! Extracted from ir.rs for use by runtime instruction decoding.
 
-use std::num::NonZeroU16;
-
 use crate::core::NodeKindId;
 
 /// Node kind constraint for Match instructions.
@@ -47,19 +45,30 @@ impl NodeKindConstraint {
 
     /// Decode from bytecode: node_class bits (2 bits) and node_val (u16).
     pub fn from_bytes(node_class: u8, node_val: u16) -> Self {
-        Self::try_from_bytes(node_class, node_val)
-            .unwrap_or_else(|| panic!("invalid node_class: {node_class}"))
+        Self::try_from_bytes(node_class, node_val).unwrap_or_else(|| {
+            panic!("invalid node-kind constraint: class={node_class}, value={node_val}")
+        })
     }
 
     /// Non-panicking decode, for validating an untrusted instruction stream at
-    /// load time. `node_class` `0b11` is reserved and has no valid decoding.
+    /// load time. Class `0b11` and Tree-sitter's internal `_ERROR` symbol have
+    /// no valid decoding. The built-in `ERROR` symbol remains valid for
+    /// `(ERROR)`.
     pub fn try_from_bytes(node_class: u8, node_val: u16) -> Option<Self> {
         match node_class {
-            0b00 => Some(Self::Any),
-            0b01 => Some(Self::Named(NonZeroU16::new(node_val).map(NodeKindId::from))),
-            0b10 => Some(Self::Anonymous(
-                NonZeroU16::new(node_val).map(NodeKindId::from),
-            )),
+            0b00 => (node_val == 0).then_some(Self::Any),
+            0b01 | 0b10 => {
+                let id = if node_val == 0 {
+                    None
+                } else {
+                    Some(NodeKindId::try_from(node_val).ok()?)
+                };
+                Some(if node_class == 0b01 {
+                    Self::Named(id)
+                } else {
+                    Self::Anonymous(id)
+                })
+            }
             _ => None,
         }
     }

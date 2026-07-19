@@ -29,14 +29,12 @@ impl ModuleRenderContext {
 
         let mut node_kind_names = BTreeMap::new();
         for t in node_kinds.iter() {
-            let id = NodeKindId::try_from(t.symbol).expect("node kind id must be non-zero");
-            node_kind_names.insert(id, strings.get(t.name).to_string());
+            node_kind_names.insert(t.symbol(), strings.get(t.name()).to_string());
         }
 
         let mut node_field_names = BTreeMap::new();
         for f in node_fields.iter() {
-            let id = NodeFieldId::try_from(f.symbol).expect("node field id must be non-zero");
-            node_field_names.insert(id, strings.get(f.name).to_string());
+            node_field_names.insert(f.symbol(), strings.get(f.name()).to_string());
         }
 
         let member_names: Vec<String> = types

@@ -1999,3 +1999,43 @@ fn forged_zero_node_symbol_is_rejected() {
         "expected InvalidNodeSymbol(0), got {err:?}"
     );
 }
+
+#[test]
+fn forged_reserved_node_kind_symbols_are_rejected() {
+    for symbol in [u16::MAX - 1, u16::MAX] {
+        let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
+        let off = Module::validate_and_load(&bytes)
+            .expect("module validates before tampering")
+            .offsets()
+            .node_kinds as usize;
+
+        bytes[off..off + 2].copy_from_slice(&symbol.to_le_bytes());
+        reseal(&mut bytes);
+
+        let err =
+            Module::validate_and_load(&bytes).expect_err("reserved node symbol must be rejected");
+        assert!(
+            matches!(err, ModuleError::InvalidNodeSymbol(0)),
+            "expected InvalidNodeSymbol(0) for {symbol:#06x}, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn forged_noncanonical_node_kind_operands_are_rejected() {
+    for (query, operand) in [(r#"Q = _"#, 1), (r#"Q = (ERROR)"#, u16::MAX - 1)] {
+        let mut bytes = emit_bytes(query);
+        Module::validate_and_load(&bytes).expect("compiler output is canonical");
+        let off = first_instr(&bytes, |opcode| opcode <= 5);
+
+        bytes[off + 2..off + 4].copy_from_slice(&operand.to_le_bytes());
+        reseal(&mut bytes);
+
+        let err = Module::validate_and_load(&bytes)
+            .expect_err("forged node-kind operand must be rejected");
+        assert!(
+            matches!(err, ModuleError::MalformedInstructionStream),
+            "expected MalformedInstructionStream for {operand:#06x}, got {err:?}"
+        );
+    }
+}

@@ -223,14 +223,6 @@ impl Symbol {
             index: 0,
         }
     }
-
-    #[must_use]
-    pub const fn end_of_nonterminal_extra() -> Self {
-        Self {
-            kind: SymbolType::EndOfNonTerminalExtra,
-            index: 0,
-        }
-    }
 }
 
 impl From<Symbol> for Rule {

@@ -32,6 +32,12 @@ header (u8)
   ownership for `Return`.
 - `opcode`: instruction kind.
 
+For `Match`, node-kind class `00` requires `node_kind == 0`. Classes `01`
+(named) and `10` (anonymous) use zero for a class-only wildcard or a specific
+`NodeKindId`; `0xfffe`, Tree-sitter's internal `_ERROR` symbol, is invalid.
+Class `11` is reserved. The public `ERROR` kind remains representable as
+`0xffff`.
+
 | Opcode | Name    | Size     | Description                                     |
 | :----- | :------ | :------- | :---------------------------------------------- |
 | 0x0    | Match8  | 8 bytes  | Fast-path match                                 |

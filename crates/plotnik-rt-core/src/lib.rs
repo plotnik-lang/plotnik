@@ -17,7 +17,7 @@ pub use checkpoint::{
 };
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{CallFrameError, Frame, FrameArena, PortId};
-pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
+pub use ids::{InvalidNodeKindId, NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
     DecodeDepth, GENERATED_NODE_VALUE_BYTES, Limit, LimitExceeded, ResolvedRuntimeLimits,
     RuntimeLimitSpec, decode_depth_auto,

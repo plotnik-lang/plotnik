@@ -6,7 +6,7 @@ use crate::core::NodeKind;
 
 use crate::bytecode::{
     EntryPoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SPAN_NO_BINDING,
-    SpanEntry, SymbolNameEntry,
+    SYMBOL_NAME_ENTRY_SIZE, SpanEntry,
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
@@ -88,13 +88,13 @@ impl<'a> EmitPipeline<'a> {
                 NodeKind::Named(sym) | NodeKind::Anonymous(sym) => sym,
             };
             let name = self.strings.intern(sym, self.input.interner)?;
-            node_kinds.push(NodeKindEntry::new(u16::from(node_id), name));
+            node_kinds.push(NodeKindEntry::new(node_id, name));
         }
 
         let mut fields: Vec<FieldEntry> = Vec::new();
         for (sym, field_id) in self.input.grammar.field_entries() {
             let name = self.strings.intern(sym, self.input.interner)?;
-            fields.push(FieldEntry::new(u16::from(field_id), name));
+            fields.push(FieldEntry::new(field_id, name));
         }
 
         let mut entry_points: Vec<EntryPoint> = Vec::new();
@@ -148,8 +148,8 @@ impl<'a> EmitPipeline<'a> {
         let (regex_blob, regex_table) = pool.emit_regexes()?;
         let (type_defs_bytes, type_members_bytes, type_names_bytes) = pool.emit_types();
 
-        let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds);
-        let node_fields_bytes = emit_symbol_name_table(&tables.fields);
+        let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds, NodeKindEntry::to_bytes);
+        let node_fields_bytes = emit_symbol_name_table(&tables.fields, FieldEntry::to_bytes);
         let entry_points_bytes = emit_entry_points(&tables.entry_points);
         let spans_bytes = self.emit_spans()?;
 
@@ -366,11 +366,13 @@ impl SectionWriter {
     }
 }
 
-fn emit_symbol_name_table(symbols: &[SymbolNameEntry]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * SymbolNameEntry::SIZE);
-    for sym in symbols {
-        bytes.extend_from_slice(&sym.symbol.to_le_bytes());
-        bytes.extend_from_slice(&u16::from(sym.name).to_le_bytes());
+fn emit_symbol_name_table<T: Copy>(
+    symbols: &[T],
+    encode: impl Fn(T) -> [u8; SYMBOL_NAME_ENTRY_SIZE],
+) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(symbols.len() * SYMBOL_NAME_ENTRY_SIZE);
+    for &sym in symbols {
+        bytes.extend_from_slice(&encode(sym));
     }
     bytes
 }

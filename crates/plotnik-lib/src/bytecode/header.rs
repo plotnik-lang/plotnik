@@ -6,7 +6,7 @@
 //! Instructions → Spans
 
 use super::entry_point::EntryPoint;
-use super::sections::SymbolNameEntry;
+use super::sections::SYMBOL_NAME_ENTRY_SIZE;
 use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
 use super::{
     BYTECODE_WORD_SIZE, HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE,
@@ -218,8 +218,8 @@ impl Header {
             self.regex_blob_size as u64,
             (self.str_table_count as u64 + 1) * STRING_TABLE_ENTRY_SIZE as u64,
             (self.regex_table_count as u64 + 1) * REGEX_TABLE_ENTRY_SIZE as u64,
-            self.node_kinds_count as u64 * SymbolNameEntry::SIZE as u64,
-            self.node_fields_count as u64 * SymbolNameEntry::SIZE as u64,
+            self.node_kinds_count as u64 * SYMBOL_NAME_ENTRY_SIZE as u64,
+            self.node_fields_count as u64 * SYMBOL_NAME_ENTRY_SIZE as u64,
             self.type_defs_count as u64 * TypeDef::SIZE as u64,
             self.type_members_count as u64 * TypeMember::SIZE as u64,
             self.type_names_count as u64 * TypeNameEntry::SIZE as u64,
