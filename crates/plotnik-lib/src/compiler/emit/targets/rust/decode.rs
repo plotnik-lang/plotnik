@@ -116,12 +116,12 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         model: &'m TypeModel<'a>,
         decode: &'a ResultDecodePlan,
     ) -> Self {
-        let tables = DecoderTables::collect(decode, schema.interner());
+        let tables = DecoderTables::collect(decode, schema.interner);
 
         Self {
             model,
-            definitions: schema.definitions(),
-            interner: schema.interner(),
+            definitions: schema.definitions,
+            interner: schema.interner,
             decode,
             tables,
         }

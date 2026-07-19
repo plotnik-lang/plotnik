@@ -502,7 +502,7 @@ impl<'a> Generator<'a> {
             let name = self
                 .plan
                 .result()
-                .definitions()
+                .definitions
                 .definition(entry.definition)
                 .name();
             let has_decoder = self.plan.decode().item(name).has_decoder();
