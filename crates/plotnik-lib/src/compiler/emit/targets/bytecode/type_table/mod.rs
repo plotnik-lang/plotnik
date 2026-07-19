@@ -168,7 +168,7 @@ fn emit_type_at_slot(
             );
             let member_count = u8::try_from(scope.members().len())
                 .map_err(|_| EmitError::TooManyFields(scope.members().len()))?;
-            for &member_id in scope.members() {
+            for member_id in scope.members() {
                 let member = layout.expect_member(member_id);
                 let CaptureMemberKind::Field(field) = member.kind else {
                     unreachable!("record scope contains only field descriptors")
@@ -196,7 +196,7 @@ fn emit_type_at_slot(
             );
             let member_count = u8::try_from(scope.members().len())
                 .map_err(|_| EmitError::TooManyCases(scope.members().len()))?;
-            for &member_id in scope.members() {
+            for member_id in scope.members() {
                 let member = layout.expect_member(member_id);
                 let CaptureMemberKind::Case(payload) = member.kind else {
                     unreachable!("variant scope contains only case descriptors")

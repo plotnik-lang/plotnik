@@ -155,9 +155,8 @@ impl DecodePlanBuilder<'_, '_> {
             .expect("variant result item has a capture scope");
         scope
             .members()
-            .iter()
             .enumerate()
-            .map(|(index, &member)| {
+            .map(|(index, member)| {
                 let descriptor = layout.expect_member(member);
                 let CaptureMemberKind::Case(payload) = descriptor.kind else {
                     unreachable!("variant result scope contains only cases");
@@ -183,9 +182,8 @@ impl DecodePlanBuilder<'_, '_> {
         DecodeScope {
             fields: scope
                 .members()
-                .iter()
                 .enumerate()
-                .map(|(index, &member)| {
+                .map(|(index, member)| {
                     let descriptor = layout.expect_member(member);
                     let CaptureMemberKind::Field(info) = descriptor.kind else {
                         unreachable!("record result scope contains only fields");

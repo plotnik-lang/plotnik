@@ -110,7 +110,6 @@ pub(crate) enum CaptureMemberKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CaptureMember {
     pub(crate) parent_type: TypeId,
-    pub(crate) relative_index: u16,
     pub(crate) name: Symbol,
     pub(crate) kind: CaptureMemberKind,
 }
@@ -119,7 +118,6 @@ pub(crate) struct CaptureMember {
 pub(crate) struct CaptureScope {
     kind: CaptureScopeKind,
     base: u16,
-    members: Vec<ResultMemberId>,
     members_by_name: BTreeMap<Symbol, ResultMemberId>,
 }
 
@@ -132,12 +130,19 @@ impl CaptureScope {
         self.base
     }
 
-    pub(crate) fn members(&self) -> &[ResultMemberId] {
-        &self.members
+    pub(crate) fn members(&self) -> impl ExactSizeIterator<Item = ResultMemberId> + '_ {
+        self.members_by_name.values().copied()
     }
 
     pub(crate) fn member_id(&self, relative: u16) -> Option<ResultMemberId> {
-        self.members.get(usize::from(relative)).copied()
+        if usize::from(relative) >= self.members_by_name.len() {
+            return None;
+        }
+        let absolute = self
+            .base
+            .checked_add(relative)
+            .expect("capture scope member belongs to the result member space");
+        Some(ResultMemberId::from_raw(absolute))
     }
 
     pub(crate) fn member_named(&self, name: Symbol) -> Option<ResultMemberId> {
@@ -257,7 +262,6 @@ impl CaptureLayout {
             }
             let base = u16::try_from(member_count)
                 .expect("member count was checked against the u16 format limit");
-            let mut member_ids = Vec::with_capacity(members.len());
             let mut members_by_name = BTreeMap::new();
             for (relative_index, (name, kind)) in members.into_iter().enumerate() {
                 let relative_index = u16::try_from(relative_index)
@@ -268,11 +272,9 @@ impl CaptureLayout {
                 );
                 all_members.push(CaptureMember {
                     parent_type: type_id,
-                    relative_index,
                     name,
                     kind,
                 });
-                member_ids.push(id);
                 members_by_name.insert(name, id);
             }
             scopes.insert(
@@ -280,7 +282,6 @@ impl CaptureLayout {
                 CaptureScope {
                     kind,
                     base,
-                    members: member_ids,
                     members_by_name,
                 },
             );
