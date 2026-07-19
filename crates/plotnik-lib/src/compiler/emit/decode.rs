@@ -210,6 +210,7 @@ impl DecodePlanBuilder<'_, '_> {
             TypeShape::Record(_) | TypeShape::Variant(_) => DecodeValue::Nested {
                 item: self
                     .schema
+                    .types
                     .type_name_of(ty)
                     .expect("naming pass names every non-payload composite"),
                 source_type: ty,
@@ -244,7 +245,7 @@ impl DecodePlanBuilder<'_, '_> {
         if !seen.insert(ty) {
             return false;
         }
-        if let Some(name) = self.schema.type_name_of(ty)
+        if let Some(name) = self.schema.types.type_name_of(ty)
             && self.item_enters_depth(name)
         {
             return true;

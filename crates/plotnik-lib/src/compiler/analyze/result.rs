@@ -379,7 +379,6 @@ impl PublicResultGroup {
 pub(crate) struct ResultModel {
     reachable_defs: DefinitionReachability,
     type_layout: ResultTypeLayout,
-    named_types: BTreeMap<TypeId, Symbol>,
     type_name_bindings: Vec<TypeNameBinding>,
     entry_point_items: Vec<ResultItem>,
     capture_layout: CaptureLayout,
@@ -421,10 +420,9 @@ impl ResultModel {
             &collected_types.builtins,
             collected_types.value_types,
         );
-        let named_types: BTreeMap<TypeId, Symbol> = types.iter_named_types().collect();
-        let mut type_name_bindings = named_types
-            .iter()
-            .map(|(&type_id, &name)| TypeNameBinding { name, type_id })
+        let mut type_name_bindings = types
+            .iter_named_types()
+            .map(|(type_id, name)| TypeNameBinding { name, type_id })
             .collect::<Vec<_>>();
         for def_id in reachable_defs.iter() {
             let Some(body) = types.expect_def_output(def_id).value() else {
@@ -437,8 +435,8 @@ impl ResultModel {
         }
         type_name_bindings.sort_by_key(|binding| (binding.type_id, binding.name));
         type_name_bindings.dedup();
-        let entry_point_items = ItemCollector::new(types, definitions, &named_types)
-            .collect(artifacts.iter_entry_point_outputs());
+        let entry_point_items =
+            ItemCollector::new(types, definitions).collect(artifacts.iter_entry_point_outputs());
         let mut public_result_groups = BTreeMap::new();
         for item in entry_point_items
             .iter()
@@ -451,7 +449,7 @@ impl ResultModel {
             );
             assert!(previous.is_none(), "public result item names are unique");
         }
-        for (&type_id, &name) in &named_types {
+        for (type_id, name) in types.iter_named_types() {
             let Some(group) = public_result_groups.get_mut(&name) else {
                 continue;
             };
@@ -466,7 +464,6 @@ impl ResultModel {
         Ok(Self {
             reachable_defs,
             type_layout,
-            named_types,
             type_name_bindings,
             entry_point_items,
             capture_layout,
@@ -509,10 +506,6 @@ impl ResultModel {
         );
         group
     }
-
-    pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
-        self.named_types.get(&type_id).copied()
-    }
 }
 
 impl<'a> ResultSchema<'a> {
@@ -532,10 +525,6 @@ impl<'a> ResultSchema<'a> {
 
     pub(crate) fn type_layout(&self) -> &ResultTypeLayout {
         &self.model.type_layout
-    }
-
-    pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
-        self.model.type_name_of(type_id)
     }
 
     pub(crate) fn iter_type_name_bindings(&self) -> impl Iterator<Item = TypeNameBinding> + '_ {
@@ -572,22 +561,16 @@ impl<'a> ResultSchema<'a> {
 struct ItemCollector<'a> {
     types: &'a TypeAnalysis,
     definitions: &'a DefinitionGraph,
-    named_types: &'a BTreeMap<TypeId, Symbol>,
     declared_names: HashSet<Symbol>,
     walked_types: HashSet<TypeId>,
     items: Vec<ResultItem>,
 }
 
 impl<'a> ItemCollector<'a> {
-    fn new(
-        types: &'a TypeAnalysis,
-        definitions: &'a DefinitionGraph,
-        named_types: &'a BTreeMap<TypeId, Symbol>,
-    ) -> Self {
+    fn new(types: &'a TypeAnalysis, definitions: &'a DefinitionGraph) -> Self {
         Self {
             types,
             definitions,
-            named_types,
             declared_names: HashSet::new(),
             walked_types: HashSet::new(),
             items: Vec::new(),
@@ -655,14 +638,14 @@ impl<'a> ItemCollector<'a> {
     fn collect_position(&mut self, ty: TypeId) {
         match self.types.expect_type_shape(ty) {
             TypeShape::Record(_) | TypeShape::Variant(_) => {
-                let name = *self
-                    .named_types
-                    .get(&ty)
+                let name = self
+                    .types
+                    .type_name_of(ty)
                     .expect("naming pass names every non-payload composite");
                 self.add_item(name, ty);
             }
             TypeShape::List { .. } | TypeShape::Option(_) => {
-                let Some(&name) = self.named_types.get(&ty) else {
+                let Some(name) = self.types.type_name_of(ty) else {
                     self.walk(ty);
                     return;
                 };

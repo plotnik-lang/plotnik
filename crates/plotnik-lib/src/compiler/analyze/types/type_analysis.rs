@@ -556,6 +556,10 @@ impl TypeAnalysis {
             })
     }
 
+    pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
+        self.named_types.get(&type_id).copied()
+    }
+
     /// Iterate generated and explicitly named structural bodies in `TypeId`
     /// order. Definition declarations are exposed separately through their
     /// `DefId` and output body.
