@@ -391,10 +391,12 @@ impl<'a> Generator<'a> {
         );
         out.push('\n');
         out.push_str("/// Field ids baked into the field checks: `(id, name)`.\n");
+        let mut expected_fields = matcher.fields().iter().collect::<Vec<_>>();
+        expected_fields.sort_unstable_by_key(|field| field.id);
         render_const_slice(
             out,
             "const EXPECTED_FIELDS: &[(u16, &str)]",
-            matcher.expected_fields().iter().map(|field| {
+            expected_fields.into_iter().map(|field| {
                 let id = field.id;
                 let name = rust_string(&field.name);
                 format!("({id}, {name})")

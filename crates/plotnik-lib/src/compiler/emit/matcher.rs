@@ -216,12 +216,6 @@ pub(crate) struct ExpectedKind {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ExpectedField {
-    pub(crate) id: u16,
-    pub(crate) name: String,
-}
-
-#[derive(Clone, Debug)]
 pub(crate) struct RegexPlan {
     pub(crate) id: RegexId,
     pub(crate) pattern: String,
@@ -241,7 +235,6 @@ pub(crate) struct MatcherPlan {
     states: Vec<StatePlan>,
     entry_points: Vec<EntryPlan>,
     expected_kinds: Vec<ExpectedKind>,
-    expected_fields: Vec<ExpectedField>,
     /// Fields in first-appearance order. Target representation passes use
     /// this order when resolving identifier collisions.
     fields: Vec<FieldPlan>,
@@ -301,7 +294,6 @@ impl MatcherPlan {
             states,
             entry_points,
             expected_kinds: builder.expected_kinds.into_values().collect(),
-            expected_fields: builder.expected_fields.into_values().collect(),
             fields: builder.fields,
             regexes: builder.regexes,
             label_width: dumper.label_width(),
@@ -320,10 +312,6 @@ impl MatcherPlan {
 
     pub(crate) fn expected_kinds(&self) -> &[ExpectedKind] {
         &self.expected_kinds
-    }
-
-    pub(crate) fn expected_fields(&self) -> &[ExpectedField] {
-        &self.expected_fields
     }
 
     pub(crate) fn fields(&self) -> &[FieldPlan] {
@@ -352,7 +340,7 @@ struct MatcherPlanBuilder<'p, 'a> {
     artifacts: AnalysisArtifacts<'a>,
     ids: &'p BTreeMap<Label, StateId>,
     expected_kinds: BTreeMap<u16, ExpectedKind>,
-    expected_fields: BTreeMap<u16, ExpectedField>,
+    field_indices: BTreeMap<u16, usize>,
     fields: Vec<FieldPlan>,
     regex_ids: BTreeMap<String, RegexId>,
     regexes: Vec<RegexPlan>,
@@ -371,7 +359,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             artifacts,
             ids,
             expected_kinds: BTreeMap::new(),
-            expected_fields: BTreeMap::new(),
+            field_indices: BTreeMap::new(),
             fields: Vec::new(),
             regex_ids: BTreeMap::new(),
             regexes: Vec::new(),
@@ -529,20 +517,17 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
     }
 
     fn record_field(&mut self, field: NodeFieldId) -> FieldPlan {
+        let id = u16::from(field);
+        if let Some(&index) = self.field_indices.get(&id) {
+            return self.fields[index].clone();
+        }
+
         let field = FieldPlan {
-            id: u16::from(field),
+            id,
             name: self.field_name(field),
         };
-        if !self.expected_fields.contains_key(&field.id) {
-            self.fields.push(field.clone());
-        }
-        self.expected_fields.insert(
-            field.id,
-            ExpectedField {
-                id: field.id,
-                name: field.name.clone(),
-            },
-        );
+        self.field_indices.insert(id, self.fields.len());
+        self.fields.push(field.clone());
         field
     }
 
