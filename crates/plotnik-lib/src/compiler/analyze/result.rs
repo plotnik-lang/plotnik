@@ -95,8 +95,6 @@ pub(crate) enum CaptureScopeKind {
 /// accept member slots from every `occurrence`.
 #[derive(Clone, Debug)]
 pub(crate) struct PublicResultGroup {
-    name: Symbol,
-    kind: CaptureScopeKind,
     representative: TypeId,
     occurrences: Vec<TypeId>,
 }
@@ -329,8 +327,6 @@ impl PublicResultGroup {
         assert_eq!(kind, expected_kind, "public item kind matches its scope");
 
         let mut group = Self {
-            name: item.name,
-            kind,
             representative,
             occurrences: Vec::new(),
         };
@@ -339,14 +335,9 @@ impl PublicResultGroup {
     }
 
     fn add_occurrence(&mut self, types: &TypeAnalysis, layout: &CaptureLayout, type_id: TypeId) {
-        let scope = layout
+        layout
             .scope(type_id)
             .expect("public result occurrence has a capture scope");
-        assert_eq!(
-            scope.kind(),
-            self.kind,
-            "one public result name has one composite kind"
-        );
         assert!(
             types.types_structurally_equal(self.representative, type_id),
             "one public result name has one structural shape"
@@ -495,16 +486,10 @@ impl ResultModel {
             .public_result_groups
             .get(&item.name)
             .expect("composite result item has a public group");
-        assert_eq!(group.name, item.name, "public group owns the item name");
         assert_eq!(
             group.representative,
             item.value_type(),
             "public group owns the item representative"
-        );
-        assert_eq!(
-            Some(group.kind),
-            item.scope_kind(),
-            "public group owns the item scope kind"
         );
         group
     }
