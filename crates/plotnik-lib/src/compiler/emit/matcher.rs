@@ -121,7 +121,7 @@ pub(crate) struct CallPlan {
     pub(crate) nav: Nav,
     pub(crate) search: SkipPolicy,
     pub(crate) retry: Option<SkipPolicy>,
-    pub(crate) field: Option<u16>,
+    pub(crate) field: Option<NodeFieldId>,
     pub(crate) target: StateId,
     pub(crate) returns: Vec<StateId>,
 }
@@ -186,13 +186,13 @@ pub(crate) enum KindClass {
 #[derive(Clone, Debug)]
 pub(crate) struct KindCheck {
     pub(crate) class: KindClass,
-    pub(crate) id: Option<u16>,
+    pub(crate) id: Option<NodeKindId>,
     pub(crate) name: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct FieldPlan {
-    pub(crate) id: u16,
+    pub(crate) id: NodeFieldId,
     pub(crate) name: String,
 }
 
@@ -210,7 +210,7 @@ pub(crate) enum PredicateValuePlan {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ExpectedKind {
-    pub(crate) id: u16,
+    pub(crate) id: NodeKindId,
     pub(crate) name: String,
     pub(crate) named: bool,
 }
@@ -339,8 +339,8 @@ struct MatcherPlanBuilder<'p, 'a> {
     dumper: &'p NfaDumper<'a>,
     artifacts: AnalysisArtifacts<'a>,
     ids: &'p BTreeMap<Label, StateId>,
-    expected_kinds: BTreeMap<u16, ExpectedKind>,
-    field_indices: BTreeMap<u16, usize>,
+    expected_kinds: BTreeMap<NodeKindId, ExpectedKind>,
+    field_indices: BTreeMap<NodeFieldId, usize>,
     fields: Vec<FieldPlan>,
     regex_ids: BTreeMap<String, RegexId>,
     regexes: Vec<RegexPlan>,
@@ -499,36 +499,30 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         if let (Some(id), Some(name)) = (id, &name)
             && id != NodeKindId::ERROR
         {
-            let raw = u16::from(id);
             self.expected_kinds.insert(
-                raw,
+                id,
                 ExpectedKind {
-                    id: raw,
+                    id,
                     name: name.clone(),
                     named: class == KindClass::Named,
                 },
             );
         }
-        Some(KindCheck {
-            class,
-            id: id.map(u16::from),
-            name,
-        })
+        Some(KindCheck { class, id, name })
     }
 
     fn record_field(&mut self, field: NodeFieldId) -> FieldPlan {
-        let id = u16::from(field);
-        if let Some(&index) = self.field_indices.get(&id) {
+        if let Some(&index) = self.field_indices.get(&field) {
             return self.fields[index].clone();
         }
 
-        let field = FieldPlan {
-            id,
+        let plan = FieldPlan {
+            id: field,
             name: self.field_name(field),
         };
-        self.field_indices.insert(id, self.fields.len());
-        self.fields.push(field.clone());
-        field
+        self.field_indices.insert(field, self.fields.len());
+        self.fields.push(plan.clone());
+        plan
     }
 
     fn kind_name(&self, id: NodeKindId) -> String {

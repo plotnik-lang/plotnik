@@ -36,6 +36,7 @@ use crate::compiler::emit::targets::rust::ident::{shouty_ident, snake_ident};
 use crate::compiler::emit::targets::rust::literal::{decimal_byte_lines, rust_string};
 use crate::compiler::emit::targets::rust::template::splice;
 use crate::compiler::regex::compile_native_dfa;
+use crate::core::NodeFieldId;
 use plotnik_rt::{Limit, Nav, SkipPolicy};
 
 use super::entry_names::{journal_fn_name, limited_journal_fn_name, matches_fn_name};
@@ -108,9 +109,9 @@ impl RegexStatic {
 /// Rust-only representation decisions over the neutral matcher plan.
 struct RustRepresentation {
     states: Vec<StateInfo>,
-    /// Field-id consts: raw id → `F_{NAME}` const name. Keyed by id and
+    /// Field-id consts: id → `F_{NAME}` const name. Keyed by id and
     /// collision-suffixed at insert, so the const namespace stays injective.
-    fields: BTreeMap<u16, String>,
+    fields: BTreeMap<NodeFieldId, String>,
     /// Rust uses regex-automata's native serialized sparse-DFA format compiled
     /// from the same normalized semantics dynamic backends print.
     regexes: Vec<RegexStatic>,
@@ -161,7 +162,7 @@ impl RustRepresentation {
         Ok(representation)
     }
 
-    fn record_field(&mut self, id: u16, display: &str) {
+    fn record_field(&mut self, id: NodeFieldId, display: &str) {
         if self.fields.contains_key(&id) {
             return;
         }
@@ -223,7 +224,7 @@ impl<'a> Generator<'a> {
         self.rust.state(id)
     }
 
-    fn field_const(&self, field: u16) -> String {
+    fn field_const(&self, field: NodeFieldId) -> String {
         self.rust
             .fields
             .get(&field)

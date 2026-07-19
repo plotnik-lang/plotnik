@@ -61,4 +61,4 @@ pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use plotnik_rt::{Nav, deserialize_dfa};
 pub(crate) use predicate_op::PredicateOp;
 pub(crate) use render::ModuleRenderContext;
-pub(crate) use sections::{FieldEntry, NodeKindEntry, SymbolNameEntry};
+pub(crate) use sections::{FieldEntry, NodeKindEntry, SYMBOL_NAME_ENTRY_SIZE};

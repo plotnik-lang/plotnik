@@ -20,7 +20,7 @@ pub(super) struct GrammarTables {
 
 #[derive(Debug, Clone)]
 pub(super) struct NodeKindEntry {
-    pub(super) id: u16,
+    pub(super) id: NodeKindId,
     pub(super) kind_name: String,
     pub(super) named: bool,
     pub(super) visible: bool,
@@ -33,7 +33,7 @@ pub(super) struct NodeKindEntry {
 }
 
 impl NodeKindEntry {
-    pub(super) fn alias(id: u16, kind_name: String, named: bool) -> Self {
+    pub(super) fn alias(id: NodeKindId, kind_name: String, named: bool) -> Self {
         Self {
             id,
             kind_name,
@@ -50,7 +50,7 @@ impl NodeKindEntry {
 
 #[derive(Debug, Clone)]
 pub(super) struct FieldEntry {
-    pub(super) id: u16,
+    pub(super) id: NodeFieldId,
     pub(super) name: String,
 }
 
@@ -177,7 +177,7 @@ impl Grammar {
         let mut all_terminal: HashMap<NodeKindId, bool> = HashMap::new();
 
         for symbol in tables.symbols {
-            let node_id = node_kind_id(symbol.id);
+            let node_id = symbol.id;
             node_names.insert(node_id, symbol.kind_name.clone());
 
             all_terminal
@@ -205,7 +205,7 @@ impl Grammar {
         let mut field_ids = HashMap::new();
         let mut field_names = HashMap::new();
         for field in tables.fields {
-            let field_id = node_field_id(field.id);
+            let field_id = field.id;
             field_names.insert(field_id, field.name.clone());
             field_ids.insert(field.name, field_id);
         }
@@ -519,10 +519,6 @@ impl Grammar {
     }
 }
 
-fn node_kind_id(id: u16) -> NodeKindId {
-    NodeKindId::try_from(id).expect("lowered node symbol id must be non-zero in production grammar")
-}
-
 /// Resolve a node kind to its id via the public name maps. Equivalent to the former
 /// `node_ids: HashMap<NodeKind<&str>, _>`: both maps are populated in lockstep with it, so the
 /// lookups match — but these own their keys, freeing the symbol loop to consume `tables.symbols`.
@@ -535,11 +531,6 @@ fn resolve_node_id(
         NodeKind::Named(name) => named_node_ids.get(name).copied(),
         NodeKind::Anonymous(name) => anonymous_node_ids.get(name).copied(),
     }
-}
-
-fn node_field_id(id: u16) -> NodeFieldId {
-    NodeFieldId::try_from(id)
-        .expect("lowered field symbol id must be non-zero in production grammar")
 }
 
 /// Expands a supertype to the concrete member ids it stands for, splicing any *inlined*

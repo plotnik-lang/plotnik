@@ -18,6 +18,26 @@ impl std::fmt::Display for ZeroIdError {
 
 impl std::error::Error for ZeroIdError {}
 
+/// A raw value is not a public/matchable Tree-sitter node kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvalidNodeKindId {
+    Zero,
+    ErrorRepeat,
+}
+
+impl std::fmt::Display for InvalidNodeKindId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Zero => f.write_str("node kind id must be non-zero"),
+            Self::ErrorRepeat => {
+                f.write_str("node kind id is Tree-sitter's internal error-repeat symbol")
+            }
+        }
+    }
+}
+
+impl std::error::Error for InvalidNodeKindId {}
+
 macro_rules! nonzero_u16_id {
     ($Name:ident) => {
         impl From<NonZeroU16> for $Name {
@@ -58,18 +78,79 @@ macro_rules! nonzero_u16_id {
     };
 }
 
-/// Node kind ID (tree-sitter uses u16, but 0 is internal-only).
+/// Node kind ID.
+///
+/// Tree-sitter uses `u16`: zero is its end symbol, `0xfffe` is its internal
+/// error-repeat symbol, and `0xffff` is the public `ERROR` kind. This type
+/// represents regular grammar ids (`1..=0xfffd`) and `ERROR`; error-repeat is
+/// deliberately unrepresentable.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct NodeKindId(NonZeroU16);
 
-nonzero_u16_id!(NodeKindId);
+impl TryFrom<NonZeroU16> for NodeKindId {
+    type Error = InvalidNodeKindId;
+
+    #[inline]
+    fn try_from(id: NonZeroU16) -> Result<Self, Self::Error> {
+        if id.get() == Self::ERROR_REPEAT_RAW {
+            return Err(InvalidNodeKindId::ErrorRepeat);
+        }
+        Ok(Self(id))
+    }
+}
+
+impl From<NodeKindId> for NonZeroU16 {
+    #[inline]
+    fn from(id: NodeKindId) -> Self {
+        id.0
+    }
+}
+
+impl From<NodeKindId> for u16 {
+    #[inline]
+    fn from(id: NodeKindId) -> Self {
+        id.0.get()
+    }
+}
+
+impl TryFrom<u16> for NodeKindId {
+    type Error = InvalidNodeKindId;
+
+    #[inline]
+    fn try_from(id: u16) -> Result<Self, Self::Error> {
+        let id = NonZeroU16::new(id).ok_or(InvalidNodeKindId::Zero)?;
+        Self::try_from(id)
+    }
+}
+
+impl std::fmt::Display for NodeKindId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.get())
+    }
+}
 
 impl NodeKindId {
+    const ERROR_REPEAT_RAW: u16 = u16::MAX - 1;
+
+    /// Highest regular grammar symbol ID.
+    pub const MAX_REGULAR: Self = Self(
+        NonZeroU16::new(Self::ERROR_REPEAT_RAW - 1).expect("maximum regular symbol is non-zero"),
+    );
+
+    /// Number of IDs available to regular grammar symbols.
+    pub const REGULAR_COUNT: usize = Self::MAX_REGULAR.0.get() as usize;
+
     /// Tree-sitter's builtin error symbol (`ts_builtin_sym_error`, `(TSSymbol)-1`).
     /// Every grammar shares it for `(ERROR)` nodes, and its metadata is always
     /// `named`, so a live error node satisfies `is_named() && kind_id() == ERROR`.
-    pub const ERROR: Self = Self(NonZeroU16::new(0xFFFF).expect("0xFFFF is non-zero lol"));
+    pub const ERROR: Self =
+        Self(NonZeroU16::new(u16::MAX).expect("Tree-sitter ERROR symbol is non-zero"));
+
+    /// Whether this ID belongs to a grammar's ordinary symbol range.
+    pub const fn is_regular(self) -> bool {
+        self.0.get() <= Self::MAX_REGULAR.0.get()
+    }
 }
 
 /// Field ID (tree-sitter uses NonZeroU16).

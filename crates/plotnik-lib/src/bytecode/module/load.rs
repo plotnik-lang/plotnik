@@ -10,14 +10,14 @@ use super::super::instructions::{
     PREDICATE_SLOTS, header_byte,
 };
 use super::super::node_kind_constraint::NodeKindConstraint;
-use super::super::sections::SymbolNameEntry;
+use super::super::sections::SYMBOL_NAME_ENTRY_SIZE;
 use super::super::type_meta::{TypeDefKind, TypeMember, TypeNameEntry};
 use super::super::{
     HEADER_SIZE, MAX_SPANS, SECTION_ALIGN, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, SpanKind, VERSION,
 };
 use super::*;
 use crate::bytecode::predicate_op::PredicateOp;
-use plotnik_rt::{Nav, PortId};
+use plotnik_rt::{Nav, NodeFieldId, NodeKindId, PortId};
 
 /// Bytecode validation error.
 ///
@@ -541,14 +541,14 @@ impl Module {
         // node/field symbol name: u16 at entry+2
         check(
             self.offsets.node_kinds,
-            SymbolNameEntry::SIZE,
+            SYMBOL_NAME_ENTRY_SIZE,
             2,
             0,
             self.header.node_kinds_count as usize,
         )?;
         check(
             self.offsets.node_fields,
-            SymbolNameEntry::SIZE,
+            SYMBOL_NAME_ENTRY_SIZE,
             2,
             0,
             self.header.node_fields_count as usize,
@@ -582,16 +582,22 @@ impl Module {
         Ok(())
     }
 
-    /// The `symbol` half of each node-kind/node-field entry must be non-zero:
-    /// renderers rebuild `NodeKindId`/`NodeFieldId` (`NonZeroU16`) from it via
-    /// `try_from(..).expect(..)` (`render.rs`), so a malformed zero would panic
-    /// `dump`/`trace` instead of failing validation.
+    /// Node-kind symbols must be regular grammar ids: zero is Tree-sitter's end
+    /// symbol, while `0xfffe` and `0xffff` are its built-in `_ERROR` and `ERROR`
+    /// symbols. Field symbols only reserve zero. The table views construct typed
+    /// IDs after this boundary, so malformed values must stop here.
     fn validate_symbol_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
-        let check = |base: u32, count: usize| {
+        let check = |base: u32, count: usize, node_kinds: bool| {
             let base = base as usize;
             for i in 0..count {
-                if read_u16_le(storage, base + i * SymbolNameEntry::SIZE) == 0 {
+                let symbol = read_u16_le(storage, base + i * SYMBOL_NAME_ENTRY_SIZE);
+                let valid = if node_kinds {
+                    NodeKindId::try_from(symbol).is_ok_and(NodeKindId::is_regular)
+                } else {
+                    NodeFieldId::try_from(symbol).is_ok()
+                };
+                if !valid {
                     return Err(ModuleError::InvalidNodeSymbol(i));
                 }
             }
@@ -600,10 +606,12 @@ impl Module {
         check(
             self.offsets.node_kinds,
             self.header.node_kinds_count as usize,
+            true,
         )?;
         check(
             self.offsets.node_fields,
             self.header.node_fields_count as usize,
+            false,
         )?;
         Ok(())
     }

@@ -6,11 +6,13 @@
 
 use std::ops::Deref;
 
+use crate::core::{NodeFieldId, NodeKindId};
+
 use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, header_byte};
-use super::sections::SymbolNameEntry;
+use super::sections::{FieldEntry, NodeKindEntry, SYMBOL_NAME_ENTRY_SIZE};
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
@@ -176,20 +178,20 @@ impl Module {
         }
     }
 
-    pub(crate) fn node_kinds(&self) -> GrammarTableView<'_> {
+    pub(crate) fn node_kinds(&self) -> NodeKindTableView<'_> {
         let offset = self.offsets.node_kinds as usize;
         let count = self.header.node_kinds_count as usize;
-        GrammarTableView {
-            bytes: &self.storage[offset..offset + count * SymbolNameEntry::SIZE],
+        NodeKindTableView {
+            bytes: &self.storage[offset..offset + count * SYMBOL_NAME_ENTRY_SIZE],
             count,
         }
     }
 
-    pub(crate) fn node_fields(&self) -> GrammarTableView<'_> {
+    pub(crate) fn node_fields(&self) -> FieldTableView<'_> {
         let offset = self.offsets.node_fields as usize;
         let count = self.header.node_fields_count as usize;
-        GrammarTableView {
-            bytes: &self.storage[offset..offset + count * SymbolNameEntry::SIZE],
+        FieldTableView {
+            bytes: &self.storage[offset..offset + count * SYMBOL_NAME_ENTRY_SIZE],
             count,
         }
     }
@@ -310,25 +312,51 @@ impl<'a> StringsView<'a> {
     }
 }
 
-pub struct GrammarTableView<'a> {
+pub struct NodeKindTableView<'a> {
     bytes: &'a [u8],
     count: usize,
 }
 
-impl<'a> GrammarTableView<'a> {
-    pub fn get(&self, idx: usize) -> SymbolNameEntry {
+impl<'a> NodeKindTableView<'a> {
+    pub fn get(&self, idx: usize) -> NodeKindEntry {
         assert!(idx < self.count, "symbol-name table index out of bounds");
-        let offset = idx * SymbolNameEntry::SIZE;
-        SymbolNameEntry::new(
-            read_u16_le(self.bytes, offset),
-            StringId::try_from(read_u16_le(self.bytes, offset + 2))
-                .expect("symbol name id must be non-zero"),
+        let offset = idx * SYMBOL_NAME_ENTRY_SIZE;
+        NodeKindEntry::new(
+            NodeKindId::try_from(read_u16_le(self.bytes, offset))
+                .expect("validated node-kind metadata contains a public symbol"),
+            symbol_name_id(self.bytes, offset),
         )
     }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = SymbolNameEntry> + '_ {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = NodeKindEntry> + '_ {
         (0..self.count).map(|idx| self.get(idx))
     }
+}
+
+pub struct FieldTableView<'a> {
+    bytes: &'a [u8],
+    count: usize,
+}
+
+impl<'a> FieldTableView<'a> {
+    pub fn get(&self, idx: usize) -> FieldEntry {
+        assert!(idx < self.count, "symbol-name table index out of bounds");
+        let offset = idx * SYMBOL_NAME_ENTRY_SIZE;
+        FieldEntry::new(
+            NodeFieldId::try_from(read_u16_le(self.bytes, offset))
+                .expect("validated node-field metadata contains a non-zero symbol"),
+            symbol_name_id(self.bytes, offset),
+        )
+    }
+
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = FieldEntry> + '_ {
+        (0..self.count).map(|idx| self.get(idx))
+    }
+}
+
+fn symbol_name_id(bytes: &[u8], offset: usize) -> StringId {
+    StringId::try_from(read_u16_le(bytes, offset + 2))
+        .expect("validated symbol name id must be non-zero")
 }
 
 /// View into the regex table.

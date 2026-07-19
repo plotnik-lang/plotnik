@@ -59,6 +59,10 @@ struct SymbolNameEntry {
 
 This table enables name lookup for debugging and error messages.
 
+`symbol` must be a regular Tree-sitter grammar ID in `1..=0xfffd`. Zero is
+Tree-sitter's end symbol; `0xfffe` and `0xffff` are its built-in `_ERROR` and
+`ERROR` symbols and do not belong in grammar metadata.
+
 ## 3. Node Fields
 
 Maps Tree-sitter grammar-field IDs to their string names.
@@ -74,3 +78,5 @@ struct SymbolNameEntry {
     name: u16,      // StringId
 }
 ```
+
+Field IDs occupy `1..=0xffff`; zero means no field and is invalid in this table.

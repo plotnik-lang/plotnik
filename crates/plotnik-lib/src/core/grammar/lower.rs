@@ -4,6 +4,8 @@ use std::collections::BTreeSet;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::core::{NodeFieldId, NodeKindId};
+
 use super::raw::{RawGrammar, RawPrecedence, RawPrecedenceEntry, RawRule};
 use super::{
     node_shapes::{self, GrammarContext},
@@ -17,7 +19,7 @@ use super::{
 
 const TREE_SITTER_PUBLIC_NAME_SEPARATOR: char = '\0';
 const FIRST_SYMBOL_POSITION_AFTER_END: usize = 1;
-const MAX_GRAMMAR_SYMBOL_ID: u16 = u16::MAX - 1;
+const MAX_GRAMMAR_SYMBOLS: usize = NodeKindId::REGULAR_COUNT;
 
 pub(super) struct LoweredGrammar {
     pub variables: Vec<Variable>,
@@ -300,13 +302,7 @@ pub(super) fn derive_fields(
         .into_iter()
         .enumerate()
         .map(|(index, name)| FieldEntry {
-            id: u16::try_from(index + 1).unwrap_or_else(|_| {
-                panic!(
-                    "grammar field validation admitted field index {}, which exceeds the u16 \
-                     format limit",
-                    index + 1
-                )
-            }),
+            id: grammar_field_id(index + 1),
             name,
         })
         .collect())
@@ -360,16 +356,19 @@ pub(super) fn derive_symbols(
 
     let mut symbols = Vec::new();
     for symbol in &symbol_order {
-        let public_id = symbol_ids[&symbol_map[symbol]];
+        let public_symbol = symbol_map[symbol];
+        if public_symbol == Symbol::end() {
+            continue;
+        }
+        let public_id = symbol_ids
+            .get(&public_symbol)
+            .copied()
+            .expect("non-end grammar symbol maps to a non-end public symbol");
         let (kind_name, kind) = default_aliases.get(symbol).map_or_else(
             || metadata_for_symbol(syntax_grammar, lexical_grammar, *symbol),
             |alias| (alias.value.as_str(), alias.kind()),
         );
         let visibility = symbol_visibility(syntax_grammar, *symbol, kind, default_aliases);
-
-        if public_id == 0 {
-            continue;
-        }
 
         symbols.push(NodeKindEntry {
             id: public_id,
@@ -381,29 +380,17 @@ pub(super) fn derive_symbols(
         });
     }
 
-    let first_alias_id = symbol_ids.values().copied().max().unwrap_or_else(|| {
-        panic!(
-            "grammar lowering produced an empty symbol-ID map; the reserved end symbol must \
-                 always be present"
-        )
-    });
-    if usize::from(first_alias_id) + unique_aliases.len() > usize::from(MAX_GRAMMAR_SYMBOL_ID) {
+    let symbol_count = symbol_ids.len();
+    if symbol_count + unique_aliases.len() > MAX_GRAMMAR_SYMBOLS {
         return Err(format!(
-            "grammar defines {} symbols and aliases, exceeding the bytecode limit of \
-             {MAX_GRAMMAR_SYMBOL_ID}",
-            usize::from(first_alias_id) + unique_aliases.len()
+            "grammar defines {} symbols and aliases, exceeding Tree-sitter's regular-symbol \
+             limit of {MAX_GRAMMAR_SYMBOLS}",
+            symbol_count + unique_aliases.len()
         ));
     }
     for (index, alias) in unique_aliases.iter().enumerate() {
-        let offset = u16::try_from(index + 1).unwrap_or_else(|_| {
-            panic!(
-                "grammar alias validation admitted alias offset {}, which exceeds the u16 format \
-                 limit",
-                index + 1
-            )
-        });
         symbols.push(NodeKindEntry::alias(
-            first_alias_id + offset,
+            grammar_kind_id(symbol_count + index + 1),
             public_node_kind(&alias.value),
             alias.is_named,
         ));
@@ -457,38 +444,43 @@ fn derive_symbol_order(
     symbols
 }
 
-fn symbol_ids(symbols: &[Symbol]) -> Result<rustc_hash::FxHashMap<Symbol, u16>, String> {
+fn symbol_ids(symbols: &[Symbol]) -> Result<rustc_hash::FxHashMap<Symbol, NodeKindId>, String> {
     let symbol_count = symbols
         .iter()
         .filter(|&&symbol| symbol != Symbol::end())
         .count();
-    if symbol_count > usize::from(MAX_GRAMMAR_SYMBOL_ID) {
+    if symbol_count > MAX_GRAMMAR_SYMBOLS {
         return Err(format!(
-            "grammar defines {symbol_count} symbols, exceeding the bytecode limit of \
-             {MAX_GRAMMAR_SYMBOL_ID}"
+            "grammar defines {symbol_count} symbols, exceeding Tree-sitter's regular-symbol \
+             limit of {MAX_GRAMMAR_SYMBOLS}"
         ));
     }
 
     let mut ids = rustc_hash::FxHashMap::default();
-    ids.insert(Symbol::end(), 0);
 
     for (index, symbol) in symbols
         .iter()
         .filter(|&&symbol| symbol != Symbol::end())
         .enumerate()
     {
-        let id = u16::try_from(index + 1).unwrap_or_else(|_| {
-            panic!(
-                "grammar symbol validation admitted symbol index {}, which exceeds the u16 format \
-                 limit",
-                index + 1
-            )
-        });
-        ids.insert(*symbol, id);
+        ids.insert(*symbol, grammar_kind_id(index + 1));
     }
 
-    ids.insert(Symbol::end_of_nonterminal_extra(), 0);
     Ok(ids)
+}
+
+fn grammar_kind_id(position: usize) -> NodeKindId {
+    NodeKindId::try_from(
+        u16::try_from(position).expect("validated grammar symbol position fits in u16"),
+    )
+    .expect("grammar symbol positions start at one")
+}
+
+fn grammar_field_id(position: usize) -> NodeFieldId {
+    NodeFieldId::try_from(
+        u16::try_from(position).expect("validated grammar field position fits in u16"),
+    )
+    .expect("grammar field positions start at one")
 }
 
 fn public_symbol_map(
@@ -541,7 +533,7 @@ fn public_symbol_map(
 /// `unique_aliases` consults to decide whether an alias already names an existing symbol.
 #[derive(Clone, Copy)]
 struct SymbolResolution<'a> {
-    ids: &'a rustc_hash::FxHashMap<Symbol, u16>,
+    ids: &'a rustc_hash::FxHashMap<Symbol, NodeKindId>,
     map: &'a rustc_hash::FxHashMap<Symbol, Symbol>,
 }
 
