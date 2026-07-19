@@ -6,7 +6,9 @@
 //! Backends choose identifiers, error syntax, recursion representation, and
 //! construction syntax without walking analysis types or rebuilding tables.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use crate::compiler::analyze::result::{
     CaptureLayout, CaptureMemberKind, PublicResultGroup, ResultItem, ResultItemKind, ResultSchema,
@@ -17,8 +19,7 @@ use crate::core::Symbol;
 
 #[derive(Clone, Debug)]
 pub(crate) struct ResultDecodePlan {
-    items: Vec<DecodeItem>,
-    items_by_name: HashMap<Symbol, usize>,
+    items: IndexMap<Symbol, DecodeItem>,
 }
 
 impl ResultDecodePlan {
@@ -27,29 +28,22 @@ impl ResultDecodePlan {
         let items = schema
             .entry_point_items()
             .iter()
-            .map(|item| builder.item(*item))
-            .collect::<Vec<_>>();
-        let items_by_name = items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| (item.name, index))
+            .map(|item| {
+                let item = builder.item(*item);
+                (item.name, item)
+            })
             .collect();
-        Self {
-            items,
-            items_by_name,
-        }
+        Self { items }
     }
 
-    pub(crate) fn items(&self) -> &[DecodeItem] {
-        &self.items
+    pub(crate) fn items(&self) -> impl Iterator<Item = &DecodeItem> {
+        self.items.values()
     }
 
     pub(crate) fn item(&self, name: Symbol) -> &DecodeItem {
-        let index = self
-            .items_by_name
+        self.items
             .get(&name)
-            .expect("every decode target declares a result item");
-        &self.items[*index]
+            .expect("every decode target declares a result item")
     }
 }
 

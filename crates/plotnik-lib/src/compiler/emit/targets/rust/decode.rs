@@ -155,7 +155,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     pub(super) fn uses_decode_depth(&self) -> bool {
         self.decode
             .items()
-            .iter()
             .any(|item| item.has_decoder() && item.fallible)
     }
 

@@ -35,7 +35,6 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
     pub(super) fn max_bytes(&self) -> u64 {
         self.decode
             .items()
-            .iter()
             .filter(|item| item.has_decoder())
             .map(|item| self.decoder_frame_bytes(item))
             .max()
