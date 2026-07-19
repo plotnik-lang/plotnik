@@ -33,6 +33,7 @@ pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::refs::DefinitionGraph;
+use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::SourceMap;
 use crate::compiler::limits::SatisfiabilityLimits;
@@ -50,6 +51,7 @@ pub(super) struct SatisfiabilityInput<'a> {
     pub(super) grammar: &'a Grammar,
     pub(super) interner: &'a Interner,
     pub(super) definitions: &'a DefinitionGraph,
+    pub(super) pattern_facts: &'a PatternFacts,
     pub(super) source_map: &'a SourceMap,
     pub(super) limits: SatisfiabilityLimits,
 }
@@ -66,6 +68,7 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
         grammar: input.grammar,
         interner: input.interner,
         definitions: input.definitions,
+        pattern_facts: input.pattern_facts,
         source_map: input.source_map,
     };
 

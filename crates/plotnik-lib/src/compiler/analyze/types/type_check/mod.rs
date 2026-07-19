@@ -10,7 +10,7 @@ pub use crate::core::Interner;
 pub(crate) use infer::definition_value_root;
 
 use crate::compiler::analyze::refs::DefinitionGraph;
-use crate::compiler::analyze::shape::DefinitionFacts;
+use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::analyze::types::naming::{RawTypeNameValidator, TypeNamer};
 use crate::compiler::diagnostics::report::Diagnostics;
 
@@ -21,13 +21,13 @@ use crate::compiler::diagnostics::report::Diagnostics;
 pub fn infer_types(
     interner: &mut Interner,
     definitions: &DefinitionGraph,
-    definition_facts: &DefinitionFacts,
+    pattern_facts: &PatternFacts,
     diag: &mut Diagnostics,
 ) -> TypeAnalysis {
     let pass = infer::InferPassEnv {
         interner,
         definitions,
-        definition_facts,
+        pattern_facts,
         diag,
     };
     let mut types = infer::InferPass::new(pass).run();

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use indexmap::IndexMap;
 
 use crate::bytecode::{EntryBoundary, Labeling as SpanLabeling, Nav, SpanKind};
-use crate::compiler::analyze::boundary::BoundaryAnalyzer;
+use crate::compiler::analyze::boundary::BoundaryRelation;
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
@@ -17,7 +17,7 @@ use crate::compiler::lower::ir::{
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
 use crate::compiler::lower::verify::verify_fresh_build;
-use crate::compiler::parse::ast::{self, Pattern};
+use crate::compiler::parse::ast::{self, Pattern, SeqItem};
 use crate::compiler::parse::cst::SyntaxNode;
 
 use super::boundary::{EntryObligation, NavigationContract};
@@ -30,7 +30,6 @@ use crate::compiler::analyze::types::type_check::definition_value_root;
 pub struct NfaBuilder<'a> {
     pub(super) ctx: &'a LowerInput<'a>,
     pub(super) anchor_semantics: AnchorSemantics<'a>,
-    pub(super) boundary_relations: BoundaryAnalyzer<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
     /// Compilation window every fresh label is attributed to (see [`LabelOrigin`]).
@@ -63,11 +62,7 @@ impl<'a> NfaBuilder<'a> {
     pub(in crate::compiler::lower) fn new(ctx: &'a LowerInput<'a>) -> Self {
         Self {
             ctx,
-            anchor_semantics: AnchorSemantics::new(ctx.analysis.interner, ctx.analysis.definitions),
-            boundary_relations: BoundaryAnalyzer::new(
-                ctx.analysis.interner,
-                ctx.analysis.definitions,
-            ),
+            anchor_semantics: AnchorSemantics::new(ctx.analysis.pattern_facts),
             instructions: Vec::new(),
             next_label_id: 0,
             current_origin: None,
@@ -106,7 +101,31 @@ impl<'a> NfaBuilder<'a> {
     }
 
     pub(super) fn definition_is_nullable(&self, def_id: DefId) -> bool {
-        self.ctx.analysis.definition_facts.is_nullable(def_id)
+        self.ctx
+            .analysis
+            .pattern_facts
+            .definition_is_nullable(def_id)
+    }
+
+    pub(super) fn pattern_boundary_relation(&self, pattern: &Pattern) -> &BoundaryRelation {
+        self.ctx
+            .analysis
+            .pattern_facts
+            .pattern_boundary_relation(pattern)
+    }
+
+    pub(super) fn definition_boundary_relation(&self, def_id: DefId) -> &BoundaryRelation {
+        self.ctx
+            .analysis
+            .pattern_facts
+            .definition_boundary_relation(def_id)
+    }
+
+    pub(super) fn items_boundary_relation(&self, items: &[SeqItem]) -> BoundaryRelation {
+        self.ctx
+            .analysis
+            .pattern_facts
+            .items_boundary_relation(items)
     }
 
     pub(super) fn records_inspection(&self) -> bool {

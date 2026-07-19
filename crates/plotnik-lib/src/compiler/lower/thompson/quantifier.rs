@@ -514,7 +514,7 @@ impl NfaBuilder<'_> {
         targets: &ExitMap<Label>,
         output_mode: BoundaryIterationOutputMode,
     ) -> Option<Label> {
-        let relation = self.boundary_relations.pattern(inner);
+        let relation = self.pattern_boundary_relation(inner);
         let first_classes: BTreeSet<_> = relation
             .outcomes(input)
             .iter()
@@ -586,7 +586,7 @@ impl NfaBuilder<'_> {
             empty_effects,
         } = output;
 
-        let relation = self.boundary_relations.pattern(inner);
+        let relation = self.pattern_boundary_relation(inner);
         let mut consuming_targets = ExitMap::new();
         for outcome in relation
             .outcomes(input)
@@ -636,7 +636,7 @@ impl NfaBuilder<'_> {
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
         ));
 
-        let relation = self.boundary_relations.pattern(inner);
+        let relation = self.pattern_boundary_relation(inner).clone();
         let mut reachable = BTreeSet::new();
         let mut pending = vec![input];
         while let Some(state) = pending.pop() {

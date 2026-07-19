@@ -6,12 +6,9 @@
 //! computes that finite relation independently of bytecode and runtime ABI
 //! choices.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
-use crate::compiler::analyze::refs::DefinitionGraph;
-use crate::compiler::ids::DefId;
-use crate::compiler::parse::ast::{Pattern, QuantifierKind, SeqItem};
-use crate::core::Interner;
+use crate::compiler::parse::ast::QuantifierKind;
 
 const FIRST_CLASS_COUNT: usize = 4;
 const PENDING_ANCHOR_COUNT: usize = 3;
@@ -144,7 +141,7 @@ pub(crate) struct BoundaryRelation {
 }
 
 impl BoundaryRelation {
-    fn empty() -> Self {
+    pub(super) fn empty() -> Self {
         Self {
             outcomes: std::array::from_fn(|_| BTreeSet::new()),
         }
@@ -187,7 +184,7 @@ impl BoundaryRelation {
         }
     }
 
-    fn then(&self, next: &Self) -> Self {
+    pub(super) fn then(&self, next: &Self) -> Self {
         let mut composed = Self::empty();
         for input in BoundaryState::all() {
             for prefix in self.outcomes(input) {
@@ -281,141 +278,5 @@ impl BoundaryRelation {
                 }));
         }
         closure
-    }
-}
-
-/// Computes definition relations to a least fixed point, then answers pattern
-/// relation queries using those stable definition summaries.
-pub(crate) struct BoundaryAnalyzer<'a> {
-    interner: &'a Interner,
-    definitions: &'a DefinitionGraph,
-    relations: HashMap<DefId, BoundaryRelation>,
-}
-
-impl<'a> BoundaryAnalyzer<'a> {
-    pub(crate) fn new(interner: &'a Interner, definitions: &'a DefinitionGraph) -> Self {
-        let mut analyzer = Self {
-            interner,
-            definitions,
-            relations: HashMap::new(),
-        };
-        analyzer.compute_definitions();
-        analyzer
-    }
-
-    pub(crate) fn pattern(&self, pattern: &Pattern) -> BoundaryRelation {
-        self.compute_pattern(pattern)
-    }
-
-    pub(crate) fn items(&self, items: &[SeqItem]) -> BoundaryRelation {
-        self.compute_items(items)
-    }
-
-    pub(crate) fn definition(&self, def_id: DefId) -> &BoundaryRelation {
-        self.relations
-            .get(&def_id)
-            .expect("every analyzed definition has a boundary relation")
-    }
-
-    fn compute_definitions(&mut self) {
-        for scc in self.definitions.sccs() {
-            for &def_id in scc {
-                self.relations
-                    .entry(def_id)
-                    .or_insert_with(BoundaryRelation::empty);
-            }
-
-            loop {
-                let mut changed = false;
-                for &def_id in scc {
-                    let body = self.definitions.definition(def_id).body();
-                    let relation = self.compute_pattern(body);
-                    let current = self
-                        .relations
-                        .get_mut(&def_id)
-                        .expect("SCC definitions were initialized");
-                    if *current != relation {
-                        *current = relation;
-                        changed = true;
-                    }
-                }
-                if !changed {
-                    break;
-                }
-            }
-        }
-    }
-
-    fn compute_pattern(&self, pattern: &Pattern) -> BoundaryRelation {
-        match pattern {
-            Pattern::NamedNodePattern(_) => BoundaryRelation::atom(FirstClass::Named),
-            Pattern::AnonymousNodePattern(_) => BoundaryRelation::atom(FirstClass::Anonymous),
-            Pattern::NodeWildcard(_) => BoundaryRelation::atom(FirstClass::Either),
-            Pattern::CapturedPattern(capture) => capture
-                .inner()
-                .map_or_else(BoundaryRelation::identity, |inner| {
-                    self.compute_pattern(&inner)
-                }),
-            Pattern::FieldPattern(field) => field
-                .value()
-                .map_or_else(BoundaryRelation::identity, |value| {
-                    self.compute_pattern(&value)
-                }),
-            Pattern::SeqPattern(sequence) => {
-                let items: Vec<_> = sequence.items().collect();
-                self.compute_items(&items)
-            }
-            Pattern::Alternation(alternation) => {
-                let mut relation = BoundaryRelation::empty();
-                let mut had_alternative = false;
-                for alternative in alternation.patterns() {
-                    had_alternative = true;
-                    relation.union_with(&self.compute_pattern(&alternative));
-                }
-                if had_alternative {
-                    relation
-                } else {
-                    BoundaryRelation::identity()
-                }
-            }
-            Pattern::QuantifiedPattern(quantified) => {
-                let Some(inner) = quantified.inner() else {
-                    return BoundaryRelation::identity();
-                };
-                let inner = self.compute_pattern(&inner);
-                quantified
-                    .quantifier_kind()
-                    .map_or(inner.clone(), |kind| inner.quantified(kind))
-            }
-            Pattern::DefRef(reference) => {
-                let Some(def_id) = reference
-                    .name()
-                    .and_then(|name| self.definitions.id_for_name(self.interner, name.text()))
-                else {
-                    return BoundaryRelation::empty();
-                };
-                self.relations.get(&def_id).cloned().unwrap_or_else(|| {
-                    panic!(
-                        "boundary analysis resolved definition {def_id:?}, but its relation was \
-                             not initialized before the reference was evaluated"
-                    )
-                })
-            }
-        }
-    }
-
-    fn compute_items(&self, items: &[SeqItem]) -> BoundaryRelation {
-        let mut relation = BoundaryRelation::identity();
-        for item in items {
-            relation = match item {
-                SeqItem::Anchor(anchor) => relation.anchor(if anchor.is_exact() {
-                    PendingAnchor::Exact
-                } else {
-                    PendingAnchor::Soft
-                }),
-                SeqItem::Pattern(pattern) => relation.then(&self.compute_pattern(pattern)),
-            };
-        }
-        relation
     }
 }

@@ -13,6 +13,7 @@ use super::binding::GrammarBindingBuilder;
 use super::check::AdmissibilityWalkState;
 use super::participation::Participation;
 use crate::compiler::analyze::refs::DefinitionGraph;
+use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::Span;
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::report::Diagnostics;
@@ -27,6 +28,7 @@ pub struct GrammarBindInput<'a, 'q> {
     pub grammar: &'a Grammar,
     pub source_map: &'q SourceMap,
     pub definitions: &'a DefinitionGraph,
+    pub pattern_facts: &'a PatternFacts,
     pub strict_lints: bool,
     pub satisfiability_limits: SatisfiabilityLimits,
 }
@@ -38,6 +40,7 @@ impl<'q> GrammarBindInput<'_, 'q> {
             grammar,
             source_map,
             definitions,
+            pattern_facts,
             strict_lints,
             satisfiability_limits,
         } = self;
@@ -79,6 +82,7 @@ impl<'q> GrammarBindInput<'_, 'q> {
                 grammar,
                 interner,
                 definitions,
+                pattern_facts,
                 source_map,
                 limits: satisfiability_limits,
             },

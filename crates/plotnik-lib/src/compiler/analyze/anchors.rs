@@ -8,14 +8,10 @@
 //! projects those navs onto the skip classes the checker reasons over; its
 //! `admits` method delegates to the same core skip class the VM uses.
 
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-
 use crate::bytecode::Nav;
-use crate::compiler::analyze::refs::DefinitionGraph;
-use crate::compiler::ids::DefId;
-use crate::compiler::parse::ast::{DefRef, Pattern, SeqItem};
-use crate::core::{Interner, NodeClass, SkipClass};
+use crate::compiler::analyze::shape::PatternFacts;
+use crate::compiler::parse::ast::{Pattern, SeqItem};
+use crate::core::{NodeClass, SkipClass};
 
 /// What a gap between two query patterns may skip over, projected from the same
 /// [`Nav`] codegen emits so the checker and the VM cannot drift.
@@ -111,25 +107,9 @@ impl GapClass {
     }
 }
 
-/// Classifies whether patterns may match anonymous nodes after syntactic wrappers.
-pub struct AnonymousClassifier<'a> {
-    interner: &'a Interner,
-    definitions: &'a DefinitionGraph,
-    /// Memoizes each definition's result so a reference-heavy DAG — an alternation
-    /// referenced twice per level, say — is walked once per definition, not once per
-    /// path: the difference between linear and exponential. Only path-independent
-    /// results are stored; see [`AnonymousClassifier::classify_ref`].
-    cache: RefCell<HashMap<DefId, bool>>,
-}
-
-/// Computes anchor-derived navigation with one anonymous-pattern cache.
-///
-/// A node body needs both leading-gap navs and trailing-anchor navs; building those
-/// through separate free functions used to create separate classifiers and re-walk
-/// the same referenced definitions. Keep the classifier here so one construction pass
-/// pays that cost once.
+/// Computes anchor-derived navigation from retained pattern facts.
 pub struct AnchorSemantics<'a> {
-    classifier: AnonymousClassifier<'a>,
+    pattern_facts: &'a PatternFacts,
 }
 
 /// Whether this pattern's immediate alternatives compile alternative-local entry navs.
@@ -146,102 +126,13 @@ pub(crate) fn has_direct_alternative_nav(pattern: &Pattern) -> bool {
     }
 }
 
-impl<'a> AnonymousClassifier<'a> {
-    pub fn new(interner: &'a Interner, definitions: &'a DefinitionGraph) -> Self {
-        Self {
-            interner,
-            definitions,
-            cache: RefCell::new(HashMap::new()),
-        }
-    }
-
-    pub fn pattern_may_match_anonymous(&self, pattern: Option<&Pattern>) -> bool {
-        let mut visited = HashSet::new();
-        pattern.is_some_and(|pattern| self.classify(pattern, &mut visited).0)
-    }
-
-    /// Returns `(may_match, cut)`. `cut` is true when the walk broke a reference cycle:
-    /// the answer then hinged on which names were already on the stack, so a `false`
-    /// carrying it is not safe to memoize.
-    fn classify(&self, pattern: &Pattern, visited: &mut HashSet<DefId>) -> (bool, bool) {
-        match pattern {
-            Pattern::AnonymousNodePattern(_) | Pattern::NodeWildcard(_) => (true, false),
-            Pattern::NamedNodePattern(_) => (false, false),
-            Pattern::CapturedPattern(cap) => self.classify_opt(cap.inner().as_ref(), visited),
-            Pattern::QuantifiedPattern(q) => self.classify_opt(q.inner().as_ref(), visited),
-            Pattern::FieldPattern(field) => self.classify_opt(field.value().as_ref(), visited),
-            Pattern::Alternation(_) => self.classify_any(pattern.children(), visited),
-            Pattern::SeqPattern(seq) => self.classify_any(seq.children(), visited),
-            Pattern::DefRef(r) => self.classify_ref(r, visited),
-        }
-    }
-
-    fn classify_opt(
-        &self,
-        pattern: Option<&Pattern>,
-        visited: &mut HashSet<DefId>,
-    ) -> (bool, bool) {
-        pattern.map_or((false, false), |p| self.classify(p, visited))
-    }
-
-    /// OR over children: any alternative that may match anonymous makes the whole pattern.
-    /// A `true` short-circuits (and is always sound to cache); an all-`false` answer
-    /// inherits a cut from any alternative, since a cut alternative might have masked a `true`.
-    fn classify_any(
-        &self,
-        children: impl Iterator<Item = Pattern>,
-        visited: &mut HashSet<DefId>,
-    ) -> (bool, bool) {
-        let mut cut = false;
-        for child in children {
-            let (result, child_cut) = self.classify(&child, visited);
-            if result {
-                return (true, false);
-            }
-            cut |= child_cut;
-        }
-        (false, cut)
-    }
-
-    fn classify_ref(&self, r: &DefRef, visited: &mut HashSet<DefId>) -> (bool, bool) {
-        let Some(def_id) = r
-            .name()
-            .and_then(|name| self.definitions.id_for_name(self.interner, name.text()))
-        else {
-            return (false, false);
-        };
-
-        if let Some(&cached) = self.cache.borrow().get(&def_id) {
-            return (cached, false);
-        }
-        if !visited.insert(def_id) {
-            // A reference cycle: going around it again adds nothing, but this `false`
-            // holds only with the current ancestors on the stack, so flag it uncacheable.
-            return (false, true);
-        }
-
-        let body = self.definitions.definition(def_id).body();
-        let (result, cut) = self.classify(body, visited);
-        visited.remove(&def_id);
-
-        // A `true` is genuine no matter what was cut; a cut-free `false` is path-
-        // independent. Either is sound to reuse for every later reference to this name.
-        if result || !cut {
-            self.cache.borrow_mut().insert(def_id, result);
-        }
-        (result, cut)
-    }
-}
-
 impl<'a> AnchorSemantics<'a> {
-    pub fn new(interner: &'a Interner, definitions: &'a DefinitionGraph) -> Self {
-        Self {
-            classifier: AnonymousClassifier::new(interner, definitions),
-        }
+    pub fn new(pattern_facts: &'a PatternFacts) -> Self {
+        Self { pattern_facts }
     }
 
-    pub fn pattern_may_match_anonymous(&self, pattern: Option<&Pattern>) -> bool {
-        self.classifier.pattern_may_match_anonymous(pattern)
+    pub fn pattern_may_match_anonymous_node(&self, pattern: Option<&Pattern>) -> bool {
+        pattern.is_some_and(|pattern| self.pattern_facts.pattern_may_match_anonymous_node(pattern))
     }
 
     /// Check for trailing anchor in items, descending into a sole-child sequence if needed.
@@ -264,7 +155,7 @@ impl<'a> AnchorSemantics<'a> {
                 }
             });
 
-            let nav = if self.classifier.pattern_may_match_anonymous(prev_pattern) {
+            let nav = if self.pattern_may_match_anonymous_node(prev_pattern) {
                 Nav::UpSkipExtras(1)
             } else {
                 Nav::UpSkipTrivia(1)
@@ -324,7 +215,7 @@ impl<'a> AnchorSemantics<'a> {
                 }
                 SeqItem::Pattern(pattern) => {
                     let current_is_anonymous =
-                        self.classifier.pattern_may_match_anonymous(Some(pattern));
+                        self.pattern_facts.pattern_may_match_anonymous_node(pattern);
                     // Alternation alternatives compile their own entry nav, so the alternative body—not
                     // the whole alternation—decides whether soft anchors use extras-only nav.
                     let current_is_anonymous_for_anchor = if has_direct_alternative_nav(pattern) {

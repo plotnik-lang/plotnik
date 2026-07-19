@@ -6,33 +6,42 @@
 //! contextless across every definition composition are rejected here.
 
 use crate::compiler::analyze::refs::DefinitionGraph;
-use crate::compiler::analyze::shape::anchor_context::AnchorContextAnalysis;
+use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
+use crate::core::Interner;
 
 pub(crate) struct AnchorValidationInput<'a, 'd> {
-    pub analysis: &'a AnchorContextAnalysis<'a>,
+    pub pattern_facts: &'a PatternFacts,
     pub definitions: &'a DefinitionGraph,
+    pub interner: &'a Interner,
     pub diag: &'d mut Diagnostics,
 }
 
 pub(crate) fn validate_anchors(input: AnchorValidationInput<'_, '_>) -> bool {
-    let context_free_roots = input
-        .definitions
-        .ids_in_def_id_order()
-        .filter(|&def_id| !input.analysis.definition_requires_external_context(def_id));
-    let discharged = input.definitions.reachable_from(context_free_roots);
+    let self_contained_roots = input.definitions.ids_in_def_id_order().filter(|&def_id| {
+        !input
+            .pattern_facts
+            .definition_requires_external_anchor_context(def_id)
+    });
+    let discharged = input.definitions.reachable_from(self_contained_roots);
 
     let mut valid = true;
     for def_id in input.definitions.ids_in_def_id_order() {
-        if !input.analysis.definition_requires_external_context(def_id)
+        if !input
+            .pattern_facts
+            .definition_requires_external_anchor_context(def_id)
             || discharged.contains(def_id)
         {
             continue;
         }
 
         let source = input.definitions.definition(def_id).source();
-        for range in input.analysis.exported_anchor_ranges(def_id) {
+        for range in
+            input
+                .pattern_facts
+                .exported_anchor_ranges(def_id, input.definitions, input.interner)
+        {
             valid = false;
             input
                 .diag

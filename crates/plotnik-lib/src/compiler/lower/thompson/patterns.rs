@@ -442,11 +442,7 @@ impl NfaBuilder<'_> {
 
     /// Whether a pattern can match zero nodes.
     pub(super) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
-        self.ctx.analysis.definition_facts.pattern_is_nullable(
-            pattern,
-            self.ctx.analysis.definitions,
-            self.ctx.analysis.interner,
-        )
+        self.ctx.analysis.pattern_facts.pattern_is_nullable(pattern)
     }
 
     /// A sequence item that may consume nothing: a skippable quantifier, a
@@ -603,8 +599,7 @@ impl NfaBuilder<'_> {
         targets: &ExitMap<Label>,
     ) -> Option<Label> {
         let reachable_ports: Vec<_> = self
-            .boundary_relations
-            .definition(def_id)
+            .definition_boundary_relation(def_id)
             .outcomes(input)
             .iter()
             .copied()
