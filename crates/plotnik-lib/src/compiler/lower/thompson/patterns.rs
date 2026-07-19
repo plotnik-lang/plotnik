@@ -776,29 +776,6 @@ impl NfaBuilder<'_> {
         mode
     }
 
-    /// Inline a nullable definition's body at the reference site.
-    ///
-    /// The lowering mirrors [`ref_call_lowering`](Self::ref_call_lowering) with
-    /// the body substituted for the `Call`:
-    ///
-    /// - Captured ref returning a record: `RecordOpen → body → RecordClose → RecordSet → exit(s)`
-    /// - Captured ref returning another value: `body → RecordSet → exit(s)`
-    /// - Bare ref: body compiled under suppression (compile-time — no
-    ///   `SuppressBegin`/`SuppressEnd` brackets needed)
-    ///
-    /// The body routes through [`compile_nullable_pattern`](Self::compile_nullable_pattern),
-    /// so its empty path exits to `skip_exit` with the checkpoint-restored
-    /// cursor — exactly the inline `?` semantics. Single-exit callers pass the
-    /// same label for both exits; the paths still differ in cursor state.
-    pub(super) fn compile_ref_inline(
-        &mut self,
-        def_id: DefId,
-        matched: PatternCtx,
-        skip_exit: SkipExit,
-    ) -> Label {
-        self.compile_ref_inline_in(def_id, matched, skip_exit)
-    }
-
     /// [`compile_ref_inline`](Self::compile_ref_inline) with `keep_value`: the
     /// body's pending value survives with no attaching effect at this site (see
     /// [`compile_ref_call`](Self::compile_ref_call)).
@@ -818,7 +795,7 @@ impl NfaBuilder<'_> {
             capture: CaptureEffects::default(),
             observe_value: true,
         };
-        self.compile_ref_inline_in(def_id, pattern_ctx, skip_exit)
+        self.compile_ref_inline(def_id, pattern_ctx, skip_exit)
     }
 
     /// Call a definition keeping its pending value alive (no attaching effect).
@@ -840,7 +817,21 @@ impl NfaBuilder<'_> {
         self.compile_ref_call(specialization, pattern_ctx, field_override)
     }
 
-    fn compile_ref_inline_in(
+    /// Inline a nullable definition's body at the reference site.
+    ///
+    /// The lowering mirrors [`ref_call_lowering`](Self::ref_call_lowering) with
+    /// the body substituted for the `Call`:
+    ///
+    /// - Captured ref returning a record: `RecordOpen → body → RecordClose → RecordSet → exit(s)`
+    /// - Captured ref returning another value: `body → RecordSet → exit(s)`
+    /// - Bare ref: body compiled under suppression (compile-time — no
+    ///   `SuppressBegin`/`SuppressEnd` brackets needed)
+    ///
+    /// The body routes through [`compile_nullable_pattern`](Self::compile_nullable_pattern),
+    /// so its empty path exits to `skip_exit` with the checkpoint-restored
+    /// cursor — exactly the inline `?` semantics. Single-exit callers pass the
+    /// same label for both exits; the paths still differ in cursor state.
+    pub(super) fn compile_ref_inline(
         &mut self,
         def_id: DefId,
         matched: PatternCtx,
