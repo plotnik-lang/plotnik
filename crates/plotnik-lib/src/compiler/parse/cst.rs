@@ -46,9 +46,6 @@ pub enum SyntaxKind {
     #[token("-")]
     Minus,
 
-    #[token("~")]
-    Tilde,
-
     #[token("_")]
     Underscore,
 

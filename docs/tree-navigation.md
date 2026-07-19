@@ -340,7 +340,9 @@ for &fid in pattern.neg_fields {
 }
 ```
 
-Both constraints participate in the skip policy — a mismatch triggers retry (for `*`), fail-if-non-trivia (for `~`), or immediate fail (for `.`).
+Both constraints participate in the skip policy — a mismatch retries under
+`Any`, retries only across nodes admitted by `Trivia` or `Extras`, or fails
+immediately under `Exact`.
 
 ## Call Navigation
 

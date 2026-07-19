@@ -113,7 +113,6 @@ fn class_name(kind: SyntaxKind) -> &'static str {
         | SyntaxKind::Equals
         | SyntaxKind::Negation
         | SyntaxKind::Minus
-        | SyntaxKind::Tilde
         | SyntaxKind::Underscore
         | SyntaxKind::Star
         | SyntaxKind::Plus
