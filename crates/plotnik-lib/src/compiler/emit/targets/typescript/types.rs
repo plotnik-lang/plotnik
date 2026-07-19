@@ -356,8 +356,7 @@ impl<'a> SchemaEmitter<'a> {
         );
         let mut fields = scope
             .members()
-            .iter()
-            .map(|&member| {
+            .map(|member| {
                 let descriptor = self.schema.layout().expect_member(member);
                 let CaptureMemberKind::Field(info) = descriptor.kind else {
                     unreachable!("record capture scope contains only field members");
@@ -382,8 +381,7 @@ impl<'a> SchemaEmitter<'a> {
         );
         scope
             .members()
-            .iter()
-            .map(|&member| {
+            .map(|member| {
                 let descriptor = self.schema.layout().expect_member(member);
                 let CaptureMemberKind::Case(payload) = descriptor.kind else {
                     unreachable!("variant capture scope contains only case members");
