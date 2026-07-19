@@ -232,7 +232,7 @@ impl<'a> SchemaEmitter<'a> {
 
     fn render_ty(&self, ty: TypeId) -> Sink<SemanticTag> {
         if !ty.is_builtin()
-            && let Some(symbol) = self.schema.type_name_of(ty)
+            && let Some(symbol) = self.schema.types.type_name_of(ty)
             && self.items_by_name.contains_key(&symbol)
         {
             let mut out = Sink::new();

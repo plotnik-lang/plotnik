@@ -244,6 +244,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let name = self
                     .schema
+                    .types
                     .type_name_of(ty)
                     .expect("naming pass names every composite outside enum-variant payloads");
                 self.named_type(name, ty)

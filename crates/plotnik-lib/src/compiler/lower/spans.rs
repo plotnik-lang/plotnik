@@ -358,7 +358,7 @@ fn custom_capture_type_binding(
         .final_type;
 
     loop {
-        if input.result.type_name_of(type_id) == Some(written_name) {
+        if input.analysis.type_analysis.type_name_of(type_id) == Some(written_name) {
             return Some(SpanBindingIR::Type(type_id));
         }
         match input.analysis.type_analysis.type_shape(type_id) {
