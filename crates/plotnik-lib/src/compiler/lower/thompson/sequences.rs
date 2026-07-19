@@ -187,7 +187,7 @@ impl NfaBuilder<'_> {
         let first_is_skippable = nav_modes
             .first()
             .and_then(|(idx, _)| items[*idx].as_pattern())
-            .is_some_and(|p| self.is_skippable_item(p));
+            .is_some_and(|p| self.pattern_is_nullable(p));
         // The skip path makes the follower the new "first" item, so it must re-derive
         // first-position navigation rather than the sibling `Next` the match path uses.
         // This is required whenever the first item navigates to a position (`Down*` into
@@ -225,7 +225,7 @@ impl NfaBuilder<'_> {
         let last_is_skippable = nav_modes
             .last()
             .and_then(|(idx, _)| items[*idx].as_pattern())
-            .is_some_and(|p| self.is_skippable_item(p));
+            .is_some_and(|p| self.pattern_is_nullable(p));
 
         // Build chain in reverse: last pattern exits to `exit`, each prior exits to next.
         let mut current_exit = exit;

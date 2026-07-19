@@ -439,13 +439,6 @@ impl NfaBuilder<'_> {
         self.ctx.analysis.pattern_facts.pattern_is_nullable(pattern)
     }
 
-    /// A sequence item that may consume nothing: a skippable quantifier, a
-    /// reference to a nullable definition, a group of such items, or an
-    /// alternation with a nullable alternative.
-    pub(super) fn is_skippable_item(&self, pattern: &Pattern) -> bool {
-        self.pattern_is_nullable(pattern)
-    }
-
     /// [`pattern_owns_iteration`] extended to nullable references: the inlined
     /// body stands in for the item, so iteration ownership is the body's — a
     /// quantifier-rooted body owns its sibling search, and wrapping it in a
