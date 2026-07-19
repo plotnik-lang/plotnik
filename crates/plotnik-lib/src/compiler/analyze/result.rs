@@ -162,21 +162,22 @@ pub(crate) struct CaptureLayout {
 #[derive(Clone, Debug)]
 pub(crate) struct ResultTypeLayout {
     no_value: bool,
-    builtins: Vec<TypeId>,
-    value_types: Vec<TypeId>,
+    builtin_count: usize,
+    ordered_types: Vec<TypeId>,
     output_ids: HashMap<TypeId, ResultTypeId>,
 }
 
 impl ResultTypeLayout {
     fn build(no_value: bool, used_builtins: &HashSet<TypeId>, value_types: Vec<TypeId>) -> Self {
-        let builtins = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
+        let mut ordered_types = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
             .into_iter()
             .filter(|builtin| used_builtins.contains(builtin))
             .collect::<Vec<_>>();
+        let builtin_count = ordered_types.len();
+        ordered_types.extend(value_types);
 
-        let output_ids = builtins
+        let output_ids = ordered_types
             .iter()
-            .chain(&value_types)
             .enumerate()
             .map(|(index, &type_id)| {
                 (
@@ -190,14 +191,14 @@ impl ResultTypeLayout {
             .collect();
         Self {
             no_value,
-            builtins,
-            value_types,
+            builtin_count,
+            ordered_types,
             output_ids,
         }
     }
 
     pub(crate) fn builtins(&self) -> &[TypeId] {
-        &self.builtins
+        &self.ordered_types[..self.builtin_count]
     }
 
     pub(crate) fn has_no_value(&self) -> bool {
@@ -213,7 +214,7 @@ impl ResultTypeLayout {
     }
 
     pub(crate) fn value_types(&self) -> &[TypeId] {
-        &self.value_types
+        &self.ordered_types[self.builtin_count..]
     }
 
     pub(crate) fn output_id(&self, type_id: TypeId) -> ResultTypeId {
