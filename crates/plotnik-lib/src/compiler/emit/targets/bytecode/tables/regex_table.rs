@@ -70,14 +70,6 @@ impl RegexTableBuilder {
         self.entries.len()
     }
 
-    /// Validate that the regex count fits in u16.
-    pub fn validate(&self) -> Result<(), EmitError> {
-        if self.entries.len() > EmitError::MAX_REGEXES {
-            return Err(EmitError::TooManyRegexes(self.entries.len()));
-        }
-        Ok(())
-    }
-
     pub fn lookup(&self, string_id: StringId) -> Option<RegexId> {
         self.lookup.get(&string_id).copied()
     }
@@ -123,10 +115,4 @@ fn blob_offset(size: usize) -> Result<u32, EmitError> {
         section: "regex blob",
         size,
     })
-}
-
-impl Default for RegexTableBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
 }

@@ -120,8 +120,6 @@ impl<'a> EmitPipeline<'a> {
             entry_points.push(EntryPoint::new(name, target, result_type, entry.boundary));
         }
 
-        self.strings.validate()?;
-        self.types.validate()?;
         if node_kinds.len() > EmitError::MAX_NODE_KINDS {
             return Err(EmitError::TooManyNodeKinds(node_kinds.len()));
         }

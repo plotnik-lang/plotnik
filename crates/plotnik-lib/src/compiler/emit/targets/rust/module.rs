@@ -42,13 +42,12 @@ use super::entry_names::{journal_fn_name, limited_journal_fn_name, matches_fn_na
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
 ///
-/// The caller guarantees the query compiled successfully (all ids bound, the
-/// target-neutral verifier accepted the same semantic NFA) and was built *without*
-/// inspection — spans are a VM/playground concern and never reach generated
-/// code.
-pub(crate) fn generate(plan: &CodegenPlan<'_>, config: &Config) -> String {
-    let generator = Generator::new(plan, config);
-    generator.render()
+/// The caller guarantees the query compiled successfully and was built
+/// *without* inspection — spans are a VM/playground concern and never reach
+/// generated code.
+pub(crate) fn generate(plan: &CodegenPlan<'_>, config: &Config) -> Result<String, String> {
+    let generator = Generator::new(plan, config)?;
+    Ok(generator.render())
 }
 
 struct StateInfo {
@@ -95,9 +94,14 @@ struct RegexStatic {
 }
 
 impl RegexStatic {
-    fn compile(id: RegexId, pattern: &regex_syntax::hir::Hir) -> Self {
-        let bytes = compile_native_dfa(pattern).expect("regex predicate compiled during emit");
-        Self { id, bytes }
+    fn compile(
+        id: RegexId,
+        source: &str,
+        pattern: &regex_syntax::hir::Hir,
+    ) -> Result<Self, String> {
+        let bytes = compile_native_dfa(pattern)
+            .map_err(|error| format!("regex compile error for {source:?}: {error}"))?;
+        Ok(Self { id, bytes })
     }
 }
 
@@ -113,7 +117,7 @@ struct RustRepresentation {
 }
 
 impl RustRepresentation {
-    fn from_plan(plan: &crate::compiler::emit::plan::MatcherPlan) -> Self {
+    fn from_plan(plan: &crate::compiler::emit::plan::MatcherPlan) -> Result<Self, String> {
         let width = plan.label_width();
         let states = plan
             .states()
@@ -141,19 +145,20 @@ impl RustRepresentation {
             })
             .collect();
 
+        let regexes = plan
+            .regexes()
+            .iter()
+            .map(|regex| RegexStatic::compile(regex.id, &regex.pattern, &regex.normalized))
+            .collect::<Result<Vec<_>, _>>()?;
         let mut representation = Self {
             states,
             fields: BTreeMap::new(),
-            regexes: plan
-                .regexes()
-                .iter()
-                .map(|regex| RegexStatic::compile(regex.id, &regex.normalized))
-                .collect(),
+            regexes,
         };
         for field in plan.fields() {
             representation.record_field(field.id, &field.name);
         }
-        representation
+        Ok(representation)
     }
 
     fn record_field(&mut self, id: u16, display: &str) {
@@ -193,25 +198,25 @@ struct RustLimits {
 }
 
 impl<'a> Generator<'a> {
-    fn new(plan: &'a CodegenPlan<'a>, config: &'a Config) -> Self {
+    fn new(plan: &'a CodegenPlan<'a>, config: &'a Config) -> Result<Self, String> {
         let limits = RustLimits {
             fuel: config.limits.fuel_limit,
             memory: config.limits.memory,
             decode_depth: config.decode_depth,
         };
-        let rust = RustRepresentation::from_plan(plan.matcher());
+        let rust = RustRepresentation::from_plan(plan.matcher())?;
         let has_calls = plan
             .matcher()
             .states()
             .iter()
             .any(|state| matches!(state.kind, StatePlanKind::Call(_)));
-        Self {
+        Ok(Self {
             config,
             plan,
             limits,
             rust,
             has_calls,
-        }
+        })
     }
 
     fn state(&self, id: StateId) -> &StateInfo {

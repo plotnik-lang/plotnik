@@ -19,7 +19,6 @@ pub fn build_regex_table(
 ) -> Result<RegexTableBuilder, EmitError> {
     let mut regexes = RegexTableBuilder::new();
     intern_regex_predicates(nfa.instructions(), strings, &mut regexes)?;
-    regexes.validate()?;
     Ok(regexes)
 }
 

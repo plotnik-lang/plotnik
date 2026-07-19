@@ -287,6 +287,8 @@ The loader verifies:
 - callee ports are dense, every call supplies exactly the callee arity, calls
   to one specialized target agree on entry ownership and port behavior, and
   entry point definitions use the caller-owned contract and return through port 0 only;
+- every body returns at its declared cursor depth, and cursor-reading effects
+  cannot execute before a path consumes a node;
 - every accepted output-event path keeps the materializer stack balanced;
 - suppression effects cannot underflow their depth and finish balanced;
 - the committed match journal cannot underflow or mis-nest the inspection span

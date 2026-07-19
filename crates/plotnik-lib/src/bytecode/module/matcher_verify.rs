@@ -1,13 +1,8 @@
-//! Target-neutral verification of matcher control flow and result effects.
+//! Validation of decoded bytecode control flow and result effects.
 //!
-//! Both the semantic NFA and validated bytecode project into this small program
-//! shape. Keeping the abstract interpreter here prevents their two trust
-//! boundaries from maintaining parallel implementations of recursive call
-//! summaries, materializer-stack safety, return routing, and cursor depth.
-//!
-//! Representation adapters resolve their own metadata before constructing a
-//! [`Program`], so this layer needs only normalized instructions and body
-//! contracts. It proves every control-flow path, not just every instruction:
+//! The bytecode loader projects structurally decoded instructions into this
+//! small program shape before the VM can observe the module. The abstract
+//! interpreter proves every control-flow path, not just every instruction:
 //! deduplicated alternative tails may legitimately reach one address with
 //! different builder stacks, so effect analysis keeps a set of abstract states
 //! per address.
@@ -32,14 +27,14 @@ use crate::bytecode::{
 const STATE_BUDGET: usize = 1 << 18;
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Effect {
+pub(super) struct Effect {
     kind: EffectKind,
     payload: usize,
     variant_has_no_payload: Option<bool>,
 }
 
 impl Effect {
-    pub(crate) fn new(kind: EffectKind, payload: usize) -> Self {
+    pub(super) fn new(kind: EffectKind, payload: usize) -> Self {
         assert_ne!(
             kind,
             EffectKind::VariantOpen,
@@ -52,7 +47,7 @@ impl Effect {
         }
     }
 
-    pub(crate) fn variant_open(payload: usize, has_no_payload: bool) -> Self {
+    pub(super) fn variant_open(payload: usize, has_no_payload: bool) -> Self {
         Self {
             kind: EffectKind::VariantOpen,
             payload,
@@ -62,14 +57,14 @@ impl Effect {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Match<A> {
+pub(super) struct Match<A> {
     nav: Nav,
     effects: Box<[Effect]>,
     successors: Box<[A]>,
 }
 
 impl<A> Match<A> {
-    pub(crate) fn new(
+    pub(super) fn new(
         nav: Nav,
         effects: impl Into<Box<[Effect]>>,
         successors: impl Into<Box<[A]>>,
@@ -83,7 +78,7 @@ impl<A> Match<A> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Call<A> {
+pub(super) struct Call<A> {
     nav: Nav,
     contract: CalleeContract,
     target: A,
@@ -92,7 +87,7 @@ pub(crate) struct Call<A> {
 }
 
 impl<A> Call<A> {
-    pub(crate) fn new(
+    pub(super) fn new(
         nav: Nav,
         contract: CalleeContract,
         target: A,
@@ -118,45 +113,45 @@ impl<A> Call<A> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Return {
+pub(super) struct Return {
     port: PortId,
     contract: CalleeContract,
 }
 
 impl Return {
-    pub(crate) fn new(port: PortId, contract: CalleeContract) -> Self {
+    pub(super) fn new(port: PortId, contract: CalleeContract) -> Self {
         Self { port, contract }
     }
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum Instruction<A> {
+pub(super) enum Instruction<A> {
     Match(Match<A>),
     Call(Call<A>),
     Return(Return),
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Entry<A> {
+pub(super) struct Entry<A> {
     target: A,
     boundary: EntryBoundary,
 }
 
 impl<A> Entry<A> {
-    pub(crate) fn new(target: A, boundary: EntryBoundary) -> Self {
+    pub(super) fn new(target: A, boundary: EntryBoundary) -> Self {
         Self { target, boundary }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct BodyContract {
+struct BodyContract {
     contract: CalleeContract,
     arity: u8,
     consumed_mask: u8,
 }
 
 impl BodyContract {
-    pub(crate) fn new(contract: CalleeContract, arity: usize, consumed_mask: u8) -> Self {
+    fn new(contract: CalleeContract, arity: usize, consumed_mask: u8) -> Self {
         Self {
             contract,
             arity: u8::try_from(arity).expect("matcher call arity fits u8"),
@@ -205,7 +200,7 @@ impl BodyContract {
     }
 }
 
-pub(crate) struct Program<A> {
+pub(super) struct Program<A> {
     instructions: HashMap<A, Instruction<A>>,
     entries: Vec<Entry<A>>,
     roots: HashMap<A, BodyContract>,
@@ -215,10 +210,9 @@ impl<A> Program<A>
 where
     A: Copy + Eq + Hash + Debug,
 {
-    pub(crate) fn new(
+    pub(super) fn new(
         instructions: impl IntoIterator<Item = (A, Instruction<A>)>,
         entries: Vec<Entry<A>>,
-        declared_roots: impl IntoIterator<Item = (A, BodyContract)>,
     ) -> Result<Self, VerifyError<A>> {
         let mut instruction_map = HashMap::new();
         for (address, instruction) in instructions {
@@ -231,9 +225,6 @@ where
         }
 
         let mut roots = HashMap::new();
-        for (address, contract) in declared_roots {
-            insert_root(&mut roots, address, contract)?;
-        }
         for entry in &entries {
             insert_root(&mut roots, entry.target, BodyContract::entry_point())?;
         }
@@ -322,7 +313,7 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum VerifyError<A> {
+pub(super) enum VerifyError<A> {
     Malformed { at: Option<A>, detail: String },
     EffectStack(A),
     SpanStack(A),
@@ -341,28 +332,17 @@ impl<A> VerifyError<A> {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct VerifyStats {
-    pub(crate) body_analyses: usize,
+pub(super) struct VerifyStats {
+    pub(super) body_analyses: usize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum EmptyPathCheck {
-    Verify,
-    Skip,
-}
-
-pub(crate) fn verify<A>(
-    program: &Program<A>,
-    empty_paths: EmptyPathCheck,
-) -> Result<VerifyStats, VerifyError<A>>
+pub(super) fn verify<A>(program: &Program<A>) -> Result<VerifyStats, VerifyError<A>>
 where
     A: Copy + Eq + Hash + Debug,
 {
     verify_return_routes(program)?;
     verify_cursor_depth(program)?;
-    if empty_paths == EmptyPathCheck::Verify {
-        verify_empty_paths(program)?;
-    }
+    verify_empty_paths(program)?;
     verify_effects(program)
 }
 

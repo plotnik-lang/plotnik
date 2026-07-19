@@ -2,7 +2,7 @@
 //!
 //! Each test emits a bytecode buffer, deliberately corrupts one field, and
 //! recomputes the CRC so the checksum gate still passes. It then asserts that
-//! [`Module::load_compiler_output`] returns a clean [`ModuleError`] before a
+//! [`Module::validate_and_load`] returns a clean [`ModuleError`] before a
 //! view, decoder, VM, or materializer can observe the buffer. Together these
 //! tests preserve the mandatory checks between compiler emission and VM use.
 //!
@@ -16,10 +16,7 @@
 use std::fmt::Write as _;
 
 use crate::compiler::test_utils::synthetic_grammar as grammar;
-use crate::compiler::{
-    BytecodeConfig, BytecodeInspection, QueryBuilder, SourceMap, SourcePath,
-    reset_semantic_body_analyses, semantic_body_analyses,
-};
+use crate::compiler::{BytecodeConfig, BytecodeInspection, QueryBuilder, SourceMap, SourcePath};
 use indoc::indoc;
 
 use super::verify::{
@@ -117,21 +114,18 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
         writeln!(query, "Query{index} = (identifier)").expect("writing to a string succeeds");
     }
 
-    reset_semantic_body_analyses();
     reset_loader_body_analyses();
     let bytes = emit_bytes(&query);
-    let semantic_analyses = semantic_body_analyses();
     let emission_load_analyses = loader_body_analyses();
     assert!(
         bytes.len() > 63 * 1_024,
         "regression module must stay large"
     );
 
-    assert_linear_body_analyses("semantic verifier", semantic_analyses);
     assert_linear_body_analyses("emission loader", emission_load_analyses);
 
     reset_loader_body_analyses();
-    let module = Module::load_compiler_output(&bytes).expect("compiler output validates");
+    let module = Module::validate_and_load(&bytes).expect("compiler output validates");
     let reload_analyses = loader_body_analyses();
     assert_linear_body_analyses("module reload", reload_analyses);
 
@@ -142,7 +136,7 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
 /// (`op_and_flags` u16 || `value_ref` u16) in the instruction stream.
 fn find_predicate_off(bytes: &[u8]) -> usize {
     let (base, word_count) = {
-        let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(bytes).expect("module validates before tampering");
         (
             m.offsets().instructions as usize,
             m.header().instruction_word_count,
@@ -174,7 +168,7 @@ fn forged_invalid_entry_point_name_is_rejected() {
     // is past the table; both must yield a clean error, not panic during StringId decoding.
     for forged in [0u16, u16::MAX] {
         let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
-        let ep_off = Module::load_compiler_output(&bytes)
+        let ep_off = Module::validate_and_load(&bytes)
             .expect("module validates before tampering")
             .offsets()
             .entry_points as usize;
@@ -182,7 +176,7 @@ fn forged_invalid_entry_point_name_is_rejected() {
         bytes[ep_off..ep_off + 2].copy_from_slice(&forged.to_le_bytes());
         reseal(&mut bytes);
 
-        let err = Module::load_compiler_output(&bytes)
+        let err = Module::validate_and_load(&bytes)
             .expect_err("forged entry point name must be rejected");
         assert!(
             matches!(err, ModuleError::InvalidStringId(_)),
@@ -195,7 +189,7 @@ fn forged_invalid_entry_point_name_is_rejected() {
 fn forged_out_of_range_predicate_operand_is_rejected() {
     // The `== "needle"` predicate stores a string-table index as its value_ref.
     let mut bytes = emit_bytes(r#"Q = (identifier == "needle")"#);
-    let str_count = Module::load_compiler_output(&bytes)
+    let str_count = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .header()
         .str_table_count;
@@ -204,8 +198,8 @@ fn forged_out_of_range_predicate_operand_is_rejected() {
     bytes[pred_off + 2..pred_off + 4].copy_from_slice(&str_count.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged predicate operand must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged predicate operand must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidPredicateOperand(_)),
         "expected InvalidPredicateOperand, got {err:?}"
@@ -222,8 +216,7 @@ fn forged_invalid_predicate_op_is_rejected() {
     bytes[pred_off] = 7;
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged predicate op must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged predicate op must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidPredicateOperand(_)),
         "expected InvalidPredicateOperand, got {err:?}"
@@ -236,7 +229,7 @@ const RECORD_QUERY: &str =
     r#"Top = (binary_expression left: (identifier) @l right: (identifier) @r)"#;
 
 fn instruction_section(bytes: &[u8]) -> (usize, u16) {
-    let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
+    let m = Module::validate_and_load(bytes).expect("module validates before tampering");
     (
         m.offsets().instructions as usize,
         m.header().instruction_word_count,
@@ -401,6 +394,31 @@ fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
         .expect("no matching effect slot in the instruction stream")
 }
 
+fn first_instruction_with_effect(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
+    let (base, word_count) = instruction_section(bytes);
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
+        let opcode = bytes[off] & 0x0F;
+        if (1..=5).contains(&opcode) {
+            let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
+            let effects = ((counts >> 12) & 0xF) as usize;
+            for index in 0..effects {
+                let effect = off + BYTECODE_WORD_SIZE + index * 2;
+                let op =
+                    u16::from_le_bytes([bytes[effect], bytes[effect + 1]]) >> EFFECT_PAYLOAD_BITS;
+                if want(op) {
+                    return off;
+                }
+            }
+        }
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
+    }
+    panic!("no instruction with a matching effect");
+}
+
 fn effect_word(kind: EffectKind) -> [u8; 2] {
     ((kind as u16) << EFFECT_PAYLOAD_BITS).to_le_bytes()
 }
@@ -414,14 +432,14 @@ fn effect_payload(bytes: &[u8], slot: usize) -> u16 {
 }
 
 fn type_member_type_id_off(bytes: &[u8], member: u16) -> usize {
-    let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
+    let m = Module::validate_and_load(bytes).expect("module validates before tampering");
     m.offsets().type_members as usize + member as usize * 4 + 2
 }
 
 /// Byte offset of the first non-empty inter-section alignment gap — the padding
 /// the emitter zero-fills before each aligned section (or the final tail).
 fn first_section_gap(bytes: &[u8]) -> usize {
-    let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
+    let m = Module::validate_and_load(bytes).expect("module validates before tampering");
     let o = m.offsets();
     let h = m.header();
     // (section start, data length) in layout order, terminated by the buffer end.
@@ -460,7 +478,7 @@ fn forged_nonzero_section_padding_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged section padding must be rejected");
+        Module::validate_and_load(&bytes).expect_err("forged section padding must be rejected");
     assert!(
         matches!(err, ModuleError::NonZeroSectionPadding),
         "expected NonZeroSectionPadding, got {err:?}"
@@ -476,7 +494,7 @@ fn forged_unknown_opcode_is_rejected() {
     bytes[off] = (bytes[off] & 0xF0) | 0x0A;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes).expect_err("forged opcode must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged opcode must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidOpcode { opcode: 0x0A, .. }),
         "expected InvalidOpcode, got {err:?}"
@@ -492,7 +510,7 @@ fn forged_nonzero_segment_is_rejected() {
     bytes[off] |= 0x40;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes).expect_err("forged segment must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged segment must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -507,8 +525,7 @@ fn forged_reserved_return_header_flag_is_rejected() {
     bytes[off] |= 0x20;
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged return flag must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged return flag must be rejected");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
 
@@ -522,7 +539,7 @@ fn forged_reserved_node_kind_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged node_class_bits must be rejected");
+        Module::validate_and_load(&bytes).expect_err("forged node_class_bits must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -538,7 +555,7 @@ fn forged_invalid_nav_is_rejected() {
     bytes[off + 1] = 0x80;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes).expect_err("forged nav must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged nav must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -557,8 +574,7 @@ fn forged_invalid_effect_opcode_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged effect opcode must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged effect opcode must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -572,8 +588,8 @@ fn forged_nonzero_unit_effect_payload_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::ScalarMark, 1));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("unit effects must reject a nonzero payload");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("unit effects must reject a nonzero payload");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -587,7 +603,7 @@ fn forged_bool_close_payload_out_of_range_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::BoolClose, 2));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("BoolClose payload must be exactly zero or one");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
@@ -602,7 +618,7 @@ fn forged_span_effect_before_spans_section_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::SpanStart));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes).expect_err("span effects need a spans section");
+    let err = Module::validate_and_load(&bytes).expect_err("span effects need a spans section");
     assert!(
         matches!(err, ModuleError::InvalidSpanPayload(_)),
         "expected InvalidSpanPayload, got {err:?}"
@@ -626,8 +642,8 @@ fn forged_span_effect_payload_out_of_range_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::SpanStart, 1));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("span payload must address an existing span");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("span payload must address an existing span");
     assert!(
         matches!(err, ModuleError::InvalidSpanPayload(_)),
         "expected InvalidSpanPayload, got {err:?}"
@@ -639,7 +655,7 @@ fn forged_oob_member_operand_is_rejected() {
     // A `RecordSet`/`VariantOpen` payload indexes the type-member table via the materializer's
     // `get_member`, which asserts the index is in bounds.
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let members = Module::load_compiler_output(&bytes)
+    let members = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .header()
         .type_members_count;
@@ -660,7 +676,7 @@ fn forged_oob_member_operand_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged member operand must be rejected");
+        Module::validate_and_load(&bytes).expect_err("forged member operand must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -694,7 +710,7 @@ fn forged_invalid_span_kind_is_rejected() {
     span[2] = 99;
     add_single_span(&mut bytes, span);
 
-    let err = Module::load_compiler_output(&bytes).expect_err("forged span kind must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged span kind must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidSpanEntry(0)),
         "expected InvalidSpanEntry, got {err:?}"
@@ -714,7 +730,7 @@ fn forged_invalid_span_range_is_rejected() {
     };
     add_single_span(&mut bytes, span.to_bytes());
 
-    let err = Module::load_compiler_output(&bytes).expect_err("forged span range must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged span range must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidSpanEntry(0)),
         "expected InvalidSpanEntry, got {err:?}"
@@ -736,7 +752,7 @@ fn forged_member_binding_without_type_is_rejected() {
     };
     add_single_span(&mut bytes, span.to_bytes());
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("member binding without type must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidSpanEntry(0)),
@@ -788,7 +804,7 @@ fn forged_unclosed_span_bracket_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("unclosed span bracket must be rejected");
+        Module::validate_and_load(&bytes).expect_err("unclosed span bracket must be rejected");
     assert!(
         matches!(err, ModuleError::SpanImbalance(_)),
         "expected SpanImbalance, got {err:?}"
@@ -807,8 +823,7 @@ fn forged_unopened_span_close_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::SpanEnd, payload));
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("unopened span close must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("unopened span close must be rejected");
     assert!(
         matches!(err, ModuleError::SpanImbalance(_)),
         "expected SpanImbalance, got {err:?}"
@@ -821,7 +836,7 @@ fn forged_mispaired_span_ids_are_rejected() {
     // matching open — inspection extraction asserts pairing, so the loader must
     // prove it.
     let mut bytes = emit_inspection_bytes(RECORD_QUERY);
-    let spans_count = Module::load_compiler_output(&bytes)
+    let spans_count = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .header()
         .spans_count;
@@ -834,8 +849,7 @@ fn forged_mispaired_span_ids_are_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::SpanEnd, other));
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("mis-paired span ids must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("mis-paired span ids must be rejected");
     assert!(
         matches!(err, ModuleError::SpanImbalance(_)),
         "expected SpanImbalance, got {err:?}"
@@ -845,7 +859,7 @@ fn forged_mispaired_span_ids_are_rejected() {
 #[test]
 fn forged_invalid_span_binding_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let module = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+    let module = Module::validate_and_load(&bytes).expect("module validates before tampering");
     let span = SpanEntry {
         source_id: 0,
         kind: SpanKind::Capture,
@@ -856,8 +870,7 @@ fn forged_invalid_span_binding_is_rejected() {
     };
     add_single_span(&mut bytes, span.to_bytes());
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged span binding must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged span binding must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidSpanEntry(0)),
         "expected InvalidSpanEntry, got {err:?}"
@@ -874,7 +887,7 @@ fn forged_zero_successor_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged zero successor must be rejected");
+        Module::validate_and_load(&bytes).expect_err("forged zero successor must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -889,7 +902,7 @@ fn forged_out_of_range_successor_is_rejected() {
     bytes[succ_off..succ_off + 2].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged out-of-range successor must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
@@ -905,7 +918,7 @@ fn forged_depth_imbalance_is_rejected() {
     bytes[nav_off] = Nav::Down.to_byte();
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged cursor-depth imbalance must be rejected");
     assert!(
         matches!(err, ModuleError::DepthImbalance(_)),
@@ -921,8 +934,7 @@ fn forged_regex_pattern_string_id_is_rejected() {
     for forged in [0u16, u16::MAX] {
         let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
         let (regex_off, regex_count, str_count) = {
-            let m =
-                Module::load_compiler_output(&bytes).expect("module validates before tampering");
+            let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
             (
                 m.offsets().regex_table as usize,
                 m.header().regex_table_count,
@@ -942,8 +954,8 @@ fn forged_regex_pattern_string_id_is_rejected() {
         bytes[sid_off..sid_off + 2].copy_from_slice(&value.to_le_bytes());
         reseal(&mut bytes);
 
-        let err = Module::load_compiler_output(&bytes)
-            .expect_err("forged regex string_id must be rejected");
+        let err =
+            Module::validate_and_load(&bytes).expect_err("forged regex string_id must be rejected");
         assert!(
             matches!(err, ModuleError::InvalidStringId(_)),
             "forged regex string_id {value}: expected InvalidStringId, got {err:?}"
@@ -958,7 +970,7 @@ fn forged_nonzero_regex_table_reserved_is_rejected() {
     // non-zero value must be rejected at load, not carried as smuggled state.
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
     let (regex_off, regex_count) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         (
             m.offsets().regex_table as usize,
             m.header().regex_table_count,
@@ -971,7 +983,7 @@ fn forged_nonzero_regex_table_reserved_is_rejected() {
     bytes[reserved_off..reserved_off + 2].copy_from_slice(&1u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged regex reserved field must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedRegexTable),
@@ -986,7 +998,7 @@ fn forged_corrupt_regex_dfa_is_rejected() {
     // `.expect()`ed at match time.
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
     let (blob_off, blob_len) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         (
             m.offsets().regex_blob as usize,
             m.header().regex_blob_size as usize,
@@ -997,7 +1009,7 @@ fn forged_corrupt_regex_dfa_is_rejected() {
     bytes[blob_off..blob_off + blob_len].fill(0xFF);
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes).expect_err("forged regex DFA must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged regex DFA must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidRegexDfa(_)),
         "expected InvalidRegexDfa, got {err:?}"
@@ -1012,7 +1024,7 @@ fn forged_entry_point_into_instruction_interior_is_rejected() {
     // check holds entry points to the same instruction-start rule as successors.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, interior) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         (
             m.offsets().entry_points as usize,
             first_multiword_interior_addr(&bytes).get(),
@@ -1023,7 +1035,7 @@ fn forged_entry_point_into_instruction_interior_is_rejected() {
     bytes[ep_off + 2..ep_off + 4].copy_from_slice(&interior.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged interior entry point must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidEntryPoint(_)),
@@ -1034,7 +1046,7 @@ fn forged_entry_point_into_instruction_interior_is_rejected() {
 #[test]
 fn entry_and_call_targets_may_address_word_zero() {
     let bytes = emit_bytes(CALLER_OWNED_CALL_QUERY);
-    let module = Module::load_compiler_output(&bytes).expect("compiler output validates");
+    let module = Module::validate_and_load(&bytes).expect("compiler output validates");
     let first_entry = module.entry_points().get(0);
     let call = first_call(&bytes, false);
 
@@ -1052,7 +1064,7 @@ fn forged_record_set_to_array_push_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::ArrayPush));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged RecordSet->ArrayPush must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
@@ -1070,7 +1082,7 @@ fn forged_scalar_capture_record_set_to_array_push_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::ArrayPush));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged scalar RecordSet->ArrayPush must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
@@ -1087,12 +1099,27 @@ fn forged_record_set_without_producer_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::RecordOpen));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged producerless RecordSet must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
     );
+}
+
+#[test]
+fn forged_cursor_read_on_empty_path_is_rejected() {
+    // Turn the match carrying `Node` into an epsilon without changing its
+    // result-stack behavior. Only the post-emission empty-path analysis can
+    // reject the resulting cursor read before any node was consumed.
+    let mut bytes = emit_bytes(r#"Q = (program) @node"#);
+    let instruction = first_instruction_with_effect(&bytes, |op| op == EffectKind::Node as u16);
+    bytes[instruction + 1] = Nav::Epsilon.to_byte();
+    reseal(&mut bytes);
+
+    let err = Module::validate_and_load(&bytes)
+        .expect_err("cursor read on an empty path must be rejected");
+    assert!(matches!(err, ModuleError::EmptyPathCursorRead(_)));
 }
 
 #[test]
@@ -1108,7 +1135,7 @@ fn forged_no_payload_variant_case_with_data_is_rejected() {
     bytes[type_id_off..type_id_off + 2].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged data on a no-payload variant case must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
@@ -1121,7 +1148,7 @@ fn forged_data_variant_case_without_data_is_rejected() {
     // A tag-only case emits `VariantOpen`/`VariantClose` and has no payload effects.
     // Lie that the case has a payload by pointing it at the variant type itself.
     let mut bytes = emit_bytes(r#"Q = [A: (identifier)]"#);
-    let type_count = Module::load_compiler_output(&bytes)
+    let type_count = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .header()
         .type_defs_count;
@@ -1134,7 +1161,7 @@ fn forged_data_variant_case_without_data_is_rejected() {
     bytes[type_id_off..type_id_off + 2].copy_from_slice(&1u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged missing variant data must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
@@ -1157,8 +1184,8 @@ fn forged_dropped_scope_close_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Node));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged dropped RecordClose must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged dropped RecordClose must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1180,7 +1207,7 @@ fn forged_mismatched_scalar_frame_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("TextClose must close a ScalarOpen frame");
+        Module::validate_and_load(&bytes).expect_err("TextClose must close a ScalarOpen frame");
     assert!(matches!(err, ModuleError::EffectStackImbalance(_)));
 }
 
@@ -1196,7 +1223,7 @@ fn forged_suppress_underflow_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::SuppressEnd));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged SuppressEnd underflow must be rejected");
     assert!(matches!(err, ModuleError::EffectStackImbalance(_)));
 }
@@ -1246,7 +1273,7 @@ fn forged_returnless_entry_body_is_rejected() {
     assert!(patched, "no Match8 flows into the def body's Return");
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged returnless entry body must be rejected");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1256,14 +1283,14 @@ fn forged_record_entry_without_root_boundary_is_rejected() {
     // A record entry supplies the root frame its body's `RecordSet` effects
     // target. Forging the boundary to Passthrough must be rejected at load.
     let mut bytes = emit_bytes(r#"Q = (_) @x"#);
-    let ep_off = Module::load_compiler_output(&bytes)
+    let ep_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .entry_points as usize;
     bytes[ep_off + 6..ep_off + 8].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged rootless entry boundary must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
@@ -1281,8 +1308,8 @@ fn forged_set_extended_match_reserved_count_bit_is_rejected() {
     bytes[off + 6] |= 0x01;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged reserved count bit must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged reserved count bit must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -1299,7 +1326,7 @@ fn forged_nonzero_return_pad_is_rejected() {
         reseal(&mut bytes);
 
         let err =
-            Module::load_compiler_output(&bytes).expect_err("forged return pad must be rejected");
+            Module::validate_and_load(&bytes).expect_err("forged return pad must be rejected");
         assert!(
             matches!(err, ModuleError::MalformedInstructionStream),
             "forged byte {byte}: expected MalformedInstructionStream, got {err:?}"
@@ -1314,7 +1341,7 @@ fn forged_invalid_return_port_is_rejected() {
     bytes[off + 1] = 8;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("port outside the runtime universe must be rejected");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1332,7 +1359,7 @@ fn forged_invalid_return_entry_metadata_is_rejected() {
         }
         reseal(&mut bytes);
 
-        let err = Module::load_compiler_output(&bytes)
+        let err = Module::validate_and_load(&bytes)
             .expect_err("malformed return entry metadata must be rejected");
         assert!(matches!(err, ModuleError::MalformedInstructionStream));
     }
@@ -1352,8 +1379,8 @@ fn forged_calln_invalid_nav_target_and_return_are_rejected() {
         }
         reseal(&mut bytes);
 
-        let err = Module::load_compiler_output(&bytes)
-            .expect_err("malformed split call must be rejected");
+        let err =
+            Module::validate_and_load(&bytes).expect_err("malformed split call must be rejected");
         assert!(matches!(err, ModuleError::MalformedInstructionStream));
     }
 }
@@ -1378,7 +1405,7 @@ fn forged_calln_invalid_arity_mask_flags_and_padding_are_rejected() {
         }
         reseal(&mut bytes);
 
-        let err = Module::load_compiler_output(&bytes)
+        let err = Module::validate_and_load(&bytes)
             .expect_err("malformed CallN metadata must be rejected");
         assert!(matches!(err, ModuleError::MalformedInstructionStream));
     }
@@ -1396,7 +1423,7 @@ fn forged_callee_owned_call1_invalid_nav_and_targets_are_rejected() {
         }
         reseal(&mut bytes);
 
-        let err = Module::load_compiler_output(&bytes)
+        let err = Module::validate_and_load(&bytes)
             .expect_err("malformed callee-owned Call1 must be rejected");
         assert!(matches!(err, ModuleError::MalformedInstructionStream));
     }
@@ -1409,7 +1436,7 @@ fn forged_caller_owned_empty_call1_is_rejected() {
     bytes[off] &= !(0b10 << 4);
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("caller-owned calls cannot expose an empty port");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1423,7 +1450,7 @@ fn forged_caller_and_callee_owned_call_target_mismatches_are_rejected() {
     bytes[caller + 6..caller + 8].copy_from_slice(&callee_target);
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("caller-owned call cannot target a callee-owned body");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 
@@ -1434,7 +1461,7 @@ fn forged_caller_and_callee_owned_call_target_mismatches_are_rejected() {
     bytes[callee + 6..callee + 8].copy_from_slice(&caller_target);
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("callee-owned call cannot target a caller-owned body");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1449,7 +1476,7 @@ fn forged_single_call_ownership_mismatch_is_rejected() {
     bytes[call] |= 1 << 4;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("callee ownership must match the target return contract");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1473,7 +1500,7 @@ fn forged_single_call_horizontal_navigation_mismatch_is_rejected() {
     };
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("same-depth horizontal navigation must match the target return contract");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1493,7 +1520,7 @@ fn forged_single_call_field_mismatch_is_rejected() {
     bytes[call + 2..call + 4].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("grammar field must match the target return contract");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1507,7 +1534,7 @@ fn forged_call_and_callee_return_contract_mismatch_is_rejected() {
     bytes[call1 + 6..call1 + 8].copy_from_slice(&calln_target);
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("ordinary call cannot target a split-return body");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 
@@ -1518,7 +1545,7 @@ fn forged_call_and_callee_return_contract_mismatch_is_rejected() {
     bytes[calln + 4..calln + 6].copy_from_slice(&call1_target);
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("split call requires a body with both return outcomes");
     assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
@@ -1533,7 +1560,7 @@ fn forged_nonzero_predicate_reserved_bits_is_rejected() {
     bytes[pred_off + 1] |= 0x02;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged predicate reserved bit must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidPredicateOperand(_)),
@@ -1553,7 +1580,7 @@ fn forged_regex_predicate_sentinel_operand_is_rejected() {
     bytes[pred_off + 2..pred_off + 4].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged regex sentinel operand must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidPredicateOperand(_)),
@@ -1572,8 +1599,8 @@ fn forged_predicate_regex_flag_mismatch_is_rejected() {
     bytes[pred_off + 1] |= 0x01;
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged regex-flag mismatch must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged regex-flag mismatch must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidPredicateOperand(_)),
         "expected InvalidPredicateOperand, got {err:?}"
@@ -1585,15 +1612,14 @@ fn forged_unknown_type_def_kind_is_rejected() {
     // A TypeDef's kind byte (byte 3 of the 4-byte entry) must be a known TypeKind;
     // an unknown kind would panic the materializer's `def`/`TypeDefKind` decode.
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let type_defs_off = Module::load_compiler_output(&bytes)
+    let type_defs_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .type_defs as usize;
     bytes[type_defs_off + 3] = 0xFF;
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged type-def kind must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged type-def kind must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidTypeDef(_)),
         "expected InvalidTypeDef, got {err:?}"
@@ -1605,15 +1631,15 @@ fn forged_out_of_range_entry_point_target_is_rejected() {
     // The plain out-of-range case (vs the interior-target case above): `target >=
     // word_count` must be rejected before `is_start` is indexed.
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let ep_off = Module::load_compiler_output(&bytes)
+    let ep_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .entry_points as usize;
     bytes[ep_off + 2..ep_off + 4].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged out-of-range target must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged out-of-range target must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidEntryPoint(_)),
         "expected InvalidEntryPoint, got {err:?}"
@@ -1623,14 +1649,14 @@ fn forged_out_of_range_entry_point_target_is_rejected() {
 #[test]
 fn forged_invalid_entry_point_boundary_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let ep_off = Module::load_compiler_output(&bytes)
+    let ep_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .entry_points as usize;
     bytes[ep_off + 6..ep_off + 8].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged entry point boundary must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidEntryPoint(_)),
@@ -1645,7 +1671,7 @@ fn forged_out_of_range_entry_point_result_type_is_rejected() {
     // is one past the last valid index.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, type_defs) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         (
             m.offsets().entry_points as usize,
             m.header().type_defs_count,
@@ -1654,8 +1680,7 @@ fn forged_out_of_range_entry_point_result_type_is_rejected() {
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&type_defs.to_le_bytes());
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged result_type must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged result_type must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidEntryPoint(_)),
         "expected InvalidEntryPoint, got {err:?}"
@@ -1668,7 +1693,7 @@ fn forged_type_member_name_string_id_is_rejected() {
     // (base, stride, name_off) tuples; this locks the type-member arithmetic
     // (stride 4, name at offset 0) the materializer's record-field keys rely on.
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let members_off = Module::load_compiler_output(&bytes)
+    let members_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .type_members as usize;
@@ -1676,7 +1701,7 @@ fn forged_type_member_name_string_id_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged type-member name must be rejected");
+        Module::validate_and_load(&bytes).expect_err("forged type-member name must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidStringId(_)),
         "expected InvalidStringId, got {err:?}"
@@ -1689,7 +1714,7 @@ fn forged_oob_member_type_id_is_rejected() {
     // TypeDef, or the materializer resolves a record field to a type out of range.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (members_off, type_defs) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         (
             m.offsets().type_members as usize,
             m.header().type_defs_count,
@@ -1701,7 +1726,7 @@ fn forged_oob_member_type_id_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged member type id must be rejected");
+        Module::validate_and_load(&bytes).expect_err("forged member type id must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidTypeDef(_)),
         "expected InvalidTypeDef, got {err:?}"
@@ -1715,7 +1740,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
     // element lookup resolves a type out of range.
     let mut bytes = emit_bytes(r#"Top = (program (expression_statement)* @stmts)"#);
     let (defs_off, type_defs, wrapper_idx) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         let types = m.types();
         let idx = (0..types.defs_count())
             .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
@@ -1731,7 +1756,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
     bytes[off..off + 2].copy_from_slice(&type_defs.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("forged wrapper inner type id must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidTypeDef(_)),
@@ -1747,8 +1772,7 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
     for byte in [0usize, 2] {
         let mut bytes = emit_bytes(RECORD_QUERY);
         let (defs_off, prim_idx) = {
-            let m =
-                Module::load_compiler_output(&bytes).expect("module validates before tampering");
+            let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
             let types = m.types();
             let idx = (0..types.defs_count())
                 .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Primitive(_)))
@@ -1759,7 +1783,7 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
         bytes[defs_off + prim_idx * 4 + byte] = 1;
         reseal(&mut bytes);
 
-        let err = Module::load_compiler_output(&bytes)
+        let err = Module::validate_and_load(&bytes)
             .expect_err("forged primitive reserved field must be rejected");
         assert!(
             matches!(err, ModuleError::InvalidTypeDef(_)),
@@ -1780,8 +1804,8 @@ fn scalar_primitive_typedefs_use_reserved_zero_metadata() {
         for byte in [0usize, 2] {
             let mut bytes = emit_bytes(query);
             let (defs_off, primitive_idx) = {
-                let module = Module::load_compiler_output(&bytes)
-                    .expect("module validates before tampering");
+                let module =
+                    Module::validate_and_load(&bytes).expect("module validates before tampering");
                 let types = module.types();
                 let index = (0..types.defs_count())
                     .find(|&index| {
@@ -1794,7 +1818,7 @@ fn scalar_primitive_typedefs_use_reserved_zero_metadata() {
             bytes[defs_off + primitive_idx * 4 + byte] = 1;
             reseal(&mut bytes);
 
-            let err = Module::load_compiler_output(&bytes)
+            let err = Module::validate_and_load(&bytes)
                 .expect_err("scalar primitive metadata must remain reserved-zero");
             assert!(
                 matches!(err, ModuleError::InvalidTypeDef(_)),
@@ -1809,7 +1833,7 @@ fn version_ten_module_is_rejected_without_compatibility_mode() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     bytes[4..8].copy_from_slice(&10_u32.to_le_bytes());
 
-    let err = Module::load_compiler_output(&bytes)
+    let err = Module::validate_and_load(&bytes)
         .expect_err("v10 modules must be regenerated for the scalar vocabulary");
     assert!(
         matches!(err, ModuleError::UnsupportedVersion(10)),
@@ -1823,7 +1847,7 @@ fn forged_nonzero_wrapper_typedef_count_is_rejected() {
     // (byte 2) as zero. A non-zero count must be rejected.
     let mut bytes = emit_bytes(r#"Top = (program (expression_statement)* @stmts)"#);
     let (defs_off, wrapper_idx) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         let types = m.types();
         let idx = (0..types.defs_count())
             .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
@@ -1834,8 +1858,7 @@ fn forged_nonzero_wrapper_typedef_count_is_rejected() {
     bytes[defs_off + wrapper_idx * 4 + 2] = 1;
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged wrapper count must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged wrapper count must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidTypeDef(_)),
         "expected InvalidTypeDef, got {err:?}"
@@ -1848,7 +1871,7 @@ fn forged_oob_type_name_type_id_is_rejected() {
     // real TypeDef; a named definition emits at least one entry.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (names_off, type_defs) = {
-        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
+        let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         assert!(
             m.types().names_count() > 0,
             "named def must emit a type name"
@@ -1859,8 +1882,8 @@ fn forged_oob_type_name_type_id_is_rejected() {
     bytes[names_off + 2..names_off + 4].copy_from_slice(&type_defs.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged type name type id must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged type name type id must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidTypeName(_)),
         "expected InvalidTypeName, got {err:?}"
@@ -1912,7 +1935,7 @@ fn load_walks_past_extended_match_payload() {
     let bytes = module_with_instructions(&instructions, 2);
 
     let module =
-        Module::load_compiler_output(&bytes).expect("extended match payload must not false-reject");
+        Module::validate_and_load(&bytes).expect("extended match payload must not false-reject");
 
     assert_eq!(module.header().instruction_word_count, 2);
 }
@@ -1950,7 +1973,7 @@ fn forged_zero_neg_field_is_rejected() {
     reseal(&mut bytes);
 
     let err =
-        Module::load_compiler_output(&bytes).expect_err("forged zero neg field must be rejected");
+        Module::validate_and_load(&bytes).expect_err("forged zero neg field must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedInstructionStream),
         "expected MalformedInstructionStream, got {err:?}"
@@ -1962,7 +1985,7 @@ fn forged_zero_node_symbol_is_rejected() {
     // The `symbol` half of a node-kind entry decodes as `NodeKindId`
     // (`NonZeroU16`) in the renderers; a forged zero would panic `dump`/`trace`.
     let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
-    let off = Module::load_compiler_output(&bytes)
+    let off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
         .node_kinds as usize;
@@ -1970,8 +1993,7 @@ fn forged_zero_node_symbol_is_rejected() {
     bytes[off..off + 2].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged node symbol must be rejected");
+    let err = Module::validate_and_load(&bytes).expect_err("forged node symbol must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidNodeSymbol(0)),
         "expected InvalidNodeSymbol(0), got {err:?}"

@@ -256,14 +256,17 @@ impl MatcherPlan {
         graph: &NfaGraph,
         artifacts: AnalysisArtifacts<'_>,
         layout: &CaptureLayout,
-    ) -> Self {
+    ) -> Result<Self, String> {
         let dumper = NfaDumper::new(graph, artifacts, layout);
         let mut sorted: Vec<&InstructionIR> = graph.instructions().iter().collect();
         sorted.sort_by_key(|instruction| instruction.label());
-        assert!(
-            sorted.len() <= u16::MAX as usize + 1,
-            "state space exceeds u16 ids"
-        );
+        if sorted.len() > u16::MAX as usize + 1 {
+            return Err(format!(
+                "generated matcher has {} states (max {})",
+                sorted.len(),
+                u16::MAX as usize + 1
+            ));
+        }
 
         let ids = sorted
             .iter()
@@ -294,7 +297,7 @@ impl MatcherPlan {
             .map(|(index, instruction)| builder.state(graph, index, instruction))
             .collect();
 
-        Self {
+        Ok(Self {
             states,
             entry_points,
             expected_kinds: builder.expected_kinds.into_values().collect(),
@@ -304,7 +307,7 @@ impl MatcherPlan {
             label_width: dumper.label_width(),
             any_predicate: builder.any_predicate,
             any_retry_predicate: builder.any_retry_predicate,
-        }
+        })
     }
 
     pub(crate) fn states(&self) -> &[StatePlan] {

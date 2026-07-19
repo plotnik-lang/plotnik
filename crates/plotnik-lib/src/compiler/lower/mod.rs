@@ -16,7 +16,6 @@ pub mod epsilon;
 mod input;
 pub mod ir;
 pub mod pack;
-pub(crate) mod semantic_verify;
 pub(crate) mod spans;
 pub mod thompson;
 mod verify;

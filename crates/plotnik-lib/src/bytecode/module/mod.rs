@@ -21,6 +21,7 @@ use plotnik_rt::RegexDfas;
 
 mod decoded;
 mod load;
+mod matcher_verify;
 mod verify;
 
 pub(crate) use decoded::{
@@ -117,10 +118,10 @@ pub struct Module {
 }
 
 impl Module {
-    /// Load compiler output into the VM after running every boundary check.
+    /// Validate raw bytecode and construct the module accepted by the VM.
     ///
-    /// Crate-private visibility keeps this loader on the compiler-to-VM boundary.
-    pub(crate) fn load_compiler_output(bytes: &[u8]) -> Result<Self, ModuleError> {
+    /// Crate-private visibility prevents bypassing the validation boundary.
+    pub(crate) fn validate_and_load(bytes: &[u8]) -> Result<Self, ModuleError> {
         Self::load_storage(ByteStorage::from_emitted_bytes(bytes))
     }
 

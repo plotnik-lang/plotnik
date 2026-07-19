@@ -83,14 +83,6 @@ impl StringTableBuilder {
         self.strings.len()
     }
 
-    /// Validate that the string count fits in u16.
-    pub fn validate(&self) -> Result<(), EmitError> {
-        if self.strings.len() > EmitError::MAX_STRINGS {
-            return Err(EmitError::TooManyStrings(self.strings.len()));
-        }
-        Ok(())
-    }
-
     /// Get the StringId for direct string content, if it was interned.
     pub fn lookup_str(&self, s: &str) -> Option<StringId> {
         self.str_lookup.get(s).copied()
@@ -118,10 +110,4 @@ fn blob_offset(size: usize) -> Result<u32, EmitError> {
         section: "string blob",
         size,
     })
-}
-
-impl Default for StringTableBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
 }

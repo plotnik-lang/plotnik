@@ -28,14 +28,14 @@ impl<'a> CodegenPlan<'a> {
         graph: &NfaGraph,
         artifacts: AnalysisArtifacts<'a>,
         result: ResultSchema<'a>,
-    ) -> Self {
-        let matcher = MatcherPlan::build(graph, artifacts, result.layout());
+    ) -> Result<Self, String> {
+        let matcher = MatcherPlan::build(graph, artifacts, result.layout())?;
         let decode = ResultDecodePlan::build(&result);
-        Self {
+        Ok(Self {
             result,
             matcher,
             decode,
-        }
+        })
     }
 
     pub(crate) fn result(&self) -> &ResultSchema<'a> {

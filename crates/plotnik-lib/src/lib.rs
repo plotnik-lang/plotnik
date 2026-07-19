@@ -20,7 +20,6 @@
 pub mod bytecode;
 mod compiler;
 mod core;
-mod matcher_verify;
 #[cfg(feature = "vm")]
 mod vm;
 

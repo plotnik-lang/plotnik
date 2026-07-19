@@ -1,8 +1,8 @@
-//! Loading and structural validation of compiler-emitted bytecode.
+//! Loading and validation of raw bytecode.
 //!
-//! This loader is crate-private and accepts only compiler output. Its checks catch
-//! compiler bugs before the VM trusts the bytecode. Malformed bytes
-//! return [`ModuleError`]; they never become a [`Module`] or reach execution.
+//! The in-process compiler is currently the only producer, but this boundary
+//! treats its bytes as untrusted. Malformed bytes return [`ModuleError`]; they
+//! never become a [`Module`] or reach execution.
 
 use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
@@ -70,6 +70,8 @@ pub enum ModuleError {
     EffectStackBudget(CodeAddr),
     #[error("cursor depth imbalance at instruction address {0}")]
     DepthImbalance(CodeAddr),
+    #[error("cursor read on an empty path at instruction address {0}")]
+    EmptyPathCursorRead(CodeAddr),
     #[error("invalid span entry at index {0}")]
     InvalidSpanEntry(usize),
     #[error("span effect payload out of range at instruction address {0}")]
@@ -167,7 +169,7 @@ impl Module {
         Ok(module)
     }
 
-    /// Validate compiler output so later *view* accesses cannot panic and
+    /// Validate raw bytecode so later *view* accesses cannot panic and
     /// accidental corruption of the body is detected.
     ///
     /// Section bounds are checked earlier, in [`validate_section_bounds`], before
@@ -182,7 +184,7 @@ impl Module {
     /// construction. It is not a substitute for structural validation, so a
     /// test buffer with a recomputed checksum must still fail the checks below;
     /// [`Self::validate_instructions`] therefore re-verifies the lazily-decoded
-    /// instruction stream structurally. The shared matcher verifier then proves
+    /// instruction stream structurally. The matcher verifier then proves
     /// return routing, cursor depth, and materializer-stack safety, so validated
     /// bytecode never panics on view/decode/VM access even when compiler output
     /// is malformed.
@@ -214,8 +216,8 @@ impl Module {
         self.validate_symbol_ids()?;
         let is_start = self.validate_instructions()?;
         self.validate_entry_points(&is_start)?;
-        // Structural validity is now established, so the target-neutral matcher
-        // verifier can safely project the typed instruction stream.
+        // Structural validity is now established, so the matcher verifier can
+        // safely project the typed instruction stream.
         super::verify::validate(self)?;
         Ok((regex_dfas, is_start))
     }
