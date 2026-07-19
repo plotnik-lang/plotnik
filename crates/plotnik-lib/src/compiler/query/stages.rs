@@ -13,6 +13,7 @@ use crate::compiler::analyze::shape::validation::{
 };
 use crate::compiler::analyze::types::check_entry_points;
 use crate::compiler::analyze::types::type_check::{self, TypeAnalysis};
+#[cfg(test)]
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::emit::{
     BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
@@ -20,7 +21,6 @@ use crate::compiler::emit::{
 };
 use crate::compiler::limits::CompilerLimits;
 use crate::compiler::lower::ir::SemanticNfa;
-use crate::compiler::lower::semantic_verify;
 use crate::compiler::lower::spans::assign_spans;
 use crate::compiler::lower::{LowerInput, lower_semantic, pack_lowered};
 use crate::compiler::parse::{Root, parse_lossless};
@@ -430,17 +430,11 @@ impl CompiledQuery {
         ) {
             Ok(bytes) => bytes,
             Err(error) => {
-                if error.is_target_limit() {
-                    self.bound.report_target_error(&mut diagnostics, error);
-                    return Ok(Emission::failure(diagnostics));
-                }
-                panic!(
-                    "bytecode emission rejected compiler-validated input with an internal error: \
-                     {error}"
-                );
+                self.bound.report_target_error(&mut diagnostics, error);
+                return Ok(Emission::failure(diagnostics));
             }
         };
-        let module = Module::load_compiler_output(&bytes).unwrap_or_else(|error| {
+        let module = Module::validate_and_load(&bytes).unwrap_or_else(|error| {
             panic!("compiler-emitted bytecode failed immediate module validation: {error}")
         });
         Ok(Emission::success(module, diagnostics))
@@ -483,13 +477,27 @@ impl CompiledQuery {
             })?;
             matcher = matcher.grammar_identity(identity);
         }
-        let plan = bound.codegen_plan(
+        let plan = match bound.codegen_plan(
             self.semantic_nfa
                 .as_ref()
                 .expect("valid query retains semantic NFA"),
             schema,
-        );
-        let source = crate::compiler::emit::targets::rust::generate(&plan, &matcher);
+        ) {
+            Ok(plan) => plan,
+            Err(error) => {
+                let mut diagnostics = Diagnostics::new();
+                self.bound.report_target_error(&mut diagnostics, error);
+                return Ok(Emission::failure(diagnostics));
+            }
+        };
+        let source = match crate::compiler::emit::targets::rust::generate(&plan, &matcher) {
+            Ok(source) => source,
+            Err(error) => {
+                let mut diagnostics = Diagnostics::new();
+                self.bound.report_target_error(&mut diagnostics, error);
+                return Ok(Emission::failure(diagnostics));
+            }
+        };
         Ok(Emission::success(
             RustModuleOutput::new(source),
             Diagnostics::new(),
@@ -643,25 +651,12 @@ impl BindOutcome {
                 });
             }
         };
-        let schema = result.schema(bound.analysis_input());
         let input = LowerInput {
             analysis: bound.analysis_input(),
             result: &result,
             inspection: false,
         };
         let semantic_nfa = lower_semantic(&input);
-        if let Err(error) = semantic_verify::verify(&semantic_nfa, &schema) {
-            if error.is_query_rejection() {
-                self.report_shared_limit_error(&mut diagnostics, error.to_string());
-                return Ok(CompiledQuery {
-                    bound: self,
-                    result: None,
-                    semantic_nfa: None,
-                    diagnostics,
-                });
-            }
-            panic!("lowered semantic NFA violated post-lowering verification: {error}");
-        }
         Ok(CompiledQuery {
             bound: self,
             result: Some(result),
@@ -718,7 +713,7 @@ impl BindOutcome {
             .emit();
     }
 
-    fn report_target_error(&self, diagnostics: &mut Diagnostics, error: EmitError) {
+    fn report_target_error(&self, diagnostics: &mut Diagnostics, error: impl std::fmt::Display) {
         if let Some((source, range)) = self.fallback_span() {
             diagnostics
                 .report(
@@ -792,7 +787,7 @@ impl BoundQuery {
         &'a self,
         semantic: &SemanticNfa,
         result: ResultSchema<'a>,
-    ) -> crate::compiler::emit::CodegenPlan<'a> {
+    ) -> Result<crate::compiler::emit::CodegenPlan<'a>, String> {
         crate::compiler::emit::CodegenPlan::build(semantic.raw(), self.analysis_input(), result)
     }
 

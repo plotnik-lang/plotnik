@@ -342,21 +342,6 @@ impl DefSpecialization {
         self.boundary
     }
 
-    pub(crate) fn entry_contract(&self) -> CalleeEntryContract {
-        if let Some(boundary) = self.boundary {
-            return CalleeEntryContract::CalleeOwned {
-                obligation: boundary.entry(),
-            };
-        }
-
-        match self.route {
-            DefRoute::Caller => CalleeEntryContract::CallerOwned,
-            DefRoute::Routed { nav, .. } => CalleeEntryContract::CalleeOwned {
-                obligation: EntryObligation::new(NavigationContract::from_nav(nav)),
-            },
-        }
-    }
-
     pub(crate) fn ports(&self) -> &ExitSignature {
         &self.ports
     }
@@ -799,13 +784,6 @@ impl CallEntry {
 
     pub fn caller_owned(self) -> bool {
         matches!(self, Self::CallerOwned { .. })
-    }
-
-    pub(crate) fn target_contract(self) -> CalleeEntryContract {
-        match self {
-            Self::CallerOwned { .. } => CalleeEntryContract::CallerOwned,
-            Self::CalleeOwned { obligation } => CalleeEntryContract::CalleeOwned { obligation },
-        }
     }
 
     pub fn continuation_depth(self, consumed: bool) -> Option<i32> {

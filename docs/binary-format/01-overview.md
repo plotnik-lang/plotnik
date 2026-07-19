@@ -113,11 +113,12 @@ struct Header {
 
 ## Construction and validation
 
-The module loader validates compiler output before constructing the VM module.
-It is a compiler assertion boundary, not a user input parser. Tests deliberately
-mutate emitted bytecode to prove that malformed compiler output is rejected
-cleanly. The CRC catches accidental corruption; structural
-checks uphold the no-panic guarantee. Validation runs in this order:
+The module loader treats the emitted bytes as untrusted before constructing the
+VM module. This is the representation's single production trust boundary; it
+does not rely on the current in-process compiler being the producer. Tests
+deliberately mutate emitted bytecode to prove malformed input is rejected
+cleanly. The CRC catches accidental corruption; structural checks uphold the
+no-panic guarantee. Validation runs in this order:
 
 1. **Magic / version / size** — `PTKQ`, version 0, and `total_size` equal to the
    byte length.
@@ -152,11 +153,13 @@ checks uphold the no-panic guarantee. Validation runs in this order:
     (not merely be in range — an entry point into the interior of a multi-word
     instruction would start decoding mid-instruction), `result_type` must address
     a real TypeDef, and the boundary mode must be known.
-12. **Effect stack** — an interprocedural walk of the committed-effect order
-    (across `Call`/`Return`, under the suppression filter) proves no path can
-    drive the materializer's builder stack (`ArrayPush`/`RecordSet`/`ListClose`/
-    `RecordClose`/`VariantClose`), the VM's suppression counter, or the inspection
-    span bracket stack into a panic.
+12. **Control/effect safety** — an interprocedural walk proves call/return
+    contracts, cursor-depth balance, and that cursor-reading effects cannot run
+    on an empty path. The same walk follows committed-effect order (across
+    `Call`/`Return`, under the suppression filter) to prove no path can drive
+    the materializer's builder stack (`ArrayPush`/`RecordSet`/`ListClose`/
+    `RecordClose`/`VariantClose`), the VM's suppression counter, or the
+    inspection span bracket stack into a panic.
     This closes the last malformed-representation panic class — the materializer's
     builder-stack panics and the VM's `SuppressEnd` underflow — that
     decode-level checks cannot see.

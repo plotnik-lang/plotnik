@@ -4,11 +4,11 @@ Plotnik is a strongly-typed pattern matching language for tree-sitter syntax tre
 
 ## Compiler and emission pipeline
 
-Compilation stops at a target-neutral, always-verified semantic NFA:
+Compilation stops at a target-neutral semantic NFA:
 
 ```text
 Parse → Analyze → Link → Lower → CompiledQuery
-                                   ├─ emit(BytecodeConfig) → verified Module
+                                   ├─ emit bytes → validate/load → Module
                                    ├─ emit(RustCodegenConfig) → Rust module
                                    ├─ emit_types(RustCodegenConfig) → Rust types
                                    └─ emit_types(TypeScriptCodegenConfig) → .d.ts
@@ -16,7 +16,8 @@ Parse → Analyze → Link → Lower → CompiledQuery
 
 Emission is pure and never writes files. `CompiledQuery` contains no eager
 bytecode. `BytecodeConfig` serves the in-process VM and compiler diagnostics;
-the compiler emits bytecode and immediately loads it as a validated `Module`.
+the compiler emits bytecode and immediately validates it as raw input before
+constructing a `Module`.
 It is not accepted or persisted as a user-facing artifact. Inspection explicitly
 re-lowers the bytecode with span effects.
 

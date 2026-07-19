@@ -80,22 +80,4 @@ impl EmitError {
     pub(in crate::compiler) const MAX_INSTRUCTION_WORDS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_REGEXES: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_SPANS: usize = MAX_SPANS;
-
-    pub(in crate::compiler) fn is_target_limit(&self) -> bool {
-        matches!(
-            self,
-            Self::TooManyStrings(_)
-                | Self::TooManyTypes(_)
-                | Self::TooManyTypeNames(_)
-                | Self::TooManyFields(_)
-                | Self::TooManyCases(_)
-                | Self::TooManyInstructionWords(_)
-                | Self::TooManyRegexes(_)
-                | Self::TooManySpans(_)
-                | Self::SourceIdTooLarge(_)
-                | Self::SectionTooLarge { .. }
-                | Self::ModuleTooLarge(_)
-                | Self::Encode(_)
-        )
-    }
 }

@@ -1,15 +1,15 @@
-//! Projection from validated bytecode into the shared matcher verifier.
+//! Projection from structurally valid bytecode into control-flow validation.
 
 #[cfg(test)]
 use std::cell::Cell;
 
+use super::matcher_verify::{
+    self, Call as VerifyCall, Effect as VerifyEffect, Entry as VerifyEntry,
+    Instruction as VerifyInstruction, Match as VerifyMatch, Program as VerifyProgram,
+    Return as VerifyReturn, VerifyError,
+};
 use super::{Instruction, Module, ModuleError};
 use crate::bytecode::{CodeAddr, Effect, EffectKind, TypeDefKind, TypeKind};
-use crate::matcher_verify::{
-    self, BodyContract, Call as VerifyCall, Effect as VerifyEffect, EmptyPathCheck,
-    Entry as VerifyEntry, Instruction as VerifyInstruction, Match as VerifyMatch,
-    Program as VerifyProgram, Return as VerifyReturn, VerifyError,
-};
 
 #[cfg(test)]
 thread_local! {
@@ -82,13 +82,8 @@ pub(crate) fn validate(module: &Module) -> Result<(), ModuleError> {
         .iter()
         .map(|entry| VerifyEntry::new(entry.target(), entry.boundary()))
         .collect();
-    let program = VerifyProgram::new(
-        instructions,
-        entries,
-        std::iter::empty::<(CodeAddr, BodyContract)>(),
-    )
-    .map_err(map_verify_error)?;
-    let stats = matcher_verify::verify(&program, EmptyPathCheck::Skip).map_err(map_verify_error)?;
+    let program = VerifyProgram::new(instructions, entries).map_err(map_verify_error)?;
+    let stats = matcher_verify::verify(&program).map_err(map_verify_error)?;
     #[cfg(test)]
     record_body_analyses(stats.body_analyses);
     #[cfg(not(test))]
@@ -121,6 +116,6 @@ fn map_verify_error(error: VerifyError<CodeAddr>) -> ModuleError {
         VerifyError::SpanStack(address) => ModuleError::SpanImbalance(address),
         VerifyError::StateBudget(address) => ModuleError::EffectStackBudget(address),
         VerifyError::CursorDepth { at, .. } => ModuleError::DepthImbalance(at),
-        VerifyError::EmptyPathCursorRead(address) => ModuleError::EffectStackImbalance(address),
+        VerifyError::EmptyPathCursorRead(address) => ModuleError::EmptyPathCursorRead(address),
     }
 }

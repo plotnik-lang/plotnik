@@ -112,17 +112,6 @@ impl TypeTableBuilder {
         self.wire_id(layout.output_id(type_id))
     }
 
-    /// Validate that counts fit in u16.
-    pub fn validate(&self) -> Result<(), EmitError> {
-        if self.type_defs.len() > EmitError::MAX_TYPES {
-            return Err(EmitError::TooManyTypes(self.type_defs.len()));
-        }
-        if self.type_names.len() > EmitError::MAX_TYPE_NAMES {
-            return Err(EmitError::TooManyTypeNames(self.type_names.len()));
-        }
-        Ok(())
-    }
-
     pub fn wire_id(&self, result_id: ResultTypeId) -> Result<WireTypeId, EmitError> {
         assert!(
             result_id.index() < self.type_defs.len(),
@@ -174,11 +163,5 @@ impl TypeTableBuilder {
     /// Number of type names.
     pub fn type_names_count(&self) -> usize {
         self.type_names.len()
-    }
-}
-
-impl Default for TypeTableBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }

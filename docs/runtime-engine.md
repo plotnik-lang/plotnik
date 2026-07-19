@@ -63,8 +63,8 @@ used for forks, value/default effects, and wrapper cleanup.
 ### Call
 
 `Call` applies its own navigation and field check, when present, pushes a frame with
-the encoded return address, and jumps to the callee target. Definition bodies
-are statically verified to return at the same cursor depth they entered.
+the encoded return address, and jumps to the callee target. Module validation
+proves that definition bodies return at the same cursor depth they entered.
 
 ### Split call
 
