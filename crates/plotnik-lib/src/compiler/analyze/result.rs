@@ -535,14 +535,6 @@ impl<'a> ResultSchema<'a> {
     pub(crate) fn public_result_group(&self, item: ResultItem) -> &PublicResultGroup {
         self.model.public_result_group(item)
     }
-
-    pub(crate) fn definitions(&self) -> &DefinitionGraph {
-        self.definitions
-    }
-
-    pub(crate) fn interner(&self) -> &Interner {
-        self.interner
-    }
 }
 
 struct ItemCollector<'a> {
