@@ -23,7 +23,7 @@ arborium-javascript = "2.18.0"
 arborium-typescript = "2.18.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["unbounded_depth"] }
-tree-sitter = "=0.26.10"
+tree-sitter = "=0.26.11"
 
 [dev-dependencies]
 plotnik = { path = "../plotnik", features = ["serde"] }
