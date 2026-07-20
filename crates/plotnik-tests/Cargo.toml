@@ -18,9 +18,9 @@ codegen-tests = []
 [dependencies]
 plotnik-lib = { workspace = true }
 plotnik-rt = { workspace = true, features = ["serde", "debug"] }
-arborium-dart = "2.18.0"
-arborium-javascript = "2.18.0"
-arborium-typescript = "2.18.0"
+arborium-dart = "2.18.1"
+arborium-javascript = "2.18.1"
+arborium-typescript = "2.18.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["unbounded_depth"] }
 tree-sitter = "=0.26.10"

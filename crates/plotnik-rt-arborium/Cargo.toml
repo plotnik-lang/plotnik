@@ -27,4 +27,4 @@ debug = ["serde", "dep:serde_json"]
 plotnik-rt-core = { path = "../plotnik-rt-core", version = "0.4.0" }
 serde = { version = "1.0", optional = true }
 serde_json = { version = "1.0", optional = true }
-tree-sitter = { package = "arborium-tree-sitter", version = "2.18.0" }
+tree-sitter = { package = "arborium-tree-sitter", version = "2.18.1" }
