@@ -36,7 +36,7 @@ similar = "=3.1.1"
 # pins the multi-grammar (`pkg/sub`) selection.
 tree-sitter-javascript = "=0.25.0"
 tree-sitter-typescript = "=0.23.2"
-trybuild = "=1.0.117"
+trybuild = "=1.0.118"
 
 [build-dependencies]
 cargo_metadata = "=0.23.1"
