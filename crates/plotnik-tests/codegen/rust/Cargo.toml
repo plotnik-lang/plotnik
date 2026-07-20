@@ -9,6 +9,6 @@ arborium-dart = "=2.18.1"
 arborium-javascript = "=2.18.1"
 arborium-typescript = "=2.18.1"
 plotnik-rt = { path = "../../../plotnik-rt", features = ["debug"] }
-tree-sitter = "=0.26.10"
+tree-sitter = "=0.26.11"
 
 [workspace]
