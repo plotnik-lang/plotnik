@@ -1,5 +1,7 @@
 //! Provenance for one exact `grammar.json` artifact.
 
+use std::fmt::Write as _;
+
 use sha2::{Digest, Sha256};
 
 /// Exact grammar artifact used to bind a query.
@@ -19,9 +21,15 @@ impl GrammarIdentity {
         grammar_json: &[u8],
         source: impl Into<String>,
     ) -> Self {
+        let digest = Sha256::digest(grammar_json);
+        let mut sha256 = String::with_capacity(digest.len() * 2);
+        for byte in digest {
+            write!(&mut sha256, "{byte:02x}").expect("writing to a String cannot fail");
+        }
+
         Self {
             name: name.into(),
-            sha256: format!("{:x}", Sha256::digest(grammar_json)),
+            sha256,
             source: source.into(),
         }
     }
