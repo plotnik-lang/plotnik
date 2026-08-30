@@ -256,7 +256,7 @@ clap = { version = "4.5", features = ["derive", "string"] }
 clap_complete = "4.5"
 plotnik-lib = { path = "../plotnik-lib", version = "0.4.0", default-features = false, features = ["vm"] }
 serde_json = "1"
-tree-sitter = "0.26.10"
+tree-sitter = "0.27.0"
 # @generated:lang-deps:begin
 arborium-ada = { version = "2.18.1", optional = true }
 arborium-agda = { version = "2.18.1", optional = true }
