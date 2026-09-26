@@ -26,7 +26,7 @@ plotnik-lib.workspace = true
 serde = { version = "1.0.228", default-features = false }
 serde-wasm-bindgen = "0.6"
 serde_json = "1"
-tree-sitter = "0.26.10"
+tree-sitter = "0.27.0"
 wasm-bindgen = "0.2"
 
 [build-dependencies]
