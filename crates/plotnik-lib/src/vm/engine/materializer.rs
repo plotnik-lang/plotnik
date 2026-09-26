@@ -39,13 +39,13 @@ impl<'a> ValueMaterializer<'a> {
 /// follow-up: it catches materializer/typegen drift and compiles to a no-op in
 /// release. Folding it in here keeps each call site from re-threading
 /// `result_type` and from materializing a value that silently skips the check.
-pub fn materialize_verified<'s>(
+pub fn materialize_verified<'s, 't>(
     source: &'s str,
     module: &'s Module,
     entry_point: &EntryPoint,
-    events: OutputEvents<'_, '_>,
+    events: OutputEvents<'_, 't>,
     colors: Colors,
-) -> Value<'s> {
+) -> Value<'s, 't> {
     let materializer = ValueMaterializer::new(source, module);
     let value = materializer.materialize(events);
     debug_verify_type(&value, entry_point.result_type(), module, colors);
@@ -53,12 +53,12 @@ pub fn materialize_verified<'s>(
 }
 
 /// Value accumulator for stack-based materialization.
-enum ValueAccumulator<'s> {
-    List(Vec<Value<'s>>),
-    Record(Vec<(&'s str, Value<'s>)>),
+enum ValueAccumulator<'s, 't> {
+    List(Vec<Value<'s, 't>>),
+    Record(Vec<(&'s str, Value<'s, 't>)>),
     Variant {
         case: &'s str,
-        fields: Vec<(&'s str, Value<'s>)>,
+        fields: Vec<(&'s str, Value<'s, 't>)>,
     },
     /// Marker into the scalar-only range stack. Keeping the marker here
     /// preserves heterogeneous frame nesting checks without making ScalarMark
@@ -66,7 +66,7 @@ enum ValueAccumulator<'s> {
     Scalar(usize),
 }
 
-impl ValueAccumulator<'_> {
+impl ValueAccumulator<'_, '_> {
     fn kind(&self) -> &'static str {
         match self {
             ValueAccumulator::List(_) => "List",
@@ -78,12 +78,12 @@ impl ValueAccumulator<'_> {
 }
 
 impl<'a> ValueMaterializer<'a> {
-    pub fn materialize(&self, events: OutputEvents<'_, '_>) -> Value<'a> {
-        let mut stack: Vec<ValueAccumulator<'a>> = vec![];
+    pub fn materialize<'t>(&self, events: OutputEvents<'_, 't>) -> Value<'a, 't> {
+        let mut stack: Vec<ValueAccumulator<'a, 't>> = vec![];
         let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
 
         // Pending result value attached by `RecordSet` or `ArrayPush`.
-        let mut pending: Option<Value<'a>> = None;
+        let mut pending: Option<Value<'a, 't>> = None;
 
         for (event_idx, event) in events.iter().enumerate() {
             match event {

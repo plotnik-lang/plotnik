@@ -9,24 +9,23 @@ use tree_sitter::Node;
 use crate::core::Colors;
 use crate::core::utils::escape_json_into;
 
-/// Materialized node value borrowing the document source.
+/// Materialized node value borrowing the document source and syntax tree.
 ///
 /// `text` is a span slice of the source — no copy, no per-node UTF-8
-/// re-validation (the source is already `&str`). `kind` points into the
-/// grammar's static symbol table.
+/// re-validation (the source is already `&str`). `kind` points into language
+/// storage retained by the tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NodeValue<'s> {
-    /// Node kind name (e.g., "identifier"). Tree-sitter kind names live in the
-    /// grammar's static symbol table, hence `&'static`.
-    pub kind: &'static str,
+pub struct NodeValue<'s, 't> {
+    /// Node kind name (e.g., "identifier").
+    pub kind: &'t str,
     /// Source text of the node.
     pub text: &'s str,
     /// Half-open document byte range `[start, end)`.
     pub span: (u32, u32),
 }
 
-impl<'s> NodeValue<'s> {
-    pub fn from_node(node: Node<'_>, source: &'s str) -> Self {
+impl<'s, 't> NodeValue<'s, 't> {
+    pub fn from_node(node: Node<'t>, source: &'s str) -> Self {
         let span = (node.start_byte() as u32, node.end_byte() as u32);
         Self {
             kind: node.kind(),
@@ -40,7 +39,7 @@ impl<'s> NodeValue<'s> {
 /// generated matchers slice predicate text identically to the VM.
 pub(crate) use plotnik_runtime::node_text;
 
-impl Serialize for NodeValue<'_> {
+impl Serialize for NodeValue<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -54,34 +53,36 @@ impl Serialize for NodeValue<'_> {
     }
 }
 
-/// Self-contained result value, borrowing node text from the document source and
-/// field/case names from the bytecode string table (`'s` must outlive both).
+/// Self-contained result value, borrowing node text from the document source,
+/// field/case names from the bytecode string table, and node kind names from the
+/// syntax tree. Source and bytecode borrows currently share `'s`; the tree borrow
+/// uses `'t`.
 ///
 /// `Record` uses `Vec<(&str, Value)>` to preserve field order from type metadata.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Value<'s> {
+pub enum Value<'s, 't> {
     Absent,
-    Node(NodeValue<'s>),
+    Node(NodeValue<'s, 't>),
     Text(&'s str),
     Bool(bool),
-    List(Vec<Value<'s>>),
+    List(Vec<Value<'s, 't>>),
     /// Record with ordered fields.
-    Record(Vec<(&'s str, Value<'s>)>),
+    Record(Vec<(&'s str, Value<'s, 't>)>),
     /// Variant value. `payload` is `None` when the case has no payload.
     Variant {
         case: &'s str,
-        payload: Option<Box<Value<'s>>>,
+        payload: Option<Box<Value<'s, 't>>>,
     },
 }
 
-impl Drop for Value<'_> {
+impl Drop for Value<'_, '_> {
     fn drop(&mut self) {
         // A captured-recursive query nests values as deep as the match, which can
         // exceed any native-stack budget — so the derived recursive drop could
         // overflow. Dismantle level by level instead: move each node's children
         // onto a heap worklist, so every node drops only after it is childless and
         // its own drop is a leaf.
-        let mut worklist: Vec<Value<'_>> = Vec::new();
+        let mut worklist: Vec<Value<'_, '_>> = Vec::new();
         take_children(self, &mut worklist);
         while let Some(mut value) = worklist.pop() {
             take_children(&mut value, &mut worklist);
@@ -90,7 +91,7 @@ impl Drop for Value<'_> {
 }
 
 /// Move `value`'s direct child values onto `worklist`, leaving `value` childless.
-fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
+fn take_children<'s, 't>(value: &mut Value<'s, 't>, worklist: &mut Vec<Value<'s, 't>>) {
     match value {
         Value::List(items) => worklist.append(items),
         Value::Record(fields) => worklist.extend(fields.drain(..).map(|(_, v)| v)),
@@ -107,7 +108,7 @@ fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
 // iterative `Value::format`. If a serde-based output path is ever added, give it a
 // depth guard or an iterative serializer first; a captured-recursive query can nest
 // values past the native stack.
-impl Serialize for Value<'_> {
+impl Serialize for Value<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -144,7 +145,7 @@ impl Serialize for Value<'_> {
     }
 }
 
-impl Value<'_> {
+impl Value<'_, '_> {
     /// Format value as colored JSON.
     ///
     /// Color scheme (jq-inspired):
@@ -175,7 +176,7 @@ struct FormatCtx<'a> {
 /// One emission for the iterative formatter's work stack.
 enum WorkItem<'a> {
     /// Render a value: a leaf writes directly, a composite pushes its expansion.
-    Value(&'a Value<'a>, usize),
+    Value(&'a Value<'a, 'a>, usize),
     /// Write a borrowed slice verbatim. Color codes are `'static`; record keys and
     /// variant tags borrow the value.
     Str(&'a str),
@@ -191,7 +192,7 @@ enum WorkItem<'a> {
 /// `Unbounded` depth limit lets it exceed any native-stack budget — so the walk
 /// uses an explicit work stack. Emission is byte-identical to the equivalent
 /// recursive printer; the `06-vm` snapshots pin that.
-fn format_value<'a>(ctx: &mut FormatCtx<'_>, value: &'a Value<'a>, indent: usize) {
+fn format_value<'a>(ctx: &mut FormatCtx<'_>, value: &'a Value<'a, 'a>, indent: usize) {
     let mut stack = vec![WorkItem::Value(value, indent)];
     while let Some(item) = stack.pop() {
         match item {
@@ -206,7 +207,7 @@ fn format_value<'a>(ctx: &mut FormatCtx<'_>, value: &'a Value<'a>, indent: usize
     }
 }
 
-fn format_node_value(ctx: &mut FormatCtx<'_>, node: &NodeValue<'_>, indent: usize) {
+fn format_node_value(ctx: &mut FormatCtx<'_>, node: &NodeValue<'_, '_>, indent: usize) {
     let c = ctx.colors;
     let pretty = ctx.pretty;
     let out = &mut *ctx.out;
@@ -300,7 +301,7 @@ fn format_node_value(ctx: &mut FormatCtx<'_>, node: &NodeValue<'_>, indent: usiz
 /// nesting is driven by the stack rather than the native call stack.
 fn emit_value<'a>(
     ctx: &mut FormatCtx<'_>,
-    value: &'a Value<'a>,
+    value: &'a Value<'a, 'a>,
     indent: usize,
     stack: &mut Vec<WorkItem<'a>>,
 ) {

@@ -39,7 +39,7 @@ pub struct RunStats {
 /// checkpoint contract stays single-sourced. The VM keeps only the
 /// interpretive layer: the instruction pointer into decoded bytecode and the
 /// fuel/memory budget.
-pub struct VM<'t> {
+pub struct VM<'s, 't> {
     pub(crate) engine: Engine<'t>,
     /// Current address in the decoded instruction stream.
     pub(crate) ip: CodeAddr,
@@ -47,18 +47,18 @@ pub struct VM<'t> {
     pub(crate) fuel_used: u64,
     pub(crate) limits: ResolvedRuntimeLimits,
 
-    pub(crate) source: &'t str,
+    pub(crate) source: &'s str,
 }
 
 /// Builder for VM instances.
-pub struct VMBuilder<'t> {
-    source: &'t str,
+pub struct VMBuilder<'s, 't> {
+    source: &'s str,
     tree: &'t Tree,
     spec: RuntimeLimitSpec,
 }
 
-impl<'t> VMBuilder<'t> {
-    pub fn new(source: &'t str, tree: &'t Tree) -> Self {
+impl<'s, 't> VMBuilder<'s, 't> {
+    pub fn new(source: &'s str, tree: &'t Tree) -> Self {
         Self {
             source,
             tree,
@@ -74,7 +74,7 @@ impl<'t> VMBuilder<'t> {
     }
 
     /// Build the VM, resolving `Auto` limits against the source's node count.
-    pub fn build(self) -> VM<'t> {
+    pub fn build(self) -> VM<'s, 't> {
         let source_nodes =
             u32::try_from(self.tree.root_node().descendant_count()).unwrap_or(u32::MAX);
         VM {
@@ -87,8 +87,8 @@ impl<'t> VMBuilder<'t> {
     }
 }
 
-impl<'t> VM<'t> {
-    pub fn builder(source: &'t str, tree: &'t Tree) -> VMBuilder<'t> {
+impl<'s, 't> VM<'s, 't> {
+    pub fn builder(source: &'s str, tree: &'t Tree) -> VMBuilder<'s, 't> {
         VMBuilder::new(source, tree)
     }
 
