@@ -116,9 +116,8 @@ export type RunResult =
     }
   | { error: string; execution_trace?: unknown };
 
-/** `tree()` output — crates/plotnik-lib/src/core/tree_dump.rs.
-    A pre-rendered dump of the source tree in Plotnik pattern syntax;
-    concatenating chunk `text` yields exactly the CLI's `plotnik tree` output. */
+/** `tree()` output from crates/plotnik-lib/src/core/tree_dump.rs.
+    A pre-rendered dump of the source tree in Plotnik pattern syntax. */
 export interface DumpChunk {
   kind: "text" | "punct" | "kind" | "field" | "string" | "comment";
   text: string;

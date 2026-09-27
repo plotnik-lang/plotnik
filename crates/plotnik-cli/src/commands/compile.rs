@@ -5,18 +5,9 @@ use plotnik_lib::grammar::Grammar;
 use plotnik_lib::{BytecodeConfig, CompiledQuery, QueryBuilder, SourceMap};
 
 use crate::error::{CliError, write_stderr};
-use crate::language_registry::Lang;
 
 /// Parse, analyze, bind, lower, and validate target-neutral compiler IR.
 pub fn compile_query(
-    sources: SourceMap,
-    lang: &Lang,
-    color: bool,
-) -> Result<CompiledQuery, CliError> {
-    compile_query_with_grammar(sources, lang.grammar(), color)
-}
-
-pub fn compile_query_with_grammar(
     sources: SourceMap,
     grammar: &Grammar,
     color: bool,
@@ -31,14 +22,18 @@ pub fn compile_query_with_grammar(
             "{}",
             diagnostics.render_colored(compiled.source_map(), color)
         ))?;
-        return Err(CliError::FatalRendered);
+        return Err(CliError::No);
     }
 
     Ok(compiled)
 }
 
-pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
-    let compiled = compile_query(sources, lang, color)?;
+pub fn compile_module(
+    sources: SourceMap,
+    grammar: &Grammar,
+    color: bool,
+) -> Result<Module, CliError> {
+    let compiled = compile_query(sources, grammar, color)?;
     emit_module(&compiled, BytecodeConfig::new(), color)
 }
 

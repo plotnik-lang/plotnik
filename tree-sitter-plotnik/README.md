@@ -23,7 +23,7 @@ diagnostics parses cleanly here, with the deliberate exceptions below.
 Later-stage rejections (analyze/link: unknown node kinds, empty `()`/`[]`/
 `{}`, supertype refinements, dimensionality, anchor placement semantics)
 are out of scope, as usual for editor grammars — files may parse here and
-still fail `plotnik check`.
+still fail `plotnik check` when compiled against a source grammar with `--grammar`.
 
 Deliberately rejected despite being warn-accepted (deprecated) upstream:
 

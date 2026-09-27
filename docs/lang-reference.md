@@ -149,7 +149,7 @@ A directory of `.ptk` files loaded as a single compilation unit.
 
 ### Language
 
-Set with `-l/--lang` or a shebang (`#!/usr/bin/env -S plotnik run -l <language>`); an explicit `-l` must agree with the shebang.
+CLI compiler commands require an explicit `--grammar <grammar.json>`. A query shebang does not select the grammar or entry point for these commands.
 
 ### Execution
 

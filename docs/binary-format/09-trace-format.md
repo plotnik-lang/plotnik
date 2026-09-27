@@ -1,16 +1,6 @@
 # Execution Trace Format
 
-`plotnik trace` prints the instruction stream as it executes. It reuses the dump
-line format and adds sub-lines for navigation, match results, effects, calls,
-and backtracking.
-
-## Command
-
-```sh
-plotnik trace query.ptk source.js
-plotnik trace -q 'Q = (program)' -s 'x;' -l javascript -v
-plotnik trace query.ptk source.js --fuel 10000
-```
+This document describes the VM execution trace format. The CLI `trace` command is currently unimplemented. The format reuses the dump line format and adds sub-lines for navigation, match results, effects, calls, and backtracking.
 
 ## Verbosity
 

@@ -2,14 +2,14 @@ use std::path::PathBuf;
 
 use plotnik_lib::QueryBuilder;
 
-use super::lang_resolver::require_lang;
+use super::grammar;
 use super::query_loader::load_query;
 use crate::error::{CliError, CliResult, write_stderr, writeln_stdout};
 
 pub struct CheckArgs {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub lang: Option<String>,
+    pub grammar: PathBuf,
     pub strict: bool,
     pub json: bool,
     pub color: bool,
@@ -22,14 +22,10 @@ pub fn run(args: CheckArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let lang = require_lang(
-        args.lang.as_deref(),
-        loaded.shebang.lang.as_deref(),
-        "check",
-    )?;
+    let grammar = grammar::load(&args.grammar)?;
     let checked = QueryBuilder::new(loaded.sources)
         .with_strict_lints(args.strict)
-        .compile(lang.grammar())
+        .compile(&grammar)
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
     let diagnostics = checked.diagnostics();

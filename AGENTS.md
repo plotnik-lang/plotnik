@@ -68,10 +68,9 @@ crates/
   plotnik/                     # facade: query! + rt + tree_sitter re-exports
   plotnik-macros/              # proc-macro shell: args, grammar resolution, expansion
   plotnik-cli/
-    src/cli/                   # clap defs, dispatch, shebang, limit flags
+    src/cli/                   # clap defs, compiler dispatch, retained limit flags
     src/commands/              # one module per CLI subcommand
-    src/language_registry.rs   # define_langs! table, one entry per language
-    build.rs                   # embeds gzipped grammar.json per enabled lang feature
+      grammar.rs               # external grammar.json loader and identity
   plotnik-lib/
     src/bytecode/              # bytecode format, instruction set, module loading
     src/compiler/
@@ -188,23 +187,22 @@ Expr = [
 ]
 ```
 
-# Running queries
+# CLI compiler commands
 
 `cargo run -p plotnik-cli -- <command>`. Full reference: `docs/cli.md`.
 
 ```sh
-cargo run -p plotnik-cli -- run query.ptk app.ts
-cargo run -p plotnik-cli -- run -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l javascript
-cargo run -p plotnik-cli -- check query.ptk -l typescript   # silent on success; --json, --strict
-cargo run -p plotnik-cli -- infer query.ptk -l typescript   # emit TypeScript types
-cargo run -p plotnik-cli -- tree app.ts                     # source syntax tree
-cargo run -p plotnik-cli -- trace query.ptk app.ts -vv      # step-by-step execution
-cargo run -p plotnik-cli -- lang list                       # languages + aliases
+cargo run -p plotnik-cli -- check query.ptk --grammar path/to/grammar.json
+cargo run -p plotnik-cli -- infer query.ptk --grammar path/to/grammar.json
+cargo run -p plotnik-cli -- gen query.ptk --grammar path/to/grammar.json --target rust
+cargo run -p plotnik-cli -- dump query.ptk --grammar path/to/grammar.json
 ```
+
+`run`, `trace`, `inspect`, `tree`, and `lang` retain their arguments but have unimplemented handlers.
 
 - Exit codes:
   - `0`: yes/success
-  - `1`: domain "no" (no match or invalid query)
+  - `1`: invalid query or emission failure
   - `2`: couldn't answer (usage/IO/internal)
 
 # Testing

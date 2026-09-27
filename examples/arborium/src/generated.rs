@@ -1,6 +1,6 @@
 // Grammar name: "javascript"
-// Grammar SHA-256: 8ed9a5635732be4c730a71625802082215e1c39a840212740d1869ed62237172
-// Grammar source: "arborium-javascript@2.18.1"
+// Grammar SHA-256: 7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3
+// Grammar source: "grammar.json"
 // Generated Plotnik query module: typed result types, `parse`/`matches` entry
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
@@ -115,8 +115,8 @@ mod matcher {
     }
 
     const GRAMMAR_NAME: &str = "javascript";
-    const GRAMMAR_SHA256: &str = "8ed9a5635732be4c730a71625802082215e1c39a840212740d1869ed62237172";
-    const GRAMMAR_SOURCE: &str = "arborium-javascript@2.18.1";
+    const GRAMMAR_SHA256: &str = "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3";
+    const GRAMMAR_SOURCE: &str = "grammar.json";
 
     /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
     /// as the generation-time grammar defines them.

@@ -2,16 +2,11 @@ mod args;
 mod commands;
 mod dispatch;
 mod limits;
-pub mod shebang;
 
 pub use commands::build_cli;
-pub use dispatch::{
-    CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
-    TreeOpts,
-};
+pub use dispatch::{CheckOpts, DumpOpts, GenerateOpts, InferOpts};
 
-/// Bare default subcommand: `plotnik query.ptk …` routes to `run`.
-/// This is what makes flag-free shebang execution (`#!/usr/bin/env plotnik`) work.
+/// Bare `.ptk` invocation still routes to the retained `run` command.
 pub fn route_default_subcommand(mut args: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
     if let Some(first) = args.get(1)
         && !first.as_encoded_bytes().starts_with(b"-")

@@ -1,18 +1,12 @@
 //! Command builders for the CLI.
 //!
 //! Each command is built using the shared arg builders from `args.rs`.
-//! The unified flags feature is implemented here: dump/exec/trace accept
-//! all runtime flags, with irrelevant ones hidden from `--help`.
+//! Runtime command arguments remain available even while their handlers are stubs.
 
 use clap::Command;
 
 use super::args::*;
 use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
-
-fn with_hidden_source_args(cmd: Command) -> Command {
-    cmd.arg(source_path_arg().hide(true))
-        .arg(source_text_arg().hide(true))
-}
 
 fn with_hidden_exec_args(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
@@ -20,19 +14,12 @@ fn with_hidden_exec_args(cmd: Command) -> Command {
         .arg(include_points_arg().hide(true))
 }
 
-// --include-points is visible for infer, so exclude it from the hidden set.
-fn with_hidden_exec_args_partial(cmd: Command) -> Command {
-    cmd.arg(entry_arg().hide(true))
-        .arg(compact_arg().hide(true))
-}
-
 fn with_hidden_trace_args(cmd: Command) -> Command {
     cmd.arg(verbose_arg().hide(true))
         .arg(no_result_arg().hide(true))
 }
 
-// Runtime-limit flags, hidden. Added to non-exec commands so the unified flag
-// set parses them without error; `run`/`trace`/`inspect` surface them visibly.
+// The tree command retains its hidden runtime-limit arguments.
 fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
     cmd.arg(fuel_arg().hide(true))
         .arg(max_memory_arg().hide(true))
@@ -47,21 +34,16 @@ pub fn build_cli() -> Command {
     Command::new("plotnik")
         .about("Query language for tree-sitter syntax trees with type inference")
         .version(env!("CARGO_PKG_VERSION"))
-        .long_version(format!(
-            "{} ({} bundled languages)",
-            env!("CARGO_PKG_VERSION"),
-            crate::language_registry::all().len()
-        ))
         .propagate_version(true)
         .subcommand_required(true)
         .arg_required_else_help(true)
         .after_help(
             r#"EXIT CODES:
-  0  yes/success (match found, query valid)
-  1  no (run: no match; check: invalid)
+  0  success
+  1  invalid query or emission failure
   2  couldn't answer (usage, IO, or internal error)
 
-Run 'plotnik <command> --help' for examples."#,
+Run 'plotnik <command> --help' for options."#,
         )
         .subcommand(run_command())
         .subcommand(check_command())
@@ -81,15 +63,13 @@ pub fn generate_command() -> Command {
         .about("Generate a compiled matcher module")
         .override_usage(
             "\
-  plotnik gen <QUERY> --target rust -l <LANG>
-  plotnik gen <QUERY> --target rust --grammar <grammar.json>
-  plotnik gen -q <TEXT> --target rust -l <LANG>",
+  plotnik gen <QUERY> --grammar <grammar.json> --target rust
+  plotnik gen -q <TEXT> --grammar <grammar.json> --target rust",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik gen query.ptk --target rust -l typescript
-  plotnik gen query.ptk --target rust --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json
-  plotnik gen query.ptk --target rust -l javascript -o query.rs
+  plotnik gen query.ptk --grammar path/to/grammar.json --target rust
+  plotnik gen query.ptk --grammar path/to/grammar.json --target rust -o query.rs
 
 The generated module imports `plotnik_rt`. Depend on `plotnik-rt` for
 Tree-sitter or `plotnik-rt-arborium` for Arborium; both packages expose that
@@ -99,7 +79,6 @@ during binding."#,
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(lang_arg())
         .arg(grammar_arg())
         .next_help_heading("Generation options")
         .arg(target_arg())
@@ -111,7 +90,7 @@ during binding."#,
 
 pub fn tree_command() -> Command {
     let cmd = Command::new("tree")
-        .about("Show the query tree and/or source syntax tree")
+        .about("Query and source tree view (currently unimplemented)")
         .override_usage(
             "\
   plotnik tree <FILE>                 # auto-detect by extension
@@ -119,17 +98,7 @@ pub fn tree_command() -> Command {
   plotnik tree -q <TEXT> [SOURCE]
   plotnik tree -s <TEXT> -l <LANG>",
         )
-        .after_help(
-            r#"EXAMPLES:
-  plotnik tree query.ptk                         # query AST (.ptk extension)
-  plotnik tree query.ptk --query-view cst        # query CST
-  plotnik tree app.ts                            # source syntax tree
-  plotnik tree query.ptk app.ts                  # both trees
-  plotnik tree app.ts --include-anonymous        # include literal tokens
-  plotnik tree app.ts --json                     # source syntax tree as JSON
-  plotnik tree -q '(id) @x'                      # inline query AST
-  plotnik tree -s 'let x = 1' -l js              # inline source syntax tree"#,
-        )
+        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
@@ -147,81 +116,69 @@ pub fn tree_command() -> Command {
 }
 
 pub fn check_command() -> Command {
-    let cmd = Command::new("check")
+    Command::new("check")
         .about("Validate a query")
         .override_usage(
             "\
-  plotnik check <QUERY>
-  plotnik check <QUERY> -l <LANG>
-  plotnik check -q <TEXT> [-l <LANG>]",
+  plotnik check <QUERY> --grammar <grammar.json>
+  plotnik check -q <TEXT> --grammar <grammar.json>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik check query.ptk             # validate syntax only
-  plotnik check query.ptk -l ts       # also check against grammar
-  plotnik check queries.ts/           # workspace directory
-  plotnik check -q 'Q = ...' -l js    # inline query
-  plotnik check query.ptk --json      # diagnostics as JSON"#,
+  plotnik check query.ptk --grammar path/to/grammar.json
+  plotnik check queries/ --grammar path/to/grammar.json
+  plotnik check -q 'Q = ...' --grammar path/to/grammar.json --json"#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(lang_arg())
+        .arg(grammar_arg())
         .next_help_heading("Check options")
         .arg(strict_arg())
         .arg(json_arg())
         .next_help_heading("Global options")
-        .arg(color_arg());
-
-    with_hidden_runtime_limit_args(with_hidden_trace_args(with_hidden_exec_args(
-        with_hidden_source_args(cmd),
-    )))
+        .arg(color_arg())
 }
 
 pub fn dump_command() -> Command {
-    let cmd = Command::new("dump")
+    Command::new("dump")
         .about("Show compiled bytecode for debugging")
         .override_usage(
             "\
-  plotnik dump <QUERY>
-  plotnik dump <QUERY> -l <LANG>
-  plotnik dump -q <TEXT> [-l <LANG>]",
+  plotnik dump <QUERY> --grammar <grammar.json>
+  plotnik dump -q <TEXT> --grammar <grammar.json>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik dump query.ptk -l ts       # resolved node kinds
-  plotnik dump -q 'Q = ...' -l ts    # inline query"#,
+  plotnik dump query.ptk --grammar path/to/grammar.json
+  plotnik dump -q 'Q = ...' --grammar path/to/grammar.json"#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(lang_arg())
+        .arg(grammar_arg())
         .next_help_heading("Global options")
-        .arg(color_arg());
-
-    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_trace_args(
-        with_hidden_exec_args(with_hidden_source_args(cmd)),
-    )))
+        .arg(color_arg())
 }
 
 pub fn infer_command() -> Command {
-    let cmd = Command::new("infer")
+    Command::new("infer")
         .about("Generate type definitions from a query")
         .override_usage(
             "\
-  plotnik infer <QUERY> -l <LANG>
-  plotnik infer -q <TEXT> -l <LANG>",
+  plotnik infer <QUERY> --grammar <grammar.json>
+  plotnik infer -q <TEXT> --grammar <grammar.json>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik infer query.ptk -l js       # from file
-  plotnik infer -q 'Q = ...' -l ts    # inline query
-  plotnik infer query.ptk -l js -o types.d.ts  # write to file"#,
+  plotnik infer query.ptk --grammar path/to/grammar.json
+  plotnik infer -q 'Q = ...' --grammar path/to/grammar.json
+  plotnik infer query.ptk --grammar path/to/grammar.json -o types.d.ts"#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(lang_arg())
+        .arg(grammar_arg())
         .next_help_heading("Output options")
         .arg(format_arg())
         .arg(include_points_arg())
@@ -230,29 +187,20 @@ pub fn infer_command() -> Command {
         .arg(match_only_type_arg())
         .arg(output_file_arg())
         .next_help_heading("Global options")
-        .arg(color_arg());
-
-    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_trace_args(
-        with_hidden_exec_args_partial(with_hidden_source_args(cmd)),
-    )))
+        .arg(color_arg())
 }
 
 pub fn run_command() -> Command {
     let cmd = Command::new("run")
         .alias("exec")
-        .about("Execute a query against source code and output JSON")
+        .about("Execute a query (currently unimplemented)")
         .override_usage(
             "\
   plotnik run <QUERY> <SOURCE>
   plotnik run -q <TEXT> <SOURCE>
   plotnik run -q <TEXT> -s <TEXT> -l <LANG>",
         )
-        .after_help(
-            r#"EXAMPLES:
-  plotnik run query.ptk app.js           # two positional files
-  plotnik run -q 'Q = ...' app.js        # inline query + source file
-  plotnik run -q 'Q = ...' -s 'let x' -l js  # all inline"#,
-        )
+        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
@@ -275,19 +223,14 @@ pub fn run_command() -> Command {
 
 pub fn trace_command() -> Command {
     let cmd = Command::new("trace")
-        .about("Trace query execution for debugging")
+        .about("Trace query execution (currently unimplemented)")
         .override_usage(
             "\
   plotnik trace <QUERY> <SOURCE>
   plotnik trace -q <TEXT> <SOURCE>
   plotnik trace -q <TEXT> -s <TEXT> -l <LANG>",
         )
-        .after_help(
-            r#"EXAMPLES:
-  plotnik trace query.ptk app.js          # two positional files
-  plotnik trace -q 'Q = ...' app.js       # inline query + source file
-  plotnik trace -q 'Q = ...' -s 'let x' -l js  # all inline"#,
-        )
+        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
@@ -313,19 +256,14 @@ pub fn trace_command() -> Command {
 
 pub fn inspect_command() -> Command {
     let cmd = Command::new("inspect")
-        .about("Compile and execute a query, emitting playground inspection data")
+        .about("Inspect query execution (currently unimplemented)")
         .override_usage(
             "\
   plotnik inspect <QUERY> <SOURCE> [--json]
   plotnik inspect -q <TEXT> <SOURCE> [--json]
   plotnik inspect -q <TEXT> -s <TEXT> -l <LANG> [--json]",
         )
-        .after_help(
-            r#"EXAMPLES:
-  plotnik inspect query.ptk app.js --json
-  plotnik inspect -q 'Q = ...' -s 'let x' -l js --json
-  plotnik inspect query.ptk app.js --json -v  # include execution trace"#,
-        )
+        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
@@ -350,7 +288,7 @@ pub fn inspect_command() -> Command {
 
 pub fn lang_command() -> Command {
     Command::new("lang")
-        .about("Language information and grammar dump")
+        .about("Language information (currently unimplemented)")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .flatten_help(true)
@@ -359,7 +297,7 @@ pub fn lang_command() -> Command {
 }
 
 fn lang_list_command() -> Command {
-    Command::new("list").about("List supported languages with aliases")
+    Command::new("list").about("List languages (currently unimplemented)")
 }
 
 pub fn completions_command() -> Command {
@@ -380,7 +318,7 @@ pub fn completions_command() -> Command {
 
 fn lang_dump_command() -> Command {
     Command::new("dump")
-        .about("Dump grammar tree shapes in query-flavored notation")
+        .about("Dump grammar tree shapes (currently unimplemented)")
         .arg(
             clap::Arg::new("lang")
                 .help("Language name or alias")

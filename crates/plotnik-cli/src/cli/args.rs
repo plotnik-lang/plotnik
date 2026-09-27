@@ -45,7 +45,7 @@ pub fn lang_arg() -> Arg {
         .short('l')
         .long("lang")
         .value_name("LANG")
-        .help("Language (inferred from extension if not specified)")
+        .help("Source language")
 }
 
 pub fn color_arg() -> Arg {
@@ -147,8 +147,8 @@ pub fn grammar_arg() -> Arg {
         .long("grammar")
         .value_name("GRAMMAR_JSON")
         .value_parser(value_parser!(PathBuf))
-        .conflicts_with("lang")
-        .help("Bind query names using this exact grammar.json instead of the registry")
+        .required(true)
+        .help("Bind query names using this grammar.json")
 }
 
 pub fn debug_arg() -> Arg {

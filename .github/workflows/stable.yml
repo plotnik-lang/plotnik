@@ -120,7 +120,7 @@ jobs:
           prefix-key: v0-rust-stable
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
-      - name: No-default-features langs
+      - name: Compiler-only CLI
         run: cargo clippy -p plotnik-cli --no-default-features -- -D warnings
 
       - name: No-default-features lib (C-free compiler)
@@ -130,9 +130,6 @@ jobs:
         run: |
           cargo check -p plotnik-rt
           cargo check -p plotnik-rt --no-default-features
-
-      - name: Single non-default language
-        run: cargo check -p plotnik-cli --no-default-features --features lang-styx
 
       - name: All-features workspace
         run: cargo check --workspace --all-targets --all-features

@@ -1,21 +1,17 @@
 mod cli;
 mod commands;
 mod error;
-mod language_registry;
 
 use std::io::{self, Write as _};
 use std::process::ExitCode;
 
 use clap::ArgMatches;
 
-use cli::{
-    CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
-    TreeOpts, build_cli, route_default_subcommand,
-};
+use cli::{CheckOpts, DumpOpts, GenerateOpts, InferOpts, build_cli, route_default_subcommand};
 use error::{CliError, CliResult};
 
 fn main() -> ExitCode {
-    // Die silently on closed pipes (`plotnik run … | head`) like standard Unix
+    // Die silently on closed pipes (`plotnik dump … | head`) like standard Unix
     // tools, instead of panicking with exit 101 when println! hits EPIPE.
     #[cfg(unix)]
     unsafe {
@@ -33,10 +29,7 @@ fn main() -> ExitCode {
 
 fn dispatch(matches: &ArgMatches) -> CliResult {
     match matches.subcommand() {
-        Some(("tree", m)) => {
-            let params = TreeOpts::from_matches(m);
-            commands::tree::run(params.into())
-        }
+        Some(("tree", _)) => commands::tree::run(),
         Some(("check", m)) => {
             let params = CheckOpts::from_matches(m);
             commands::check::run(params.into())
@@ -53,24 +46,12 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
             let params = GenerateOpts::from_matches(m);
             commands::generate::run(params.into())
         }
-        Some(("run", m)) => {
-            let params = RunOpts::from_matches(m);
-            commands::run::run(params.into())
-        }
-        Some(("trace", m)) => {
-            let params = TraceOpts::from_matches(m);
-            commands::trace::run(params.into())
-        }
-        Some(("inspect", m)) => {
-            let params = InspectOpts::from_matches(m);
-            commands::inspect::run(params.into())
-        }
+        Some(("run", _)) => commands::run::run(),
+        Some(("trace", _)) => commands::trace::run(),
+        Some(("inspect", _)) => commands::inspect::run(),
         Some(("lang", m)) => match m.subcommand() {
             Some(("list", _)) => commands::lang::run_list(),
-            Some(("dump", sub_m)) => {
-                let params = LangDumpOpts::from_matches(sub_m);
-                commands::lang::run_dump(&params.lang, params.legend, params.json, params.width)
-            }
+            Some(("dump", _)) => commands::lang::run_dump(),
             _ => unreachable!("clap should have caught this"),
         },
         Some(("completions", m)) => {

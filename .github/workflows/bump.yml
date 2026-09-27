@@ -60,7 +60,6 @@ jobs:
           # explicit path+version dependencies (default-features / feature overrides
           # that can't inherit from the workspace) need local version bumps too
           tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
-          tomato set build-dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
           tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-macros/Cargo.toml
           tomato set dependencies.plotnik-rt.version "$next" crates/plotnik-macros/Cargo.toml
           tomato set dependencies.plotnik-macros.version "$next" crates/plotnik/Cargo.toml

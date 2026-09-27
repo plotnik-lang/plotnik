@@ -1,7 +1,6 @@
 //! Language registry for the wasm bundle.
 //!
-//! A small sibling of the CLI's `language_registry`: one `define_langs!` row
-//! per language, gated by a cargo feature. Runnable languages are fixed at
+//! One `define_langs!` row per language, gated by a cargo feature. Runnable languages are fixed at
 //! bundle build time (a tree-sitter `Tree` can't cross wasm instances — see
 //! `docs/wip/playground-design.md` §6), so growing the set means growing
 //! this table.

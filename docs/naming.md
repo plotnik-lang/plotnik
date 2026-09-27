@@ -256,7 +256,7 @@ use `Parse` / `parse` for typed query application and `Matches` / `matches` for
 match-only queries. Tree-sitter's `Parser::parse` separately turns source text
 into a syntax tree; the receiver and argument types make the boundary clear.
 
-The tree display command is `tree`. When both trees appear, call them the
+The retained tree display command is `tree`, though its CLI handler is currently unimplemented. When both trees appear, call them the
 **Query AST** or **Query CST** and the **Source syntax tree**. Inspection syntax
 uses `SpanKind::Alternation(Labeling)` and `SpanKind::Alternative`; serialized
 alternations use `kind: "alternation"` plus `labeling: "unlabeled"` or
