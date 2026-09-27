@@ -966,7 +966,7 @@ fn forged_regex_pattern_string_id_is_rejected() {
 #[test]
 fn forged_nonzero_regex_table_reserved_is_rejected() {
     // Each regex-table entry is `string_id(u16) | reserved(u16) | offset(u32)`; the
-    // reserved field is pinned to zero (docs/binary-format/03-symbols.md). A forged
+    // reserved field is pinned to zero (docs/bytecode/06-tables.md). A forged
     // non-zero value must be rejected at load, not carried as smuggled state.
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
     let (regex_off, regex_count) = {
@@ -1301,7 +1301,7 @@ fn forged_record_entry_without_root_boundary_is_rejected() {
 #[test]
 fn forged_set_extended_match_reserved_count_bit_is_rejected() {
     // Bit 0 of an extended-Match counts word (low bit of byte 6) is reserved-zero
-    // (docs/binary-format/06-instructions.md); the decoder never reads it, so a
+    // (docs/bytecode/02-instructions.md); the decoder never reads it, so a
     // forged set bit must be rejected at load.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |o| (1..=5).contains(&o)); // extended Match
@@ -1767,7 +1767,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
 #[test]
 fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
     // NoValue/Node/Text/Bool carry no metadata: both `data` (bytes 0-1) and `count`
-    // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
+    // (byte 2) are reserved-zero (docs/bytecode/03-types.md). Smuggled state
     // in either must be rejected, not silently ignored by the typed view.
     for byte in [0usize, 2] {
         let mut bytes = emit_bytes(RECORD_QUERY);

@@ -55,7 +55,7 @@ Emission snapshots mirror that taxonomy under `04-emit/bytecode`,
 - [Generated Runtime Interface](runtime-interface.md) — Cross-language codegen runtime contract
 - [Runtime Engine](runtime-engine.md) — VM execution model
 - [Tree Navigation](tree-navigation.md) — Cursor walk implementation
-- [Binary Format](binary-format/01-overview.md) — Contributor and debugging reference
+- [Bytecode](bytecode/00-intro.md): Encoding, validation, and execution
 
 ## Document Map
 
@@ -69,16 +69,14 @@ docs/
 ├── runtime-interface.md # Generated matcher/runtime contract
 ├── runtime-engine.md  # VM state, backtracking, effects
 ├── tree-navigation.md # Cursor walk, search loop, anchor lowering
-└── binary-format/     # Bytecode layout and debug-output reference
-    ├── 01-overview.md   # Header, sections, alignment
-    ├── 02-strings.md    # String pool and table
-    ├── 03-symbols.md    # Node kinds, fields, trivia
-    ├── 04-types.md      # Type metadata format
-    ├── 05-entrypoints.md # Callable definition table
-    ├── 06-transitions.md # VM instructions and data blocks
-    ├── 07-spans.md      # Inspection spans section
-    ├── 08-dump-format.md # Bytecode dump output format
-    └── 09-trace-format.md # Execution trace output format
+└── bytecode/          # Bytecode design and implementation
+    ├── 00-intro.md        # Overview and contents
+    ├── 01-layout.md       # Sections, alignment, integrity
+    ├── 02-instructions.md # Matching, navigation, calls
+    ├── 03-types.md        # Result shapes
+    ├── 04-effects.md      # Result construction
+    ├── 05-spans.md        # Inspection metadata and occurrences
+    └── 06-tables.md       # Shared constants and regex encoding
 ```
 
 ## Reading Order
@@ -92,11 +90,9 @@ New to Plotnik:
 Contributing to the runtime or debugging the compiler:
 
 1. `runtime-interface.md` — Cross-language generated runtime contract
-2. `binary-format/01-overview.md` → through `06-transitions.md` (bytecode layout)
+2. [Bytecode](bytecode/00-intro.md): Encoding and validation requirements
 3. `runtime-engine.md`
 4. `tree-navigation.md`
-5. `binary-format/08-dump-format.md` — Understanding bytecode dumps
-6. `binary-format/09-trace-format.md` — Debugging with execution traces
 
 Contributing:
 

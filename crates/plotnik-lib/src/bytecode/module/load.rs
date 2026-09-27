@@ -316,7 +316,7 @@ impl Module {
         let mut prev = 0u32;
         for i in 0..=count {
             // Entry layout: string_id (u16) | reserved (u16) | offset (u32).
-            // The reserved u16 is pinned to zero (docs/binary-format/03-symbols.md);
+            // The reserved u16 is pinned to zero (docs/bytecode/06-tables.md);
             // a non-zero value is smuggled state.
             if read_u16_le(table, i * 8 + 2) != 0 {
                 return Err(ModuleError::MalformedRegexTable);
@@ -366,7 +366,7 @@ impl Module {
     /// TypeMembers section, and every referenced TypeId — a wrapper/alias inner
     /// type or a record/variant member type — addressing a real def, so the
     /// materializer never resolves a type out of range
-    /// (`docs/binary-format/04-types.md`).
+    /// (`docs/bytecode/03-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
         let types = self.types();
         let members = self.header.type_members_count as u32;
@@ -380,7 +380,7 @@ impl Module {
                 return Err(invalid());
             };
             // Fields the kind does not name are reserved-zero
-            // (docs/binary-format/04-types.md); smuggled state there must not pass validation.
+            // (docs/bytecode/03-types.md); smuggled state there must not pass validation.
             let (raw_data, raw_count) = def.member_range();
             match data {
                 TypeDefKind::Primitive(_) => {
@@ -509,7 +509,7 @@ impl Module {
     /// etc.) never slice out of bounds. The table holds `str_table_count + 1`
     /// offsets, so the valid id range is `0..str_table_count`. This upholds the
     /// representation's guarantee that validated bytecode never panics on view access
-    /// (`docs/binary-format/01-overview.md`).
+    /// (`docs/bytecode/01-layout.md`).
     fn validate_string_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
         let n = self.header.str_table_count;
@@ -896,7 +896,7 @@ impl Module {
             let value_ref = u16::from_le_bytes([b[2], b[3]]);
 
             // Bits above the operator and regex flag are reserved-zero
-            // (docs/binary-format/06-instructions.md), so a malformed set bit must
+            // (docs/bytecode/02-instructions.md), so a malformed set bit must
             // not pass validation.
             if MatchPredicate::reserved_bits_set(op_and_flags) {
                 return Err(ModuleError::InvalidPredicateOperand(addr));

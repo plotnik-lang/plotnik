@@ -1,6 +1,4 @@
 //! Human-readable bytecode dump for debugging and documentation.
-//!
-//! See `docs/binary-format/08-dump-format.md` for the output format specification.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;

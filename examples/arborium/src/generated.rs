@@ -4,8 +4,7 @@
 // Generated Plotnik query module: typed result types, `parse`/`matches` entry
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
-// dispatch arm carries its instruction in the dump format
-// (docs/binary-format/08-dump-format.md).
+// dispatch arm carries its instruction in the dump format.
 
 use ::plotnik_rt as rt;
 
