@@ -12,7 +12,11 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 5;
+pub const REQUIRED_RUNTIME_ABI: u32 = 0;
+const _: () = assert!(
+    rt::RUNTIME_ABI == REQUIRED_RUNTIME_ABI,
+    "Plotnik runtime ABI mismatch"
+);
 
 use ::plotnik_rt::Node;
 
@@ -485,7 +489,7 @@ mod matcher {
                         break 'state Flow::Backtrack;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(eng.node_class()) {
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
                         S04_INNER,
@@ -686,7 +690,7 @@ mod matcher {
                         return None;
                     }
                 }
-                if rt::SkipPolicy::Any.admits(eng.node_class()) {
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
                     eng.push_checkpoint(rt::Checkpoint::match_retry(
                         eng.checkpoint_state(),
                         S04_INNER,

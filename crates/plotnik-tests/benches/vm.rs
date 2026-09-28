@@ -109,10 +109,8 @@ mod corpus {
 }
 
 static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-    let raw = RawGrammar::from_json(grammar_loader::load_arborium_grammar_json(
-        "arborium-javascript",
-    ))
-    .expect("javascript grammar fixture");
+    let raw = RawGrammar::from_json(grammar_loader::javascript_grammar_json())
+        .expect("javascript grammar fixture");
     Grammar::from_raw(&raw).expect("javascript grammar metadata")
 });
 
@@ -122,7 +120,7 @@ static LARGE: LazyLock<String> = LazyLock::new(|| corpus::generate(1024 * 1024))
 
 fn parse_js(source: &str) -> Tree {
     let mut parser = TsParser::new();
-    let lang: TsLanguage = arborium_javascript::language().into();
+    let lang: TsLanguage = tree_sitter_javascript::LANGUAGE.into();
     parser.set_language(&lang).expect("set javascript language");
     parser.parse(source, None).expect("parse corpus")
 }

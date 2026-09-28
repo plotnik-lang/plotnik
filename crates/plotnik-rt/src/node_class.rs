@@ -11,6 +11,16 @@ pub struct NodeClass {
     pub extra: bool,
 }
 
+#[cfg(feature = "execution")]
+impl NodeClass {
+    pub(crate) fn from_node(node: &tree_sitter::Node<'_>) -> Self {
+        Self {
+            anonymous: !node.is_named(),
+            extra: node.is_extra(),
+        }
+    }
+}
+
 /// What kind of sibling may be skipped while searching for the next match.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkipClass {

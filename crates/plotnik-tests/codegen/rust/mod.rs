@@ -342,12 +342,16 @@ fn direct_dependency<'a>(
 }
 
 fn grammar_package_root(grammar_json: &Path) -> Result<&Path, String> {
-    grammar_json.ancestors().nth(3).ok_or_else(|| {
-        format!(
-            "grammar path does not have `<package>/grammar/src/grammar.json` shape: {}",
-            grammar_json.display()
-        )
-    })
+    grammar_json
+        .ancestors()
+        .skip(1)
+        .find(|directory| directory.join("Cargo.toml").is_file())
+        .ok_or_else(|| {
+            format!(
+                "grammar path is not inside a Cargo package: {}",
+                grammar_json.display()
+            )
+        })
 }
 
 fn rust_names(relative: &str) -> Result<(String, String), String> {
@@ -391,16 +395,16 @@ fn language_variant(language: SourceLanguage) -> &'static str {
 
 fn package_name(language: SourceLanguage) -> &'static str {
     match language {
-        SourceLanguage::JavaScript => "arborium-javascript",
-        SourceLanguage::TypeScript => "arborium-typescript",
-        SourceLanguage::Dart => "arborium-dart",
+        SourceLanguage::JavaScript => "tree-sitter-javascript",
+        SourceLanguage::TypeScript => "tree-sitter-typescript",
+        SourceLanguage::Dart => "tree-sitter-dart",
     }
 }
 
 fn dependency_name(language: SourceLanguage) -> &'static str {
     match language {
-        SourceLanguage::JavaScript => "arborium_javascript",
-        SourceLanguage::TypeScript => "arborium_typescript",
-        SourceLanguage::Dart => "arborium_dart",
+        SourceLanguage::JavaScript => "tree_sitter_javascript",
+        SourceLanguage::TypeScript => "tree_sitter_typescript",
+        SourceLanguage::Dart => "tree_sitter_dart",
     }
 }

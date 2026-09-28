@@ -1,6 +1,8 @@
-Q = (program
-  (function_signature
-    name: (identifier) @name
+Q = (source_file
+  (function_declaration
+    signature: (function_signature
+      name: (identifier) @name
+    )
   )
 )
 ------------------ INPUT (dart) ------------------
@@ -22,9 +24,11 @@ export interface Q {
 S0 "Beauty will save the world"
 S1 "name"
 S2 "Q"
-S3 "program"
-S4 "function_signature"
-S5 "identifier"
+S3 "source_file"
+S4 "function_declaration"
+S5 "function_signature"
+S6 "identifier"
+S7 "signature"
 
 [type_defs]
 T0 = <Node>
@@ -41,20 +45,23 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (program)                         1
-  1  └‣─  (function_signature)              2
-  2  └‣─  name: (identifier) [Node RecordSet(M0)]  4
-  4  ─‣┘² _                                 5
-  5                                         ▶
+  0   !   (source_file)                     1
+  1  └‣─  (function_declaration)            2
+  2  └‣─  signature: (function_signature)   3
+  3  └‣─  name: (identifier) [Node RecordSet(M0)]  5
+  5  ─‣┘³ _                                 6
+  6                                         ▶
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
-      ●   program
-  1       (function_signature)              02
+  0       (source_file)                     01
+      ●   source_file
+  1       (function_declaration)            02
+      ●   function_declaration
+  2       signature: (function_signature)   03
       ●   function_signature
-  2       name: (identifier) [Node RecordSet(M0)]  04
-      ○   void_type
+  3       name: (identifier) [Node RecordSet(M0)]  05
+      ○   type
       ●   identifier
-  4       _                                 05
-      ●   program
-  5   ◀   (Q)                               ◼
+  5       _                                 06
+      ●   source_file
+  6   ◀   (Q)                               ◼

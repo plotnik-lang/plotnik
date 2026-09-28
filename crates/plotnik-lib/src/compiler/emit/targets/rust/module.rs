@@ -1239,6 +1239,10 @@ const HEADER: &str = r#"
 use @RT@ as rt;
 
 pub const REQUIRED_RUNTIME_ABI: u32 = @ABI@;
+const _: () = assert!(
+    rt::RUNTIME_ABI == REQUIRED_RUNTIME_ABI,
+    "Plotnik runtime ABI mismatch"
+);
 "#;
 
 const MOD_HEADER: &str = r#"
@@ -1563,13 +1567,13 @@ loop {
 "#;
 
 const RETRY_CHECKPOINT_COMPACT: &str = r#"
-if @POLICY@.admits(eng.node_class()) {
+if @POLICY@.admits(&eng.node()) {
     eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), @STATE@));
 }
 "#;
 
 const RETRY_CHECKPOINT_EXPANDED: &str = r#"
-if @POLICY@.admits(eng.node_class()) {
+if @POLICY@.admits(&eng.node()) {
     eng.push_checkpoint(rt::Checkpoint::match_retry(
         eng.checkpoint_state(),
         @STATE@,

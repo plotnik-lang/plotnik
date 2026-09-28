@@ -3,10 +3,14 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const GRAMMARS: &[(&str, &str)] = &[
-    ("arborium_javascript", "JAVASCRIPT"),
-    ("arborium_typescript", "TYPESCRIPT"),
-    ("arborium_dart", "DART"),
+const GRAMMARS: &[(&str, &str, &str)] = &[
+    ("tree_sitter_dart", "DART", "src/grammar.json"),
+    ("tree_sitter_javascript", "JAVASCRIPT", "src/grammar.json"),
+    (
+        "tree_sitter_typescript",
+        "TYPESCRIPT",
+        "typescript/src/grammar.json",
+    ),
 ];
 
 fn main() {
@@ -31,7 +35,7 @@ fn main() {
         .find(|node| node.id == package.id)
         .expect("plotnik-tests must be in the resolved dependency graph");
 
-    for &(dependency, key) in GRAMMARS {
+    for &(dependency, key, relative_path) in GRAMMARS {
         let dependency_id = &node
             .deps
             .iter()
@@ -47,7 +51,7 @@ fn main() {
             .manifest_path
             .parent()
             .unwrap_or_else(|| panic!("{dependency} package must have a parent directory"));
-        let grammar_path = root.join("grammar/src/grammar.json");
+        let grammar_path = root.join(relative_path);
         if !grammar_path.is_file() {
             panic!("{dependency} grammar.json must exist at {grammar_path}");
         }

@@ -1,4 +1,4 @@
-.PHONY: check clippy test test-arborium codegen-rust lint-codegen-rust test-codegen-rust bench coverage coverage-lines check-wasm wasm-web clean
+.PHONY: check clippy test codegen-rust lint-codegen-rust test-codegen-rust bench coverage coverage-lines check-wasm wasm-web clean
 
 LLVM_PREFIX ?= /opt/homebrew/opt/llvm
 WASM_CC ?= $(LLVM_PREFIX)/bin/clang
@@ -34,44 +34,6 @@ test:
 		--quiet \
 		-- \
 		$(FILTER)
-
-test-arborium:
-	@cargo test \
-		--manifest-path crates/plotnik-rt-arborium/Cargo.toml \
-		--all-targets \
-		--all-features \
-		--quiet
-	@cargo clippy \
-		--manifest-path crates/plotnik-rt-arborium/Cargo.toml \
-		--all-targets \
-		--all-features \
-		-- \
-		-D warnings
-	@cargo clippy \
-		--manifest-path crates/plotnik-arborium/Cargo.toml \
-		--all-targets \
-		--all-features \
-		-- \
-		-D warnings
-	@mkdir -p target/arborium-smoke
-	@grammar_dir=$$(cargo metadata --locked --format-version 1 \
-		--manifest-path examples/arborium/Cargo.toml \
-		| jq -r '.packages[] | select(.name == "arborium-javascript") | .manifest_path | sub("/Cargo.toml$$"; "/grammar/src")'); \
-		test -f "$$grammar_dir/grammar.json"; \
-		cd "$$grammar_dir" && cargo run \
-			--manifest-path "$(CURDIR)/Cargo.toml" \
-			--package plotnik-cli \
-			--locked \
-			--quiet \
-			-- gen "$(CURDIR)/examples/arborium/query.ptk" \
-			--grammar grammar.json \
-			--target rust \
-			--output "$(CURDIR)/target/arborium-smoke/generated.rs"
-	@cmp examples/arborium/src/generated.rs target/arborium-smoke/generated.rs
-	@cargo run \
-		--manifest-path examples/arborium/Cargo.toml \
-		--locked \
-		--quiet
 
 codegen-rust:
 	@cargo build \

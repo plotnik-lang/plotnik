@@ -10,9 +10,9 @@ pub enum Language {
 #[must_use]
 pub fn parse(language: Language, source: &str) -> Tree {
     let language = match language {
-        Language::JavaScript => arborium_javascript::language().into(),
-        Language::TypeScript => arborium_typescript::language().into(),
-        Language::Dart => arborium_dart::language().into(),
+        Language::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
+        Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+        Language::Dart => tree_sitter_dart::LANGUAGE.into(),
     };
     let mut parser = Parser::new();
     parser

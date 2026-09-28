@@ -3,12 +3,12 @@
 
 plotnik::query! {
     "A = (program (expression_statement (identifier) @id))",
-    grammar = "arborium-javascript",
+    grammar = "tree-sitter-javascript",
 }
 
 plotnik::query! {
     "B = {(program)}",
-    grammar = "arborium-javascript",
+    grammar = "tree-sitter-javascript",
 }
 
 fn main() {}

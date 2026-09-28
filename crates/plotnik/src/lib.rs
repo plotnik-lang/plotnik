@@ -26,8 +26,8 @@
 //! ```
 //!
 //! There is no built-in language list: `grammar = "..."` names any package in
-//! your own dependency graph that ships a `grammar.json` (`tree-sitter-*`,
-//! `arborium-*`, or your own grammar crate), so the baked grammar is exactly
+//! your own dependency graph that ships a `grammar.json` (`tree-sitter-*` or
+//! your own grammar crate), so the baked grammar is exactly
 //! the version your lockfile resolves — the same package whose parser you
 //! link at runtime. The generated module double-checks every tree it is
 //! handed against that grammar and panics on version skew.

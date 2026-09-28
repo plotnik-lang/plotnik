@@ -11,18 +11,18 @@ fn parse(language: &Language, source: &str) -> Tree {
 }
 
 fn js() -> Language {
-    arborium_javascript::language().into()
+    tree_sitter_javascript::LANGUAGE.into()
 }
 
 mod queries {
     plotnik::query! {
         "Idents = (program (expression_statement (identifier) @id))",
-        grammar = "arborium-javascript",
+        grammar = "tree-sitter-javascript",
     }
 
     plotnik::query! {
         "Probe = {(program)}",
-        grammar = "arborium-javascript",
+        grammar = "tree-sitter-javascript",
     }
 }
 
@@ -42,7 +42,7 @@ mod tsx {
 
 mod from_file {
     plotnik::query! {
-        grammar = "arborium-javascript",
+        grammar = "tree-sitter-javascript",
         file = "macro_queries/idents.ptk",
     }
 }
@@ -50,7 +50,7 @@ mod from_file {
 mod limited {
     plotnik::query! {
         "Q = (program (expression_statement (identifier) @id))",
-        grammar = "arborium-javascript",
+        grammar = "tree-sitter-javascript",
         fuel = 1,
     }
 }
@@ -64,7 +64,7 @@ mod depth_limited {
         ]
         Q = (program (expression_statement (Expr) @expr))
         "#,
-        grammar = "arborium-javascript",
+        grammar = "tree-sitter-javascript",
         depth = 1,
     }
 }
@@ -72,7 +72,7 @@ mod depth_limited {
 mod skew {
     plotnik::query! {
         "Q = (program (expression_statement (identifier) @id))",
-        grammar = "arborium-javascript",
+        grammar = "tree-sitter-javascript",
     }
 }
 
@@ -96,11 +96,10 @@ fn facade_executes_generated_types_from_multiple_expansions() {
 #[test]
 fn grammar_packages_and_file_form_resolve() {
     let source = "x;";
-    let arborium_tree = parse(&js(), source);
     let javascript_tree = parse(&tree_sitter_javascript::LANGUAGE.into(), source);
     let tsx_tree = parse(&tree_sitter_typescript::LANGUAGE_TSX.into(), source);
 
-    assert!(from_file::Q::matches(&arborium_tree, source).expect("auto limits fit"));
+    assert!(from_file::Q::matches(&javascript_tree, source).expect("auto limits fit"));
     assert!(tree_sitter_package::Q::matches(&javascript_tree, source).expect("auto limits fit"));
     assert!(tsx::Q::matches(&tsx_tree, source).expect("auto limits fit"));
 }
@@ -124,10 +123,10 @@ fn compiled_limits_reject_work_at_their_distinct_boundaries() {
 #[test]
 fn wrong_language_tree_panics_with_version_skew() {
     let source = "void main() {}";
-    let tree = parse(&arborium_dart::language().into(), source);
+    let tree = parse(&tree_sitter_dart::LANGUAGE.into(), source);
 
     let panic = std::panic::catch_unwind(|| skew::Q::parse(&tree, source))
-        .expect_err("the language check must reject a dart tree");
+        .expect_err("the language check must reject a Dart tree");
     let message = panic
         .downcast_ref::<String>()
         .map(String::as_str)

@@ -617,15 +617,15 @@ impl Lang {
         match ext {
             None | Some("js") | Some("javascript") | Some("jsx") => Ok(Lang {
                 grammar: javascript_grammar(),
-                ts: arborium_javascript::language().into(),
+                ts: tree_sitter_javascript::LANGUAGE.into(),
             }),
             Some("ts") | Some("typescript") => Ok(Lang {
                 grammar: typescript_grammar(),
-                ts: arborium_typescript::language().into(),
+                ts: tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
             }),
             Some("dart") => Ok(Lang {
                 grammar: dart_grammar(),
-                ts: arborium_dart::language().into(),
+                ts: tree_sitter_dart::LANGUAGE.into(),
             }),
             Some(other) => Err(format!(
                 "source language `{other}` is not wired into the snapshot suite yet (have: javascript, typescript, dart)"
@@ -642,24 +642,33 @@ impl Lang {
     }
 }
 
-/// Define a lazily-loaded `&'static Grammar` from the `grammar.json` shipped by
-/// the arborium dev-dependency. One per wired language.
 macro_rules! grammar_loader {
-    ($name:ident, $package:literal) => {
+    ($name:ident, $json:path, $description:literal) => {
         fn $name() -> &'static Grammar {
             static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-                let raw = RawGrammar::from_json(support::load_arborium_grammar_json($package))
-                    .expect(concat!($package, " grammar fixture"));
-                Grammar::from_raw(&raw).expect(concat!($package, " grammar metadata"))
+                let raw = RawGrammar::from_json($json()).expect(concat!($description, " fixture"));
+                Grammar::from_raw(&raw).expect(concat!($description, " metadata"))
             });
             &GRAMMAR
         }
     };
 }
 
-grammar_loader!(javascript_grammar, "arborium-javascript");
-grammar_loader!(typescript_grammar, "arborium-typescript");
-grammar_loader!(dart_grammar, "arborium-dart");
+grammar_loader!(
+    dart_grammar,
+    support::grammar_loader::dart_grammar_json,
+    "dart grammar"
+);
+grammar_loader!(
+    javascript_grammar,
+    support::javascript_grammar_json,
+    "javascript grammar"
+);
+grammar_loader!(
+    typescript_grammar,
+    support::grammar_loader::typescript_grammar_json,
+    "typescript grammar"
+);
 
 fn source_map(query: &str) -> SourceMap {
     let mut sm = SourceMap::new();

@@ -282,16 +282,8 @@ impl<'t> CursorWrapper<'t> {
     }
 
     #[inline]
-    pub fn node_class(node: &Node<'_>) -> NodeClass {
-        NodeClass {
-            anonymous: !node.is_named(),
-            extra: node.is_extra(),
-        }
-    }
-
-    #[inline]
     pub fn is_trivia(node: &Node<'_>) -> bool {
-        SkipClass::Trivia.admits(Self::node_class(node))
+        SkipClass::Trivia.admits(NodeClass::from_node(node))
     }
 
     /// Navigate according to Nav command, preparing for match attempt.
@@ -338,7 +330,7 @@ impl<'t> CursorWrapper<'t> {
             return true;
         }
         loop {
-            if !skip_class.admits(Self::node_class(&self.cursor.node())) {
+            if !skip_class.admits(NodeClass::from_node(&self.cursor.node())) {
                 self.goto_descendant(origin);
                 return false;
             }
@@ -400,7 +392,7 @@ impl<'t> CursorWrapper<'t> {
             UpMode::SkipTrivia => self.is_last_child_skipping(Self::is_trivia),
             UpMode::SkipExtras => {
                 let skip_class = mode.skip_class();
-                self.is_last_child_skipping(|n| skip_class.admits(Self::node_class(n)))
+                self.is_last_child_skipping(|n| skip_class.admits(NodeClass::from_node(n)))
             }
         }
     }
@@ -433,7 +425,7 @@ impl<'t> CursorWrapper<'t> {
         match policy {
             SkipPolicy::Exact => false,
             SkipPolicy::Trivia | SkipPolicy::Extras => {
-                if !policy.admits(Self::node_class(&self.cursor.node())) {
+                if !policy.admits(&self.cursor.node()) {
                     return false;
                 }
                 self.cursor.goto_next_sibling()

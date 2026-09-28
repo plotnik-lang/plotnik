@@ -35,9 +35,9 @@ impl<'s, 't> NodeValue<'s, 't> {
     }
 }
 
-/// Slice `node`'s span out of the source. The concrete runtime owns this so
+/// Slice `node`'s span out of the source. The runtime owns this so
 /// generated matchers slice predicate text identically to the VM.
-pub(crate) use plotnik_runtime::node_text;
+pub(crate) use plotnik_rt::node_text;
 
 impl Serialize for NodeValue<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

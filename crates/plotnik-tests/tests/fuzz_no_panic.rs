@@ -67,7 +67,7 @@ fn source_smoke_module() -> &'static Module {
 
 fn parse_js(source: &str) -> Tree {
     let mut parser = TsParser::new();
-    let language: TsLanguage = arborium_javascript::language().into();
+    let language: TsLanguage = tree_sitter_javascript::LANGUAGE.into();
     parser
         .set_language(&language)
         .expect("set javascript language");

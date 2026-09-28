@@ -5,7 +5,7 @@ use tree_sitter::Node;
 
 use crate::bytecode::{Module, SpanKind};
 
-use plotnik_runtime::{JournalEvent, MatchJournal};
+use plotnik_rt::{JournalEvent, MatchJournal};
 
 #[derive(Debug, Serialize)]
 pub struct ResultProvenanceEntry {

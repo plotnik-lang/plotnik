@@ -3,7 +3,7 @@
 // error from inside the expansion.
 
 plotnik::query! {
-    grammar = "arborium-javascript",
+    grammar = "tree-sitter-javascript",
     r#"
     HTTPServer = (program)
     HttpServer = (program)

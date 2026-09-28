@@ -1,29 +1,16 @@
-//! Language registry for the wasm bundle.
+//! Tree-sitter languages compiled into the WASM bundle.
 //!
-//! One `define_langs!` row per language, gated by a cargo feature. Runnable languages are fixed at
-//! bundle build time (a tree-sitter `Tree` can't cross wasm instances — see
-//! `docs/wip/playground-design.md` §6), so growing the set means growing
-//! this table.
-//!
-//! Adding a language touches four places:
-//! 1. `Cargo.toml`: a `lang-*` feature and its `arborium-*` dependency
-//! 2. `build.rs`: `arborium_package_to_feature`
-//! 3. a `define_langs!` row below
-//! 4. the playground selector: `web/src/components/playground/Playground.tsx`
+//! `grammars.rs` supplies both the build inputs and the runtime registry.
 
 use plotnik_lib::GrammarIdentity;
 use plotnik_lib::grammar::Grammar;
-use std::sync::OnceLock;
 use tree_sitter::{Language, Parser, Tree};
 
-/// A language the bundle can run queries against: the tree-sitter parser
-/// plus the Plotnik grammar metadata queries compile against.
+/// A parser and the grammar metadata used to compile queries against it.
 pub struct Lang {
-    grammar_json: &'static str,
-    source: &'static str,
-    ts_language: Language,
+    // WASM language handles are thread-bound. Cache metadata, then create a handle per parser.
+    language: fn() -> Language,
     grammar: Grammar,
-    identity: OnceLock<GrammarIdentity>,
 }
 
 impl Lang {
@@ -32,66 +19,55 @@ impl Lang {
     }
 
     pub fn identity(&self) -> &GrammarIdentity {
-        self.identity.get_or_init(|| {
-            GrammarIdentity::from_json_bytes(
-                self.grammar.name(),
-                self.grammar_json.as_bytes(),
-                self.source,
-            )
-        })
+        self.grammar
+            .identity()
+            .expect("embedded grammar has an identity")
     }
 
     pub fn parse_source(&self, source: &str) -> Tree {
         let mut parser = Parser::new();
+        let language = (self.language)();
         parser
-            .set_language(&self.ts_language)
+            .set_language(&language)
             .expect("failed to set language");
         parser.parse(source, None).expect("failed to parse source")
     }
 }
 
-/// build.rs embeds each enabled grammar's compacted `grammar.json`
-/// (uncompressed — the served bundle is compressed as a whole).
-#[cfg(any(feature = "lang-javascript", feature = "lang-typescript"))]
-fn load_grammar(json: &str, name: &str, source: &str) -> Grammar {
-    use plotnik_lib::grammar::raw::RawGrammar;
+macro_rules! define_grammars {
+    ($($name:ident => {
+        feature: $feature:literal,
+        dependency: $dependency:literal,
+        parser_dir: $parser_dir:literal,
+        symbol: $symbol:ident,
+        aliases: [$($alias:literal),* $(,)?],
+    }),* $(,)?) => {
+        #[cfg(any($(feature = $feature),*))]
+        fn load_grammar(json: &str, source: &str) -> Grammar {
+            use plotnik_lib::grammar::raw::RawGrammar;
 
-    let raw = RawGrammar::from_json(json)
-        .unwrap_or_else(|error| panic!("invalid embedded {name} grammar JSON: {error}"));
-    Grammar::from_raw(&raw)
-        .unwrap_or_else(|error| panic!("invalid embedded {name} grammar metadata: {error}"))
-        .with_identity(GrammarIdentity::from_json_bytes(
-            name,
-            json.as_bytes(),
-            source,
-        ))
-}
+            let raw = RawGrammar::from_json(json)
+                .unwrap_or_else(|error| panic!("invalid embedded {source} grammar JSON: {error}"));
+            let identity = GrammarIdentity::from_json_bytes(&raw.name, json.as_bytes(), source);
+            Grammar::from_raw(&raw)
+                .unwrap_or_else(|error| panic!("invalid embedded {source} grammar metadata: {error}"))
+                .with_identity(identity)
+        }
 
-macro_rules! define_langs {
-    (
-        $(
-            $fn_name:ident => {
-                feature: $feature:literal,
-                name: $name:literal,
-                ts_lang: $ts_lang:expr,
-                env_suffix: $env_suffix:literal,
-                names: [$($alias:literal),* $(,)?] $(,)?
-            }
-        ),* $(,)?
-    ) => {
         $(
             #[cfg(feature = $feature)]
-            fn $fn_name() -> &'static Lang {
+            fn $name() -> &'static Lang {
+                unsafe extern "C" {
+                    fn $symbol() -> *const ();
+                }
+
                 static LANGUAGE: std::sync::LazyLock<Lang> = std::sync::LazyLock::new(|| Lang {
-                    grammar_json: include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", $env_suffix))),
-                    source: env!(concat!("PLOTNIK_WASM_GRAMMAR_SOURCE_", $env_suffix)),
-                    ts_language: $ts_lang.into(),
+                    // The build script compiles this entry point from the same package as the JSON.
+                    language: || unsafe { tree_sitter_language::LanguageFn::from_raw($symbol) }.into(),
                     grammar: load_grammar(
-                        include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", $env_suffix))),
-                        $name,
-                        env!(concat!("PLOTNIK_WASM_GRAMMAR_SOURCE_", $env_suffix)),
+                        include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", stringify!($name)))),
+                        env!(concat!("PLOTNIK_WASM_GRAMMAR_SOURCE_", stringify!($name))),
                     ),
-                    identity: std::sync::OnceLock::new(),
                 });
                 &LANGUAGE
             }
@@ -101,7 +77,7 @@ macro_rules! define_langs {
             match input.to_ascii_lowercase().as_str() {
                 $(
                     #[cfg(feature = $feature)]
-                    $($alias)|* => Some($fn_name()),
+                    stringify!($name) $(| $alias)* => Some($name()),
                 )*
                 _ => None,
             }
@@ -111,40 +87,26 @@ macro_rules! define_langs {
             &[
                 $(
                     #[cfg(feature = $feature)]
-                    $name,
+                    stringify!($name),
                 )*
             ]
         }
     };
 }
 
-define_langs! {
-    javascript => {
-        feature: "lang-javascript",
-        name: "javascript",
-        ts_lang: arborium_javascript::language(),
-        env_suffix: "JAVASCRIPT",
-        names: ["javascript", "js", "jsx", "ecmascript", "es"],
-    },
-    typescript => {
-        feature: "lang-typescript",
-        name: "typescript",
-        ts_lang: arborium_typescript::language(),
-        env_suffix: "TYPESCRIPT",
-        names: ["typescript", "ts"],
-    },
-}
+include!("../grammars.rs");
 
-/// Resolve a user-supplied language name or alias. Unknown names are user
-/// error, reported as a message — this is the outside boundary, never panic.
+/// Resolve a user-supplied language name or alias.
 pub fn resolve(input: &str) -> Result<&'static Lang, String> {
     if let Some(lang) = from_name(input) {
         return Ok(lang);
     }
+
     let supported = supported_names();
     if supported.is_empty() {
         return Err("no languages are enabled in this plotnik-wasm build".to_string());
     }
+
     Err(format!(
         "unsupported language: {input}; supported languages: {}",
         supported.join(", ")

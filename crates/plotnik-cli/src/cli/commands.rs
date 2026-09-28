@@ -71,10 +71,9 @@ pub fn generate_command() -> Command {
   plotnik gen query.ptk --grammar path/to/grammar.json --target rust
   plotnik gen query.ptk --grammar path/to/grammar.json --target rust -o query.rs
 
-The generated module imports `plotnik_rt`. Depend on `plotnik-rt` for
-Tree-sitter or `plotnik-rt-arborium` for Arborium; both packages expose that
-crate name. The module records the exact grammar name, SHA-256, and source used
-during binding."#,
+The generated module imports `plotnik_rt`. Depend on `plotnik-rt` to use it.
+The module records the exact grammar name, SHA-256, and source used during
+binding."#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")

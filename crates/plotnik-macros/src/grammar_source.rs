@@ -2,8 +2,8 @@
 //!
 //! There is deliberately no built-in language registry and no per-language
 //! feature flags here: the caller's own dependency graph is the registry.
-//! Any package that ships a `grammar.json` works — `tree-sitter-*` crates,
-//! `arborium-*` crates, or a local grammar crate — and the grammar version
+//! Any package that ships a `grammar.json` works, including `tree-sitter-*`
+//! crates and local grammar crates, and the grammar version
 //! is exactly the package version the caller's lockfile resolved, i.e. the
 //! same package whose parser they link at runtime. A filesystem path is the
 //! escape hatch for grammars that live outside the graph.
@@ -203,7 +203,7 @@ fn select_dependency_package<'a>(
         [] => Err(format!(
             "package `{name}` is not in this crate's dependency graph; add it \
                  to [dependencies] — any crate that ships a grammar.json works \
-                 (tree-sitter-*, arborium-*, or your own grammar crate)"
+                 (tree-sitter-* or your own grammar crate)"
         )),
         [package] => Ok(*package),
         several => {

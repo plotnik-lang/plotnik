@@ -204,8 +204,8 @@ const DECODE_FRAME_OVERHEAD_BYTES: u64 = 512;
 
 /// Space reserved for one native node handle in generated decoder frames.
 ///
-/// Concrete runtime crates assert that their selected binding's `Node` fits
-/// this estimate, so the compiler can use one backend-independent model.
+/// Execution builds assert that `tree_sitter::Node` fits this estimate, allowing
+/// the compiler to estimate frames without linking Tree-sitter.
 #[doc(hidden)]
 pub const GENERATED_NODE_VALUE_BYTES: u64 = 48;
 

@@ -15,12 +15,11 @@
 //! input — failures come back as `{error}` payloads or a rejected `compile`,
 //! never a panic. Past that validation the engine is trusted and asserts.
 
-#[cfg(target_family = "wasm")]
-mod libc_shims;
-
 mod langs;
 mod wire;
 
+#[cfg(test)]
+mod langs_tests;
 #[cfg(test)]
 mod wire_tests;
 

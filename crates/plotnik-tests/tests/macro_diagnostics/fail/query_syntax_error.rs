@@ -2,7 +2,7 @@
 // inside compile_error!.
 
 plotnik::query! {
-    grammar = "arborium-javascript",
+    grammar = "tree-sitter-javascript",
     r#"
     Q = (program
       (expression_statement (identifier) @id)

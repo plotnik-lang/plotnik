@@ -29,7 +29,7 @@ mod grammar_source;
 ///
 /// - `grammar = "..."` (required) — where the grammar comes from:
 ///   - a package name from your dependency graph (`"tree-sitter-javascript"`,
-///     `"arborium-javascript"`, any crate shipping a `grammar.json`),
+///     any crate shipping a `grammar.json`),
 ///   - `"package/subgrammar"` when one package ships several grammars
 ///     (`"tree-sitter-typescript/tsx"`),
 ///   - a `grammar.json` path (`"./grammars/mylang.json"`, resolved like

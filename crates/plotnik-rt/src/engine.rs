@@ -95,12 +95,6 @@ impl<'t> Engine<'t> {
         self.cursor.node()
     }
 
-    /// Classification used by sibling-skip policies for the current node.
-    #[inline]
-    pub fn node_class(&self) -> crate::NodeClass {
-        CursorWrapper::node_class(&self.node())
-    }
-
     /// The current rollbackable match journal.
     #[inline]
     pub fn journal(&self) -> &MatchJournal<'t> {

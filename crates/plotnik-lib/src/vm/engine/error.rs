@@ -1,6 +1,6 @@
 //! Runtime errors and control-flow signals for VM execution.
 
-use plotnik_runtime::CallFrameError;
+use plotnik_rt::CallFrameError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {

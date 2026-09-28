@@ -1,6 +1,6 @@
 plotnik::query! {
     "Q = (program)",
-    grammar = "arborium-javascript",
+    grammar = "tree-sitter-javascript",
     depth = nope,
 }
 

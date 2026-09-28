@@ -31,10 +31,11 @@ impl SkipPolicy {
         }
     }
 
-    /// Whether this policy may skip a node with `class` while searching or
+    /// Whether this policy may skip `node` while searching or
     /// resuming past a failed candidate.
-    pub fn admits(self, class: crate::NodeClass) -> bool {
-        self.skip_class().admits(class)
+    #[cfg(feature = "execution")]
+    pub fn admits(self, node: &tree_sitter::Node<'_>) -> bool {
+        self.skip_class().admits(crate::NodeClass::from_node(node))
     }
 }
 

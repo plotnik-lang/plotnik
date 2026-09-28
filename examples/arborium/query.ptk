@@ -1,1 +1,0 @@
-Standalone = (program (expression_statement (identifier) @id))

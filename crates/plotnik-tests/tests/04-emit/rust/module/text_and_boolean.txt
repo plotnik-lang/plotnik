@@ -10,7 +10,11 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 5;
+pub const REQUIRED_RUNTIME_ABI: u32 = 0;
+const _: () = assert!(
+    rt::RUNTIME_ABI == REQUIRED_RUNTIME_ABI,
+    "Plotnik runtime ABI mismatch"
+);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'s> {

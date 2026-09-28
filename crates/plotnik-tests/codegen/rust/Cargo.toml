@@ -5,10 +5,10 @@ edition = "2024"
 publish = false
 
 [dependencies]
-arborium-dart = "=2.18.1"
-arborium-javascript = "=2.18.1"
-arborium-typescript = "=2.18.1"
 plotnik-rt = { path = "../../../plotnik-rt", features = ["debug"] }
 tree-sitter = "=0.27.0"
+tree-sitter-dart = "=0.2.0"
+tree-sitter-javascript = "=0.25.0"
+tree-sitter-typescript = "=0.23.2"
 
 [workspace]

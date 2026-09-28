@@ -2,7 +2,7 @@ error: missing the query: pass a string literal or `file = "..."`
  --> tests/macro_diagnostics/fail/missing_query.rs:1:1
   |
 1 | / plotnik::query! {
-2 | |     grammar = "arborium-javascript",
+2 | |     grammar = "tree-sitter-javascript",
 3 | | }
   | |_^
   |

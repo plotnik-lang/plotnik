@@ -3,7 +3,7 @@
 // file-backed path doesn't degrade the UX to a bare span on `file = "..."`.
 
 plotnik::query! {
-    grammar = "arborium-javascript",
+    grammar = "tree-sitter-javascript",
     file = "broken_query.ptk",
 }
 
