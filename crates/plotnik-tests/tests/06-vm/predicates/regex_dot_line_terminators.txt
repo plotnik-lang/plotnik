@@ -42,15 +42,15 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (comment) [Node RecordSet(M0)] =~ /^\/\*..\*\/$/  4
-  4  ─‣┘  _                                 5
-  5                                         ▶
+  1  └‣─  (comment) [Node RecordSet(M0)] =~ /^\/\*..\*\/$/  3
+  3  ─‣┘  _                                 4
+  4                                         ▶
 --------------------- TRACE ----------------------
 Q:
   0       (program)                         01
       ●   program
-  1       (comment) [Node RecordSet(M0)] =~ /^\/\*..\*\/$/  04
+  1       (comment) [Node RecordSet(M0)] =~ /^\/\*..\*\/$/  03
       ●   comment
-  4       _                                 05
+  3       _                                 04
       ●   program
-  5   ◀   (Q)                               ◼
+  4   ◀   (Q)                               ◼

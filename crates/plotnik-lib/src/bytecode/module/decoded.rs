@@ -52,7 +52,6 @@ impl DecodedMatch {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct DecodedPredicate {
     pub(crate) op: PredicateOp,
-    pub(crate) is_regex: bool,
     pub(crate) value_ref: u16,
 }
 
@@ -143,8 +142,7 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                 program.successors.extend(m.successors());
 
                 let predicate = m.predicate().map(|p| DecodedPredicate {
-                    op: PredicateOp::from_byte(p.op),
-                    is_regex: p.is_regex,
+                    op: p.op,
                     value_ref: p.value_ref,
                 });
 

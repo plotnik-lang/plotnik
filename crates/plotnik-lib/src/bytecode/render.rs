@@ -6,7 +6,6 @@ use super::format::format_effect;
 use super::instructions::Match;
 use super::module::Module;
 use super::node_kind_constraint::NodeKindConstraint;
-use super::predicate_op::PredicateOp;
 
 pub(crate) struct ModuleRenderContext {
     node_kind_names: BTreeMap<NodeKindId, String>,
@@ -142,8 +141,8 @@ impl<'a> MatchRenderer<'a> {
         if !m.is_epsilon()
             && let Some(predicate) = m.predicate()
         {
-            let op = PredicateOp::from_byte(predicate.op);
-            let value = if predicate.is_regex {
+            let op = predicate.op;
+            let value = if op.is_regex_op() {
                 let pattern = self.context.regex_pattern(predicate.value_ref as usize);
                 format!("/{}/", pattern)
             } else {

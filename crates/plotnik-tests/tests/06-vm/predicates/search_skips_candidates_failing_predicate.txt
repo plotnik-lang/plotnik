@@ -48,9 +48,9 @@ Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
   2  └‣─  (binary_expression)               3
-  3  └‣─  (identifier) [Node RecordSet(M0)] == "b"  6
-  6  ─‣┘³ _                                 7
-  7                                         ▶
+  3  └‣─  (identifier) [Node RecordSet(M0)] == "b"  5
+  5  ─‣┘³ _                                 6
+  6                                         ▶
 --------------------- TRACE ----------------------
 Q:
   0       (program)                         01
@@ -59,9 +59,9 @@ Q:
       ●   expression_statement
   2       (binary_expression)               03
       ●   binary_expression
-  3       (identifier) [Node RecordSet(M0)] == "b"  06
+  3       (identifier) [Node RecordSet(M0)] == "b"  05
       ○   +
       ●   identifier
-  6       _                                 07
+  5       _                                 06
       ●   program
-  7   ◀   (Q)                               ◼
+  6   ◀   (Q)                               ◼

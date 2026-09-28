@@ -195,8 +195,12 @@ fn successor_budget(m: &MatchIR) -> usize {
     // effects, neg fields, and predicate (`MatchIR::resolve` panics on a combined
     // overflow). Budget the successor split against those other slots — not the bare
     // 28 — so the kept successors plus the cascade entry appended below land exactly at
-    // the limit, never one over. (`other_slots` ≤ 15+7+2, so the budget stays ≥ 4.)
-    let predicate_slots = if m.predicate.is_some() { 2 } else { 0 };
+    // the limit, never one over. (`other_slots` ≤ 15+7+1, so the budget stays ≥ 5.)
+    let predicate_slots = if m.predicate.is_some() {
+        crate::bytecode::PREDICATE_SLOTS
+    } else {
+        0
+    };
     let other_slots = m.effects.len() + m.neg_fields.len() + predicate_slots;
     MAX_MATCH_PAYLOAD_SLOTS - other_slots
 }

@@ -75,18 +75,19 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _                                14, 22
+  03  └─!  _                                14, 26
   05                                        ▶
   06  ─‣┘³ _                                05
   07  ...
   08  ─‣─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  06
   11  ─•─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  06
-  14   !   "["                              27, 16
+  14   !   "["                              24, 16
   16  ─‣─  (identifier) [Absent RecordSet(M2) Node RecordSet(M3)] == "b"  06
   19   !   (identifier) [VariantOpen(M0) VariantClose] == "a"  11
-  22  ──!  _                                14, 22
-  24   !   (identifier) [VariantOpen(M1) VariantClose] == "x"  08
-  27  ──!  _                                19, 24, 27
+  21   !   (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  23  ...
+  24  ──!  _                                19, 21, 24
+  26  ──!  _                                14, 26
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
@@ -95,56 +96,56 @@ Q:
        ●   expression_statement
   02       (array)                          03
        ●   array
-  03       _                                14, 22
+  03       _                                14, 26
        ●   [
-  14       "["                              27, 16
+  14       "["                              24, 16
        ●   [
-  27       _                                19, 24, 27
+  24       _                                19, 21, 24
        ●   identifier
   19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
        ●   identifier
   11       (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  06
        ○   ,
-  27  ❮❮❮ 
-  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
-  27  ❮❮❮ 
-  27       _                                19, 24, 27
+  24  ❮❮❮ 
+  21       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  24  ❮❮❮ 
+  24       _                                19, 21, 24
        ●   ,
   19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
        ○   ,
-  27  ❮❮❮ 
-  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  24  ❮❮❮ 
+  21       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
        ○   ,
-  27  ❮❮❮ 
-  27       _                                19, 24, 27
+  24  ❮❮❮ 
+  24       _                                19, 21, 24
        ●   identifier
   19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
-  27  ❮❮❮ 
-  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
-  27  ❮❮❮ 
-  27       _                                19, 24, 27
+  24  ❮❮❮ 
+  21       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  24  ❮❮❮ 
+  24       _                                19, 21, 24
        ●   ,
   19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
        ○   ,
-  27  ❮❮❮ 
-  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  24  ❮❮❮ 
+  21       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
        ○   ,
-  27  ❮❮❮ 
-  27       _                                19, 24, 27
+  24  ❮❮❮ 
+  24       _                                19, 21, 24
        ●   identifier
   19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
-  27  ❮❮❮ 
-  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
-  27  ❮❮❮ 
-  27       _                                19, 24, 27
+  24  ❮❮❮ 
+  21       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  24  ❮❮❮ 
+  24       _                                19, 21, 24
        ●   ]
   19       (identifier) [VariantOpen(M0) VariantClose] == "a"  11
        ○   ]
-  27  ❮❮❮ 
-  24       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
+  24  ❮❮❮ 
+  21       (identifier) [VariantOpen(M1) VariantClose] == "x"  08
        ○   ]
-  27  ❮❮❮ 
-  27       _                                19, 24, 27
+  24  ❮❮❮ 
+  24       _                                19, 21, 24
   14  ❮❮❮ 
   16       (identifier) [Absent RecordSet(M2) Node RecordSet(M3)] == "b"  06
        ○   ,

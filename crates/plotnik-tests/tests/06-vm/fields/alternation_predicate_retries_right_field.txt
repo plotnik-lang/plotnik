@@ -57,32 +57,32 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └─!  _                                11, 16, 18
+  02  └─!  _                                10, 14, 16
   04  ─‣┘  _                                05
   05  ─‣┘² _                                06
   06                                        ▶
   07  ...
   08  └‣─  left: (identifier) [Node RecordSet(M0)] == "target"  04
-  11   !   (binary_expression) [Absent RecordSet(M1)]  08
-  13  └‣─  right: (identifier) [Node RecordSet(M1)] == "target"  04
-  16   !   (binary_expression) [Absent RecordSet(M0)]  13
-  18  ──!  _                                11, 16, 18
+  10   !   (binary_expression) [Absent RecordSet(M1)]  08
+  12  └‣─  right: (identifier) [Node RecordSet(M1)] == "target"  04
+  14   !   (binary_expression) [Absent RecordSet(M0)]  12
+  16  ──!  _                                10, 14, 16
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
        ●   program
   01       (expression_statement)           02
        ●   expression_statement
-  02       _                                11, 16, 18
+  02       _                                10, 14, 16
        ●   binary_expression
-  11       (binary_expression) [Absent RecordSet(M1)]  08
+  10       (binary_expression) [Absent RecordSet(M1)]  08
        ●   binary_expression
   08       left: (identifier) [Node RecordSet(M0)] == "target"  04
        ○   +
   02  ❮❮❮ 
-  16       (binary_expression) [Absent RecordSet(M0)]  13
+  14       (binary_expression) [Absent RecordSet(M0)]  12
        ●   binary_expression
-  13       right: (identifier) [Node RecordSet(M1)] == "target"  04
+  12       right: (identifier) [Node RecordSet(M1)] == "target"  04
        ○   +
        ●   identifier
   04       _                                05

@@ -57,19 +57,19 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _                                07, 22
+  03  └─!  _                                21, 22
   05                                        ▶
-  06  ─‣┘³ _                                05
-  07   !   "["                              24
-  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  06
-  11  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  06
-  14                                        ▶
-  15                                        ▶ p1
-  16   !   (identifier) == "a"              14
-  18  ──!  _                                16, 18
-  20  -ε-                                   18, 15
-  22  ──!  _                                07, 22
-  24       (@20)                            20 : 08 / 11
+  06  ─•─  (identifier) [Node RecordSet(M0)] == "b"  24
+  08  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  24
+  10                                        ▶
+  11                                        ▶ p1
+  12   !   (identifier) == "a"              10
+  14  ──!  _                                12, 14
+  16  -ε-                                   14, 11
+  18       (@16)                            16 : 06 / 08
+  21   !   "["                              18
+  22  ──!  _                                21, 22
+  24  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
@@ -78,31 +78,31 @@ Q:
        ●   expression_statement
   02       (array)                          03
        ●   array
-  03       _                                07, 22
+  03       _                                21, 22
        ●   [
-  07       "["                              24
+  21       "["                              18
        ●   [
-  24       (@20)                            20 : 08 / 11
-       ▶   (@20)
+  18       (@16)                            16 : 06 / 08
+       ▶   (@16)
 
-@20:
-  20  -ε-                                   18, 15
-  18       _                                16, 18
+@16:
+  16  -ε-                                   14, 11
+  14       _                                12, 14
        ●   identifier
-  16       (identifier) == "a"              14
-  18  ❮❮❮ 
-  18       _                                16, 18
+  12       (identifier) == "a"              10
+  14  ❮❮❮ 
+  14       _                                12, 14
        ●   ]
-  16       (identifier) == "a"              14
+  12       (identifier) == "a"              10
        ○   ]
-  18  ❮❮❮ 
-  18       _                                16, 18
-  20  ❮❮❮ 
-  15   ◀   (@20)                            p1
+  14  ❮❮❮ 
+  14       _                                12, 14
+  16  ❮❮❮ 
+  11   ◀   (@16)                            p1
 
 Q:
-  11       (identifier) [Node RecordSet(M0)] == "b"  06
+  08       (identifier) [Node RecordSet(M0)] == "b"  24
        ●   identifier
-  06       _                                05
+  24       _                                05
        ●   program
   05   ◀   (Q)                              ◼

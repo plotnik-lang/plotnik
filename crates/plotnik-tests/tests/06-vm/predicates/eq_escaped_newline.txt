@@ -54,9 +54,9 @@ Q:
   1  └‣─  (lexical_declaration)             2
   2  └‣─  (variable_declarator)             3
   3  └‣─  value: (template_string)          4
-  4  └‣─  (string_fragment) [Node RecordSet(M0)] == "a\nb"  7
-  7  ─‣┘⁴ _                                 8
-  8                                         ▶
+  4  └‣─  (string_fragment) [Node RecordSet(M0)] == "a\nb"  6
+  6  ─‣┘⁴ _                                 7
+  7                                         ▶
 --------------------- TRACE ----------------------
 Q:
   0       (program)                         01
@@ -70,9 +70,9 @@ Q:
       ○   identifier
       ○   =
       ●   template_string
-  4       (string_fragment) [Node RecordSet(M0)] == "a\nb"  07
+  4       (string_fragment) [Node RecordSet(M0)] == "a\nb"  06
       ○   `
       ●   string_fragment
-  7       _                                 08
+  6       _                                 07
       ●   program
-  8   ◀   (Q)                               ◼
+  7   ◀   (Q)                               ◼

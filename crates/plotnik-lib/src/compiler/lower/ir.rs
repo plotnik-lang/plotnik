@@ -538,11 +538,6 @@ impl PredicateIR {
             value: PredicateValueIR::Regex(pattern.into()),
         }
     }
-
-    /// Returns the operator as a u8 for bytecode encoding.
-    pub fn op_byte(&self) -> u8 {
-        self.op.to_byte()
-    }
 }
 
 /// Pre-layout instruction with symbolic references.
@@ -703,8 +698,11 @@ impl MatchIR {
             return 8;
         }
 
-        // Predicate occupies 2 slots: op_byte(u8) + is_regex(u8)|value_ref(u16).
-        let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
+        let predicate_slots = if self.predicate.is_some() {
+            crate::bytecode::PREDICATE_SLOTS
+        } else {
+            0
+        };
         let slots =
             self.effects.len() + self.neg_fields.len() + predicate_slots + self.successors.len();
 

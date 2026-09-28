@@ -60,18 +60,19 @@ N1: S05 → T2  ; Q
 
 [entry_points]
 Member = 00 :: T1
-Q      = 06 :: T2
+Q      = 05 :: T2
 
 [instructions]
 Member:
   00   !   (method_definition)              01
-  01  └‣─  name: (property_identifier) [Node RecordSet(M0)] == "b"  04
-  04  ─‣┘  _                                05
-  05                                        ▶
+  01  └‣─  name: (property_identifier) [Node RecordSet(M0)] == "b"  03
+  03  ─‣┘  _                                04
+  04                                        ▶
 
 Q:
-  06   !   (program)                        07
-  07  └‣─  (class_declaration)              08
+  05   !   (program)                        06
+  06  └‣─  (class_declaration)              08
+  07  ...
   08  └‣─  body: (class_body) [RecordOpen]  10
   10  └‣─  member: (Member)                 00 : 11
   11  -ε-  [RecordClose]                    13
@@ -79,9 +80,9 @@ Q:
   15                                        ▶
 --------------------- TRACE ----------------------
 Q:
-  06       (program)                        07
+  05       (program)                        06
        ●   program
-  07       (class_declaration)              08
+  06       (class_declaration)              08
        ●   class_declaration
   08       body: (class_body) [RecordOpen]  10
        ○   class
@@ -93,7 +94,7 @@ Q:
 Member:
   00       (method_definition)              01
        ●   method_definition
-  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  04
+  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  03
        ○   formal_parameters
        ○   statement_block
   10  ❮❮❮ 
@@ -102,11 +103,11 @@ Member:
 Member:
   00       (method_definition)              01
        ●   method_definition
-  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  04
+  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  03
        ●   property_identifier
-  04       _                                05
+  03       _                                04
        ●   method_definition
-  05   ◀   (Member)                         
+  04   ◀   (Member)                         
 
 Q:
   11  -ε-  [RecordClose]                    13

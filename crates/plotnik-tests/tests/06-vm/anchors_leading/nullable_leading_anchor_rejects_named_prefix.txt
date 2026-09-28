@@ -43,24 +43,24 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (array)                          11, 05
+  02  └‣─  (array)                          10, 05
   04                                        ▶
-  05  └•─  (identifier) [Node RecordSet(M0)] == "b"  13
-  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  13
-  11  └•─  (identifier) == "a"              08
-  13  ─‣┘³ _                                04
+  05  └•─  (identifier) [Node RecordSet(M0)] == "b"  07
+  07  ─‣┘³ _                                04
+  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  07
+  10  └•─  (identifier) == "a"              08
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
        ●   program
   01       (expression_statement)           02
        ●   expression_statement
-  02       (array)                          11, 05
+  02       (array)                          10, 05
        ●   array
-  11       (identifier) == "a"              08
+  10       (identifier) == "a"              08
        ○   [
   02  ❮❮❮ 
-  05       (identifier) [Node RecordSet(M0)] == "b"  13
+  05       (identifier) [Node RecordSet(M0)] == "b"  07
        ○   [
   02  ❮❮❮ 
   01  ❮❮❮ 

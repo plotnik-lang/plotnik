@@ -33,5 +33,5 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (identifier) [Node RecordSet(M0)] !~ /foo/  3
-  3                                         ▶
+  0   !   (identifier) [Node RecordSet(M0)] !~ /foo/  2
+  2                                         ▶

@@ -57,13 +57,13 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (call_expression)                03
-  03  └‣─  arguments: (arguments)           14, 06
+  03  └‣─  arguments: (arguments)           10, 12
   05                                        ▶
-  06  └‣─  ";"                              11
-  07  ─‣┘⁴ _                                05
-  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  07
-  11  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  07
-  14  └‣─  (identifier) == "a"              08
+  06  ─•─  (identifier) [Node RecordSet(M0)] == "b"  13
+  08  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  13
+  10  └‣─  (identifier) == "a"              06
+  12  └‣─  ";"                              08
+  13  ─‣┘⁴ _                                05
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
@@ -72,16 +72,16 @@ Q:
        ●   expression_statement
   02       (call_expression)                03
        ●   call_expression
-  03       arguments: (arguments)           14, 06
+  03       arguments: (arguments)           10, 12
        ○   identifier
        ●   arguments
-  14       (identifier) == "a"              08
+  10       (identifier) == "a"              06
        ○   (
        ●   identifier
-  08       (identifier) [Node RecordSet(M0)] == "b"  07
+  06       (identifier) [Node RecordSet(M0)] == "b"  13
        ○   ,
        ○   comment
        ●   identifier
-  07       _                                05
+  13       _                                05
        ●   program
   05   ◀   (Q)                              ◼

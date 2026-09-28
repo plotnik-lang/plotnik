@@ -6,8 +6,8 @@
 
 use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
-    MATCH_PAYLOAD_START, MatchCounts, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
-    PREDICATE_SLOTS, header_byte,
+    MATCH_PAYLOAD_START, MatchCounts, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE, PREDICATE_SLOTS,
+    header_byte,
 };
 use super::super::node_kind_constraint::NodeKindConstraint;
 use super::super::sections::SYMBOL_NAME_ENTRY_SIZE;
@@ -16,7 +16,6 @@ use super::super::{
     HEADER_SIZE, MAX_SPANS, SECTION_ALIGN, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, SpanKind, VERSION,
 };
 use super::*;
-use crate::bytecode::predicate_op::PredicateOp;
 use plotnik_rt::{Nav, NodeFieldId, NodeKindId, PortId};
 
 /// Bytecode validation error.
@@ -771,17 +770,11 @@ impl Module {
         let storage: &[u8] = &self.storage;
 
         let counts = read_operand_u16(storage, instr_off + 6)?;
-        // Bits 1-0 of the counts word are reserved (bit 2 is the `missing` flag,
-        // which the decoder does read); the decoder never reads the reserved bits,
-        // so a malformed set bit would pass validation unnoticed.
-        if MatchCounts::reserved_bits_set(counts) {
-            return Err(ModuleError::MalformedInstructionStream);
-        }
         let c = MatchCounts::unpack(counts);
         let effects = c.effects as usize;
         let neg = c.neg as usize;
         let succ = c.succ as usize;
-        let has_predicate = c.has_predicate;
+        let has_predicate = c.predicate.is_some();
 
         // Every payload slot the decoders read — effects, predicate, successors —
         // must lie within this instruction's fixed-size slot, or the iterators
@@ -830,40 +823,16 @@ impl Module {
             }
         }
 
-        if has_predicate {
+        if let Some(op) = c.predicate {
             let pred_off = instr_off + MATCH_PAYLOAD_START + (effects + neg) * PAYLOAD_SLOT_SIZE;
-            let b = storage
-                .get(pred_off..pred_off + PREDICATE_SIZE)
-                .ok_or(ModuleError::MalformedInstructionStream)?;
-            let op_and_flags = u16::from_le_bytes([b[0], b[1]]);
-            let (op, is_regex) = MatchPredicate::unpack_op_flags(op_and_flags);
-            let value_ref = u16::from_le_bytes([b[2], b[3]]);
-
-            // Bits above the operator and regex flag are reserved-zero
-            // (docs/bytecode/02-instructions.md), so a malformed set bit must
-            // not pass validation.
-            if MatchPredicate::reserved_bits_set(op_and_flags) {
-                return Err(ModuleError::InvalidPredicateOperand(addr));
-            }
-
-            // The operator must be a known predicate op, the regex flag must agree
-            // with the operator's class, and the operand must index its table —
-            // otherwise `PredicateOp::from_byte`, `at`, or the VM's
-            // op/flag `unreachable!` would panic when this predicate is evaluated
-            // or dumped. The regex operand must be a *real* entry (`1..count`):
-            // index 0 is the reserved sentinel that `load_regex_dfas` leaves empty,
-            // so its DFA slot is `None`, and the VM `.expect()`s a populated slot.
-            // A string operand of 0 is benign — the validated easter-egg entry,
-            // never asserted non-empty.
-            let Some(pred_op) = PredicateOp::try_from_byte(op) else {
-                return Err(ModuleError::InvalidPredicateOperand(addr));
-            };
-            let operand_ok = if is_regex {
+            let value_ref = read_operand_u16(storage, pred_off)?;
+            // Regex zero is an empty sentinel. String zero names a real reserved string.
+            let operand_ok = if op.is_regex_op() {
                 (1..self.header.regex_table_count).contains(&value_ref)
             } else {
                 value_ref < self.header.str_table_count
             };
-            if pred_op.is_regex_op() != is_regex || !operand_ok {
+            if !operand_ok {
                 return Err(ModuleError::InvalidPredicateOperand(addr));
             }
         }

@@ -172,13 +172,13 @@ Kind `0xfffe`, Tree-sitter's internal `_ERROR`, is invalid. The public `ERROR` k
 The extended `Match` counts word is:
 
 ```text
-bits    15..12    11..9      8..4         3           2         1..0
-       +---------+---------+------------+-----------+---------+------+
-       | effects | negated | successors | predicate | missing | zero |
-       +---------+---------+------------+-----------+---------+------+
+bits    15..12    11..9      8..4         3         2..0
+       +---------+---------+------------+---------+-----------+
+       | effects | negated | successors | missing | predicate |
+       +---------+---------+------------+---------+-----------+
 ```
 
-The three counts allow up to 15 effects, 7 negated fields, and 31 successors. A negated field requires the candidate to have no child in that grammar field. The predicate bit adds a test of the node's source text, such as equality or a regex match. The missing bit requires a node that Tree-sitter inserted to recover from absent syntax. Bits 1–0 are zero.
+The three counts allow up to 15 effects, 7 negated fields, and 31 successors. A negated field requires the candidate to have no child in that grammar field. The predicate field selects a test of the node's source text, with zero meaning no predicate. The missing bit independently requires a node that Tree-sitter inserted to recover from absent syntax.
 
 The payload starts at byte 8. Its parts are contiguous `u16` slots in this order:
 
@@ -188,9 +188,9 @@ The payload starts at byte 8. Its parts are contiguous `u16` slots in this order
 +--------------+----------------+-----------+------------+--------+
 ```
 
-Each effect, negated field, and successor occupies one slot. A present predicate occupies two. The counts share the selected opcode's capacity, which the used slots cannot exceed. Negated field IDs are nonzero. Repeated successors and negated fields are accepted.
+Each effect, negated field, and successor occupies one slot. A present predicate occupies one. The counts share the selected opcode's capacity, which the used slots cannot exceed. Negated field IDs are nonzero. Repeated successors and negated fields are accepted.
 
-For example, two effects, one negated field, a predicate, and two successors use seven slots. They fit in `Match24` with one unused slot, but cannot fit in `Match16`.
+For example, two effects, one negated field, a predicate, and two successors use six slots. They fit in `Match24` with two unused slots, but cannot fit in `Match16`.
 
 #### Match semantics
 
@@ -208,7 +208,7 @@ When a candidate passes, effects take place in encoded order. A `Match` with no 
 
 #### Accepted and emitted forms
 
-A `Match` form can be larger than its operands require. The reader ignores unused bytes in extended `Match` forms, including nonzero bytes. Reserved count bits still have to be zero.
+A `Match` form can be larger than its operands require. The reader ignores unused bytes in extended `Match` forms, including nonzero bytes.
 
 The compiler emits `Match8` when there are no effects, negated fields, predicate, or missing constraint and at most one successor. Otherwise it emits the smallest extended form with sufficient capacity. It zeroes unused payload bytes and omits ignored constraints from `Epsilon` matches. A missing-only `Match` occupies at least 16 bytes.
 
@@ -272,23 +272,26 @@ Non-exact `Down` and `Next` matches retain their later sibling candidates when t
 
 ### Predicates
 
-A predicate occupies two `u16` slots. The first stores the operator in bits 7–0 and the regex flag in bit 8. Bits 15–9 are zero. The second slot stores the referenced string or regex index.
+The three-bit predicate field in the counts word selects the operation and the operand's table. Zero means no predicate and no operand. A nonzero choice adds one `u16` operand to the payload, after effects and negated fields and before successors.
 
 Predicates test the candidate node's exact source slice. Text uses UTF-8 bytes without case folding, normalization, or trimming.
 
-| Operator | Regex flag | Condition      |
-| -------- | ---------- | -------------- |
-| 0        | 0          | Equal          |
-| 1        | 0          | Unequal        |
-| 2        | 0          | Prefix         |
-| 3        | 0          | Suffix         |
-| 4        | 0          | Substring      |
-| 5        | 1          | Regex match    |
-| 6        | 1          | No regex match |
+| Predicate | Condition      | Operand      |
+| --------- | -------------- | ------------ |
+| 0         | No predicate   | Absent       |
+| 1         | Equal          | String index |
+| 2         | Unequal        | String index |
+| 3         | Prefix         | String index |
+| 4         | Suffix         | String index |
+| 5         | Substring      | String index |
+| 6         | Regex match    | Regex index  |
+| 7         | No regex match | Regex index  |
+
+For `(identifier == "foo")`, if `"foo"` has string index 12, the predicate field is 1 and its payload operand is 12. The operator determines which table contains the operand, so no separate regex flag is stored.
 
 Equality compares the entire source slice to the referenced string. Prefix and suffix require that string at the start or end of the slice. Substring requires a contiguous occurrence within the slice. Regex operators test whether the compiled DFA for the referenced regex finds a match in the slice.
 
-Other operators and mismatched operator/flag pairs are invalid. String operands are less than `str_table_count`, including the real reserved string at index zero. Regex operands are nonzero and less than `regex_table_count`. Matching searches the complete node slice as an unanchored haystack, subject to any anchors encoded by the [DFA](06-tables.md).
+String operands are less than `str_table_count`, including the real reserved string at index zero. Regex operands are nonzero and less than `regex_table_count`. Matching searches the complete node slice as an unanchored haystack, subject to any anchors encoded by the [DFA](06-tables.md).
 
 ### Calls and returns
 

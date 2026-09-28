@@ -45,12 +45,12 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _                                10, 11
-  05  ──!  (identifier) [Node RecordSet(M0)] == "b"  08
-  08  ─‣┘³ _                                09
-  09                                        ▶
-  10   !   "["                              05
-  11  ──!  _                                10, 11
+  03  └─!  _                                09, 10
+  05  ──!  (identifier) [Node RecordSet(M0)] == "b"  07
+  07  ─‣┘³ _                                08
+  08                                        ▶
+  09   !   "["                              05
+  10  ──!  _                                09, 10
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
@@ -59,28 +59,28 @@ Q:
        ●   expression_statement
   02       (array)                          03
        ●   array
-  03       _                                10, 11
+  03       _                                09, 10
        ●   [
-  10       "["                              05
+  09       "["                              05
        ●   [
-  05       (identifier) [Node RecordSet(M0)] == "b"  08
+  05       (identifier) [Node RecordSet(M0)] == "b"  07
        ○   comment
   03  ❮❮❮ 
-  11       _                                10, 11
+  10       _                                09, 10
        ●   comment
-  10       "["                              05
+  09       "["                              05
        ○   comment
-  11  ❮❮❮ 
-  11       _                                10, 11
+  10  ❮❮❮ 
+  10       _                                09, 10
        ●   identifier
-  10       "["                              05
+  09       "["                              05
        ○   identifier
-  11  ❮❮❮ 
-  11       _                                10, 11
+  10  ❮❮❮ 
+  10       _                                09, 10
        ●   ]
-  10       "["                              05
+  09       "["                              05
        ○   ]
-  11  ❮❮❮ 
-  11       _                                10, 11
+  10  ❮❮❮ 
+  10       _                                09, 10
   02  ❮❮❮ 
   01  ❮❮❮ 

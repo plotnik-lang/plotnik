@@ -7,12 +7,17 @@ use std::num::NonZeroU16;
 
 use crate::core::{NodeFieldId, ZeroIdError};
 
+use super::PredicateOp;
 use super::constants::{
     BYTECODE_WORD_SIZE, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SUCCESSORS,
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
 use super::node_kind_constraint::NodeKindConstraint;
 use plotnik_rt::{Nav, PortId};
+
+#[cfg(test)]
+#[path = "instructions_tests.rs"]
+mod instructions_tests;
 
 /// Fixed header bytes before an extended Match's payload — exactly the first
 /// bytecode word. Effects, negated fields, an optional predicate, and successors follow,
@@ -22,8 +27,8 @@ pub(crate) const MATCH_PAYLOAD_START: usize = BYTECODE_WORD_SIZE;
 /// Each Match payload slot is one little-endian `u16`.
 pub(crate) const PAYLOAD_SLOT_SIZE: usize = size_of::<u16>();
 
-/// A predicate occupies two payload slots: `op|flags (u16)`, then `value_ref (u16)`.
-pub(crate) const PREDICATE_SLOTS: usize = 2;
+/// A predicate occupies one payload slot: its string or regex index.
+pub(crate) const PREDICATE_SLOTS: usize = 1;
 
 /// A predicate's size in bytes within the payload.
 pub(crate) const PREDICATE_SIZE: usize = PREDICATE_SLOTS * PAYLOAD_SLOT_SIZE;
@@ -67,22 +72,15 @@ pub(crate) mod header_byte {
     }
 }
 
-/// The 16-bit counts word of an extended Match (`Match16`–`Match64`):
-/// `effects(4) | neg(3) | succ(5) | has_predicate(1) | missing(1) | reserved(2)`.
-///
-/// `missing` and `has_predicate` are independent flags on adjacent bits, not a
-/// 2-bit enum: `missing` (the `(MISSING)` node-nature constraint, checked by the
-/// VM) is orthogonal to `has_predicate` (a payload-framing bit the decoder needs
-/// to size the instruction), so they compose freely.
-///
-/// Decoded once here so the Match decoder, the encoder, and the load-time
-/// validator share one definition of the field positions.
+/// The 16-bit counts word of an extended Match:
+/// `effects(4) | neg(3) | succ(5) | missing(1) | predicate(3)`.
+/// Predicate zero means no operand. Values 1–7 select an operator and its table.
 #[derive(Clone, Copy)]
 pub(crate) struct MatchCounts {
     pub(crate) effects: u8,
     pub(crate) neg: u8,
     pub(crate) succ: u8,
-    pub(crate) has_predicate: bool,
+    pub(crate) predicate: Option<PredicateOp>,
     pub(crate) missing: bool,
 }
 
@@ -93,16 +91,14 @@ impl MatchCounts {
     const EFFECTS_MASK: u16 = 0xF;
     const COUNT3_MASK: u16 = 0x7;
     const SUCC_MASK: u16 = 0x1F;
-    const PREDICATE_BIT: u16 = 1 << 3;
-    const MISSING_BIT: u16 = 1 << 2;
-    const RESERVED_MASK: u16 = 0x3;
+    const MISSING_BIT: u16 = 1 << 3;
 
     pub(crate) fn unpack(w: u16) -> Self {
         Self {
             effects: ((w >> Self::EFFECTS_SHIFT) & Self::EFFECTS_MASK) as u8,
             neg: ((w >> Self::NEG_SHIFT) & Self::COUNT3_MASK) as u8,
             succ: ((w >> Self::SUCC_SHIFT) & Self::SUCC_MASK) as u8,
-            has_predicate: w & Self::PREDICATE_BIT != 0,
+            predicate: PredicateOp::try_from_byte((w & Self::COUNT3_MASK) as u8),
             missing: w & Self::MISSING_BIT != 0,
         }
     }
@@ -111,17 +107,8 @@ impl MatchCounts {
         ((self.effects as u16) << Self::EFFECTS_SHIFT)
             | ((self.neg as u16) << Self::NEG_SHIFT)
             | ((self.succ as u16) << Self::SUCC_SHIFT)
-            | if self.has_predicate {
-                Self::PREDICATE_BIT
-            } else {
-                0
-            }
             | if self.missing { Self::MISSING_BIT } else { 0 }
-    }
-
-    /// Whether any reserved bit (bits 1-0) is set; load-time validation rejects it.
-    pub(crate) fn reserved_bits_set(w: u16) -> bool {
-        w & Self::RESERVED_MASK != 0
+            | u16::from(self.predicate.map_or(0, PredicateOp::to_byte))
     }
 }
 
@@ -334,7 +321,7 @@ enum MatchLayout {
         effect_count: u8,
         neg_count: u8,
         succ_count: u8,
-        has_predicate: bool,
+        predicate: Option<PredicateOp>,
         missing: bool,
     },
 }
@@ -375,7 +362,7 @@ impl<'a> Match<'a> {
                 effect_count: c.effects,
                 neg_count: c.neg,
                 succ_count: c.succ,
-                has_predicate: c.has_predicate,
+                predicate: c.predicate,
                 missing: c.missing,
             }
         };
@@ -472,7 +459,7 @@ impl<'a> Match<'a> {
         matches!(
             self.layout,
             MatchLayout::Extended {
-                has_predicate: true,
+                predicate: Some(_),
                 ..
             }
         )
@@ -487,23 +474,17 @@ impl<'a> Match<'a> {
     }
 
     pub fn predicate(&self) -> Option<MatchPredicate> {
-        if !self.has_predicate() {
+        let MatchLayout::Extended {
+            predicate: Some(op),
+            ..
+        } = self.layout
+        else {
             return None;
-        }
+        };
 
         let offset = MATCH_PAYLOAD_START + self.predicate_offset();
-        let op_and_flags = u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]]);
-        let (op, is_regex) = MatchPredicate::unpack_op_flags(op_and_flags);
-        let value_ref = u16::from_le_bytes([
-            self.bytes[offset + PAYLOAD_SLOT_SIZE],
-            self.bytes[offset + PAYLOAD_SLOT_SIZE + 1],
-        ]);
-
-        Some(MatchPredicate {
-            op,
-            is_regex,
-            value_ref,
-        })
+        let value_ref = u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]]);
+        Some(MatchPredicate { op, value_ref })
     }
 
     #[inline]
@@ -561,38 +542,9 @@ impl<'a> Match<'a> {
 ///
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MatchPredicate {
-    /// Operator byte (see [`crate::bytecode::predicate_op::PredicateOp`]).
-    pub op: u8,
-    /// Whether `value_ref` indexes the regex table (`true`) or string table.
-    pub is_regex: bool,
-    /// Index into the string or regex table.
+    pub op: PredicateOp,
+    /// Index into the table selected by the operator.
     pub value_ref: u16,
-}
-
-impl MatchPredicate {
-    /// Operator occupies the low byte of the op/flags word.
-    const OP_MASK: u16 = 0xFF;
-    /// Bit 8 flags a regex operand; the operator byte is below it.
-    const REGEX_FLAG: u16 = 1 << 8;
-    /// Bits above the operator and regex flag are reserved-zero.
-    const RESERVED_MASK: u16 = !(Self::OP_MASK | Self::REGEX_FLAG);
-
-    /// Pack the op/flags word — the predicate's first payload slot.
-    fn pack_op_flags(self) -> u16 {
-        (self.op as u16) | if self.is_regex { Self::REGEX_FLAG } else { 0 }
-    }
-
-    /// Unpack `(op, is_regex)` from the op/flags word. Shared by the decoder and
-    /// the load-time validator.
-    pub(crate) fn unpack_op_flags(w: u16) -> (u8, bool) {
-        ((w & Self::OP_MASK) as u8, w & Self::REGEX_FLAG != 0)
-    }
-
-    /// Whether any reserved bit of the op/flags word is set; load-time
-    /// validation rejects it.
-    pub(crate) fn reserved_bits_set(w: u16) -> bool {
-        w & Self::RESERVED_MASK != 0
-    }
 }
 
 /// Owned, encodable form of a Match instruction.
@@ -702,7 +654,7 @@ impl MatchInstr {
             effects: effects as u8,
             neg: neg as u8,
             succ: succ as u8,
-            has_predicate: self.predicate.is_some(),
+            predicate: self.predicate.map(|p| p.op),
             missing: self.missing,
         };
         bytes[6..8].copy_from_slice(&counts.pack().to_le_bytes());
@@ -719,7 +671,6 @@ impl MatchInstr {
             put(&mut bytes, u16::from(field).to_le_bytes());
         }
         if let Some(pred) = &self.predicate {
-            put(&mut bytes, pred.pack_op_flags().to_le_bytes());
             put(&mut bytes, pred.value_ref.to_le_bytes());
         }
         for succ in &self.successors {

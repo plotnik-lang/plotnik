@@ -51,8 +51,8 @@ pub(crate) use format::{
 };
 pub(crate) use header::Header;
 pub(crate) use instructions::{
-    Call, CallOwnership, CalleeContract, Match, MatchInstr, MatchPredicate, Return, SuccessorAddr,
-    select_match_opcode,
+    Call, CallOwnership, CalleeContract, Match, MatchInstr, MatchPredicate, PREDICATE_SLOTS,
+    Return, SuccessorAddr, select_match_opcode,
 };
 pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Instruction};
 pub(crate) use node_kind_constraint::NodeKindConstraint;

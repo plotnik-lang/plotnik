@@ -80,8 +80,7 @@ fn resolve_match(
             u16::from(string_id)
         };
         MatchPredicate {
-            op: pred.op_byte(),
-            is_regex: pred.value.is_regex(),
+            op: pred.op,
             value_ref,
         }
     });

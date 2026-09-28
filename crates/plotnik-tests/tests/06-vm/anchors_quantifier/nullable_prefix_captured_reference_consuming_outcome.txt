@@ -80,28 +80,28 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _                                45, 14
+  03  └─!  _                                14, 43
   05                                        ▶
   06  ─‣┘³ _                                05
   07  ...
   08  ─‣─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
   11  ─•─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
-  14  ──!  _                                45, 14
+  14   !   "[" [RecordOpen]                 40
   16  ─◦─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
   19                                        ▶
   20                                        ▶ p1
   21                                        ▶ p2
   22  -ε-  [Absent RecordSet(M1)]           20
   24  ─•─  (identifier) [Node RecordSet(M1)] == "x"  19
-  27  -ε-  [Absent RecordSet(M1)]           21
-  29  ─◦─  (identifier) [Node RecordSet(M1)] == "x"  19
-  32  -ε-  [Absent RecordSet(M0)]           29, 27
-  34   !   (identifier) [Node RecordSet(M0)] == "a"  24, 22
-  37  ──!  _                                34, 37
+  26  -ε-  [Absent RecordSet(M1)]           21
+  28  ─◦─  (identifier) [Node RecordSet(M1)] == "x"  19
+  30  -ε-  [Absent RecordSet(M0)]           28, 26
+  32   !   (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  35  ──!  _                                32, 35
+  37  -ε-                                   35, 30
   39  ...
-  40  -ε-                                   37, 32
-  42       (@40)                            40 : 08 / 11 / 16
-  45   !   "[" [RecordOpen]                 42
+  40       (@37)                            37 : 08 / 11 / 16
+  43  ──!  _                                14, 43
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
@@ -110,24 +110,24 @@ Q:
        ●   expression_statement
   02       (array)                          03
        ●   array
-  03       _                                45, 14
+  03       _                                14, 43
        ●   [
-  45       "[" [RecordOpen]                 42
+  14       "[" [RecordOpen]                 40
        ●   [
-  42       (@40)                            40 : 08 / 11 / 16
-       ▶   (@40)
+  40       (@37)                            37 : 08 / 11 / 16
+       ▶   (@37)
 
-@40:
-  40  -ε-                                   37, 32
-  37       _                                34, 37
+@37:
+  37  -ε-                                   35, 30
+  35       _                                32, 35
        ●   identifier
-  34       (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  32       (identifier) [Node RecordSet(M0)] == "a"  24, 22
        ●   identifier
   24       (identifier) [Node RecordSet(M1)] == "x"  19
        ○   ,
-  34  ❮❮❮ 
+  32  ❮❮❮ 
   22  -ε-  [Absent RecordSet(M1)]           20
-  20   ◀   (@40)                            p1
+  20   ◀   (@37)                            p1
 
 Q:
   11       (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06

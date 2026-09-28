@@ -16,22 +16,17 @@ pub enum PredicateOp {
 }
 
 impl PredicateOp {
-    /// Decode from bytecode representation, panicking on an unknown byte.
-    pub fn from_byte(b: u8) -> Self {
-        Self::try_from_byte(b).expect("invalid predicate op byte")
-    }
-
     /// Non-panicking decode, for validating an untrusted instruction stream at
     /// load time before the VM or dump constructs a `PredicateOp` from the byte.
     pub fn try_from_byte(b: u8) -> Option<Self> {
         let op = match b {
-            0 => Self::Eq,
-            1 => Self::Ne,
-            2 => Self::StartsWith,
-            3 => Self::EndsWith,
-            4 => Self::Contains,
-            5 => Self::RegexMatch,
-            6 => Self::RegexNoMatch,
+            1 => Self::Eq,
+            2 => Self::Ne,
+            3 => Self::StartsWith,
+            4 => Self::EndsWith,
+            5 => Self::Contains,
+            6 => Self::RegexMatch,
+            7 => Self::RegexNoMatch,
             _ => return None,
         };
         Some(op)
@@ -40,13 +35,13 @@ impl PredicateOp {
     /// Encode for bytecode.
     pub fn to_byte(self) -> u8 {
         match self {
-            Self::Eq => 0,
-            Self::Ne => 1,
-            Self::StartsWith => 2,
-            Self::EndsWith => 3,
-            Self::Contains => 4,
-            Self::RegexMatch => 5,
-            Self::RegexNoMatch => 6,
+            Self::Eq => 1,
+            Self::Ne => 2,
+            Self::StartsWith => 3,
+            Self::EndsWith => 4,
+            Self::Contains => 5,
+            Self::RegexMatch => 6,
+            Self::RegexNoMatch => 7,
         }
     }
 

@@ -38,15 +38,15 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
-  2  └‣─  (identifier) [Node RecordSet(M0)] *= "xyz"  5
-  5  ─‣┘² _                                 6
-  6                                         ▶
+  2  └‣─  (identifier) [Node RecordSet(M0)] *= "xyz"  4
+  4  ─‣┘² _                                 5
+  5                                         ▶
 --------------------- TRACE ----------------------
 Q:
   0       (program)                         01
       ●   program
   1       (expression_statement)            02
       ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)] *= "xyz"  05
+  2       (identifier) [Node RecordSet(M0)] *= "xyz"  04
       ○   ;
   1  ❮❮❮ 

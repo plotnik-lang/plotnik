@@ -85,8 +85,9 @@ Q:
   14  ──!  _                                07, 14
   16  ─◦─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
   19   !   (identifier) [Node RecordSet(M0)] == "a"  11
-  22  ──!  _                                19, 22
-  24   !   _ [Absent RecordSet(M1)]         19, 22
+  21  ──!  _                                19, 21
+  23  ...
+  24   !   _ [Absent RecordSet(M1)]         19, 21
   26  -ε-  [Absent RecordSet(M1) Absent RecordSet(M0)]  16
   29   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  08
   32  ──!  _                                24, 29, 32
@@ -106,27 +107,27 @@ Q:
   34  -ε-  [RecordOpen]                     32, 26
   32       _                                24, 29, 32
        ●   identifier
-  24       _ [Absent RecordSet(M1)]         19, 22
+  24       _ [Absent RecordSet(M1)]         19, 21
        ●   identifier
   19       (identifier) [Node RecordSet(M0)] == "a"  11
   24  ❮❮❮ 
-  22       _                                19, 22
+  21       _                                19, 21
        ●   ]
   19       (identifier) [Node RecordSet(M0)] == "a"  11
        ○   ]
-  22  ❮❮❮ 
-  22       _                                19, 22
+  21  ❮❮❮ 
+  21       _                                19, 21
   32  ❮❮❮ 
   29       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  08
   32  ❮❮❮ 
   32       _                                24, 29, 32
        ●   ]
-  24       _ [Absent RecordSet(M1)]         19, 22
+  24       _ [Absent RecordSet(M1)]         19, 21
        ●   ]
   19       (identifier) [Node RecordSet(M0)] == "a"  11
        ○   ]
   24  ❮❮❮ 
-  22       _                                19, 22
+  21       _                                19, 21
   32  ❮❮❮ 
   29       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  08
        ○   ]

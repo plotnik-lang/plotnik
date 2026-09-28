@@ -56,57 +56,55 @@ N1: S05 → T2  ; Q
 
 [entry_points]
 B = 00 :: T1
-Q = 04 :: T2
+Q = 03 :: T2
 
 [instructions]
 B:
-  00   !   (identifier) [Node RecordSet(M0)] == "b"  03
-  03                                        ▶
+  00   !   (identifier) [Node RecordSet(M0)] == "b"  02
+  02                                        ▶
 
 Q:
-  04   !   (program)                        05
-  05  └‣─  (expression_statement)           06
-  06  └‣─  (call_expression)                08
-  07  ...
-  08  └‣─  arguments: (arguments)           25, 27
-  10  -ε-  [RecordClose RecordSet(M1)]      12
-  12  ─‣┘⁴ _                                13
-  13                                        ▶
-  14                                        ▶
-  15  ...
-  16  ─•─  (identifier) [Node RecordSet(M0)] == "b"  14
-  19       (@16)                            16 : 10
-  20                                        ▶
-  21  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  20
-  24       (@21)                            21 : 10
-  25  └‣─  (identifier) [RecordOpen] == "a"  19
-  27  └‣─  ";" [RecordOpen]                 24
+  03   !   (program)                        04
+  04  └‣─  (expression_statement)           05
+  05  └‣─  (call_expression)                06
+  06  └‣─  arguments: (arguments)           20, 22
+  08  -ε-  [RecordClose RecordSet(M1)]      10
+  10  ─‣┘⁴ _                                11
+  11                                        ▶
+  12                                        ▶
+  13  ─•─  (identifier) [Node RecordSet(M0)] == "b"  12
+  15       (@13)                            13 : 08
+  16                                        ▶
+  17  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  16
+  19       (@17)                            17 : 08
+  20  └‣─  (identifier) [RecordOpen] == "a"  15
+  22  └‣─  ";" [RecordOpen]                 19
 --------------------- TRACE ----------------------
 Q:
-  04       (program)                        05
+  03       (program)                        04
        ●   program
-  05       (expression_statement)           06
+  04       (expression_statement)           05
        ●   expression_statement
-  06       (call_expression)                08
+  05       (call_expression)                06
        ●   call_expression
-  08       arguments: (arguments)           25, 27
+  06       arguments: (arguments)           20, 22
        ○   identifier
        ●   arguments
-  25       (identifier) [RecordOpen] == "a"  19
+  20       (identifier) [RecordOpen] == "a"  15
        ○   (
        ●   identifier
-  19       (@16)                            16 : 10
-       ▶   (@16)
+  15       (@13)                            13 : 08
+       ▶   (@13)
 
-@16:
-  16       (identifier) [Node RecordSet(M0)] == "b"  14
+@13:
+  13       (identifier) [Node RecordSet(M0)] == "b"  12
        ○   ,
-  25  ❮❮❮ 
+  20  ❮❮❮ 
        ○   ,
        ○   ,
        ○   )
-  08  ❮❮❮ 
-  27       ";" [RecordOpen]                 24
+  06  ❮❮❮ 
+  22       ";" [RecordOpen]                 19
        ○   (
        ○   identifier
        ○   ,
@@ -114,6 +112,6 @@ Q:
        ○   ,
        ○   identifier
        ○   )
-  08  ❮❮❮ 
   06  ❮❮❮ 
   05  ❮❮❮ 
+  04  ❮❮❮ 

@@ -728,6 +728,7 @@ Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
   02  └─!  _                                20, 24, 14
   04  └‣─  (identifier) [SpanStartAt#7 SpanStart#6 Node RecordSet(M0) SpanEnd#6 SpanEnd#7] == "nope"  08
+  07  ...
   08  ─‣┘  _ [SpanEnd#5 VariantClose SpanEnd#4 SpanEnd#3]  27
   11  └‣─  (identifier) [SpanStartAt#11 SpanStart#10 Node RecordSet(M1) SpanEnd#10 SpanEnd#11]  16
   14  ──!  _                                20, 24, 14

@@ -132,8 +132,7 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
     assert_eq!(module.entry_points().len(), MANY_DEFINITIONS);
 }
 
-/// Byte offset of the first predicated Match's 4-byte predicate
-/// (`op_and_flags` u16 || `value_ref` u16) in the instruction stream.
+/// Byte offset of the first predicated Match's u16 operand in the instruction stream.
 fn find_predicate_off(bytes: &[u8]) -> usize {
     let (base, word_count) = {
         let m = Module::validate_and_load(bytes).expect("module validates before tampering");
@@ -149,7 +148,7 @@ fn find_predicate_off(bytes: &[u8]) -> usize {
         let size = instr_size(opcode);
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[instr + 6], bytes[instr + 7]]);
-            if (counts >> 3) & 1 != 0 {
+            if counts & 7 != 0 {
                 let effects = ((counts >> 12) & 0xF) as usize;
                 let neg = ((counts >> 9) & 0x7) as usize;
                 return instr + 8 + (effects + neg) * 2;
@@ -195,7 +194,7 @@ fn forged_out_of_range_predicate_operand_is_rejected() {
         .str_table_count;
 
     let pred_off = find_predicate_off(&bytes);
-    bytes[pred_off + 2..pred_off + 4].copy_from_slice(&str_count.to_le_bytes());
+    bytes[pred_off..pred_off + 2].copy_from_slice(&str_count.to_le_bytes());
     reseal(&mut bytes);
 
     let err =
@@ -207,20 +206,19 @@ fn forged_out_of_range_predicate_operand_is_rejected() {
 }
 
 #[test]
-fn forged_invalid_predicate_op_is_rejected() {
-    let mut bytes = emit_bytes(r#"Q = (identifier == "needle")"#);
+fn forged_out_of_range_regex_predicate_operand_is_rejected() {
+    let mut bytes = emit_bytes(r#"Q = (identifier !~ /needle/)"#);
+    let regex_count = Module::validate_and_load(&bytes)
+        .expect("module validates before tampering")
+        .header()
+        .regex_table_count;
 
-    // The op is the low byte of the predicate; `7` is not a valid PredicateOp and
-    // would panic in PredicateOp::from_byte when the predicate is evaluated/dumped.
     let pred_off = find_predicate_off(&bytes);
-    bytes[pred_off] = 7;
+    bytes[pred_off..pred_off + 2].copy_from_slice(&regex_count.to_le_bytes());
     reseal(&mut bytes);
+    let err = Module::validate_and_load(&bytes).expect_err("regex index is outside its table");
 
-    let err = Module::validate_and_load(&bytes).expect_err("forged predicate op must be rejected");
-    assert!(
-        matches!(err, ModuleError::InvalidPredicateOperand(_)),
-        "expected InvalidPredicateOperand, got {err:?}"
-    );
+    assert!(matches!(err, ModuleError::InvalidPredicateOperand(_)));
 }
 
 /// A record-producing query that emits extended Matches carrying `Node`/`RecordSet` effects and
@@ -374,9 +372,9 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
             let effects = ((counts >> 12) & 0xF) as usize;
             let neg = ((counts >> 9) & 0x7) as usize;
             let succ = ((counts >> 4) & 0x1F) as usize;
-            let has_pred = (counts >> 3) & 1 != 0;
+            let has_pred = counts & 7 != 0;
             if succ > 0 {
-                return off + 8 + (effects + neg) * 2 + if has_pred { 4 } else { 0 };
+                return off + 8 + (effects + neg) * 2 + if has_pred { 2 } else { 0 };
             }
         }
         addr = addr
@@ -1299,24 +1297,6 @@ fn forged_record_entry_without_root_boundary_is_rejected() {
 }
 
 #[test]
-fn forged_set_extended_match_reserved_count_bit_is_rejected() {
-    // Bit 0 of an extended-Match counts word (low bit of byte 6) is reserved-zero
-    // (docs/bytecode/02-instructions.md); the decoder never reads it, so a
-    // forged set bit must be rejected at load.
-    let mut bytes = emit_bytes(RECORD_QUERY);
-    let off = first_instr(&bytes, |o| (1..=5).contains(&o)); // extended Match
-    bytes[off + 6] |= 0x01;
-    reseal(&mut bytes);
-
-    let err =
-        Module::validate_and_load(&bytes).expect_err("forged reserved count bit must be rejected");
-    assert!(
-        matches!(err, ModuleError::MalformedInstructionStream),
-        "expected MalformedInstructionStream, got {err:?}"
-    );
-}
-
-#[test]
 fn forged_nonzero_return_pad_is_rejected() {
     // Byte 1 is the port, byte 2 is entry nav, and bytes 4-5 are the field.
     for byte in [3usize, 6, 7] {
@@ -1551,24 +1531,6 @@ fn forged_call_and_callee_return_contract_mismatch_is_rejected() {
 }
 
 #[test]
-fn forged_nonzero_predicate_reserved_bits_is_rejected() {
-    // Only the op/flags word's low byte (operator) and bit 8 (regex flag) are
-    // decoded; bits 9-15 are reserved-zero. A forged set bit there must be
-    // rejected at load. Bit 9 is the low bit of the word's high byte.
-    let mut bytes = emit_bytes(r#"Q = (identifier == "needle")"#);
-    let pred_off = find_predicate_off(&bytes);
-    bytes[pred_off + 1] |= 0x02;
-    reseal(&mut bytes);
-
-    let err = Module::validate_and_load(&bytes)
-        .expect_err("forged predicate reserved bit must be rejected");
-    assert!(
-        matches!(err, ModuleError::InvalidPredicateOperand(_)),
-        "expected InvalidPredicateOperand, got {err:?}"
-    );
-}
-
-#[test]
 fn forged_regex_predicate_sentinel_operand_is_rejected() {
     // Regex value_ref `0` is the reserved sentinel: `load_regex_dfas` skips it,
     // so its DFA slot is `None`, and the VM expects a populated slot. The loader
@@ -1577,30 +1539,11 @@ fn forged_regex_predicate_sentinel_operand_is_rejected() {
     // there is the validated easter-egg string.)
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /needle/)"#);
     let pred_off = find_predicate_off(&bytes);
-    bytes[pred_off + 2..pred_off + 4].copy_from_slice(&0u16.to_le_bytes());
+    bytes[pred_off..pred_off + 2].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
     let err = Module::validate_and_load(&bytes)
         .expect_err("forged regex sentinel operand must be rejected");
-    assert!(
-        matches!(err, ModuleError::InvalidPredicateOperand(_)),
-        "expected InvalidPredicateOperand, got {err:?}"
-    );
-}
-
-#[test]
-fn forged_predicate_regex_flag_mismatch_is_rejected() {
-    // The is_regex flag must agree with the op's class. Set the regex flag (bit 8
-    // of `op_and_flags`) on a string op (`==`): the VM would resolve a string
-    // operand as a regex and hit its op/flag `unreachable!`. The op nibble is left
-    // intact, so this isolates the `op_is_regex != is_regex` branch.
-    let mut bytes = emit_bytes(r#"Q = (identifier == "needle")"#);
-    let pred_off = find_predicate_off(&bytes);
-    bytes[pred_off + 1] |= 0x01;
-    reseal(&mut bytes);
-
-    let err =
-        Module::validate_and_load(&bytes).expect_err("forged regex-flag mismatch must be rejected");
     assert!(
         matches!(err, ModuleError::InvalidPredicateOperand(_)),
         "expected InvalidPredicateOperand, got {err:?}"

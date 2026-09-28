@@ -75,15 +75,16 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  -ε-  [ListOpen]                       16, 08
-  03  └‣─  (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  06
-  06  ─‣┘  _                                10
-  07                                        ▶
-  08  -ε-  [ListClose RecordSet(M1)]        07
+  03  └‣─  (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
+  05  ─‣┘  _                                10
+  06                                        ▶
+  07  ...
+  08  -ε-  [ListClose RecordSet(M1)]        06
   10  -ε-  [RecordClose ArrayPush]          14, 18
   12   !   (expression_statement) [RecordOpen]  03
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
-  18  ─‣┘  _ [ListClose RecordSet(M1)]      07
+  18  ─‣┘  _ [ListClose RecordSet(M1)]      06
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
@@ -93,38 +94,38 @@ Q:
        ●   expression_statement
   12       (expression_statement) [RecordOpen]  03
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  06
+  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
        ●   identifier
-  06       _                                10
+  05       _                                10
        ●   expression_statement
   10  -ε-  [RecordClose ArrayPush]          14, 18
   14       _                                12, 14
        ●   expression_statement
   12       (expression_statement) [RecordOpen]  03
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  06
+  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
        ●   identifier
-  06       _                                10
+  05       _                                10
        ●   expression_statement
   10  -ε-  [RecordClose ArrayPush]          14, 18
   14       _                                12, 14
        ●   expression_statement
   12       (expression_statement) [RecordOpen]  03
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  06
+  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
        ●   identifier
-  06       _                                10
+  05       _                                10
        ●   expression_statement
   10  -ε-  [RecordClose ArrayPush]          14, 18
   14       _                                12, 14
        ●   expression_statement
   12       (expression_statement) [RecordOpen]  03
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  06
+  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
        ○   ;
   14  ❮❮❮ 
   14       _                                12, 14
   10  ❮❮❮ 
-  18       _ [ListClose RecordSet(M1)]      07
+  18       _ [ListClose RecordSet(M1)]      06
        ●   program
-  07   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼

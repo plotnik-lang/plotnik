@@ -85,24 +85,24 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _                                07, 22
+  03  └─!  _                                31, 32
   05                                        ▶
-  06  ─‣┘³ _                                05
-  07   !   "["                              34
-  08  ─‣─  (identifier) [Node RecordSet(M7)] == "b"  06
-  11  ─•─  (identifier) [Node RecordSet(M7)] == "b"  06
-  14                                        ▶
-  15                                        ▶ p1
-  16  ─•─  (identifier) == "x"              14
-  18   !   (identifier) == "a"              16, 15
-  20  -ε-                                   16, 15
-  22  ──!  _                                07, 22
-  24       (@32)                            32 : 20 / 20
-  27   !   ","                              24
-  28  ──!  _                                27, 28
-  30   !   (identifier) == "a"              28
-  32  ──!  _                                18, 30, 32
-  34       (@32)                            32 : 08 / 11
+  06  ─‣─  (identifier) [Node RecordSet(M7)] == "b"  34
+  08  ─•─  (identifier) [Node RecordSet(M7)] == "b"  34
+  10                                        ▶
+  11                                        ▶ p1
+  12  ─•─  (identifier) == "x"              10
+  14   !   (identifier) == "a"              12, 11
+  16  -ε-                                   12, 11
+  18       (@26)                            26 : 16 / 16
+  21   !   ","                              18
+  22  ──!  _                                21, 22
+  24   !   (identifier) == "a"              22
+  26  ──!  _                                14, 24, 26
+  28       (@26)                            26 : 06 / 08
+  31   !   "["                              28
+  32  ──!  _                                31, 32
+  34  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
@@ -111,57 +111,57 @@ Q:
        ●   expression_statement
   02       (array)                          03
        ●   array
-  03       _                                07, 22
+  03       _                                31, 32
        ●   [
-  07       "["                              34
+  31       "["                              28
        ●   [
-  34       (@32)                            32 : 08 / 11
-       ▶   (@32)
+  28       (@26)                            26 : 06 / 08
+       ▶   (@26)
 
-@32:
-  32       _                                18, 30, 32
+@26:
+  26       _                                14, 24, 26
        ●   identifier
-  18       (identifier) == "a"              16, 15
+  14       (identifier) == "a"              12, 11
        ●   identifier
-  16       (identifier) == "x"              14
+  12       (identifier) == "x"              10
        ○   ,
-  18  ❮❮❮ 
-  15   ◀   (@32)                            p1
+  14  ❮❮❮ 
+  11   ◀   (@26)                            p1
 
 Q:
-  11       (identifier) [Node RecordSet(M7)] == "b"  06
+  08       (identifier) [Node RecordSet(M7)] == "b"  34
        ○   ,
-  32  ❮❮❮ 
-  30       (identifier) == "a"              28
+  26  ❮❮❮ 
+  24       (identifier) == "a"              22
        ●   identifier
-  28       _                                27, 28
+  22       _                                21, 22
        ●   ,
-  27       ","                              24
+  21       ","                              18
        ●   ,
-  24       (@32)                            32 : 20 / 20
-       ▶   (@32)
+  18       (@26)                            26 : 16 / 16
+       ▶   (@26)
 
-@32:
-  32       _                                18, 30, 32
+@26:
+  26       _                                14, 24, 26
        ●   identifier
-  18       (identifier) == "a"              16, 15
+  14       (identifier) == "a"              12, 11
        ●   identifier
-  16       (identifier) == "x"              14
+  12       (identifier) == "x"              10
        ○   ,
-  18  ❮❮❮ 
-  15   ◀   (@32)                            p1
+  14  ❮❮❮ 
+  11   ◀   (@26)                            p1
 
-@32:
-  20  -ε-                                   16, 15
-  16       (identifier) == "x"              14
+@26:
+  16  -ε-                                   12, 11
+  12       (identifier) == "x"              10
        ○   ,
-  20  ❮❮❮ 
-  15   ◀   (@32)                            p1
+  16  ❮❮❮ 
+  11   ◀   (@26)                            p1
 
 Q:
-  11       (identifier) [Node RecordSet(M7)] == "b"  06
+  08       (identifier) [Node RecordSet(M7)] == "b"  34
        ○   ,
        ●   identifier
-  06       _                                05
+  34       _                                05
        ●   program
   05   ◀   (Q)                              ◼

@@ -334,12 +334,12 @@ impl<'s, 't> VM<'s, 't> {
         }
     }
 
-    /// `p.is_regex` chooses RegexTable over StringTable for `p.value_ref`.
+    /// The operator selects the table containing `p.value_ref`.
     fn evaluate_predicate(&self, p: DecodedPredicate, module: &Module) -> bool {
         let node = self.engine.node();
         let node_text = node_text(self.source, &node);
 
-        if p.is_regex {
+        if p.op.is_regex_op() {
             // The DFAs are deserialized once at module load and reused here;
             // `RegexDfas::is_match` upholds the populated-slot invariant that a
             // module passing load guarantees. Deserializing per evaluation, as
@@ -352,7 +352,7 @@ impl<'s, 't> VM<'s, 't> {
             match p.op {
                 PredicateOp::RegexMatch => matched,
                 PredicateOp::RegexNoMatch => !matched,
-                _ => unreachable!("non-regex op with is_regex=true"),
+                _ => unreachable!("string operator in regex evaluation"),
             }
         } else {
             let target = module.strings().at(p.value_ref as usize);
@@ -363,7 +363,7 @@ impl<'s, 't> VM<'s, 't> {
                 PredicateOp::StartsWith => node_text.starts_with(target),
                 PredicateOp::EndsWith => node_text.ends_with(target),
                 PredicateOp::Contains => node_text.contains(target),
-                _ => unreachable!("regex op with is_regex=false"),
+                _ => unreachable!("regex operator in string evaluation"),
             }
         }
     }
