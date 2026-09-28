@@ -211,7 +211,6 @@ ast_node!(
 );
 
 impl AnonymousNodePattern {
-    /// Returns the string literal's content token.
     pub fn value(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| k == SyntaxKind::StringContent)
     }
@@ -443,7 +442,6 @@ impl NamedNodePattern {
         Some(MissingArg::Anonymous(content))
     }
 
-    /// Returns the predicate if present: `(identifier == "foo")`.
     pub fn predicate(&self) -> Option<NodePredicate> {
         self.0.children().find_map(NodePredicate::cast)
     }

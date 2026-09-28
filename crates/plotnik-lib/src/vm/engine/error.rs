@@ -2,7 +2,6 @@
 
 use plotnik_runtime::CallFrameError;
 
-/// Errors during VM execution.
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
     /// The matcher exhausted its fuel before the run finished. The value is

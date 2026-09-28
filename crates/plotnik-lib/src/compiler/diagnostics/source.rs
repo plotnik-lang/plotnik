@@ -106,12 +106,10 @@ impl SourceMap {
         }
     }
 
-    /// Number of sources in the map.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
-    /// Check if the map is empty.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

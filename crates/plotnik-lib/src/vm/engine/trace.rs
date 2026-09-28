@@ -192,7 +192,6 @@ pub struct PrintTracerBuilder<'s, 'm> {
 }
 
 impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
-    /// Create a new builder with required parameters.
     pub fn new(source: &'s str, module: &'m Module) -> Self {
         Self {
             source,
@@ -207,13 +206,11 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         self
     }
 
-    /// Set whether to use colored output.
     pub fn colored(mut self, enabled: bool) -> Self {
         self.colors = Colors::new(enabled);
         self
     }
 
-    /// Build the PrintTracer.
     pub fn build(self) -> PrintTracer<'s> {
         let header = self.module.header();
         let addr_width = width_for_count(header.instruction_word_count as usize);
@@ -316,7 +313,6 @@ impl TraceEffect {
 }
 
 impl<'s> PrintTracer<'s> {
-    /// Create a builder for PrintTracer.
     pub fn builder<'m>(source: &'s str, module: &'m Module) -> PrintTracerBuilder<'s, 'm> {
         PrintTracerBuilder::new(source, module)
     }
@@ -460,10 +456,8 @@ impl<'s> PrintTracer<'s> {
     fn format_def_ref(&self, name: &str) -> String {
         let c = self.colors;
         if name.starts_with('_') {
-            // Internal labels: no parentheses.
             format!("{}{}{}", c.blue, name, c.reset)
         } else {
-            // User definitions: wrap in parentheses
             format!("({}{}{})", c.blue, name, c.reset)
         }
     }

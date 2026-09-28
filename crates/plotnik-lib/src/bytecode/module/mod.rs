@@ -96,25 +96,18 @@ impl<'a> Instruction<'a> {
 
 /// A compiled bytecode module.
 ///
-/// Instructions are decoded lazily via [`decode_instruction`](Self::decode_instruction).
-/// Cold data (strings, symbols, types) is accessed through view methods.
+/// The VM uses instructions decoded at load time. Strings, symbols, and types
+/// remain views into the bytecode buffer.
 #[derive(Debug)]
 pub struct Module {
     storage: ByteStorage,
     header: Header,
     /// Cached section offsets (computed from header counts).
     offsets: SectionOffsets,
-    /// Regex-predicate DFAs, deserialized once at module load and reused by the
-    /// VM on every evaluation instead of being rebuilt from the blob each time
-    /// (issue #426).
+    /// Deserialized once at load time to avoid rebuilding DFAs during matching.
     regex_dfas: RegexDfas,
-    /// Pre-decoded instructions, built at module load after validation (the hot loop
-    /// indexes this instead of re-parsing bytes; see `decoded`).
     decoded: DecodedProgram,
-    /// Per-word "is an instruction start" bitmap from load validation
-    /// ([`validate_instructions`](Self::validate_instructions)), retained only in
-    /// debug builds to back the VM's pre-decode IP assertion. It does not
-    /// exist in release, so the steady-state module carries no extra memory.
+    /// Instruction starts retained for the VM's debug IP assertion.
     #[cfg(debug_assertions)]
     instr_start_bitmap: Vec<bool>,
 }
@@ -203,10 +196,6 @@ impl Module {
         }
     }
 
-    /// Regex-predicate DFAs, deserialized once at load (issue #426).
-    ///
-    /// The VM evaluates `=~`/`!~` against these cached automata; rebuilding them
-    /// from [`regexes`](Self::regexes)'s raw blob per call is what this avoids.
     pub(crate) fn regex_dfas(&self) -> &RegexDfas {
         &self.regex_dfas
     }
@@ -466,17 +455,14 @@ impl<'a> TypesView<'a> {
         TypeId::from(read_u16_le(self.names_bytes, idx * TypeNameEntry::SIZE + 2))
     }
 
-    /// Number of type definitions.
     pub fn defs_count(&self) -> usize {
         self.defs_count
     }
 
-    /// Number of type members.
     pub fn members_count(&self) -> usize {
         self.members_count
     }
 
-    /// Number of type names.
     pub fn names_count(&self) -> usize {
         self.names_count
     }
@@ -522,7 +508,6 @@ impl<'a> EntryPointsView<'a> {
         EntryPoint::from_bytes(&self.bytes[offset..])
     }
 
-    /// Number of entry points.
     pub fn len(&self) -> usize {
         self.count
     }
@@ -535,7 +520,6 @@ impl<'a> EntryPointsView<'a> {
         (0..self.count).map(|idx| self.get(idx))
     }
 
-    /// Find an entry point by name (requires StringsView for comparison).
     pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<EntryPoint> {
         self.iter().find(|e| strings.get(e.name()) == name)
     }

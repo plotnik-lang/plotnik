@@ -32,23 +32,16 @@ pub fn dump(module: &Module, colors: Colors) -> String {
     out
 }
 
-/// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {
     /// Maps instruction addresses to entry point names for labeling.
     addr_labels: BTreeMap<CodeAddr, String>,
     /// Shared symbol/string decoding and match rendering.
     render: ModuleRenderContext,
-    /// Width for string indices (S#).
     str_width: usize,
-    /// Width for type indices (T#).
     type_width: usize,
-    /// Width for member indices (M#).
     member_width: usize,
-    /// Width for name indices (N#).
     name_width: usize,
-    /// Width for instruction addresses.
     addr_width: usize,
-    /// Color palette.
     colors: Colors,
 }
 
@@ -494,7 +487,6 @@ impl DumpFormatter<'_> {
         };
         let prefix = format!("  {:0aw$} {} ", addr, symbol.format(), aw = self.addr_width);
 
-        // Format field constraint if present
         let field_part = if let Some(field_id) = call.node_field {
             let name = self.ctx.render.dump_node_field_name(field_id);
             format!("{name}: ")
@@ -507,7 +499,6 @@ impl DumpFormatter<'_> {
             .label_for(call.target)
             .map(String::from)
             .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
-        // Definition name in call is blue
         let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
         let returns = call
             .returns()

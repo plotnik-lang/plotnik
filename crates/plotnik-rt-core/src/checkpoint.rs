@@ -162,7 +162,6 @@ pub struct CheckpointStack {
 }
 
 impl CheckpointStack {
-    /// Create an empty checkpoint stack.
     pub fn new() -> Self {
         Self {
             stack: Vec::new(),
@@ -247,7 +246,6 @@ impl CheckpointStack {
         Some((cp, snapshot))
     }
 
-    /// Get the highest frame index referenced by any checkpoint.
     #[inline]
     pub fn max_frame_idx(&self) -> Option<u32> {
         self.max_frame_idx

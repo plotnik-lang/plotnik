@@ -1,14 +1,8 @@
 //! The typed decoder's cursor over an output-event stream.
 //!
-//! A generated matcher commits the same journal the VM commits; the generated
-//! per-type decoders then decode its logical output-event view once, on the winning
-//! path, into the query's typed result. [`ResultDecoder`] is the cursor those
-//! decoders share: it only knows the stream's vocabulary, while the decoders
-//! carry the schema (which entries are possible where — proven before target
-//! emission by shared matcher verification).
-//!
-//! Every miss here is emitter/decoder drift, not anything an input can cause,
-//! so misses panic with the position and the offending entry.
+//! Generated decoders turn the winning match journal into typed results.
+//! Matcher verification guarantees the event structure, so an unexpected event
+//! is a compiler bug and panics.
 
 use tree_sitter::Node;
 
@@ -21,11 +15,8 @@ pub struct ResultDecoder<'a, 't, 's> {
     events: OutputEvents<'a, 't>,
     source: &'s str,
     pos: usize,
-    /// For each position, where the `RecordSet` that closes a field value
-    /// starting there sits — [`Self::peek_record_set`]'s answer, precomputed. One backward
-    /// pass at construction keeps decoding linear; peeking on demand would
-    /// rescan every nested composite once per enclosing scope, going
-    /// quadratic on deep recursive values.
+    /// Precomputed answers for [`Self::peek_record_set`]. Rescanning nested
+    /// values on each peek would make decoding quadratic in nesting depth.
     record_set_index: Vec<u32>,
 }
 
@@ -63,14 +54,9 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
         self.events.get(self.pos)
     }
 
-    /// The member index of the `RecordSet` that will close the field value
-    /// starting at the cursor. Record scopes need it because the stream is
-    /// value-first: the entries of a field's value arrive *before* the
-    /// `RecordSet` that names the field, and sibling fields of one record can differ in
-    /// type — so the decoder peeks ahead to pick the right nested decoder, then
-    /// consumes the value linearly. The answer — the first `RecordSet` past the
-    /// cursor's balanced composite values — comes from the precomputed
-    /// [`Self::record_set_index`].
+    /// The member index of the field value starting at the cursor.
+    /// Values precede their `RecordSet`, so the decoder needs this lookahead
+    /// to choose the field's type before consuming its value.
     pub fn peek_record_set(&self) -> u16 {
         let record_set_pos = *self
             .record_set_index

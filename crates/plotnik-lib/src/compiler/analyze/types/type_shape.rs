@@ -59,13 +59,10 @@ impl CasePayload {
 /// `type_system::TypeKind`, the bytecode discriminant.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeShape {
-    /// A tree-sitter node.
     Node,
     /// Borrowed source text.
     Text,
-    /// Boolean value.
     Bool,
-    /// Record with named fields.
     Record(BTreeMap<Symbol, RecordField>),
     /// Variant type from a labeled alternation.
     Variant(BTreeMap<Symbol, CasePayload>),
@@ -74,7 +71,6 @@ pub enum TypeShape {
         element: TypeId,
         minimum: ListMinimum,
     },
-    /// Option type containing zero or one value.
     Option(TypeId),
     /// Reference to a named type declaration.
     Ref(TypeDeclId),
@@ -183,7 +179,6 @@ impl PatternFlow {
 /// Inference-time result flow and field provenance for a pattern.
 #[derive(Clone, Debug)]
 pub struct PatternShape {
-    /// What data flows through this expression.
     pub flow: PatternFlow,
     pub(super) field_flow: Option<InferredFieldFlow>,
 }

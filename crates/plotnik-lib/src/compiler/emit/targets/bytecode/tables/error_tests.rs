@@ -139,10 +139,8 @@ fn effect_member_payload_overflow_is_emit_error() {
 fn truncated_or_corrupted_module_is_rejected() {
     let bytes = try_emit("Q = (program (_) @name)").expect("valid query emits");
 
-    // The pristine representation validates.
     Module::validate_and_load(&bytes).expect("pristine representation validates");
 
-    // Any truncation shorter than the whole file is rejected, never panics.
     for cut in [0, 1, 63, 64, 96, bytes.len() / 2, bytes.len() - 1] {
         assert!(
             Module::validate_and_load(&bytes[..cut]).is_err(),

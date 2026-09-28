@@ -26,7 +26,6 @@ use super::navigation::AnchorSemantics;
 use super::scope::{CaptureExits, RecordScope, SkipExit};
 use crate::compiler::analyze::types::type_check::definition_value_root;
 
-/// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {
     pub(super) ctx: &'a LowerInput<'a>,
     pub(super) anchor_semantics: AnchorSemantics<'a>,

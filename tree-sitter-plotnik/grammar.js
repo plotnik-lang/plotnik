@@ -21,8 +21,6 @@ module.exports = grammar({
   extras: ($) => [/[ \t]+/, /\r?\n/, $.comment],
 
   rules: {
-    // A .ptk module is a list of named definitions. Bare patterns are a
-    // CLI-only script form (`-q`) and are rejected in module files.
     source_file: ($) => seq(optional($.shebang), repeat($.definition)),
 
     definition: ($) =>

@@ -119,7 +119,6 @@ pub(super) fn extract_default_aliases(
             for (j, step) in production.steps.iter().enumerate() {
                 let status = statuses.get_mut(step.symbol);
 
-                // If this step is aliased as the symbol's default alias, then remove that alias.
                 if step.alias.is_some()
                     && step.alias.as_ref() == status.aliases.first().map(|t| &t.0)
                 {

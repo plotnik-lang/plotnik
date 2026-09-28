@@ -50,7 +50,6 @@ pub struct VM<'s, 't> {
     pub(crate) source: &'s str,
 }
 
-/// Builder for VM instances.
 pub struct VMBuilder<'s, 't> {
     source: &'s str,
     tree: &'t Tree,

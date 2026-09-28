@@ -1,9 +1,7 @@
 //! Pre-decoded instruction stream, built once at module load.
 //!
-//! The VM's dispatch loop previously re-parsed instruction bytes on every
-//! visit. Load-time validation proves the stream well-formed, so the same walk
-//! now also materializes fixed-size structs the loop can index directly; the
-//! byte-level decoders remain the single source of truth and feed this build.
+//! The VM indexes this cache instead of decoding bytes on every dispatch.
+//! Construction uses the bytecode decoders after load-time validation.
 
 use crate::bytecode::{
     BYTECODE_WORD_SIZE, CallOwnership, CodeAddr, Effect, Nav, NodeKindConstraint, PredicateOp,

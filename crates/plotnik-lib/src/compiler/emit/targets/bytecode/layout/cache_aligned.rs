@@ -497,7 +497,6 @@ fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label
             }))
         });
 
-    // Sort other chains by size (descending) for better locality
     other_chains.sort_by_key(|chain| std::cmp::Reverse(chain.len()));
 
     entry_chains.extend(other_chains);

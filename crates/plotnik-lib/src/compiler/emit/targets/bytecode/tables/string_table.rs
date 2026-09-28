@@ -78,12 +78,10 @@ impl StringTableBuilder {
         Ok(id)
     }
 
-    /// Number of interned strings.
     pub fn len(&self) -> usize {
         self.strings.len()
     }
 
-    /// Get the StringId for direct string content, if it was interned.
     pub fn lookup_str(&self, s: &str) -> Option<StringId> {
         self.str_lookup.get(s).copied()
     }

@@ -369,7 +369,6 @@ pub enum EffectArg {
 }
 
 impl EffectIR {
-    /// The effect's kind.
     #[inline]
     pub fn kind(&self) -> EffectKind {
         self.kind
@@ -394,12 +393,10 @@ impl EffectIR {
         }
     }
 
-    /// Capture current node value.
     pub fn node() -> Self {
         Self::literal(EffectKind::Node, 0)
     }
 
-    /// Produce an absent value.
     pub fn absent() -> Self {
         Self::literal(EffectKind::Absent, 0)
     }
@@ -409,37 +406,30 @@ impl EffectIR {
         Self::literal(EffectKind::ArrayPush, 0)
     }
 
-    /// Begin a list value.
     pub fn list_open() -> Self {
         Self::literal(EffectKind::ListOpen, 0)
     }
 
-    /// End a list value.
     pub fn list_close() -> Self {
         Self::literal(EffectKind::ListClose, 0)
     }
 
-    /// Begin a record value.
     pub fn record_open() -> Self {
         Self::literal(EffectKind::RecordOpen, 0)
     }
 
-    /// End a record value.
     pub fn record_close() -> Self {
         Self::literal(EffectKind::RecordClose, 0)
     }
 
-    /// End variant scope.
     pub fn end_variant() -> Self {
         Self::literal(EffectKind::VariantClose, 0)
     }
 
-    /// Begin suppression (suppress effects within).
     pub fn suppress_begin() -> Self {
         Self::literal(EffectKind::SuppressBegin, 0)
     }
 
-    /// End suppression.
     pub fn suppress_end() -> Self {
         Self::literal(EffectKind::SuppressEnd, 0)
     }
@@ -482,7 +472,6 @@ impl EffectIR {
         Self::literal(EffectKind::SpanStart, id as usize)
     }
 
-    /// Close an inspection span.
     pub fn span_end(id: u16) -> Self {
         Self::literal(EffectKind::SpanEnd, id as usize)
     }
@@ -602,7 +591,6 @@ impl InstructionIR {
 /// Match instruction IR with symbolic successors.
 #[derive(Clone, Debug)]
 pub struct MatchIR {
-    /// Where this instruction lives.
     pub label: Label,
     /// Navigation command. `Epsilon` means pure control flow (no node check).
     pub nav: Nav,
@@ -706,7 +694,6 @@ impl MatchIR {
     }
 
     pub fn size(&self) -> usize {
-        // Match8 can be used if: no effects, no neg_fields, no predicate, and at most 1 successor
         let can_use_match8 = self.effects.is_empty()
             && self.neg_fields.is_empty()
             && self.predicate.is_none()
@@ -742,7 +729,6 @@ impl From<MatchIR> for InstructionIR {
 /// Call instruction IR with symbolic target.
 #[derive(Clone, Debug)]
 pub struct CallIR {
-    /// Where this instruction lives.
     pub label: Label,
     /// Which side of the call boundary discharges entry navigation and field
     /// selection.
@@ -927,10 +913,8 @@ impl From<CallIR> for InstructionIR {
     }
 }
 
-/// Return instruction IR.
 #[derive(Clone, Debug)]
 pub struct ReturnIR {
-    /// Where this instruction lives.
     pub label: Label,
     /// Callee-local dense exit port.
     pub port: PortId,

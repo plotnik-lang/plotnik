@@ -19,13 +19,11 @@ pub struct TypeDef {
     payload: u16,
     /// Member count (0 for wrappers/alias, field/case count for composites).
     count: u8,
-    /// TypeKind discriminant.
     kind: u8,
 }
 
 const _: () = assert!(std::mem::size_of::<TypeDef>() == TypeDef::SIZE);
 
-/// Structured view of TypeDef data, eliminating the need for Option-returning accessors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TypeDefKind {
     /// Primitive entries: NoValue, Node, Text, Bool.
@@ -51,7 +49,6 @@ impl TypeDef {
         }
     }
 
-    /// Create a placeholder slot (to be filled later).
     pub fn placeholder() -> Self {
         Self {
             payload: 0,
@@ -60,7 +57,6 @@ impl TypeDef {
         }
     }
 
-    /// Create a wrapper type.
     pub fn wrapper(kind: TypeKind, inner: TypeId) -> Self {
         Self {
             payload: u16::from(inner),
@@ -172,9 +168,7 @@ impl TypeDef {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct TypeNameEntry {
-    /// StringId of the type name.
     pub name_id: StringId,
-    /// TypeId this name refers to.
     pub type_id: TypeId,
 }
 
@@ -200,9 +194,7 @@ impl TypeNameEntry {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct TypeMember {
-    /// Field/case name.
     pub name_id: StringId,
-    /// Type of this field/case.
     pub type_id: TypeId,
 }
 

@@ -705,7 +705,6 @@ impl<'q> Parser<'q, '_> {
                 continue;
             }
 
-            // LL(2): Id followed by Colon → alternative label or field (check casing)
             if self.at(SyntaxKind::Id) && self.next_is(SyntaxKind::Colon) {
                 if starts_uppercase(self.current_text()) {
                     self.parse_alternative();

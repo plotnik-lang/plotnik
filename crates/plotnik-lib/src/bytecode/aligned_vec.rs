@@ -54,7 +54,6 @@ impl AlignedVec {
         self.len
     }
 
-    /// View as byte slice.
     pub fn as_slice(&self) -> &[u8] {
         if self.blocks.is_empty() {
             return &[];

@@ -45,7 +45,6 @@ impl<'q> GrammarBindInput<'_, 'q> {
             satisfiability_limits,
         } = self;
 
-        // Local deduplication maps (not exposed in output)
         let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
         let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
 

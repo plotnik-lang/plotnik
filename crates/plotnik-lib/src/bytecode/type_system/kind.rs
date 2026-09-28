@@ -25,12 +25,10 @@ pub enum TypeKind {
     Alias = 7,
     /// Borrowed source text.
     Text = 8,
-    /// Boolean value.
     Bool = 9,
 }
 
 impl TypeKind {
-    /// Convert from raw discriminant.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             0 => Some(Self::NoValue),
@@ -47,7 +45,6 @@ impl TypeKind {
         }
     }
 
-    /// Whether this is a primitive/builtin type.
     pub fn is_primitive(self) -> bool {
         matches!(self, Self::NoValue | Self::Node | Self::Text | Self::Bool)
     }

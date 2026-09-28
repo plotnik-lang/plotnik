@@ -125,7 +125,6 @@ impl Diagnostics {
                     continue;
                 }
 
-                // Rule 2: Same start position
                 if a.span.range.start() == b.span.range.start() {
                     // Root cause errors (Expected*) suppress structural errors (Unclosed*)
                     // even though structural errors have higher enum priority. This is because

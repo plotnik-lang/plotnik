@@ -169,27 +169,11 @@ impl Module {
         Ok(module)
     }
 
-    /// Validate raw bytecode so later *view* accesses cannot panic and
-    /// accidental corruption of the body is detected.
-    ///
-    /// Section bounds are checked earlier, in [`validate_section_bounds`], before
-    /// offsets are computed. The remaining checks here defend a corrupted header
-    /// (which the CRC does not cover) whose counts/sizes would otherwise drive
-    /// out-of-bounds slicing: the reserved bytes are zero, the CRC32 over the
-    /// post-header body matches, the string/regex table sentinels are
-    /// well-formed, the documented TypeDef member ranges stay in bounds, and
-    /// entry point targets address real instructions.
-    ///
-    /// The CRC32 detects accidental corruption between emission and
-    /// construction. It is not a substitute for structural validation, so a
-    /// test buffer with a recomputed checksum must still fail the checks below;
-    /// [`Self::validate_instructions`] therefore re-verifies the lazily-decoded
-    /// instruction stream structurally. The matcher verifier then proves
-    /// return routing, cursor depth, and materializer-stack safety, so validated
-    /// bytecode never panics on view/decode/VM access even when compiler output
-    /// is malformed.
+    /// Section bounds must already be checked before these methods slice data.
+    /// A valid checksum alone does not prove that encodings, references, or
+    /// control flow are safe for the trusting views and VM.
     fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
-        // Reserved header bytes are not covered by the CRC; v6 fixes them at zero.
+        // The CRC excludes the header, so check its reserved bytes separately.
         if self.header._reserved != [0u8; 20] {
             return Err(ModuleError::MalformedHeader);
         }
@@ -502,23 +486,14 @@ impl Module {
         Ok(())
     }
 
-    /// Every *required* `StringId` held in a section — entry point names,
-    /// node/field symbol names, type names, type member names, and regex pattern
-    /// names — must address a real string-table entry, so the view accessors that
-    /// resolve them (and `find_by_name`, the materializer's record-field keys,
-    /// etc.) never slice out of bounds. The table holds `str_table_count + 1`
-    /// offsets, so the valid id range is `0..str_table_count`. This upholds the
-    /// representation's guarantee that validated bytecode never panics on view access
-    /// (`docs/bytecode/01-layout.md`).
+    /// Required names must reference a string in `1..str_table_count`.
+    /// Table views trust these IDs without rechecking them.
     fn validate_string_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
         let n = self.header.str_table_count;
 
-        // Read the raw `u16` rather than the typed accessor: a required `StringId`
-        // is a `NonZeroU16`, so building one from a malformed zero would panic
-        // here in the validator itself, defeating the purpose. A valid required id
-        // is a real, non-easter-egg entry: `1..str_table_count`. Section bounds are
-        // already proven by `validate_section_bounds`, so the reads stay in range.
+        // Typed accessors would panic on zero before we could reject it.
+        // Section bounds have already been checked.
         let check = |base: u32, stride: usize, name_off: usize, start: usize, count: usize| {
             let base = base as usize;
             for i in start..count {
@@ -568,10 +543,7 @@ impl Module {
             0,
             self.header.type_members_count as usize,
         )?;
-        // regex pattern name: u16 at entry+0. Index 0 is the reserved sentinel —
-        // never resolved — so start at 1; `dump`/`trace` resolve `string_id` for
-        // every real entry through the panicking `RegexView::pattern_string_id` (and
-        // then index the string blob).
+        // Regex entry 0 is a sentinel with no pattern name.
         check(
             self.offsets.regex_table,
             REGEX_TABLE_ENTRY_SIZE,
@@ -616,38 +588,11 @@ impl Module {
         Ok(())
     }
 
-    /// Structurally re-verify the whole instruction stream so the documented
-    /// guarantee — validated bytecode never panics on view/decode access — holds
-    /// for every compiler buffer whose header and CRC check out, including the
-    /// deliberately mutated buffers used by validation tests.
+    /// Check encodings and operands before the trusting decoders read them.
     ///
-    /// A module is decoded lazily: [`decode_instruction`](Self::decode_instruction) and the
-    /// per-opcode decoders, the effect/predicate iterators, and the materializer
-    /// all build `NonZero`/enum values and index tables straight from
-    /// instruction bytes. Each is a panic site on malformed compiler output — `Opcode`,
-    /// `Nav`, `NodeKindConstraint`, `EffectKind`, and `SuccessorAddr` decoding, plus
-    /// `get_member` / `at` table lookups. This walk rejects every such
-    /// input up front, reading only through checked slicing so it never panics
-    /// itself.
-    ///
-    /// Two passes over the stream:
-    /// 1. Decode each instruction's fixed-size slot (the slot size is fixed by
-    ///    the opcode, so the walk is unambiguous), validating opcode, segment,
-    ///    nav, node kind, effect opcodes, `RecordSet`/`Variant` member operands, and
-    ///    predicate operands, and rejecting any zero successor address. Record
-    ///    each instruction start and collect every jump target.
-    /// 2. Every collected jump target — successor or call next/target — must land
-    ///    on a recorded instruction start.
-    ///
-    /// Returns the instruction-start bitmap so [`Self::validate_entry_points`] can
-    /// hold entry point targets to the same rule: an entry point pointing into the
-    /// interior of a multi-word instruction would otherwise begin decoding
-    /// mid-instruction.
-    ///
-    /// Out of scope (not a decode/view panic): node-kind/field ids, which are
-    /// resolved against the tree-sitter grammar at match time, and member
-    /// `type_id`s, which the materializer reads through the checked `Types::get`
-    /// that returns `Option`.
+    /// Jump validation needs two passes: collect instruction starts while
+    /// checking each slot, then reject targets that land inside a slot or
+    /// outside the stream. Entry-point validation reuses the returned bitmap.
     fn validate_instructions(&self) -> Result<Vec<bool>, ModuleError> {
         let storage: &[u8] = &self.storage;
         let base = self.offsets.instructions as usize;
@@ -767,7 +712,6 @@ impl Module {
                     }
                 }
                 opcode if opcode.is_match() => {
-                    // A Match variant (`Match8` or extended).
                     let node_kind = header_byte::node_class_bits(header);
                     if NodeKindConstraint::try_from_bytes(
                         node_kind,

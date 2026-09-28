@@ -400,7 +400,6 @@ impl<'a> Match<'a> {
         self.nav == Nav::Epsilon
     }
 
-    /// Check if this is a Match8 (8-byte fast-path instruction).
     #[inline]
     pub fn is_match8(&self) -> bool {
         matches!(self.layout, MatchLayout::Match8 { .. })
@@ -414,7 +413,6 @@ impl<'a> Match<'a> {
             .word_count()
     }
 
-    /// Number of successors.
     #[inline]
     pub fn succ_count(&self) -> usize {
         match self.layout {
@@ -488,7 +486,6 @@ impl<'a> Match<'a> {
         matches!(self.layout, MatchLayout::Extended { missing: true, .. })
     }
 
-    /// Get predicate data if present.
     pub fn predicate(&self) -> Option<MatchPredicate> {
         if !self.has_predicate() {
             return None;
@@ -976,7 +973,6 @@ impl Call {
     }
 }
 
-/// Return instruction for returning from definitions.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Return {
     /// Segment index (0-3).

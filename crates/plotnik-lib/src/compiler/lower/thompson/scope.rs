@@ -137,7 +137,6 @@ impl ScopeCloseEffects<'_> {
 }
 
 impl NfaBuilder<'_> {
-    /// Avoids the repeated `if let Some(type_id) = type_id { with_scope } else { f }` pattern.
     pub(super) fn with_scope_if_present<T>(
         &mut self,
         type_id: Option<TypeId>,

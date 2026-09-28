@@ -10,7 +10,6 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Root);
 
         while !self.is_done() && !self.at(SyntaxKind::Error) {
-            // LL(2): Id followed by Equals → named definition (if PascalCase)
             if self.at(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
                 self.parse_def();
                 continue;

@@ -14,9 +14,7 @@ use plotnik_rt::Nav;
 
 /// Column widths for instruction line formatting.
 pub mod cols {
-    /// Leading indentation (2 spaces).
     pub const INDENT: usize = 2;
-    /// Gap between columns (1 space).
     pub const GAP: usize = 1;
     /// Symbol column width for fixed-width trace symbols.
     pub const SYMBOL: usize = 5;
@@ -125,9 +123,7 @@ pub fn nav_symbol(nav: Nav) -> Symbol {
 pub mod trace {
     use super::Symbol;
 
-    /// Match: success.
     pub const MATCH_SUCCESS: Symbol = Symbol::new("  ", "●", "  ");
-    /// Match: failure.
     pub const MATCH_FAILURE: Symbol = Symbol::new("  ", "○", "  ");
 
     /// Effect: data capture or structure.
@@ -135,9 +131,7 @@ pub mod trace {
     /// Effect: suppressed (inside @_ capture).
     pub const EFFECT_SUPPRESSED: Symbol = Symbol::new("  ", "⬦", "  ");
 
-    /// Call: entering definition.
     pub const CALL: Symbol = Symbol::new("  ", "▶", "  ");
-    /// Return: back from definition.
     pub const RETURN: Symbol = Symbol::new("  ", "◀", "  ");
 
     /// Backtrack symbol (centered in 5 chars).
@@ -200,7 +194,6 @@ pub struct LineBuilder {
 }
 
 impl LineBuilder {
-    /// Create a new line builder with the given address width.
     pub fn new(addr_width: usize) -> Self {
         Self { addr_width }
     }

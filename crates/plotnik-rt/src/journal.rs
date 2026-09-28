@@ -79,7 +79,6 @@ impl<'t> MatchJournal<'t> {
         (self.0.len() * std::mem::size_of::<JournalEvent<'t>>()) as u64
     }
 
-    /// Check if empty.
     #[inline]
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {

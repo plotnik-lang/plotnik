@@ -138,7 +138,6 @@ pub struct FrameArena {
 }
 
 impl FrameArena {
-    /// Create an empty frame arena.
     pub fn new() -> Self {
         Self {
             frames: Vec::new(),
@@ -196,7 +195,6 @@ impl FrameArena {
         (self.frames.len() * std::mem::size_of::<Frame>()) as u64
     }
 
-    /// Check if frame stack is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.current.is_none()

@@ -150,17 +150,14 @@ impl TypeTableBuilder {
         (defs_bytes, members_bytes, names_bytes)
     }
 
-    /// Number of type definitions.
     pub fn type_defs_count(&self) -> usize {
         self.type_defs.len()
     }
 
-    /// Number of type members.
     pub fn type_members_count(&self) -> usize {
         self.type_members.len()
     }
 
-    /// Number of type names.
     pub fn type_names_count(&self) -> usize {
         self.type_names.len()
     }

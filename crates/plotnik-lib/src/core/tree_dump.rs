@@ -23,9 +23,7 @@ pub enum DumpChunkKind {
     Text,
     /// Structural punctuation: parens, `: ` after a field, ` == `.
     Punct,
-    /// A node kind.
     Kind,
-    /// A field name.
     Field,
     /// A quoted string: predicate values and anonymous tokens.
     String,

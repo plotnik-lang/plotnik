@@ -130,7 +130,6 @@ pub enum DiagnosticKind {
 }
 
 impl DiagnosticKind {
-    /// Severity for this kind.
     pub fn severity(&self) -> Severity {
         match self {
             Self::UnusedAlternativeLabels

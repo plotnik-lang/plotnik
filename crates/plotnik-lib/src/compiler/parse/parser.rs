@@ -96,7 +96,6 @@ pub struct Parser<'q, 'd> {
 }
 
 impl<'q, 'd> Parser<'q, 'd> {
-    /// Create a new parser with the specified parameters.
     pub fn new(
         source: &'q str,
         source_id: SourceId,

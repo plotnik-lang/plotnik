@@ -28,12 +28,10 @@ pub enum PrimitiveType {
     Node = TYPE_NODE,
     /// Borrowed source text.
     Text = TYPE_TEXT,
-    /// Boolean value.
     Bool = TYPE_BOOL,
 }
 
 impl PrimitiveType {
-    /// Try to convert a type index to a primitive type.
     #[inline]
     pub fn from_index(index: u16) -> Option<Self> {
         match index {
@@ -45,13 +43,11 @@ impl PrimitiveType {
         }
     }
 
-    /// Get the type index for this primitive.
     #[inline]
     pub const fn index(self) -> u16 {
         self as u16
     }
 
-    /// Check if a type index is a builtin primitive.
     #[inline]
     pub fn is_builtin(index: u16) -> bool {
         index < TYPE_CUSTOM_START
