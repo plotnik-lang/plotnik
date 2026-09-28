@@ -95,7 +95,7 @@ crates/
       05-typegen/
       06-vm/
       07-codegen/
-docs/                          # specs: language, type system, CLI, runtime, binary format
+docs/                          # query language reference and bytecode specification
 ```
 
 Pipeline:
@@ -108,7 +108,7 @@ Pipeline:
 
 # Query language
 
-Full spec: `docs/lang-reference.md`, `docs/type-system.md`. The essentials:
+Full spec: `docs/reference.md`. The essentials:
 
 | Syntax              | Meaning                                      |
 | ------------------- | -------------------------------------------- |
@@ -189,7 +189,7 @@ Expr = [
 
 # CLI compiler commands
 
-`cargo run -p plotnik-cli -- <command>`. Full reference: `docs/cli.md`.
+`cargo run -p plotnik-cli -- <command>`.
 
 ```sh
 cargo run -p plotnik-cli -- check query.ptk --grammar path/to/grammar.json

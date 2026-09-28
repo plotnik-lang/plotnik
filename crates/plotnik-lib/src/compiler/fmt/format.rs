@@ -41,7 +41,7 @@ impl FormatError {
     }
 }
 
-/// Format one Plotnik query file according to `docs/fmt.md`.
+/// Format one Plotnik query file.
 ///
 /// Successful output is canonical, idempotent, LF-only, and ends in exactly
 /// one newline. Syntax failures carry their matching source map so callers can

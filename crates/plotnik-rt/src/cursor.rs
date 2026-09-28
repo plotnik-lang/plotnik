@@ -1,7 +1,6 @@
 //! TreeCursor wrapper with Plotnik navigation semantics.
 //!
-//! The wrapper handles the search loop and skip policies defined
-//! in docs/tree-navigation.md.
+//! The wrapper handles tree movement and sibling search under each skip policy.
 
 use std::collections::VecDeque;
 use std::num::NonZeroU64;
@@ -362,7 +361,7 @@ impl<'t> CursorWrapper<'t> {
     /// nested trailing anchor — `(array (object (pair) .) .)`, "pair last in
     /// object AND object last in array" — sound when `collapse_up` merges the two
     /// single-level ascents (and why merging caps at the encoding limit rather
-    /// than dropping checks; see docs/tree-navigation.md).
+    /// than dropping checks).
     ///
     /// On any failure the cursor is restored to where it started, so a failed
     /// navigation leaves no net movement (the VM also backtracks to a checkpoint,
