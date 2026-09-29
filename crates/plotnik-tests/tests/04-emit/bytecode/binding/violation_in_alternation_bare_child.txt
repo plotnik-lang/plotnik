@@ -1,7 +1,20 @@
 Q = [
-  (function_declaration (class_declaration))
-  (identifier)
+  (param (num))
+  (id)
 ]
+-------------------- GRAMMAR ---------------------
+rules:
+  args:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: param}
+      - {type: SYMBOL, name: num}
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 0
@@ -10,16 +23,16 @@ Q = 0
 Q:
   0  -ε-                                    2, 5
   1                                         ▶
-  2   !   (function_declaration)            4
+  2   !   (param)                           4
   3  ─‣┘  _                                 1
-  4  └‣─  (class_declaration)               3
-  5   !   (identifier)                      1
+  4  └‣─  (num)                             3
+  5   !   (id)                              1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "function_declaration"
-S2 "class_declaration"
-S3 "identifier"
+S1 "param"
+S2 "num"
+S3 "id"
 S4 "Q"
 
 [type_defs]
@@ -35,8 +48,8 @@ Q = 0 :: T0
 [instructions]
 Q:
   0  -ε-                                    5, 6
-  2  └‣─  (class_declaration)               3
+  2  └‣─  (num)                             3
   3  ─‣┘  _                                 4
   4                                         ▶
-  5   !   (function_declaration)            2
-  6   !   (identifier)                      4
+  5   !   (param)                           2
+  6   !   (id)                              4

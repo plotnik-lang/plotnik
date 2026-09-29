@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use plotnik_tests::snapshot::expectation::{Admission, Expectation};
 use plotnik_tests::snapshot::{Document, Section, parse_document};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,6 +45,7 @@ pub(crate) struct Case {
     pub(crate) language: SourceLanguage,
     pub(crate) grammar_json: PathBuf,
     pub(crate) expected: Expected,
+    pub(crate) expected_tree: Option<String>,
 }
 
 pub(crate) struct Corpus {
@@ -72,7 +74,8 @@ pub(crate) fn discover(manifest_dir: &Path, filter: Option<&str>) -> Result<Corp
             .map_err(|error| format!("read snapshot {}: {error}", path.display()))?;
         let document = parse_document(&raw)
             .map_err(|error| format!("parse snapshot `{relative}`: {error}"))?;
-        match case_from_document(&relative, document)? {
+        let requirement = Expectation::load(&path)?;
+        match case_from_document(&relative, document, requirement.as_ref())? {
             Some(case) => cases.push(case),
             None => skipped += 1,
         }
@@ -85,7 +88,11 @@ pub(crate) fn discover(manifest_dir: &Path, filter: Option<&str>) -> Result<Corp
     })
 }
 
-fn case_from_document(relative: &str, document: Document) -> Result<Option<Case>, String> {
+fn case_from_document(
+    relative: &str,
+    document: Document,
+    requirement: Option<&Expectation>,
+) -> Result<Option<Case>, String> {
     let input = document.sections.first().ok_or_else(|| {
         format!("snapshot `{relative}` has no `INPUT` section and cannot run natively")
     })?;
@@ -94,6 +101,20 @@ fn case_from_document(relative: &str, document: Document) -> Result<Option<Case>
     })?;
     let output = unique_section(&document.sections, "output", relative)?;
     let diagnostics = unique_section(&document.sections, "diagnostics", relative)?;
+    if let Some(requirement) = requirement {
+        if (requirement.admission == Admission::Accept) != output.is_some() {
+            return Err(format!(
+                "snapshot `{relative}` output contradicts its authored admission"
+            ));
+        }
+        if let Some(runtime) = &requirement.runtime {
+            let output =
+                output.ok_or_else(|| format!("snapshot `{relative}` requires runtime output"))?;
+            runtime
+                .check(&output.body)
+                .map_err(|error| format!("snapshot `{relative}`: {error}"))?;
+        }
+    }
 
     let Some(output) = output else {
         let Some(diagnostics) = diagnostics else {
@@ -118,6 +139,7 @@ fn case_from_document(relative: &str, document: Document) -> Result<Option<Case>
         language,
         grammar_json: language.grammar_json(),
         expected,
+        expected_tree: requirement.and_then(|r| r.tree.clone()),
     }))
 }
 

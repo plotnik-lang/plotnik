@@ -1,9 +1,21 @@
-Q = (array "+")
+Q = (list ";")
+-------------------- GRAMMAR ---------------------
+rules:
+  stmt:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: list}
+      - {type: STRING, value: ";"}
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: STRING, value: "]"}
 ------------------ DIAGNOSTICS -------------------
-error: the grammar builds no `array` with these children
+error: the grammar builds no `list` with these children
  --> query.ptk:1:6
   |
-1 | Q = (array "+")
-  |      ^^^^^
+1 | Q = (list ";")
+  |      ^^^^
   |
-help: `array` allows children `expression` or `spread_element`
+help: `list` takes no named children

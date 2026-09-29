@@ -1,0 +1,53 @@
+Q = (pair
+  (comment)
+  (num)
+)
+-------------------- GRAMMAR ---------------------
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  pair:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ":"}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+  comment: {type: PATTERN, value: "#[^\\n]*"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (pair)                            5
+  3  ─‣┘  _                                 1
+  4  ─‣─  (num)                             3
+  5  └‣─  (comment)                         4
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "pair"
+S2 "comment"
+S3 "num"
+S4 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (pair)                            1
+  1  └‣─  (comment)                         2
+  2  ─‣─  (num)                             3
+  3  ─‣┘  _                                 4
+  4                                         ▶

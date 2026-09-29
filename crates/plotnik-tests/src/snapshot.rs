@@ -1,5 +1,7 @@
 //! Shared parsing for snapshot documents and section boundaries.
 
+pub mod expectation;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Document {
     pub query: String,
@@ -65,7 +67,8 @@ pub fn parse_section_header(line: &str) -> Option<String> {
         || name.starts_with("input.")
         || matches!(
             name.as_str(),
-            "cst"
+            "grammar"
+                | "cst"
                 | "ast"
                 | "definitions"
                 | "nfa"

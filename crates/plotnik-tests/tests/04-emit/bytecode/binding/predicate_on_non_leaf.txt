@@ -1,11 +1,20 @@
-Q = (function_declaration == "foo")
+Q = (call == "f()")
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "("}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: predicate `function_declaration == "foo"` cannot test `function_declaration` because this node kind can contain children
- --> query.ptk:1:27
+error: predicate `call == "f()"` cannot test `call` because this node kind can contain children
+ --> query.ptk:1:11
   |
-1 | Q = (function_declaration == "foo")
-  |      -------------------- ^^^^^^^^
+1 | Q = (call == "f()")
+  |      ---- ^^^^^^^^
   |      |
-  |      `function_declaration` starts here
+  |      `call` starts here
   |
-help: move `== "foo"` to a leaf child of `function_declaration`, or match a literal token directly
+help: move `== "f()"` to a leaf child of `call`, or match a literal token directly

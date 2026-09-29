@@ -1,11 +1,24 @@
-Q = (function_declaration (class_declaration))
+Q = (param (num))
+-------------------- GRAMMAR ---------------------
+rules:
+  args:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: param}
+      - {type: SYMBOL, name: num}
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `class_declaration` cannot be an unlabeled child of `function_declaration`
- --> query.ptk:1:28
+error: `num` cannot be an unlabeled child of `param`
+ --> query.ptk:1:13
   |
-1 | Q = (function_declaration (class_declaration))
-  |      --------------------  ^^^^^^^^^^^^^^^^^
+1 | Q = (param (num))
+  |      -----  ^^^
   |      |
-  |      `function_declaration` starts here
+  |      `param` starts here
   |
-help: `function_declaration` has no unlabeled children. Use its grammar fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`
+help: `param` has no unlabeled children. Use its grammar fields: `name: (id)`

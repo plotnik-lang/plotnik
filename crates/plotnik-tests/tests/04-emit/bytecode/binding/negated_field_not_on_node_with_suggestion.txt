@@ -1,15 +1,33 @@
-Q = (function_declaration -parameter) @fn
+Q = (call -arg)
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - type: FIELD
+        name: args
+        content: {type: SYMBOL, name: args}
+  args:
+    type: SEQ
+    members:
+      - {type: STRING, value: "("}
+      - type: FIELD
+        name: arg
+        content: {type: SYMBOL, name: id}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `parameter` is not a grammar field of `function_declaration`
- --> query.ptk:1:28
+error: `arg` is not a grammar field of `call`
+ --> query.ptk:1:12
   |
-1 | Q = (function_declaration -parameter) @fn
-  |      --------------------  ^^^^^^^^^
+1 | Q = (call -arg)
+  |      ----  ^^^
   |      |
-  |      `function_declaration` starts here
+  |      `call` starts here
   |
-help: replace with `parameters`
+help: replace with `args`
   |
-1 | Q = (function_declaration -parameters) @fn
-  |                                     +
-help: valid grammar fields for `function_declaration`: `body`, `name`, `parameters`
+1 | Q = (call -args)
+  |               +
+help: valid grammar fields for `call`: `args`

@@ -1,7 +1,20 @@
-Q = (binary_expression
-  left: (_) @left
-  right: (_) @right
+Q = (pair
+  key: (_) @key
+  value: (_) @value
 )
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: key
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2
@@ -9,25 +22,25 @@ Q = 2
 [transitions]
 Q:
   1                                         ▶
-  2   !   (binary_expression)               5
+  2   !   (pair)                            5
   3  ─‣┘  _                                 1
-  4  ─‣─  right: (_) [Node RecordSet(right)]  3
-  5  └‣─  left: (_) [Node RecordSet(left)]  4
+  4  ─‣─  value: (_) [Node RecordSet(value)]  3
+  5  └‣─  key: (_) [Node RecordSet(key)]    4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "left"
-S2 "right"
+S1 "key"
+S2 "value"
 S3 "Q"
-S4 "binary_expression"
+S4 "pair"
 
 [type_defs]
 T0 = <Node>
-T1 = Record  M0:2  ; { left, right }
+T1 = Record  M0:2  ; { key, value }
 
 [type_members]
-M0: S1 → T0  ; left: <Node>
-M1: S2 → T0  ; right: <Node>
+M0: S1 → T0  ; key: <Node>
+M1: S2 → T0  ; value: <Node>
 
 [type_names]
 N0: S3 → T1  ; Q
@@ -37,8 +50,8 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (binary_expression)               1
-  1  └‣─  left: (_) [Node RecordSet(M0)]    3
-  3  ─‣─  right: (_) [Node RecordSet(M1)]   5
+  0   !   (pair)                            1
+  1  └‣─  key: (_) [Node RecordSet(M0)]     3
+  3  ─‣─  value: (_) [Node RecordSet(M1)]   5
   5  ─‣┘  _                                 6
   6                                         ▶

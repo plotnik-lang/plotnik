@@ -1,0 +1,30 @@
+Q = (pair
+  .!
+  (comment)
+  (num)
+)
+-------------------- GRAMMAR ---------------------
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  pair:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ":"}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+  comment: {type: PATTERN, value: "#[^\\n]*"}
+------------------ DIAGNOSTICS -------------------
+error: with the exact anchor (`.!`), the first child of `pair` must be `comment`, but `pair` begins with `id`
+ --> query.ptk:1:6
+  |
+1 | Q = (pair
+  |      ^^^^
+  |
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(pair
+        .
+        (comment)
+        (num)
+      )`

@@ -1,13 +1,18 @@
-Q = (identifier
-  name: (identifier) @inner
-) @id
+Q = (id name: (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `name` is not a grammar field of `identifier`
- --> query.ptk:2:3
+error: `name` is not a grammar field of `id`
+ --> query.ptk:1:9
   |
-1 | Q = (identifier
-  |      ---------- `identifier` starts here
-2 |   name: (identifier) @inner
-  |   ^^^^
+1 | Q = (id name: (id))
+  |      -- ^^^^
+  |      |
+  |      `id` starts here
   |
-help: `identifier` has no grammar fields
+help: `id` has no grammar fields

@@ -1,7 +1,19 @@
 Q = [
-  (function_declaration name: (number))
-  (identifier)
+  (decl name: (num))
+  (id)
 ]
+-------------------- GRAMMAR ---------------------
+rules:
+  decl:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - {type: STRING, value: "="}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 0
@@ -10,16 +22,16 @@ Q = 0
 Q:
   0  -ε-                                    2, 5
   1                                         ▶
-  2   !   (function_declaration)            4
+  2   !   (decl)                            4
   3  ─‣┘  _                                 1
-  4  └‣─  name: (number)                    3
-  5   !   (identifier)                      1
+  4  └‣─  name: (num)                       3
+  5   !   (id)                              1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "function_declaration"
-S2 "number"
-S3 "identifier"
+S1 "decl"
+S2 "num"
+S3 "id"
 S4 "name"
 S5 "Q"
 
@@ -36,8 +48,8 @@ Q = 0 :: T0
 [instructions]
 Q:
   0  -ε-                                    5, 6
-  2  └‣─  name: (number)                    3
+  2  └‣─  name: (num)                       3
   3  ─‣┘  _                                 4
   4                                         ▶
-  5   !   (function_declaration)            2
-  6   !   (identifier)                      4
+  5   !   (decl)                            2
+  6   !   (id)                              4

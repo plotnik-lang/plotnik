@@ -1,7 +1,16 @@
 Q = [
-  (identifier (number))
-  (number)
+  (id (num))
+  (num)
 ]
+-------------------- GRAMMAR ---------------------
+rules:
+  expr:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 0
@@ -10,15 +19,15 @@ Q = 0
 Q:
   0  -ε-                                    2, 5
   1                                         ▶
-  2   !   (identifier)                      4
+  2   !   (id)                              4
   3  ─‣┘  _                                 1
-  4  └‣─  (number)                          3
-  5   !   (number)                          1
+  4  └‣─  (num)                             3
+  5   !   (num)                             1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "identifier"
-S2 "number"
+S1 "id"
+S2 "num"
 S3 "Q"
 
 [type_defs]
@@ -34,8 +43,8 @@ Q = 0 :: T0
 [instructions]
 Q:
   0  -ε-                                    5, 6
-  2  └‣─  (number)                          3
+  2  └‣─  (num)                             3
   3  ─‣┘  _                                 4
   4                                         ▶
-  5   !   (identifier)                      2
-  6   !   (number)                          4
+  5   !   (id)                              2
+  6   !   (num)                             4

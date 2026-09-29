@@ -1,7 +1,15 @@
-Q = (xyzzy_foobar_baz) @fn
+Q = (comment)
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - {type: STRING, value: fn}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `xyzzy_foobar_baz` is not a valid node kind
+error: `comment` is not a valid node kind
  --> query.ptk:1:6
   |
-1 | Q = (xyzzy_foobar_baz) @fn
-  |      ^^^^^^^^^^^^^^^^
+1 | Q = (comment)
+  |      ^^^^^^^

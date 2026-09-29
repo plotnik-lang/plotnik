@@ -1,12 +1,20 @@
-Q = (function_declaraton) @fn
+Q = (fuc)
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - {type: STRING, value: fn}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `function_declaraton` is not a valid node kind
+error: `fuc` is not a valid node kind
  --> query.ptk:1:6
   |
-1 | Q = (function_declaraton) @fn
-  |      ^^^^^^^^^^^^^^^^^^^
+1 | Q = (fuc)
+  |      ^^^
   |
-help: replace with `function_declaration`
+help: replace with `func`
   |
-1 | Q = (function_declaration) @fn
-  |                       +
+1 | Q = (func)
+  |        +

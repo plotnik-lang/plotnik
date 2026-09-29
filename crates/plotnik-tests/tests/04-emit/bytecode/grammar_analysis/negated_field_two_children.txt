@@ -1,0 +1,33 @@
+Q = (update
+  -left
+  (id)
+  (id)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  update:
+    type: CHOICE
+    members:
+      - type: SEQ
+        members:
+          - {type: STRING, value: "++"}
+          - type: FIELD
+            name: right
+            content: {type: SYMBOL, name: id}
+      - type: SEQ
+        members:
+          - type: FIELD
+            name: left
+            content: {type: SYMBOL, name: id}
+          - {type: STRING, value: "++"}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `-left` requires `left` to be absent, but this `update` pattern also matches `left`
+ --> query.ptk:2:4
+  |
+2 |   -left
+  |    ^^^^
+3 |   (id)
+  |   ---- matches `left` here
+  |
+help: drop `-left` or remove the `left` child

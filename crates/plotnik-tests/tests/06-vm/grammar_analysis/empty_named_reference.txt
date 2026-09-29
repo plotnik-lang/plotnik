@@ -1,0 +1,78 @@
+Leaf = (identifier .!)
+
+Q = (program
+  (expression_statement (Leaf)) @expression
+)
+------------------- INPUT (js) -------------------
+x;
+------------------- TYPESCRIPT -------------------
+export type Leaf = undefined;
+
+export interface Q {
+  expression: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "expression": {
+    "kind": "expression_statement",
+    "span": [0, 2],
+    "text": "x;"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "expression"
+S2 "Q"
+S3 "identifier"
+S4 "program"
+S5 "expression_statement"
+S6 "Leaf"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Record  M0:1  ; { expression }
+
+[type_members]
+M0: S1 → T1  ; expression: <Node>
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Leaf = 0 :: T0
+Q    = 3 :: T2
+
+[instructions]
+Leaf:
+  0   !   (identifier)                      1
+  1  └!┘  _                                 2
+  2                                         ▶
+
+Q:
+  3   !   (program)                         4
+  4  └‣─  (expression_statement) [Node RecordSet(M0)]  6
+  6  └‣─  (Leaf)                            0 : 7
+  7  ─‣┘² _                                 8
+  8                                         ▶
+--------------------- TRACE ----------------------
+Q:
+  3       (program)                         04
+      ●   program
+  4       (expression_statement) [Node RecordSet(M0)]  06
+      ●   expression_statement
+  6       (Leaf)                            00 : 07
+      ▶   (Leaf)
+
+Leaf:
+  0       (identifier)                      01
+      ●   identifier
+  1       _                                 02
+      ●   identifier
+  2   ◀   (Leaf)                            
+
+Q:
+  7       _                                 08
+      ●   program
+  8   ◀   (Q)                               ◼

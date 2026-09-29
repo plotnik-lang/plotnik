@@ -1,0 +1,56 @@
+Q = (update
+  -left
+  (id)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  update:
+    type: CHOICE
+    members:
+      - type: SEQ
+        members:
+          - {type: STRING, value: "++"}
+          - type: FIELD
+            name: right
+            content: {type: SYMBOL, name: id}
+      - type: SEQ
+        members:
+          - type: FIELD
+            name: left
+            content: {type: SYMBOL, name: id}
+          - {type: STRING, value: "++"}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   -left (update)                    4
+  3  ─‣┘  _                                 1
+  4  └‣─  (id)                              3
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "update"
+S2 "id"
+S3 "left"
+S4 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   -left (update)                    2
+  2  └‣─  (id)                              3
+  3  ─‣┘  _                                 4
+  4                                         ▶

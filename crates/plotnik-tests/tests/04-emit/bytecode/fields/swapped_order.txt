@@ -1,16 +1,29 @@
-Q = (binary_expression
-  right: (_)
-  left: (_)
+Q = (pair
+  value: (_)
+  key: (_)
 )
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: key
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ------------------ DIAGNOSTICS -------------------
-error: the grammar places `left:` before `right:` in `binary_expression`
+error: the grammar places `key:` before `value:` in `pair`
  --> query.ptk:2:3
   |
-1 | Q = (binary_expression
-  |      ----------------- inside `binary_expression`
-2 |   right: (_)
+1 | Q = (pair
+  |      ---- inside `pair`
+2 |   value: (_)
   |   ^^^^^^^^^^
-3 |   left: (_)
-  |   --------- `left:` must come before `right:`
+3 |   key: (_)
+  |   -------- `key:` must come before `value:`
   |
-help: write `left:` before `right:`
+help: write `key:` before `value:`

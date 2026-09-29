@@ -1,0 +1,59 @@
+Q = (program
+  (comment)
+  (expression_statement) @statement
+)
+------------------- INPUT (js) -------------------
+/* c */ let x = 1; x;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  statement: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "statement": {
+    "kind": "expression_statement",
+    "span": [19, 21],
+    "text": "x;"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "statement"
+S2 "Q"
+S3 "program"
+S4 "comment"
+S5 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { statement }
+
+[type_members]
+M0: S1 → T0  ; statement: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entry_points]
+Q = 0 :: T1
+
+[instructions]
+Q:
+  0   !   (program)                         1
+  1  └‣─  (comment)                         2
+  2  ─‣─  (expression_statement) [Node RecordSet(M0)]  4
+  4  ─‣┘  _                                 5
+  5                                         ▶
+--------------------- TRACE ----------------------
+Q:
+  0       (program)                         01
+      ●   program
+  1       (comment)                         02
+      ●   comment
+  2       (expression_statement) [Node RecordSet(M0)]  04
+      ○   lexical_declaration
+      ●   expression_statement
+  4       _                                 05
+      ●   program
+  5   ◀   (Q)                               ◼

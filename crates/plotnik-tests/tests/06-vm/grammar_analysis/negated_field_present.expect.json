@@ -1,0 +1,8 @@
+{
+  "admission": "accept",
+  "codes": [],
+  "tree": "(program (lexical_declaration (variable_declarator name: (identifier) value: (identifier))))",
+  "runtime": {
+    "result": "no_match"
+  }
+}

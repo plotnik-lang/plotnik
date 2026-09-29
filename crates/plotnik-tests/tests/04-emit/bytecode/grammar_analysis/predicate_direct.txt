@@ -1,0 +1,20 @@
+Q = (call == "f()")
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "("}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: predicate `call == "f()"` cannot test `call` because this node kind can contain children
+ --> query.ptk:1:11
+  |
+1 | Q = (call == "f()")
+  |      ---- ^^^^^^^^
+  |      |
+  |      `call` starts here
+  |
+help: move `== "f()"` to a leaf child of `call`, or match a literal token directly

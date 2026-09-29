@@ -1,12 +1,23 @@
-Q = (binary_expression operator: (identifier))
+Q = (sum op: (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  sum:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - type: FIELD
+        name: op
+        content: {type: STRING, value: "+"}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `identifier` is not valid for grammar field `operator` of `binary_expression`
- --> query.ptk:1:35
+error: `id` is not valid for grammar field `op` of `sum`
+ --> query.ptk:1:15
   |
-1 | Q = (binary_expression operator: (identifier))
-  |      ----------------- --------   ^^^^^^^^^^
-  |      |                 |
-  |      |                 grammar field `operator`
-  |      `binary_expression` starts here
+1 | Q = (sum op: (id))
+  |      --- --   ^^
+  |      |   |
+  |      |   grammar field `op`
+  |      `sum` starts here
   |
-help: `operator` accepts only literal tokens. Write `operator: "!="`
+help: `op` accepts only literal tokens. Write `op: "+"`

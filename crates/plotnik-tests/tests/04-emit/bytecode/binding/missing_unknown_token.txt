@@ -1,7 +1,11 @@
-Q = (MISSING "zzzznotoken") @m
+Q = (MISSING "return")
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `zzzznotoken` is not a valid node kind
+error: `return` is not a valid node kind
  --> query.ptk:1:15
   |
-1 | Q = (MISSING "zzzznotoken") @m
-  |               ^^^^^^^^^^^
+1 | Q = (MISSING "return")
+  |               ^^^^^^

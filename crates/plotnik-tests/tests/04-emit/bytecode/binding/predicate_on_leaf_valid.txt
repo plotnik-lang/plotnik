@@ -1,4 +1,8 @@
-Q = (identifier == "foo")
+Q = (id == "x")
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2
@@ -6,12 +10,12 @@ Q = 2
 [transitions]
 Q:
   1                                         ▶
-  2   !   (identifier) == "foo"             1
+  2   !   (id) == "x"                       1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "foo"
-S2 "identifier"
+S1 "x"
+S2 "id"
 S3 "Q"
 
 [type_defs]
@@ -26,5 +30,5 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0   !   (identifier) == "foo"             2
+  0   !   (id) == "x"                       2
   2                                         ▶

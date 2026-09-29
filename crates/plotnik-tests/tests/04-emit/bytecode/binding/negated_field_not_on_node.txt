@@ -1,11 +1,25 @@
-Q = (function_declaration -condition) @fn
+Q = (func -type)
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: param}
+  param:
+    type: FIELD
+    name: type
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `condition` is not a grammar field of `function_declaration`
- --> query.ptk:1:28
+error: `type` is not a grammar field of `func`
+ --> query.ptk:1:12
   |
-1 | Q = (function_declaration -condition) @fn
-  |      --------------------  ^^^^^^^^^
+1 | Q = (func -type)
+  |      ----  ^^^^
   |      |
-  |      `function_declaration` starts here
+  |      `func` starts here
   |
-help: valid grammar fields for `function_declaration`: `body`, `name`, `parameters`
+help: valid grammar fields for `func`: `name`

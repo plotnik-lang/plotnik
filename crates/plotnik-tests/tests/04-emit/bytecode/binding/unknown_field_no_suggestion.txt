@@ -1,9 +1,14 @@
-Q = (function_declaration
-  xyzzy: (identifier) @name
-) @fn
+Q = (param condition: (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `xyzzy` is not a valid grammar field
- --> query.ptk:2:3
+error: `condition` is not a valid grammar field
+ --> query.ptk:1:12
   |
-2 |   xyzzy: (identifier) @name
-  |   ^^^^^
+1 | Q = (param condition: (id))
+  |            ^^^^^^^^^

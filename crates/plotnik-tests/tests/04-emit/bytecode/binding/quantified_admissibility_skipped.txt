@@ -1,4 +1,18 @@
-Q = (statement_block (identifier)?)
+Q = (block (id)?)
+-------------------- GRAMMAR ---------------------
+rules:
+  label:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ":"}
+      - {type: SYMBOL, name: block}
+  id: {type: PATTERN, value: "[a-z]+"}
+  block:
+    type: SEQ
+    members:
+      - {type: STRING, value: "{"}
+      - {type: STRING, value: "}"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2
@@ -6,16 +20,16 @@ Q = 2
 [transitions]
 Q:
   1                                         ▶
-  2   !   (statement_block)                 7, 1
+  2   !   (block)                           7, 1
   3  ─‣┘  _                                 1
-  4   !   (identifier)                      3
+  4   !   (id)                              3
   6  ──!  _                                 4, 6
   7  └─!  _                                 4, 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "statement_block"
-S2 "identifier"
+S1 "block"
+S2 "id"
 S3 "Q"
 
 [type_defs]
@@ -30,8 +44,8 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0   !   (statement_block)                 8, 4
-  2   !   (identifier)                      3
+  0   !   (block)                           8, 4
+  2   !   (id)                              3
   3  ─‣┘  _                                 4
   4                                         ▶
   5  ──!  _                                 2, 5

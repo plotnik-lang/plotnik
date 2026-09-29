@@ -1,4 +1,13 @@
-Q = (array . (identifier))
+Q = (list . (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "]"}
+  id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2
@@ -6,14 +15,14 @@ Q = 2
 [transitions]
 Q:
   1                                         ▶
-  2   !   (array)                           5
+  2   !   (list)                            5
   4  ─‣┘  _                                 1
-  5  └•─  (identifier)                      4
+  5  └•─  (id)                              4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "array"
-S2 "identifier"
+S1 "list"
+S2 "id"
 S3 "Q"
 
 [type_defs]
@@ -28,7 +37,7 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0   !   (array)                           1
-  1  └•─  (identifier)                      2
+  0   !   (list)                            1
+  1  └•─  (id)                              2
   2  ─‣┘  _                                 3
   3                                         ▶

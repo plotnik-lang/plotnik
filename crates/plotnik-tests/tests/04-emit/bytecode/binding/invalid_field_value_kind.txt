@@ -1,12 +1,24 @@
-Q = (function_declaration name: (number))
+Q = (decl name: (num))
+-------------------- GRAMMAR ---------------------
+rules:
+  decl:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - {type: STRING, value: "="}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `number` is not valid for grammar field `name` of `function_declaration`
- --> query.ptk:1:34
+error: `num` is not valid for grammar field `name` of `decl`
+ --> query.ptk:1:18
   |
-1 | Q = (function_declaration name: (number))
-  |      -------------------- ----   ^^^^^^
-  |      |                    |
-  |      |                    grammar field `name`
-  |      `function_declaration` starts here
+1 | Q = (decl name: (num))
+  |      ---- ----   ^^^
+  |      |    |
+  |      |    grammar field `name`
+  |      `decl` starts here
   |
-help: `name` accepts: `identifier`
+help: `name` accepts: `id`

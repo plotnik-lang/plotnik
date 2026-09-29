@@ -1,7 +1,20 @@
-Q = (function_declaration
-  name: (identifier) @n
-  body: (statement_block) @b
+Q = (pair
+  key: (id)
+  value: (num)
 )
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: key
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2
@@ -9,40 +22,34 @@ Q = 2
 [transitions]
 Q:
   1                                         ▶
-  2   !   (function_declaration)            5
+  2   !   (pair)                            5
   3  ─‣┘  _                                 1
-  4  ─‣─  body: (statement_block) [Node RecordSet(b)]  3
-  5  └‣─  name: (identifier) [Node RecordSet(n)]  4
+  4  ─‣─  value: (num)                      3
+  5  └‣─  key: (id)                         4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "n"
-S2 "b"
-S3 "Q"
-S4 "function_declaration"
-S5 "identifier"
-S6 "statement_block"
-S7 "name"
-S8 "body"
+S1 "pair"
+S2 "id"
+S3 "num"
+S4 "key"
+S5 "value"
+S6 "Q"
 
 [type_defs]
-T0 = <Node>
-T1 = Record  M0:2  ; { n, b }
+T0 = <NoValue>
 
 [type_members]
-M0: S1 → T0  ; n: <Node>
-M1: S2 → T0  ; b: <Node>
 
 [type_names]
-N0: S3 → T1  ; Q
 
 [entry_points]
-Q = 0 :: T1
+Q = 0 :: T0
 
 [instructions]
 Q:
-  0   !   (function_declaration)            1
-  1  └‣─  name: (identifier) [Node RecordSet(M0)]  3
-  3  ─‣─  body: (statement_block) [Node RecordSet(M1)]  5
-  5  ─‣┘  _                                 6
-  6                                         ▶
+  0   !   (pair)                            1
+  1  └‣─  key: (id)                         2
+  2  ─‣─  value: (num)                      3
+  3  ─‣┘  _                                 4
+  4                                         ▶

@@ -1,11 +1,18 @@
-Q = (function_declaration -name) @fn
+Q = (param -name)
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
 error: `-name` can never match
- --> query.ptk:1:28
+ --> query.ptk:1:13
   |
-1 | Q = (function_declaration -name) @fn
-  |      --------------------  ^^^^
+1 | Q = (param -name)
+  |      -----  ^^^^
   |      |
-  |      on `function_declaration`
+  |      on `param`
   |
-help: `-name` requires `name` to be absent, but every `function_declaration` has one. Drop `-name`
+help: `-name` requires `name` to be absent, but every `param` has one. Drop `-name`

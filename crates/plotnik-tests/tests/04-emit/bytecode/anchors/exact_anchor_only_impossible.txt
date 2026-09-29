@@ -1,9 +1,16 @@
-Q = (array .!)
+Q = (list .!)
+-------------------- GRAMMAR ---------------------
+rules:
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: STRING, value: "]"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), this child cannot appear first in `array` because an `array` begins with `"["`
+error: with the exact anchor (`.!`), this child cannot appear first in `list` because a `list` begins with `"["`
  --> query.ptk:1:6
   |
-1 | Q = (array .!)
-  |      ^^^^^
+1 | Q = (list .!)
+  |      ^^^^
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(array .)`
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(list .)`

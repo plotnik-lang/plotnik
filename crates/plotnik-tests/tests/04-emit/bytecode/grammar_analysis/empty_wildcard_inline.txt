@@ -1,0 +1,39 @@
+Q = (expr (_ .!))
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (expr)                            4
+  3  ─‣┘  _                                 1
+  4  └‣─  (_)                               5
+  5  └!┘  _                                 3
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "expr"
+S2 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (expr)                            1
+  1  └‣─  (_)                               2
+  2  └!┘  _                                 3
+  3  ─‣┘  _                                 4
+  4                                         ▶

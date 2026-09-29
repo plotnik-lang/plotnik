@@ -1,27 +1,34 @@
-Foo = (identifier)
-Q = (function_declaration name: (Foo))
+Name = (id)
+Q = (param name: (Name))
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
 [entry_points]
-Foo = 2
-Q   = 5
+Name = 2
+Q    = 5
 
 [transitions]
-Foo:
+Name:
   1                                         ▶
-  2   !   (identifier)                      1
+  2   !   (id)                              1
 
 Q:
   4                                         ▶
-  5   !   (function_declaration)            7
+  5   !   (param)                           7
   6  ─‣┘  _                                 4
-  7  └‣─  name: (Foo)                       2 : 6
+  7  └‣─  name: (Name)                      2 : 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "identifier"
-S2 "function_declaration"
+S1 "id"
+S2 "param"
 S3 "name"
-S4 "Foo"
+S4 "Name"
 S5 "Q"
 
 [type_defs]
@@ -32,16 +39,16 @@ T0 = <NoValue>
 [type_names]
 
 [entry_points]
-Foo = 0 :: T0
-Q   = 2 :: T0
+Name = 0 :: T0
+Q    = 2 :: T0
 
 [instructions]
-Foo:
-  0   !   (identifier)                      1
+Name:
+  0   !   (id)                              1
   1                                         ▶
 
 Q:
-  2   !   (function_declaration)            3
-  3  └‣─  name: (Foo)                       0 : 4
+  2   !   (param)                           3
+  3  └‣─  name: (Name)                      0 : 4
   4  ─‣┘  _                                 5
   5                                         ▶

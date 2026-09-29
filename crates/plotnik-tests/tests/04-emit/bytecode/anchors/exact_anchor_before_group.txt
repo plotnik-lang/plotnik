@@ -1,15 +1,23 @@
-Q = (function_declaration
+Q = (func
   .!
-  {(identifier) @n}
+  {(id)}
 )
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - {type: STRING, value: fn}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), this child cannot appear first in `function_declaration` because a `function_declaration` begins with `"async"` or `"function"`
+error: with the exact anchor (`.!`), this child cannot appear first in `func` because a `func` begins with `"fn"`
  --> query.ptk:1:6
   |
-1 | Q = (function_declaration
-  |      ^^^^^^^^^^^^^^^^^^^^
+1 | Q = (func
+  |      ^^^^
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(function_declaration
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(func
         .
-        {(identifier) @n}
+        {(id)}
       )`

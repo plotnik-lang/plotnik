@@ -1,7 +1,21 @@
 Q = [
-  (function_declaration condition: (identifier))
-  (identifier)
+  (func type: (id))
+  (id)
 ]
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: param}
+  param:
+    type: FIELD
+    name: type
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 0
@@ -10,16 +24,16 @@ Q = 0
 Q:
   0  -ε-                                    2, 5
   1                                         ▶
-  2   !   (function_declaration)            4
+  2   !   (func)                            4
   3  ─‣┘  _                                 1
-  4  └‣─  condition: (identifier)           3
-  5   !   (identifier)                      1
+  4  └‣─  type: (id)                        3
+  5   !   (id)                              1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "function_declaration"
-S2 "identifier"
-S3 "condition"
+S1 "func"
+S2 "id"
+S3 "type"
 S4 "Q"
 
 [type_defs]
@@ -35,8 +49,8 @@ Q = 0 :: T0
 [instructions]
 Q:
   0  -ε-                                    5, 6
-  2  └‣─  condition: (identifier)           3
+  2  └‣─  type: (id)                        3
   3  ─‣┘  _                                 4
   4                                         ▶
-  5   !   (function_declaration)            2
-  6   !   (identifier)                      4
+  5   !   (func)                            2
+  6   !   (id)                              4

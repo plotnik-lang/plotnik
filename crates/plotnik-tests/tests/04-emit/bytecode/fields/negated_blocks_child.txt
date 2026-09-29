@@ -1,14 +1,27 @@
-Q = (new_expression
-  -arguments
-  (arguments)
+Q = (break
+  -label
+  (id)
 )
+-------------------- GRAMMAR ---------------------
+rules:
+  break:
+    type: SEQ
+    members:
+      - {type: STRING, value: break}
+      - type: CHOICE
+        members:
+          - type: FIELD
+            name: label
+            content: {type: SYMBOL, name: id}
+          - {type: BLANK}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `-arguments` requires `arguments` to be absent, but this `new_expression` pattern also matches `arguments`
+error: `-label` requires `label` to be absent, but this `break` pattern also matches `label`
  --> query.ptk:2:4
   |
-2 |   -arguments
-  |    ^^^^^^^^^
-3 |   (arguments)
-  |   ----------- matches `arguments` here
+2 |   -label
+  |    ^^^^^
+3 |   (id)
+  |   ---- matches `label` here
   |
-help: drop `-arguments` or remove the `arguments` child
+help: drop `-label` or remove the `label` child

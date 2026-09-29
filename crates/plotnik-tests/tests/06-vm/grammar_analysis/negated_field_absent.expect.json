@@ -1,0 +1,15 @@
+{
+  "admission": "accept",
+  "codes": [],
+  "tree": "(program (lexical_declaration (variable_declarator name: (identifier))))",
+  "runtime": {
+    "result": "match",
+    "value": {
+      "declaration": {
+        "kind": "variable_declarator",
+        "span": [4, 5],
+        "text": "a"
+      }
+    }
+  }
+}

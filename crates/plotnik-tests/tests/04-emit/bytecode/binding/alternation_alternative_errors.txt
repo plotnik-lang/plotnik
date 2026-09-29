@@ -1,26 +1,44 @@
 Q = [
-  (function_declaraton)
-  (class_declaraton)
-] @decl
+  (fuc)
+  (clas)
+]
+-------------------- GRAMMAR ---------------------
+rules:
+  decl:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: func}
+      - {type: SYMBOL, name: class}
+  func:
+    type: SEQ
+    members:
+      - {type: STRING, value: fn}
+      - {type: SYMBOL, name: id}
+  class:
+    type: SEQ
+    members:
+      - {type: STRING, value: class}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `function_declaraton` is not a valid node kind
+error: `fuc` is not a valid node kind
  --> query.ptk:2:4
   |
-2 |   (function_declaraton)
-  |    ^^^^^^^^^^^^^^^^^^^
+2 |   (fuc)
+  |    ^^^
   |
-help: replace with `function_declaration`
+help: replace with `func`
   |
-2 |   (function_declaration)
-  |                     +
+2 |   (func)
+  |      +
 
-error: `class_declaraton` is not a valid node kind
+error: `clas` is not a valid node kind
  --> query.ptk:3:4
   |
-3 |   (class_declaraton)
-  |    ^^^^^^^^^^^^^^^^
+3 |   (clas)
+  |    ^^^^
   |
-help: replace with `class_declaration`
+help: replace with `class`
   |
-3 |   (class_declaration)
-  |                  +
+3 |   (class)
+  |        +

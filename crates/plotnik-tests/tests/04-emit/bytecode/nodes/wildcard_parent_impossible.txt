@@ -1,9 +1,13 @@
-Q = (_ (program) @p)
+Q = (_ (expr))
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
 error: no node the grammar builds takes these children
  --> query.ptk:1:6
   |
-1 | Q = (_ (program) @p)
+1 | Q = (_ (expr))
   |      ^
   |
 help: `(_)` matches any named node, but no named node kind admits this combination of children in this order

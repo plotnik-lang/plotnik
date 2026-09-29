@@ -1,0 +1,15 @@
+{
+  "admission": "accept",
+  "codes": [],
+  "tree": "(program (expression_statement (identifier)))",
+  "runtime": {
+    "result": "match",
+    "value": {
+      "expression": {
+        "kind": "expression_statement",
+        "span": [0, 2],
+        "text": "x;"
+      }
+    }
+  }
+}

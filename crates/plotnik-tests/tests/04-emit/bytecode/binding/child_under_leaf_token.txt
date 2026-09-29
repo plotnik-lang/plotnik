@@ -1,11 +1,15 @@
-Q = (identifier (_))
+Q = (id (_))
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `identifier` is a leaf token and has no child nodes
- --> query.ptk:1:17
+error: `id` is a leaf token and has no child nodes
+ --> query.ptk:1:9
   |
-1 | Q = (identifier (_))
-  |      ---------- ^^^
+1 | Q = (id (_))
+  |      -- ^^^
   |      |
-  |      `identifier`
+  |      `id`
   |
-help: a leaf token's content is its text. Match `(identifier)` directly or add a text predicate to `(identifier)`
+help: a leaf token's content is its text. Match `(id)` directly or add a text predicate to `(id)`

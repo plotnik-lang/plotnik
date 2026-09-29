@@ -1,7 +1,15 @@
-Q = (function_declaration "xyzzy_fake_token") @fn
+Q = (func "return")
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - {type: STRING, value: fn}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `xyzzy_fake_token` is not a valid node kind
- --> query.ptk:1:28
+error: `return` is not a valid node kind
+ --> query.ptk:1:12
   |
-1 | Q = (function_declaration "xyzzy_fake_token") @fn
-  |                            ^^^^^^^^^^^^^^^^
+1 | Q = (func "return")
+  |            ^^^^^^

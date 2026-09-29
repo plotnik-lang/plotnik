@@ -1,9 +1,13 @@
-Q = (MISSING binary_expression) @m
+Q = (MISSING expr)
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `binary_expression` has children. Only leaf tokens can be missing nodes
+error: `expr` has children. Only leaf tokens can be missing nodes
  --> query.ptk:1:14
   |
-1 | Q = (MISSING binary_expression) @m
-  |              ^^^^^^^^^^^^^^^^^
+1 | Q = (MISSING expr)
+  |              ^^^^
   |
 help: use a token kind like `(MISSING identifier)`, a quoted literal like `(MISSING ";")`, or bare `(MISSING)`

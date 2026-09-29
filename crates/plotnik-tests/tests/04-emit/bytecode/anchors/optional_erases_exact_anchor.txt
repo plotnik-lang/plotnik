@@ -1,17 +1,31 @@
-Q = (array
+Q = (list
   .!
   ";"?
-  (identifier) @id
+  (id)
 )
+-------------------- GRAMMAR ---------------------
+rules:
+  stmt:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: list}
+      - {type: STRING, value: ";"}
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "]"}
+  id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), this child cannot appear first in `array` because an `array` begins with `"["`
+error: with the exact anchor (`.!`), this child cannot appear first in `list` because a `list` begins with `"["`
  --> query.ptk:1:6
   |
-1 | Q = (array
-  |      ^^^^^
+1 | Q = (list
+  |      ^^^^
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(array
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(list
         .
         ";"?
-        (identifier) @id
+        (id)
       )`
