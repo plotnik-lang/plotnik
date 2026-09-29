@@ -8,6 +8,7 @@ Plotnik matches Tree-sitter syntax trees and builds typed results from the parts
   - [Children and sibling sequences](#children-and-sibling-sequences)
   - [Grammar fields](#grammar-fields)
   - [Syntax errors and missing tokens](#syntax-errors-and-missing-tokens)
+  - [What grammar checking establishes](#what-grammar-checking-establishes)
 - [Filter by text](#filter-by-text)
   - [Regular expressions](#regular-expressions)
 - [Shape the result](#shape-the-result)
@@ -190,7 +191,15 @@ Tree-sitter can return a tree even when the source is incomplete or malformed:
 | `(MISSING identifier)` | An inserted identifier token   |
 | `(MISSING ";")`        | An inserted semicolon token    |
 
-These patterns accept no child constraints. An `ERROR` node can cover source text. A `MISSING` node has a zero-width source range. The kind in `(MISSING kind)` must be a leaf token, so `(MISSING binary_expression)` is rejected.
+These patterns accept no child constraints. An `ERROR` node can cover source text. A `MISSING` node has a zero-width source range. The kind in `(MISSING kind)` must be one the parser can insert as a token, so `(MISSING binary_expression)` is rejected. An aliased kind can qualify even if other occurrences of that kind have children.
+
+### What grammar checking establishes
+
+The compiler checks node kinds, field names, and structural constraints against the selected language's grammar. An unknown name is an error even inside an optional pattern or a branch that matching could skip. A known pattern whose constraints are impossible can be bypassed by a live alternative, `?`, or `*`. Each definition is also checked in its own right, so an impossible definition is rejected even when a caller could skip it.
+
+Passing these checks means the grammar model has not ruled out a match. It does not guarantee that the query matches your source, or that some source produces the requested tree. Structural checking does not solve text predicates or fully model lexical competition, parser conflicts, and recovery. Recursive sibling patterns can also be approximated more broadly than they match.
+
+A grammar-analysis resource error means checking stopped before it could reach a verdict. It does not mean the query is impossible. Simplify the child constraints or, when using the Rust API, increase the relevant analysis limit.
 
 ## Filter by text
 

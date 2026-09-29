@@ -402,15 +402,11 @@ impl<'a> SatisfiabilitySolver<'a> {
         }
         let root = AutomatonId(self.frozen.automata.len());
         let frozen = self.frozen.with_probe(automaton);
-        let budget = self.remaining_budget();
+        let budget = self.solve.budget.remaining();
         let mut probe = Solve::new(budget);
         let result = probe.solve_automaton(&frozen, root, kind);
         self.solve.budget.spend(budget - probe.budget.remaining())?;
         result
-    }
-
-    pub(super) fn remaining_budget(&self) -> u64 {
-        self.solve.budget.remaining()
     }
 
     /// A completed feasibility result, or a resource failure.

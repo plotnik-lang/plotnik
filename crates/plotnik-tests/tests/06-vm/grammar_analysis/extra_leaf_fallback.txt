@@ -1,0 +1,62 @@
+Q = [
+  (program
+    (comment .!) @comment
+  )
+  (program)
+]
+------------------- INPUT (js) -------------------
+/* c */ x;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  comment: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "comment": {
+    "kind": "comment",
+    "span": [0, 7],
+    "text": "/* c */"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "comment"
+S2 "Q"
+S3 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { comment }
+
+[type_members]
+M0: S1 → T1  ; comment: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 0 :: T2
+
+[instructions]
+Q:
+  0  -ε-                                    7, 8
+  2  └!┘  _                                 3
+  3  ─‣┘  _                                 4
+  4                                         ▶
+  5  └‣─  (comment) [Node RecordSet(M0)]    2
+  7   !   (program)                         5
+  8   !   (program) [Absent RecordSet(M0)]  4
+--------------------- TRACE ----------------------
+Q:
+  0  -ε-                                    07, 08
+  7       (program)                         05
+      ●   program
+  5       (comment) [Node RecordSet(M0)]    02
+      ●   comment
+  2       _                                 03
+      ●   comment
+  3       _                                 04
+      ●   program
+  4   ◀   (Q)                               ◼

@@ -54,7 +54,7 @@ impl Configurations {
         Ok(set)
     }
 
-    pub(super) fn word_count(&self) -> u64 {
+    fn word_count(&self) -> u64 {
         self.words.len() as u64
     }
 
