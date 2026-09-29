@@ -1,0 +1,79 @@
+Q = (block
+  (decl (Value))
+  (ret (Value))
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  block:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: decl}
+      - {type: SYMBOL, name: ret}
+  decl: {type: SYMBOL, name: id}
+  ret: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+--------------- QUERY (value.ptk) ----------------
+Value = [
+  (id)
+  (num)
+]
+---------------------- NFA -----------------------
+[entry_points]
+Q     = 07
+Value = 00
+
+[transitions]
+Value:
+  00  -ε-                                   02, 03
+  01                                        ▶
+  02   !   (id)                             01
+  03   !   (num)                            01
+
+Q:
+  06                                        ▶
+  07   !   (block)                          12
+  09  ─‣─  (ret)                            11
+  10  ─‣┘² _                                06
+  11  └‣─  (Value)                          00 : 10
+  12  └‣─  (decl)                           14
+  13  ─‣┘  _                                09
+  14  └‣─  (Value)                          00 : 13
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "block"
+S2 "decl"
+S3 "ret"
+S4 "id"
+S5 "num"
+S6 "Value"
+S7 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q     = 02 :: T0
+Value = 00 :: T0
+
+[instructions]
+Value:
+  00  -ε-                                   11, 12
+
+Q:
+  02   !   (block)                          03
+  03  └‣─  (decl)                           04
+  04  └‣─  (Value)                          00 : 05
+  05  ─‣┘  _                                06
+  06  ─‣─  (ret)                            07
+  07  └‣─  (Value)                          00 : 08
+  08  ─‣┘² _                                09
+  09                                        ▶
+  10                                        ▶
+  11   !   (id)                             10
+  12   !   (num)                            10

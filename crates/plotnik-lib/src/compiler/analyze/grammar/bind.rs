@@ -2,7 +2,7 @@
 //!
 //! Two-phase approach:
 //! 1. Resolve all symbols (node kinds and fields) against grammar
-//! 2. Validate structural constraints (field on node kind, child kind for field)
+//! 2. Validate syntax, then solve the resolved matching constraints
 
 use std::collections::HashMap;
 
@@ -10,8 +10,6 @@ use crate::core::grammar::Grammar;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId};
 
 use super::binding::GrammarBindingBuilder;
-use super::check::AdmissibilityWalkState;
-use super::participation::Participation;
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::Span;
@@ -70,13 +68,13 @@ impl<'q> GrammarBindInput<'_, 'q> {
             binder.bind(definition_ids);
         }
 
-        // The satisfiability check (sequence, anchor, and grammar arity) runs only on a query the
-        // structural check left clean: it adds rejections those checks cannot see, and
-        // gating keeps it from piling onto an impossibility already pinned precisely.
+        // Invalid names and unsupported syntax are unconditional errors. Matching
+        // constraints are evaluated only after every definition passes this boundary.
         if diagnostics.has_errors() {
             return;
         }
         let model = super::model::Model::resolve(
+            grammar,
             definitions,
             pattern_facts,
             source_map,
@@ -124,7 +122,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             }
         }
         for &def_id in definition_ids {
-            self.check_definition_grammar(def_id);
+            self.validate_syntax(&self.definitions.definition(def_id).located_body());
         }
     }
 
@@ -160,11 +158,5 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 "make `{name}` start with a `{grammar_root_name}` node pattern because matching begins at the syntax-tree root"
             ))
             .emit();
-    }
-
-    fn check_definition_grammar(&mut self, def_id: DefId) {
-        let located = self.definitions.definition(def_id).located_body();
-        let mut walk = AdmissibilityWalkState::default();
-        self.check_pattern_grammar(&located, None, Participation::Required, &mut walk);
     }
 }

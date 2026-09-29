@@ -13,6 +13,7 @@ use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{self, QuantifierKind, SeqItem, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
+use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -57,6 +58,7 @@ pub(super) enum PatternKind {
 
 pub(super) struct Node {
     pub(super) kind: KindConstraint,
+    pub(super) violation: Option<NodeViolation>,
     pub(super) children: Vec<Item>,
     pub(super) trailing: GapClass,
     pub(super) negated_fields: Vec<NodeFieldId>,
@@ -68,6 +70,12 @@ impl Node {
             || self.trailing != GapClass::Any
             || !self.negated_fields.is_empty()
     }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum NodeViolation {
+    PredicateOnNonLeaf,
+    FieldNotOnKind(NodeFieldId),
 }
 
 pub(super) struct Item {
@@ -83,6 +91,7 @@ pub(super) struct Model {
 
 impl Model {
     pub(super) fn resolve(
+        grammar: &Grammar,
         definitions: &DefinitionGraph,
         facts: &PatternFacts,
         sources: &SourceMap,
@@ -91,6 +100,7 @@ impl Model {
     ) -> Self {
         let mut builder = Builder {
             model: Self::default(),
+            grammar,
             definitions,
             anchors: AnchorSemantics::new(facts),
             sources,
@@ -139,6 +149,7 @@ impl Model {
 
 struct Builder<'a> {
     model: Model,
+    grammar: &'a Grammar,
     definitions: &'a DefinitionGraph,
     anchors: AnchorSemantics<'a>,
     sources: &'a SourceMap,
@@ -173,7 +184,7 @@ impl Builder<'_> {
                 } else {
                     GapClass::Any
                 };
-                let negated_fields = node
+                let negated_fields: Vec<_> = node
                     .syntax()
                     .children()
                     .filter_map(ast::NegatedField::cast)
@@ -181,8 +192,27 @@ impl Builder<'_> {
                         self.field(field.name().expect("validated field has a name").text())
                     })
                     .collect();
+                // Kind-wide restrictions cannot vary with a production or caller.
+                // Keep the reason so a dead branch can later be explained, without
+                // issuing an error when another branch can match.
+                let violation = match kind {
+                    KindConstraint::Exact(kind) => {
+                        if node.predicate().is_some()
+                            && self.grammar.has_declared_child_structure(kind)
+                        {
+                            Some(NodeViolation::PredicateOnNonLeaf)
+                        } else {
+                            negated_fields.iter().find_map(|&field| {
+                                (!self.grammar.has_field(kind, field))
+                                    .then_some(NodeViolation::FieldNotOnKind(field))
+                            })
+                        }
+                    }
+                    _ => None,
+                };
                 PatternKind::Node(Node {
                     kind,
+                    violation,
                     children: self.items(source, &items, true),
                     trailing,
                     negated_fields,

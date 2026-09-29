@@ -29,11 +29,12 @@ use crate::compiler::limits::SatisfiabilityLimits;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::super::model::{KindConstraint, Model, PatternId};
+use super::super::model::{KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
 use super::automaton::{self, ChildAutomaton, ChildMatcher, State};
 use super::configurations::{Configuration, Configurations};
 use super::facts::{GrammarFacts, NodeRealizer};
+use crate::compiler::parse::ast::QuantifierKind;
 
 /// How a production step participates in threading.
 enum StepClass {
@@ -331,6 +332,7 @@ struct Solve {
 pub(super) struct SatisfiabilitySolver<'a> {
     frozen: Frozen<'a>,
     solve: Solve,
+    patterns: HashMap<PatternId, bool>,
 }
 
 impl<'a> SatisfiabilitySolver<'a> {
@@ -374,6 +376,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         facts: Arc<GrammarFacts>,
     ) -> Self {
         Self {
+            patterns: HashMap::new(),
             frozen: Frozen {
                 grammar,
                 model,
@@ -396,6 +399,10 @@ impl<'a> SatisfiabilitySolver<'a> {
         pattern: PatternId,
         kind: NodeKindId,
     ) -> Result<bool, AnalysisLimit> {
+        if self.frozen.model.node(pattern).violation.is_some() {
+            return Ok(false);
+        }
+
         self.build_pending(pattern)?;
         let realizer_count = self.frozen.realizers_of(kind).len();
         if realizer_count == 0 {
@@ -425,6 +432,86 @@ impl<'a> SatisfiabilitySolver<'a> {
             }
         }
         Ok(false)
+    }
+
+    /// Feasibility without a caller's parent. Sibling order and fields are checked
+    /// by the enclosing node's automaton. Here sequences require each item, choices
+    /// require one live branch, and nullable repeats need not enter their body.
+    pub(super) fn possible(&mut self, pattern: PatternId) -> Result<bool, AnalysisLimit> {
+        if let Some(&result) = self.patterns.get(&pattern) {
+            return Ok(result);
+        }
+
+        // A reference chain can multiply the nesting of individually shallow
+        // definitions. Keep this walk off the native stack and memoize shared bodies.
+        let mut pending = vec![(pattern, 0)];
+        let mut visiting = HashSet::from([pattern]);
+        while let Some((current, next_child)) = pending.last_mut() {
+            self.solve.charge()?;
+            let current = *current;
+            let kind = &self.frozen.model.pattern(current).kind;
+            let result = match kind {
+                PatternKind::Node(node) => match node.kind {
+                    KindConstraint::Exact(kind) => self.satisfiable(current, kind)?,
+                    KindConstraint::AnyNamed if node.constrains_children() => {
+                        self.wildcard_satisfiable(current)?
+                    }
+                    _ => true,
+                },
+                PatternKind::Leaf(_)
+                | PatternKind::Repeat(QuantifierKind::Optional | QuantifierKind::ZeroOrMore, _) => {
+                    true
+                }
+                _ => {
+                    let alternative = matches!(kind, PatternKind::Alternative(_));
+                    let child = match kind {
+                        PatternKind::Alternative(children) => children.get(*next_child).copied(),
+                        PatternKind::Sequence(items) => {
+                            items.get(*next_child).map(|item| item.pattern)
+                        }
+                        PatternKind::Field(_, inner) | PatternKind::Repeat(_, inner) => {
+                            (*next_child == 0).then_some(*inner)
+                        }
+                        PatternKind::Reference(definition) => {
+                            (*next_child == 0).then(|| self.frozen.model.definition(*definition))
+                        }
+                        PatternKind::Node(_) | PatternKind::Leaf(_) => {
+                            unreachable!("node and leaf cases were handled above")
+                        }
+                    };
+                    if let Some(child) = child {
+                        let child_result = if let Some(&result) = self.patterns.get(&child) {
+                            result
+                        } else if visiting.contains(&child) {
+                            // Sibling recursion stays conservative, as in child automata.
+                            // Concrete recursive nodes still use the least fixed point.
+                            true
+                        } else {
+                            visiting.insert(child);
+                            pending.push((child, 0));
+                            continue;
+                        };
+                        if alternative && child_result {
+                            true
+                        } else if !alternative && !child_result {
+                            false
+                        } else {
+                            *next_child += 1;
+                            continue;
+                        }
+                    } else {
+                        match kind {
+                            PatternKind::Alternative(children) => children.is_empty(),
+                            _ => true,
+                        }
+                    }
+                }
+            };
+            self.patterns.insert(current, result);
+            visiting.remove(&current);
+            pending.pop();
+        }
+        Ok(self.patterns[&pattern])
     }
 
     /// Finish all transitively referenced child automata before solving. Inserting
@@ -785,8 +872,7 @@ impl Solve {
     }
 
     /// Whether a query child matching an extra kind may advance the automaton without a
-    /// production step — the satisfiability mirror of `check.rs`'s extras rescue, and the
-    /// same tolerated over-acceptance: an extra is consumable in *any* gap, including
+    /// production step. An extra is conservatively consumable in *any* gap, including
     /// lexically sealed nodes (`(string (comment))`). Proving a gap sealed needs lexer-level
     /// longest-match reasoning our model lacks (not the `IMMEDIATE_TOKEN` fact it looks
     /// like), so we admit and stay sound — extra consumption only grows the reachable set.

@@ -1,0 +1,14 @@
+Q = (id =~ "name")?
+-------------------- GRAMMAR ---------------------
+rules:
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: predicate `id =~ "name"` uses `=~`, which requires a regex value, but supplies a quoted string
+ --> query.ptk:1:9
+  |
+1 | Q = (id =~ "name")?
+  |      -- ^^^^^^^^^
+  |      |
+  |      predicate applies to `id`
+  |
+help: change the value in `=~ "name"` to a regex value, or choose an operator that accepts a quoted string

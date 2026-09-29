@@ -166,6 +166,7 @@ impl Builder<'_> {
         from: State,
     ) -> Result<State, AnalysisLimit> {
         match &self.model.pattern(pattern).kind {
+            PatternKind::Node(node) if node.violation.is_some() => self.new_state(GapClass::Any),
             PatternKind::Node(node) => self.emit_single(
                 ChildMatcher {
                     kind: node.kind,

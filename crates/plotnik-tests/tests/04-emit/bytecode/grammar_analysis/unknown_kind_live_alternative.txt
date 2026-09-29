@@ -1,0 +1,22 @@
+Q = [
+  (func value: (ghost))
+  (func)
+]
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: assign}
+  assign:
+    type: FIELD
+    name: value
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `ghost` is not a valid node kind
+ --> query.ptk:2:17
+  |
+2 |   (func value: (ghost))
+  |                 ^^^^^

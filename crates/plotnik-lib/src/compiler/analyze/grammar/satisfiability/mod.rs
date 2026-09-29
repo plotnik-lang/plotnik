@@ -1,6 +1,6 @@
 //! Grammar productions threaded through resolved query child automata. The
-//! structural checker remains separate until checkpoint 3, and diagnostic wording
-//! still uses source syntax until checkpoint 4.
+//! solver owns feasibility. Reporting follows failed constraints and retains source
+//! syntax only for diagnostic wording and highlights.
 
 mod automaton;
 mod configurations;
@@ -16,7 +16,6 @@ use crate::compiler::parse::ast::QuantifierKind;
 use crate::core::NodeKindId;
 
 use super::model::{KindConstraint, Model, PatternId, PatternKind};
-use super::participation::Participation;
 use engine::SatisfiabilitySolver;
 
 #[derive(Clone, Copy, Debug)]
@@ -25,10 +24,6 @@ struct AnalysisLimit;
 pub(super) use diagnose::Context as ReportContext;
 
 pub(super) fn check(ctx: ReportContext<'_>, limits: SatisfiabilityLimits, diag: &mut Diagnostics) {
-    if ctx.grammar.structure().variables().is_empty() {
-        return;
-    }
-
     let mut solver = SatisfiabilitySolver::checking(ctx.grammar, ctx.model, limits);
     let mut reporter = Reporter {
         ctx,
@@ -39,7 +34,7 @@ pub(super) fn check(ctx: ReportContext<'_>, limits: SatisfiabilityLimits, diag: 
     };
 
     for pattern in ctx.model.definitions() {
-        match reporter.walk(pattern, Participation::Required) {
+        match reporter.walk(pattern) {
             Ok(WalkOutcome::Continue) => {}
             Ok(WalkOutcome::Stop) => return,
             Err(AnalysisLimit) => {
@@ -80,29 +75,21 @@ impl From<diagnose::ReportOutcome> for WalkOutcome {
 }
 
 impl Reporter<'_, '_> {
-    fn walk(
-        &mut self,
-        pattern: PatternId,
-        participation: Participation,
-    ) -> Result<WalkOutcome, AnalysisLimit> {
+    fn walk(&mut self, pattern: PatternId) -> Result<WalkOutcome, AnalysisLimit> {
+        if self.solver.possible(pattern)? {
+            return Ok(WalkOutcome::Continue);
+        }
+
         let ctx = self.ctx;
         match &ctx.model.pattern(pattern).kind {
             PatternKind::Node(node) => {
-                if !participation.is_required() {
-                    return Ok(WalkOutcome::Continue);
-                }
-                let Some(goal) = Goal::from_pattern(ctx.model, pattern) else {
-                    return Ok(WalkOutcome::Continue);
-                };
-                if !goal.is_impossible(self.solver)? {
-                    return Ok(WalkOutcome::Continue);
-                }
-
                 for child in &node.children {
                     if let Some(alternation) = self.dead_alternation_child(child.pattern)? {
-                        return self.walk(alternation, Participation::Required);
+                        return self.walk(alternation);
                     }
                 }
+                let goal = Goal::from_pattern(ctx.model, pattern)
+                    .expect("an impossible node has a concrete or wildcard goal");
                 diagnose::report_goal(
                     ctx,
                     self.solver,
@@ -114,38 +101,23 @@ impl Reporter<'_, '_> {
                 .map(Into::into)
             }
             PatternKind::Alternative(alternatives) => {
-                let dead = participation.is_required() && self.all_impossible(alternatives)?;
-                let participation = if dead {
-                    Participation::Required
-                } else {
-                    Participation::Deferred
-                };
-                self.walk_children(alternatives.iter().copied(), participation)
+                self.walk_children(alternatives.iter().copied())
             }
-            PatternKind::Field(_, inner) => self.walk(*inner, participation),
+            PatternKind::Field(_, inner) | PatternKind::Repeat(_, inner) => self.walk(*inner),
             PatternKind::Sequence(items) => {
-                self.walk_children(items.iter().map(|item| item.pattern), participation)
+                self.walk_children(items.iter().map(|item| item.pattern))
             }
-            PatternKind::Repeat(kind, inner) => {
-                let participation = if *kind == QuantifierKind::OneOrMore {
-                    participation
-                } else {
-                    Participation::Deferred
-                };
-                self.walk(*inner, participation)
-            }
-            // Each definition is checked separately, in declaration order.
-            PatternKind::Leaf(_) | PatternKind::Reference(_) => Ok(WalkOutcome::Continue),
+            // Definitions are checked in their own right in declaration order.
+            PatternKind::Reference(_) | PatternKind::Leaf(_) => Ok(WalkOutcome::Continue),
         }
     }
 
     fn walk_children(
         &mut self,
         children: impl Iterator<Item = PatternId>,
-        participation: Participation,
     ) -> Result<WalkOutcome, AnalysisLimit> {
         for child in children {
-            let outcome = self.walk(child, participation)?;
+            let outcome = self.walk(child)?;
             if outcome.should_stop() {
                 return Ok(outcome);
             }
@@ -157,54 +129,14 @@ impl Reporter<'_, '_> {
         &mut self,
         pattern: PatternId,
     ) -> Result<Option<PatternId>, AnalysisLimit> {
-        let model = self.ctx.model;
-        match &model.pattern(pattern).kind {
-            PatternKind::Alternative(alternatives) => {
-                Ok(self.all_impossible(alternatives)?.then_some(pattern))
-            }
+        match &self.ctx.model.pattern(pattern).kind {
+            PatternKind::Alternative(_) => Ok((!self.solver.possible(pattern)?).then_some(pattern)),
             PatternKind::Field(_, inner)
             | PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => {
                 self.dead_alternation_child(*inner)
             }
             _ => Ok(None),
         }
-    }
-
-    fn impossible(&mut self, pattern: PatternId) -> Result<bool, AnalysisLimit> {
-        let ctx = self.ctx;
-        match &ctx.model.pattern(pattern).kind {
-            PatternKind::Node(_) => match Goal::from_pattern(ctx.model, pattern) {
-                Some(goal) => goal.is_impossible(self.solver),
-                None => Ok(false),
-            },
-            PatternKind::Alternative(alternatives) => self.all_impossible(alternatives),
-            PatternKind::Field(_, inner)
-            | PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => self.impossible(*inner),
-            PatternKind::Sequence(items) => {
-                for item in items {
-                    if self.impossible(item.pattern)? {
-                        return Ok(true);
-                    }
-                }
-                Ok(false)
-            }
-            PatternKind::Reference(definition) => {
-                match Goal::from_pattern(ctx.model, ctx.model.definition(*definition)) {
-                    Some(goal) => goal.is_impossible(self.solver),
-                    None => Ok(false),
-                }
-            }
-            PatternKind::Leaf(_) | PatternKind::Repeat(_, _) => Ok(false),
-        }
-    }
-
-    fn all_impossible(&mut self, alternatives: &[PatternId]) -> Result<bool, AnalysisLimit> {
-        for &alternative in alternatives {
-            if !self.impossible(alternative)? {
-                return Ok(false);
-            }
-        }
-        Ok(!alternatives.is_empty())
     }
 }
 
@@ -248,43 +180,23 @@ impl Goal {
     }
 }
 
-fn collect_goals(
-    pattern: PatternId,
-    participation: Participation,
-    model: &Model,
-    out: &mut Vec<Goal>,
-) {
+fn collect_goals(pattern: PatternId, model: &Model, out: &mut Vec<Goal>) {
     match &model.pattern(pattern).kind {
         PatternKind::Node(_) => {
-            if participation.is_required()
-                && let Some(goal) = Goal::from_pattern(model, pattern)
-            {
+            if let Some(goal) = Goal::from_pattern(model, pattern) {
                 out.push(goal);
             }
         }
-        PatternKind::Field(_, inner) => collect_goals(*inner, participation, model, out),
+        PatternKind::Field(_, inner) => collect_goals(*inner, model, out),
         PatternKind::Sequence(items) => {
             for item in items {
-                collect_goals(item.pattern, participation, model, out);
+                collect_goals(item.pattern, model, out);
             }
         }
-        PatternKind::Repeat(kind, inner) => {
-            let participation = if *kind == QuantifierKind::OneOrMore {
-                participation
-            } else {
-                Participation::Deferred
-            };
-            collect_goals(*inner, participation, model, out);
-        }
-        PatternKind::Alternative(alternatives) => {
-            for &alternative in alternatives {
-                collect_goals(alternative, Participation::Deferred, model, out);
-            }
-        }
+        PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => collect_goals(*inner, model, out),
+        PatternKind::Repeat(_, _) | PatternKind::Alternative(_) => {}
         PatternKind::Reference(definition) => {
-            if participation.is_required()
-                && let Some(goal) = Goal::from_pattern(model, model.definition(*definition))
-            {
+            if let Some(goal) = Goal::from_pattern(model, model.definition(*definition)) {
                 out.push(goal);
             }
         }

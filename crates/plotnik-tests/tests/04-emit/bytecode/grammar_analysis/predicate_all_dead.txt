@@ -11,37 +11,23 @@ rules:
       - {type: STRING, value: "("}
       - {type: STRING, value: ")"}
   id: {type: PATTERN, value: "[a-z]+"}
----------------------- NFA -----------------------
-[entry_points]
-Q = 0
+------------------ DIAGNOSTICS -------------------
+error: predicate `call == "f()"` cannot test `call` because this node kind can contain children
+ --> query.ptk:2:9
+  |
+2 |   (call == "f()")
+  |    ---- ^^^^^^^^
+  |    |
+  |    `call` starts here
+  |
+help: move `== "f()"` to a leaf child of `call`, or match a literal token directly
 
-[transitions]
-Q:
-  0  -ε-                                    2, 3
-  1                                         ▶
-  2   !   (call) == "f()"                   1
-  3   !   (call) == "g()"                   1
--------------------- BYTECODE --------------------
-[strings]
-S0 "Beauty will save the world"
-S1 "f()"
-S2 "g()"
-S3 "call"
-S4 "Q"
-
-[type_defs]
-T0 = <NoValue>
-
-[type_members]
-
-[type_names]
-
-[entry_points]
-Q = 0 :: T0
-
-[instructions]
-Q:
-  0  -ε-                                    3, 5
-  2                                         ▶
-  3   !   (call) == "f()"                   2
-  5   !   (call) == "g()"                   2
+error: predicate `call == "g()"` cannot test `call` because this node kind can contain children
+ --> query.ptk:3:9
+  |
+3 |   (call == "g()")
+  |    ---- ^^^^^^^^
+  |    |
+  |    `call` starts here
+  |
+help: move `== "g()"` to a leaf child of `call`, or match a literal token directly

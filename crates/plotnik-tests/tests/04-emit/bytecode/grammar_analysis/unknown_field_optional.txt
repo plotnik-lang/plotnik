@@ -1,0 +1,13 @@
+Q = (func
+  missing: (id)
+)?
+-------------------- GRAMMAR ---------------------
+rules:
+  func: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `missing` is not a valid grammar field
+ --> query.ptk:2:3
+  |
+2 |   missing: (id)
+  |   ^^^^^^^

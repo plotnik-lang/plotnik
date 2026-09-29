@@ -1,0 +1,40 @@
+Q = (stmt
+  [
+    (call == "f()")
+    (call == "g()")
+  ]
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  stmt:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: call}
+      - {type: SYMBOL, name: id}
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "("}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: predicate `call == "f()"` cannot test `call` because this node kind can contain children
+ --> query.ptk:3:11
+  |
+3 |     (call == "f()")
+  |      ---- ^^^^^^^^
+  |      |
+  |      `call` starts here
+  |
+help: move `== "f()"` to a leaf child of `call`, or match a literal token directly
+
+error: predicate `call == "g()"` cannot test `call` because this node kind can contain children
+ --> query.ptk:4:11
+  |
+4 |     (call == "g()")
+  |      ---- ^^^^^^^^
+  |      |
+  |      `call` starts here
+  |
+help: move `== "g()"` to a leaf child of `call`, or match a literal token directly

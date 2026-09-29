@@ -28,7 +28,7 @@ use crate::core::{NodeFieldId, NodeKindId};
 use super::super::model::{KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
 use super::engine::SatisfiabilitySolver;
-use super::{Goal, Participation, collect_goals};
+use super::{Goal, collect_goals};
 
 #[derive(Clone, Copy)]
 pub(in crate::compiler::analyze::grammar) struct Context<'a> {
@@ -75,6 +75,16 @@ pub(super) fn report_goal(
     diagnostic_budget: &mut u64,
     reported: &mut ReportedCulprits,
 ) -> Result<ReportOutcome, AnalysisLimit> {
+    if super::super::diagnostics::StructuralDiagnostics::report(
+        ctx.grammar,
+        ctx.model,
+        goal.pattern(),
+        diag,
+        &mut reported.nodes,
+    ) {
+        return Ok(ReportOutcome::Emitted);
+    }
+
     let mut visited = HashSet::new();
     let culprit = locate(ctx.model, solver, goal, &mut visited)?;
     if !reported.insert(&culprit) {
@@ -106,11 +116,6 @@ fn report_culprit(
 
     if let Some(conflict) = negated_matched_field(ctx, &culprit) {
         emit_negated_field_conflict(ctx, &culprit, conflict, diag);
-        return ReportOutcome::Emitted;
-    }
-
-    if let Some(field) = negated_required_field(ctx, &culprit) {
-        emit_negated_required_field(ctx, &culprit, field, diag);
         return ReportOutcome::Emitted;
     }
 
@@ -302,14 +307,6 @@ fn negated_matched_field(
     None
 }
 
-fn negated_required_field(ctx: Context<'_>, culprit: &ConcreteCulprit) -> Option<NegatedFieldUse> {
-    negated_fields(ctx, culprit).into_iter().find(|field| {
-        ctx.grammar
-            .field_cardinality(culprit.kind, field.id)
-            .is_some_and(|cardinality| cardinality.is_required())
-    })
-}
-
 fn pattern_matches_field(
     ctx: Context<'_>,
     parent: NodeKindId,
@@ -366,23 +363,6 @@ fn emit_negated_field_conflict(
         .emit();
 }
 
-fn emit_negated_required_field(
-    ctx: Context<'_>,
-    culprit: &ConcreteCulprit,
-    field: NegatedFieldUse,
-    diag: &mut Diagnostics,
-) {
-    let kind_name = culprit.kind_name(ctx);
-    diag.report(DiagnosticKind::NegatedRequiredField, field.span)
-        .detail(field.name.clone())
-        .related_to(culprit.span(), format!("on {kind_name}"))
-        .hint(format!(
-            "`-{0}` requires `{0}` to be absent, but every {1} has one. Drop `-{0}`",
-            field.name, kind_name
-        ))
-        .emit();
-}
-
 /// Walk down from an unsatisfiable node to the deepest node whose children are each
 /// satisfiable on their own — the point where the arrangement, not any one child, is
 /// what the grammar rejects.
@@ -399,7 +379,7 @@ fn locate(
 
     let mut children = Vec::new();
     for child in &model.node(goal.pattern()).children {
-        collect_goals(child.pattern, Participation::Required, model, &mut children);
+        collect_goals(child.pattern, model, &mut children);
     }
 
     for child in children {

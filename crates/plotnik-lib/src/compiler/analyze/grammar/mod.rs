@@ -2,13 +2,12 @@
 
 pub mod bind;
 pub mod binding;
-mod check;
 mod diagnostics;
 mod model;
-mod participation;
 mod resolve;
 mod satisfiability;
 mod utils;
+mod validate;
 
 pub use binding::{GrammarBinding, GrammarBindingBuilder};
 pub use satisfiability::DEFAULT_SATISFIABILITY_WORK_BUDGET;

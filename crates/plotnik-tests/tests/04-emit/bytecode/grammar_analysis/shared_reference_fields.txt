@@ -1,0 +1,37 @@
+Q = (assign
+  name: (Value)
+  value: (Value)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  assign:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+--------------- QUERY (value.ptk) ----------------
+Value = (id)
+------------------ DIAGNOSTICS -------------------
+error: `id` is not valid for grammar field `value` of `assign`
+ --> value.ptk:1:10
+  |
+1 | Value = (id)
+  |          ^^
+  |
+ ::: query.ptk:3:3
+  |
+3 |   value: (Value)
+  |   ----- grammar field `value`
+  |
+ ::: query.ptk:1:6
+  |
+1 | Q = (assign
+  |      ------ `assign` starts here
+  |
+help: `value` accepts: `num`

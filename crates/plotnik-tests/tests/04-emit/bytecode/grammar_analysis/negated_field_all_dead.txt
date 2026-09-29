@@ -1,0 +1,37 @@
+Q = [
+  (func -value)
+  (param -value)
+]
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: param}
+      - {type: SYMBOL, name: assign}
+  param: {type: SYMBOL, name: id}
+  assign:
+    type: FIELD
+    name: value
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `value` is not a grammar field of `func`
+ --> query.ptk:2:10
+  |
+2 |   (func -value)
+  |    ----  ^^^^^
+  |    |
+  |    `func` starts here
+  |
+help: `func` has no grammar fields
+
+error: `value` is not a grammar field of `param`
+ --> query.ptk:3:11
+  |
+3 |   (param -value)
+  |    -----  ^^^^^
+  |    |
+  |    `param` starts here
+  |
+help: `param` has no grammar fields

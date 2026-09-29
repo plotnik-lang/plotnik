@@ -1,0 +1,30 @@
+Q = (block
+  (decl (Value))
+  (ret (Value))
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  block:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: decl}
+      - {type: SYMBOL, name: ret}
+  decl: {type: SYMBOL, name: id}
+  ret: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+--------------- QUERY (value.ptk) ----------------
+Value = (id)
+------------------ DIAGNOSTICS -------------------
+error: `id` cannot be an unlabeled child of `ret`
+ --> value.ptk:1:10
+  |
+1 | Value = (id)
+  |          ^^
+  |
+ ::: query.ptk:3:4
+  |
+3 |   (ret (Value))
+  |    --- `ret` starts here
+  |
+help: valid children of `ret`: `num`

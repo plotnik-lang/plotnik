@@ -1,0 +1,17 @@
+Q = [
+  (id == /name/)
+  (id)
+]
+-------------------- GRAMMAR ---------------------
+rules:
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: predicate `id == /name/` uses `==`, which requires a quoted string, but supplies a regex value
+ --> query.ptk:2:7
+  |
+2 |   (id == /name/)
+  |    -- ^^^^^^^^^
+  |    |
+  |    predicate applies to `id`
+  |
+help: change the value in `== /name/` to a quoted string, or choose an operator that accepts a regex value
