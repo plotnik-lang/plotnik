@@ -7,4 +7,4 @@ error: matching the `expression#` supertype is not supported yet
   |      ^^^^^^^^^^
   |
 help: choose the concrete subtypes of `expression` that this query should match
-help: the grammar includes `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, … (7 more)
+help: the grammar includes `array`, `arrow_function`, `assignment_expression`, `augmented_assignment_expression`, `await_expression`, … (28 more)

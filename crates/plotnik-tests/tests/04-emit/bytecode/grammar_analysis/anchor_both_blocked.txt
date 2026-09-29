@@ -1,0 +1,29 @@
+Q = (call
+  .!
+  (args)
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: args}
+      - {type: STRING, value: ";"}
+  args: {type: STRING, value: "()"}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: these anchors prevent the child patterns from matching `call`
+ --> query.ptk:2:3
+  |
+1 | Q = (call
+  |      ---- inside `call`
+2 |   .!
+  |   ^^
+3 |   (args)
+4 |   .!
+  |   -- also constrains the child positions
+  |
+help: `call` allows `id args ";"`
+help: remove the highlighted anchors to allow these child patterns

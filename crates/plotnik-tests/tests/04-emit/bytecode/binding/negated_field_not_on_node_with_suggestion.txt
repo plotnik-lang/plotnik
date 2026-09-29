@@ -26,8 +26,4 @@ error: `arg` is not a grammar field of `call`
   |      |
   |      `call` starts here
   |
-help: replace with `args`
-  |
-1 | Q = (call -args)
-  |               +
-help: valid grammar fields for `call`: `args`
+help: remove `-arg`

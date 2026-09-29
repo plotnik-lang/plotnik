@@ -22,4 +22,4 @@ error: `type` is not a grammar field of `func`
   |      |
   |      `func` starts here
   |
-help: valid grammar fields for `func`: `name`
+help: remove `-type`

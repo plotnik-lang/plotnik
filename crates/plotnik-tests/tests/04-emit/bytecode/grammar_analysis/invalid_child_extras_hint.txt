@@ -1,0 +1,27 @@
+Q = (args (num))
+-------------------- GRAMMAR ---------------------
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  program:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: args}
+      - {type: SYMBOL, name: num}
+  args:
+    type: SEQ
+    members:
+      - {type: STRING, value: "("}
+      - {type: STRING, value: ")"}
+  num: {type: PATTERN, value: "[0-9]+"}
+  comment: {type: PATTERN, value: "//[^\n]*"}
+------------------ DIAGNOSTICS -------------------
+error: `num` cannot be a child of `args`
+ --> query.ptk:1:12
+  |
+1 | Q = (args (num))
+  |      ----  ^^^
+  |      |
+  |      `args` starts here
+  |
+help: named child kinds of `args`: `comment`

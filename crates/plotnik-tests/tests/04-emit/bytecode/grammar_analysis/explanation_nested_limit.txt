@@ -1,0 +1,31 @@
+Q = (list
+  .!
+  (pair
+    (num)
+    (id)
+  )
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: SYMBOL, name: pair}
+      - {type: STRING, value: "]"}
+  pair:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+--------------------- LIMITS ---------------------
+# The outer anchor proves failure before the nested order needs examination.
+work_budget: 24
+------------------ DIAGNOSTICS -------------------
+error: the grammar builds no `list` matching this child structure
+ --> query.ptk:1:6
+  |
+1 | Q = (list
+  |      ^^^^

@@ -6,20 +6,19 @@ use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::parse::ast::{self, QuantifierKind};
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::utils::find_similar;
-use crate::compiler::diagnostics::report::Diagnostics;
+use crate::compiler::diagnostics::report::{DiagnosticBuilder, Diagnostics};
 use crate::core::grammar::Grammar;
 
-pub(super) struct StructuralDiagnostics<'a> {
+pub(super) struct LocalDiagnostics<'a> {
     grammar: &'a Grammar,
     diag: &'a mut Diagnostics,
     model: &'a Model,
     reported: bool,
     reported_nodes: &'a mut HashSet<PatternId>,
-    visited: HashSet<(PatternId, Option<ParentNode>)>,
+    visited: HashSet<(PatternId, Option<ParentNode>, Option<FieldRef>)>,
 }
 
-impl StructuralDiagnostics<'_> {
+impl LocalDiagnostics<'_> {
     /// Explain simple structural contradictions only after the solver has rejected
     /// the enclosing pattern. These summaries choose wording, never admission.
     pub(super) fn report(
@@ -29,7 +28,7 @@ impl StructuralDiagnostics<'_> {
         diag: &mut Diagnostics,
         reported_nodes: &mut HashSet<PatternId>,
     ) -> bool {
-        let mut reporter = StructuralDiagnostics {
+        let mut reporter = LocalDiagnostics {
             grammar,
             model,
             diag,
@@ -37,17 +36,20 @@ impl StructuralDiagnostics<'_> {
             reported_nodes,
             visited: HashSet::new(),
         };
-        reporter.walk(pattern, None);
+        reporter.walk(pattern, None, None);
         reporter.reported
     }
 
-    fn walk(&mut self, pattern: PatternId, parent: Option<ParentNode>) {
-        if !self.visited.insert((pattern, parent)) {
+    fn walk(&mut self, pattern: PatternId, parent: Option<ParentNode>, field: Option<FieldRef>) {
+        if !self.visited.insert((pattern, parent, field)) {
             return;
         }
 
         match &self.model.pattern(pattern).kind {
             PatternKind::Node(node) => {
+                if let Some(parent) = parent {
+                    self.child(pattern, node.kind, &parent, field.as_ref());
+                }
                 if self.reported_nodes.contains(&pattern) {
                     self.reported = true;
                     return;
@@ -68,7 +70,7 @@ impl StructuralDiagnostics<'_> {
                 };
                 match node.violation {
                     Some(NodeViolation::PredicateOnNonLeaf) => {
-                        self.emit_predicate_on_non_leaf(&origin, &ctx);
+                        self.emit_predicate_on_non_leaf(&origin, &ctx)
                     }
                     Some(NodeViolation::FieldNotOnKind(field)) => {
                         let name = self
@@ -76,71 +78,50 @@ impl StructuralDiagnostics<'_> {
                             .field_name(field)
                             .expect("resolved field has a name");
                         let span = self.negated_span(pattern, name);
-                        self.emit_field_not_on_node(span, name, &ctx);
+                        self.emit_negated_field_not_on_node(span, name, &ctx);
                     }
                     None => {}
                 }
                 for item in &node.children {
-                    if !matches!(
-                        self.model.pattern(item.pattern).kind,
-                        PatternKind::Field(_, _)
-                    ) {
-                        self.child(item.pattern, &ctx, None, &mut HashSet::new());
-                    }
-                    self.walk(item.pattern, Some(ctx));
-                }
-                for &field in &node.negated_fields {
-                    if !self
-                        .grammar
-                        .field_cardinality(kind, field)
-                        .is_some_and(|cardinality| cardinality.is_required())
-                    {
-                        continue;
-                    }
-
-                    let name = self
-                        .grammar
-                        .field_name(field)
-                        .expect("resolved field has a name");
-                    let span = self.negated_span(pattern, name);
-                    self.emit_negated_required_field(span, name, &ctx);
+                    self.walk(item.pattern, Some(ctx), None);
                 }
                 if self.diag.len() != before {
                     self.reported_nodes.insert(pattern);
                 }
             }
             PatternKind::Field(id, inner) => {
-                let Some(parent) = parent else {
-                    return;
-                };
                 let origin = self.model.pattern(pattern).syntax();
                 let ast::Pattern::FieldPattern(field) = origin.node() else {
                     unreachable!("resolved field originates in field syntax");
                 };
                 let token = field.name().expect("resolved field has a name");
-                let field = FieldRef {
-                    id: *id,
-                    name: token.text(),
-                    span: origin.span_of(token.text_range()),
-                };
-                if !self.grammar.has_field(parent.id(), *id) {
-                    self.emit_field_not_on_node(field.span, field.name, &parent);
-                    return;
-                }
-
-                self.child(*inner, &parent, Some(&field), &mut HashSet::new());
-                self.walk(*inner, Some(parent));
+                self.walk(
+                    *inner,
+                    parent,
+                    Some(FieldRef {
+                        id: *id,
+                        span: origin.span_of(token.text_range()),
+                    }),
+                );
             }
             PatternKind::Sequence(items) => {
                 for item in items {
-                    self.walk(item.pattern, parent);
+                    // A group does not carry its outer field into its siblings.
+                    self.walk(item.pattern, parent, None);
                 }
             }
-            PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => self.walk(*inner, parent),
-            PatternKind::Reference(definition) => {
-                self.walk(self.model.definition(*definition), parent)
+            PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => {
+                self.walk(*inner, parent, field)
             }
-            PatternKind::Alternative(_) | PatternKind::Repeat(_, _) | PatternKind::Leaf(_) => {}
+            PatternKind::Reference(definition) => {
+                self.walk(self.model.definition(*definition), parent, field)
+            }
+            PatternKind::Leaf(kind) => {
+                if let Some(parent) = parent {
+                    self.child(pattern, *kind, &parent, field.as_ref());
+                }
+            }
+            PatternKind::Alternative(_) | PatternKind::Repeat(_, _) => {}
         }
     }
 
@@ -160,29 +141,10 @@ impl StructuralDiagnostics<'_> {
     fn child(
         &mut self,
         pattern: PatternId,
+        kind: KindConstraint,
         parent: &ParentNode,
         field: Option<&FieldRef>,
-        visited: &mut HashSet<PatternId>,
     ) {
-        if !visited.insert(pattern) {
-            return;
-        }
-
-        let kind = match &self.model.pattern(pattern).kind {
-            PatternKind::Node(node) => node.kind,
-            PatternKind::Leaf(kind) => *kind,
-            PatternKind::Sequence(items) => {
-                for item in items {
-                    self.child(item.pattern, parent, field, visited);
-                }
-                return;
-            }
-            PatternKind::Reference(definition) => {
-                self.child(self.model.definition(*definition), parent, field, visited);
-                return;
-            }
-            _ => return,
-        };
         let origin = self.model.pattern(pattern).syntax();
         let span = match origin.node() {
             ast::Pattern::NamedNodePattern(node) if !node.is_any() => origin.span_of(
@@ -198,6 +160,15 @@ impl StructuralDiagnostics<'_> {
             _ => origin.span_of(origin.node().text_range()),
         };
         if let Some(field) = field {
+            let name = self
+                .grammar
+                .field_name(field.id)
+                .expect("resolved field has a name");
+            if !self.grammar.has_field(parent.id(), field.id) {
+                self.emit_field_not_on_node(field.span, name, parent);
+                return;
+            }
+
             let types = self.grammar.valid_field_types(parent.id(), field.id);
             let accepted = match kind {
                 KindConstraint::Exact(kind) => types.iter().any(|&candidate| {
@@ -286,51 +257,50 @@ impl StructuralDiagnostics<'_> {
             ))
             .related_to(ctx.span(), format!("`{name}` starts here"))
             .hint(format!(
-                "move `{text}` to a leaf child of `{name}`, or match a literal token directly"
+                "match the children of `{name}` instead of testing the whole node's text"
             ))
             .emit();
         self.reported = true;
     }
 
-    fn emit_negated_required_field(&mut self, span: Span, name: &str, ctx: &ParentNode) {
+    fn field_error(
+        &mut self,
+        span: Span,
+        field_name: &str,
+        ctx: &ParentNode,
+    ) -> DiagnosticBuilder<'_> {
+        self.reported = true;
         let parent_name = ctx.name(self.grammar);
         self.diag
-            .report(DiagnosticKind::NegatedRequiredField, span)
-            .detail(name)
-            .related_to(ctx.span(), format!("on `{parent_name}`"))
-            .hint(format!(
-                "`-{name}` requires `{name}` to be absent, but every `{parent_name}` has one. Drop `-{name}`"
-            ))
-            .emit();
-        self.reported = true;
-    }
-
-    fn emit_field_not_on_node(&mut self, span: Span, field_name: &str, ctx: &ParentNode) {
-        self.reported = true;
-        let valid_fields = self.grammar.fields_for_node_kind(ctx.id());
-        let parent_name = ctx.name(self.grammar);
-        let parent_span = ctx.span();
-
-        let mut builder = self
-            .diag
             .report(DiagnosticKind::GrammarFieldNotOnNodeKind, span)
             .detail(format!(
                 "`{field_name}` is not a grammar field of `{parent_name}`"
             ))
-            .related_to(parent_span, format!("`{parent_name}` starts here"));
+            .related_to(ctx.span(), format!("`{parent_name}` starts here"))
+    }
 
+    fn emit_negated_field_not_on_node(&mut self, span: Span, field_name: &str, ctx: &ParentNode) {
+        self.field_error(span, field_name, ctx)
+            .hint(format!("remove `-{field_name}`"))
+            .emit();
+    }
+
+    fn emit_field_not_on_node(&mut self, span: Span, field_name: &str, ctx: &ParentNode) {
+        let grammar = self.grammar;
+        let valid_fields = grammar.fields_for_node_kind(ctx.id());
+        let parent_name = ctx.name(grammar);
+        let mut builder = self.field_error(span, field_name, ctx);
         if valid_fields.is_empty() {
-            builder = builder.hint(format!("`{}` has no grammar fields", parent_name));
-        } else {
-            if let Some(similar) = find_similar(field_name, &valid_fields) {
-                builder = builder.fix(format!("replace with `{similar}`"), similar);
-            }
-            builder = builder.hint(format!(
-                "valid grammar fields for `{}`: {}",
-                parent_name,
-                format_list(&valid_fields, 5)
-            ));
+            builder
+                .hint(format!("`{parent_name}` has no grammar fields"))
+                .emit();
+            return;
         }
+
+        builder = builder.hint(format!(
+            "valid grammar fields for `{parent_name}`: {}",
+            format_list(&valid_fields, 5)
+        ));
         builder.emit();
     }
 
@@ -348,7 +318,7 @@ impl StructuralDiagnostics<'_> {
         self.diag
             .report(DiagnosticKind::InvalidChildType, span)
             .detail(format!(
-                "`{child_name}` cannot be an unlabeled child of `{parent_name}`"
+                "`{child_name}` cannot be a child of `{parent_name}`"
             ))
             .related_to(parent_span, format!("`{parent_name}` starts here"))
             .hint(hint)
@@ -371,51 +341,59 @@ impl StructuralDiagnostics<'_> {
             .emit();
     }
 
-    /// Hint for the inadmissible-child diagnostic: list valid unlabeled children, or — when a
-    /// node's only children are grammar-field values — surface those constraints so users don't write ghost
-    /// bare-child queries.
     fn child_hint(&self, parent_id: NodeKindId, parent_name: &str) -> String {
-        let child_types = self.grammar.valid_child_types(parent_id);
-        if !child_types.is_empty() {
-            let names = child_types
-                .iter()
-                .filter_map(|&id| self.grammar.node_kind(id))
-                .collect::<Vec<_>>();
-            return format!(
-                "valid children of `{}`: {}",
-                parent_name,
-                format_list(&names, 8)
-            );
-        }
-
-        let field_ids = self.grammar.field_ids_for_node_kind(parent_id);
-        if field_ids.is_empty() {
-            return format!("`{}` has no named children", parent_name);
-        }
-        let rendered = field_ids
+        // An unlabelled query can also match a labelled child. Offer concrete
+        // kinds from both sources, never an unsupported abstract supertype.
+        let kinds = self
+            .grammar
+            .valid_child_types(parent_id)
             .iter()
-            .map(|&field| self.render_field(parent_id, field))
-            .collect::<Vec<_>>()
-            .join(", ");
+            .copied()
+            .chain(
+                self.grammar
+                    .field_ids_for_node_kind(parent_id)
+                    .iter()
+                    .flat_map(|&field| {
+                        self.grammar
+                            .valid_field_types(parent_id, field)
+                            .iter()
+                            .copied()
+                    }),
+            )
+            .chain(self.grammar.extra_node_kinds().iter().copied());
+        let names = self.concrete_kinds(kinds);
+        if names.is_empty() {
+            return format!("`{parent_name}` has no named children");
+        }
         format!(
-            "`{}` has no unlabeled children. Use its grammar fields: {}",
-            parent_name, rendered
+            "named child kinds of `{parent_name}`: {}",
+            format_list(&names, 8)
         )
     }
 
-    /// Render a grammar field as `name: (kind)` using its first valid kind.
-    fn render_field(&self, parent_id: NodeKindId, field_id: NodeFieldId) -> String {
-        let field_name = self
-            .grammar
-            .field_name(field_id)
-            .expect("admissible field id must have a name");
-        let type_name = self
-            .grammar
-            .valid_field_types(parent_id, field_id)
-            .iter()
-            .find_map(|&id| self.grammar.node_kind(id))
-            .unwrap_or("_");
-        format!("`{}: ({})`", field_name, type_name)
+    fn concrete_kinds(&self, kinds: impl Iterator<Item = NodeKindId>) -> Vec<&str> {
+        let mut names = Vec::new();
+        for kind in kinds {
+            let candidates = if self.grammar.is_supertype(kind) {
+                self.grammar.collect_subtypes(kind).into_iter().collect()
+            } else {
+                vec![kind]
+            };
+            for candidate in candidates {
+                if !self.grammar.is_supertype(candidate)
+                    && !self.grammar.is_anonymous_node(candidate)
+                {
+                    names.push(
+                        self.grammar
+                            .node_kind(candidate)
+                            .expect("retained kind has a name"),
+                    );
+                }
+            }
+        }
+        names.sort_unstable();
+        names.dedup();
+        names
     }
 
     fn emit_invalid_field_value(
@@ -426,18 +404,25 @@ impl StructuralDiagnostics<'_> {
         field: &FieldRef,
     ) {
         self.reported = true;
-        let hint = self.field_value_hint(ctx.id(), field.id, field.name);
+        let name = self
+            .grammar
+            .field_name(field.id)
+            .expect("resolved field has a name");
+        let hint = self.field_value_hint(ctx.id(), field.id, name);
         let parent_name = ctx.name(self.grammar);
-        self.diag
+        let mut builder = self
+            .diag
             .report(DiagnosticKind::InvalidGrammarFieldChildKind, span)
             .detail(format!(
                 "{value} is not valid for grammar field `{}` of `{parent_name}`",
-                field.name
+                name
             ))
-            .related_to(field.span, format!("grammar field `{}`", field.name))
-            .related_to(ctx.span(), format!("`{parent_name}` starts here"))
-            .hint(hint)
-            .emit();
+            .related_to(field.span, format!("grammar field `{name}`"))
+            .related_to(ctx.span(), format!("`{parent_name}` starts here"));
+        if let Some(hint) = hint {
+            builder = builder.hint(hint);
+        }
+        builder.emit();
     }
 
     /// Hint for the invalid-field-value diagnostic: the named kinds a grammar field accepts, or — for
@@ -447,25 +432,38 @@ impl StructuralDiagnostics<'_> {
         parent_id: NodeKindId,
         field_id: NodeFieldId,
         field_name: &str,
-    ) -> String {
+    ) -> Option<String> {
         let types = self.grammar.valid_field_types(parent_id, field_id);
-        let named = types
+        let named = self.concrete_kinds(types.iter().copied());
+        let mut literals = types
             .iter()
-            .filter(|&&id| !self.grammar.is_anonymous_node(id))
-            .filter_map(|&id| self.grammar.node_kind(id))
+            .filter(|&&id| self.grammar.is_anonymous_node(id))
+            .map(|&id| {
+                self.grammar
+                    .node_kind(id)
+                    .expect("retained kind has a name")
+            })
             .collect::<Vec<_>>();
+        literals.sort_unstable();
 
         if named.is_empty() {
-            let example = types
-                .iter()
-                .find_map(|&id| self.grammar.node_kind(id))
-                .unwrap_or("…");
-            return format!(
-                "`{0}` accepts only literal tokens. Write `{0}: \"{1}\"`",
+            let example = literals.first()?;
+            return Some(format!(
+                "`{0}` accepts only literal tokens. Write `{0}: {1:?}`",
                 field_name, example
-            );
+            ));
         }
-        format!("`{}` accepts: {}", field_name, format_list(&named, 8))
+        let values = named
+            .iter()
+            .map(|name| name.to_string())
+            .chain(literals.iter().map(|literal| format!("{literal:?}")))
+            .collect::<Vec<_>>();
+        let values = values.iter().map(String::as_str).collect::<Vec<_>>();
+        Some(format!(
+            "`{}` accepts: {}",
+            field_name,
+            format_list(&values, 8)
+        ))
     }
 }
 
@@ -488,9 +486,9 @@ pub(super) fn format_list(items: &[&str], max_items: usize) -> String {
     }
 }
 
-struct FieldRef<'a> {
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct FieldRef {
     id: NodeFieldId,
-    name: &'a str,
     span: Span,
 }
 

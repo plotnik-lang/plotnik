@@ -4,10 +4,8 @@ rules:
   expr: {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: no node the grammar builds takes these children
- --> query.ptk:1:12
+error: no named node in the grammar satisfies these child constraints
+ --> query.ptk:1:14
   |
 1 | Q = (expr (_ (expr)))
-  |            ^
-  |
-help: `(_)` matches any named node, but no named node kind admits this combination of children in this order
+  |              ^^^^^^

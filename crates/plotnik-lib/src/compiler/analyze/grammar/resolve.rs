@@ -130,13 +130,16 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         None
     }
 
-    fn resolve_field_by_token(&mut self, source: SourceId, name_token: Option<SyntaxToken>) {
-        let Some(name_token) = name_token else {
-            return;
-        };
+    /// Return the first occurrence of an unknown field for contextual reporting.
+    fn resolve_field_by_token(
+        &mut self,
+        source: SourceId,
+        name_token: Option<SyntaxToken>,
+    ) -> Option<SyntaxToken> {
+        let name_token = name_token?;
         let field_name = name_token.text();
         if self.node_field_ids.contains_key(field_name) {
-            return;
+            return None;
         }
         let resolved = self.grammar.resolve_field(field_name);
         self.node_field_ids
@@ -144,20 +147,21 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         if let Some(id) = resolved {
             let sym = self.interner.intern(field_name);
             self.output.insert_node_field_id(sym, id);
-            return;
+            return None;
         }
-        let all_fields = self.grammar.all_field_names();
-        let suggestion = find_similar(field_name, &all_fields);
+        Some(name_token)
+    }
 
+    fn report_unknown_field(&mut self, source: SourceId, token: &SyntaxToken, candidates: &[&str]) {
+        let name = token.text();
         let mut builder = self
             .diag
             .report(
                 DiagnosticKind::UnknownGrammarField,
-                Span::new(source, name_token.text_range()),
+                Span::new(source, token.text_range()),
             )
-            .detail(field_name);
-
-        if let Some(similar) = suggestion {
+            .detail(name);
+        if let Some(similar) = find_similar(name, candidates) {
             builder = builder.fix(format!("replace with `{similar}`"), similar);
         }
         builder.emit();
@@ -201,8 +205,35 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
             .children()
             .filter_map(ast::NegatedField::cast)
         {
-            self.binder
-                .resolve_field_by_token(node.source(), neg.name());
+            if let Some(token) = self
+                .binder
+                .resolve_field_by_token(node.source(), neg.name())
+            {
+                let grammar = self.binder.grammar;
+                let candidates = self
+                    .binder
+                    .resolve_named_node_id(node)
+                    .map(|kind| {
+                        grammar
+                            .field_ids_for_node_kind(kind)
+                            .iter()
+                            .copied()
+                            .filter(|&field| {
+                                !grammar
+                                    .field_cardinality(kind, field)
+                                    .is_some_and(|cardinality| cardinality.is_required())
+                            })
+                            .map(|field| {
+                                grammar
+                                    .field_name(field)
+                                    .expect("resolved field has a name")
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                self.binder
+                    .report_unknown_field(node.source(), &token, &candidates);
+            }
         }
 
         crate::compiler::analyze::visitor::walk_named_node_pattern(self, node);
@@ -216,8 +247,24 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
     }
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
-        self.binder
-            .resolve_field_by_token(field.source(), field.node().name());
+        if let Some(token) = self
+            .binder
+            .resolve_field_by_token(field.source(), field.node().name())
+        {
+            let grammar = self.binder.grammar;
+            let parent = field
+                .node()
+                .syntax()
+                .ancestors()
+                .find_map(NamedNodePattern::cast);
+            let kind =
+                parent.and_then(|parent| self.binder.resolve_named_node_id(&field.wrap(parent)));
+            let candidates = kind
+                .map(|kind| grammar.fields_for_node_kind(kind))
+                .unwrap_or_else(|| grammar.all_field_names());
+            self.binder
+                .report_unknown_field(field.source(), &token, &candidates);
+        }
         crate::compiler::analyze::visitor::walk_field_pattern(self, field);
     }
 }

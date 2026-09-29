@@ -10,10 +10,14 @@ rules:
     content: {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: a `param` has one `name`, but this pattern binds `name` 2 times
- --> query.ptk:1:6
+error: a `param` has at most one `name`, but this pattern requires it at least 2 times
+ --> query.ptk:3:3
   |
 1 | Q = (param
-  |      ^^^^^
+  |      ----- inside `param`
+2 |   name: (id)
+  |   ---------- first `name:` child
+3 |   name: (id)
+  |   ^^^^^^^^^^
   |
-help: keep a single `name:` child
+help: use one `name:` pattern for this single-valued field

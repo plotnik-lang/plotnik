@@ -12,10 +12,17 @@ rules:
       - {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), the first child of `func` must be `id`, but `func` begins with `"async"` or `"fn"`
- --> query.ptk:1:6
+error: the leading exact anchor (`.!`) prevents these children from matching `func`
+ --> query.ptk:1:11
   |
 1 | Q = (func .! (id))
-  |      ^^^^
+  |      ---- ^^
+  |      |
+  |      inside `func`
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(func . (id))`
+help: remove this anchor to allow these child patterns
+  |
+1 - Q = (func .! (id))
+1 + Q = (func  (id))
+  |
+help: `func` allows `"async" "fn" id` or `"fn" id`

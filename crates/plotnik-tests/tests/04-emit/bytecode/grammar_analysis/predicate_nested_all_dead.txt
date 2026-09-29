@@ -27,7 +27,7 @@ error: predicate `call == "f()"` cannot test `call` because this node kind can c
   |      |
   |      `call` starts here
   |
-help: move `== "f()"` to a leaf child of `call`, or match a literal token directly
+help: match the children of `call` instead of testing the whole node's text
 
 error: predicate `call == "g()"` cannot test `call` because this node kind can contain children
  --> query.ptk:4:11
@@ -37,4 +37,4 @@ error: predicate `call == "g()"` cannot test `call` because this node kind can c
   |      |
   |      `call` starts here
   |
-help: move `== "g()"` to a leaf child of `call`, or match a literal token directly
+help: match the children of `call` instead of testing the whole node's text

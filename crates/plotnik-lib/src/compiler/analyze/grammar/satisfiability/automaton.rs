@@ -2,6 +2,7 @@
 //! own sequence exits, while nested node obligations share their pattern IDs.
 
 use crate::compiler::analyze::anchors::GapClass;
+use crate::compiler::diagnostics::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::QuantifierKind;
 use crate::core::NodeFieldId;
@@ -18,14 +19,26 @@ pub(super) struct ChildMatcher {
     pub(super) field: Option<NodeFieldId>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct StateData {
     gap: GapClass,
+    anchor: Option<Span>,
     pattern_edges: Vec<(ChildMatcher, State)>,
     eps_edges: Vec<State>,
 }
 
-#[derive(Debug)]
+impl StateData {
+    fn new(gap: GapClass) -> Self {
+        Self {
+            gap,
+            anchor: None,
+            pattern_edges: Vec::new(),
+            eps_edges: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(super) struct ChildAutomaton {
     states: Vec<StateData>,
     start: State,
@@ -34,6 +47,51 @@ pub(super) struct ChildAutomaton {
 }
 
 impl ChildAutomaton {
+    pub(super) fn set_gap(&mut self, state: State, gap: GapClass) {
+        self.states[state as usize].gap = gap;
+    }
+
+    pub(super) fn anchor(&self, state: State) -> Option<Span> {
+        self.states[state as usize].anchor
+    }
+
+    pub(super) fn allow_field(&mut self, field: NodeFieldId) {
+        self.negated_fields.retain(|&id| id != field);
+    }
+
+    pub(super) fn without_field(field: NodeFieldId) -> Self {
+        Self {
+            states: vec![StateData::new(GapClass::Any)],
+            start: 0,
+            accept: 0,
+            negated_fields: vec![field],
+        }
+    }
+
+    pub(super) fn allow_nested(&mut self, pattern: PatternId) {
+        for state in &mut self.states {
+            for (matcher, _) in &mut state.pattern_edges {
+                if matcher.nested_pattern == Some(pattern) {
+                    matcher.nested_pattern = None;
+                }
+            }
+        }
+    }
+
+    /// An order probe asks about two resolved demands without carrying the rest
+    /// of the failed query's restrictions into the answer.
+    pub(super) fn ordered_pair(first: ChildMatcher, second: ChildMatcher) -> Self {
+        let mut states: Vec<_> = (0..3).map(|_| StateData::new(GapClass::Any)).collect();
+        states[0].pattern_edges.push((first, 1));
+        states[1].pattern_edges.push((second, 2));
+        Self {
+            states,
+            start: 0,
+            accept: 2,
+            negated_fields: Vec::new(),
+        }
+    }
+
     pub(super) fn start(&self) -> State {
         self.start
     }
@@ -88,6 +146,7 @@ pub(super) fn build(
     let start = builder.new_state(GapClass::Any)?;
     let accept = builder.emit_items(&node.children, start, None)?;
     builder.states[accept as usize].gap = node.trailing;
+    builder.states[accept as usize].anchor = node.trailing_anchor;
     Ok(ChildAutomaton {
         states: builder.states,
         start,
@@ -115,11 +174,7 @@ impl Builder<'_> {
         }
 
         let id = self.states.len() as State;
-        self.states.push(StateData {
-            gap,
-            pattern_edges: Vec::new(),
-            eps_edges: Vec::new(),
-        });
+        self.states.push(StateData::new(gap));
         Ok(id)
     }
 
@@ -127,16 +182,17 @@ impl Builder<'_> {
         &mut self,
         items: &[Item],
         entry: State,
-        inherited_first_gap: Option<GapClass>,
+        inherited_first_gap: Option<(GapClass, Option<Span>)>,
     ) -> Result<State, AnalysisLimit> {
         let mut current = entry;
         for (index, item) in items.iter().enumerate() {
-            let gap = if index == 0 {
-                inherited_first_gap.unwrap_or(item.gap)
+            let (gap, anchor) = if index == 0 {
+                inherited_first_gap.unwrap_or((item.gap, item.anchor))
             } else {
-                item.gap
+                (item.gap, item.anchor)
             };
             self.states[current as usize].gap = gap;
+            self.states[current as usize].anchor = anchor;
             // A sibling list does not inherit a field from its surrounding group.
             current = self.emit_pattern(item.pattern, None, current)?;
         }
@@ -184,9 +240,14 @@ impl Builder<'_> {
                 from,
             ),
             PatternKind::Field(field, inner) => self.emit_pattern(*inner, Some(*field), from),
-            PatternKind::Sequence(items) => {
-                self.emit_items(items, from, Some(self.states[from as usize].gap))
-            }
+            PatternKind::Sequence(items) => self.emit_items(
+                items,
+                from,
+                Some((
+                    self.states[from as usize].gap,
+                    self.states[from as usize].anchor,
+                )),
+            ),
             PatternKind::Repeat(kind, inner) => self.emit_repeat(*kind, *inner, field, from),
             PatternKind::Alternative(alternatives) => {
                 let to = self.new_state(GapClass::Any)?;

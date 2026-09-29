@@ -9,10 +9,17 @@ rules:
       - {type: STRING, value: "]"}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), the first child of `list` must be `id`, but `list` begins with `"["`
- --> query.ptk:1:6
+error: the leading exact anchor (`.!`) prevents these children from matching `list`
+ --> query.ptk:1:11
   |
 1 | Q = (list .! (id))
-  |      ^^^^
+  |      ---- ^^
+  |      |
+  |      inside `list`
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(list . (id))`
+help: remove this anchor to allow these child patterns
+  |
+1 - Q = (list .! (id))
+1 + Q = (list  (id))
+  |
+help: `list` allows `"[" id "]"`

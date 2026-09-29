@@ -1,0 +1,32 @@
+Q = (decl
+  value: (num)?
+  (id)
+  (id)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  program:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: decl}
+      - {type: SYMBOL, name: assign}
+  decl: {type: SYMBOL, name: id}
+  assign:
+    type: FIELD
+    name: value
+    content: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `decl` has at most 1 `id` child, but this pattern requires 2
+ --> query.ptk:4:3
+  |
+1 | Q = (decl
+  |      ---- inside `decl`
+2 |   value: (num)?
+3 |   (id)
+  |   ---- also requires `id`
+4 |   (id)
+  |   ^^^^
+  |
+help: `decl` allows `id`

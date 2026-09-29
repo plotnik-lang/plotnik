@@ -1,0 +1,26 @@
+Q = (expr)
+-------------------- GRAMMAR ---------------------
+supertypes: [expr, atom]
+rules:
+  program: {type: SYMBOL, name: expr}
+  expr:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: atom}
+      - {type: SYMBOL, name: num}
+  atom:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: str}
+  str: {type: STRING, value: "text"}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `expr` is a supertype, not a node kind
+ --> query.ptk:1:6
+  |
+1 | Q = (expr)
+  |      ^^^^
+  |
+help: match concrete subtypes with an alternation: `[(id) (num) (str)]`

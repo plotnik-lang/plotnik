@@ -24,7 +24,7 @@ error: `value` is not a grammar field of `func`
   |    |
   |    `func` starts here
   |
-help: `func` has no grammar fields
+help: remove `-value`
 
 error: `value` is not a grammar field of `param`
  --> query.ptk:3:11
@@ -34,4 +34,4 @@ error: `value` is not a grammar field of `param`
   |    |
   |    `param` starts here
   |
-help: `param` has no grammar fields
+help: remove `-value`

@@ -6,7 +6,7 @@ Q = (function_declaration
   ]
 )
 ------------------ DIAGNOSTICS -------------------
-error: `class_declaration` cannot be an unlabeled child of `function_declaration`
+error: `class_declaration` cannot be a child of `function_declaration`
  --> query.ptk:2:4
   |
 1 | Q = (function_declaration
@@ -14,4 +14,4 @@ error: `class_declaration` cannot be an unlabeled child of `function_declaration
 2 |   (class_declaration)
   |    ^^^^^^^^^^^^^^^^^
   |
-help: `function_declaration` has no unlabeled children. Use its grammar fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`
+help: named child kinds of `function_declaration`: `comment`, `formal_parameters`, `html_comment`, `identifier`, `statement_block`

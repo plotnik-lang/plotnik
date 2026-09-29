@@ -4,11 +4,13 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
+use rowan::TextRange;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass, has_direct_alternative_nav};
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::PatternFacts;
+use crate::compiler::diagnostics::Span;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{self, QuantifierKind, SeqItem, token_src};
@@ -61,6 +63,7 @@ pub(super) struct Node {
     pub(super) violation: Option<NodeViolation>,
     pub(super) children: Vec<Item>,
     pub(super) trailing: GapClass,
+    pub(super) trailing_anchor: Option<Span>,
     pub(super) negated_fields: Vec<NodeFieldId>,
 }
 
@@ -81,6 +84,7 @@ pub(super) enum NodeViolation {
 pub(super) struct Item {
     pub(super) pattern: PatternId,
     pub(super) gap: GapClass,
+    pub(super) anchor: Option<Span>,
 }
 
 #[derive(Default)]
@@ -215,6 +219,7 @@ impl Builder<'_> {
                     violation,
                     children: self.items(source, &items, true),
                     trailing,
+                    trailing_anchor: trailing_anchor(&items).map(|range| Span::new(source, range)),
                     negated_fields,
                 })
             }
@@ -280,6 +285,8 @@ impl Builder<'_> {
                 Item {
                     pattern: self.pattern(Located::new(source, pattern.clone())),
                     gap,
+                    anchor: anchor_range(items[..index].iter().rev())
+                        .map(|range| Span::new(source, range)),
                 }
             })
             .collect()
@@ -301,4 +308,22 @@ fn uncaptured(mut pattern: ast::Pattern) -> ast::Pattern {
         pattern = capture.inner().expect("validated capture has a body");
     }
     pattern
+}
+
+// Source provenance follows the same item boundaries used during resolution.
+// It does not compute navigation or decide what an anchor permits.
+fn anchor_range<'a>(items: impl Iterator<Item = &'a SeqItem>) -> Option<TextRange> {
+    items
+        .map_while(|item| match item {
+            SeqItem::Anchor(anchor) => Some(anchor.syntax().text_range()),
+            SeqItem::Pattern(_) => None,
+        })
+        .reduce(TextRange::cover)
+}
+
+fn trailing_anchor(items: &[SeqItem]) -> Option<TextRange> {
+    if let [SeqItem::Pattern(ast::Pattern::SeqPattern(sequence))] = items {
+        return trailing_anchor(&sequence.items().collect::<Vec<_>>());
+    }
+    anchor_range(items.iter().rev())
 }

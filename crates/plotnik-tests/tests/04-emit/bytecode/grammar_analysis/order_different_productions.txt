@@ -1,0 +1,40 @@
+Q = (call
+  (id)
+  (args)
+  (num)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: CHOICE
+    members:
+      - type: SEQ
+        members:
+          - {type: SYMBOL, name: id}
+          - {type: SYMBOL, name: num}
+          - {type: SYMBOL, name: args}
+      - type: SEQ
+        members:
+          - {type: SYMBOL, name: args}
+          - {type: SYMBOL, name: id}
+          - {type: SYMBOL, name: num}
+      - type: SEQ
+        members:
+          - {type: SYMBOL, name: num}
+          - {type: SYMBOL, name: args}
+          - {type: SYMBOL, name: id}
+  args: {type: STRING, value: "()"}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: these child constraints cannot be satisfied together in `call`
+ --> query.ptk:2:3
+  |
+1 |   Q = (call
+  |        ---- inside `call`
+2 | /   (id)
+3 | |   (args)
+4 | |   (num)
+  | |_______^
+  |
+help: `call` allows `id num args` or `args id num` or `num args id`

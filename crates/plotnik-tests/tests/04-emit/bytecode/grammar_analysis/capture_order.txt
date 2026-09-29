@@ -22,5 +22,3 @@ error: the grammar places `id` before `num` in `assign`
   |   ^^^^^^^^^^^^
 3 |   (id) @name
   |   ---------- `id` must come before `num`
-  |
-help: write `id` before `num`

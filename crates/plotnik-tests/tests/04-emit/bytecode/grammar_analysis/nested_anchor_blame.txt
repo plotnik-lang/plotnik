@@ -26,10 +26,13 @@ rules:
       - {type: STRING, value: ")"}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: the grammar builds no `pair` with these children
- --> query.ptk:1:6
+error: this pattern requires a childless node, but this position in `pair` needs a node with children
+ --> query.ptk:5:9
   |
 1 | Q = (pair
-  |      ^^^^
+  |      ---- inside `pair`
+...
+5 |   (term .!)
+  |         ^^
   |
-help: `pair` allows children `term`
+help: match `(term)` here without its child or negated-field constraints

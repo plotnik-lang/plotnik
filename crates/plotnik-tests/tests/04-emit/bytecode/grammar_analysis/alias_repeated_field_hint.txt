@@ -1,0 +1,46 @@
+Q = (stmt
+  value: (id)
+  value: (id)
+  value: (id)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  program:
+    type: CHOICE
+    members:
+      - type: ALIAS
+        content: {type: SYMBOL, name: single}
+        named: true
+        value: stmt
+      - type: ALIAS
+        content: {type: SYMBOL, name: pair}
+        named: true
+        value: stmt
+  single:
+    type: FIELD
+    name: value
+    content: {type: SYMBOL, name: id}
+  pair:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `stmt` has at most 2 `value:` children, but this pattern requires 3
+ --> query.ptk:4:3
+  |
+1 | Q = (stmt
+  |      ---- inside `stmt`
+2 |   value: (id)
+  |   ----------- also requires `value:`
+3 |   value: (id)
+  |   ----------- also requires `value:`
+4 |   value: (id)
+  |   ^^^^^^^^^^^
+  |
+help: `stmt` allows `value: id` or `value: id value: id`

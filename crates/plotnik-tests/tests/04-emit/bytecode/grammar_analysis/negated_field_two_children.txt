@@ -22,12 +22,15 @@ rules:
           - {type: STRING, value: "++"}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `-left` requires `left` to be absent, but this `update` pattern also matches `left`
- --> query.ptk:2:4
+error: `update` has at most 1 `id` child, but this pattern requires 2
+ --> query.ptk:4:3
   |
+1 | Q = (update
+  |      ------ inside `update`
 2 |   -left
-  |    ^^^^
 3 |   (id)
-  |   ---- matches `left` here
+  |   ---- also requires `id`
+4 |   (id)
+  |   ^^^^
   |
-help: drop `-left` or remove the `left` child
+help: `update` allows `"++" right: id` or `left: id "++"`

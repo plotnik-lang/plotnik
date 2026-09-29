@@ -1,0 +1,28 @@
+Q = (assign (Values))
+-------------------- GRAMMAR ---------------------
+rules:
+  assign:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+--------------- QUERY (values.ptk) ---------------
+Values = {
+  (num)
+  (id)
+}
+------------------ DIAGNOSTICS -------------------
+error: the grammar places `id` before `num` in `assign`
+ --> values.ptk:2:3
+  |
+2 |   (num)
+  |   ^^^^^
+3 |   (id)
+  |   ---- `id` must come before `num`
+  |
+ ::: query.ptk:1:6
+  |
+1 | Q = (assign (Values))
+  |      ------ inside `assign`

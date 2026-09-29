@@ -5,13 +5,15 @@ Q = (_
   ) @a
 )
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), the first child of `array` must be `identifier`, but `array` begins with `"["`
- --> query.ptk:2:4
+error: the leading exact anchor (`.!`) prevents these children from matching `array`
+ --> query.ptk:3:5
   |
 2 |   (array
-  |    ^^^^^
+  |    ----- inside `array`
+3 |     .!
+  |     ^^
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(array
-          .
-          (identifier)
-        )`
+help: remove this anchor to allow these child patterns
+  |
+3 -     .!
+  |

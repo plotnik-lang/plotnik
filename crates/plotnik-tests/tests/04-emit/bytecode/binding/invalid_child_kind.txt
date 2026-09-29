@@ -13,7 +13,7 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
   num: {type: PATTERN, value: "[0-9]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `num` cannot be an unlabeled child of `param`
+error: `num` cannot be a child of `param`
  --> query.ptk:1:13
   |
 1 | Q = (param (num))
@@ -21,4 +21,4 @@ error: `num` cannot be an unlabeled child of `param`
   |      |
   |      `param` starts here
   |
-help: `param` has no unlabeled children. Use its grammar fields: `name: (id)`
+help: named child kinds of `param`: `id`

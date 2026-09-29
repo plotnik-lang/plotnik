@@ -1,0 +1,20 @@
+Q = (list .! (id))
+Other = (list (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "]"}
+  id: {type: PATTERN, value: "[a-z]+"}
+--------------------- LIMITS ---------------------
+# One definition is already impossible when checking the next exhausts the budget.
+work_budget: 12
+------------------ DIAGNOSTICS -------------------
+error: the grammar builds no `list` matching this child structure
+ --> query.ptk:1:6
+  |
+1 | Q = (list .! (id))
+  |      ^^^^

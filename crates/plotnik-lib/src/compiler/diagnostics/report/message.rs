@@ -294,7 +294,7 @@ impl DiagnosticKind {
                 "a missing node is a zero-byte node inserted by error recovery. Give `MISSING` at most one node kind or quoted token"
             }
             Self::MissingKindNotToken => {
-                "use a token kind like `(MISSING identifier)`, a quoted literal like `(MISSING \";\")`, or bare `(MISSING)`"
+                "use bare `(MISSING)` or a leaf token kind from this grammar"
             }
             Self::RefCannotHaveChildren => {
                 "a reference reuses its definition as a whole. Put child constraints in the definition or on a concrete node pattern"

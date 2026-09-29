@@ -17,10 +17,17 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
   num: {type: PATTERN, value: "[0-9]+"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), the first child of `call` must be `args`, but `call` begins with `id`
- --> query.ptk:1:6
+error: the leading exact anchor (`.!`) prevents these children from matching `call`
+ --> query.ptk:1:11
   |
 1 | Q = (call .! (args))
-  |      ^^^^
+  |      ---- ^^
+  |      |
+  |      inside `call`
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(call . (args))`
+help: remove this anchor to allow these child patterns
+  |
+1 - Q = (call .! (args))
+1 + Q = (call  (args))
+  |
+help: `call` allows `id args`

@@ -16,12 +16,12 @@ rules:
           - {type: BLANK}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `-label` requires `label` to be absent, but this `break` pattern also matches `label`
+error: `-label` requires `label` to be absent, but these `break` child constraints require it to be present
  --> query.ptk:2:4
   |
 2 |   -label
   |    ^^^^^
 3 |   (id)
-  |   ---- matches `label` here
+  |   ---- these children require the field to be present
   |
-help: drop `-label` or remove the `label` child
+help: drop `-label` to allow these child patterns

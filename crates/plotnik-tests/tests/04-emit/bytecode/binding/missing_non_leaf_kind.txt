@@ -10,4 +10,4 @@ error: `expr` has children. Only leaf tokens can be missing nodes
 1 | Q = (MISSING expr)
   |              ^^^^
   |
-help: use a token kind like `(MISSING identifier)`, a quoted literal like `(MISSING ";")`, or bare `(MISSING)`
+help: use bare `(MISSING)` or a leaf token kind from this grammar

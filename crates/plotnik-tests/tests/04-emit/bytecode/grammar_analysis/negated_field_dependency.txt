@@ -1,0 +1,28 @@
+Q = (stmt
+  -label
+  (num)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  stmt:
+    type: CHOICE
+    members:
+      - type: SEQ
+        members:
+          - type: FIELD
+            name: label
+            content: {type: SYMBOL, name: id}
+          - {type: SYMBOL, name: num}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `-label` requires `label` to be absent, but these `stmt` child constraints require it to be present
+ --> query.ptk:2:4
+  |
+2 |   -label
+  |    ^^^^^
+3 |   (num)
+  |   ----- these children require the field to be present
+  |
+help: drop `-label` to allow these child patterns

@@ -17,5 +17,3 @@ error: the grammar builds no `list` matching this child structure
   |
 1 | Q = (list .! (id))
   |      ^^^^
-  |
-help: adjust the children, anchors, or order to match a shape this grammar produces

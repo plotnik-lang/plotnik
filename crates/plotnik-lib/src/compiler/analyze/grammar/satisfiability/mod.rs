@@ -7,6 +7,7 @@ mod configurations;
 mod diagnose;
 mod engine;
 mod facts;
+mod shapes;
 
 pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
 
@@ -25,20 +26,35 @@ pub(super) use diagnose::Context as ReportContext;
 
 pub(super) fn check(ctx: ReportContext<'_>, limits: SatisfiabilityLimits, diag: &mut Diagnostics) {
     let mut solver = SatisfiabilitySolver::checking(ctx.grammar, ctx.model, limits);
+    let mut failed = Vec::new();
+    for pattern in ctx.model.definitions() {
+        match solver.possible(pattern) {
+            Ok(true) => {}
+            Ok(false) => failed.push(pattern),
+            Err(AnalysisLimit) => {
+                if let Some(&impossible) = failed.first() {
+                    diagnose::report_unexplained(ctx, impossible, diag);
+                    return;
+                }
+
+                diagnose::report_too_complex(&ctx.model.pattern(pattern).origin, diag);
+                return;
+            }
+        }
+    }
+
+    solver.begin_diagnostics(limits.work_budget);
     let mut reporter = Reporter {
         ctx,
         solver: &mut solver,
         diag,
-        diagnostic_budget: limits.work_budget,
         reported: diagnose::ReportedCulprits::default(),
     };
-
-    for pattern in ctx.model.definitions() {
+    for pattern in failed {
         match reporter.walk(pattern) {
-            Ok(WalkOutcome::Continue) => {}
-            Ok(WalkOutcome::Stop) => return,
+            Ok(()) => {}
             Err(AnalysisLimit) => {
-                diagnose::report_too_complex(&ctx.model.pattern(pattern).origin, reporter.diag);
+                diagnose::report_unexplained(ctx, pattern, reporter.diag);
                 return;
             }
         }
@@ -49,35 +65,13 @@ struct Reporter<'a, 'q> {
     ctx: ReportContext<'q>,
     solver: &'a mut SatisfiabilitySolver<'q>,
     diag: &'a mut Diagnostics,
-    diagnostic_budget: u64,
     reported: diagnose::ReportedCulprits,
 }
 
-enum WalkOutcome {
-    Continue,
-    Stop,
-}
-
-impl WalkOutcome {
-    fn should_stop(&self) -> bool {
-        matches!(self, Self::Stop)
-    }
-}
-
-impl From<diagnose::ReportOutcome> for WalkOutcome {
-    fn from(outcome: diagnose::ReportOutcome) -> Self {
-        if outcome.should_stop() {
-            Self::Stop
-        } else {
-            Self::Continue
-        }
-    }
-}
-
 impl Reporter<'_, '_> {
-    fn walk(&mut self, pattern: PatternId) -> Result<WalkOutcome, AnalysisLimit> {
+    fn walk(&mut self, pattern: PatternId) -> Result<(), AnalysisLimit> {
         if self.solver.possible(pattern)? {
-            return Ok(WalkOutcome::Continue);
+            return Ok(());
         }
 
         let ctx = self.ctx;
@@ -90,15 +84,7 @@ impl Reporter<'_, '_> {
                 }
                 let goal = Goal::from_pattern(ctx.model, pattern)
                     .expect("an impossible node has a concrete or wildcard goal");
-                diagnose::report_goal(
-                    ctx,
-                    self.solver,
-                    goal,
-                    self.diag,
-                    &mut self.diagnostic_budget,
-                    &mut self.reported,
-                )
-                .map(Into::into)
+                diagnose::report_goal(ctx, self.solver, goal, self.diag, &mut self.reported)
             }
             PatternKind::Alternative(alternatives) => {
                 self.walk_children(alternatives.iter().copied())
@@ -108,21 +94,18 @@ impl Reporter<'_, '_> {
                 self.walk_children(items.iter().map(|item| item.pattern))
             }
             // Definitions are checked in their own right in declaration order.
-            PatternKind::Reference(_) | PatternKind::Leaf(_) => Ok(WalkOutcome::Continue),
+            PatternKind::Reference(_) | PatternKind::Leaf(_) => Ok(()),
         }
     }
 
     fn walk_children(
         &mut self,
         children: impl Iterator<Item = PatternId>,
-    ) -> Result<WalkOutcome, AnalysisLimit> {
+    ) -> Result<(), AnalysisLimit> {
         for child in children {
-            let outcome = self.walk(child)?;
-            if outcome.should_stop() {
-                return Ok(outcome);
-            }
+            self.walk(child)?;
         }
-        Ok(WalkOutcome::Continue)
+        Ok(())
     }
 
     fn dead_alternation_child(
@@ -181,25 +164,26 @@ impl Goal {
 }
 
 fn collect_goals(pattern: PatternId, model: &Model, out: &mut Vec<Goal>) {
-    match &model.pattern(pattern).kind {
-        PatternKind::Node(_) => {
-            if let Some(goal) = Goal::from_pattern(model, pattern) {
-                out.push(goal);
-            }
+    let mut pending = vec![pattern];
+    let mut visited = std::collections::HashSet::new();
+    while let Some(pattern) = pending.pop() {
+        if !visited.insert(pattern) {
+            continue;
         }
-        PatternKind::Field(_, inner) => collect_goals(*inner, model, out),
-        PatternKind::Sequence(items) => {
-            for item in items {
-                collect_goals(item.pattern, model, out);
+
+        match &model.pattern(pattern).kind {
+            PatternKind::Node(_) => {
+                if let Some(goal) = Goal::from_pattern(model, pattern) {
+                    out.push(goal);
+                }
             }
-        }
-        PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => collect_goals(*inner, model, out),
-        PatternKind::Repeat(_, _) | PatternKind::Alternative(_) => {}
-        PatternKind::Reference(definition) => {
-            if let Some(goal) = Goal::from_pattern(model, model.definition(*definition)) {
-                out.push(goal);
+            PatternKind::Field(_, inner)
+            | PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => pending.push(*inner),
+            PatternKind::Sequence(items) => {
+                pending.extend(items.iter().rev().map(|item| item.pattern))
             }
+            PatternKind::Reference(definition) => pending.push(model.definition(*definition)),
+            PatternKind::Repeat(_, _) | PatternKind::Alternative(_) | PatternKind::Leaf(_) => {}
         }
-        PatternKind::Leaf(_) => {}
     }
 }

@@ -13,13 +13,15 @@ rules:
       - {type: STRING, value: "]"}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), this child cannot appear first in `list` because a `list` begins with `"["`
- --> query.ptk:1:6
+error: the leading exact anchor (`.!`) prevents these children from matching `list`
+ --> query.ptk:2:3
   |
 1 | Q = (list
-  |      ^^^^
+  |      ---- inside `list`
+2 |   .!
+  |   ^^
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(list
-        .
-        (id)*
-      )`
+help: remove this anchor to allow these child patterns
+  |
+2 -   .!
+  |

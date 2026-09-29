@@ -11,13 +11,16 @@ rules:
       - {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), this child cannot appear first in `func` because a `func` begins with `"fn"`
- --> query.ptk:1:6
+error: the leading exact anchor (`.!`) prevents these children from matching `func`
+ --> query.ptk:2:3
   |
 1 | Q = (func
-  |      ^^^^
+  |      ---- inside `func`
+2 |   .!
+  |   ^^
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(func
-        .
-        {(id)}
-      )`
+help: remove this anchor to allow these child patterns
+  |
+2 -   .!
+  |
+help: `func` allows `"fn" id`

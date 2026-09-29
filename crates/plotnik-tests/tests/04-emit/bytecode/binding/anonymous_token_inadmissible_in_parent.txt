@@ -12,10 +12,12 @@ rules:
       - {type: STRING, value: "["}
       - {type: STRING, value: "]"}
 ------------------ DIAGNOSTICS -------------------
-error: the grammar builds no `list` with these children
- --> query.ptk:1:6
+error: `list` cannot contain a `";"` child
+ --> query.ptk:1:11
   |
 1 | Q = (list ";")
-  |      ^^^^
+  |      ---- ^^^
+  |      |
+  |      inside `list`
   |
-help: `list` takes no named children
+help: `list` allows `"[" "]"`

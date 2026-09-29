@@ -25,5 +25,3 @@ error: the grammar places `key:` before `value:` in `pair`
   |   ^^^^^^^^^^
 3 |   key: (_)
   |   -------- `key:` must come before `value:`
-  |
-help: write `key:` before `value:`

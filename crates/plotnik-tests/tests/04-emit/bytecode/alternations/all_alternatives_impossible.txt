@@ -6,18 +6,29 @@ Q = [
   )
 ]
 ------------------ DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), the first child of `function_declaration` must be `identifier`, but `function_declaration` begins with `"async"` or `"function"`
- --> query.ptk:2:4
+error: the leading exact anchor (`.!`) prevents these children from matching `function_declaration`
+ --> query.ptk:2:25
   |
 2 |   (function_declaration .! (identifier))
-  |    ^^^^^^^^^^^^^^^^^^^^
+  |    -------------------- ^^
+  |    |
+  |    inside `function_declaration`
   |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(function_declaration . (identifier))`
+help: remove this anchor to allow these child patterns
+  |
+2 -   (function_declaration .! (identifier))
+2 +   (function_declaration  (identifier))
+  |
+help: `function_declaration` allows `"async" "function" name: identifier parameters: formal_parameters body: statement_block` or `"function" name: identifier parameters: formal_parameters body: statement_block` (apart from extras)
 
-error: a `binary_expression` has one `left`, but this pattern binds `left` 2 times
- --> query.ptk:3:4
+error: a `binary_expression` has at most one `left`, but this pattern requires it at least 2 times
+ --> query.ptk:5:5
   |
 3 |   (binary_expression
-  |    ^^^^^^^^^^^^^^^^^
+  |    ----------------- inside `binary_expression`
+4 |     left: (_)
+  |     --------- first `left:` child
+5 |     left: (_)
+  |     ^^^^^^^^^
   |
-help: keep a single `left:` child
+help: use one `left:` pattern for this single-valued field

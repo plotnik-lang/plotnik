@@ -1,0 +1,22 @@
+Q = (quoted close: (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  quoted:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - type: FIELD
+        name: close
+        content: {type: STRING, value: '"'}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `id` is not valid for grammar field `close` of `quoted`
+ --> query.ptk:1:21
+  |
+1 | Q = (quoted close: (id))
+  |      ------ -----   ^^
+  |      |      |
+  |      |      grammar field `close`
+  |      `quoted` starts here
+  |
+help: `close` accepts only literal tokens. Write `close: "\""`

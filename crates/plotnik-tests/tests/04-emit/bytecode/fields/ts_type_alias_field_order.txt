@@ -13,5 +13,3 @@ error: the grammar places `name:` before `type_parameters:` in `type_alias_decla
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 3 |   name: (type_identifier) @name
   |   ----------------------------- `name:` must come before `type_parameters:`
-  |
-help: write `name:` before `type_parameters:`

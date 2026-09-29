@@ -16,7 +16,7 @@ rules:
 --------------- QUERY (value.ptk) ----------------
 Value = (id)
 ------------------ DIAGNOSTICS -------------------
-error: `id` cannot be an unlabeled child of `ret`
+error: `id` cannot be a child of `ret`
  --> value.ptk:1:10
   |
 1 | Value = (id)
@@ -27,4 +27,4 @@ error: `id` cannot be an unlabeled child of `ret`
 3 |   (ret (Value))
   |    --- `ret` starts here
   |
-help: valid children of `ret`: `num`
+help: named child kinds of `ret`: `num`

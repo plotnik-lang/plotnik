@@ -1,0 +1,26 @@
+Q = (param
+  name: (id)?
+  name: (id)?
+  (id)
+  (id)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `param` has at most 1 `id` child, but this pattern requires 2
+ --> query.ptk:5:3
+  |
+1 | Q = (param
+  |      ----- inside `param`
+...
+4 |   (id)
+  |   ---- also requires `id`
+5 |   (id)
+  |   ^^^^
+  |
+help: `param` allows `name: id`

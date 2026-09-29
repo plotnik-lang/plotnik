@@ -24,7 +24,6 @@ use std::sync::Arc;
 
 use indexmap::IndexSet;
 
-use crate::compiler::analyze::anchors::GapClass;
 use crate::compiler::limits::SatisfiabilityLimits;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
@@ -100,11 +99,22 @@ fn field_ok(want: Option<NodeFieldId>, have: Option<NodeFieldId>) -> bool {
     want.is_none() || want == have
 }
 
-type SatKey = (PatternId, NodeRealizer);
+/// Primary automata occupy their pattern's slot. A diagnostic probe appends its
+/// own automaton, so recursive edges still target the unchanged primary slots.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct AutomatonId(usize);
+
+impl From<PatternId> for AutomatonId {
+    fn from(pattern: PatternId) -> Self {
+        Self(pattern.index())
+    }
+}
+
+type SatKey = (AutomatonId, NodeRealizer);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct ThreadKey {
-    pattern: PatternId,
+    pattern: AutomatonId,
     hidden_var: VarId,
     input: Configuration,
     /// Part of the key: the same frontier entered under different labels admits
@@ -114,14 +124,14 @@ struct ThreadKey {
 
 struct ProductionThread<'f, 'q> {
     frozen: &'f Frozen<'q>,
-    pattern: PatternId,
+    pattern: AutomatonId,
     inherited_field: Option<NodeFieldId>,
 }
 
 impl<'f, 'q> ProductionThread<'f, 'q> {
     fn new(
         frozen: &'f Frozen<'q>,
-        pattern: PatternId,
+        pattern: AutomatonId,
         inherited_field: Option<NodeFieldId>,
     ) -> Self {
         Self {
@@ -168,14 +178,13 @@ struct Frozen<'a> {
     model: &'a Model,
     automata: Vec<Option<ChildAutomaton>>,
     facts: Arc<GrammarFacts>,
-    relaxed_pattern: Option<PatternId>,
     /// Native-recursion ceiling for automaton construction while inlining references.
     automaton_max_depth: u32,
 }
 
 impl<'a> Frozen<'a> {
-    fn automaton(&self, p: PatternId) -> &ChildAutomaton {
-        self.automata[p.index()]
+    fn automaton(&self, p: AutomatonId) -> &ChildAutomaton {
+        self.automata[p.0]
             .as_ref()
             .expect("solver only reads completed automata")
     }
@@ -191,13 +200,11 @@ impl<'a> Frozen<'a> {
         self.facts.realizers_of(kind)
     }
 
-    fn configuration(&self, pattern: PatternId, state: State) -> Configuration {
-        let gap = if self.relaxed_pattern == Some(pattern) {
-            GapClass::Any
-        } else {
-            self.automaton(pattern).gap(state)
-        };
-        Configuration { state, gap }
+    fn configuration(&self, pattern: AutomatonId, state: State) -> Configuration {
+        Configuration {
+            state,
+            gap: self.automaton(pattern).gap(state),
+        }
     }
 
     /// Whether a child-position kind constraint admits visible grammar kind `k`.
@@ -235,71 +242,6 @@ impl<'a> Frozen<'a> {
         self.facts
             .any_extra_admitted_by(self.grammar, constraint, predicate)
     }
-
-    /// The kinds that can be the first (or last) child of a node of `kind`: the
-    /// leading (trailing) visible step of each production, descending through hidden
-    /// frontiers. Best-effort for diagnostics — it may under-list past a nullable
-    /// hidden rule, so messages phrase it positively ("begins with …"), never "never".
-    fn edge_child_kinds(&self, kind: NodeKindId, edge: Edge) -> Vec<NodeKindId> {
-        let mut out = Vec::new();
-        let mut visited = HashSet::new();
-        for &realizer in self.realizers_of(kind) {
-            if let NodeRealizer::Var(var) = realizer {
-                self.edge_kinds_of_var(var, edge, &mut out, &mut visited);
-            }
-        }
-        out.sort_unstable();
-        out.dedup();
-        out
-    }
-
-    fn edge_kinds_of_var(
-        &self,
-        var: VarId,
-        edge: Edge,
-        out: &mut Vec<NodeKindId>,
-        visited: &mut HashSet<VarId>,
-    ) {
-        if !visited.insert(var) {
-            return;
-        }
-        for production in &self.variable(var).productions {
-            match edge {
-                Edge::First => self.edge_kinds_of_steps(production.iter(), edge, out, visited),
-                Edge::Last => self.edge_kinds_of_steps(production.iter().rev(), edge, out, visited),
-            }
-        }
-    }
-
-    fn edge_kinds_of_steps<'s>(
-        &self,
-        steps: impl Iterator<Item = &'s SkeletonStep>,
-        edge: Edge,
-        out: &mut Vec<NodeKindId>,
-        visited: &mut HashSet<VarId>,
-    ) {
-        for step in steps {
-            match StepClass::of(step, self.grammar) {
-                StepClass::Visible(visible) => {
-                    out.push(visible.kind);
-                    break;
-                }
-                StepClass::HiddenSubtree(hidden) => {
-                    self.edge_kinds_of_var(hidden.var, edge, out, visited);
-                    break;
-                }
-                // A hidden token surfaces nothing — the edge child is further along.
-                StepClass::HiddenLeaf => {}
-            }
-        }
-    }
-}
-
-/// Which end of a node's child sequence [`Frozen::edge_child_kinds`] asks about.
-#[derive(Clone, Copy)]
-enum Edge {
-    First,
-    Last,
 }
 
 /// Default ceiling on satisfiability work before the query is declared too complex.
@@ -341,37 +283,68 @@ impl<'a> SatisfiabilitySolver<'a> {
         model: &'a Model,
         limits: SatisfiabilityLimits,
     ) -> Self {
-        Self::with_anchor_relaxation(
+        Self::new(
             grammar,
             model,
-            None,
             limits,
             Arc::new(GrammarFacts::from_grammar(grammar)),
         )
     }
 
-    pub(super) fn relaxing_anchors(&self, pattern: PatternId, work_budget: u64) -> Self {
+    /// All primary verdicts are complete before diagnostic work starts. Retain
+    /// their caches, but charge refinement to a separate budget.
+    pub(super) fn begin_diagnostics(&mut self, work_budget: u64) {
+        self.solve.budget = work_budget;
+        self.solve.work_used = 0;
+    }
+
+    pub(super) fn automaton(&self, pattern: PatternId) -> &ChildAutomaton {
+        self.frozen.automaton(pattern.into())
+    }
+
+    pub(super) fn child_shapes(&self, kind: NodeKindId) -> Option<Vec<Vec<super::shapes::Child>>> {
+        super::shapes::children(self.frozen.grammar, self.frozen.realizers_of(kind))
+    }
+
+    /// Replace only this node's child automaton. Nested nodes keep their original
+    /// constraints, including when the same definition occurs in both positions.
+    pub(super) fn probe(
+        &mut self,
+        kind: NodeKindId,
+        automaton: ChildAutomaton,
+    ) -> Result<bool, AnalysisLimit> {
+        let budget = self.remaining_budget();
         let limits = SatisfiabilityLimits {
             automaton_max_depth: self.frozen.automaton_max_depth,
-            work_budget,
+            work_budget: budget,
         };
-        Self::with_anchor_relaxation(
+        let mut probe = Self::new(
             self.frozen.grammar,
             self.frozen.model,
-            Some(pattern),
             limits,
             Arc::clone(&self.frozen.facts),
-        )
+        );
+        let result = (|| {
+            probe.solve.spend(automaton.state_count() as u64)?;
+            let nested: Vec<_> = automaton.nested_patterns().collect();
+            let root = AutomatonId(probe.frozen.automata.len());
+            probe.frozen.automata.push(Some(automaton));
+            for child in nested {
+                probe.build_pending(child)?;
+            }
+            probe.solve_automaton(root, kind)
+        })();
+        self.solve.spend(budget - probe.remaining_budget())?;
+        result
     }
 
     pub(super) fn remaining_budget(&self) -> u64 {
         self.solve.remaining_budget()
     }
 
-    fn with_anchor_relaxation(
+    fn new(
         grammar: &'a Grammar,
         model: &'a Model,
-        relaxed_pattern: Option<PatternId>,
         limits: SatisfiabilityLimits,
         facts: Arc<GrammarFacts>,
     ) -> Self {
@@ -382,7 +355,6 @@ impl<'a> SatisfiabilitySolver<'a> {
                 model,
                 automata: std::iter::repeat_with(|| None).take(model.len()).collect(),
                 facts,
-                relaxed_pattern,
                 automaton_max_depth: limits.automaton_max_depth,
             },
             solve: Solve {
@@ -404,6 +376,14 @@ impl<'a> SatisfiabilitySolver<'a> {
         }
 
         self.build_pending(pattern)?;
+        self.solve_automaton(pattern.into(), kind)
+    }
+
+    fn solve_automaton(
+        &mut self,
+        pattern: AutomatonId,
+        kind: NodeKindId,
+    ) -> Result<bool, AnalysisLimit> {
         let realizer_count = self.frozen.realizers_of(kind).len();
         if realizer_count == 0 {
             return Ok(true);
@@ -543,16 +523,6 @@ impl<'a> SatisfiabilitySolver<'a> {
             }
         }
         Ok(())
-    }
-
-    /// The kinds a node of `kind` can begin with — for a leading-anchor diagnostic.
-    pub(super) fn first_child_kinds(&self, kind: NodeKindId) -> Vec<NodeKindId> {
-        self.frozen.edge_child_kinds(kind, Edge::First)
-    }
-
-    /// The kinds a node of `kind` can end with — for a trailing-anchor diagnostic.
-    pub(super) fn last_child_kinds(&self, kind: NodeKindId) -> Vec<NodeKindId> {
-        self.frozen.edge_child_kinds(kind, Edge::Last)
     }
 }
 
@@ -806,7 +776,7 @@ impl Solve {
     fn child_sat(&mut self, matcher: &ChildMatcher, realizer: NodeRealizer) -> bool {
         match matcher.nested_pattern {
             None => true,
-            Some(nested_pattern) => self.get_sat((nested_pattern, realizer)),
+            Some(nested_pattern) => self.get_sat((nested_pattern.into(), realizer)),
         }
     }
 
@@ -893,7 +863,7 @@ impl Solve {
                 .realizers_of(extra)
                 .iter()
                 .copied()
-                .any(|realizer| self.get_sat((nested_pattern, realizer)))
+                .any(|realizer| self.get_sat((nested_pattern.into(), realizer)))
         })
     }
 }

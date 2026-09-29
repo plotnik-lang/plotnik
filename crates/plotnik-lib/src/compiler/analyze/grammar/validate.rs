@@ -171,12 +171,18 @@ impl GrammarBinder<'_, '_> {
         } else {
             DiagnosticKind::BareSupertype
         };
-        let subtypes = self
+        let mut subtypes = self
             .grammar
-            .subtypes(id)
-            .iter()
-            .filter_map(|&sub| self.grammar.node_kind(sub))
+            .collect_subtypes(id)
+            .into_iter()
+            .filter(|&sub| !self.grammar.is_supertype(sub))
+            .map(|sub| {
+                self.grammar
+                    .node_kind(sub)
+                    .expect("resolved subtype has a name")
+            })
             .collect::<Vec<_>>();
+        subtypes.sort_unstable();
         let mut builder = self.diag.report(kind, span).detail(name.as_str());
         if !subtypes.is_empty() {
             if subtypes.len() <= 8 {
@@ -186,7 +192,7 @@ impl GrammarBinder<'_, '_> {
                     .collect::<Vec<_>>()
                     .join(" ");
                 builder = builder.hint(format!(
-                    "replace `{name}` with an exhaustive alternation of its concrete subtypes: `[{alternatives}]`"
+                    "match concrete subtypes with an alternation: `[{alternatives}]`"
                 ));
             } else {
                 builder = builder.hint(format!(

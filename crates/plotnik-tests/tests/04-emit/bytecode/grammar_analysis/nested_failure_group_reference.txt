@@ -1,0 +1,28 @@
+Q = (list (Entries))
+-------------------- GRAMMAR ---------------------
+rules:
+  list: {type: SYMBOL, name: pair}
+  pair:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+-------------- QUERY (entries.ptk) ---------------
+Entries = {
+  (pair
+    (num)
+    (id)
+  )
+}
+------------------ DIAGNOSTICS -------------------
+error: the grammar places `id` before `num` in `pair`
+ --> entries.ptk:3:5
+  |
+2 |   (pair
+  |    ---- inside `pair`
+3 |     (num)
+  |     ^^^^^
+4 |     (id)
+  |     ---- `id` must come before `num`

@@ -1,0 +1,34 @@
+Q = (pair
+  .!
+  (id)
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: CHOICE
+    members:
+      - type: SEQ
+        members:
+          - {type: SYMBOL, name: id}
+          - {type: SYMBOL, name: num}
+      - type: SEQ
+        members:
+          - {type: SYMBOL, name: num}
+          - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: the leading exact anchor (`.!`) prevents these children from matching `pair`
+ --> query.ptk:2:3
+  |
+1 | Q = (pair
+  |      ---- inside `pair`
+2 |   .!
+  |   ^^
+  |
+help: remove this anchor to allow these child patterns
+  |
+2 -   .!
+  |
+help: `pair` allows `id num` or `num id`

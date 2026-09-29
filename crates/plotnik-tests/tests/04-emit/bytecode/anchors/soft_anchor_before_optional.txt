@@ -18,10 +18,16 @@ rules:
       - {type: STRING, value: "]"}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: after the soft anchor (`.`), this child cannot appear first in `list` because a `list` begins with `"["`
- --> query.ptk:1:6
+error: the leading soft anchor (`.`) prevents these children from matching `list`
+ --> query.ptk:2:3
   |
 1 | Q = (list
-  |      ^^^^
+  |      ---- inside `list`
+2 |   .
+  |   ^
   |
-help: here `.` skips extras only because one side can match an anonymous token. Use `(_)` for a named node, or drop the anchor to match these children in any positions
+help: remove this anchor to allow these child patterns
+  |
+2 -   .
+  |
+help: `list` allows `"[" id "]"`

@@ -1,0 +1,32 @@
+Q = (list
+  .!
+  (pair
+    (num)
+    (id)
+  )
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: SYMBOL, name: pair}
+      - {type: STRING, value: "]"}
+  pair:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: the grammar places `id` before `num` in `pair`
+ --> query.ptk:4:5
+  |
+3 |   (pair
+  |    ---- inside `pair`
+4 |     (num)
+  |     ^^^^^
+5 |     (id)
+  |     ---- `id` must come before `num`

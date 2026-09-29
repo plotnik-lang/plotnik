@@ -84,8 +84,6 @@ impl<'q> GrammarBindInput<'_, 'q> {
         super::satisfiability::check(
             super::satisfiability::ReportContext {
                 grammar,
-                pattern_facts,
-                source_map,
                 model: &model,
             },
             satisfiability_limits,

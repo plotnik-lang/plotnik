@@ -1,0 +1,29 @@
+Q = (param value: (num))
+-------------------- GRAMMAR ---------------------
+rules:
+  program:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: param}
+      - {type: SYMBOL, name: num}
+  param:
+    type: FIELD
+    name: value
+    content:
+      type: CHOICE
+      members:
+        - {type: SYMBOL, name: id}
+        - {type: STRING, value: "nil"}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `num` is not valid for grammar field `value` of `param`
+ --> query.ptk:1:20
+  |
+1 | Q = (param value: (num))
+  |      ----- -----   ^^^
+  |      |     |
+  |      |     grammar field `value`
+  |      `param` starts here
+  |
+help: `value` accepts: `id`, `"nil"`

@@ -13,5 +13,3 @@ error: the grammar places `"["` before `"]"` in `list_literal`
   |   ^^^
 3 |   "["
   |   --- `"["` must come before `"]"`
-  |
-help: write `"["` before `"]"`

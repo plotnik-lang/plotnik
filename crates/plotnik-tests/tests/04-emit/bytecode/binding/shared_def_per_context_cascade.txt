@@ -29,7 +29,7 @@ error: `identifier` is not valid for grammar field `arguments` of `call_expressi
   |
 help: `arguments` accepts: `arguments`, `template_string`
 
-error: `call_expression` cannot be an unlabeled child of `statement_block`
+error: `call_expression` cannot be a child of `statement_block`
  --> query.ptk:4:4
   |
 3 | Q = (statement_block
@@ -37,9 +37,9 @@ error: `call_expression` cannot be an unlabeled child of `statement_block`
 4 |   (call_expression (Args))
   |    ^^^^^^^^^^^^^^^
   |
-help: valid children of `statement_block`: `statement`
+help: named child kinds of `statement_block`: `break_statement`, `class_declaration`, `comment`, `continue_statement`, `debugger_statement`, `do_statement`, `empty_statement`, `export_statement`, … (19 more)
 
-error: `binary_expression` cannot be an unlabeled child of `statement_block`
+error: `binary_expression` cannot be a child of `statement_block`
  --> query.ptk:5:4
   |
 3 | Q = (statement_block
@@ -48,4 +48,4 @@ error: `binary_expression` cannot be an unlabeled child of `statement_block`
 5 |   (binary_expression (Args))
   |    ^^^^^^^^^^^^^^^^^
   |
-help: valid children of `statement_block`: `statement`
+help: named child kinds of `statement_block`: `break_statement`, `class_declaration`, `comment`, `continue_statement`, `debugger_statement`, `do_statement`, `empty_statement`, `export_statement`, … (19 more)

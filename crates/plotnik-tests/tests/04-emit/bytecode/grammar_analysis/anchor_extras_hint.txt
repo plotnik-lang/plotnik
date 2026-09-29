@@ -1,0 +1,28 @@
+Q = (call .! (args))
+-------------------- GRAMMAR ---------------------
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: args}
+  args: {type: STRING, value: "()"}
+  id: {type: PATTERN, value: "[a-z]+"}
+  comment: {type: PATTERN, value: "//[^\n]*"}
+------------------ DIAGNOSTICS -------------------
+error: the leading exact anchor (`.!`) prevents these children from matching `call`
+ --> query.ptk:1:11
+  |
+1 | Q = (call .! (args))
+  |      ---- ^^
+  |      |
+  |      inside `call`
+  |
+help: remove this anchor to allow these child patterns
+  |
+1 - Q = (call .! (args))
+1 + Q = (call  (args))
+  |
+help: `call` allows `id args` (apart from extras)
