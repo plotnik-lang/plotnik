@@ -1,0 +1,22 @@
+Q = (quoted
+  (id)
+  '"'
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  quoted:
+    type: SEQ
+    members:
+      - {type: STRING, value: '"'}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: the grammar places `"\""` before `id` in `quoted`
+ --> query.ptk:2:3
+  |
+1 | Q = (quoted
+  |      ------ inside `quoted`
+2 |   (id)
+  |   ^^^^
+3 |   '"'
+  |   --- `"\""` must come before `id`

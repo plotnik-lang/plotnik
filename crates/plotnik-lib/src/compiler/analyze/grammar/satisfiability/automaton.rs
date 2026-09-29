@@ -139,6 +139,17 @@ impl ChildAutomaton {
         }
     }
 
+    pub(super) fn child(matcher: ChildMatcher) -> Self {
+        let mut states = vec![StateData::new(), StateData::new()];
+        states[0].pattern_edges.push((matcher, 1));
+        Self {
+            states,
+            start: 0,
+            accept: 1,
+            negated_fields: Vec::new(),
+        }
+    }
+
     pub(super) fn start(&self) -> State {
         self.start
     }
@@ -212,8 +223,12 @@ const STATE_CAP: usize = 20_000;
 
 impl Builder<'_> {
     fn new_state(&mut self) -> Result<State, AnalysisLimit> {
-        if self.states.len() >= STATE_CAP || self.states.len() as u64 >= self.state_budget {
-            return Err(AnalysisLimit);
+        if self.states.len() >= STATE_CAP {
+            return Err(AnalysisLimit::AutomatonStates);
+        }
+
+        if self.states.len() as u64 >= self.state_budget {
+            return Err(AnalysisLimit::WorkBudget);
         }
 
         let id = self.states.len() as State;
@@ -247,7 +262,7 @@ impl Builder<'_> {
         from: State,
     ) -> Result<State, AnalysisLimit> {
         if self.depth >= self.max_depth {
-            return Err(AnalysisLimit);
+            return Err(AnalysisLimit::ConstructionDepth);
         }
 
         self.depth += 1;

@@ -9,10 +9,10 @@ rules:
 # The child automaton fits. Solving the repeating grammar exhausts this budget.
 work_budget: 10
 ------------------ DIAGNOSTICS -------------------
-error: query too complex to compile
+error: grammar analysis exhausted its work budget
  --> query.ptk:1:5
   |
 1 | Q = (args (id))
   |     ^^^^^^^^^^^
   |
-help: simplify the pattern. Deeply nested or repeatedly referenced alternations can expand exponentially
+help: reduce the child constraints or increase the grammar-analysis work budget

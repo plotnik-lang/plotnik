@@ -1,0 +1,52 @@
+Q = (pair .! (term))
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - type: ALIAS
+        named: true
+        value: term
+        content: {type: SYMBOL, name: binding}
+      - type: ALIAS
+        named: true
+        value: term
+        content: {type: SYMBOL, name: id}
+  binding:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (pair)                            5
+  4  ─‣┘  _                                 1
+  5  └─!  (term)                            4
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "pair"
+S2 "term"
+S3 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (pair)                            1
+  1  └─!  (term)                            2
+  2  ─‣┘  _                                 3
+  3                                         ▶

@@ -226,7 +226,7 @@ impl Builder<'_> {
                         let token = field.name().expect("validated field has a name");
                         NegatedField {
                             id: self.field(token.text()),
-                            span: Span::new(source, token.text_range()),
+                            span: Span::new(source, field.syntax().text_range()),
                         }
                     })
                     .collect();

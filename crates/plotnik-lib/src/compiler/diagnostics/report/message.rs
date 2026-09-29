@@ -486,7 +486,7 @@ impl DiagnosticKind {
             Self::ChildUnderLeafToken => "`{}` is a leaf token and has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
             // The detail, when present, is the crafted message; bare emits use the summary.
-            Self::UnsatisfiablePattern => "{}".to_string(),
+            Self::UnsatisfiablePattern | Self::QueryTooComplex => "{}".to_string(),
             Self::MixedAlternativeLabels => {
                 "an alternation cannot mix labeled and unlabeled alternatives: {}".to_string()
             }

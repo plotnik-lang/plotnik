@@ -11,6 +11,7 @@ use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern};
 use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKindId};
 
+use super::super::format::format_kind;
 use super::super::model::{Item, KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
 use super::automaton::{ChildAutomaton, ChildMatcher};
@@ -36,9 +37,9 @@ impl ReportedCulprits {
 }
 
 /// Emit the impossibility diagnostic for a failed root goal.
-pub(super) fn report_goal(
-    ctx: Context<'_>,
-    solver: &mut SatisfiabilitySolver,
+pub(super) fn report_goal<'q>(
+    ctx: Context<'q>,
+    solver: &mut SatisfiabilitySolver<'q>,
     goal: Goal,
     diag: &mut Diagnostics,
     reported: &mut ReportedCulprits,
@@ -46,10 +47,11 @@ pub(super) fn report_goal(
     if super::local::LocalDiagnostics::report(
         ctx.grammar,
         ctx.model,
+        solver,
         goal.pattern(),
         diag,
         &mut reported.nodes,
-    ) {
+    )? {
         return Ok(());
     }
 
@@ -68,8 +70,8 @@ fn report_culprit(
 ) -> Result<(), AnalysisLimit> {
     let culprit = match ConcreteCulprit::from_goal(ctx.model, culprit) {
         Ok(culprit) => culprit,
-        Err(node) => {
-            emit_wildcard_failure(&node, diag);
+        Err(pattern) => {
+            emit_wildcard_failure(ctx.model, pattern, diag);
             return Ok(());
         }
     };
@@ -108,10 +110,10 @@ impl ConcreteCulprit {
         }
     }
 
-    fn from_goal(model: &Model, goal: Goal) -> Result<Self, Located<NamedNodePattern>> {
+    fn from_goal(model: &Model, goal: Goal) -> Result<Self, PatternId> {
         match goal {
             Goal::Concrete { pattern, kind } => Ok(Self::new(model, pattern, kind)),
-            Goal::Wildcard { pattern } => Err(model.node_origin(pattern)),
+            Goal::Wildcard { pattern } => Err(pattern),
         }
     }
 
@@ -127,10 +129,10 @@ impl ConcreteCulprit {
 /// Emit an impossible wildcard parent `(_ …)`: no kind the grammar builds takes the
 /// children it constrains. A wildcard fixes no kind of its own, so there is no single
 /// node to blame — the obstacle is that no production anywhere realizes this child list.
-fn emit_wildcard_failure(node: &Located<NamedNodePattern>, diag: &mut Diagnostics) {
+fn emit_wildcard_failure(model: &Model, pattern: PatternId, diag: &mut Diagnostics) {
     diag.report(
         DiagnosticKind::UnsatisfiablePattern,
-        node_children_span(node),
+        constraints_span(model, pattern),
     )
     .detail("no named node in the grammar satisfies these child constraints".to_string())
     .emit();
@@ -141,16 +143,29 @@ fn emit_wildcard_failure(node: &Located<NamedNodePattern>, diag: &mut Diagnostic
 /// reference. This is a resource limit, *not* an impossibility claim: the query may be
 /// perfectly valid, just larger than the compiler will spend on it. We point at the
 /// definition under analysis when the ceiling tripped.
-pub(super) fn report_too_complex(body: &Located<Pattern>, diag: &mut Diagnostics) {
+pub(super) fn report_too_complex(
+    body: &Located<Pattern>,
+    limit: AnalysisLimit,
+    diag: &mut Diagnostics,
+) {
     let span = Span::new(body.source(), body.node().syntax().text_range());
-    emit_too_complex(span, diag);
-}
-
-fn emit_too_complex(span: Span, diag: &mut Diagnostics) {
+    let (reason, hint) = match limit {
+        AnalysisLimit::ConstructionDepth => (
+            "grammar analysis exceeded its pattern construction depth limit",
+            "reduce nesting in child patterns and definition references",
+        ),
+        AnalysisLimit::AutomatonStates => (
+            "grammar analysis exceeded its expanded child-pattern size limit",
+            "simplify groups or definitions that duplicate sibling patterns",
+        ),
+        AnalysisLimit::WorkBudget => (
+            "grammar analysis exhausted its work budget",
+            "reduce the child constraints or increase the grammar-analysis work budget",
+        ),
+    };
     diag.report(DiagnosticKind::QueryTooComplex, span)
-        .hint(
-            "simplify the pattern. Deeply nested or repeatedly referenced alternations can expand exponentially",
-        )
+        .detail(reason)
+        .hint(hint)
         .emit();
 }
 
@@ -243,10 +258,14 @@ fn report_negated_fields(
         let mut relaxed = solver.automaton(culprit.pattern).clone();
         relaxed.allow_field(field.id);
         if solver.probe(culprit.kind, relaxed)? {
+            let others = cover_spans(
+                constraint_spans(ctx.model, culprit.pattern).filter(|&other| other != span),
+            )
+            .expect("a conditional field conflict has other constraints");
             diag.report(DiagnosticKind::UnsatisfiablePattern, span)
-                .detail(format!("`-{name}` requires `{name}` to be absent, but these {kind} child constraints require it to be present"))
-                .related_to(children_span(ctx.model, culprit.pattern), "these children require the field to be present")
-                .hint(format!("drop `-{name}` to allow these child patterns"))
+                .detail(format!("`-{name}` requires `{name}` to be absent, but the remaining constraints on {kind} require it to be present"))
+                .related_to(others, "these constraints require the field to be present")
+                .hint(format!("drop `-{name}` to allow the remaining constraints"))
                 .emit();
             reported = true;
         }
@@ -321,7 +340,7 @@ fn report_anchors(
         removed.remove_anchor(*span);
         match solver.probe(culprit.kind, removed) {
             Ok(false) => continue,
-            Err(AnalysisLimit) => break,
+            Err(_) => break,
             Ok(true) => {}
         }
 
@@ -410,7 +429,7 @@ fn emit_arrangement_failure(
     let mut builder = diag
         .report(
             DiagnosticKind::UnsatisfiablePattern,
-            children_span(ctx.model, culprit.pattern),
+            constraints_span(ctx.model, culprit.pattern),
         )
         .detail(format!(
             "these child constraints cannot be satisfied together in {kind}"
@@ -502,15 +521,7 @@ fn describe_shapes(ctx: Context<'_>, kind: &str, shapes: &[Vec<Child>]) -> Strin
             let children: Vec<_> = shape
                 .iter()
                 .map(|child| {
-                    let name = ctx
-                        .grammar
-                        .node_kind(child.kind)
-                        .expect("retained kind has a name");
-                    let name = if ctx.grammar.is_anonymous_node(child.kind) {
-                        format!("{name:?}")
-                    } else {
-                        name.to_string()
-                    };
+                    let name = format_kind(ctx.grammar, child.kind);
                     match child.field {
                         Some(field) => format!(
                             "{}: {name}",
@@ -533,18 +544,27 @@ fn describe_shapes(ctx: Context<'_>, kind: &str, shapes: &[Vec<Child>]) -> Strin
     format!("{kind} allows {}{extras}", sequences.join(" or "))
 }
 
-fn children_span(model: &Model, pattern: PatternId) -> Span {
-    let origin = model.node_origin(pattern);
-    node_children_span(&origin)
+fn constraint_spans(model: &Model, pattern: PatternId) -> impl Iterator<Item = Span> + '_ {
+    let node = model.node(pattern);
+    node.children
+        .iter()
+        .map(|item| match item {
+            Item::Pattern(child) => {
+                let origin = &model.pattern(*child).origin;
+                origin.span_of(origin.node().text_range())
+            }
+            Item::Anchor(_, span) => *span,
+        })
+        .chain(node.negated_fields.iter().map(|field| field.span))
 }
 
-fn node_children_span(origin: &Located<NamedNodePattern>) -> Span {
-    let mut children = origin.node().children();
-    let Some(first) = children.next() else {
-        return kind_span(origin);
-    };
-    let last = children.last().unwrap_or_else(|| first.clone());
-    origin.span_of(first.text_range().cover(last.text_range()))
+fn cover_spans(spans: impl Iterator<Item = Span>) -> Option<Span> {
+    spans.reduce(|left, right| Span::new(left.source, left.range.cover(right.range)))
+}
+
+fn constraints_span(model: &Model, pattern: PatternId) -> Span {
+    cover_spans(constraint_spans(model, pattern))
+        .unwrap_or_else(|| kind_span(&model.node_origin(pattern)))
 }
 
 /// A nested pattern can work on some realization of its public kind and still
@@ -570,6 +590,22 @@ fn report_nested_constraints(
 
         let parent = culprit.kind_name(ctx);
         let resolved = ctx.model.node(nested);
+        if resolved.children.is_empty() && resolved.negated_fields.len() == 1 {
+            let field = resolved.negated_fields[0];
+            let name = ctx
+                .grammar
+                .field_name(field.id)
+                .expect("resolved field has a name");
+            diag.report(DiagnosticKind::UnsatisfiablePattern, field.span)
+                .detail(format!(
+                    "`-{name}` excludes the field required at this child position in {parent}"
+                ))
+                .related_to(culprit.span(), format!("inside {parent}"))
+                .hint(format!("drop `-{name}` to allow this child position"))
+                .emit();
+            return Ok(true);
+        }
+
         let childless_anchor = if resolved.negated_fields.is_empty()
             && resolved
                 .children
@@ -584,13 +620,17 @@ fn report_nested_constraints(
             None
         };
         let empty = childless_anchor.is_some();
-        let span = childless_anchor.unwrap_or_else(|| children_span(ctx.model, nested));
+        let span = childless_anchor.unwrap_or_else(|| constraints_span(ctx.model, nested));
         let detail = if empty {
             format!(
                 "this pattern requires a childless node, but this position in {parent} needs a node with children"
             )
-        } else {
+        } else if resolved.negated_fields.is_empty() {
             format!("these nested child constraints cannot be satisfied inside {parent}")
+        } else {
+            format!(
+                "these nested child or absent-field constraints cannot be satisfied inside {parent}"
+            )
         };
         let mut builder = diag
             .report(DiagnosticKind::UnsatisfiablePattern, span)
@@ -784,7 +824,7 @@ pub(super) fn report_unexplained(ctx: Context<'_>, pattern: PatternId, diag: &mu
         Some(Goal::Concrete { kind, .. }) => {
             emit_generic_failure(ctx, &ConcreteCulprit::new(ctx.model, pattern, kind), diag)
         }
-        Some(Goal::Wildcard { .. }) => emit_wildcard_failure(&ctx.model.node_origin(pattern), diag),
+        Some(Goal::Wildcard { .. }) => emit_wildcard_failure(ctx.model, pattern, diag),
         None => {
             diag.report(
                 DiagnosticKind::UnsatisfiablePattern,
@@ -822,15 +862,7 @@ fn kind_span(node: &Located<NamedNodePattern>) -> Span {
 
 /// Render one kind: a named kind in backticks, an anonymous one as a quoted literal.
 fn render_kind(ctx: Context<'_>, kind: NodeKindId) -> String {
-    let name = ctx
-        .grammar
-        .node_kind(kind)
-        .expect("resolved kind has a name");
-    if ctx.grammar.is_anonymous_node(kind) {
-        return format!("`\"{name}\"`");
-    }
-
-    format!("`{name}`")
+    format!("`{}`", format_kind(ctx.grammar, kind))
 }
 
 /// "a" or "an" for a rendered kind like `` `array` `` — chosen on the first letter

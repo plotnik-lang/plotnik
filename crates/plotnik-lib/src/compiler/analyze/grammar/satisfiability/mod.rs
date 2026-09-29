@@ -11,6 +11,7 @@ mod local;
 mod shapes;
 
 pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
+pub(super) use engine::FieldProbe;
 
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::limits::SatisfiabilityLimits;
@@ -21,7 +22,11 @@ use super::model::{KindConstraint, Model, PatternId, PatternKind};
 use engine::SatisfiabilitySolver;
 
 #[derive(Clone, Copy, Debug)]
-struct AnalysisLimit;
+pub(super) enum AnalysisLimit {
+    ConstructionDepth,
+    AutomatonStates,
+    WorkBudget,
+}
 
 pub(super) use diagnose::Context as ReportContext;
 
@@ -32,13 +37,13 @@ pub(super) fn check(ctx: ReportContext<'_>, limits: SatisfiabilityLimits, diag: 
         match solver.possible(pattern) {
             Ok(true) => {}
             Ok(false) => failed.push(pattern),
-            Err(AnalysisLimit) => {
+            Err(limit) => {
                 if let Some(&impossible) = failed.first() {
                     diagnose::report_unexplained(ctx, impossible, diag);
                     return;
                 }
 
-                diagnose::report_too_complex(&ctx.model.pattern(pattern).origin, diag);
+                diagnose::report_too_complex(&ctx.model.pattern(pattern).origin, limit, diag);
                 return;
             }
         }
@@ -54,7 +59,7 @@ pub(super) fn check(ctx: ReportContext<'_>, limits: SatisfiabilityLimits, diag: 
     for pattern in failed {
         match reporter.walk(pattern) {
             Ok(()) => {}
-            Err(AnalysisLimit) => {
+            Err(_) => {
                 diagnose::report_unexplained(ctx, pattern, reporter.diag);
                 return;
             }

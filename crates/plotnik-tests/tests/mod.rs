@@ -27,7 +27,8 @@
 //!
 //! Compiler snapshots may add `QUERY (file.ptk)` sections after the grammar/input
 //! to compile additional query files alongside the initial `query.ptk`. An optional
-//! YAML `LIMITS` section sets `work_budget` through the compiler's public API.
+//! YAML `LIMITS` section sets `work_budget` and optionally `automaton_max_depth`
+//! through the compiler's public API.
 //! `make shot` formats every query file and preserves the authored limit settings.
 //!
 //! Compile-stage snapshots under an `inspection/` folder compile with
@@ -362,11 +363,15 @@ fn render_compile(kind: SnapshotKind, parsed: &Parsed) -> Result<Vec<GeneratedSe
         #[serde(deny_unknown_fields)]
         struct Limits {
             work_budget: u64,
+            automaton_max_depth: Option<u32>,
         }
 
         let limits: Limits =
             serde_saphyr::from_str(yaml).map_err(|error| format!("invalid LIMITS: {error}"))?;
         builder = builder.with_satisfiability_work_budget(limits.work_budget);
+        if let Some(depth) = limits.automaton_max_depth {
+            builder = builder.with_satisfiability_automaton_max_depth(depth);
+        }
     }
     let compiled = builder
         .compile(lang.grammar())

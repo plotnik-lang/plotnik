@@ -1,0 +1,27 @@
+Q = (call value: (call))
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: FIELD
+    name: value
+    content: {type: SYMBOL, name: _expr}
+  _expr:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `call` is not valid for grammar field `value` of `call`
+ --> query.ptk:1:19
+  |
+1 | Q = (call value: (call))
+  |      ---- -----   ^^^^
+  |      |    |
+  |      |    grammar field `value`
+  |      `call` starts here
+  |
+help: `value` accepts: `num`

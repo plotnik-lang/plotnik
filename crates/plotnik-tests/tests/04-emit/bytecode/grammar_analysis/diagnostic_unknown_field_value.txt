@@ -1,0 +1,20 @@
+Q = (param nme: (num))
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: default
+        content: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `nme` is not a valid grammar field
+ --> query.ptk:1:12
+  |
+1 | Q = (param nme: (num))
+  |            ^^^

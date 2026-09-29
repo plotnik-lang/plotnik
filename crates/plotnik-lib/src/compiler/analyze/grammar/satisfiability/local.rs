@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
-use super::super::format::format_list;
+use super::super::format::{format_kind, format_list};
 use super::super::model::{KindConstraint, Model, NodeViolation, PatternId, PatternKind};
+use super::AnalysisLimit;
+use super::automaton::{ChildAutomaton, ChildMatcher};
+use super::engine::SatisfiabilitySolver;
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::parse::ast::{self, QuantifierKind};
@@ -10,56 +13,64 @@ use crate::core::{NodeFieldId, NodeKindId};
 use crate::compiler::diagnostics::report::{DiagnosticBuilder, Diagnostics};
 use crate::core::grammar::Grammar;
 
-pub(super) struct LocalDiagnostics<'a> {
-    grammar: &'a Grammar,
+pub(super) struct LocalDiagnostics<'a, 'q> {
+    grammar: &'q Grammar,
     diag: &'a mut Diagnostics,
-    model: &'a Model,
+    model: &'q Model,
+    solver: &'a mut SatisfiabilitySolver<'q>,
     reported: bool,
     reported_nodes: &'a mut HashSet<PatternId>,
     visited: HashSet<(PatternId, Option<ParentNode>, Option<FieldRef>)>,
 }
 
-impl LocalDiagnostics<'_> {
+impl<'q> LocalDiagnostics<'_, 'q> {
     /// Explain simple structural contradictions only after the solver has rejected
     /// the enclosing pattern. These summaries choose wording, never admission.
     pub(super) fn report(
-        grammar: &Grammar,
-        model: &Model,
+        grammar: &'q Grammar,
+        model: &'q Model,
+        solver: &mut SatisfiabilitySolver<'q>,
         pattern: PatternId,
         diag: &mut Diagnostics,
         reported_nodes: &mut HashSet<PatternId>,
-    ) -> bool {
+    ) -> Result<bool, AnalysisLimit> {
         let mut reporter = LocalDiagnostics {
             grammar,
             model,
+            solver,
             diag,
             reported: false,
             reported_nodes,
             visited: HashSet::new(),
         };
-        reporter.walk(pattern, None, None);
-        reporter.reported
+        reporter.walk(pattern, None, None)?;
+        Ok(reporter.reported)
     }
 
-    fn walk(&mut self, pattern: PatternId, parent: Option<ParentNode>, field: Option<FieldRef>) {
+    fn walk(
+        &mut self,
+        pattern: PatternId,
+        parent: Option<ParentNode>,
+        field: Option<FieldRef>,
+    ) -> Result<(), AnalysisLimit> {
         if !self.visited.insert((pattern, parent, field)) {
-            return;
+            return Ok(());
         }
 
         match &self.model.pattern(pattern).kind {
             PatternKind::Node(node) => {
                 if let Some(parent) = parent {
-                    self.child(pattern, node.kind, &parent, field.as_ref());
+                    self.child(pattern, node.kind, &parent, field.as_ref())?;
                 }
                 if self.reported_nodes.contains(&pattern) {
                     self.reported = true;
-                    return;
+                    return Ok(());
                 }
 
                 let before = self.diag.len();
                 let origin = self.model.node_origin(pattern);
                 let KindConstraint::Exact(kind) = node.kind else {
-                    return;
+                    return Ok(());
                 };
                 let token = origin
                     .node()
@@ -83,7 +94,7 @@ impl LocalDiagnostics<'_> {
                     None => {}
                 }
                 for pattern in node.children.iter().filter_map(|item| item.pattern()) {
-                    self.walk(pattern, Some(ctx), None);
+                    self.walk(pattern, Some(ctx), None)?;
                 }
                 if self.diag.len() != before {
                     self.reported_nodes.insert(pattern);
@@ -102,27 +113,28 @@ impl LocalDiagnostics<'_> {
                         id: *id,
                         span: origin.span_of(token.text_range()),
                     }),
-                );
+                )?;
             }
             PatternKind::Sequence(items) => {
                 for pattern in items.iter().filter_map(|item| item.pattern()) {
                     // A group does not carry its outer field into its siblings.
-                    self.walk(pattern, parent, None);
+                    self.walk(pattern, parent, None)?;
                 }
             }
             PatternKind::Repeat(repeat) if repeat.kind == QuantifierKind::OneOrMore => {
-                self.walk(repeat.inner, parent, field)
+                self.walk(repeat.inner, parent, field)?;
             }
             PatternKind::Reference(definition) => {
-                self.walk(self.model.definition(*definition), parent, field)
+                self.walk(self.model.definition(*definition), parent, field)?;
             }
             PatternKind::Leaf(kind) => {
                 if let Some(parent) = parent {
-                    self.child(pattern, *kind, &parent, field.as_ref());
+                    self.child(pattern, *kind, &parent, field.as_ref())?;
                 }
             }
             PatternKind::Alternative(_) | PatternKind::Repeat(_) => {}
         }
+        Ok(())
     }
 
     fn child(
@@ -131,7 +143,7 @@ impl LocalDiagnostics<'_> {
         kind: KindConstraint,
         parent: &ParentNode,
         field: Option<&FieldRef>,
-    ) {
+    ) -> Result<(), AnalysisLimit> {
         let origin = self.model.pattern(pattern).syntax();
         let span = match origin.node() {
             ast::Pattern::NamedNodePattern(node) if !node.is_any() => origin.span_of(
@@ -153,50 +165,36 @@ impl LocalDiagnostics<'_> {
                 .expect("resolved field has a name");
             if !self.grammar.has_field(parent.id(), field.id) {
                 self.emit_field_not_on_node(field.span, name, parent);
-                return;
+                return Ok(());
             }
 
-            let types = self.grammar.valid_field_types(parent.id(), field.id);
-            let accepted = match kind {
-                KindConstraint::Exact(kind) => types
-                    .iter()
-                    .any(|&candidate| self.accepts_kind(candidate, kind)),
-                KindConstraint::AnyNamed => {
-                    types.is_empty()
-                        || types
-                            .iter()
-                            .any(|&kind| !self.grammar.is_anonymous_node(kind))
-                }
-                KindConstraint::AnyNode | KindConstraint::Unconstrained => true,
-            };
+            let accepted = self.solver.probe(
+                parent.id(),
+                ChildAutomaton::child(ChildMatcher::new(kind, Some(field.id))),
+            )?;
             if !accepted {
                 let value = match kind {
-                    KindConstraint::Exact(kind) => format!(
-                        "`{}`",
-                        self.grammar
-                            .node_kind(kind)
-                            .expect("resolved kind has a name")
-                    ),
+                    KindConstraint::Exact(kind) => format!("`{}`", format_kind(self.grammar, kind)),
                     _ => "a named node".to_string(),
                 };
-                self.emit_invalid_field_value(span, &value, parent, field);
+                self.emit_invalid_field_value(span, &value, parent, field)?;
             }
-            return;
+            return Ok(());
         }
 
         if !matches!(origin.node(), ast::Pattern::NamedNodePattern(_))
             || matches!(kind, KindConstraint::Unconstrained)
         {
-            return;
+            return Ok(());
         }
 
         if self.grammar.is_token(parent.id()) {
             self.emit_child_under_leaf_token(span, parent);
-            return;
+            return Ok(());
         }
 
         let KindConstraint::Exact(kind) = kind else {
-            return;
+            return Ok(());
         };
         let accepted = self.grammar.is_extra(kind)
             || self
@@ -205,6 +203,7 @@ impl LocalDiagnostics<'_> {
         if !accepted {
             self.emit_invalid_child(span, kind, parent);
         }
+        Ok(())
     }
 
     fn emit_predicate_on_non_leaf(
@@ -380,13 +379,13 @@ impl LocalDiagnostics<'_> {
         value: &str,
         ctx: &ParentNode,
         field: &FieldRef,
-    ) {
+    ) -> Result<(), AnalysisLimit> {
         self.reported = true;
         let name = self
             .grammar
             .field_name(field.id)
             .expect("resolved field has a name");
-        let hint = self.field_value_hint(ctx.id(), field.id, name);
+        let hint = self.field_value_hint(ctx.id(), field.id, name)?;
         let parent_name = ctx.name(self.grammar);
         let mut builder = self
             .diag
@@ -401,47 +400,69 @@ impl LocalDiagnostics<'_> {
             builder = builder.hint(hint);
         }
         builder.emit();
+        Ok(())
     }
 
     /// Hint for the invalid-field-value diagnostic: the named kinds a grammar field accepts, or — for
     /// literal-only fields — a concrete `field: "token"` example.
     fn field_value_hint(
-        &self,
+        &mut self,
         parent_id: NodeKindId,
         field_id: NodeFieldId,
         field_name: &str,
-    ) -> Option<String> {
+    ) -> Result<Option<String>, AnalysisLimit> {
         let types = self.grammar.valid_field_types(parent_id, field_id);
-        let named = self.concrete_kinds(types.iter().copied());
-        let mut literals = types
-            .iter()
-            .filter(|&&id| self.grammar.is_anonymous_node(id))
-            .map(|&id| {
-                self.grammar
-                    .node_kind(id)
-                    .expect("retained kind has a name")
-            })
-            .collect::<Vec<_>>();
-        literals.sort_unstable();
-
-        if named.is_empty() {
-            let example = literals.first()?;
-            return Some(format!(
-                "`{0}` accepts only literal tokens. Write `{0}: {1:?}`",
-                field_name, example
-            ));
+        let mut candidates = Vec::new();
+        for &kind in types {
+            if self.grammar.is_supertype(kind) {
+                candidates.extend(self.grammar.collect_subtypes(kind));
+            } else {
+                candidates.push(kind);
+            }
         }
-        let values = named
+        candidates.sort_unstable();
+        candidates.dedup();
+        let mut accepted = Vec::new();
+        for kind in candidates {
+            if self.solver.probe(
+                parent_id,
+                ChildAutomaton::child(ChildMatcher::new(
+                    KindConstraint::Exact(kind),
+                    Some(field_id),
+                )),
+            )? {
+                accepted.push(kind);
+            }
+        }
+        accepted.sort_by_key(|&kind| {
+            (
+                self.grammar.is_anonymous_node(kind),
+                format_kind(self.grammar, kind),
+            )
+        });
+        if accepted.is_empty() {
+            return Ok(None);
+        }
+
+        if accepted
             .iter()
-            .map(|name| name.to_string())
-            .chain(literals.iter().map(|literal| format!("{literal:?}")))
+            .all(|&kind| self.grammar.is_anonymous_node(kind))
+        {
+            let example = format_kind(self.grammar, accepted[0]);
+            return Ok(Some(format!(
+                "`{field_name}` accepts only literal tokens. Write `{field_name}: {example}`"
+            )));
+        }
+        let values = accepted
+            .into_iter()
+            .map(|kind| format_kind(self.grammar, kind))
             .collect::<Vec<_>>();
         let values = values.iter().map(String::as_str).collect::<Vec<_>>();
-        Some(format!(
+        Ok(Some(format!(
             "`{}` accepts: {}",
             field_name,
             format_list(&values, 8)
-        ))
+        )))
     }
 }
 

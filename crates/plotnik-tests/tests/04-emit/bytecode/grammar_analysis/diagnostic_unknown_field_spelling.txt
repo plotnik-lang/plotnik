@@ -1,0 +1,21 @@
+Q = (param
+  nme: (id)?
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `nme` is not a valid grammar field
+ --> query.ptk:2:3
+  |
+2 |   nme: (id)?
+  |   ^^^
+  |
+help: replace with `name`
+  |
+2 |   name: (id)?
+  |    +

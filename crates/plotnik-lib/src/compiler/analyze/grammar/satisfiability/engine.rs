@@ -173,14 +173,23 @@ enum Key {
 /// at once (disjoint borrows) while threading.
 struct Frozen<'a> {
     grammar: &'a Grammar,
-    model: &'a Model,
     automata: Vec<Option<ChildAutomaton>>,
     facts: Arc<GrammarFacts>,
-    /// Native-recursion ceiling for automaton construction while inlining references.
-    automaton_max_depth: u32,
 }
 
 impl<'a> Frozen<'a> {
+    fn new(
+        grammar: &'a Grammar,
+        automata: Vec<Option<ChildAutomaton>>,
+        facts: Arc<GrammarFacts>,
+    ) -> Self {
+        Self {
+            grammar,
+            automata,
+            facts,
+        }
+    }
+
     fn automaton(&self, p: AutomatonId) -> &ChildAutomaton {
         self.automata[p.0]
             .as_ref()
@@ -273,9 +282,63 @@ struct Solve {
 }
 
 pub(super) struct SatisfiabilitySolver<'a> {
+    model: &'a Model,
+    automaton_max_depth: u32,
     frozen: Frozen<'a>,
     solve: Solve,
     patterns: HashMap<PatternId, bool>,
+}
+
+/// Field-name corrections need the grammar's actual child labels before a valid
+/// query model exists. These small probes use the same production solver, with
+/// no query patterns or nested obligations.
+pub(in crate::compiler::analyze::grammar) struct FieldProbe<'a> {
+    frozen: Frozen<'a>,
+    solve: Solve,
+}
+
+impl<'a> FieldProbe<'a> {
+    pub(in crate::compiler::analyze::grammar) fn new(grammar: &'a Grammar, budget: u64) -> Self {
+        Self {
+            frozen: Frozen::new(
+                grammar,
+                Vec::new(),
+                Arc::new(GrammarFacts::from_grammar(grammar)),
+            ),
+            solve: Solve::new(budget),
+        }
+    }
+
+    pub(in crate::compiler::analyze::grammar) fn accepts(
+        &mut self,
+        parent: NodeKindId,
+        field: NodeFieldId,
+        kind: KindConstraint,
+    ) -> Result<bool, AnalysisLimit> {
+        self.probe(
+            parent,
+            ChildAutomaton::child(ChildMatcher::new(kind, Some(field))),
+        )
+    }
+
+    pub(in crate::compiler::analyze::grammar) fn can_omit(
+        &mut self,
+        parent: NodeKindId,
+        field: NodeFieldId,
+    ) -> Result<bool, AnalysisLimit> {
+        self.probe(parent, ChildAutomaton::without_field(field))
+    }
+
+    fn probe(
+        &mut self,
+        kind: NodeKindId,
+        automaton: ChildAutomaton,
+    ) -> Result<bool, AnalysisLimit> {
+        self.solve.spend(automaton.state_count() as u64)?;
+        let root = AutomatonId(self.frozen.automata.len());
+        self.frozen.automata.push(Some(automaton));
+        self.solve.solve_automaton(&self.frozen, root, kind)
+    }
 }
 
 impl<'a> SatisfiabilitySolver<'a> {
@@ -316,12 +379,12 @@ impl<'a> SatisfiabilitySolver<'a> {
     ) -> Result<bool, AnalysisLimit> {
         let budget = self.remaining_budget();
         let limits = SatisfiabilityLimits {
-            automaton_max_depth: self.frozen.automaton_max_depth,
+            automaton_max_depth: self.automaton_max_depth,
             work_budget: budget,
         };
         let mut probe = Self::new(
             self.frozen.grammar,
-            self.frozen.model,
+            self.model,
             limits,
             Arc::clone(&self.frozen.facts),
         );
@@ -350,18 +413,15 @@ impl<'a> SatisfiabilitySolver<'a> {
         facts: Arc<GrammarFacts>,
     ) -> Self {
         Self {
+            model,
+            automaton_max_depth: limits.automaton_max_depth,
             patterns: HashMap::new(),
-            frozen: Frozen {
+            frozen: Frozen::new(
                 grammar,
-                model,
-                automata: std::iter::repeat_with(|| None).take(model.len()).collect(),
+                std::iter::repeat_with(|| None).take(model.len()).collect(),
                 facts,
-                automaton_max_depth: limits.automaton_max_depth,
-            },
-            solve: Solve {
-                budget: limits.work_budget,
-                ..Solve::default()
-            },
+            ),
+            solve: Solve::new(limits.work_budget),
         }
     }
 
@@ -371,7 +431,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         pattern: PatternId,
         kind: NodeKindId,
     ) -> Result<bool, AnalysisLimit> {
-        if self.frozen.model.node(pattern).violation.is_some() {
+        if self.model.node(pattern).violation.is_some() {
             return Ok(false);
         }
 
@@ -384,17 +444,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         pattern: AutomatonId,
         kind: NodeKindId,
     ) -> Result<bool, AnalysisLimit> {
-        let realizer_count = self.frozen.realizers_of(kind).len();
-        for index in 0..realizer_count {
-            let realizer = self.frozen.realizers_of(kind)[index];
-            self.solve.seed(Key::Sat((pattern, realizer)));
-        }
-        self.run()?;
-        Ok(self
-            .frozen
-            .realizers_of(kind)
-            .iter()
-            .any(|&realizer| self.solve.sat_value((pattern, realizer))))
+        self.solve.solve_automaton(&self.frozen, pattern, kind)
     }
 
     pub(super) fn wildcard_satisfiable(
@@ -425,7 +475,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         while let Some((current, next_child)) = pending.last_mut() {
             self.solve.charge()?;
             let current = *current;
-            let kind = &self.frozen.model.pattern(current).kind;
+            let kind = &self.model.pattern(current).kind;
             let result = match kind {
                 PatternKind::Node(node) => match node.kind {
                     KindConstraint::Exact(kind) => self.satisfiable(current, kind)?,
@@ -453,7 +503,7 @@ impl<'a> SatisfiabilitySolver<'a> {
                         PatternKind::Field(_, inner) => (*next_child == 0).then_some(*inner),
                         PatternKind::Repeat(repeat) => (*next_child == 0).then_some(repeat.inner),
                         PatternKind::Reference(definition) => {
-                            (*next_child == 0).then(|| self.frozen.model.definition(*definition))
+                            (*next_child == 0).then(|| self.model.definition(*definition))
                         }
                         PatternKind::Node(_) | PatternKind::Leaf(_) => {
                             unreachable!("node and leaf cases were handled above")
@@ -504,9 +554,9 @@ impl<'a> SatisfiabilitySolver<'a> {
             }
 
             let automaton = automaton::build(
-                self.frozen.model,
+                self.model,
                 pattern,
-                self.frozen.automaton_max_depth,
+                self.automaton_max_depth,
                 self.solve.remaining_budget(),
             )?;
             self.solve.spend(automaton.state_count() as u64)?;
@@ -515,18 +565,36 @@ impl<'a> SatisfiabilitySolver<'a> {
         }
         Ok(())
     }
-
-    fn run(&mut self) -> Result<(), AnalysisLimit> {
-        while let Some(key) = self.solve.dequeue() {
-            if self.solve.recompute(&self.frozen, key)? {
-                self.solve.requeue_dependents(key);
-            }
-        }
-        Ok(())
-    }
 }
 
 impl Solve {
+    fn new(budget: u64) -> Self {
+        Self {
+            budget,
+            ..Self::default()
+        }
+    }
+
+    fn solve_automaton(
+        &mut self,
+        frozen: &Frozen,
+        pattern: AutomatonId,
+        kind: NodeKindId,
+    ) -> Result<bool, AnalysisLimit> {
+        for &realizer in frozen.realizers_of(kind) {
+            self.seed(Key::Sat((pattern, realizer)));
+        }
+        while let Some(key) = self.dequeue() {
+            if self.recompute(frozen, key)? {
+                self.requeue_dependents(key);
+            }
+        }
+        Ok(frozen
+            .realizers_of(kind)
+            .iter()
+            .any(|&realizer| self.sat_value((pattern, realizer))))
+    }
+
     fn remaining_budget(&self) -> u64 {
         self.budget.saturating_sub(self.work_used)
     }
@@ -534,7 +602,7 @@ impl Solve {
     fn spend(&mut self, work_units: u64) -> Result<(), AnalysisLimit> {
         self.work_used = self.work_used.saturating_add(work_units);
         if self.work_used > self.budget {
-            return Err(AnalysisLimit);
+            return Err(AnalysisLimit::WorkBudget);
         }
         Ok(())
     }

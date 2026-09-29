@@ -1,0 +1,33 @@
+Q = (pair
+  .!
+  (term -name)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - type: ALIAS
+        named: true
+        value: term
+        content: {type: SYMBOL, name: binding}
+      - type: ALIAS
+        named: true
+        value: term
+        content: {type: SYMBOL, name: id}
+  binding:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `-name` excludes the field required at this child position in `pair`
+ --> query.ptk:3:9
+  |
+1 | Q = (pair
+  |      ---- inside `pair`
+2 |   .!
+3 |   (term -name)
+  |         ^^^^^
+  |
+help: drop `-name` to allow this child position

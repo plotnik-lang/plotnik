@@ -83,10 +83,10 @@ rules:
     content: {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: query too complex to compile
+error: grammar analysis exceeded its expanded child-pattern size limit
   --> query.ptk:78:5
    |
 78 | Q = (args (Ids15))
    |     ^^^^^^^^^^^^^^
    |
-help: simplify the pattern. Deeply nested or repeatedly referenced alternations can expand exponentially
+help: simplify groups or definitions that duplicate sibling patterns

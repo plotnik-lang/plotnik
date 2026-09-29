@@ -1,0 +1,20 @@
+Name = (id)
+Group = {(Name)}
+Q = (args (Group))
+-------------------- GRAMMAR ---------------------
+rules:
+  args:
+    type: REPEAT
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+--------------------- LIMITS ---------------------
+work_budget: 2000000
+automaton_max_depth: 2
+------------------ DIAGNOSTICS -------------------
+error: grammar analysis exceeded its pattern construction depth limit
+ --> query.ptk:3:5
+  |
+3 | Q = (args (Group))
+  |     ^^^^^^^^^^^^^^
+  |
+help: reduce nesting in child patterns and definition references

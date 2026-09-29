@@ -1,0 +1,37 @@
+Q = (param
+  -name
+  -value
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: CHOICE
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `-name` requires `name` to be absent, but the remaining constraints on `param` require it to be present
+ --> query.ptk:2:3
+  |
+2 |   -name
+  |   ^^^^^
+3 |   -value
+  |   ------ these constraints require the field to be present
+  |
+help: drop `-name` to allow the remaining constraints
+
+error: `-value` requires `value` to be absent, but the remaining constraints on `param` require it to be present
+ --> query.ptk:3:3
+  |
+2 |   -name
+  |   ----- these constraints require the field to be present
+3 |   -value
+  |   ^^^^^^
+  |
+help: drop `-value` to allow the remaining constraints

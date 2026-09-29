@@ -1,0 +1,30 @@
+Q = (stmt -labl)
+-------------------- GRAMMAR ---------------------
+rules:
+  program:
+    type: CHOICE
+    members:
+      - type: ALIAS
+        named: true
+        value: stmt
+        content: {type: SYMBOL, name: labeled}
+      - type: ALIAS
+        named: true
+        value: stmt
+        content: {type: SYMBOL, name: id}
+  labeled:
+    type: FIELD
+    name: label
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `labl` is not a valid grammar field
+ --> query.ptk:1:12
+  |
+1 | Q = (stmt -labl)
+  |            ^^^^
+  |
+help: replace with `label`
+  |
+1 | Q = (stmt -label)
+  |               +

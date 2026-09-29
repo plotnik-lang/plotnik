@@ -9,7 +9,18 @@ use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeKind, NodeKindId};
 
 use super::bind::GrammarBinder;
+use super::model::KindConstraint;
 use crate::core::utils::find_similar;
+
+enum FieldSuggestion<'a> {
+    Replacement(&'a str),
+    Spelling(&'a str),
+}
+
+enum FieldValue {
+    Bare(KindConstraint),
+    Nested(KindConstraint),
+}
 
 impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn resolve_symbols(&mut self, pattern: &Located<ast::Pattern>) {
@@ -158,7 +169,12 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         Some(name_token)
     }
 
-    fn report_unknown_field(&mut self, source: SourceId, token: &SyntaxToken, candidates: &[&str]) {
+    fn report_unknown_field(
+        &mut self,
+        source: SourceId,
+        token: &SyntaxToken,
+        suggestion: Option<FieldSuggestion<'_>>,
+    ) {
         let name = token.text();
         let mut builder = self
             .diag
@@ -167,8 +183,14 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 Span::new(source, token.text_range()),
             )
             .detail(name);
-        if let Some(similar) = find_similar(name, candidates) {
-            builder = builder.fix(format!("replace with `{similar}`"), similar);
+        match suggestion {
+            Some(FieldSuggestion::Replacement(similar)) => {
+                builder = builder.fix(format!("replace with `{similar}`"), similar);
+            }
+            Some(FieldSuggestion::Spelling(similar)) => {
+                builder = builder.hint(format!("a similarly spelled grammar field is `{similar}`"));
+            }
+            None => {}
         }
         builder.emit();
     }
@@ -196,6 +218,65 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
 
         let key = NodeKind::Named(token_src(&type_token, self.content(located.source())));
         self.node_kind_ids.get(&key).copied().flatten()
+    }
+
+    /// A bare node value has no nested constraints left to validate. More complex
+    /// values retain a spelling hint instead of promising a working replacement.
+    fn field_value(&self, mut located: Located<ast::Pattern>) -> Option<FieldValue> {
+        let mut references = std::collections::HashSet::new();
+        loop {
+            match located.node() {
+                ast::Pattern::CapturedPattern(capture) => {
+                    located = located.wrap(capture.inner().expect("validated capture has a body"));
+                }
+                ast::Pattern::DefRef(reference) => {
+                    let definition = self
+                        .definitions
+                        .reference_target(reference)
+                        .expect("validated reference has a target");
+                    if !references.insert(definition) {
+                        return None;
+                    }
+
+                    located = self.definitions.definition(definition).located_body();
+                }
+                ast::Pattern::NamedNodePattern(node) => {
+                    let kind = if node.is_any() {
+                        KindConstraint::AnyNamed
+                    } else {
+                        KindConstraint::Exact(
+                            self.resolve_named_node_id(&located.wrap(node.clone()))?,
+                        )
+                    };
+                    let nested = node.items().next().is_some()
+                        || node.predicate().is_some()
+                        || node
+                            .syntax()
+                            .children()
+                            .any(|child| ast::NegatedField::can_cast(child.kind()));
+                    return Some(if nested {
+                        FieldValue::Nested(kind)
+                    } else {
+                        FieldValue::Bare(kind)
+                    });
+                }
+                ast::Pattern::AnonymousNodePattern(node) => {
+                    let token = node.value().expect("validated literal has a value");
+                    let key =
+                        NodeKind::Anonymous(token_src(&token, self.content(located.source())));
+                    return self
+                        .node_kind_ids
+                        .get(&key)
+                        .copied()
+                        .flatten()
+                        .map(|kind| FieldValue::Bare(KindConstraint::Exact(kind)));
+                }
+                ast::Pattern::NodeWildcard(_) => {
+                    return Some(FieldValue::Bare(KindConstraint::AnyNode));
+                }
+                _ => return None,
+            }
+        }
     }
 }
 
@@ -226,11 +307,6 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
                             .field_ids_for_node_kind(kind)
                             .iter()
                             .copied()
-                            .filter(|&field| {
-                                !grammar
-                                    .field_cardinality(kind, field)
-                                    .is_some_and(|cardinality| cardinality.is_required())
-                            })
                             .map(|field| {
                                 grammar
                                     .field_name(field)
@@ -239,8 +315,22 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default();
+                let suggestion = find_similar(token.text(), &candidates).and_then(|name| {
+                    let kind = self
+                        .binder
+                        .resolve_named_node_id(node)
+                        .expect("field candidates have a resolved parent");
+                    let field = grammar
+                        .resolve_field(name)
+                        .expect("candidate field has an id");
+                    match self.binder.field_probe.can_omit(kind, field) {
+                        Ok(true) => Some(FieldSuggestion::Replacement(name)),
+                        Ok(false) => None,
+                        Err(_) => Some(FieldSuggestion::Spelling(name)),
+                    }
+                });
                 self.binder
-                    .report_unknown_field(node.source(), &token, &candidates);
+                    .report_unknown_field(node.source(), &token, suggestion);
             }
         }
 
@@ -256,10 +346,12 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
     }
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
-        if let Some(token) = self.binder.resolve_field_by_token(
+        let unknown = self.binder.resolve_field_by_token(
             field.source(),
             field.node().name().expect("validated field has a name"),
-        ) {
+        );
+        crate::compiler::analyze::visitor::walk_field_pattern(self, field);
+        if let Some(token) = unknown {
             let grammar = self.binder.grammar;
             let parent = field
                 .node()
@@ -271,9 +363,32 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
             let candidates = kind
                 .map(|kind| grammar.fields_for_node_kind(kind))
                 .unwrap_or_else(|| grammar.all_field_names());
+            let suggestion = find_similar(token.text(), &candidates).and_then(|name| {
+                let Some(parent) = kind else {
+                    return Some(FieldSuggestion::Spelling(name));
+                };
+
+                let value = field.node().value().expect("validated field has a value");
+                let Some(value) = self.binder.field_value(field.wrap(value)) else {
+                    return Some(FieldSuggestion::Spelling(name));
+                };
+
+                let candidate = grammar
+                    .resolve_field(name)
+                    .expect("candidate field has an id");
+                let (kind, replacement) = match value {
+                    FieldValue::Bare(kind) => (kind, true),
+                    FieldValue::Nested(kind) => (kind, false),
+                };
+                match self.binder.field_probe.accepts(parent, candidate, kind) {
+                    Ok(true) if replacement => Some(FieldSuggestion::Replacement(name)),
+                    Ok(true) => Some(FieldSuggestion::Spelling(name)),
+                    Ok(false) => None,
+                    Err(_) => Some(FieldSuggestion::Spelling(name)),
+                }
+            });
             self.binder
-                .report_unknown_field(field.source(), &token, &candidates);
+                .report_unknown_field(field.source(), &token, suggestion);
         }
-        crate::compiler::analyze::visitor::walk_field_pattern(self, field);
     }
 }
