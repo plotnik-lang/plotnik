@@ -7,8 +7,8 @@
 
 use crate::bytecode::Nav;
 use crate::compiler::analyze::anchors::GapClass;
+use crate::compiler::analyze::boundary::ExitPort;
 use crate::compiler::analyze::boundary::{BoundaryState, FirstClass, PendingAnchor};
-use crate::compiler::lower::boundary::ExitPort;
 use crate::core::NodeFieldId;
 
 /// Navigation an atom must perform when it receives control.
@@ -54,7 +54,7 @@ impl NavigationContract {
             "entry navigation can only be resolved for a consuming pattern"
         );
 
-        let boundary_gap = gap_before_next(state, next);
+        let boundary_gap = state.gap_before(next);
         match self.authored {
             Nav::Stay => {
                 if boundary_gap == GapClass::Any {
@@ -122,7 +122,7 @@ pub(crate) fn trailing_up_nav(state: BoundaryState, levels: u8) -> Nav {
         "trailing ascent level must fit one Up instruction"
     );
 
-    match gap_before_next(state, FirstClass::Named) {
+    match state.gap_before(FirstClass::Named) {
         GapClass::Any => Nav::Up(levels),
         GapClass::AnonymousAndExtras => Nav::UpSkipTrivia(levels),
         GapClass::ExtrasOnly => Nav::UpSkipExtras(levels),
@@ -135,7 +135,7 @@ pub(crate) fn trailing_up_nav(state: BoundaryState, levels: u8) -> Nav {
 /// No check is necessary without a pending anchor. Otherwise the childless
 /// instruction enforces the same gap class without descending or ascending.
 pub(crate) fn trailing_childless_nav(state: BoundaryState) -> Option<Nav> {
-    let nav = match gap_before_next(state, FirstClass::Named) {
+    let nav = match state.gap_before(FirstClass::Named) {
         GapClass::Any => return None,
         GapClass::AnonymousAndExtras => Nav::ChildlessSkipTrivia,
         GapClass::ExtrasOnly => Nav::ChildlessSkipExtras,
@@ -163,22 +163,6 @@ pub(crate) fn next_boundary_state(input: BoundaryState, port: ExitPort) -> Bound
         ExitPort::EmptyNone => BoundaryState::new(input.previous, PendingAnchor::None),
         ExitPort::EmptySoft => BoundaryState::new(input.previous, PendingAnchor::Soft),
         ExitPort::EmptyExact => BoundaryState::new(input.previous, PendingAnchor::Exact),
-    }
-}
-
-fn gap_before_next(state: BoundaryState, next: FirstClass) -> GapClass {
-    match state.pending {
-        PendingAnchor::None => GapClass::Any,
-        PendingAnchor::Exact => GapClass::Exact,
-        PendingAnchor::Soft => {
-            let previous_allows_broad =
-                matches!(state.previous, FirstClass::Empty | FirstClass::Named);
-            if previous_allows_broad && next == FirstClass::Named {
-                GapClass::AnonymousAndExtras
-            } else {
-                GapClass::ExtrasOnly
-            }
-        }
     }
 }
 

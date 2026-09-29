@@ -1,0 +1,19 @@
+Q = (id
+  {
+    (id)?
+  }+
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: these child constraints cannot be satisfied together in `id`
+ --> query.ptk:2:3
+  |
+1 |   Q = (id
+  |        -- inside `id`
+2 | /   {
+3 | |     (id)?
+4 | |   }+
+  | |____^

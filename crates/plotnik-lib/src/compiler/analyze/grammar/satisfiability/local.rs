@@ -82,8 +82,8 @@ impl LocalDiagnostics<'_> {
                     }
                     None => {}
                 }
-                for item in &node.children {
-                    self.walk(item.pattern, Some(ctx), None);
+                for pattern in node.children.iter().filter_map(|item| item.pattern()) {
+                    self.walk(pattern, Some(ctx), None);
                 }
                 if self.diag.len() != before {
                     self.reported_nodes.insert(pattern);
@@ -105,13 +105,13 @@ impl LocalDiagnostics<'_> {
                 );
             }
             PatternKind::Sequence(items) => {
-                for item in items {
+                for pattern in items.iter().filter_map(|item| item.pattern()) {
                     // A group does not carry its outer field into its siblings.
-                    self.walk(item.pattern, parent, None);
+                    self.walk(pattern, parent, None);
                 }
             }
-            PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => {
-                self.walk(*inner, parent, field)
+            PatternKind::Repeat(repeat) if repeat.kind == QuantifierKind::OneOrMore => {
+                self.walk(repeat.inner, parent, field)
             }
             PatternKind::Reference(definition) => {
                 self.walk(self.model.definition(*definition), parent, field)
@@ -121,7 +121,7 @@ impl LocalDiagnostics<'_> {
                     self.child(pattern, *kind, &parent, field.as_ref());
                 }
             }
-            PatternKind::Alternative(_) | PatternKind::Repeat(_, _) => {}
+            PatternKind::Alternative(_) | PatternKind::Repeat(_) => {}
         }
     }
 

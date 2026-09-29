@@ -5,13 +5,13 @@
 use std::collections::HashSet;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::anchors::GapClass;
+use crate::compiler::analyze::boundary::PendingAnchor;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics, Span};
 use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern};
 use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::super::model::{KindConstraint, Model, PatternId, PatternKind};
+use super::super::model::{Item, KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
 use super::automaton::{ChildAutomaton, ChildMatcher};
 use super::engine::SatisfiabilitySolver;
@@ -265,8 +265,13 @@ fn locate(
     let mut visited = HashSet::new();
     while visited.insert(goal.pattern()) {
         let mut children = Vec::new();
-        for child in &model.node(goal.pattern()).children {
-            collect_goals(child.pattern, model, &mut children);
+        for child in model
+            .node(goal.pattern())
+            .children
+            .iter()
+            .filter_map(|item| item.pattern())
+        {
+            collect_goals(child, model, &mut children);
         }
         let mut failed = None;
         for child in children {
@@ -295,18 +300,15 @@ fn report_anchors(
     let mut anchors: Vec<(Span, Vec<u32>)> = Vec::new();
     let mut relaxed = original.clone();
     for state in 0..original.state_count() as u32 {
-        if original.gap(state) == GapClass::Any {
+        let Some((_, span)) = original.anchor(state) else {
             continue;
-        }
-        let span = original
-            .anchor(state)
-            .expect("a constrained gap retains its anchor source");
+        };
         if let Some((_, states)) = anchors.iter_mut().find(|(seen, _)| *seen == span) {
             states.push(state);
         } else {
             anchors.push((span, vec![state]));
         }
-        relaxed.set_gap(state, GapClass::Any);
+        relaxed.remove_anchor(span);
     }
     if anchors.is_empty() || !solver.probe(culprit.kind, relaxed)? {
         return Ok(false);
@@ -316,29 +318,36 @@ fn report_anchors(
     let shapes = solver.child_shapes(culprit.kind);
     for (span, states) in &anchors {
         let mut removed = original.clone();
-        for &state in states {
-            removed.set_gap(state, GapClass::Any);
-        }
+        removed.remove_anchor(*span);
         match solver.probe(culprit.kind, removed) {
             Ok(false) => continue,
             Err(AnalysisLimit) => break,
             Ok(true) => {}
         }
 
-        let position = if states.len() != 1 {
-            ""
-        } else if original.start() == original.accept() {
-            "childless "
-        } else if states[0] == original.start() {
-            "leading "
-        } else if states[0] == original.accept() {
-            "trailing "
-        } else {
-            "interior "
-        };
-        let exact = states
+        let children = &ctx.model.node(culprit.pattern).children;
+        let position = children
             .iter()
-            .any(|&state| original.gap(state) == GapClass::Exact);
+            .position(|item| matches!(item, Item::Anchor(_, source) if source == span))
+            .map_or("", |index| {
+                let before = children[..index]
+                    .iter()
+                    .any(|item| item.pattern().is_some());
+                let after = children[index + 1..]
+                    .iter()
+                    .any(|item| item.pattern().is_some());
+                match (before, after) {
+                    (false, false) => "childless ",
+                    (false, true) => "leading ",
+                    (true, false) => "trailing ",
+                    (true, true) => "interior ",
+                }
+            });
+        let exact = states.iter().any(|&state| {
+            original
+                .anchor(state)
+                .is_some_and(|(anchor, _)| anchor == PendingAnchor::Exact)
+        });
         let anchor = if exact {
             "exact anchor (`.!`)"
         } else {
@@ -561,16 +570,21 @@ fn report_nested_constraints(
 
         let parent = culprit.kind_name(ctx);
         let resolved = ctx.model.node(nested);
-        let empty = resolved.children.is_empty()
-            && resolved.negated_fields.is_empty()
-            && resolved.trailing == GapClass::Exact;
-        let span = if empty {
-            resolved
-                .trailing_anchor
-                .expect("a childless exact anchor has source provenance")
+        let childless_anchor = if resolved.negated_fields.is_empty()
+            && resolved
+                .children
+                .iter()
+                .all(|item| item.pattern().is_none())
+        {
+            resolved.children.iter().find_map(|item| match item {
+                Item::Anchor(PendingAnchor::Exact, span) => Some(*span),
+                _ => None,
+            })
         } else {
-            children_span(ctx.model, nested)
+            None
         };
+        let empty = childless_anchor.is_some();
+        let span = childless_anchor.unwrap_or_else(|| children_span(ctx.model, nested));
         let detail = if empty {
             format!(
                 "this pattern requires a childless node, but this position in {parent} needs a node with children"
@@ -653,7 +667,8 @@ fn query_child_demands(ctx: Context<'_>, node: PatternId) -> Vec<QueryChild> {
         .children
         .iter()
         .rev()
-        .map(|item| (item.pattern, HashSet::new()))
+        .filter_map(|item| item.pattern())
+        .map(|pattern| (pattern, HashSet::new()))
         .collect();
     while let Some((pattern, mut references)) = pending.pop() {
         let demand = match &ctx.model.pattern(pattern).kind {
@@ -678,12 +693,13 @@ fn query_child_demands(ctx: Context<'_>, node: PatternId) -> Vec<QueryChild> {
                     items
                         .iter()
                         .rev()
-                        .map(|item| (item.pattern, references.clone())),
+                        .filter_map(|item| item.pattern())
+                        .map(|pattern| (pattern, references.clone())),
                 );
                 continue;
             }
-            PatternKind::Repeat(ast::QuantifierKind::OneOrMore, inner) => {
-                pending.push((*inner, references));
+            PatternKind::Repeat(repeat) if repeat.kind == ast::QuantifierKind::OneOrMore => {
+                pending.push((repeat.inner, references));
                 continue;
             }
             _ => continue,
@@ -705,8 +721,8 @@ fn guaranteed_child(model: &Model, pattern: PatternId, visited: &mut HashSet<Pat
     }
     match &model.pattern(pattern).kind {
         PatternKind::Node(_) | PatternKind::Leaf(_) => true,
-        PatternKind::Repeat(ast::QuantifierKind::OneOrMore, inner) => {
-            guaranteed_child(model, *inner, visited)
+        PatternKind::Repeat(repeat) if repeat.kind == ast::QuantifierKind::OneOrMore => {
+            guaranteed_child(model, repeat.inner, visited)
         }
         PatternKind::Reference(definition) => {
             guaranteed_child(model, model.definition(*definition), visited)

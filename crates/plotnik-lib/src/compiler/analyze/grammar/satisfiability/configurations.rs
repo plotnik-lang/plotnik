@@ -1,38 +1,36 @@
-//! Reachable (automaton state, pending gap) pairs. Four bits per state retain
-//! every effective gap across hidden-rule summaries and successive closures.
+//! Reachable automaton positions and their path-specific sibling boundaries.
 
 use super::automaton::State;
-use crate::compiler::analyze::anchors::GapClass;
+use crate::compiler::analyze::boundary::{BoundaryState, FirstClass};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) struct Configuration {
     pub(super) state: State,
-    pub(super) gap: GapClass,
+    pub(super) boundary: BoundaryState,
 }
 
 impl Configuration {
+    pub(super) fn new(state: State, boundary: BoundaryState) -> Self {
+        Self { state, boundary }
+    }
+
+    pub(super) fn start(state: State) -> Self {
+        Self::new(state, BoundaryState::START)
+    }
+
+    pub(super) fn consume(self, state: State, class: FirstClass) -> Self {
+        Self::new(state, self.boundary.consume(class))
+    }
+
     fn index(self) -> u32 {
-        self.state * 4
-            + match self.gap {
-                GapClass::Exact => 0,
-                GapClass::ExtrasOnly => 1,
-                GapClass::AnonymousAndExtras => 2,
-                GapClass::Any => 3,
-            }
+        self.state * BoundaryState::COUNT as u32 + self.boundary.index() as u32
     }
 
     fn from_index(index: u32) -> Self {
-        let gap = match index % 4 {
-            0 => GapClass::Exact,
-            1 => GapClass::ExtrasOnly,
-            2 => GapClass::AnonymousAndExtras,
-            3 => GapClass::Any,
-            _ => unreachable!(),
-        };
-        Self {
-            state: index / 4,
-            gap,
-        }
+        Self::new(
+            index / BoundaryState::COUNT as u32,
+            BoundaryState::from_index(index as usize % BoundaryState::COUNT),
+        )
     }
 }
 
@@ -61,10 +59,12 @@ impl Configurations {
     }
 
     pub(super) fn contains_state(&self, state: State) -> bool {
-        let index = state * 4;
-        self.words
-            .get((index / 64) as usize)
-            .is_some_and(|word| word & (0xf << (index % 64)) != 0)
+        BoundaryState::all().any(|boundary| {
+            let (word, bit) = Self::position(Configuration::new(state, boundary));
+            self.words
+                .get(word)
+                .is_some_and(|word| word & (1 << bit) != 0)
+        })
     }
 
     /// Union `other` into `self`, returning whether `self` grew.

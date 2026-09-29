@@ -1,13 +1,16 @@
 //! Child automata compiled from resolved matching structure. Each caller gets its
 //! own sequence exits, while nested node obligations share their pattern IDs.
 
+use std::collections::HashMap;
+
 use crate::compiler::analyze::anchors::GapClass;
+use crate::compiler::analyze::boundary::{BoundaryState, FirstClass, PendingAnchor};
 use crate::compiler::diagnostics::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::QuantifierKind;
 use crate::core::NodeFieldId;
 
-use super::super::model::{Item, KindConstraint, Model, PatternId, PatternKind};
+use super::super::model::{Item, KindConstraint, Model, PatternId, PatternKind, Repeat};
 use super::AnalysisLimit;
 
 pub(super) type State = u32;
@@ -42,17 +45,19 @@ impl ChildMatcher {
 
 #[derive(Clone, Debug)]
 struct StateData {
-    gap: GapClass,
-    anchor: Option<Span>,
+    anchor: Option<(PendingAnchor, Span)>,
+    entry_states: u16,
+    entry_gap: GapClass,
     pattern_edges: Vec<(ChildMatcher, State)>,
     eps_edges: Vec<State>,
 }
 
 impl StateData {
-    fn new(gap: GapClass) -> Self {
+    fn new() -> Self {
         Self {
-            gap,
             anchor: None,
+            entry_states: (1 << BoundaryState::COUNT) - 1,
+            entry_gap: GapClass::Any,
             pattern_edges: Vec::new(),
             eps_edges: Vec::new(),
         }
@@ -68,12 +73,33 @@ pub(super) struct ChildAutomaton {
 }
 
 impl ChildAutomaton {
-    pub(super) fn set_gap(&mut self, state: State, gap: GapClass) {
-        self.states[state as usize].gap = gap;
+    pub(super) fn remove_anchor(&mut self, span: Span) {
+        for state in &mut self.states {
+            if state.anchor.is_some_and(|(_, source)| source == span) {
+                state.anchor = None;
+            }
+        }
     }
 
-    pub(super) fn anchor(&self, state: State) -> Option<Span> {
+    pub(super) fn anchor(&self, state: State) -> Option<(PendingAnchor, Span)> {
         self.states[state as usize].anchor
+    }
+
+    pub(super) fn advance(&self, state: State, boundary: BoundaryState) -> Option<BoundaryState> {
+        let data = &self.states[state as usize];
+        if data.entry_states & (1 << boundary.index()) == 0 {
+            return None;
+        }
+        Some(
+            data.anchor
+                .map_or(boundary, |(anchor, _)| boundary.tighten(anchor)),
+        )
+    }
+
+    pub(super) fn gap(&self, state: State, boundary: BoundaryState, next: FirstClass) -> GapClass {
+        boundary
+            .gap_before(next)
+            .tighten(self.states[state as usize].entry_gap)
     }
 
     pub(super) fn allow_field(&mut self, field: NodeFieldId) {
@@ -82,7 +108,7 @@ impl ChildAutomaton {
 
     pub(super) fn without_field(field: NodeFieldId) -> Self {
         Self {
-            states: vec![StateData::new(GapClass::Any)],
+            states: vec![StateData::new()],
             start: 0,
             accept: 0,
             negated_fields: vec![field],
@@ -102,7 +128,7 @@ impl ChildAutomaton {
     /// An order probe asks about two resolved demands without carrying the rest
     /// of the failed query's restrictions into the answer.
     pub(super) fn ordered_pair(first: ChildMatcher, second: ChildMatcher) -> Self {
-        let mut states: Vec<_> = (0..3).map(|_| StateData::new(GapClass::Any)).collect();
+        let mut states: Vec<_> = (0..3).map(|_| StateData::new()).collect();
         states[0].pattern_edges.push((first, 1));
         states[1].pattern_edges.push((second, 2));
         Self {
@@ -123,10 +149,6 @@ impl ChildAutomaton {
 
     pub(super) fn negates(&self, field: Option<NodeFieldId>) -> bool {
         field.is_some_and(|field| self.negated_fields.contains(&field))
-    }
-
-    pub(super) fn gap(&self, state: State) -> GapClass {
-        self.states[state as usize].gap
     }
 
     pub(super) fn state_count(&self) -> usize {
@@ -160,14 +182,13 @@ pub(super) fn build(
         model,
         states: Vec::new(),
         state_budget,
+        boundary_inputs: model.boundary_inputs().collect(),
         ref_stack: Vec::new(),
         max_depth,
         depth: 0,
     };
-    let start = builder.new_state(GapClass::Any)?;
-    let accept = builder.emit_items(&node.children, start, None)?;
-    builder.states[accept as usize].gap = node.trailing;
-    builder.states[accept as usize].anchor = node.trailing_anchor;
+    let start = builder.new_state()?;
+    let accept = builder.emit_items(&node.children, start)?;
     Ok(ChildAutomaton {
         states: builder.states,
         start,
@@ -180,42 +201,41 @@ struct Builder<'a> {
     model: &'a Model,
     states: Vec<StateData>,
     state_budget: u64,
+    boundary_inputs: Vec<BoundaryState>,
     ref_stack: Vec<DefId>,
     max_depth: u32,
     depth: u32,
 }
 
-// Reference diamonds can expand exponentially even when their source is small.
+// Reference diamonds and nested repeats can expand faster than their source.
 const STATE_CAP: usize = 20_000;
 
 impl Builder<'_> {
-    fn new_state(&mut self, gap: GapClass) -> Result<State, AnalysisLimit> {
+    fn new_state(&mut self) -> Result<State, AnalysisLimit> {
         if self.states.len() >= STATE_CAP || self.states.len() as u64 >= self.state_budget {
             return Err(AnalysisLimit);
         }
 
         let id = self.states.len() as State;
-        self.states.push(StateData::new(gap));
+        self.states.push(StateData::new());
         Ok(id)
     }
 
-    fn emit_items(
-        &mut self,
-        items: &[Item],
-        entry: State,
-        inherited_first_gap: Option<(GapClass, Option<Span>)>,
-    ) -> Result<State, AnalysisLimit> {
+    fn emit_items(&mut self, items: &[Item], entry: State) -> Result<State, AnalysisLimit> {
         let mut current = entry;
-        for (index, item) in items.iter().enumerate() {
-            let (gap, anchor) = if index == 0 {
-                inherited_first_gap.unwrap_or((item.gap, item.anchor))
-            } else {
-                (item.gap, item.anchor)
-            };
-            self.states[current as usize].gap = gap;
-            self.states[current as usize].anchor = anchor;
-            // A sibling list does not inherit a field from its surrounding group.
-            current = self.emit_pattern(item.pattern, None, current)?;
+        for item in items {
+            match item {
+                Item::Pattern(pattern) => {
+                    // A sibling list does not inherit a field from its surrounding group.
+                    current = self.emit_pattern(*pattern, None, current)?;
+                }
+                Item::Anchor(anchor, span) => {
+                    self.states[current as usize].anchor = Some((*anchor, *span));
+                    let next = self.new_state()?;
+                    self.states[current as usize].eps_edges.push(next);
+                    current = next;
+                }
+            }
         }
         Ok(current)
     }
@@ -243,25 +263,20 @@ impl Builder<'_> {
         from: State,
     ) -> Result<State, AnalysisLimit> {
         match &self.model.pattern(pattern).kind {
-            PatternKind::Node(node) if node.violation.is_some() => self.new_state(GapClass::Any),
+            PatternKind::Node(node) if node.violation.is_some() => self.new_state(),
             PatternKind::Node(node) => {
                 self.emit_single(ChildMatcher::node(node, pattern, field), from)
             }
             PatternKind::Leaf(kind) => self.emit_single(ChildMatcher::new(*kind, field), from),
             PatternKind::Field(field, inner) => self.emit_pattern(*inner, Some(*field), from),
-            PatternKind::Sequence(items) => self.emit_items(
-                items,
-                from,
-                Some((
-                    self.states[from as usize].gap,
-                    self.states[from as usize].anchor,
-                )),
-            ),
-            PatternKind::Repeat(kind, inner) => self.emit_repeat(*kind, *inner, field, from),
+            PatternKind::Sequence(items) => self.emit_items(items, from),
+            PatternKind::Repeat(repeat) => self.emit_repeat(repeat, field, from),
             PatternKind::Alternative(alternatives) => {
-                let to = self.new_state(GapClass::Any)?;
+                let to = self.new_state()?;
                 for &alternative in alternatives {
-                    let exit = self.emit_pattern(alternative, field, from)?;
+                    let branch = self.new_state()?;
+                    self.states[from as usize].eps_edges.push(branch);
+                    let exit = self.emit_pattern(alternative, field, branch)?;
                     self.states[exit as usize].eps_edges.push(to);
                 }
                 if alternatives.is_empty() {
@@ -274,33 +289,93 @@ impl Builder<'_> {
     }
 
     fn emit_single(&mut self, matcher: ChildMatcher, from: State) -> Result<State, AnalysisLimit> {
-        let to = self.new_state(GapClass::Any)?;
+        let to = self.new_state()?;
         self.states[from as usize].pattern_edges.push((matcher, to));
         Ok(to)
     }
 
     fn emit_repeat(
         &mut self,
-        kind: QuantifierKind,
-        inner: PatternId,
+        repeat: &Repeat,
         field: Option<NodeFieldId>,
         from: State,
     ) -> Result<State, AnalysisLimit> {
-        let exit = self.emit_pattern(inner, field, from)?;
-        if kind == QuantifierKind::Optional {
-            self.states[from as usize].eps_edges.push(exit);
-            return Ok(exit);
+        let to = self.new_state()?;
+        if repeat.kind != QuantifierKind::OneOrMore {
+            self.states[from as usize].eps_edges.push(to);
         }
-
-        self.states[exit as usize].eps_edges.push(from);
-        let to = self.new_state(GapClass::Any)?;
-        let bypass = if kind == QuantifierKind::ZeroOrMore {
-            from
-        } else {
-            exit
-        };
-        self.states[bypass as usize].eps_edges.push(to);
+        // A simple repeat reuses its entry search permission. Keep that finite
+        // choice in loop control, while BoundaryState retains path-specific
+        // previous consumers and pending anchors throughout the body.
+        let mut entries = Vec::new();
+        for &input in &self.boundary_inputs {
+            let gap = if repeat.kind == QuantifierKind::Optional {
+                None
+            } else {
+                repeat.entry_gaps[input.index()]
+            };
+            if let Some((_, inputs)) = entries.iter_mut().find(|(seen, _)| *seen == gap) {
+                *inputs |= 1u16 << input.index();
+            } else {
+                entries.push((gap, 1u16 << input.index()));
+            }
+        }
+        for (gap, inputs) in entries {
+            let branch = self.new_state()?;
+            let body = self.new_state()?;
+            let exit = self.emit_pattern(repeat.inner, field, body)?;
+            let consuming = self.consuming_entry(body, exit, GapClass::Any)?;
+            self.states[from as usize].eps_edges.push(branch);
+            self.states[branch as usize].entry_states = inputs;
+            self.states[branch as usize].eps_edges.push(consuming);
+            self.states[exit as usize].eps_edges.push(to);
+            if repeat.kind != QuantifierKind::Optional {
+                let loop_entry = if let Some(gap) = gap {
+                    self.consuming_entry(body, exit, gap)?
+                } else {
+                    consuming
+                };
+                self.states[exit as usize].eps_edges.push(loop_entry);
+            }
+        }
         Ok(to)
+    }
+
+    /// An iteration must consume. Copy only its epsilon prefix, with no route
+    /// to its empty exit. The first consuming edge joins the original body.
+    /// Loop entries also retain the search permission resolved at repeat entry.
+    fn consuming_entry(
+        &mut self,
+        entry: State,
+        exit: State,
+        entry_gap: GapClass,
+    ) -> Result<State, AnalysisLimit> {
+        let start = self.new_state()?;
+        let mut copies = HashMap::from([(entry, start)]);
+        let mut pending = vec![entry];
+        while let Some(state) = pending.pop() {
+            let copy = copies[&state];
+            if state == exit {
+                continue;
+            }
+            let original = self.states[state as usize].clone();
+            self.states[copy as usize].anchor = original.anchor;
+            self.states[copy as usize].entry_states = original.entry_states;
+            self.states[copy as usize].entry_gap = original.entry_gap.tighten(entry_gap);
+            self.states[copy as usize].pattern_edges = original.pattern_edges;
+            for next in original.eps_edges {
+                let target = if let Some(&target) = copies.get(&next) {
+                    target
+                } else {
+                    let target = self.new_state()?;
+                    copies.insert(next, target);
+                    pending.push(next);
+                    target
+                };
+                self.states[copy as usize].eps_edges.push(target);
+            }
+        }
+        Ok(start)
     }
 
     fn emit_reference(
@@ -312,10 +387,15 @@ impl Builder<'_> {
         // Sibling recursion is not generally regular. Keep the existing conservative
         // tail loop while retaining constraints imposed by the non-recursive prefix.
         if self.ref_stack.contains(&definition) {
+            let exit = self.new_state()?;
+            let consumer = self.new_state()?;
             self.states[from as usize]
+                .eps_edges
+                .extend([consumer, exit]);
+            self.states[consumer as usize]
                 .pattern_edges
                 .push((ChildMatcher::new(KindConstraint::AnyNode, None), from));
-            return Ok(from);
+            return Ok(exit);
         }
 
         let target = self.model.definition(definition);

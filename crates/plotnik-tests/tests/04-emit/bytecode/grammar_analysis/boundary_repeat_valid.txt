@@ -1,0 +1,62 @@
+Q = (pair
+  .!
+  {
+    (id)
+    ","
+  }*
+  (id)
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ","}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 02
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (pair)                           13, 06
+  05  !─┘  _                                01
+  06  └─!  (id)                             05
+  07   !   (id)                             05
+  09  ──!  _                                07, 09
+  12  ─‣─  ","                              15, 09
+  13  └─!  (id)                             12
+  15  ──!  (id)                             12
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "pair"
+S2 "id"
+S3 ","
+S4 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 00 :: T0
+
+[instructions]
+Q:
+  00   !   (pair)                           10, 04
+  02                                        ▶
+  03  !─┘  _                                02
+  04  └─!  (id)                             03
+  05   !   (id)                             03
+  06  ──!  _                                05, 06
+  08  ─‣─  ","                              11, 06
+  10  └─!  (id)                             08
+  11  ──!  (id)                             08

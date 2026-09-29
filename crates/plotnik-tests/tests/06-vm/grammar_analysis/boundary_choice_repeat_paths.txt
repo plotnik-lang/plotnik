@@ -1,0 +1,144 @@
+Q = (program
+  (expression_statement
+    (array
+      .!
+      [
+        "["
+        (identifier)
+        "]"
+      ]+ @parts
+      .!
+    )
+  )
+)
+------------------- INPUT (js) -------------------
+[x, 1, y];
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  parts: [Node, ...Node[]];
+}
+--------------------- OUTPUT ---------------------
+{
+  "parts": [
+    {
+      "kind": "[",
+      "span": [0, 1],
+      "text": "["
+    },
+    {
+      "kind": "identifier",
+      "span": [1, 2],
+      "text": "x"
+    },
+    {
+      "kind": "identifier",
+      "span": [7, 8],
+      "text": "y"
+    },
+    {
+      "kind": "]",
+      "span": [8, 9],
+      "text": "]"
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "parts"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "array"
+S6 "["
+S7 "identifier"
+S8 "]"
+
+[type_defs]
+T0 = <Node>
+T1 = ListOneOrMore(T0)  ; <Node>+
+T2 = Record  M0:1  ; { parts }
+
+[type_members]
+M0: S1 → T1  ; parts: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entry_points]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  -ε-  [ListOpen]                       16, 17, 18
+  05  !─┘  _                                06
+  06  ─‣┘² _                                07
+  07                                        ▶
+  08  -ε-  [ListClose RecordSet(M0)]        05
+  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
+  13  ─‣─  "["                              10
+  14  ─‣─  (identifier)                     10
+  15  ─‣─  "]"                              10
+  16  └─!  "["                              10
+  17  └─!  (identifier)                     10
+  18  └─!  "]"                              10
+--------------------- TRACE ----------------------
+Q:
+  00       (program)                        01
+       ●   program
+  01       (expression_statement)           02
+       ●   expression_statement
+  02       (array)                          03
+       ●   array
+  03  -ε-  [ListOpen]                       16, 17, 18
+  16       "["                              10
+       ●   [
+  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
+  13       "["                              10
+       ○   identifier
+       ○   ,
+       ○   number
+       ○   ,
+       ○   identifier
+       ○   ]
+  10  ❮❮❮ 
+  14       (identifier)                     10
+       ●   identifier
+  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
+  13       "["                              10
+       ○   ,
+       ○   number
+       ○   ,
+       ○   identifier
+       ○   ]
+  10  ❮❮❮ 
+  14       (identifier)                     10
+       ○   ,
+       ○   number
+       ○   ,
+       ●   identifier
+  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
+  13       "["                              10
+       ○   ]
+  10  ❮❮❮ 
+  14       (identifier)                     10
+       ○   ]
+  10  ❮❮❮ 
+  15       "]"                              10
+       ●   ]
+  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
+  13       "["                              10
+  10  ❮❮❮ 
+  14       (identifier)                     10
+  10  ❮❮❮ 
+  15       "]"                              10
+  10  ❮❮❮ 
+  08  -ε-  [ListClose RecordSet(M0)]        05
+  05       _                                06
+       ●   array
+  06       _                                07
+       ●   program
+  07   ◀   (Q)                              ◼

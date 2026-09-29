@@ -8,6 +8,8 @@
 
 use std::collections::BTreeSet;
 
+use super::anchors::GapClass;
+
 use crate::compiler::parse::ast::QuantifierKind;
 
 const FIRST_CLASS_COUNT: usize = 4;
@@ -53,7 +55,7 @@ pub(crate) enum PendingAnchor {
 impl PendingAnchor {
     pub(crate) const ALL: [Self; PENDING_ANCHOR_COUNT] = [Self::None, Self::Soft, Self::Exact];
 
-    fn index(self) -> usize {
+    pub(crate) fn index(self) -> usize {
         match self {
             Self::None => 0,
             Self::Soft => 1,
@@ -85,7 +87,16 @@ impl BoundaryState {
         Self { previous, pending }
     }
 
-    fn index(self) -> usize {
+    pub(crate) const COUNT: usize = STATE_COUNT;
+
+    pub(crate) fn from_index(index: usize) -> Self {
+        Self::new(
+            FirstClass::ALL[index / PENDING_ANCHOR_COUNT],
+            PendingAnchor::ALL[index % PENDING_ANCHOR_COUNT],
+        )
+    }
+
+    pub(crate) fn index(self) -> usize {
         self.previous.index() * PENDING_ANCHOR_COUNT + self.pending.index()
     }
 
@@ -97,14 +108,30 @@ impl BoundaryState {
         })
     }
 
-    fn tighten(self, anchor: PendingAnchor) -> Self {
+    pub(crate) fn tighten(self, anchor: PendingAnchor) -> Self {
         Self {
             previous: self.previous,
             pending: self.pending.tighten(anchor),
         }
     }
 
-    fn consume(self, class: FirstClass) -> Self {
+    pub(crate) fn gap_before(self, next: FirstClass) -> GapClass {
+        match self.pending {
+            PendingAnchor::None => GapClass::Any,
+            PendingAnchor::Exact => GapClass::Exact,
+            PendingAnchor::Soft => {
+                let previous_allows_broad =
+                    matches!(self.previous, FirstClass::Empty | FirstClass::Named);
+                if previous_allows_broad && next == FirstClass::Named {
+                    GapClass::AnonymousAndExtras
+                } else {
+                    GapClass::ExtrasOnly
+                }
+            }
+        }
+    }
+
+    pub(crate) fn consume(self, class: FirstClass) -> Self {
         let _ = self;
         Self {
             previous: class,
@@ -167,6 +194,18 @@ impl BoundaryRelation {
             });
         }
         relation
+    }
+
+    /// The simple lowering route reuses its resolved entry navigation on every
+    /// iteration. Multiple boundary outcomes instead use path-specific entries.
+    pub(crate) fn repeat_entry_gap(&self, input: BoundaryState) -> Option<GapClass> {
+        let outcomes: Vec<_> = self.outcomes(input).iter().copied().collect();
+        if !simple_boundary_outcomes(&outcomes) {
+            return None;
+        }
+        let first = outcomes.iter().find(|outcome| outcome.consumed)?.first;
+        let gap = input.gap_before(first);
+        (gap != GapClass::Any).then_some(gap)
     }
 
     pub(crate) fn outcomes(&self, input: BoundaryState) -> &BTreeSet<BoundaryOutcome> {
@@ -279,4 +318,77 @@ impl BoundaryRelation {
         }
         closure
     }
+}
+
+/// Maximum semantic continuation universe after operationally equivalent
+/// descriptive outcomes are merged.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum ExitPort {
+    ConsumedNamedNone,
+    ConsumedOtherNone,
+    ConsumedNamedSoft,
+    ConsumedOtherSoft,
+    ConsumedExact,
+    EmptyNone,
+    EmptySoft,
+    EmptyExact,
+}
+
+impl ExitPort {
+    pub(crate) fn from_outcome(outcome: BoundaryOutcome) -> Self {
+        if !outcome.consumed {
+            return match outcome.state.pending {
+                PendingAnchor::None => Self::EmptyNone,
+                PendingAnchor::Soft => Self::EmptySoft,
+                PendingAnchor::Exact => Self::EmptyExact,
+            };
+        }
+
+        match (outcome.state.previous, outcome.state.pending) {
+            (_, PendingAnchor::Exact) => Self::ConsumedExact,
+            (FirstClass::Named, PendingAnchor::None) => Self::ConsumedNamedNone,
+            (FirstClass::Named, PendingAnchor::Soft) => Self::ConsumedNamedSoft,
+            (FirstClass::Anonymous | FirstClass::Either, PendingAnchor::None) => {
+                Self::ConsumedOtherNone
+            }
+            (FirstClass::Anonymous | FirstClass::Either, PendingAnchor::Soft) => {
+                Self::ConsumedOtherSoft
+            }
+            (FirstClass::Empty, _) => {
+                unreachable!("a consuming outcome has a previous consumer")
+            }
+        }
+    }
+
+    pub(crate) fn from_state(state: BoundaryState, consumed: bool) -> Self {
+        Self::from_outcome(BoundaryOutcome {
+            state,
+            consumed,
+            first: if consumed {
+                state.previous
+            } else {
+                FirstClass::Empty
+            },
+        })
+    }
+
+    pub(crate) fn consumed(self) -> bool {
+        !matches!(self, Self::EmptyNone | Self::EmptySoft | Self::EmptyExact)
+    }
+}
+
+/// Whether a pattern has at most one consuming route and one empty route under
+/// the operational boundary quotient used by lowering.
+pub(crate) fn simple_boundary_outcomes(outcomes: &[BoundaryOutcome]) -> bool {
+    let mut consuming = BTreeSet::new();
+    let mut empty = BTreeSet::new();
+    for outcome in outcomes {
+        let port = ExitPort::from_outcome(*outcome);
+        if port.consumed() {
+            consuming.insert((port, outcome.first));
+        } else {
+            empty.insert(port);
+        }
+    }
+    consuming.len() <= 1 && empty.len() <= 1
 }

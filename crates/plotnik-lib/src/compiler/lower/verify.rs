@@ -83,9 +83,9 @@ mod debug_impl {
     use crate::bytecode::{EffectKind, EntryBoundary, Nav};
     use indexmap::IndexMap;
 
+    use crate::compiler::analyze::boundary::ExitPort;
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
-    use crate::compiler::lower::boundary::ExitPort;
     use crate::compiler::lower::ir::{
         DefRoute, DefSpecialization, EffectArg, InstructionIR, Label, MatchIR, NfaGraph,
         NodeKindConstraint, PortId, PredicateValueIR,

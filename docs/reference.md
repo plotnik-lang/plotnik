@@ -30,9 +30,9 @@ Plotnik matches Tree-sitter syntax trees and builds typed results from the parts
 - [Constrain sibling positions](#constrain-sibling-positions)
   - [Soft and exact adjacency](#soft-and-exact-adjacency)
   - [First, last, and no children](#first-last-and-no-children)
-  - [Anchors with optional or repeated patterns](#anchors-with-optional-or-repeated-patterns)
   - [Anchors in groups and definitions](#anchors-in-groups-and-definitions)
   - [Anchors beside alternatives](#anchors-beside-alternatives)
+  - [Anchors with optional or repeated patterns](#anchors-with-optional-or-repeated-patterns)
 - [Choose capture types](#choose-capture-types)
   - [Source text](#source-text)
   - [Presence booleans](#presence-booleans)
@@ -637,26 +637,23 @@ The progress check needs a node match before the recursive call, as shown by `me
 
 ## Constrain sibling positions
 
-Anchors restrict the gaps that ordinary matching can skip. They constrain syntax-tree nodes, not source characters. Whitespace that Tree-sitter leaves out of the tree cannot break an anchor.
+An anchor restricts the gap between matched siblings, or between a matched child and the beginning or end of its parent's child list. It constrains syntax-tree nodes, not source characters. Whitespace that Tree-sitter leaves out of the tree cannot break an anchor.
 
-Tree-sitter marks some nodes as _extras_, commonly comments. Extras can be named or anonymous. An anchor's treatment of extras is separate from whether a pattern can explicitly match them.
+The patterns that actually consume nodes determine the gap's boundaries. A sequence uses its first and last consuming patterns, and an alternation uses the selected alternative. A pattern that matches nothing supplies no new boundary node. Groups, captures, and definition references do not insert nodes of their own.
+
+Tree-sitter marks some nodes as _extras_, commonly comments. Extras can be named or anonymous. The rules below distinguish nodes skipped in a gap from nodes explicitly matched by a pattern.
 
 ### Soft and exact adjacency
 
-`.` is soft adjacency. Between named-node patterns it skips punctuation and extras, but no other named node. With an anonymous token or bare `_` on either side, it skips extras only. `.!` allows no intervening tree node:
+Without an anchor, matching can skip any intervening siblings. Anchors narrow that permission:
 
-| Gap                | Nodes allowed in the gap   |
-| ------------------ | -------------------------- |
-| No anchor          | Any                        |
-| `(a) . (b)`        | Anonymous nodes and extras |
-| `(a) . "token"`    | Extras only                |
-| `"token" . (b)`    | Extras only                |
-| `(a) . _`          | Extras only                |
-| Any pair with `.!` | None                       |
+- Soft `.` between named-node patterns allows anonymous nodes and extras in the gap, but no other named node.
+- Soft `.` with an anonymous token pattern or bare `_` at either boundary allows extras only.
+- Exact `.!` allows no intervening tree node, including extras.
 
-Here `a` and `b` stand for named node kinds. `(_)` uses the named-node rule, while `_` must allow for an anonymous match.
+The named wildcard `(_)` follows the named-node rule. Bare `_` follows the extras-only rule even when it happens to match a named node.
 
-For example:
+For example, these identifiers must be consecutive among the array's named non-extra children:
 
 ```ptk
 (array (identifier) @first . (identifier) @second)
@@ -667,13 +664,13 @@ For example:
 [a, 42, b]              fails: number is a named node
 ```
 
-Replacing `.` with `.!` makes this query impossible: JavaScript arrays separate identifiers with comma nodes. The compiler rejects that adjacency using the grammar. Exact adjacency is quite literal about punctuation.
+Replacing `.` with `.!` makes this pattern impossible in the JavaScript grammar because a comma node must separate the identifiers. The compiler reports the impossible adjacency.
 
-An explicit `(comment)` pattern still gets to match a comment. Skipping rules apply to the gap, not to the node requested by the pattern.
+An explicit `(comment)` pattern can still match a comment. Being allowed to skip an extra does not prevent a pattern from selecting it.
 
 ### First, last, and no children
 
-A leading anchor restricts the gap before the first matched child. A trailing anchor restricts the gap after the last one:
+A leading anchor applies the gap rule before the first matched child. A trailing anchor applies it after the last matched child:
 
 ```ptk
 (array . (identifier) @first)
@@ -683,48 +680,27 @@ A leading anchor restricts the gap before the first matched child. A trailing an
 (array (identifier) @last .)
 ```
 
-The first pattern requires the first named non-extra child to be an identifier. The second requires the last such child to be an identifier. Anonymous brackets and commas can be skipped. For an anonymous operand, only extras can be skipped at that boundary. With `.!`, the matched node must be the actual first or last child, including punctuation.
+The first pattern selects the first named non-extra child, which must be an identifier. The second selects the last such child. Both can skip the array's anonymous brackets and commas. If the boundary pattern is an anonymous token or bare `_`, a soft anchor allows only extras before or after it. With `.!`, the matched node must be the actual first or last child, including punctuation and extras.
 
-Anchors alone check emptiness:
+An anchor with no child patterns applies its rule to the whole child list:
 
 ```ptk
 (statement_block .)
 ```
 
-This accepts a block containing only braces and comments. `(program .!)` requires a program with no children at all.
-
-### Anchors with optional or repeated patterns
-
-An empty match does not erase an anchor:
-
-```ptk
-Q = (program
-  (lexical_declaration)? @declaration
-  .
-  (debugger_statement) @stop
-)
-```
-
-If the declaration matches, `stop` must follow it under the soft adjacency rule. If the declaration is skipped, the anchor applies at the beginning of the child list. `debugger;` and `/* note */ debugger;` match that path, but `call(); debugger;` does not.
-
-An anchor before a quantified pattern constrains both where the repeat begins and the gaps between its iterations:
-
-```ptk
-Q = (program
-  . (debugger_statement)* @stops
-  . (expression_statement) @next
-)
-```
-
-For `debugger; debugger; work();`, `stops` contains both debuggers. It cannot skip `other();` to find another debugger farther ahead. If the repeat takes zero nodes, the next anchored pattern must still begin at the parent's allowed boundary. `.!` keeps the exact rule on both the consuming and empty paths.
-
-If an entire anchored child list matches nothing, its anchors check that the parent contains no disallowed children. `(program (debugger_statement)* @stops .)` can match an empty or comment-only program with `stops: []`, but not a program containing an expression statement. When both leading and trailing constraints remain, the stricter one applies.
+This accepts a block containing only anonymous nodes and extras, such as braces and comments. `(program .!)` requires a program with no children at all.
 
 ### Anchors in groups and definitions
 
-An interior anchor can join patterns inside a sequence. A boundary anchor needs a sibling or an enclosing node supplied by its surroundings. Braces do not create a parent node.
+Braces group sibling patterns without changing their boundaries. An anchor before a group applies to its first consuming pattern, and an anchor after it applies to its last consuming pattern:
 
-A definition can leave that boundary for its caller:
+```ptk
+(array {"[" (identifier)} . (identifier) @last)
+```
+
+On `[x, y]`, the group matches `[` and `x`, then the soft anchor allows the comma before `y`. The group's last consuming pattern is an identifier, so the earlier `"["` does not narrow that gap to extras only.
+
+A leading or trailing anchor inside a group also reaches outside the braces. It needs a sibling pattern or an enclosing parent boundary supplied by its surroundings. A definition can leave this boundary for its caller:
 
 ```ptk
 Tail = {(identifier) @name .}
@@ -736,21 +712,71 @@ Q = (program
 )
 ```
 
-`Tail` is a fragment. Its trailing anchor makes the captured identifier the array's last named non-extra child. A chain of references that never supplies the required context is rejected.
+`Tail` is a fragment. Here its trailing anchor reaches the end of the array's child list, so `name` is the last named non-extra child. On `[x, y]`, it captures `y`. If the caller instead places another sibling pattern after `(Tail)`, the anchor constrains the gap to that pattern. A chain of references that never supplies the required context is rejected.
 
-Anchors cannot be captured or quantified. They also cannot stand directly between alternatives. To anchor a sequence within an alternative, put that sequence in braces.
+An anchor itself cannot be captured or quantified. A group containing anchors can be captured or quantified.
 
 ### Anchors beside alternatives
 
-With a soft anchor before an alternation, the alternative being tried determines whether anonymous nodes can be skipped:
+An alternation's boundary follows the alternative being tried:
 
 ```ptk
 (array (identifier) . [(identifier) ","])
 ```
 
-The identifier alternative can skip punctuation. The comma alternative can skip only extras. After an alternation, the path that matched determines the rule too, including before a trailing anchor. Captures, quantified alternatives, and definition references preserve the named and anonymous paths. Bare `_` still uses the extras-only rule even when it happens to match a named node.
+The identifier alternative can skip punctuation and extras after the first identifier. The comma alternative can skip only extras. An anonymous alternative does not narrow the gap for a named alternative.
 
-One conservative case remains in the grammar check: a sequence containing an anonymous token is classified as potentially anonymous as a whole. Inside an array, `{"[" (identifier)} . (identifier)` is rejected because the gap needs a comma. Write `"[" {(identifier) . (identifier)}` to put the soft anchor directly between the named patterns.
+After the alternation, the last consuming pattern in the selected alternative determines the next soft anchor's rule. This also applies to a trailing anchor at the end of a child list. Capturing or referencing the alternation preserves these distinct boundaries.
+
+Anchors cannot stand directly between alternatives. To put an anchor inside one alternative, write that alternative as a sequence, such as `{(identifier) . (identifier)}`.
+
+### Anchors with optional or repeated patterns
+
+An anchor already reached remains in effect when an optional pattern or a `*` repeat matches nothing. The next pattern that consumes a node must satisfy it:
+
+```ptk
+Q = (program
+  (lexical_declaration)? @declaration
+  .
+  (debugger_statement) @stop
+)
+```
+
+If the declaration matches, `stop` must follow it under the soft adjacency rule. If the declaration is skipped, the anchor applies from the beginning of the program's child list. `debugger;` and `/* note */ debugger;` match that empty path, but `call(); debugger;` does not. The same rule carries an anchor placed before the optional pattern through to its follower when the optional pattern is skipped.
+
+If several anchors apply to the same gap because patterns between them match nothing, the strictest one wins. An exact `.!` is not weakened by a later soft `.`. If the entire child list matches nothing, the remaining anchors check the whole list. Thus `(program (debugger_statement)* @stops .)` accepts an empty or comment-only program with `stops: []`, but rejects a program containing an expression statement.
+
+For a repeated node pattern, a preceding anchor sets both the entry gap and the gaps between iterations:
+
+```ptk
+Q = (program
+  . (debugger_statement)* @stops
+  . (expression_statement) @next
+)
+```
+
+On `debugger; debugger; work();`, `stops` contains both debuggers. The repeat can skip comments between them, but cannot cross another statement to find a later debugger. Replacing the leading `.` with `.!` also forbids comments before and between the debuggers. The following anchor independently constrains the gap from the last debugger to `next`.
+
+Alternatives consisting only of named-node patterns, such as `[(identifier) (number)]+`, follow the same rule. The different node kinds have the same boundary behavior.
+
+A repeated group with a fixed beginning and end also reuses its entry gap permission. That permission is not recalculated solely from the last node of each iteration:
+
+```ptk
+(array
+  . {(identifier) @id ","}+ @pairs
+  (identifier) @last "]" .!
+)
+```
+
+On `[x,,y,,z]`, `pairs` contains records for `x` and `y`, and `last` is `z`. The leading soft anchor allows anonymous nodes before each iteration's identifier. It therefore permits the extra comma before `y`, even though the preceding iteration ended by matching a comma. The gaps inside the group and before `last` have no anchor.
+
+Do not extend that repeat rule to alternatives with different boundaries. An anchor before a mixed repeat constrains its first iteration, but does not necessarily constrain later gaps:
+
+```ptk
+(array .! ["[" (identifier) "]"]+ @parts .!)
+```
+
+On `[x, 1, y]`, `parts` contains `[`, `x`, `y`, and `]`. The outer exact anchors require the repeat to start at the first child and finish at the last child. Later iterations can search forward, skipping commas and the number, because the repeated alternatives leave no anchor between those iterations. To require a boundary on every iteration of such a repeat, put the anchor inside each alternative's sequence. An outer trailing anchor checks the final endpoint, not the gaps crossed to reach it.
 
 ## Choose capture types
 

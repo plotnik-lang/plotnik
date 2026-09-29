@@ -1,0 +1,127 @@
+Q = (program
+  (expression_statement
+    (array
+      {
+        (identifier)? @id
+      }+ @ids
+    )
+  )
+)
+------------------- INPUT (js) -------------------
+[x, y];
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  ids: [QIds, ...QIds[]];
+}
+
+export interface QIds {
+  id: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "ids": [
+    {
+      "id": {
+        "kind": "identifier",
+        "span": [1, 2],
+        "text": "x"
+      }
+    },
+    {
+      "id": {
+        "kind": "identifier",
+        "span": [4, 5],
+        "text": "y"
+      }
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "ids"
+S3 "QIds"
+S4 "Q"
+S5 "program"
+S6 "expression_statement"
+S7 "array"
+S8 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:1  ; { id }
+T3 = ListOneOrMore(T2)  ; QIds+
+T4 = Record  M1:1  ; { ids }
+
+[type_members]
+M0: S1 → T1  ; id: T1
+M1: S2 → T3  ; ids: T3
+
+[type_names]
+N0: S3 → T2  ; QIds
+N1: S4 → T4  ; Q
+
+[entry_points]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └─!  _ [ListOpen]                     12, 14
+  05                                        ▶
+  06  -ε-  [RecordClose ArrayPush]          14, 16
+  08   !   (identifier) [Node RecordSet(M0)]  06
+  10  ──!  _                                08, 10
+  12   !   _ [RecordOpen]                   08, 10
+  14  ──!  _                                12, 14
+  16  ─‣┘³ _ [ListClose RecordSet(M1)]      05
+--------------------- TRACE ----------------------
+Q:
+  00       (program)                        01
+       ●   program
+  01       (expression_statement)           02
+       ●   expression_statement
+  02       (array)                          03
+       ●   array
+  03       _ [ListOpen]                     12, 14
+       ●   [
+  12       _ [RecordOpen]                   08, 10
+       ●   [
+  08       (identifier) [Node RecordSet(M0)]  06
+       ○   [
+  12  ❮❮❮ 
+  10       _                                08, 10
+       ●   identifier
+  08       (identifier) [Node RecordSet(M0)]  06
+       ●   identifier
+  06  -ε-  [RecordClose ArrayPush]          14, 16
+  14       _                                12, 14
+       ●   ,
+  12       _ [RecordOpen]                   08, 10
+       ●   ,
+  08       (identifier) [Node RecordSet(M0)]  06
+       ○   ,
+  12  ❮❮❮ 
+  10       _                                08, 10
+       ●   identifier
+  08       (identifier) [Node RecordSet(M0)]  06
+       ●   identifier
+  06  -ε-  [RecordClose ArrayPush]          14, 16
+  14       _                                12, 14
+       ●   ]
+  12       _ [RecordOpen]                   08, 10
+       ●   ]
+  08       (identifier) [Node RecordSet(M0)]  06
+       ○   ]
+  12  ❮❮❮ 
+  10       _                                08, 10
+  14  ❮❮❮ 
+  14       _                                12, 14
+  06  ❮❮❮ 
+  16       _ [ListClose RecordSet(M1)]      05
+       ●   program
+  05   ◀   (Q)                              ◼

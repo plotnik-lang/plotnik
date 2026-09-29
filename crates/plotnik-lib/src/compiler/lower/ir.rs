@@ -11,9 +11,10 @@ use crate::bytecode::{CodeAddr, EffectKind, EntryBoundary, MatchCounts, Nav, Pre
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::boundary::BoundaryState;
+use crate::compiler::analyze::boundary::ExitPort;
 use crate::compiler::analyze::types::CaptureTypePlan;
 use crate::compiler::ids::{DefId, ResultMemberId, TypeId};
-use crate::compiler::lower::boundary::{ExitPort, ExitSignature};
+use crate::compiler::lower::boundary::ExitSignature;
 use crate::compiler::lower::spans::SpanTable;
 use crate::compiler::lower::thompson::boundary::{EntryObligation, NavigationContract};
 use crate::core::NodeFieldId;

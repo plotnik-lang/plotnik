@@ -2,41 +2,17 @@ Q = (array
   (identifier)+
   .!
 )
----------------------- NFA -----------------------
-[entry_points]
-Q = 02
-
-[transitions]
-Q:
-  01                                        ▶
-  02   !   (array)                          10
-  05  !─┘  _                                01
-  07   !   (identifier)                     09, 05
-  09  ──!  _                                07, 09
-  10  └─!  _                                07, 09
--------------------- BYTECODE --------------------
-[strings]
-S0 "Beauty will save the world"
-S1 "array"
-S2 "identifier"
-S3 "Q"
-
-[type_defs]
-T0 = <NoValue>
-
-[type_members]
-
-[type_names]
-
-[entry_points]
-Q = 0 :: T0
-
-[instructions]
-Q:
-  0   !   (array)                           1
-  1  └─!  _                                 5, 8
-  3                                         ▶
-  4  !─┘  _                                 3
-  5   !   (identifier)                      8, 4
-  7  ...
-  8  ──!  _                                 5, 8
+------------------ DIAGNOSTICS -------------------
+error: the trailing exact anchor (`.!`) prevents these children from matching `array`
+ --> query.ptk:3:3
+  |
+1 | Q = (array
+  |      ----- inside `array`
+2 |   (identifier)+
+3 |   .!
+  |   ^^
+  |
+help: remove this anchor to allow these child patterns
+  |
+3 -   .!
+  |

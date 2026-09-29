@@ -1,0 +1,65 @@
+Q = (file
+  .
+  {
+    (id)
+    "("
+    ")"
+  }+
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  file:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: _call}
+      - {type: STRING, value: ";"}
+      - {type: SYMBOL, name: _call}
+  _call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "("}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 02
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (file)                           09
+  05  !─┘  _                                01
+  07  ─‣─  ")"                              12, 05
+  08  ─‣─  "("                              07
+  09  └•─  (id)                             08
+  12  ─•─  (id)                             08
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "file"
+S2 "id"
+S3 "("
+S4 ")"
+S5 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (file)                            1
+  1  └•─  (id)                              6
+  2                                         ▶
+  3  !─┘  _                                 2
+  4  ─‣─  ")"                               7, 3
+  6  ─‣─  "("                               4
+  7  ─•─  (id)                              6

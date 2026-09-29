@@ -4,7 +4,7 @@
 //!
 //! - `SAT(p, realizer)` — a grammar `realizer` (a token `Leaf`, or a non-terminal
 //!   `Var`) can realize the child structure query node `p` demands.
-//! - `THREAD(p, h, (q, gap))` — the visible frontier of hidden variable `h`, spliced into
+//! - `THREAD(p, h, (q, boundary))` — the visible frontier of hidden variable `h`, spliced into
 //!   `p`'s child list, drives `A_p` from the input configuration to a set of outputs.
 //!
 //! They are computed as a least fixed point by a demand-driven worklist: every key
@@ -24,13 +24,14 @@ use std::sync::Arc;
 
 use indexmap::IndexSet;
 
+use crate::compiler::analyze::boundary::FirstClass;
 use crate::compiler::limits::SatisfiabilityLimits;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::super::model::{KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
-use super::automaton::{self, ChildAutomaton, ChildMatcher, State};
+use super::automaton::{self, ChildAutomaton, ChildMatcher};
 use super::configurations::{Configuration, Configurations};
 use super::facts::GrammarFacts;
 use crate::compiler::parse::ast::QuantifierKind;
@@ -146,10 +147,6 @@ impl<'f, 'q> ProductionThread<'f, 'q> {
         self.frozen.automaton(self.pattern)
     }
 
-    fn configuration(&self, state: State) -> Configuration {
-        self.frozen.configuration(self.pattern, state)
-    }
-
     fn hidden_key(
         &self,
         hidden_var: VarId,
@@ -201,10 +198,13 @@ impl<'a> Frozen<'a> {
         self.grammar.structure().realizers_of(kind)
     }
 
-    fn configuration(&self, pattern: AutomatonId, state: State) -> Configuration {
-        Configuration {
-            state,
-            gap: self.automaton(pattern).gap(state),
+    fn consumer_class(&self, kind: KindConstraint) -> FirstClass {
+        match kind {
+            KindConstraint::Exact(kind) if self.grammar.is_anonymous_node(kind) => {
+                FirstClass::Anonymous
+            }
+            KindConstraint::AnyNode => FirstClass::Either,
+            _ => FirstClass::Named,
         }
     }
 
@@ -434,20 +434,24 @@ impl<'a> SatisfiabilitySolver<'a> {
                     }
                     _ => true,
                 },
-                PatternKind::Leaf(_)
-                | PatternKind::Repeat(QuantifierKind::Optional | QuantifierKind::ZeroOrMore, _) => {
-                    true
-                }
+                PatternKind::Leaf(_) => true,
+                PatternKind::Repeat(repeat) if repeat.kind != QuantifierKind::OneOrMore => true,
                 _ => {
                     let alternative = matches!(kind, PatternKind::Alternative(_));
                     let child = match kind {
                         PatternKind::Alternative(children) => children.get(*next_child).copied(),
-                        PatternKind::Sequence(items) => {
-                            items.get(*next_child).map(|item| item.pattern)
-                        }
-                        PatternKind::Field(_, inner) | PatternKind::Repeat(_, inner) => {
-                            (*next_child == 0).then_some(*inner)
-                        }
+                        PatternKind::Sequence(items) => match items.get(*next_child) {
+                            Some(item) => {
+                                let Some(pattern) = item.pattern() else {
+                                    *next_child += 1;
+                                    continue;
+                                };
+                                Some(pattern)
+                            }
+                            None => None,
+                        },
+                        PatternKind::Field(_, inner) => (*next_child == 0).then_some(*inner),
+                        PatternKind::Repeat(repeat) => (*next_child == 0).then_some(repeat.inner),
                         PatternKind::Reference(definition) => {
                             (*next_child == 0).then(|| self.frozen.model.definition(*definition))
                         }
@@ -638,7 +642,7 @@ impl Solve {
         (pattern, realizer): SatKey,
     ) -> Result<bool, AnalysisLimit> {
         let automaton = frozen.automaton(pattern);
-        let start = Configurations::singleton(frozen.configuration(pattern, automaton.start()));
+        let start = Configurations::singleton(Configuration::start(automaton.start()));
         let accept = automaton.accept();
         if realizer == NodeRealizer::Leaf {
             // Leaves have no children, not even extras.
@@ -750,17 +754,24 @@ impl Solve {
         let mut next = Configurations::default();
         for q in current.iter() {
             self.charge()?;
-            // Preserve the pending anchor on this path, including across hidden rules.
-            if q.gap.admits(node_class) {
+            // Control states do not own a search. Each consumer has its own
+            // position, so a broad alternative cannot lend its gap to another.
+            if q.state == automaton.accept()
+                && q.boundary.gap_before(FirstClass::Named).admits(node_class)
+            {
                 next.insert(q);
             }
             for (matcher, to) in automaton.pattern_edges(q.state) {
                 self.charge()?;
+                let class = thread.frozen.consumer_class(matcher.kind);
+                if automaton.gap(q.state, q.boundary, class).admits(node_class) {
+                    next.insert(q);
+                }
                 if thread.frozen.kind_ok(matcher.kind, visible.kind)
                     && field_ok(matcher.field, effective)
                     && self.child_sat(matcher, visible.realizer)
                 {
-                    next.insert(thread.configuration(*to));
+                    next.insert(q.consume(*to, class));
                 }
             }
         }
@@ -791,10 +802,12 @@ impl Solve {
         let mut stack: Vec<_> = result.iter().collect();
         while let Some(input) = stack.pop() {
             self.charge()?;
+            let Some(boundary) = automaton.advance(input.state, input.boundary) else {
+                continue;
+            };
             for &to in automaton.eps_edges(input.state) {
                 self.charge()?;
-                let mut output = thread.configuration(to);
-                output.gap = input.gap.tighten(output.gap);
+                let output = Configuration::new(to, boundary);
                 if result.insert(output) {
                     stack.push(output);
                 }
@@ -804,7 +817,7 @@ impl Solve {
                 if self.can_consume_extra(frozen, matcher) {
                     // Consuming an extra satisfies the incoming anchor just as
                     // consuming any other visible child does.
-                    let output = thread.configuration(*to);
+                    let output = input.consume(*to, frozen.consumer_class(matcher.kind));
                     if result.insert(output) {
                         stack.push(output);
                     }
@@ -817,20 +830,22 @@ impl Solve {
     /// A leaf realizes only the empty child sequence. Gaps cannot matter without
     /// children, so this is reachability over epsilon edges alone.
     fn accepts_empty(&mut self, automaton: &ChildAutomaton) -> Result<bool, AnalysisLimit> {
-        let mut visited = vec![false; automaton.state_count()];
-        let mut stack = vec![automaton.start()];
-        visited[automaton.start() as usize] = true;
-        while let Some(state) = stack.pop() {
+        let start = Configuration::start(automaton.start());
+        let mut visited = Configurations::singleton(start);
+        let mut stack = vec![start];
+        while let Some(input) = stack.pop() {
             self.charge()?;
-            if state == automaton.accept() {
+            if input.state == automaton.accept() {
                 return Ok(true);
             }
-
-            for &to in automaton.eps_edges(state) {
+            let Some(boundary) = automaton.advance(input.state, input.boundary) else {
+                continue;
+            };
+            for &to in automaton.eps_edges(input.state) {
                 self.charge()?;
-                if !visited[to as usize] {
-                    visited[to as usize] = true;
-                    stack.push(to);
+                let output = Configuration::new(to, boundary);
+                if visited.insert(output) {
+                    stack.push(output);
                 }
             }
         }

@@ -9,10 +9,11 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::boundary::BoundaryState;
+use crate::compiler::analyze::boundary::ExitPort;
 use crate::compiler::analyze::types::CaptureTypePlan;
 use crate::compiler::analyze::types::type_shape::{PatternFlow, TypeShape};
 use crate::compiler::ids::TypeId;
-use crate::compiler::lower::boundary::{ExitMap, ExitPort};
+use crate::compiler::lower::boundary::ExitMap;
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
 

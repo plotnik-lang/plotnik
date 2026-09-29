@@ -17,17 +17,41 @@ rules:
       - {type: SYMBOL, name: id}
       - {type: STRING, value: "]"}
   id: {type: PATTERN, value: "[a-z]+"}
------------------- DIAGNOSTICS -------------------
-error: the leading soft anchor (`.`) prevents these children from matching `list`
- --> query.ptk:2:3
-  |
-1 | Q = (list
-  |      ---- inside `list`
-2 |   .
-  |   ^
-  |
-help: remove this anchor to allow these child patterns
-  |
-2 -   .
-  |
-help: `list` allows `"[" id "]"`
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (list)                            7, 5
+  4  ─‣┘  _                                 1
+  5  └•─  (id)                              4
+  6  ─‣─  (id)                              4
+  7  └◦─  ";"                               6
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "list"
+S2 ";"
+S3 "id"
+S4 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (list)                            5, 3
+  2                                         ▶
+  3  └•─  (id)                              6
+  4  ─‣─  (id)                              6
+  5  └◦─  ";"                               4
+  6  ─‣┘  _                                 2

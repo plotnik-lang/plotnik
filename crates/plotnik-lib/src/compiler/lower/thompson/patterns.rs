@@ -9,9 +9,10 @@
 
 use crate::bytecode::{EffectKind, Nav, PredicateOp, SpanKind};
 use crate::compiler::analyze::boundary::BoundaryState;
+use crate::compiler::analyze::boundary::ExitPort;
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
-use crate::compiler::lower::boundary::{ExitMap, ExitPort, ExitSignature};
+use crate::compiler::lower::boundary::{ExitMap, ExitSignature};
 use crate::compiler::lower::ir::{
     CallEntry, CalleeEntry, DefBodyMode, DefRoute, DefSpecialization, EffectArg, EffectIR,
     InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR, ReturnAddr, SplitReturnAddrs,

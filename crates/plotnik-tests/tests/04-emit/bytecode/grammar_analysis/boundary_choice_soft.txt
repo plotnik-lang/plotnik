@@ -1,0 +1,32 @@
+Q = (call
+  (id)
+  .
+  [
+    (id)
+    ")"
+  ]
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "("}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: the interior soft anchor (`.`) prevents these children from matching `call`
+ --> query.ptk:3:3
+  |
+1 | Q = (call
+  |      ---- inside `call`
+2 |   (id)
+3 |   .
+  |   ^
+  |
+help: remove this anchor to allow these child patterns
+  |
+3 -   .
+  |
+help: `call` allows `id "(" ")"`

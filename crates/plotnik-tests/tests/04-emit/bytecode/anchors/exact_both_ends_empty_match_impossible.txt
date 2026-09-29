@@ -14,15 +14,15 @@ rules:
       - {type: STRING, value: "]"}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: the leading exact anchor (`.!`) prevents these children from matching `list`
+error: these anchors prevent the child patterns from matching `list`
  --> query.ptk:2:3
   |
 1 | Q = (list
   |      ---- inside `list`
 2 |   .!
   |   ^^
+3 |   (id)*
+4 |   .!
+  |   -- also constrains the child positions
   |
-help: remove this anchor to allow these child patterns
-  |
-2 -   .!
-  |
+help: remove the highlighted anchors to allow these child patterns

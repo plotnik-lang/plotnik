@@ -1,13 +1,13 @@
 //! Matching structure resolved once at the grammar boundary. Source nodes remain
-//! attached for diagnostics, but automaton construction uses only these IDs and gaps.
+//! attached for diagnostics, but automata use resolved IDs and boundary operations.
 
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use rowan::TextRange;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass, has_direct_alternative_nav};
+use crate::compiler::analyze::anchors::GapClass;
+use crate::compiler::analyze::boundary::{BoundaryState, PendingAnchor};
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::Span;
@@ -54,16 +54,20 @@ pub(super) enum PatternKind {
     Field(NodeFieldId, PatternId),
     Sequence(Vec<Item>),
     Alternative(Vec<PatternId>),
-    Repeat(QuantifierKind, PatternId),
+    Repeat(Repeat),
     Reference(DefId),
+}
+
+pub(super) struct Repeat {
+    pub(super) kind: QuantifierKind,
+    pub(super) inner: PatternId,
+    pub(super) entry_gaps: [Option<GapClass>; BoundaryState::COUNT],
 }
 
 pub(super) struct Node {
     pub(super) kind: KindConstraint,
     pub(super) violation: Option<NodeViolation>,
     pub(super) children: Vec<Item>,
-    pub(super) trailing: GapClass,
-    pub(super) trailing_anchor: Option<Span>,
     pub(super) negated_fields: Vec<NegatedField>,
 }
 
@@ -75,9 +79,7 @@ pub(super) struct NegatedField {
 
 impl Node {
     pub(super) fn constrains_children(&self) -> bool {
-        !self.children.is_empty()
-            || self.trailing != GapClass::Any
-            || !self.negated_fields.is_empty()
+        !self.children.is_empty() || !self.negated_fields.is_empty()
     }
 }
 
@@ -87,10 +89,19 @@ pub(super) enum NodeViolation {
     FieldNotOnKind(NegatedField),
 }
 
-pub(super) struct Item {
-    pub(super) pattern: PatternId,
-    pub(super) gap: GapClass,
-    pub(super) anchor: Option<Span>,
+#[derive(Clone, Copy)]
+pub(super) enum Item {
+    Pattern(PatternId),
+    Anchor(PendingAnchor, Span),
+}
+
+impl Item {
+    pub(super) fn pattern(&self) -> Option<PatternId> {
+        match self {
+            Self::Pattern(pattern) => Some(*pattern),
+            Self::Anchor(..) => None,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -112,7 +123,7 @@ impl Model {
             model: Self::default(),
             grammar,
             definitions,
-            anchors: AnchorSemantics::new(facts),
+            facts,
             sources,
             kinds,
             fields,
@@ -135,6 +146,26 @@ impl Model {
 
     pub(super) fn definitions(&self) -> impl Iterator<Item = PatternId> + '_ {
         self.definitions.values().copied()
+    }
+
+    /// Pending anchors can only come from authored sibling operations. Keep the
+    /// automaton's repeat-entry choices within that query-wide upper bound.
+    pub(super) fn boundary_inputs(&self) -> impl Iterator<Item = BoundaryState> {
+        let mut pending = [false; PendingAnchor::ALL.len()];
+        pending[PendingAnchor::None.index()] = true;
+        for pattern in &self.patterns {
+            let items = match &pattern.kind {
+                PatternKind::Node(node) => &node.children,
+                PatternKind::Sequence(items) => items,
+                _ => continue,
+            };
+            for item in items {
+                if let Item::Anchor(anchor, _) = item {
+                    pending[anchor.index()] = true;
+                }
+            }
+        }
+        BoundaryState::all().filter(move |input| pending[input.pending.index()])
     }
 
     pub(super) fn len(&self) -> usize {
@@ -161,7 +192,7 @@ struct Builder<'a> {
     model: Model,
     grammar: &'a Grammar,
     definitions: &'a DefinitionGraph,
-    anchors: AnchorSemantics<'a>,
+    facts: &'a PatternFacts,
     sources: &'a SourceMap,
     kinds: &'a HashMap<NodeKind<&'a str>, Option<NodeKindId>>,
     fields: &'a HashMap<&'a str, Option<NodeFieldId>>,
@@ -187,13 +218,6 @@ impl Builder<'_> {
                     }
                 };
                 let items: Vec<_> = node.items().collect();
-                let (has_trailing, nav) = self.anchors.check_trailing_anchor(&items);
-                let trailing = if has_trailing {
-                    GapClass::from_nav(nav.expect("trailing anchor has a navigation"))
-                        .expect("trailing anchor uses sibling navigation")
-                } else {
-                    GapClass::Any
-                };
                 let negated_fields: Vec<_> = node
                     .syntax()
                     .children()
@@ -227,9 +251,7 @@ impl Builder<'_> {
                 PatternKind::Node(Node {
                     kind,
                     violation,
-                    children: self.items(source, &items, true),
-                    trailing,
-                    trailing_anchor: trailing_anchor(&items).map(|range| Span::new(source, range)),
+                    children: self.items(source, &items),
                     negated_fields,
                 })
             }
@@ -248,23 +270,27 @@ impl Builder<'_> {
                     self.pattern(origin.wrap(field.value().expect("validated field has a value")));
                 PatternKind::Field(id, body)
             }
-            ast::Pattern::SeqPattern(sequence) => PatternKind::Sequence(self.items(
-                source,
-                &sequence.items().collect::<Vec<_>>(),
-                false,
-            )),
+            ast::Pattern::SeqPattern(sequence) => {
+                PatternKind::Sequence(self.items(source, &sequence.items().collect::<Vec<_>>()))
+            }
             ast::Pattern::Alternation(_) => PatternKind::Alternative(
                 syntax
                     .children()
                     .map(|child| self.pattern(origin.wrap(child)))
                     .collect(),
             ),
-            ast::Pattern::QuantifiedPattern(repeat) => PatternKind::Repeat(
-                repeat
+            ast::Pattern::QuantifiedPattern(repeat) => PatternKind::Repeat(Repeat {
+                kind: repeat
                     .quantifier_kind()
                     .expect("validated repeat has an operator"),
-                self.pattern(origin.wrap(repeat.inner().expect("validated repeat has a body"))),
-            ),
+                inner: self
+                    .pattern(origin.wrap(repeat.inner().expect("validated repeat has a body"))),
+                entry_gaps: std::array::from_fn(|index| {
+                    self.facts
+                        .pattern_boundary_relation(&syntax)
+                        .repeat_entry_gap(BoundaryState::from_index(index))
+                }),
+            }),
             ast::Pattern::DefRef(reference) => PatternKind::Reference(
                 self.definitions
                     .reference_target(reference)
@@ -276,28 +302,21 @@ impl Builder<'_> {
         id
     }
 
-    fn items(&mut self, source: SourceId, items: &[SeqItem], inside_node: bool) -> Vec<Item> {
-        self.anchors
-            .compute_nav_modes(items, inside_node)
-            .into_iter()
-            .map(|(index, nav)| {
-                let SeqItem::Pattern(pattern) = &items[index] else {
-                    unreachable!("anchor navigation is indexed by pattern items");
-                };
-                let mut gap = nav.map_or(GapClass::Any, |nav| {
-                    GapClass::from_nav(nav).expect("sequence entry uses sibling navigation")
-                });
-                // Direct alternatives choose their own navigation in the matcher. Keep
-                // their conservative shared gap, without weakening exact anchors.
-                if gap == GapClass::ExtrasOnly && has_direct_alternative_nav(pattern) {
-                    gap = GapClass::AnonymousAndExtras;
+    fn items(&mut self, source: SourceId, items: &[SeqItem]) -> Vec<Item> {
+        items
+            .iter()
+            .map(|item| match item {
+                SeqItem::Pattern(pattern) => {
+                    Item::Pattern(self.pattern(Located::new(source, pattern.clone())))
                 }
-                Item {
-                    pattern: self.pattern(Located::new(source, pattern.clone())),
-                    gap,
-                    anchor: anchor_range(items[..index].iter().rev())
-                        .map(|range| Span::new(source, range)),
-                }
+                SeqItem::Anchor(anchor) => Item::Anchor(
+                    if anchor.is_exact() {
+                        PendingAnchor::Exact
+                    } else {
+                        PendingAnchor::Soft
+                    },
+                    Span::new(source, anchor.syntax().text_range()),
+                ),
             })
             .collect()
     }
@@ -318,22 +337,4 @@ fn uncaptured(mut pattern: ast::Pattern) -> ast::Pattern {
         pattern = capture.inner().expect("validated capture has a body");
     }
     pattern
-}
-
-// Source provenance follows the same item boundaries used during resolution.
-// It does not compute navigation or decide what an anchor permits.
-fn anchor_range<'a>(items: impl Iterator<Item = &'a SeqItem>) -> Option<TextRange> {
-    items
-        .map_while(|item| match item {
-            SeqItem::Anchor(anchor) => Some(anchor.syntax().text_range()),
-            SeqItem::Pattern(_) => None,
-        })
-        .reduce(TextRange::cover)
-}
-
-fn trailing_anchor(items: &[SeqItem]) -> Option<TextRange> {
-    if let [SeqItem::Pattern(ast::Pattern::SeqPattern(sequence))] = items {
-        return trailing_anchor(&sequence.items().collect::<Vec<_>>());
-    }
-    anchor_range(items.iter().rev())
 }

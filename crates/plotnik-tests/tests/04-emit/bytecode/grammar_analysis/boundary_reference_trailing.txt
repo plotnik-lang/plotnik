@@ -1,0 +1,30 @@
+End = {
+  (id)
+  .!
+}
+
+Q = (pair .! (End))
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ","}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: the leading exact anchor (`.!`) prevents these children from matching `pair`
+ --> query.ptk:6:11
+  |
+6 | Q = (pair .! (End))
+  |      ---- ^^
+  |      |
+  |      inside `pair`
+  |
+help: remove this anchor to allow these child patterns
+  |
+6 - Q = (pair .! (End))
+6 + Q = (pair  (End))
+  |
+help: `pair` allows `id "," id`

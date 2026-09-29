@@ -6,15 +6,16 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
+use crate::compiler::analyze::boundary::ExitPort;
 use crate::compiler::analyze::boundary::{
-    BoundaryOutcome, BoundaryRelation, BoundaryState, FirstClass,
+    BoundaryRelation, BoundaryState, FirstClass, simple_boundary_outcomes,
 };
 use crate::compiler::analyze::result::CaptureMemberKind;
 use crate::compiler::analyze::types::CaptureKind;
 use crate::compiler::analyze::types::type_check::definition_value_root;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
-use crate::compiler::lower::boundary::{ExitMap, ExitPort};
+use crate::compiler::lower::boundary::ExitMap;
 use crate::compiler::lower::ir::{EffectIR, Label, MatchIR, NodeKindConstraint};
 use crate::compiler::lower::spans::SpanBindingIR;
 use crate::compiler::parse::ast::{self, Pattern, SeqItem};
@@ -1414,18 +1415,4 @@ impl NfaBuilder<'_> {
 fn simple_boundary_routes(relation: &BoundaryRelation, input: BoundaryState) -> bool {
     let outcomes: Vec<_> = relation.outcomes(input).iter().copied().collect();
     simple_boundary_outcomes(&outcomes)
-}
-
-fn simple_boundary_outcomes(outcomes: &[BoundaryOutcome]) -> bool {
-    let mut consuming = BTreeSet::new();
-    let mut empty = BTreeSet::new();
-    for outcome in outcomes {
-        let port = ExitPort::from_outcome(*outcome);
-        if port.consumed() {
-            consuming.insert((port, outcome.first));
-        } else {
-            empty.insert(port);
-        }
-    }
-    consuming.len() <= 1 && empty.len() <= 1
 }

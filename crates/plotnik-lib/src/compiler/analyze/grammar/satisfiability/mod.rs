@@ -78,8 +78,8 @@ impl Reporter<'_, '_> {
         let ctx = self.ctx;
         match &ctx.model.pattern(pattern).kind {
             PatternKind::Node(node) => {
-                for child in &node.children {
-                    if let Some(alternation) = self.dead_alternation_child(child.pattern)? {
+                for child in node.children.iter().filter_map(|item| item.pattern()) {
+                    if let Some(alternation) = self.dead_alternation_child(child)? {
                         return self.walk(alternation);
                     }
                 }
@@ -90,9 +90,10 @@ impl Reporter<'_, '_> {
             PatternKind::Alternative(alternatives) => {
                 self.walk_children(alternatives.iter().copied())
             }
-            PatternKind::Field(_, inner) | PatternKind::Repeat(_, inner) => self.walk(*inner),
+            PatternKind::Field(_, inner) => self.walk(*inner),
+            PatternKind::Repeat(repeat) => self.walk(repeat.inner),
             PatternKind::Sequence(items) => {
-                self.walk_children(items.iter().map(|item| item.pattern))
+                self.walk_children(items.iter().filter_map(|item| item.pattern()))
             }
             // Definitions are checked in their own right in declaration order.
             PatternKind::Reference(_) | PatternKind::Leaf(_) => Ok(()),
@@ -115,9 +116,9 @@ impl Reporter<'_, '_> {
     ) -> Result<Option<PatternId>, AnalysisLimit> {
         match &self.ctx.model.pattern(pattern).kind {
             PatternKind::Alternative(_) => Ok((!self.solver.possible(pattern)?).then_some(pattern)),
-            PatternKind::Field(_, inner)
-            | PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => {
-                self.dead_alternation_child(*inner)
+            PatternKind::Field(_, inner) => self.dead_alternation_child(*inner),
+            PatternKind::Repeat(repeat) if repeat.kind == QuantifierKind::OneOrMore => {
+                self.dead_alternation_child(repeat.inner)
             }
             _ => Ok(None),
         }
@@ -178,13 +179,15 @@ fn collect_goals(pattern: PatternId, model: &Model, out: &mut Vec<Goal>) {
                     out.push(goal);
                 }
             }
-            PatternKind::Field(_, inner)
-            | PatternKind::Repeat(QuantifierKind::OneOrMore, inner) => pending.push(*inner),
+            PatternKind::Field(_, inner) => pending.push(*inner),
+            PatternKind::Repeat(repeat) if repeat.kind == QuantifierKind::OneOrMore => {
+                pending.push(repeat.inner)
+            }
             PatternKind::Sequence(items) => {
-                pending.extend(items.iter().rev().map(|item| item.pattern))
+                pending.extend(items.iter().rev().filter_map(|item| item.pattern()))
             }
             PatternKind::Reference(definition) => pending.push(model.definition(*definition)),
-            PatternKind::Repeat(_, _) | PatternKind::Alternative(_) | PatternKind::Leaf(_) => {}
+            PatternKind::Repeat(_) | PatternKind::Alternative(_) | PatternKind::Leaf(_) => {}
         }
     }
 }
