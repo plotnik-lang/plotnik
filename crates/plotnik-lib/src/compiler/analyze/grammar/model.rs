@@ -108,6 +108,7 @@ impl Item {
 pub(super) struct Model {
     patterns: Vec<Pattern>,
     definitions: IndexMap<DefId, PatternId>,
+    pending_anchors: [bool; PendingAnchor::ALL.len()],
 }
 
 impl Model {
@@ -151,21 +152,10 @@ impl Model {
     /// Pending anchors can only come from authored sibling operations. Keep the
     /// automaton's repeat-entry choices within that query-wide upper bound.
     pub(super) fn boundary_inputs(&self) -> impl Iterator<Item = BoundaryState> {
-        let mut pending = [false; PendingAnchor::ALL.len()];
-        pending[PendingAnchor::None.index()] = true;
-        for pattern in &self.patterns {
-            let items = match &pattern.kind {
-                PatternKind::Node(node) => &node.children,
-                PatternKind::Sequence(items) => items,
-                _ => continue,
-            };
-            for item in items {
-                if let Item::Anchor(anchor, _) = item {
-                    pending[anchor.index()] = true;
-                }
-            }
-        }
-        BoundaryState::all().filter(move |input| pending[input.pending.index()])
+        let pending = self.pending_anchors;
+        BoundaryState::all().filter(move |input| {
+            input.pending == PendingAnchor::None || pending[input.pending.index()]
+        })
     }
 
     pub(super) fn len(&self) -> usize {
@@ -309,14 +299,15 @@ impl Builder<'_> {
                 SeqItem::Pattern(pattern) => {
                     Item::Pattern(self.pattern(Located::new(source, pattern.clone())))
                 }
-                SeqItem::Anchor(anchor) => Item::Anchor(
-                    if anchor.is_exact() {
+                SeqItem::Anchor(anchor) => {
+                    let pending = if anchor.is_exact() {
                         PendingAnchor::Exact
                     } else {
                         PendingAnchor::Soft
-                    },
-                    Span::new(source, anchor.syntax().text_range()),
-                ),
+                    };
+                    self.model.pending_anchors[pending.index()] = true;
+                    Item::Anchor(pending, Span::new(source, anchor.syntax().text_range()))
+                }
             })
             .collect()
     }

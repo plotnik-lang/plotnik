@@ -14,10 +14,10 @@
 //!
 //! The domains are finite but not small: a wide query child list yields an automaton
 //! with as many states, and threading the grammar through it is quadratic in that
-//! width. So the solve carries a work budget; once the per-state work exceeds it the
-//! solve returns a resource error. No partial fixed-point value becomes a verdict.
-//! The budget bounds work, not wall-clock, so the cut-off is the same on every
-//! machine — a slow host merely takes proportionally longer to reach it.
+//! width. Construction and solving share a work budget, including collection
+//! copying, scans, and dependency storage. Exhaustion returns a resource error.
+//! No partial fixed-point value becomes a verdict. This is an analysis-work
+//! ceiling, not a wall-clock or byte-allocation limit for the whole compiler.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -32,6 +32,7 @@ use crate::core::{NodeFieldId, NodeKindId};
 use super::super::model::{KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
 use super::automaton::{self, ChildAutomaton, ChildMatcher};
+use super::budget::Budget;
 use super::configurations::{Configuration, Configurations};
 use super::facts::GrammarFacts;
 use crate::compiler::parse::ast::QuantifierKind;
@@ -173,27 +174,38 @@ enum Key {
 /// at once (disjoint borrows) while threading.
 struct Frozen<'a> {
     grammar: &'a Grammar,
-    automata: Vec<Option<ChildAutomaton>>,
+    automata: Arc<Vec<Option<ChildAutomaton>>>,
+    roots: Vec<ChildAutomaton>,
     facts: Arc<GrammarFacts>,
 }
 
 impl<'a> Frozen<'a> {
-    fn new(
-        grammar: &'a Grammar,
-        automata: Vec<Option<ChildAutomaton>>,
-        facts: Arc<GrammarFacts>,
-    ) -> Self {
+    fn new(grammar: &'a Grammar, facts: Arc<GrammarFacts>) -> Self {
         Self {
             grammar,
-            automata,
+            automata: Arc::new(Vec::new()),
+            roots: Vec::new(),
             facts,
         }
     }
 
     fn automaton(&self, p: AutomatonId) -> &ChildAutomaton {
+        if p.0 >= self.automata.len() {
+            return &self.roots[p.0 - self.automata.len()];
+        }
+
         self.automata[p.0]
             .as_ref()
             .expect("solver only reads completed automata")
+    }
+
+    fn with_probe(&self, automaton: ChildAutomaton) -> Self {
+        Self {
+            grammar: self.grammar,
+            automata: Arc::clone(&self.automata),
+            roots: vec![automaton],
+            facts: Arc::clone(&self.facts),
+        }
     }
 
     fn variable(&self, v: VarId) -> &SkeletonVariable {
@@ -243,27 +255,22 @@ impl<'a> Frozen<'a> {
         self.facts.parent_candidate_kinds()
     }
 
-    /// Whether any extra kind admitted by `constraint` satisfies `predicate`.
-    fn any_extra_admitted_by(
+    fn extra_candidates(
         &self,
         constraint: KindConstraint,
-        predicate: impl FnMut(NodeKindId) -> bool,
-    ) -> bool {
-        self.facts
-            .any_extra_admitted_by(self.grammar, constraint, predicate)
+    ) -> impl Iterator<Item = NodeKindId> + '_ {
+        self.facts.extra_candidates(self.grammar, constraint)
     }
 }
 
-/// Default ceiling on satisfiability work before the query is declared too complex.
-/// Charged for automaton state allocation and in the two quadratic solve loops
-/// (`closure` and a `Visible` `thread_step`) for state visits and pattern-edge scans,
-/// so it caps the dominant costs. The widest real snapshot settles in a few thousand
-/// work units, leaving roughly three orders of magnitude of headroom, while a child list
-/// past about a thousand wide trips it in a fraction of a second rather than running
-/// for tens. Tunable per query via
+/// Default ceiling on grammar-analysis work. Charge before expanding patterns,
+/// copying and scanning configurations, and storing or following dependencies.
+/// Diagnostic refinement has an independent budget of the same size, so its
+/// exhaustion cannot replace an established rejection with a resource error.
+/// Tunable per query via
 /// [`QueryBuilder::with_satisfiability_work_budget`](crate::QueryBuilder::with_satisfiability_work_budget)
 /// for the rare case that legitimately needs a wider one.
-pub const DEFAULT_SATISFIABILITY_WORK_BUDGET: u64 = 2_000_000;
+pub const DEFAULT_SATISFIABILITY_WORK_BUDGET: u64 = 32_000_000;
 
 /// The mutable fixed-point state: memo tables, reverse dependencies, and the worklist.
 #[derive(Default)]
@@ -277,8 +284,7 @@ struct Solve {
     queue: VecDeque<Key>,
     queued: HashSet<Key>,
     /// Work is charged before use. Failure propagates without exposing partial memos.
-    work_used: u64,
-    budget: u64,
+    budget: Budget,
 }
 
 pub(super) struct SatisfiabilitySolver<'a> {
@@ -300,11 +306,7 @@ pub(in crate::compiler::analyze::grammar) struct FieldProbe<'a> {
 impl<'a> FieldProbe<'a> {
     pub(in crate::compiler::analyze::grammar) fn new(grammar: &'a Grammar, budget: u64) -> Self {
         Self {
-            frozen: Frozen::new(
-                grammar,
-                Vec::new(),
-                Arc::new(GrammarFacts::from_grammar(grammar)),
-            ),
+            frozen: Frozen::new(grammar, Arc::new(GrammarFacts::from_grammar(grammar))),
             solve: Solve::new(budget),
         }
     }
@@ -315,10 +317,9 @@ impl<'a> FieldProbe<'a> {
         field: NodeFieldId,
         kind: KindConstraint,
     ) -> Result<bool, AnalysisLimit> {
-        self.probe(
-            parent,
-            ChildAutomaton::child(ChildMatcher::new(kind, Some(field))),
-        )
+        let automaton =
+            ChildAutomaton::child(ChildMatcher::new(kind, Some(field)), &mut self.solve.budget)?;
+        self.probe(parent, automaton)
     }
 
     pub(in crate::compiler::analyze::grammar) fn can_omit(
@@ -326,7 +327,8 @@ impl<'a> FieldProbe<'a> {
         parent: NodeKindId,
         field: NodeFieldId,
     ) -> Result<bool, AnalysisLimit> {
-        self.probe(parent, ChildAutomaton::without_field(field))
+        let automaton = ChildAutomaton::without_field(field, &mut self.solve.budget)?;
+        self.probe(parent, automaton)
     }
 
     fn probe(
@@ -334,9 +336,9 @@ impl<'a> FieldProbe<'a> {
         kind: NodeKindId,
         automaton: ChildAutomaton,
     ) -> Result<bool, AnalysisLimit> {
-        self.solve.spend(automaton.state_count() as u64)?;
-        let root = AutomatonId(self.frozen.automata.len());
-        self.frozen.automata.push(Some(automaton));
+        self.solve.budget.charge()?;
+        let root = AutomatonId(self.frozen.roots.len());
+        self.frozen.roots.push(automaton);
         self.solve.solve_automaton(&self.frozen, root, kind)
     }
 }
@@ -347,27 +349,43 @@ impl<'a> SatisfiabilitySolver<'a> {
         model: &'a Model,
         limits: SatisfiabilityLimits,
     ) -> Self {
-        Self::new(
-            grammar,
+        Self {
             model,
-            limits,
-            Arc::new(GrammarFacts::from_grammar(grammar)),
-        )
+            automaton_max_depth: limits.automaton_max_depth,
+            frozen: Frozen::new(grammar, Arc::new(GrammarFacts::from_grammar(grammar))),
+            solve: Solve::new(limits.work_budget),
+            patterns: HashMap::new(),
+        }
     }
 
     /// All primary verdicts are complete before diagnostic work starts. Retain
     /// their caches, but charge refinement to a separate budget.
     pub(super) fn begin_diagnostics(&mut self, work_budget: u64) {
-        self.solve.budget = work_budget;
-        self.solve.work_used = 0;
+        self.solve.budget = Budget::new(work_budget);
     }
 
-    pub(super) fn automaton(&self, pattern: PatternId) -> &ChildAutomaton {
-        self.frozen.automaton(pattern.into())
+    pub(super) fn budget(&mut self) -> &mut Budget {
+        &mut self.solve.budget
     }
 
-    pub(super) fn child_shapes(&self, kind: NodeKindId) -> Option<Vec<Vec<super::shapes::Child>>> {
-        super::shapes::children(self.frozen.grammar, self.frozen.realizers_of(kind))
+    pub(super) fn copy_automaton(
+        &mut self,
+        pattern: PatternId,
+    ) -> Result<ChildAutomaton, AnalysisLimit> {
+        self.frozen
+            .automaton(pattern.into())
+            .copy(&mut self.solve.budget)
+    }
+
+    pub(super) fn child_shapes(
+        &mut self,
+        kind: NodeKindId,
+    ) -> Result<Option<Vec<Vec<super::shapes::Child>>>, AnalysisLimit> {
+        super::shapes::children(
+            self.frozen.grammar,
+            self.frozen.realizers_of(kind),
+            &mut self.solve.budget,
+        )
     }
 
     /// Replace only this node's child automaton. Nested nodes keep their original
@@ -377,52 +395,22 @@ impl<'a> SatisfiabilitySolver<'a> {
         kind: NodeKindId,
         automaton: ChildAutomaton,
     ) -> Result<bool, AnalysisLimit> {
+        self.solve.budget.spend(automaton.state_count() as u64)?;
+        self.solve.budget.spend(automaton.work_size() + 1)?;
+        for child in automaton.nested_patterns() {
+            self.frozen.automaton(child.into());
+        }
+        let root = AutomatonId(self.frozen.automata.len());
+        let frozen = self.frozen.with_probe(automaton);
         let budget = self.remaining_budget();
-        let limits = SatisfiabilityLimits {
-            automaton_max_depth: self.automaton_max_depth,
-            work_budget: budget,
-        };
-        let mut probe = Self::new(
-            self.frozen.grammar,
-            self.model,
-            limits,
-            Arc::clone(&self.frozen.facts),
-        );
-        let result = (|| {
-            probe.solve.spend(automaton.state_count() as u64)?;
-            let nested: Vec<_> = automaton.nested_patterns().collect();
-            let root = AutomatonId(probe.frozen.automata.len());
-            probe.frozen.automata.push(Some(automaton));
-            for child in nested {
-                probe.build_pending(child)?;
-            }
-            probe.solve_automaton(root, kind)
-        })();
-        self.solve.spend(budget - probe.remaining_budget())?;
+        let mut probe = Solve::new(budget);
+        let result = probe.solve_automaton(&frozen, root, kind);
+        self.solve.budget.spend(budget - probe.budget.remaining())?;
         result
     }
 
     pub(super) fn remaining_budget(&self) -> u64 {
-        self.solve.remaining_budget()
-    }
-
-    fn new(
-        grammar: &'a Grammar,
-        model: &'a Model,
-        limits: SatisfiabilityLimits,
-        facts: Arc<GrammarFacts>,
-    ) -> Self {
-        Self {
-            model,
-            automaton_max_depth: limits.automaton_max_depth,
-            patterns: HashMap::new(),
-            frozen: Frozen::new(
-                grammar,
-                std::iter::repeat_with(|| None).take(model.len()).collect(),
-                facts,
-            ),
-            solve: Solve::new(limits.work_budget),
-        }
+        self.solve.budget.remaining()
     }
 
     /// A completed feasibility result, or a resource failure.
@@ -547,6 +535,13 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// Finish all transitively referenced child automata before solving. Inserting
     /// each completed automaton before its dependencies also handles recursive nodes.
     fn build_pending(&mut self, pattern: PatternId) -> Result<(), AnalysisLimit> {
+        if self.frozen.automata.is_empty() {
+            self.solve.budget.spend(self.model.len() as u64)?;
+            Arc::get_mut(&mut self.frozen.automata)
+                .expect("primary automata are built before sharing with probes")
+                .resize_with(self.model.len(), || None);
+        }
+        self.solve.budget.charge()?;
         let mut pending = vec![pattern];
         while let Some(pattern) = pending.pop() {
             if self.frozen.automata[pattern.index()].is_some() {
@@ -557,11 +552,14 @@ impl<'a> SatisfiabilitySolver<'a> {
                 self.model,
                 pattern,
                 self.automaton_max_depth,
-                self.solve.remaining_budget(),
+                &mut self.solve.budget,
             )?;
-            self.solve.spend(automaton.state_count() as u64)?;
+            self.solve.budget.spend(automaton.state_count() as u64)?;
+            self.solve.budget.spend(automaton.work_size())?;
             pending.extend(automaton.nested_patterns());
-            self.frozen.automata[pattern.index()] = Some(automaton);
+            Arc::get_mut(&mut self.frozen.automata)
+                .expect("primary automata are built before sharing with probes")[pattern.index()] =
+                Some(automaton);
         }
         Ok(())
     }
@@ -570,7 +568,7 @@ impl<'a> SatisfiabilitySolver<'a> {
 impl Solve {
     fn new(budget: u64) -> Self {
         Self {
-            budget,
+            budget: Budget::new(budget),
             ..Self::default()
         }
     }
@@ -582,29 +580,17 @@ impl Solve {
         kind: NodeKindId,
     ) -> Result<bool, AnalysisLimit> {
         for &realizer in frozen.realizers_of(kind) {
-            self.seed(Key::Sat((pattern, realizer)));
+            self.seed(Key::Sat((pattern, realizer)))?;
         }
         while let Some(key) = self.dequeue() {
             if self.recompute(frozen, key)? {
-                self.requeue_dependents(key);
+                self.requeue_dependents(key)?;
             }
         }
         Ok(frozen
             .realizers_of(kind)
             .iter()
             .any(|&realizer| self.sat_value((pattern, realizer))))
-    }
-
-    fn remaining_budget(&self) -> u64 {
-        self.budget.saturating_sub(self.work_used)
-    }
-
-    fn spend(&mut self, work_units: u64) -> Result<(), AnalysisLimit> {
-        self.work_used = self.work_used.saturating_add(work_units);
-        if self.work_used > self.budget {
-            return Err(AnalysisLimit::WorkBudget);
-        }
-        Ok(())
     }
 
     fn sat_value(&self, key: SatKey) -> bool {
@@ -615,10 +601,11 @@ impl Solve {
     }
 
     fn charge(&mut self) -> Result<(), AnalysisLimit> {
-        self.spend(1)
+        self.budget.charge()
     }
 
-    fn seed(&mut self, key: Key) {
+    fn seed(&mut self, key: Key) -> Result<(), AnalysisLimit> {
+        self.charge()?;
         let fresh = match key {
             Key::Sat(k) => !self.sat.contains_key(&k) && self.sat.insert(k, false).is_none(),
             Key::Thread(k) => {
@@ -627,14 +614,17 @@ impl Solve {
             }
         };
         if fresh {
-            self.enqueue(key);
+            self.enqueue(key)?;
         }
+        Ok(())
     }
 
-    fn enqueue(&mut self, key: Key) {
+    fn enqueue(&mut self, key: Key) -> Result<(), AnalysisLimit> {
+        self.charge()?;
         if self.queued.insert(key) {
             self.queue.push_back(key);
         }
+        Ok(())
     }
 
     /// LIFO: a freshly demanded key is recomputed before the key that demanded it
@@ -646,34 +636,39 @@ impl Solve {
         Some(key)
     }
 
-    fn requeue_dependents(&mut self, key: Key) {
+    fn requeue_dependents(&mut self, key: Key) -> Result<(), AnalysisLimit> {
         let Some(dependents) = self.dependents.get(&key) else {
-            return;
+            return Ok(());
         };
+        self.budget.spend(dependents.len() as u64 * 2)?;
         let dependents: Vec<Key> = dependents.iter().copied().collect();
         for dependent in dependents {
-            self.enqueue(dependent);
+            self.enqueue(dependent)?;
         }
+        Ok(())
     }
 
-    fn record_read(&mut self, read: Key) {
+    fn record_read(&mut self, read: Key) -> Result<(), AnalysisLimit> {
         if let Some(current) = self.current {
+            self.charge()?;
             self.dependents.entry(read).or_default().insert(current);
         }
+        Ok(())
     }
 
-    fn get_sat(&mut self, key: SatKey) -> bool {
-        self.record_read(Key::Sat(key));
-        self.seed(Key::Sat(key));
-        self.sat_value(key)
+    fn get_sat(&mut self, key: SatKey) -> Result<bool, AnalysisLimit> {
+        self.record_read(Key::Sat(key))?;
+        self.seed(Key::Sat(key))?;
+        Ok(self.sat_value(key))
     }
 
-    fn get_thread(&mut self, key: ThreadKey) -> Configurations {
-        self.record_read(Key::Thread(key));
-        self.seed(Key::Thread(key));
-        self.thread.get(&key).cloned().unwrap_or_else(|| {
-            panic!("satisfiability solver read thread {key:?} before `Solve::seed` initialized it")
-        })
+    fn get_thread(&mut self, key: ThreadKey) -> Result<Configurations, AnalysisLimit> {
+        self.record_read(Key::Thread(key))?;
+        self.seed(Key::Thread(key))?;
+        self.thread
+            .get(&key)
+            .expect("a thread key is seeded before it is read")
+            .copy(&mut self.budget)
     }
 
     fn recompute(&mut self, frozen: &Frozen, key: Key) -> Result<bool, AnalysisLimit> {
@@ -688,12 +683,11 @@ impl Solve {
             }
             Key::Thread(k) => {
                 let computed = self.compute_thread(frozen, k)?;
-                let changed = self.thread.get(&k).unwrap_or_else(|| {
-                    panic!(
-                        "satisfiability solver dequeued thread {k:?}, but its seeded state was \
-                             missing during recomputation"
-                    )
-                }) != &computed;
+                let previous = self
+                    .thread
+                    .get(&k)
+                    .expect("a thread key is seeded before recomputation");
+                let changed = !previous.equals(&computed, &mut self.budget)?;
                 if changed {
                     self.thread.insert(k, computed);
                 }
@@ -710,7 +704,6 @@ impl Solve {
         (pattern, realizer): SatKey,
     ) -> Result<bool, AnalysisLimit> {
         let automaton = frozen.automaton(pattern);
-        let start = Configurations::singleton(Configuration::start(automaton.start()));
         let accept = automaton.accept();
         if realizer == NodeRealizer::Leaf {
             // Leaves have no children, not even extras.
@@ -720,6 +713,8 @@ impl Solve {
         let NodeRealizer::Var(variable) = realizer else {
             unreachable!()
         };
+        let start =
+            Configurations::singleton(Configuration::start(automaton.start()), &mut self.budget)?;
         let thread = ProductionThread::new(frozen, pattern, None);
         for production in &frozen.variable(variable).productions {
             if self
@@ -737,12 +732,12 @@ impl Solve {
         frozen: &Frozen,
         key: ThreadKey,
     ) -> Result<Configurations, AnalysisLimit> {
-        let start = Configurations::singleton(key.input);
+        let start = Configurations::singleton(key.input, &mut self.budget)?;
         let mut reached = Configurations::default();
         let thread = ProductionThread::new(frozen, key.pattern, key.inherited_field);
         for production in &frozen.variable(key.hidden_var).productions {
             let states = self.thread_production(&thread, production, &start)?;
-            reached.union_with(&states);
+            reached.union_with(&states, &mut self.budget)?;
         }
         Ok(reached)
     }
@@ -784,7 +779,7 @@ impl Solve {
             // inherited (a plain supertype link never relabels what it carries).
             StepClass::HiddenSubtree(hidden) => self.thread_hidden_subtree(thread, current, hidden),
             // A hidden token surfaces nothing and consumes nothing.
-            StepClass::HiddenLeaf => Ok(current.clone()),
+            StepClass::HiddenLeaf => current.copy(&mut self.budget),
         }
     }
 
@@ -796,10 +791,10 @@ impl Solve {
     ) -> Result<Configurations, AnalysisLimit> {
         let pushed = hidden.pushed_field(thread.inherited_field);
         let mut next = Configurations::default();
-        for q in current.iter() {
+        for q in current.iter(&mut self.budget)? {
             self.charge()?;
-            let reached = self.get_thread(thread.hidden_key(hidden.var, q, pushed));
-            next.union_with(&reached);
+            let reached = self.get_thread(thread.hidden_key(hidden.var, q, pushed))?;
+            next.union_with(&reached, &mut self.budget)?;
         }
         Ok(next)
     }
@@ -820,26 +815,26 @@ impl Solve {
         }
         let node_class = thread.frozen.grammar.node_class(visible.kind);
         let mut next = Configurations::default();
-        for q in current.iter() {
+        for q in current.iter(&mut self.budget)? {
             self.charge()?;
             // Control states do not own a search. Each consumer has its own
             // position, so a broad alternative cannot lend its gap to another.
             if q.state == automaton.accept()
                 && q.boundary.gap_before(FirstClass::Named).admits(node_class)
             {
-                next.insert(q);
+                next.insert(q, &mut self.budget)?;
             }
             for (matcher, to) in automaton.pattern_edges(q.state) {
                 self.charge()?;
                 let class = thread.frozen.consumer_class(matcher.kind);
                 if automaton.gap(q.state, q.boundary, class).admits(node_class) {
-                    next.insert(q);
+                    next.insert(q, &mut self.budget)?;
                 }
                 if thread.frozen.kind_ok(matcher.kind, visible.kind)
                     && field_ok(matcher.field, effective)
-                    && self.child_sat(matcher, visible.realizer)
+                    && self.child_sat(matcher, visible.realizer)?
                 {
-                    next.insert(q.consume(*to, class));
+                    next.insert(q.consume(*to, class), &mut self.budget)?;
                 }
             }
         }
@@ -848,9 +843,13 @@ impl Solve {
 
     /// Whether the matched child's own structure is realized by `realizer` — trivially
     /// true when the child is childless.
-    fn child_sat(&mut self, matcher: &ChildMatcher, realizer: NodeRealizer) -> bool {
+    fn child_sat(
+        &mut self,
+        matcher: &ChildMatcher,
+        realizer: NodeRealizer,
+    ) -> Result<bool, AnalysisLimit> {
         match matcher.nested_pattern {
-            None => true,
+            None => Ok(true),
             Some(nested_pattern) => self.get_sat((nested_pattern.into(), realizer)),
         }
     }
@@ -866,8 +865,8 @@ impl Solve {
     ) -> Result<Configurations, AnalysisLimit> {
         let frozen = thread.frozen;
         let automaton = thread.automaton();
-        let mut result = set.clone();
-        let mut stack: Vec<_> = result.iter().collect();
+        let mut result = set.copy(&mut self.budget)?;
+        let mut stack: Vec<_> = result.iter(&mut self.budget)?.collect();
         while let Some(input) = stack.pop() {
             self.charge()?;
             let Some(boundary) = automaton.advance(input.state, input.boundary) else {
@@ -876,17 +875,17 @@ impl Solve {
             for &to in automaton.eps_edges(input.state) {
                 self.charge()?;
                 let output = Configuration::new(to, boundary);
-                if result.insert(output) {
+                if result.insert(output, &mut self.budget)? {
                     stack.push(output);
                 }
             }
             for (matcher, to) in automaton.pattern_edges(input.state) {
                 self.charge()?;
-                if self.can_consume_extra(frozen, matcher) {
+                if self.can_consume_extra(frozen, matcher)? {
                     // Consuming an extra satisfies the incoming anchor just as
                     // consuming any other visible child does.
                     let output = input.consume(*to, frozen.consumer_class(matcher.kind));
-                    if result.insert(output) {
+                    if result.insert(output, &mut self.budget)? {
                         stack.push(output);
                     }
                 }
@@ -899,7 +898,7 @@ impl Solve {
     /// children, so this is reachability over epsilon edges alone.
     fn accepts_empty(&mut self, automaton: &ChildAutomaton) -> Result<bool, AnalysisLimit> {
         let start = Configuration::start(automaton.start());
-        let mut visited = Configurations::singleton(start);
+        let mut visited = Configurations::singleton(start, &mut self.budget)?;
         let mut stack = vec![start];
         while let Some(input) = stack.pop() {
             self.charge()?;
@@ -912,7 +911,7 @@ impl Solve {
             for &to in automaton.eps_edges(input.state) {
                 self.charge()?;
                 let output = Configuration::new(to, boundary);
-                if visited.insert(output) {
+                if visited.insert(output, &mut self.budget)? {
                     stack.push(output);
                 }
             }
@@ -925,24 +924,29 @@ impl Solve {
     /// lexically sealed nodes (`(string (comment))`). Proving a gap sealed needs lexer-level
     /// longest-match reasoning our model lacks (not the `IMMEDIATE_TOKEN` fact it looks
     /// like), so we admit and stay sound — extra consumption only grows the reachable set.
-    fn can_consume_extra(&mut self, frozen: &Frozen, matcher: &ChildMatcher) -> bool {
+    fn can_consume_extra(
+        &mut self,
+        frozen: &Frozen,
+        matcher: &ChildMatcher,
+    ) -> Result<bool, AnalysisLimit> {
         // Extras are inserted unfielded, so a `field:` matcher can never be one — letting
         // it "consume" an extra here would skip its field constraint.
         if matcher.field.is_some() {
-            return false;
+            return Ok(false);
         }
         let Some(nested_pattern) = matcher.nested_pattern else {
             // Childless matcher: it consumes an extra iff it admits any extra kind. No
             // subtree to realize, so answer in O(1) without building the admitted list —
             // the hot path on wide wildcard child lists.
-            return frozen.admits_any_extra(matcher.kind);
+            return Ok(frozen.admits_any_extra(matcher.kind));
         };
-        frozen.any_extra_admitted_by(matcher.kind, |extra| {
-            frozen
-                .realizers_of(extra)
-                .iter()
-                .copied()
-                .any(|realizer| self.get_sat((nested_pattern.into(), realizer)))
-        })
+        for extra in frozen.extra_candidates(matcher.kind) {
+            for &realizer in frozen.realizers_of(extra) {
+                if self.get_sat((nested_pattern.into(), realizer))? {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 }

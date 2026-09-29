@@ -24,10 +24,7 @@ error: `nme` is not a valid grammar field
 1 | Q = (pram nme: (idd))
   |           ^^^
   |
-help: replace with `name`
-  |
-1 | Q = (pram name: (idd))
-  |            +
+help: a similarly spelled grammar field is `name`
 
 error: `idd` is not a valid node kind
  --> query.ptk:1:17

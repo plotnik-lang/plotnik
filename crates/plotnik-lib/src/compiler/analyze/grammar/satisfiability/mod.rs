@@ -3,6 +3,7 @@
 //! syntax only for diagnostic wording and highlights.
 
 mod automaton;
+mod budget;
 mod configurations;
 mod diagnose;
 mod engine;
@@ -76,6 +77,7 @@ struct Reporter<'a, 'q> {
 
 impl Reporter<'_, '_> {
     fn walk(&mut self, pattern: PatternId) -> Result<(), AnalysisLimit> {
+        self.solver.budget().charge()?;
         if self.solver.possible(pattern)? {
             return Ok(());
         }
@@ -119,6 +121,7 @@ impl Reporter<'_, '_> {
         &mut self,
         pattern: PatternId,
     ) -> Result<Option<PatternId>, AnalysisLimit> {
+        self.solver.budget().charge()?;
         match &self.ctx.model.pattern(pattern).kind {
             PatternKind::Alternative(_) => Ok((!self.solver.possible(pattern)?).then_some(pattern)),
             PatternKind::Field(_, inner) => self.dead_alternation_child(*inner),
@@ -170,10 +173,16 @@ impl Goal {
     }
 }
 
-fn collect_goals(pattern: PatternId, model: &Model, out: &mut Vec<Goal>) {
+fn collect_goals(
+    pattern: PatternId,
+    model: &Model,
+    out: &mut Vec<Goal>,
+    budget: &mut budget::Budget,
+) -> Result<(), AnalysisLimit> {
     let mut pending = vec![pattern];
     let mut visited = std::collections::HashSet::new();
     while let Some(pattern) = pending.pop() {
+        budget.charge()?;
         if !visited.insert(pattern) {
             continue;
         }
@@ -189,10 +198,12 @@ fn collect_goals(pattern: PatternId, model: &Model, out: &mut Vec<Goal>) {
                 pending.push(repeat.inner)
             }
             PatternKind::Sequence(items) => {
+                budget.spend(items.len() as u64)?;
                 pending.extend(items.iter().rev().filter_map(|item| item.pattern()))
             }
             PatternKind::Reference(definition) => pending.push(model.definition(*definition)),
             PatternKind::Repeat(_) | PatternKind::Alternative(_) | PatternKind::Leaf(_) => {}
         }
     }
+    Ok(())
 }

@@ -22,7 +22,7 @@ rules:
   num: {type: PATTERN, value: "[0-9]+"}
 --------------------- LIMITS ---------------------
 # The outer anchor proves failure before the nested order needs examination.
-work_budget: 24
+work_budget: 200
 ------------------ DIAGNOSTICS -------------------
 error: the grammar builds no `list` matching this child structure
  --> query.ptk:1:6

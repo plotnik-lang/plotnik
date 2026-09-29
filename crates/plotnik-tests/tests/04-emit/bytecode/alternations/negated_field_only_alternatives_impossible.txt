@@ -6,20 +6,20 @@ Q = (object
 )
 ------------------ DIAGNOSTICS -------------------
 error: `-key` can never match
- --> query.ptk:3:12
+ --> query.ptk:3:11
   |
 3 |     (pair -key)
-  |      ----  ^^^
+  |      ---- ^^^^
   |      |
   |      on `pair`
   |
 help: `-key` requires `key` to be absent, but every `pair` has one. Drop `-key`
 
 error: `-value` can never match
- --> query.ptk:4:12
+ --> query.ptk:4:11
   |
 4 |     (pair -value)
-  |      ----  ^^^^^
+  |      ---- ^^^^^^
   |      |
   |      on `pair`
   |

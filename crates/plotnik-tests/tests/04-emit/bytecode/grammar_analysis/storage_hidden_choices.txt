@@ -1,0 +1,108 @@
+Args = {
+  (id)
+  ","
+  (id)
+  ","
+  (id)
+  ","
+  (id)
+}
+
+Q = (call
+  .!
+  (id)
+  "("
+  [
+    (Args)
+    (id)
+  ]
+  ")"
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "("}
+      - {type: SYMBOL, name: _args}
+      - {type: STRING, value: ")"}
+  _args:
+    type: CHOICE
+    members:
+      - type: SEQ
+        members:
+          - {type: SYMBOL, name: id}
+          - {type: STRING, value: ","}
+          - {type: SYMBOL, name: _args}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 02
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (call)                           26
+  05  !─┘  _                                01
+  06   !   ")"                              05
+  08  ──!  _                                06, 08
+
+Args:
+  11                                        ▶
+  12  ─‣─  (id)                             11
+  13  ─‣─  ","                              12
+  14  ─‣─  (id)                             13
+  15  ─‣─  ","                              14
+  16  ─‣─  (id)                             15
+  17  ─‣─  ","                              16
+  18   !   (id)                             17
+
+Q:
+  19   !   (Args)                           18 : 08
+  20   !   (id)                             08
+  23  ──!  _                                19, 20, 23
+  25  ─‣─  "("                              23
+  26  └─!  (id)                             25
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 ","
+S3 "call"
+S4 "("
+S5 ")"
+S6 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 00 :: T0
+
+[instructions]
+Q:
+  00   !   (call)                           01
+  01  └─!  (id)                             02
+  02  ─‣─  "("                              18
+  03                                        ▶
+  04  !─┘  _                                03
+  05   !   ")"                              04
+  06  ──!  _                                05, 06
+  08                                        ▶
+  09  ─‣─  (id)                             08
+  10  ─‣─  ","                              09
+  11  ─‣─  (id)                             10
+  12  ─‣─  ","                              11
+  13  ─‣─  (id)                             12
+  14  ─‣─  ","                              13
+  15   !   (id)                             14
+  16   !   (@15)                            15 : 06
+  17   !   (id)                             06
+  18  ──!  _                                16, 17, 18

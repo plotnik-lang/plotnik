@@ -1,0 +1,107 @@
+Q = (func
+  .!
+  "func"
+  (id)
+  "("
+  {
+    (id)
+    ","
+  }?
+  {
+    (id)
+    ","
+  }?
+  {
+    (id)
+    ","
+  }?
+  (id)
+  ")"
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  func:
+    type: SEQ
+    members:
+      - {type: STRING, value: func}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "("}
+      - {type: SYMBOL, name: _params}
+      - {type: STRING, value: ")"}
+  _params:
+    type: SEQ
+    members:
+      - type: REPEAT
+        content:
+          type: SEQ
+          members:
+            - {type: SYMBOL, name: id}
+            - {type: STRING, value: ","}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 02
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (func)                           31
+  05  !─┘  _                                01
+  06   !   ")"                              05
+  08  ──!  _                                06, 08
+  10  ─‣─  (id)                             08
+  11  ─‣─  ","                              10
+  12   !   (id)                             11
+  14  ──!  _                                12, 14
+  17  ─‣─  ","                              14, 10
+  18   !   (id)                             17
+  20  ──!  _                                18, 20
+  23  ─‣─  ","                              20, 14, 10
+  24   !   (id)                             23
+  26  ──!  _                                24, 26
+  29  ─‣─  "("                              26, 20, 14, 10
+  30  ─‣─  (id)                             29
+  31  └─!  "func"                           30
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "func"
+S2 "id"
+S3 "("
+S4 ","
+S5 ")"
+S6 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 00 :: T0
+
+[instructions]
+Q:
+  00   !   (func)                           01
+  01  └─!  "func"                           02
+  02  ─‣─  (id)                             03
+  03  ─‣─  "("                              24, 19, 13, 10
+  05                                        ▶
+  06  !─┘  _                                05
+  07   !   ")"                              06
+  08  ──!  _                                07, 08
+  10  ─‣─  (id)                             08
+  11  ─‣─  ","                              10
+  12   !   (id)                             11
+  13  ──!  _                                12, 13
+  15  ...
+  16  ─‣─  ","                              13, 10
+  18   !   (id)                             16
+  19  ──!  _                                18, 19
+  21  ─‣─  ","                              19, 13, 10
+  23   !   (id)                             21
+  24  ──!  _                                23, 24

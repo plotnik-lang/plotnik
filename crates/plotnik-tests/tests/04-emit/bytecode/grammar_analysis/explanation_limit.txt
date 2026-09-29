@@ -10,7 +10,7 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
 --------------------- LIMITS ---------------------
 # Enough to reject the query, but not to refine the explanation.
-work_budget: 12
+work_budget: 100
 ------------------ DIAGNOSTICS -------------------
 error: the grammar builds no `list` matching this child structure
  --> query.ptk:1:6

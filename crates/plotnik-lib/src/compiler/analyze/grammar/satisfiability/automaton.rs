@@ -12,6 +12,7 @@ use crate::core::NodeFieldId;
 
 use super::super::model::{Item, KindConstraint, Model, PatternId, PatternKind, Repeat};
 use super::AnalysisLimit;
+use super::budget::Budget;
 
 pub(super) type State = u32;
 
@@ -73,12 +74,26 @@ pub(super) struct ChildAutomaton {
 }
 
 impl ChildAutomaton {
-    pub(super) fn remove_anchor(&mut self, span: Span) {
+    pub(super) fn remove_anchor(
+        &mut self,
+        span: Span,
+        budget: &mut Budget,
+    ) -> Result<(), AnalysisLimit> {
+        budget.spend(self.states.len() as u64)?;
         for state in &mut self.states {
             if state.anchor.is_some_and(|(_, source)| source == span) {
                 state.anchor = None;
             }
         }
+        Ok(())
+    }
+
+    pub(super) fn clear_anchors(&mut self, budget: &mut Budget) -> Result<(), AnalysisLimit> {
+        budget.spend(self.states.len() as u64)?;
+        for state in &mut self.states {
+            state.anchor = None;
+        }
+        Ok(())
     }
 
     pub(super) fn anchor(&self, state: State) -> Option<(PendingAnchor, Span)> {
@@ -102,52 +117,87 @@ impl ChildAutomaton {
             .tighten(self.states[state as usize].entry_gap)
     }
 
-    pub(super) fn allow_field(&mut self, field: NodeFieldId) {
+    pub(super) fn allow_field(
+        &mut self,
+        field: NodeFieldId,
+        budget: &mut Budget,
+    ) -> Result<(), AnalysisLimit> {
+        budget.spend(self.negated_fields.len() as u64)?;
         self.negated_fields.retain(|&id| id != field);
+        Ok(())
     }
 
-    pub(super) fn without_field(field: NodeFieldId) -> Self {
-        Self {
-            states: vec![StateData::new()],
-            start: 0,
-            accept: 0,
-            negated_fields: vec![field],
-        }
+    pub(super) fn without_field(
+        field: NodeFieldId,
+        budget: &mut Budget,
+    ) -> Result<Self, AnalysisLimit> {
+        let mut automaton = Self::demands(&[], budget)?;
+        budget.charge()?;
+        automaton.negated_fields.push(field);
+        Ok(automaton)
     }
 
-    pub(super) fn allow_nested(&mut self, pattern: PatternId) {
+    pub(super) fn allow_nested(
+        &mut self,
+        pattern: PatternId,
+        budget: &mut Budget,
+    ) -> Result<(), AnalysisLimit> {
+        budget.spend(self.states.len() as u64)?;
         for state in &mut self.states {
+            budget.spend(state.pattern_edges.len() as u64)?;
             for (matcher, _) in &mut state.pattern_edges {
                 if matcher.nested_pattern == Some(pattern) {
                     matcher.nested_pattern = None;
                 }
             }
         }
+        Ok(())
     }
 
     /// An order probe asks about two resolved demands without carrying the rest
     /// of the failed query's restrictions into the answer.
-    pub(super) fn ordered_pair(first: ChildMatcher, second: ChildMatcher) -> Self {
-        let mut states: Vec<_> = (0..3).map(|_| StateData::new()).collect();
-        states[0].pattern_edges.push((first, 1));
-        states[1].pattern_edges.push((second, 2));
-        Self {
-            states,
-            start: 0,
-            accept: 2,
-            negated_fields: Vec::new(),
-        }
+    pub(super) fn ordered_pair(
+        first: ChildMatcher,
+        second: ChildMatcher,
+        budget: &mut Budget,
+    ) -> Result<Self, AnalysisLimit> {
+        Self::demands(&[first, second], budget)
     }
 
-    pub(super) fn child(matcher: ChildMatcher) -> Self {
-        let mut states = vec![StateData::new(), StateData::new()];
-        states[0].pattern_edges.push((matcher, 1));
-        Self {
+    pub(super) fn child(matcher: ChildMatcher, budget: &mut Budget) -> Result<Self, AnalysisLimit> {
+        Self::demands(&[matcher], budget)
+    }
+
+    fn demands(matchers: &[ChildMatcher], budget: &mut Budget) -> Result<Self, AnalysisLimit> {
+        budget.spend((matchers.len() * 2 + 1) as u64)?;
+        let mut states: Vec<_> = (0..=matchers.len()).map(|_| StateData::new()).collect();
+        for (index, &matcher) in matchers.iter().enumerate() {
+            states[index]
+                .pattern_edges
+                .push((matcher, index as State + 1));
+        }
+        Ok(Self {
             states,
             start: 0,
-            accept: 1,
+            accept: matchers.len() as State,
             negated_fields: Vec::new(),
-        }
+        })
+    }
+
+    pub(super) fn copy(&self, budget: &mut Budget) -> Result<Self, AnalysisLimit> {
+        budget.spend(self.states.len() as u64)?;
+        budget.spend(self.work_size())?;
+        Ok(self.clone())
+    }
+
+    pub(super) fn work_size(&self) -> u64 {
+        (self.states.len()
+            + self.negated_fields.len()
+            + self
+                .states
+                .iter()
+                .map(|state| state.pattern_edges.len() + state.eps_edges.len())
+                .sum::<usize>()) as u64
     }
 
     pub(super) fn start(&self) -> State {
@@ -186,13 +236,14 @@ pub(super) fn build(
     model: &Model,
     pattern: PatternId,
     max_depth: u32,
-    state_budget: u64,
+    budget: &mut Budget,
 ) -> Result<ChildAutomaton, AnalysisLimit> {
+    budget.spend(BoundaryState::COUNT as u64)?;
     let node = model.node(pattern);
     let mut builder = Builder {
         model,
         states: Vec::new(),
-        state_budget,
+        budget,
         boundary_inputs: model.boundary_inputs().collect(),
         ref_stack: Vec::new(),
         max_depth,
@@ -200,6 +251,7 @@ pub(super) fn build(
     };
     let start = builder.new_state()?;
     let accept = builder.emit_items(&node.children, start)?;
+    builder.budget.spend(node.negated_fields.len() as u64)?;
     Ok(ChildAutomaton {
         states: builder.states,
         start,
@@ -208,10 +260,10 @@ pub(super) fn build(
     })
 }
 
-struct Builder<'a> {
-    model: &'a Model,
+struct Builder<'q, 'a> {
+    model: &'q Model,
     states: Vec<StateData>,
-    state_budget: u64,
+    budget: &'a mut Budget,
     boundary_inputs: Vec<BoundaryState>,
     ref_stack: Vec<DefId>,
     max_depth: u32,
@@ -221,24 +273,28 @@ struct Builder<'a> {
 // Reference diamonds and nested repeats can expand faster than their source.
 const STATE_CAP: usize = 20_000;
 
-impl Builder<'_> {
+impl Builder<'_, '_> {
     fn new_state(&mut self) -> Result<State, AnalysisLimit> {
         if self.states.len() >= STATE_CAP {
             return Err(AnalysisLimit::AutomatonStates);
         }
 
-        if self.states.len() as u64 >= self.state_budget {
-            return Err(AnalysisLimit::WorkBudget);
-        }
-
+        self.budget.charge()?;
         let id = self.states.len() as State;
         self.states.push(StateData::new());
         Ok(id)
     }
 
+    fn connect(&mut self, from: State, to: State) -> Result<(), AnalysisLimit> {
+        self.budget.charge()?;
+        self.states[from as usize].eps_edges.push(to);
+        Ok(())
+    }
+
     fn emit_items(&mut self, items: &[Item], entry: State) -> Result<State, AnalysisLimit> {
         let mut current = entry;
         for item in items {
+            self.budget.charge()?;
             match item {
                 Item::Pattern(pattern) => {
                     // A sibling list does not inherit a field from its surrounding group.
@@ -247,7 +303,7 @@ impl Builder<'_> {
                 Item::Anchor(anchor, span) => {
                     self.states[current as usize].anchor = Some((*anchor, *span));
                     let next = self.new_state()?;
-                    self.states[current as usize].eps_edges.push(next);
+                    self.connect(current, next)?;
                     current = next;
                 }
             }
@@ -265,6 +321,7 @@ impl Builder<'_> {
             return Err(AnalysisLimit::ConstructionDepth);
         }
 
+        self.budget.charge()?;
         self.depth += 1;
         let exit = self.emit_inner(pattern, field, from);
         self.depth -= 1;
@@ -290,12 +347,12 @@ impl Builder<'_> {
                 let to = self.new_state()?;
                 for &alternative in alternatives {
                     let branch = self.new_state()?;
-                    self.states[from as usize].eps_edges.push(branch);
+                    self.connect(from, branch)?;
                     let exit = self.emit_pattern(alternative, field, branch)?;
-                    self.states[exit as usize].eps_edges.push(to);
+                    self.connect(exit, to)?;
                 }
                 if alternatives.is_empty() {
-                    self.states[from as usize].eps_edges.push(to);
+                    self.connect(from, to)?;
                 }
                 Ok(to)
             }
@@ -305,6 +362,7 @@ impl Builder<'_> {
 
     fn emit_single(&mut self, matcher: ChildMatcher, from: State) -> Result<State, AnalysisLimit> {
         let to = self.new_state()?;
+        self.budget.charge()?;
         self.states[from as usize].pattern_edges.push((matcher, to));
         Ok(to)
     }
@@ -317,13 +375,14 @@ impl Builder<'_> {
     ) -> Result<State, AnalysisLimit> {
         let to = self.new_state()?;
         if repeat.kind != QuantifierKind::OneOrMore {
-            self.states[from as usize].eps_edges.push(to);
+            self.connect(from, to)?;
         }
         // A simple repeat reuses its entry search permission. Keep that finite
         // choice in loop control, while BoundaryState retains path-specific
         // previous consumers and pending anchors throughout the body.
         let mut entries = Vec::new();
         for &input in &self.boundary_inputs {
+            self.budget.spend(entries.len() as u64 + 1)?;
             let gap = if repeat.kind == QuantifierKind::Optional {
                 None
             } else {
@@ -340,17 +399,17 @@ impl Builder<'_> {
             let body = self.new_state()?;
             let exit = self.emit_pattern(repeat.inner, field, body)?;
             let consuming = self.consuming_entry(body, exit, GapClass::Any)?;
-            self.states[from as usize].eps_edges.push(branch);
+            self.connect(from, branch)?;
             self.states[branch as usize].entry_states = inputs;
-            self.states[branch as usize].eps_edges.push(consuming);
-            self.states[exit as usize].eps_edges.push(to);
+            self.connect(branch, consuming)?;
+            self.connect(exit, to)?;
             if repeat.kind != QuantifierKind::Optional {
                 let loop_entry = if let Some(gap) = gap {
                     self.consuming_entry(body, exit, gap)?
                 } else {
                     consuming
                 };
-                self.states[exit as usize].eps_edges.push(loop_entry);
+                self.connect(exit, loop_entry)?;
             }
         }
         Ok(to)
@@ -369,11 +428,15 @@ impl Builder<'_> {
         let mut copies = HashMap::from([(entry, start)]);
         let mut pending = vec![entry];
         while let Some(state) = pending.pop() {
+            self.budget.charge()?;
             let copy = copies[&state];
             if state == exit {
                 continue;
             }
-            let original = self.states[state as usize].clone();
+            let original = &self.states[state as usize];
+            self.budget
+                .spend((original.pattern_edges.len() + original.eps_edges.len() + 1) as u64)?;
+            let original = original.clone();
             self.states[copy as usize].anchor = original.anchor;
             self.states[copy as usize].entry_states = original.entry_states;
             self.states[copy as usize].entry_gap = original.entry_gap.tighten(entry_gap);
@@ -387,7 +450,7 @@ impl Builder<'_> {
                     pending.push(next);
                     target
                 };
-                self.states[copy as usize].eps_edges.push(target);
+                self.connect(copy, target)?;
             }
         }
         Ok(start)
@@ -401,12 +464,13 @@ impl Builder<'_> {
     ) -> Result<State, AnalysisLimit> {
         // Sibling recursion is not generally regular. Keep the existing conservative
         // tail loop while retaining constraints imposed by the non-recursive prefix.
+        self.budget.spend(self.ref_stack.len() as u64 + 1)?;
         if self.ref_stack.contains(&definition) {
             let exit = self.new_state()?;
             let consumer = self.new_state()?;
-            self.states[from as usize]
-                .eps_edges
-                .extend([consumer, exit]);
+            self.connect(from, consumer)?;
+            self.connect(from, exit)?;
+            self.budget.charge()?;
             self.states[consumer as usize]
                 .pattern_edges
                 .push((ChildMatcher::new(KindConstraint::AnyNode, None), from));

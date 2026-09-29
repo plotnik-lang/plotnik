@@ -15,6 +15,7 @@ use super::super::format::format_kind;
 use super::super::model::{Item, KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
 use super::automaton::{ChildAutomaton, ChildMatcher};
+use super::budget::Budget;
 use super::engine::SatisfiabilitySolver;
 use super::shapes::Child;
 use super::{Goal, collect_goals};
@@ -178,10 +179,11 @@ fn repeated_single_field(
     culprit: &ConcreteCulprit,
 ) -> Result<Option<(String, Vec<Span>)>, AnalysisLimit> {
     let mut fields: Vec<(NodeFieldId, Vec<Span>)> = Vec::new();
-    for child in query_child_demands(ctx, culprit.pattern) {
+    for child in query_child_demands(ctx, culprit.pattern, solver.budget())? {
         let ChildDemand::Field(id) = child.demand else {
             continue;
         };
+        solver.budget().spend(fields.len() as u64 + 1)?;
         match fields.iter_mut().find(|(seen, _)| *seen == id) {
             Some((_, spans)) => spans.push(child.span),
             None => fields.push((id, vec![child.span])),
@@ -192,7 +194,8 @@ fn repeated_single_field(
             continue;
         }
         let matcher = ChildDemand::Field(field).matcher();
-        if solver.probe(culprit.kind, ChildAutomaton::ordered_pair(matcher, matcher))? {
+        let probe = ChildAutomaton::ordered_pair(matcher, matcher, solver.budget())?;
+        if solver.probe(culprit.kind, probe)? {
             continue;
         }
         return Ok(Some((
@@ -245,7 +248,8 @@ fn report_negated_fields(
         let span = field.span;
         let kind = culprit.kind_name(ctx);
         // The absence test covers every realization, including leaf aliases.
-        if !solver.probe(culprit.kind, ChildAutomaton::without_field(field.id))? {
+        let probe = ChildAutomaton::without_field(field.id, solver.budget())?;
+        if !solver.probe(culprit.kind, probe)? {
             diag.report(DiagnosticKind::NegatedRequiredField, span)
                 .detail(name)
                 .related_to(culprit.span(), format!("on {kind}"))
@@ -255,8 +259,8 @@ fn report_negated_fields(
             continue;
         }
 
-        let mut relaxed = solver.automaton(culprit.pattern).clone();
-        relaxed.allow_field(field.id);
+        let mut relaxed = solver.copy_automaton(culprit.pattern)?;
+        relaxed.allow_field(field.id, solver.budget())?;
         if solver.probe(culprit.kind, relaxed)? {
             let others = cover_spans(
                 constraint_spans(ctx.model, culprit.pattern).filter(|&other| other != span),
@@ -283,6 +287,7 @@ fn locate(
 ) -> Result<Goal, AnalysisLimit> {
     let mut visited = HashSet::new();
     while visited.insert(goal.pattern()) {
+        solver.budget().charge()?;
         let mut children = Vec::new();
         for child in model
             .node(goal.pattern())
@@ -290,7 +295,7 @@ fn locate(
             .iter()
             .filter_map(|item| item.pattern())
         {
-            collect_goals(child, model, &mut children);
+            collect_goals(child, model, &mut children, solver.budget())?;
         }
         let mut failed = None;
         for child in children {
@@ -315,10 +320,11 @@ fn report_anchors(
     culprit: &ConcreteCulprit,
     diag: &mut Diagnostics,
 ) -> Result<bool, AnalysisLimit> {
-    let original = solver.automaton(culprit.pattern).clone();
+    let original = solver.copy_automaton(culprit.pattern)?;
     let mut anchors: Vec<(Span, Vec<u32>)> = Vec::new();
-    let mut relaxed = original.clone();
+    let mut relaxed = original.copy(solver.budget())?;
     for state in 0..original.state_count() as u32 {
+        solver.budget().spend(anchors.len() as u64 + 1)?;
         let Some((_, span)) = original.anchor(state) else {
             continue;
         };
@@ -327,18 +333,24 @@ fn report_anchors(
         } else {
             anchors.push((span, vec![state]));
         }
-        relaxed.remove_anchor(span);
     }
-    if anchors.is_empty() || !solver.probe(culprit.kind, relaxed)? {
+    if anchors.is_empty() {
+        return Ok(false);
+    }
+
+    relaxed.clear_anchors(solver.budget())?;
+    if !solver.probe(culprit.kind, relaxed)? {
         return Ok(false);
     }
 
     let kind = culprit.kind_name(ctx);
-    let shapes = solver.child_shapes(culprit.kind);
+    let shapes = solver.child_shapes(culprit.kind)?;
     for (span, states) in &anchors {
-        let mut removed = original.clone();
-        removed.remove_anchor(*span);
-        match solver.probe(culprit.kind, removed) {
+        let trial = original.copy(solver.budget()).and_then(|mut removed| {
+            removed.remove_anchor(*span, solver.budget())?;
+            solver.probe(culprit.kind, removed)
+        });
+        match trial {
             Ok(false) => continue,
             Err(_) => break,
             Ok(true) => {}
@@ -417,10 +429,10 @@ fn emit_arrangement_failure(
         return Ok(());
     }
 
-    let shapes = solver.child_shapes(culprit.kind);
-    let demands = query_child_demands(ctx, culprit.pattern);
+    let shapes = solver.child_shapes(culprit.kind)?;
+    let demands = query_child_demands(ctx, culprit.pattern, solver.budget())?;
     if let Some(shapes) = &shapes
-        && report_child_count(ctx, culprit, &demands, shapes, diag)
+        && report_child_count(ctx, culprit, &demands, shapes, solver.budget(), diag)?
     {
         return Ok(());
     }
@@ -457,12 +469,17 @@ fn report_child_count(
     culprit: &ConcreteCulprit,
     demands: &[QueryChild],
     shapes: &[Vec<Child>],
+    budget: &mut Budget,
     diag: &mut Diagnostics,
-) -> bool {
+) -> Result<bool, AnalysisLimit> {
     for (index, child) in demands.iter().enumerate() {
+        budget.charge()?;
         if matches!(child.demand, ChildDemand::Kind(kind) if ctx.grammar.is_extra(kind)) {
             continue;
         }
+        budget.spend(
+            demands.len() as u64 * 2 + shapes.iter().map(|shape| shape.len() as u64).sum::<u64>(),
+        )?;
         let required: Vec<_> = demands
             .iter()
             .filter(|other| other.demand == child.demand)
@@ -506,9 +523,9 @@ fn report_child_count(
             builder = builder.related_to(earlier.span, format!("also requires {kind}"));
         }
         builder.hint(describe_shapes(ctx, &parent, shapes)).emit();
-        return true;
+        return Ok(true);
     }
-    false
+    Ok(false)
 }
 
 fn describe_shapes(ctx: Context<'_>, kind: &str, shapes: &[Vec<Child>]) -> String {
@@ -576,14 +593,15 @@ fn report_nested_constraints(
     culprit: &ConcreteCulprit,
     diag: &mut Diagnostics,
 ) -> Result<bool, AnalysisLimit> {
-    let original = solver.automaton(culprit.pattern).clone();
+    let original = solver.copy_automaton(culprit.pattern)?;
     let mut seen = HashSet::new();
     for nested in original.nested_patterns() {
+        solver.budget().charge()?;
         if !seen.insert(nested) {
             continue;
         }
-        let mut relaxed = original.clone();
-        relaxed.allow_nested(nested);
+        let mut relaxed = original.copy(solver.budget())?;
+        relaxed.allow_nested(nested, solver.budget())?;
         if !solver.probe(culprit.kind, relaxed)? {
             continue;
         }
@@ -673,21 +691,28 @@ fn order_diagnosis(
     solver: &mut SatisfiabilitySolver,
     culprit: &ConcreteCulprit,
 ) -> Result<Option<OrderDiagnosis>, AnalysisLimit> {
-    let query = query_child_demands(ctx, culprit.pattern);
+    let query = query_child_demands(ctx, culprit.pattern, solver.budget())?;
     for (index, before) in query.iter().enumerate() {
         for after in &query[index + 1..] {
+            solver.budget().charge()?;
             if before.demand == after.demand {
                 continue;
             }
 
-            let requested =
-                ChildAutomaton::ordered_pair(before.demand.matcher(), after.demand.matcher());
+            let requested = ChildAutomaton::ordered_pair(
+                before.demand.matcher(),
+                after.demand.matcher(),
+                solver.budget(),
+            )?;
             if solver.probe(culprit.kind, requested)? {
                 continue;
             }
 
-            let reversed =
-                ChildAutomaton::ordered_pair(after.demand.matcher(), before.demand.matcher());
+            let reversed = ChildAutomaton::ordered_pair(
+                after.demand.matcher(),
+                before.demand.matcher(),
+                solver.budget(),
+            )?;
             if solver.probe(culprit.kind, reversed)? {
                 return Ok(Some(OrderDiagnosis {
                     before: after.clone(),
@@ -699,8 +724,13 @@ fn order_diagnosis(
     Ok(None)
 }
 
-fn query_child_demands(ctx: Context<'_>, node: PatternId) -> Vec<QueryChild> {
+fn query_child_demands(
+    ctx: Context<'_>,
+    node: PatternId,
+    budget: &mut Budget,
+) -> Result<Vec<QueryChild>, AnalysisLimit> {
     let mut children = Vec::new();
+    budget.spend(ctx.model.node(node).children.len() as u64)?;
     let mut pending: Vec<_> = ctx
         .model
         .node(node)
@@ -711,10 +741,9 @@ fn query_child_demands(ctx: Context<'_>, node: PatternId) -> Vec<QueryChild> {
         .map(|pattern| (pattern, HashSet::new()))
         .collect();
     while let Some((pattern, mut references)) = pending.pop() {
+        budget.charge()?;
         let demand = match &ctx.model.pattern(pattern).kind {
-            PatternKind::Field(field, inner)
-                if guaranteed_child(ctx.model, *inner, &mut HashSet::new()) =>
-            {
+            PatternKind::Field(field, inner) if guaranteed_child(ctx.model, *inner, budget)? => {
                 ChildDemand::Field(*field)
             }
             PatternKind::Node(node) => match node.kind {
@@ -729,6 +758,7 @@ fn query_child_demands(ctx: Context<'_>, node: PatternId) -> Vec<QueryChild> {
                 continue;
             }
             PatternKind::Sequence(items) => {
+                budget.spend(items.len() as u64 * (references.len() as u64 + 1))?;
                 pending.extend(
                     items
                         .iter()
@@ -749,25 +779,32 @@ fn query_child_demands(ctx: Context<'_>, node: PatternId) -> Vec<QueryChild> {
             span: pattern_span(&ctx.model.pattern(pattern).origin),
         });
     }
-    children
+    Ok(children)
 }
 
 // A field wrapped around a nullable pattern need not consume a field at all.
 // Sequences discard an inherited field in the child automaton, so they do not
 // establish a demand for that outer field either.
-fn guaranteed_child(model: &Model, pattern: PatternId, visited: &mut HashSet<PatternId>) -> bool {
-    if !visited.insert(pattern) {
-        return false;
-    }
-    match &model.pattern(pattern).kind {
-        PatternKind::Node(_) | PatternKind::Leaf(_) => true,
-        PatternKind::Repeat(repeat) if repeat.kind == ast::QuantifierKind::OneOrMore => {
-            guaranteed_child(model, repeat.inner, visited)
+fn guaranteed_child(
+    model: &Model,
+    mut pattern: PatternId,
+    budget: &mut Budget,
+) -> Result<bool, AnalysisLimit> {
+    let mut visited = HashSet::new();
+    loop {
+        budget.charge()?;
+        if !visited.insert(pattern) {
+            return Ok(false);
         }
-        PatternKind::Reference(definition) => {
-            guaranteed_child(model, model.definition(*definition), visited)
+
+        pattern = match &model.pattern(pattern).kind {
+            PatternKind::Node(_) | PatternKind::Leaf(_) => return Ok(true),
+            PatternKind::Repeat(repeat) if repeat.kind == ast::QuantifierKind::OneOrMore => {
+                repeat.inner
+            }
+            PatternKind::Reference(definition) => model.definition(*definition),
+            _ => return Ok(false),
         }
-        _ => false,
     }
 }
 

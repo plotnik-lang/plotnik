@@ -19,10 +19,10 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
 error: `arg` is not a grammar field of `call`
- --> query.ptk:1:12
+ --> query.ptk:1:11
   |
 1 | Q = (call -arg)
-  |      ----  ^^^
+  |      ---- ^^^^
   |      |
   |      `call` starts here
   |

@@ -53,6 +53,7 @@ impl<'q> LocalDiagnostics<'_, 'q> {
         parent: Option<ParentNode>,
         field: Option<FieldRef>,
     ) -> Result<(), AnalysisLimit> {
+        self.solver.budget().charge()?;
         if !self.visited.insert((pattern, parent, field)) {
             return Ok(());
         }
@@ -168,10 +169,11 @@ impl<'q> LocalDiagnostics<'_, 'q> {
                 return Ok(());
             }
 
-            let accepted = self.solver.probe(
-                parent.id(),
-                ChildAutomaton::child(ChildMatcher::new(kind, Some(field.id))),
+            let probe = ChildAutomaton::child(
+                ChildMatcher::new(kind, Some(field.id)),
+                self.solver.budget(),
             )?;
+            let accepted = self.solver.probe(parent.id(), probe)?;
             if !accepted {
                 let value = match kind {
                     KindConstraint::Exact(kind) => format!("`{}`", format_kind(self.grammar, kind)),
@@ -412,9 +414,13 @@ impl<'q> LocalDiagnostics<'_, 'q> {
         field_name: &str,
     ) -> Result<Option<String>, AnalysisLimit> {
         let types = self.grammar.valid_field_types(parent_id, field_id);
+        self.solver.budget().spend(types.len() as u64)?;
         let mut candidates = Vec::new();
         for &kind in types {
             if self.grammar.is_supertype(kind) {
+                self.solver
+                    .budget()
+                    .spend(self.grammar.structure().realizers().len() as u64)?;
                 candidates.extend(self.grammar.collect_subtypes(kind));
             } else {
                 candidates.push(kind);
@@ -424,13 +430,11 @@ impl<'q> LocalDiagnostics<'_, 'q> {
         candidates.dedup();
         let mut accepted = Vec::new();
         for kind in candidates {
-            if self.solver.probe(
-                parent_id,
-                ChildAutomaton::child(ChildMatcher::new(
-                    KindConstraint::Exact(kind),
-                    Some(field_id),
-                )),
-            )? {
+            let probe = ChildAutomaton::child(
+                ChildMatcher::new(KindConstraint::Exact(kind), Some(field_id)),
+                self.solver.budget(),
+            )?;
+            if self.solver.probe(parent_id, probe)? {
                 accepted.push(kind);
             }
         }

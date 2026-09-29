@@ -29,26 +29,20 @@ impl GrammarFacts {
     }
 
     pub(super) fn admits_any_extra(&self, grammar: &Grammar, constraint: KindConstraint) -> bool {
-        match constraint {
-            KindConstraint::Exact(id) => grammar.is_extra(id),
-            KindConstraint::AnyNamed => !self.named_extras.is_empty(),
-            KindConstraint::AnyNode | KindConstraint::Unconstrained => !self.extras.is_empty(),
-        }
+        self.extra_candidates(grammar, constraint).next().is_some()
     }
 
-    pub(super) fn any_extra_admitted_by(
+    pub(super) fn extra_candidates(
         &self,
         grammar: &Grammar,
         constraint: KindConstraint,
-        mut predicate: impl FnMut(NodeKindId) -> bool,
-    ) -> bool {
-        match constraint {
-            KindConstraint::Exact(id) => grammar.is_extra(id) && predicate(id),
-            KindConstraint::AnyNamed => self.named_extras.iter().copied().any(predicate),
-            KindConstraint::AnyNode | KindConstraint::Unconstrained => {
-                self.extras.iter().copied().any(predicate)
-            }
-        }
+    ) -> impl Iterator<Item = NodeKindId> + '_ {
+        let (single, kinds): (_, &[NodeKindId]) = match constraint {
+            KindConstraint::Exact(id) => (grammar.is_extra(id).then_some(id), &[]),
+            KindConstraint::AnyNamed => (None, &self.named_extras),
+            KindConstraint::AnyNode | KindConstraint::Unconstrained => (None, &self.extras),
+        };
+        single.into_iter().chain(kinds.iter().copied())
     }
 }
 

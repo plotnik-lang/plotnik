@@ -15,10 +15,10 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
 error: `type` is not a grammar field of `func`
- --> query.ptk:1:12
+ --> query.ptk:1:11
   |
 1 | Q = (func -type)
-  |      ----  ^^^^
+  |      ---- ^^^^^
   |      |
   |      `func` starts here
   |

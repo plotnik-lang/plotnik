@@ -8,10 +8,10 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
 error: `-name` can never match
- --> query.ptk:1:13
+ --> query.ptk:1:12
   |
 1 | Q = (param -name)
-  |      -----  ^^^^
+  |      ----- ^^^^^
   |      |
   |      on `param`
   |
