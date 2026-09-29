@@ -9,7 +9,7 @@ use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeKind, NodeKindId};
 
 use super::bind::GrammarBinder;
-use super::utils::find_similar;
+use crate::core::utils::find_similar;
 
 impl<'a, 'q> GrammarBinder<'a, 'q> {
     pub(super) fn resolve_symbols(&mut self, pattern: &Located<ast::Pattern>) {
@@ -22,16 +22,17 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         if node.is_any() {
             return;
         }
-        let Some(type_token) = node.kind_token() else {
-            return;
-        };
+
+        let type_token = node.kind_token().expect("validated node has a kind");
         if type_token.kind() == SyntaxKind::KwError {
             return;
         }
+
         if type_token.kind() == SyntaxKind::KwMissing {
             self.resolve_missing_node(located);
             return;
         }
+
         self.bind_named_kind(located.source(), &type_token);
     }
 
@@ -48,6 +49,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 let Some(id) = self.bind_named_kind(source, &id_tok) else {
                     return;
                 };
+
                 if self.grammar.has_declared_child_structure(id) {
                     self.diag
                         .report(
@@ -76,6 +78,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         if let Some(&cached) = self.node_kind_ids.get(&key) {
             return cached;
         }
+
         let resolved = self.grammar.resolve_named_node(type_name);
         self.node_kind_ids.insert(key, resolved);
         if let Some(id) = resolved {
@@ -83,6 +86,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             self.output.insert_node_kind_id(NodeKind::Named(sym), id);
             return Some(id);
         }
+
         let all_types = self.grammar.all_named_node_kinds();
         let suggestion = find_similar(type_name, &all_types);
         let mut builder = self
@@ -111,6 +115,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         if let Some(&cached) = self.node_kind_ids.get(&key) {
             return cached;
         }
+
         let value = unescape(value_token.text()).0;
         let resolved = self.grammar.resolve_anonymous_node(&value);
         self.node_kind_ids.insert(key, resolved);
@@ -120,6 +125,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 .insert_node_kind_id(NodeKind::Anonymous(sym), id);
             return Some(id);
         }
+
         self.diag
             .report(
                 DiagnosticKind::UnknownNodeKind,
@@ -134,13 +140,13 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
     fn resolve_field_by_token(
         &mut self,
         source: SourceId,
-        name_token: Option<SyntaxToken>,
+        name_token: SyntaxToken,
     ) -> Option<SyntaxToken> {
-        let name_token = name_token?;
         let field_name = name_token.text();
         if self.node_field_ids.contains_key(field_name) {
             return None;
         }
+
         let resolved = self.grammar.resolve_field(field_name);
         self.node_field_ids
             .insert(token_src(&name_token, self.content(source)), resolved);
@@ -149,6 +155,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             self.output.insert_node_field_id(sym, id);
             return None;
         }
+
         Some(name_token)
     }
 
@@ -179,13 +186,15 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         if node.is_any() {
             return None;
         }
-        let type_token = node.kind_token()?;
+
+        let type_token = node.kind_token().expect("validated node has a kind");
         if matches!(
             type_token.kind(),
             SyntaxKind::KwError | SyntaxKind::KwMissing
         ) {
             return None;
         }
+
         let key = NodeKind::Named(token_src(&type_token, self.content(located.source())));
         self.node_kind_ids.get(&key).copied().flatten()
     }
@@ -205,10 +214,10 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
             .children()
             .filter_map(ast::NegatedField::cast)
         {
-            if let Some(token) = self
-                .binder
-                .resolve_field_by_token(node.source(), neg.name())
-            {
+            if let Some(token) = self.binder.resolve_field_by_token(
+                node.source(),
+                neg.name().expect("validated field has a name"),
+            ) {
                 let grammar = self.binder.grammar;
                 let candidates = self
                     .binder
@@ -240,17 +249,18 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
     }
 
     fn visit_anonymous_node_pattern(&mut self, node: &Located<ast::AnonymousNodePattern>) {
-        let Some(value_token) = node.node().value() else {
-            return;
-        };
+        let value_token = node
+            .node()
+            .value()
+            .expect("validated anonymous node has a value");
         self.binder.bind_anonymous_kind(node.source(), &value_token);
     }
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
-        if let Some(token) = self
-            .binder
-            .resolve_field_by_token(field.source(), field.node().name())
-        {
+        if let Some(token) = self.binder.resolve_field_by_token(
+            field.source(),
+            field.node().name().expect("validated field has a name"),
+        ) {
             let grammar = self.binder.grammar;
             let parent = field
                 .node()

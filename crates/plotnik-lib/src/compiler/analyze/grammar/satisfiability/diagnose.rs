@@ -43,7 +43,7 @@ pub(super) fn report_goal(
     diag: &mut Diagnostics,
     reported: &mut ReportedCulprits,
 ) -> Result<(), AnalysisLimit> {
-    if super::super::diagnostics::LocalDiagnostics::report(
+    if super::local::LocalDiagnostics::report(
         ctx.grammar,
         ctx.model,
         goal.pattern(),
@@ -100,13 +100,17 @@ struct ConcreteCulprit {
 }
 
 impl ConcreteCulprit {
+    fn new(model: &Model, pattern: PatternId, kind: NodeKindId) -> Self {
+        Self {
+            pattern,
+            node: model.node_origin(pattern),
+            kind,
+        }
+    }
+
     fn from_goal(model: &Model, goal: Goal) -> Result<Self, Located<NamedNodePattern>> {
         match goal {
-            Goal::Concrete { pattern, kind } => Ok(Self {
-                pattern,
-                node: model.node_origin(pattern),
-                kind,
-            }),
+            Goal::Concrete { pattern, kind } => Ok(Self::new(model, pattern, kind)),
             Goal::Wildcard { pattern } => Err(model.node_origin(pattern)),
         }
     }
@@ -218,23 +222,15 @@ fn report_negated_fields(
 ) -> Result<bool, AnalysisLimit> {
     let mut reported = false;
     let node = ctx.model.node(culprit.pattern);
-    for (&field, syntax) in node.negated_fields.iter().zip(
-        culprit
-            .node
-            .node()
-            .syntax()
-            .children()
-            .filter_map(ast::NegatedField::cast),
-    ) {
+    for field in &node.negated_fields {
         let name = ctx
             .grammar
-            .field_name(field)
+            .field_name(field.id)
             .expect("resolved field has a name");
-        let token = syntax.name().expect("resolved negated field has a name");
-        let span = culprit.node.span_of(token.text_range());
+        let span = field.span;
         let kind = culprit.kind_name(ctx);
         // The absence test covers every realization, including leaf aliases.
-        if !solver.probe(culprit.kind, ChildAutomaton::without_field(field))? {
+        if !solver.probe(culprit.kind, ChildAutomaton::without_field(field.id))? {
             diag.report(DiagnosticKind::NegatedRequiredField, span)
                 .detail(name)
                 .related_to(culprit.span(), format!("on {kind}"))
@@ -245,7 +241,7 @@ fn report_negated_fields(
         }
 
         let mut relaxed = solver.automaton(culprit.pattern).clone();
-        relaxed.allow_field(field);
+        relaxed.allow_field(field.id);
         if solver.probe(culprit.kind, relaxed)? {
             diag.report(DiagnosticKind::UnsatisfiablePattern, span)
                 .detail(format!("`-{name}` requires `{name}` to be absent, but these {kind} child constraints require it to be present"))
@@ -749,16 +745,8 @@ impl ChildDemand {
 
     fn matcher(self) -> ChildMatcher {
         match self {
-            Self::Field(field) => ChildMatcher {
-                kind: KindConstraint::AnyNode,
-                field: Some(field),
-                nested_pattern: None,
-            },
-            Self::Kind(kind) => ChildMatcher {
-                kind: KindConstraint::Exact(kind),
-                field: None,
-                nested_pattern: None,
-            },
+            Self::Field(field) => ChildMatcher::new(KindConstraint::AnyNode, Some(field)),
+            Self::Kind(kind) => ChildMatcher::new(KindConstraint::Exact(kind), None),
         }
     }
 
@@ -777,15 +765,9 @@ impl ChildDemand {
 
 pub(super) fn report_unexplained(ctx: Context<'_>, pattern: PatternId, diag: &mut Diagnostics) {
     match Goal::from_pattern(ctx.model, pattern) {
-        Some(Goal::Concrete { kind, .. }) => emit_generic_failure(
-            ctx,
-            &ConcreteCulprit {
-                pattern,
-                kind,
-                node: ctx.model.node_origin(pattern),
-            },
-            diag,
-        ),
+        Some(Goal::Concrete { kind, .. }) => {
+            emit_generic_failure(ctx, &ConcreteCulprit::new(ctx.model, pattern, kind), diag)
+        }
         Some(Goal::Wildcard { .. }) => emit_wildcard_failure(&ctx.model.node_origin(pattern), diag),
         None => {
             diag.report(
@@ -813,22 +795,26 @@ fn pattern_span(pattern: &Located<Pattern>) -> Span {
     pattern.span_of(pattern.node().text_range())
 }
 
-/// The span of a node pattern's kind token, falling back to the whole node.
 fn kind_span(node: &Located<NamedNodePattern>) -> Span {
     let range = node
         .node()
         .kind_token()
-        .map_or_else(|| node.node().text_range(), |token| token.text_range());
+        .expect("validated node has a kind")
+        .text_range();
     node.span_of(range)
 }
 
 /// Render one kind: a named kind in backticks, an anonymous one as a quoted literal.
 fn render_kind(ctx: Context<'_>, kind: NodeKindId) -> String {
-    match ctx.grammar.node_kind(kind) {
-        Some(name) if ctx.grammar.is_anonymous_node(kind) => format!("`\"{name}\"`"),
-        Some(name) => format!("`{name}`"),
-        None => "an unknown kind".to_string(),
+    let name = ctx
+        .grammar
+        .node_kind(kind)
+        .expect("resolved kind has a name");
+    if ctx.grammar.is_anonymous_node(kind) {
+        return format!("`\"{name}\"`");
     }
+
+    format!("`{name}`")
 }
 
 /// "a" or "an" for a rendered kind like `` `array` `` — chosen on the first letter

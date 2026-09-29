@@ -64,7 +64,13 @@ pub(super) struct Node {
     pub(super) children: Vec<Item>,
     pub(super) trailing: GapClass,
     pub(super) trailing_anchor: Option<Span>,
-    pub(super) negated_fields: Vec<NodeFieldId>,
+    pub(super) negated_fields: Vec<NegatedField>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct NegatedField {
+    pub(super) id: NodeFieldId,
+    pub(super) span: Span,
 }
 
 impl Node {
@@ -78,7 +84,7 @@ impl Node {
 #[derive(Clone, Copy)]
 pub(super) enum NodeViolation {
     PredicateOnNonLeaf,
-    FieldNotOnKind(NodeFieldId),
+    FieldNotOnKind(NegatedField),
 }
 
 pub(super) struct Item {
@@ -193,7 +199,11 @@ impl Builder<'_> {
                     .children()
                     .filter_map(ast::NegatedField::cast)
                     .map(|field| {
-                        self.field(field.name().expect("validated field has a name").text())
+                        let token = field.name().expect("validated field has a name");
+                        NegatedField {
+                            id: self.field(token.text()),
+                            span: Span::new(source, token.text_range()),
+                        }
                     })
                     .collect();
                 // Kind-wide restrictions cannot vary with a production or caller.
@@ -207,7 +217,7 @@ impl Builder<'_> {
                             Some(NodeViolation::PredicateOnNonLeaf)
                         } else {
                             negated_fields.iter().find_map(|&field| {
-                                (!self.grammar.has_field(kind, field))
+                                (!self.grammar.has_field(kind, field.id))
                                     .then_some(NodeViolation::FieldNotOnKind(field))
                             })
                         }

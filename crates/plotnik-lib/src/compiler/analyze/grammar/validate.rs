@@ -8,7 +8,7 @@ use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern};
 use crate::core::NodeKindId;
 
 use super::bind::GrammarBinder;
-use super::diagnostics::format_list;
+use super::format::format_list;
 
 impl GrammarBinder<'_, '_> {
     pub(super) fn validate_syntax(&mut self, pattern: &Located<Pattern>) {
@@ -72,39 +72,39 @@ impl GrammarBinder<'_, '_> {
             Pattern::AnonymousNodePattern(_) => false,
             Pattern::NodeWildcard(_) => true,
             Pattern::CapturedPattern(cap) => {
-                let Some(inner) = cap.inner() else {
-                    return true;
-                };
+                let inner = cap.inner().expect("validated capture has a body");
                 self.pattern_can_match_root(&located.wrap(inner), grammar_root, seen_refs)
             }
             Pattern::QuantifiedPattern(q) => {
                 if q.is_optional() {
                     return true;
                 }
-                let Some(inner) = q.inner() else {
-                    return true;
-                };
+
+                let inner = q.inner().expect("validated repeat has a body");
                 self.pattern_can_match_root(&located.wrap(inner), grammar_root, seen_refs)
             }
             Pattern::Alternation(alternation) => {
                 let mut saw_alternative = false;
                 for alternative in alternation.alternatives() {
                     saw_alternative = true;
-                    if alternative.body().is_none_or(|body| {
-                        self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs)
-                    }) {
+                    let body = alternative
+                        .body()
+                        .expect("validated alternative has a body");
+                    if self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs) {
                         return true;
                     }
                 }
                 !saw_alternative
             }
             Pattern::DefRef(def_ref) => {
-                let Some(def_id) = self.definitions.reference_target(def_ref) else {
-                    return true;
-                };
+                let def_id = self
+                    .definitions
+                    .reference_target(def_ref)
+                    .expect("validated reference has a target");
                 if !seen_refs.insert(def_id) {
                     return true;
                 }
+
                 let target = self.definitions.definition(def_id).located_body();
                 let result = self.pattern_can_match_root(&target, grammar_root, seen_refs);
                 seen_refs.remove(&def_id);
@@ -115,9 +115,11 @@ impl GrammarBinder<'_, '_> {
                 let Some(first) = children.next() else {
                     return true;
                 };
+
                 if children.next().is_some() {
                     return true;
                 }
+
                 self.pattern_can_match_root(&located.wrap(first), grammar_root, seen_refs)
             }
             // Bare fields are already reported by grammar validation; avoid piling a
@@ -134,12 +136,15 @@ impl GrammarBinder<'_, '_> {
         if located.node().is_any() {
             return true;
         }
+
         let Some(id) = self.resolve_named_node_id(located) else {
             return true;
         };
+
         if self.grammar.is_supertype(id) {
             return true;
         }
+
         id == grammar_root
     }
 
@@ -149,12 +154,11 @@ impl GrammarBinder<'_, '_> {
     /// Returns whether the node was rejected.
     fn reject_supertype_match(&mut self, located: &Located<NamedNodePattern>) -> bool {
         let node = located.node();
-        let Some(kind_token) = node.kind_token() else {
-            return false;
-        };
+        let kind_token = node.kind_token().expect("validated node has a kind");
         let Some(id) = self.resolve_named_node_id(located) else {
             return false;
         };
+
         if !self.grammar.is_supertype(id) {
             return false;
         }

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use super::model::{KindConstraint, Model, NodeViolation, PatternId, PatternKind};
+use super::super::format::format_list;
+use super::super::model::{KindConstraint, Model, NodeViolation, PatternId, PatternKind};
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::parse::ast::{self, QuantifierKind};
@@ -75,10 +76,9 @@ impl LocalDiagnostics<'_> {
                     Some(NodeViolation::FieldNotOnKind(field)) => {
                         let name = self
                             .grammar
-                            .field_name(field)
+                            .field_name(field.id)
                             .expect("resolved field has a name");
-                        let span = self.negated_span(pattern, name);
-                        self.emit_negated_field_not_on_node(span, name, &ctx);
+                        self.emit_negated_field_not_on_node(field.span, name, &ctx);
                     }
                     None => {}
                 }
@@ -125,19 +125,6 @@ impl LocalDiagnostics<'_> {
         }
     }
 
-    fn negated_span(&self, pattern: PatternId, name: &str) -> Span {
-        let node = self.model.node_origin(pattern);
-        let token = node
-            .node()
-            .syntax()
-            .children()
-            .filter_map(ast::NegatedField::cast)
-            .filter_map(|field| field.name())
-            .find(|token| token.text() == name)
-            .expect("resolved negated field has source syntax");
-        node.span_of(token.text_range())
-    }
-
     fn child(
         &mut self,
         pattern: PatternId,
@@ -171,9 +158,9 @@ impl LocalDiagnostics<'_> {
 
             let types = self.grammar.valid_field_types(parent.id(), field.id);
             let accepted = match kind {
-                KindConstraint::Exact(kind) => types.iter().any(|&candidate| {
-                    candidate == kind || self.grammar.collect_subtypes(candidate).contains(&kind)
-                }),
+                KindConstraint::Exact(kind) => types
+                    .iter()
+                    .any(|&candidate| self.accepts_kind(candidate, kind)),
                 KindConstraint::AnyNamed => {
                     types.is_empty()
                         || types
@@ -211,27 +198,11 @@ impl LocalDiagnostics<'_> {
         let KindConstraint::Exact(kind) = kind else {
             return;
         };
-        let candidates = self
-            .grammar
-            .valid_child_types(parent.id())
-            .iter()
-            .copied()
-            .chain(
-                self.grammar
-                    .field_ids_for_node_kind(parent.id())
-                    .iter()
-                    .flat_map(|&field| {
-                        self.grammar
-                            .valid_field_types(parent.id(), field)
-                            .iter()
-                            .copied()
-                    }),
-            );
-        if !self.grammar.is_extra(kind)
-            && !candidates.into_iter().any(|candidate| {
-                candidate == kind || self.grammar.collect_subtypes(candidate).contains(&kind)
-            })
-        {
+        let accepted = self.grammar.is_extra(kind)
+            || self
+                .child_kinds(parent.id())
+                .any(|candidate| self.accepts_kind(candidate, kind));
+        if !accepted {
             self.emit_invalid_child(span, kind, parent);
         }
     }
@@ -341,11 +312,9 @@ impl LocalDiagnostics<'_> {
             .emit();
     }
 
-    fn child_hint(&self, parent_id: NodeKindId, parent_name: &str) -> String {
-        // An unlabelled query can also match a labelled child. Offer concrete
-        // kinds from both sources, never an unsupported abstract supertype.
-        let kinds = self
-            .grammar
+    // An unlabelled query can also match a labelled child.
+    fn child_kinds(&self, parent_id: NodeKindId) -> impl Iterator<Item = NodeKindId> + '_ {
+        self.grammar
             .valid_child_types(parent_id)
             .iter()
             .copied()
@@ -353,13 +322,22 @@ impl LocalDiagnostics<'_> {
                 self.grammar
                     .field_ids_for_node_kind(parent_id)
                     .iter()
-                    .flat_map(|&field| {
+                    .flat_map(move |&field| {
                         self.grammar
                             .valid_field_types(parent_id, field)
                             .iter()
                             .copied()
                     }),
             )
+    }
+
+    fn accepts_kind(&self, candidate: NodeKindId, kind: NodeKindId) -> bool {
+        candidate == kind || self.grammar.collect_subtypes(candidate).contains(&kind)
+    }
+
+    fn child_hint(&self, parent_id: NodeKindId, parent_name: &str) -> String {
+        let kinds = self
+            .child_kinds(parent_id)
             .chain(self.grammar.extra_node_kinds().iter().copied());
         let names = self.concrete_kinds(kinds);
         if names.is_empty() {
@@ -464,25 +442,6 @@ impl LocalDiagnostics<'_> {
             field_name,
             format_list(&values, 8)
         ))
-    }
-}
-
-pub(super) fn format_list(items: &[&str], max_items: usize) -> String {
-    if items.is_empty() {
-        return String::new();
-    }
-    if items.len() <= max_items {
-        items
-            .iter()
-            .map(|s| format!("`{}`", s))
-            .collect::<Vec<_>>()
-            .join(", ")
-    } else {
-        let shown: Vec<_> = items[..max_items]
-            .iter()
-            .map(|s| format!("`{}`", s))
-            .collect();
-        format!("{}, … ({} more)", shown.join(", "), items.len() - max_items)
     }
 }
 

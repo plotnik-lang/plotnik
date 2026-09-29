@@ -19,6 +19,27 @@ pub(super) struct ChildMatcher {
     pub(super) field: Option<NodeFieldId>,
 }
 
+impl ChildMatcher {
+    pub(super) fn new(kind: KindConstraint, field: Option<NodeFieldId>) -> Self {
+        Self {
+            kind,
+            field,
+            nested_pattern: None,
+        }
+    }
+
+    fn node(
+        node: &super::super::model::Node,
+        pattern: PatternId,
+        field: Option<NodeFieldId>,
+    ) -> Self {
+        Self {
+            nested_pattern: node.constrains_children().then_some(pattern),
+            ..Self::new(node.kind, field)
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct StateData {
     gap: GapClass,
@@ -151,7 +172,7 @@ pub(super) fn build(
         states: builder.states,
         start,
         accept,
-        negated_fields: node.negated_fields.clone(),
+        negated_fields: node.negated_fields.iter().map(|field| field.id).collect(),
     })
 }
 
@@ -223,22 +244,10 @@ impl Builder<'_> {
     ) -> Result<State, AnalysisLimit> {
         match &self.model.pattern(pattern).kind {
             PatternKind::Node(node) if node.violation.is_some() => self.new_state(GapClass::Any),
-            PatternKind::Node(node) => self.emit_single(
-                ChildMatcher {
-                    kind: node.kind,
-                    nested_pattern: node.constrains_children().then_some(pattern),
-                    field,
-                },
-                from,
-            ),
-            PatternKind::Leaf(kind) => self.emit_single(
-                ChildMatcher {
-                    kind: *kind,
-                    nested_pattern: None,
-                    field,
-                },
-                from,
-            ),
+            PatternKind::Node(node) => {
+                self.emit_single(ChildMatcher::node(node, pattern, field), from)
+            }
+            PatternKind::Leaf(kind) => self.emit_single(ChildMatcher::new(*kind, field), from),
             PatternKind::Field(field, inner) => self.emit_pattern(*inner, Some(*field), from),
             PatternKind::Sequence(items) => self.emit_items(
                 items,
@@ -303,14 +312,9 @@ impl Builder<'_> {
         // Sibling recursion is not generally regular. Keep the existing conservative
         // tail loop while retaining constraints imposed by the non-recursive prefix.
         if self.ref_stack.contains(&definition) {
-            self.states[from as usize].pattern_edges.push((
-                ChildMatcher {
-                    kind: KindConstraint::AnyNode,
-                    nested_pattern: None,
-                    field: None,
-                },
-                from,
-            ));
+            self.states[from as usize]
+                .pattern_edges
+                .push((ChildMatcher::new(KindConstraint::AnyNode, None), from));
             return Ok(from);
         }
 

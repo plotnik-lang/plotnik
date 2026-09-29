@@ -7,6 +7,7 @@ mod configurations;
 mod diagnose;
 mod engine;
 mod facts;
+mod local;
 mod shapes;
 
 pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;

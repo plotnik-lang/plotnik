@@ -21,20 +21,6 @@ pub struct GrammarBinding {
 }
 
 impl GrammarBinding {
-    /// Freeze finished resolution tables into the binding. The bind pass's builder
-    /// is the only constructor; callers that already have admitted compiler state
-    /// should use the expecting accessors below.
-    fn new(
-        node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
-        node_field_ids: IndexMap<Symbol, NodeFieldId>,
-    ) -> Self {
-        Self {
-            node_kind_ids,
-            node_field_ids,
-            identity: None,
-        }
-    }
-
     /// Grammar id bound to a named node kind, or `None` when the query never
     /// names it (an unconstrained match).
     pub fn resolve_named_kind(&self, sym: Symbol) -> Option<NodeKindId> {
@@ -138,8 +124,10 @@ impl GrammarBindingBuilder {
 
     /// Freeze the accumulated resolution tables into an immutable [`GrammarBinding`].
     pub fn finish(self) -> GrammarBinding {
-        let mut binding = GrammarBinding::new(self.node_kind_ids, self.node_field_ids);
-        binding.identity = self.identity;
-        binding
+        GrammarBinding {
+            node_kind_ids: self.node_kind_ids,
+            node_field_ids: self.node_field_ids,
+            identity: self.identity,
+        }
     }
 }

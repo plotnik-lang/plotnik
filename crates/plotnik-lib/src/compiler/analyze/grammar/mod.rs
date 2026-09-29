@@ -2,11 +2,10 @@
 
 pub mod bind;
 pub mod binding;
-mod diagnostics;
+mod format;
 mod model;
 mod resolve;
 mod satisfiability;
-mod utils;
 mod validate;
 
 pub use binding::{GrammarBinding, GrammarBindingBuilder};
