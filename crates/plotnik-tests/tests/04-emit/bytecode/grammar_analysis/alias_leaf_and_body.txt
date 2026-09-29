@@ -1,0 +1,75 @@
+Leaf = (expr (term .!))
+Group = (expr (term (id)))
+-------------------- GRAMMAR ---------------------
+rules:
+  expr:
+    type: CHOICE
+    members:
+      - type: ALIAS
+        content: {type: SYMBOL, name: id}
+        named: true
+        value: term
+      - type: ALIAS
+        content: {type: SYMBOL, name: group}
+        named: true
+        value: term
+  group:
+    type: SEQ
+    members:
+      - {type: STRING, value: "("}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Group = 08
+Leaf  = 02
+
+[transitions]
+Leaf:
+  01                                        ▶
+  02   !   (expr)                           04
+  03  ─‣┘  _                                01
+  04  └‣─  (term)                           05
+  05  └!┘  _                                03
+
+Group:
+  07                                        ▶
+  08   !   (expr)                           10
+  10  └‣─  (term)                           12
+  11  ─‣┘² _                                07
+  12  └‣─  (id)                             11
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "expr"
+S2 "term"
+S3 "id"
+S4 "Leaf"
+S5 "Group"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Group = 5 :: T0
+Leaf  = 0 :: T0
+
+[instructions]
+Leaf:
+  0   !   (expr)                            1
+  1  └‣─  (term)                            2
+  2  └!┘  _                                 3
+  3  ─‣┘  _                                 4
+  4                                         ▶
+
+Group:
+  5   !   (expr)                            6
+  6  └‣─  (term)                            7
+  7  └‣─  (id)                              8
+  8  ─‣┘² _                                 9
+  9                                         ▶

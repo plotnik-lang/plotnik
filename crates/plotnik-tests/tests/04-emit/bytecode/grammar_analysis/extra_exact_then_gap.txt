@@ -16,15 +16,39 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
   num: {type: PATTERN, value: "[0-9]+"}
   comment: {type: PATTERN, value: "#[^\\n]*"}
------------------- DIAGNOSTICS -------------------
-error: with the exact anchor (`.!`), the first child of `pair` must be `comment`, but `pair` begins with `id`
- --> query.ptk:1:6
-  |
-1 | Q = (pair
-  |      ^^^^
-  |
-help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(pair
-        .
-        (comment)
-        (num)
-      )`
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (pair)                            6
+  4  ─‣┘  _                                 1
+  5  ─‣─  (num)                             4
+  6  └─!  (comment)                         5
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "pair"
+S2 "comment"
+S3 "num"
+S4 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (pair)                            1
+  1  └─!  (comment)                         2
+  2  ─‣─  (num)                             3
+  3  ─‣┘  _                                 4
+  4                                         ▶

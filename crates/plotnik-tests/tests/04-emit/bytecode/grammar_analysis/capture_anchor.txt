@@ -1,0 +1,92 @@
+Arg = (id) @name
+
+Q = (args
+  .!
+  (Arg) @first
+  .
+  (Arg) @last
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  args:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ","}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Arg = 02
+Q   = 05
+
+[transitions]
+Arg:
+  01                                        ▶
+  02   !   (id) [Node RecordSet(name)]      01
+
+Q:
+  04                                        ▶
+  05   !   (args) [RecordOpen]              19
+  08  !─┘  _ [RecordClose RecordSet(last)]  04
+
+Arg (consuming, routed Next):
+  11                                        ▶
+  12  ─•─  (id) [Node RecordSet(name)]      11
+
+Q:
+  13       (Arg (consuming, routed Next))   12 : 08
+  15  -ε-  [RecordClose RecordSet(first) RecordOpen]  13
+
+Arg (consuming, routed Down):
+  17                                        ▶
+  18  └─!  (id) [Node RecordSet(name)]      17
+
+Q:
+  19       (Arg (consuming, routed Down))   18 : 15
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "first"
+S3 "last"
+S4 "Arg"
+S5 "Q"
+S6 "id"
+S7 "args"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:2  ; { first, last }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T1  ; first: Arg
+M2: S3 → T1  ; last: Arg
+
+[type_names]
+N0: S4 → T1  ; Arg
+N1: S5 → T2  ; Q
+
+[entry_points]
+Arg = 00 :: T1
+Q   = 03 :: T2
+
+[instructions]
+Arg:
+  00   !   (id) [Node RecordSet(M0)]        02
+  02                                        ▶
+
+Q:
+  03   !   (args) [RecordOpen]              05
+  05       (@16)                            16 : 06
+  06  -ε-  [RecordClose RecordSet(M1) RecordOpen]  08
+  08       (@13)                            13 : 09
+  09  !─┘  _ [RecordClose RecordSet(M2)]    11
+  11                                        ▶
+  12                                        ▶
+  13  ─•─  (id) [Node RecordSet(M0)]        12
+  15                                        ▶
+  16  └─!  (id) [Node RecordSet(M0)]        15

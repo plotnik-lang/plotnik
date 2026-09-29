@@ -1,7 +1,5 @@
 //! Shared parsing for snapshot documents and section boundaries.
 
-pub mod expectation;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Document {
     pub query: String,
@@ -60,14 +58,19 @@ pub fn parse_section_header(line: &str) -> Option<String> {
         Some((head, ext)) if head.trim().eq_ignore_ascii_case("input") => {
             format!("input.{}", ext.strip_suffix(')')?.trim())
         }
+        Some((head, path)) if head.trim().eq_ignore_ascii_case("query") => {
+            format!("query.{}", path.strip_suffix(')')?.trim())
+        }
         Some(_) => return None,
         None => label.to_ascii_lowercase(),
     };
     let known = name == "input"
         || name.starts_with("input.")
+        || name.starts_with("query.")
         || matches!(
             name.as_str(),
             "grammar"
+                | "limits"
                 | "cst"
                 | "ast"
                 | "definitions"

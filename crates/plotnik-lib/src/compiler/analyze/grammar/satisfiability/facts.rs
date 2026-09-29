@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::compiler::analyze::grammar::satisfiability::automaton::KindConstraint;
+use crate::compiler::analyze::grammar::model::KindConstraint;
 use crate::core::NodeKindId;
 use crate::core::grammar::{Grammar, SurfaceRealizer, VarId};
 
@@ -104,11 +104,7 @@ fn build_parent_candidate_kinds(
     let mut candidates: Vec<NodeKindId> = realizers_by_kind
         .keys()
         .copied()
-        .filter(|&kind| {
-            !grammar.is_anonymous_node(kind)
-                && !grammar.is_supertype(kind)
-                && !grammar.is_token(kind)
-        })
+        .filter(|&kind| !grammar.is_anonymous_node(kind) && !grammar.is_supertype(kind))
         .collect();
     candidates.sort_unstable();
     candidates

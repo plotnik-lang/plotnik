@@ -1,0 +1,35 @@
+Q = (pair
+  .!
+  (term .!)
+  .!
+  (term .!)
+  .!
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  pair:
+    type: SEQ
+    members:
+      - type: ALIAS
+        content: {type: SYMBOL, name: id}
+        named: true
+        value: term
+      - type: ALIAS
+        content: {type: SYMBOL, name: group}
+        named: true
+        value: term
+  group:
+    type: SEQ
+    members:
+      - {type: STRING, value: "("}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: the grammar builds no `pair` with these children
+ --> query.ptk:1:6
+  |
+1 | Q = (pair
+  |      ^^^^
+  |
+help: `pair` allows children `term`

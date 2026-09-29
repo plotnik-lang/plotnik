@@ -1,0 +1,18 @@
+Q = (args (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  args:
+    type: REPEAT
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+--------------------- LIMITS ---------------------
+# The child automaton fits. Solving the repeating grammar exhausts this budget.
+work_budget: 10
+------------------ DIAGNOSTICS -------------------
+error: query too complex to compile
+ --> query.ptk:1:5
+  |
+1 | Q = (args (id))
+  |     ^^^^^^^^^^^
+  |
+help: simplify the pattern. Deeply nested or repeatedly referenced alternations can expand exponentially

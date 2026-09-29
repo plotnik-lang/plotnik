@@ -1,0 +1,34 @@
+Q = (call
+  .!
+  (id)
+  .!
+  (num)?
+  (args)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  call:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: _indent}
+      - {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: args}
+  _indent: {type: PATTERN, value: "[ ]+"}
+  args: {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: with the exact anchor (`.!`), the first child of `call` must be `id`, but `call` begins with `id`
+ --> query.ptk:1:6
+  |
+1 | Q = (call
+  |      ^^^^
+  |
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(call
+        .
+        (id)
+        .
+        (num)?
+        (args)
+      )`

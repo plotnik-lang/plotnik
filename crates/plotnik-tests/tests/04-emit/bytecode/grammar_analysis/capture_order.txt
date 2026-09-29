@@ -1,0 +1,26 @@
+Q = (assign
+  (num) @value
+  (id) @name
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  assign:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "="}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: the grammar places `id` before `num` in `assign`
+ --> query.ptk:2:3
+  |
+1 | Q = (assign
+  |      ------ inside `assign`
+2 |   (num) @value
+  |   ^^^^^^^^^^^^
+3 |   (id) @name
+  |   ---------- `id` must come before `num`
+  |
+help: write `id` before `num`

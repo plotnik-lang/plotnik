@@ -25,6 +25,11 @@
 //! | `04-emit/rust/module` | generated Rust matcher module                                      |
 //! | `06-vm`      | typescript, output, inspection if enabled, bytecode, trace (requires input) |
 //!
+//! Compiler snapshots may add `QUERY (file.ptk)` sections after the grammar/input
+//! to compile additional query files alongside the initial `query.ptk`. An optional
+//! YAML `LIMITS` section sets `work_budget` through the compiler's public API.
+//! `make shot` formats every query file and preserves the authored limit settings.
+//!
 //! Compile-stage snapshots under an `inspection/` folder compile with
 //! `BytecodeConfig::inspection(BytecodeInspection::Spans)`.
 //!
@@ -55,11 +60,6 @@
 //! folder boundaries follow the current compiler pipeline and subsystem ownership,
 //! not historical implementation phases.
 
-//! A neighboring `.expect.json` file adds authored requirements for admission,
-//! diagnostic codes or full payloads, a recovery-free named tree shape, and runtime
-//! output. Unlike generated sections, requirements are never rewritten by `SHOT`.
-//! Diagnostic requirements are checked against the compiler result in memory.
-
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
@@ -74,9 +74,7 @@ use plotnik_lib::{
     RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TraceRecorder, TypeScriptBinding,
     TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
-use plotnik_tests::snapshot::expectation::Expectation;
-use plotnik_tests::snapshot::parse_document;
-use support::formatter::Assessment;
+use plotnik_tests::snapshot::{Section, parse_document};
 use support::snapshots::{
     GeneratedOutput, GeneratedSection, InspectionPolicy, MappingPolicy, SectionKind, SerdePolicy,
     Snapshot, SnapshotKind, SnapshotMode, TriviaPolicy, VmMode, snapshot,
@@ -100,11 +98,44 @@ fn snapshot_mode() -> Result<SnapshotMode, String> {
 }
 
 /// The authored half of a snapshot; generated sections are recomputed, not parsed back.
+#[derive(Clone)]
 struct Parsed {
     query: String,
     source: Option<Source>,
+    files: Vec<Section>,
+    limits: Option<String>,
 }
 
+impl Parsed {
+    fn formatted(&self, kind: SnapshotKind, name: &str) -> Result<Self, String> {
+        let mut formatted = self.clone();
+        for query in std::iter::once(&mut formatted.query)
+            .chain(formatted.files.iter_mut().map(|file| &mut file.body))
+        {
+            let evaluated = support::formatter::evaluate(query, name)?;
+            if !kind.preserves_query_layout() {
+                *query = evaluated.into_query_or(query.clone());
+            }
+        }
+
+        Ok(formatted)
+    }
+
+    fn source_map(&self) -> SourceMap {
+        let mut sources = SourceMap::new();
+        sources.add_file(SourcePath::new("query.ptk"), &self.query);
+        for file in &self.files {
+            let path = file
+                .name
+                .strip_prefix("query.")
+                .expect("validated query section");
+            sources.add_file(SourcePath::new(path), &file.body);
+        }
+        sources
+    }
+}
+
+#[derive(Clone)]
 enum Source {
     Input(Input),
     Grammar(String),
@@ -119,11 +150,7 @@ impl Source {
     }
 }
 
-struct Rendered {
-    sections: Vec<GeneratedSection>,
-    requirements: Result<(), String>,
-}
-
+#[derive(Clone)]
 struct Input {
     ext: Option<String>,
     text: String,
@@ -133,58 +160,26 @@ fn check(snapshot: &Snapshot, mode: SnapshotMode) -> Result<(), String> {
     let raw = fs::read_to_string(&snapshot.path)
         .map_err(|e| format!("read {}: {e}", snapshot.path.display()))?;
     let parsed = parse_snapshot(&raw, snapshot.kind, snapshot.name.as_str())?;
-    let requirement = Expectation::load(&snapshot.path)?;
-    if requirement.is_some()
-        && matches!(
-            snapshot.kind,
-            SnapshotKind::Parser { .. } | SnapshotKind::Analyze
-        )
-    {
-        return Err("authored expectations require a compiler snapshot".into());
-    }
-
     let actual = raw.replace("\r\n", "\n");
-    let evaluated = support::formatter::evaluate(&parsed.query, snapshot.name.as_str())?;
+    let formatted = parsed.formatted(snapshot.kind, snapshot.name.as_str())?;
 
-    if matches!(mode, SnapshotMode::AcceptAll) {
-        let query = if snapshot.kind.preserves_query_layout() {
-            parsed.query
-        } else {
-            evaluated.into_query_or(parsed.query)
-        };
-        let generated = render(
-            snapshot.kind,
-            &query,
-            parsed.source.as_ref(),
-            requirement.as_ref(),
-        )?;
-        if generated.sections.is_empty() {
-            return Err(format!(
-                "snapshot `{}` produced no sections",
-                snapshot.name.as_str()
-            ));
-        }
-        let accepted = canonical(&query, parsed.source.as_ref(), &generated.sections);
-        if actual != accepted {
-            support::atomic_file::replace(&snapshot.path, &accepted)?;
-        }
-        return generated.requirements;
-    }
-
-    let generated = render(
-        snapshot.kind,
-        &parsed.query,
-        parsed.source.as_ref(),
-        requirement.as_ref(),
-    )?;
-    generated.requirements?;
-    if generated.sections.is_empty() {
+    let accepting = matches!(mode, SnapshotMode::AcceptAll);
+    let input = if accepting { &formatted } else { &parsed };
+    let generated = render(snapshot.kind, input)?;
+    if generated.is_empty() {
         return Err(format!(
             "snapshot `{}` produced no sections",
             snapshot.name.as_str()
         ));
     }
-    let expected = canonical(&parsed.query, parsed.source.as_ref(), &generated.sections);
+    let expected = canonical(input, &generated);
+    if accepting {
+        if actual != expected {
+            support::atomic_file::replace(&snapshot.path, &expected)?;
+        }
+        return Ok(());
+    }
+
     if actual != expected {
         return Err(format!(
             "snapshot out of date — run `make shot` (or `SHOT=1 cargo test -p plotnik-tests --test snapshots`):\n{}",
@@ -192,36 +187,15 @@ fn check(snapshot: &Snapshot, mode: SnapshotMode) -> Result<(), String> {
         ));
     }
 
-    if snapshot.kind.preserves_query_layout() {
+    if parsed.query == formatted.query && parsed.files == formatted.files {
         return Ok(());
     }
-    let Assessment::Changed(query) = evaluated else {
-        return Ok(());
-    };
 
-    let generated = render(
-        snapshot.kind,
-        &query,
-        parsed.source.as_ref(),
-        requirement.as_ref(),
-    )?;
-    let formatted = canonical(&query, parsed.source.as_ref(), &generated.sections);
+    let generated = render(snapshot.kind, &formatted)?;
     Err(format!(
         "query formatting is out of date — run `make shot`:\n{}",
-        unified_diff(&actual, &formatted)
+        unified_diff(&actual, &canonical(&formatted, &generated))
     ))
-}
-
-fn check_runtime(requirement: &Expectation, generated: &[GeneratedSection]) -> Result<(), String> {
-    if let Some(runtime) = &requirement.runtime {
-        let output = generated
-            .iter()
-            .find(|s| s.kind == SectionKind::Output)
-            .ok_or("authored runtime expectation requires execution output")?;
-        runtime.check(&output.body)?;
-    }
-
-    Ok(())
 }
 
 fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Parsed, String> {
@@ -251,11 +225,41 @@ fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Parsed, S
         _ => (None, 0),
     };
 
+    let mut files = Vec::new();
+    let mut limits = None;
+    let mut generated_start = generated_start;
+    while let Some(section) = sections.get(generated_start) {
+        if !section.name.starts_with("query.") && section.name != "limits" {
+            break;
+        }
+        if matches!(
+            kind,
+            SnapshotKind::Parser { .. } | SnapshotKind::Analyze | SnapshotKind::Vm { .. }
+        ) {
+            return Err(
+                "QUERY and LIMITS sections are only supported in compiler snapshots".into(),
+            );
+        }
+        if let Some(path) = section.name.strip_prefix("query.") {
+            if path.is_empty()
+                || path == "query.ptk"
+                || files.iter().any(|file: &Section| file.name == section.name)
+            {
+                return Err(format!("duplicate or empty query path `{path}`"));
+            }
+            files.push(section.clone());
+        } else if limits.replace(section.body.clone()).is_some() {
+            return Err("duplicate LIMITS section".into());
+        }
+        generated_start += 1;
+    }
     validate_generated_headers(kind, name, &sections[generated_start..])?;
 
     Ok(Parsed {
         query: document.query,
         source,
+        files,
+        limits,
     })
 }
 
@@ -286,25 +290,15 @@ fn validate_generated_headers(
     Ok(())
 }
 
-fn render(
-    kind: SnapshotKind,
-    query: &str,
-    source: Option<&Source>,
-    requirement: Option<&Expectation>,
-) -> Result<Rendered, String> {
-    let mut rendered = match kind {
-        SnapshotKind::Parser { trivia } => Rendered {
-            sections: render_frontend(query, FrontendMode::Parser(trivia))?,
-            requirements: Ok(()),
-        },
-        SnapshotKind::Analyze => Rendered {
-            sections: render_frontend(query, FrontendMode::Analyze)?,
-            requirements: Ok(()),
-        },
-        compile => render_compile(compile, query, source, requirement)?,
+fn render(kind: SnapshotKind, input: &Parsed) -> Result<Vec<GeneratedSection>, String> {
+    let sections = match kind {
+        SnapshotKind::Parser { trivia } => {
+            render_frontend(input.source_map(), FrontendMode::Parser(trivia))?
+        }
+        SnapshotKind::Analyze => render_frontend(input.source_map(), FrontendMode::Analyze)?,
+        compile => render_compile(compile, input)?,
     };
-    rendered.sections = GeneratedOutput::validate(kind, rendered.sections)?.into_sections();
-    Ok(rendered)
+    Ok(GeneratedOutput::validate(kind, sections)?.into_sections())
 }
 
 enum FrontendMode {
@@ -312,8 +306,11 @@ enum FrontendMode {
     Analyze,
 }
 
-fn render_frontend(query: &str, kind: FrontendMode) -> Result<Vec<GeneratedSection>, String> {
-    let analyzed = QueryBuilder::new(source_map(query))
+fn render_frontend(
+    sources: SourceMap,
+    kind: FrontendMode,
+) -> Result<Vec<GeneratedSection>, String> {
+    let analyzed = QueryBuilder::new(sources)
         .analyze()
         .expect("query parsing should not exhaust fuel");
     let diagnostics = analyzed.diagnostics();
@@ -346,12 +343,8 @@ fn render_frontend(query: &str, kind: FrontendMode) -> Result<Vec<GeneratedSecti
     Ok(out)
 }
 
-fn render_compile(
-    kind: SnapshotKind,
-    query: &str,
-    source: Option<&Source>,
-    requirement: Option<&Expectation>,
-) -> Result<Rendered, String> {
+fn render_compile(kind: SnapshotKind, parsed: &Parsed) -> Result<Vec<GeneratedSection>, String> {
+    let source = parsed.source.as_ref();
     let input = source.and_then(Source::input);
     let lang = match source {
         Some(Source::Grammar(yaml)) => {
@@ -363,39 +356,22 @@ fn render_compile(
         }
         _ => Lang::resolve(input.and_then(|input| input.ext.as_deref()))?,
     };
-    if let Some(expected) = requirement.and_then(|r| r.tree.as_ref()) {
-        let source = &input.ok_or("tree expectation requires source input")?.text;
-        let tree = lang.parse(source)?;
-        if tree.root_node().has_error() {
-            return Err("witness source must parse without ERROR or MISSING nodes".into());
+    let mut builder = QueryBuilder::new(parsed.source_map()).with_strict_lints(kind.strict_lints());
+    if let Some(yaml) = &parsed.limits {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Limits {
+            work_budget: u64,
         }
-        let actual = tree.root_node().to_sexp();
-        if &actual != expected {
-            return Err(format!(
-                "expected witness tree {expected}, observed {actual}"
-            ));
-        }
-    }
 
-    let compiled = QueryBuilder::new(source_map(query))
-        .with_strict_lints(kind.strict_lints())
+        let limits: Limits =
+            serde_saphyr::from_str(yaml).map_err(|error| format!("invalid LIMITS: {error}"))?;
+        builder = builder.with_satisfiability_work_budget(limits.work_budget);
+    }
+    let compiled = builder
         .compile(lang.grammar())
         .expect("query parsing should not exhaust fuel");
-    let sections = render_compiled(kind, &compiled, &lang, input)?;
-    let requirements = if let Some(requirement) = requirement {
-        let diagnostics =
-            serde_json::to_value(compiled.diagnostics().to_wire(compiled.source_map()))
-                .expect("diagnostics serialize");
-        requirement
-            .check_diagnostics(&diagnostics)
-            .and_then(|()| check_runtime(requirement, &sections))
-    } else {
-        Ok(())
-    };
-    Ok(Rendered {
-        sections,
-        requirements,
-    })
+    render_compiled(kind, &compiled, &lang, input)
 }
 
 fn render_compiled(
@@ -803,18 +779,13 @@ grammar_loader!(
     "typescript grammar"
 );
 
-fn source_map(query: &str) -> SourceMap {
-    let mut sm = SourceMap::new();
-    sm.add_file(SourcePath::new("query.ptk"), query);
-    sm
-}
-
 /// The canonical file text every snapshot is compared against. Rebuilding the whole
 /// file each run, rather than editing sections in place, is what drops stale
 /// sections on accept.
-fn canonical(query: &str, source: Option<&Source>, generated: &[GeneratedSection]) -> String {
+fn canonical(input: &Parsed, generated: &[GeneratedSection]) -> String {
+    let source = input.source.as_ref();
     let mut out = String::new();
-    out.push_str(query);
+    out.push_str(&input.query);
     if !out.ends_with('\n') {
         out.push('\n');
     }
@@ -827,6 +798,12 @@ fn canonical(query: &str, source: Option<&Source>, generated: &[GeneratedSection
             None => "input".to_string(),
         };
         push_authored_section(&mut out, &header, &input.text);
+    }
+    for file in &input.files {
+        push_authored_section(&mut out, &file.name, &file.body);
+    }
+    if let Some(limits) = &input.limits {
+        push_authored_section(&mut out, "limits", limits);
     }
     for section in generated {
         push_section(&mut out, section.kind.as_str(), &section.body);
@@ -858,9 +835,12 @@ fn push_section(out: &mut String, name: &str, body: &str) {
 /// section is the uppercased name.
 fn section_rule(name: &str) -> String {
     const WIDTH: usize = 50;
-    let label = match name.strip_prefix("input.") {
-        Some(ext) => format!("INPUT ({ext})"),
-        None => name.to_ascii_uppercase(),
+    let label = if let Some(ext) = name.strip_prefix("input.") {
+        format!("INPUT ({ext})")
+    } else if let Some(path) = name.strip_prefix("query.") {
+        format!("QUERY ({path})")
+    } else {
+        name.to_ascii_uppercase()
     };
     // At least one dash each side so an over-wide label still round-trips through
     // the snapshot parser; width degrades gracefully past 50 columns.

@@ -1,0 +1,21 @@
+Q = (list .! (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "]"}
+  id: {type: PATTERN, value: "[a-z]+"}
+--------------------- LIMITS ---------------------
+# Enough to reject the query, but not to refine the explanation.
+work_budget: 12
+------------------ DIAGNOSTICS -------------------
+error: the grammar builds no `list` matching this child structure
+ --> query.ptk:1:6
+  |
+1 | Q = (list .! (id))
+  |      ^^^^
+  |
+help: adjust the children, anchors, or order to match a shape this grammar produces

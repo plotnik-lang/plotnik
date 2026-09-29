@@ -1,0 +1,22 @@
+Q = (expr (List))
+-------------------- GRAMMAR ---------------------
+rules:
+  expr: {type: SYMBOL, name: list}
+  list:
+    type: SEQ
+    members:
+      - {type: STRING, value: "["}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: "]"}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------- QUERY (list.ptk) ----------------
+// The error belongs to this definition, not its caller.
+List = (list .! (id))
+------------------ DIAGNOSTICS -------------------
+error: with the exact anchor (`.!`), the first child of `list` must be `id`, but `list` begins with `"["`
+ --> list.ptk:2:9
+  |
+2 | List = (list .! (id))
+  |         ^^^^
+  |
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(list . (id))`

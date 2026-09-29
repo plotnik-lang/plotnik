@@ -107,11 +107,11 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         source: SourceId,
         value_token: &SyntaxToken,
     ) -> Option<NodeKindId> {
-        let value = unescape(value_token.text()).0;
         let key = NodeKind::Anonymous(token_src(value_token, self.content(source)));
         if let Some(&cached) = self.node_kind_ids.get(&key) {
             return cached;
         }
+        let value = unescape(value_token.text()).0;
         let resolved = self.grammar.resolve_anonymous_node(&value);
         self.node_kind_ids.insert(key, resolved);
         if let Some(id) = resolved {

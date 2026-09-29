@@ -20,41 +20,15 @@ rules:
       - {type: STRING, value: ")"}
   id: {type: PATTERN, value: "[a-z]+"}
   num: {type: PATTERN, value: "[0-9]+"}
----------------------- NFA -----------------------
-[entry_points]
-Q = 2
-
-[transitions]
-Q:
-  1                                         ▶
-  2   !   (call)                            7, 5
-  4  ─‣┘  _                                 1
-  5  └─!  (args)                            4
-  6  ─‣─  (args)                            4
-  7  └─!  (num)                             6
--------------------- BYTECODE --------------------
-[strings]
-S0 "Beauty will save the world"
-S1 "call"
-S2 "num"
-S3 "args"
-S4 "Q"
-
-[type_defs]
-T0 = <NoValue>
-
-[type_members]
-
-[type_names]
-
-[entry_points]
-Q = 0 :: T0
-
-[instructions]
-Q:
-  0   !   (call)                            5, 3
-  2                                         ▶
-  3  └─!  (args)                            6
-  4  ─‣─  (args)                            6
-  5  └─!  (num)                             4
-  6  ─‣┘  _                                 2
+------------------ DIAGNOSTICS -------------------
+error: with the exact anchor (`.!`), this child cannot appear first in `call` because a `call` begins with `id`
+ --> query.ptk:1:6
+  |
+1 | Q = (call
+  |      ^^^^
+  |
+help: `.!` allows no syntax-tree node in its gap, including anonymous tokens and comments. The soft anchor `.` skips those: `(call
+        .
+        (num)?
+        (args)
+      )`

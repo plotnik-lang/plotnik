@@ -139,10 +139,6 @@ fn stage(root: &Path, plotnik: &Path, cases: &[RustCase<'_>]) -> Result<(), Stri
             .map_err(|error| format!("write {}: {error}", query_path.display()))?;
         fs::write(directory.join("input"), case.case.source.as_bytes())
             .map_err(|error| format!("write input for `{}`: {error}", case.case.relative))?;
-        if let Some(tree) = &case.case.expected_tree {
-            fs::write(directory.join("tree"), tree)
-                .map_err(|error| format!("write tree for `{}`: {error}", case.case.relative))?;
-        }
         fs::write(
             directory.join("expected"),
             case.case.expected.text().as_bytes(),
@@ -207,18 +203,6 @@ fn render_shard(cases: &[&RustCase<'_>]) -> String {
             &format!("generated/{relative}/expected"),
         );
         let _ = writeln!(out, "    let tree = parse(Language::{language}, source);");
-        if case.case.expected_tree.is_some() {
-            render_include(
-                &mut out,
-                "expected_tree",
-                &format!("generated/{relative}/tree"),
-            );
-            let _ = writeln!(out, "    assert!(!tree.root_node().has_error());");
-            let _ = writeln!(
-                out,
-                "    assert_eq!(tree.root_node().to_sexp(), expected_tree);"
-            );
-        }
         let _ = writeln!(
             out,
             "    let actual = {module}::Q::parse_to_json(&tree, source)"

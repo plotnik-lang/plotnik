@@ -1,27 +1,55 @@
-//! A compact set of automaton states.
-//!
-//! `THREAD` values are state sets, churned through union and equality as the fixed
-//! point converges, so the representation is a bit vector — one bit per state, dense
-//! and small (an automaton has a handful of states). It auto-grows on insert, and
-//! equality ignores trailing zero words so two sets compare equal whatever their
-//! backing length.
+//! Reachable (automaton state, pending gap) pairs. Four bits per state retain
+//! every effective gap across hidden-rule summaries and successive closures.
 
 use super::automaton::State;
+use crate::compiler::analyze::anchors::GapClass;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) struct Configuration {
+    pub(super) state: State,
+    pub(super) gap: GapClass,
+}
+
+impl Configuration {
+    fn index(self) -> u32 {
+        self.state * 4
+            + match self.gap {
+                GapClass::Exact => 0,
+                GapClass::ExtrasOnly => 1,
+                GapClass::AnonymousAndExtras => 2,
+                GapClass::Any => 3,
+            }
+    }
+
+    fn from_index(index: u32) -> Self {
+        let gap = match index % 4 {
+            0 => GapClass::Exact,
+            1 => GapClass::ExtrasOnly,
+            2 => GapClass::AnonymousAndExtras,
+            3 => GapClass::Any,
+            _ => unreachable!(),
+        };
+        Self {
+            state: index / 4,
+            gap,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default)]
-pub(super) struct StateSet {
+pub(super) struct Configurations {
     words: Vec<u64>,
 }
 
-impl StateSet {
-    pub(super) fn singleton(state: State) -> Self {
+impl Configurations {
+    pub(super) fn singleton(state: Configuration) -> Self {
         let mut set = Self::default();
         set.insert(state);
         set
     }
 
     /// Insert `state`, returning whether it was newly added.
-    pub(super) fn insert(&mut self, state: State) -> bool {
+    pub(super) fn insert(&mut self, state: Configuration) -> bool {
         let (word, bit) = Self::position(state);
         if word >= self.words.len() {
             self.words.resize(word + 1, 0);
@@ -32,13 +60,15 @@ impl StateSet {
         absent
     }
 
-    pub(super) fn contains(&self, state: State) -> bool {
-        let (word, bit) = Self::position(state);
-        self.words.get(word).is_some_and(|w| w & (1u64 << bit) != 0)
+    pub(super) fn contains_state(&self, state: State) -> bool {
+        let index = state * 4;
+        self.words
+            .get((index / 64) as usize)
+            .is_some_and(|word| word & (0xf << (index % 64)) != 0)
     }
 
     /// Union `other` into `self`, returning whether `self` grew.
-    pub(super) fn union_with(&mut self, other: &StateSet) -> bool {
+    pub(super) fn union_with(&mut self, other: &Configurations) -> bool {
         if other.words.len() > self.words.len() {
             self.words.resize(other.words.len(), 0);
         }
@@ -55,7 +85,7 @@ impl StateSet {
         self.words.iter().all(|&w| w == 0)
     }
 
-    pub(super) fn iter(&self) -> impl Iterator<Item = State> + '_ {
+    pub(super) fn iter(&self) -> impl Iterator<Item = Configuration> + '_ {
         // Walk set bits directly via `trailing_zeros` (O(popcount)) rather than testing
         // all 64 bits of every word — `iter` is the satisfiability solver's hot frame.
         self.words.iter().enumerate().flat_map(|(word, &bits)| {
@@ -67,26 +97,27 @@ impl StateSet {
                 }
                 let bit = rest.trailing_zeros();
                 rest &= rest - 1;
-                Some(base + bit)
+                Some(Configuration::from_index(base + bit))
             })
         })
     }
 
-    fn position(state: State) -> (usize, u32) {
-        ((state / u64::BITS) as usize, state % u64::BITS)
+    fn position(state: Configuration) -> (usize, u32) {
+        let index = state.index();
+        ((index / u64::BITS) as usize, index % u64::BITS)
     }
 }
 
-impl PartialEq for StateSet {
+impl PartialEq for Configurations {
     fn eq(&self, other: &Self) -> bool {
         let len = self.words.len().max(other.words.len());
         (0..len).all(|i| self.word(i) == other.word(i))
     }
 }
 
-impl Eq for StateSet {}
+impl Eq for Configurations {}
 
-impl StateSet {
+impl Configurations {
     fn word(&self, index: usize) -> u64 {
         self.words.get(index).copied().unwrap_or(0)
     }

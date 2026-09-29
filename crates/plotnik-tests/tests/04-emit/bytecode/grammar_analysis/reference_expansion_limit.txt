@@ -1,0 +1,92 @@
+Ids0 = {(id)}
+
+Ids1 = {
+  (Ids0)
+  (Ids0)
+}
+
+Ids2 = {
+  (Ids1)
+  (Ids1)
+}
+
+Ids3 = {
+  (Ids2)
+  (Ids2)
+}
+
+Ids4 = {
+  (Ids3)
+  (Ids3)
+}
+
+Ids5 = {
+  (Ids4)
+  (Ids4)
+}
+
+Ids6 = {
+  (Ids5)
+  (Ids5)
+}
+
+Ids7 = {
+  (Ids6)
+  (Ids6)
+}
+
+Ids8 = {
+  (Ids7)
+  (Ids7)
+}
+
+Ids9 = {
+  (Ids8)
+  (Ids8)
+}
+
+Ids10 = {
+  (Ids9)
+  (Ids9)
+}
+
+Ids11 = {
+  (Ids10)
+  (Ids10)
+}
+
+Ids12 = {
+  (Ids11)
+  (Ids11)
+}
+
+Ids13 = {
+  (Ids12)
+  (Ids12)
+}
+
+Ids14 = {
+  (Ids13)
+  (Ids13)
+}
+
+Ids15 = {
+  (Ids14)
+  (Ids14)
+}
+
+Q = (args (Ids15))
+-------------------- GRAMMAR ---------------------
+rules:
+  args:
+    type: REPEAT
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: query too complex to compile
+  --> query.ptk:78:5
+   |
+78 | Q = (args (Ids15))
+   |     ^^^^^^^^^^^^^^
+   |
+help: simplify the pattern. Deeply nested or repeatedly referenced alternations can expand exponentially

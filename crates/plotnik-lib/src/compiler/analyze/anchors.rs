@@ -21,7 +21,7 @@ use crate::core::{NodeClass, SkipClass};
 /// comment, say). The two are independent — a named comment is `(false, true)`, an
 /// anonymous brace `(true, false)`. A broad skip clears `anonymous || extra` (the
 /// VM's `is_trivia`); a narrow skip clears only `extra`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GapClass {
     /// No anchor: any node may sit in the gap (the VM's `SkipPolicy::Any`).
     Any,
@@ -48,10 +48,7 @@ impl GapClass {
         self.skip_class().admits(node)
     }
 
-    /// Rank by permissiveness. The classes nest — `Exact ⊂ ExtrasOnly ⊂
-    /// AnonymousAndExtras ⊂ Any` — so a total order captures their intersection and
-    /// union exactly, which is what [`tighten`](Self::tighten)/[`loosen`](Self::loosen)
-    /// need.
+    /// The skip classes nest, so their intersection is the more restrictive class.
     fn permissiveness(self) -> u8 {
         match self {
             Self::Exact => 0,
@@ -65,16 +62,6 @@ impl GapClass {
     /// path is bounded by the tightest gap on it.
     pub fn tighten(self, other: Self) -> Self {
         if self.permissiveness() <= other.permissiveness() {
-            self
-        } else {
-            other
-        }
-    }
-
-    /// The more permissive of two gaps — their union. A state reachable by several paths
-    /// admits a skip if any path does.
-    pub fn loosen(self, other: Self) -> Self {
-        if self.permissiveness() >= other.permissiveness() {
             self
         } else {
             other

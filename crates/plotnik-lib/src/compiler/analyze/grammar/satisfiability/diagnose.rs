@@ -7,7 +7,7 @@
 //! parsers point at.
 //!
 //! It then names the obstacle. If relaxing the node's anchors would let it match
-//! (proven by re-solving with every gap widened), the anchors are to blame, and the
+//! (proven by re-solving with only that node's gaps widened), the anchors are to blame, and the
 //! message contrasts the positions they demand with what the grammar actually places
 //! first or last. Otherwise the children's kinds or order are the obstacle, and the
 //! message lists what a node of that kind does allow. Each alternative produces its own
@@ -18,15 +18,31 @@ use std::collections::HashSet;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
+use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics, Span};
+use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::parse::ast::{self, NamedNodePattern, Pattern, SeqItem};
-use crate::compiler::parse::cst::SyntaxNode;
-use crate::compiler::parse::strings::unescape;
+use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::automaton::AutomatonContext;
+use super::super::model::{KindConstraint, Model, PatternId, PatternKind};
+use super::AnalysisLimit;
 use super::engine::SatisfiabilitySolver;
-use super::{Goal, Participation, collect_goals, root_kind};
+use super::{Goal, Participation, collect_goals};
+
+#[derive(Clone, Copy)]
+pub(in crate::compiler::analyze::grammar) struct Context<'a> {
+    pub(in crate::compiler::analyze::grammar) grammar: &'a Grammar,
+    pub(in crate::compiler::analyze::grammar) model: &'a Model,
+    pub(in crate::compiler::analyze::grammar) pattern_facts: &'a PatternFacts,
+    pub(in crate::compiler::analyze::grammar) source_map: &'a SourceMap,
+}
+
+impl<'a> Context<'a> {
+    fn content(self, source: SourceId) -> &'a str {
+        self.source_map.content(source)
+    }
+}
 
 pub(super) enum ReportOutcome {
     Emitted,
@@ -41,45 +57,46 @@ impl ReportOutcome {
 
 #[derive(Default)]
 pub(super) struct ReportedCulprits {
-    nodes: HashSet<SyntaxNode>,
+    nodes: HashSet<PatternId>,
 }
 
 impl ReportedCulprits {
     fn insert(&mut self, culprit: &Goal) -> bool {
-        self.nodes.insert(culprit.node().node().syntax().clone())
+        self.nodes.insert(culprit.pattern())
     }
 }
 
 /// Emit the impossibility diagnostic for a failed root goal.
 pub(super) fn report_goal(
+    ctx: Context<'_>,
     solver: &mut SatisfiabilitySolver,
     goal: Goal,
     diag: &mut Diagnostics,
-    anchor_probes: &mut AnchorProbes<'_>,
+    diagnostic_budget: &mut u64,
     reported: &mut ReportedCulprits,
-) -> ReportOutcome {
+) -> Result<ReportOutcome, AnalysisLimit> {
     let mut visited = HashSet::new();
-    let culprit = locate(solver, goal, &mut visited);
+    let culprit = locate(ctx.model, solver, goal, &mut visited)?;
     if !reported.insert(&culprit) {
-        return ReportOutcome::Emitted;
+        return Ok(ReportOutcome::Emitted);
     }
-    report_culprit(solver, culprit, diag, anchor_probes)
+    Ok(report_culprit(
+        ctx,
+        solver,
+        culprit,
+        diag,
+        diagnostic_budget,
+    ))
 }
 
 fn report_culprit(
+    ctx: Context<'_>,
     solver: &mut SatisfiabilitySolver,
     culprit: Goal,
     diag: &mut Diagnostics,
-    anchor_probes: &mut AnchorProbes<'_>,
+    diagnostic_budget: &mut u64,
 ) -> ReportOutcome {
-    if solver.is_too_complex() {
-        report_node_too_complex(culprit.node(), diag);
-        return ReportOutcome::Stop;
-    }
-
-    let ctx = solver.context();
-
-    let culprit = match ConcreteCulprit::from_goal(culprit) {
+    let culprit = match ConcreteCulprit::from_goal(ctx.model, culprit) {
         Ok(culprit) => culprit,
         Err(node) => {
             emit_wildcard_failure(&node, diag);
@@ -105,13 +122,13 @@ fn report_culprit(
     }
 
     let anchor_probe = if has_anchor(culprit.node.node()) {
-        anchor_probes.relax(&culprit.node, culprit.kind)
+        probe_anchors(solver, culprit.pattern, culprit.kind, diagnostic_budget)
     } else {
         AnchorProbe::DoesNotMatch
     };
 
     match anchor_probe {
-        AnchorProbe::Matches => emit_anchor_failure(solver, &culprit, diag),
+        AnchorProbe::Matches => emit_anchor_failure(ctx, solver, &culprit, diag),
         AnchorProbe::DoesNotMatch => emit_arrangement_failure(ctx, &culprit, diag),
         AnchorProbe::Inconclusive => {
             emit_generic_failure(ctx, &culprit, diag);
@@ -122,15 +139,20 @@ fn report_culprit(
 }
 
 struct ConcreteCulprit {
+    pattern: PatternId,
     node: Located<NamedNodePattern>,
     kind: NodeKindId,
 }
 
 impl ConcreteCulprit {
-    fn from_goal(goal: Goal) -> Result<Self, Located<NamedNodePattern>> {
+    fn from_goal(model: &Model, goal: Goal) -> Result<Self, Located<NamedNodePattern>> {
         match goal {
-            Goal::Concrete { node, kind } => Ok(Self { node, kind }),
-            Goal::Wildcard { node } => Err(node),
+            Goal::Concrete { pattern, kind } => Ok(Self {
+                pattern,
+                node: model.node_origin(pattern),
+                kind,
+            }),
+            Goal::Wildcard { pattern } => Err(model.node_origin(pattern)),
         }
     }
 
@@ -138,7 +160,7 @@ impl ConcreteCulprit {
         kind_span(&self.node)
     }
 
-    fn kind_name(&self, ctx: AutomatonContext<'_>) -> String {
+    fn kind_name(&self, ctx: Context<'_>) -> String {
         render_kind(ctx, self.kind)
     }
 }
@@ -166,11 +188,6 @@ pub(super) fn report_too_complex(body: &Located<Pattern>, diag: &mut Diagnostics
     emit_too_complex(span, diag);
 }
 
-fn report_node_too_complex(node: &Located<NamedNodePattern>, diag: &mut Diagnostics) {
-    let span = Span::new(node.source(), node.node().syntax().text_range());
-    emit_too_complex(span, diag);
-}
-
 fn emit_too_complex(span: Span, diag: &mut Diagnostics) {
     diag.report(DiagnosticKind::QueryTooComplex, span)
         .hint(
@@ -182,10 +199,7 @@ fn emit_too_complex(span: Span, diag: &mut Diagnostics) {
 /// A single-valued field the culprit binds more than once, with the repeat count. Such a
 /// field can hold one child, so binding it twice is impossible whatever else matches —
 /// the first such field in source order, named for the message.
-fn repeated_single_field(
-    ctx: AutomatonContext<'_>,
-    culprit: &ConcreteCulprit,
-) -> Option<(String, usize)> {
+fn repeated_single_field(ctx: Context<'_>, culprit: &ConcreteCulprit) -> Option<(String, usize)> {
     let grammar = ctx.grammar;
     // First-seen order, so the message blames the field the reader meets first.
     let mut counts: Vec<(NodeFieldId, usize)> = Vec::new();
@@ -215,7 +229,7 @@ fn repeated_single_field(
 }
 
 fn emit_repeated_field_failure(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     culprit: &ConcreteCulprit,
     field: &str,
     count: usize,
@@ -244,7 +258,7 @@ struct NegatedFieldConflict {
     matched_span: Span,
 }
 
-fn negated_fields(ctx: AutomatonContext<'_>, culprit: &ConcreteCulprit) -> Vec<NegatedFieldUse> {
+fn negated_fields(ctx: Context<'_>, culprit: &ConcreteCulprit) -> Vec<NegatedFieldUse> {
     culprit
         .node
         .node()
@@ -265,15 +279,19 @@ fn negated_fields(ctx: AutomatonContext<'_>, culprit: &ConcreteCulprit) -> Vec<N
 }
 
 fn negated_matched_field(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     culprit: &ConcreteCulprit,
 ) -> Option<NegatedFieldConflict> {
     for field in negated_fields(ctx, culprit) {
-        let matched_span = culprit.node.node().children().find_map(|child| {
-            let located = culprit.node.wrap(child);
-            pattern_matches_field(ctx, culprit.kind, &located, field.id)
-                .then(|| pattern_span(&located))
-        });
+        let matched_span = ctx
+            .model
+            .node(culprit.pattern)
+            .children
+            .iter()
+            .find_map(|child| {
+                pattern_matches_field(ctx, culprit.kind, child.pattern, field.id)
+                    .then(|| pattern_span(&ctx.model.pattern(child.pattern).origin))
+            });
         if let Some(matched_span) = matched_span {
             return Some(NegatedFieldConflict {
                 field,
@@ -284,10 +302,7 @@ fn negated_matched_field(
     None
 }
 
-fn negated_required_field(
-    ctx: AutomatonContext<'_>,
-    culprit: &ConcreteCulprit,
-) -> Option<NegatedFieldUse> {
+fn negated_required_field(ctx: Context<'_>, culprit: &ConcreteCulprit) -> Option<NegatedFieldUse> {
     negated_fields(ctx, culprit).into_iter().find(|field| {
         ctx.grammar
             .field_cardinality(culprit.kind, field.id)
@@ -296,45 +311,32 @@ fn negated_required_field(
 }
 
 fn pattern_matches_field(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     parent: NodeKindId,
-    pattern: &Located<Pattern>,
+    pattern: PatternId,
     field: NodeFieldId,
 ) -> bool {
-    match pattern.node() {
-        Pattern::FieldPattern(field_pattern) => {
-            field_pattern
-                .name()
-                .and_then(|name| ctx.grammar.resolve_field(name.text()))
-                == Some(field)
+    match &ctx.model.pattern(pattern).kind {
+        PatternKind::Field(id, _) => *id == field,
+        PatternKind::Repeat(ast::QuantifierKind::OneOrMore, inner) => {
+            pattern_matches_field(ctx, parent, *inner, field)
         }
-        Pattern::CapturedPattern(cap) => cap
-            .inner()
-            .is_some_and(|inner| pattern_matches_field(ctx, parent, &pattern.wrap(inner), field)),
-        Pattern::QuantifiedPattern(q) => {
-            !q.is_optional()
-                && q.inner().is_some_and(|inner| {
-                    pattern_matches_field(ctx, parent, &pattern.wrap(inner), field)
-                })
-        }
-        Pattern::NamedNodePattern(node) => {
-            let located = pattern.wrap(node.clone());
-            root_kind(ctx, &located)
-                .is_some_and(|kind| field_value_admits(ctx, parent, field, kind))
-        }
-        Pattern::DefRef(def_ref) => match Goal::from_def_ref(ctx, def_ref) {
-            Some(Goal::Concrete { kind, .. }) => field_value_admits(ctx, parent, field, kind),
+        PatternKind::Node(node) => match node.kind {
+            KindConstraint::Exact(kind) => field_value_admits(ctx, parent, field, kind),
             _ => false,
         },
-        Pattern::AnonymousNodePattern(_)
-        | Pattern::NodeWildcard(_)
-        | Pattern::SeqPattern(_)
-        | Pattern::Alternation(_) => false,
+        PatternKind::Reference(definition) => {
+            match Goal::from_pattern(ctx.model, ctx.model.definition(*definition)) {
+                Some(Goal::Concrete { kind, .. }) => field_value_admits(ctx, parent, field, kind),
+                _ => false,
+            }
+        }
+        _ => false,
     }
 }
 
 fn field_value_admits(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     parent: NodeKindId,
     field: NodeFieldId,
     value: NodeKindId,
@@ -347,7 +349,7 @@ fn field_value_admits(
 }
 
 fn emit_negated_field_conflict(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     culprit: &ConcreteCulprit,
     conflict: NegatedFieldConflict,
     diag: &mut Diagnostics,
@@ -365,7 +367,7 @@ fn emit_negated_field_conflict(
 }
 
 fn emit_negated_required_field(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     culprit: &ConcreteCulprit,
     field: NegatedFieldUse,
     diag: &mut Diagnostics,
@@ -385,33 +387,28 @@ fn emit_negated_required_field(
 /// satisfiable on their own — the point where the arrangement, not any one child, is
 /// what the grammar rejects.
 fn locate(
+    model: &Model,
     solver: &mut SatisfiabilitySolver,
     goal: Goal,
-    visited: &mut HashSet<SyntaxNode>,
-) -> Goal {
-    if !visited.insert(goal.node().node().syntax().clone()) {
+    visited: &mut HashSet<PatternId>,
+) -> Result<Goal, AnalysisLimit> {
+    if !visited.insert(goal.pattern()) {
         // A recursive definition folded back onto a node already being blamed.
-        return goal;
+        return Ok(goal);
     }
 
-    let ctx = solver.context();
     let mut children = Vec::new();
-    for child in goal.node().node().children() {
-        collect_goals(
-            &goal.node().wrap(child),
-            Participation::Required,
-            ctx,
-            &mut children,
-        );
+    for child in &model.node(goal.pattern()).children {
+        collect_goals(child.pattern, Participation::Required, model, &mut children);
     }
 
     for child in children {
-        if child.is_impossible(solver) {
-            return locate(solver, child, visited);
+        if child.is_impossible(solver)? {
+            return locate(model, solver, child, visited);
         }
     }
 
-    goal
+    Ok(goal)
 }
 
 enum AnchorProbe {
@@ -420,44 +417,35 @@ enum AnchorProbe {
     Inconclusive,
 }
 
-/// Re-solves anchored culprits with every gap widened to "any node may intervene".
-/// It owns one relaxed solver for the whole reporting pass, so automata and fixed-point
-/// memos survive across diagnostics. Exhausting this diagnostic solver never changes the
-/// primary proof; it only makes later explanations less specific.
-pub(super) struct AnchorProbes<'a> {
-    solver: SatisfiabilitySolver<'a>,
-}
-
-impl<'a> AnchorProbes<'a> {
-    pub(super) fn new(primary: &SatisfiabilitySolver<'a>, work_budget: u64) -> Self {
-        Self {
-            solver: primary.relaxing_anchors(work_budget),
-        }
+/// Relax only the culprit's gaps. Nested constraints must still hold before we
+/// can blame this node's anchors. Each probe has different premises, so it needs
+/// fresh solve results. Grammar facts and the total diagnostic budget are shared.
+fn probe_anchors(
+    primary: &SatisfiabilitySolver,
+    pattern: PatternId,
+    kind: NodeKindId,
+    budget: &mut u64,
+) -> AnchorProbe {
+    if *budget == 0 {
+        return AnchorProbe::Inconclusive;
     }
 
-    fn relax(&mut self, node: &Located<NamedNodePattern>, kind: NodeKindId) -> AnchorProbe {
-        if self.solver.is_too_complex() || self.solver.remaining_budget() == 0 {
-            return AnchorProbe::Inconclusive;
-        }
-
-        let matches = self.solver.satisfiable(node, kind);
-        if self.solver.is_too_complex() {
-            return AnchorProbe::Inconclusive;
-        }
-        if matches {
-            AnchorProbe::Matches
-        } else {
-            AnchorProbe::DoesNotMatch
-        }
+    let mut probe = primary.relaxing_anchors(pattern, *budget);
+    let result = probe.satisfiable(pattern, kind);
+    *budget = probe.remaining_budget();
+    match result {
+        Ok(true) => AnchorProbe::Matches,
+        Ok(false) => AnchorProbe::DoesNotMatch,
+        Err(AnalysisLimit) => AnchorProbe::Inconclusive,
     }
 }
 
 fn emit_anchor_failure(
+    ctx: Context<'_>,
     solver: &SatisfiabilitySolver,
     culprit: &ConcreteCulprit,
     diag: &mut Diagnostics,
 ) {
-    let ctx = solver.context();
     let node_pattern = culprit.node.node();
     let kind_name = culprit.kind_name(ctx);
     let span = culprit.span();
@@ -471,7 +459,7 @@ fn emit_anchor_failure(
     let boundary_name = boundary.name();
     let boundary_verb = boundary.verb();
     let allowed = boundary.child_kinds(solver, culprit.kind);
-    let wanted = boundary.pattern_label(&culprit.node, ctx);
+    let wanted = boundary.pattern_label(culprit.pattern, ctx);
 
     let demand = if exact {
         "with the exact anchor (`.!`)"
@@ -503,7 +491,7 @@ fn emit_anchor_failure(
 
 /// An anchor between two children — neither end is pinned, so explain the adjacency.
 fn emit_interior_anchor_failure(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     culprit: &ConcreteCulprit,
     exact: bool,
     diag: &mut Diagnostics,
@@ -517,11 +505,7 @@ fn emit_interior_anchor_failure(
 }
 
 /// The child kinds or their order are the obstacle (the anchors, if any, are not).
-fn emit_arrangement_failure(
-    ctx: AutomatonContext<'_>,
-    culprit: &ConcreteCulprit,
-    diag: &mut Diagnostics,
-) {
+fn emit_arrangement_failure(ctx: Context<'_>, culprit: &ConcreteCulprit, diag: &mut Diagnostics) {
     if let Some(order) = order_diagnosis(ctx, culprit) {
         emit_order_failure(ctx, culprit, order, diag);
         return;
@@ -555,8 +539,8 @@ struct OrderDiagnosis {
     after: QueryChild,
 }
 
-fn order_diagnosis(ctx: AutomatonContext<'_>, culprit: &ConcreteCulprit) -> Option<OrderDiagnosis> {
-    let query = query_child_demands(ctx, &culprit.node);
+fn order_diagnosis(ctx: Context<'_>, culprit: &ConcreteCulprit) -> Option<OrderDiagnosis> {
+    let query = query_child_demands(ctx, culprit.pattern);
     if query.len() < 2 {
         return None;
     }
@@ -593,57 +577,40 @@ fn order_diagnosis(ctx: AutomatonContext<'_>, culprit: &ConcreteCulprit) -> Opti
     diagnosis
 }
 
-fn query_child_demands(
-    ctx: AutomatonContext<'_>,
-    node: &Located<NamedNodePattern>,
-) -> Vec<QueryChild> {
-    node.node()
-        .children()
+fn query_child_demands(ctx: Context<'_>, node: PatternId) -> Vec<QueryChild> {
+    ctx.model
+        .node(node)
+        .children
+        .iter()
         .filter_map(|child| {
-            let located = node.wrap(child);
-            query_demand(ctx, &located).map(|demand| QueryChild {
+            query_demand(ctx.model, child.pattern).map(|demand| QueryChild {
                 demand,
-                span: pattern_span(&located),
+                span: pattern_span(&ctx.model.pattern(child.pattern).origin),
             })
         })
         .collect()
 }
 
-fn query_demand(ctx: AutomatonContext<'_>, pattern: &Located<Pattern>) -> Option<ChildDemand> {
-    match pattern.node() {
-        Pattern::FieldPattern(field) => field
-            .name()
-            .and_then(|name| ctx.grammar.resolve_field(name.text()))
-            .map(ChildDemand::Field),
-        Pattern::CapturedPattern(cap) => cap
-            .inner()
-            .and_then(|inner| query_demand(ctx, &pattern.wrap(inner))),
-        Pattern::NamedNodePattern(node) => {
-            if node.is_any() {
-                return None;
-            }
-            root_kind(ctx, &pattern.wrap(node.clone())).map(ChildDemand::Kind)
-        }
-        Pattern::AnonymousNodePattern(node) => node
-            .value()
-            .and_then(|value| {
-                ctx.grammar
-                    .resolve_anonymous_node(&unescape(value.text()).0)
-            })
-            .map(ChildDemand::Kind),
-        Pattern::NodeWildcard(_) => None,
-        Pattern::DefRef(def_ref) => match Goal::from_def_ref(ctx, def_ref) {
-            Some(Goal::Concrete { kind, .. }) => Some(ChildDemand::Kind(kind)),
+fn query_demand(model: &Model, pattern: PatternId) -> Option<ChildDemand> {
+    match &model.pattern(pattern).kind {
+        PatternKind::Field(field, _) => Some(ChildDemand::Field(*field)),
+        PatternKind::Node(node) => match node.kind {
+            KindConstraint::Exact(kind) => Some(ChildDemand::Kind(kind)),
             _ => None,
         },
-        Pattern::QuantifiedPattern(q) => q
-            .inner()
-            .and_then(|inner| query_demand(ctx, &pattern.wrap(inner))),
-        Pattern::SeqPattern(_) | Pattern::Alternation(_) => None,
+        PatternKind::Leaf(KindConstraint::Exact(kind)) => Some(ChildDemand::Kind(*kind)),
+        PatternKind::Reference(definition) => {
+            match Goal::from_pattern(model, model.definition(*definition)) {
+                Some(Goal::Concrete { kind, .. }) => Some(ChildDemand::Kind(kind)),
+                _ => None,
+            }
+        }
+        PatternKind::Repeat(_, inner) => query_demand(model, *inner),
+        _ => None,
     }
 }
 
-fn grammar_child_orders(ctx: AutomatonContext<'_>, kind: NodeKindId) -> Vec<Vec<ChildDemand>> {
+fn grammar_child_orders(ctx: Context<'_>, kind: NodeKindId) -> Vec<Vec<ChildDemand>> {
     let realizers_by_kind = ctx.grammar.structure().surface_realizers_by_kind();
     let Some(realizers) = realizers_by_kind.get(&kind) else {
         return Vec::new();
@@ -675,7 +642,7 @@ fn grammar_child_orders(ctx: AutomatonContext<'_>, kind: NodeKindId) -> Vec<Vec<
 }
 
 fn emit_order_failure(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     culprit: &ConcreteCulprit,
     order: OrderDiagnosis,
     diag: &mut Diagnostics,
@@ -696,7 +663,7 @@ fn emit_order_failure(
 }
 
 impl ChildDemand {
-    fn label(self, ctx: AutomatonContext<'_>) -> String {
+    fn label(self, ctx: Context<'_>) -> String {
         match self {
             Self::Field(field) => match ctx.grammar.field_name(field) {
                 Some(name) => format!("`{name}:`"),
@@ -710,11 +677,7 @@ impl ChildDemand {
 /// The primary solve proved the node impossible, but diagnostic refinement ran out
 /// before it could distinguish anchors from child order. Keep the verdict precise
 /// without pretending to know the specific obstacle.
-fn emit_generic_failure(
-    ctx: AutomatonContext<'_>,
-    culprit: &ConcreteCulprit,
-    diag: &mut Diagnostics,
-) {
+fn emit_generic_failure(ctx: Context<'_>, culprit: &ConcreteCulprit, diag: &mut Diagnostics) {
     let kind_name = culprit.kind_name(ctx);
     let detail = format!("the grammar builds no {kind_name} matching this child structure");
     diag.report(DiagnosticKind::UnsatisfiablePattern, culprit.span())
@@ -726,7 +689,7 @@ fn emit_generic_failure(
 /// A help line listing what a node of `kind` does allow: its named child kinds and
 /// fields, the same vocabulary the structural pass uses.
 fn describe_allowed_children(
-    ctx: AutomatonContext<'_>,
+    ctx: Context<'_>,
     kind: NodeKindId,
     kind_name: &str,
 ) -> Option<String> {
@@ -754,11 +717,7 @@ fn describe_allowed_children(
 /// The fix hint: for an exact anchor, the soft form often matches; for a soft anchor,
 /// dropping it does. Shows the rewritten node where it can be derived by swapping the
 /// anchor token in the node's own source.
-fn anchor_fix_hint(
-    node: &Located<NamedNodePattern>,
-    ctx: AutomatonContext<'_>,
-    exact: bool,
-) -> String {
+fn anchor_fix_hint(node: &Located<NamedNodePattern>, ctx: Context<'_>, exact: bool) -> String {
     if exact {
         match relaxed_anchor_text(node, ctx) {
             Some(soft) => format!(
@@ -783,20 +742,14 @@ fn anchor_fix_hint(
 }
 
 /// The node's own source with `.!` rewritten to `.` — a concrete suggestion.
-fn relaxed_anchor_text(
-    node: &Located<NamedNodePattern>,
-    ctx: AutomatonContext<'_>,
-) -> Option<String> {
+fn relaxed_anchor_text(node: &Located<NamedNodePattern>, ctx: Context<'_>) -> Option<String> {
     let range = node.node().text_range();
     let text = ctx.content(node.source());
     let slice = text.get(usize::from(range.start())..usize::from(range.end()))?;
     slice.contains(".!").then(|| slice.replace(".!", "."))
 }
 
-fn soft_anchor_skips_extras_only(
-    node: &Located<NamedNodePattern>,
-    ctx: AutomatonContext<'_>,
-) -> bool {
+fn soft_anchor_skips_extras_only(node: &Located<NamedNodePattern>, ctx: Context<'_>) -> bool {
     let items: Vec<_> = node.node().items().collect();
     let semantics = AnchorSemantics::new(ctx.pattern_facts);
     semantics
@@ -852,16 +805,13 @@ impl Boundary {
         }
     }
 
-    fn pattern_label(
-        self,
-        node: &Located<NamedNodePattern>,
-        ctx: AutomatonContext<'_>,
-    ) -> Option<String> {
-        let pattern = match self {
-            Self::First => node.node().items().find_map(seq_pattern)?,
-            Self::Last => node.node().items().filter_map(seq_pattern).last()?,
+    fn pattern_label(self, node: PatternId, ctx: Context<'_>) -> Option<String> {
+        let children = &ctx.model.node(node).children;
+        let child = match self {
+            Self::First => children.first()?,
+            Self::Last => children.last()?,
         };
-        pattern_label(&node.wrap(pattern), ctx)
+        pattern_label(child.pattern, ctx)
     }
 }
 
@@ -872,29 +822,23 @@ fn has_exact_anchor(node: &NamedNodePattern) -> bool {
         .any(|item| matches!(item, SeqItem::Anchor(a) if a.is_exact()))
 }
 
-fn seq_pattern(item: SeqItem) -> Option<Pattern> {
-    match item {
-        SeqItem::Pattern(p) => Some(p),
-        SeqItem::Anchor(_) => None,
-    }
-}
-
-/// A short label for a child pattern: its node kind, its literal token, or `None`
-/// when it is something compound (an alternation, a reference) better left unnamed.
-fn pattern_label(located: &Located<Pattern>, ctx: AutomatonContext<'_>) -> Option<String> {
-    match located.node() {
-        Pattern::CapturedPattern(cap) => pattern_label(&located.wrap(cap.inner()?), ctx),
-        Pattern::NamedNodePattern(node) => {
-            if node.is_any() {
-                return Some("any named node".to_string());
-            }
-            root_kind(ctx, &located.wrap(node.clone())).map(|kind| render_kind(ctx, kind))
+/// A short label for a child pattern, leaving compound forms unnamed.
+fn pattern_label(pattern: PatternId, ctx: Context<'_>) -> Option<String> {
+    let pattern = ctx.model.pattern(pattern);
+    match &pattern.kind {
+        PatternKind::Node(node) => match node.kind {
+            KindConstraint::AnyNamed => Some("any named node".to_string()),
+            KindConstraint::Exact(kind) => Some(render_kind(ctx, kind)),
+            _ => None,
+        },
+        PatternKind::Leaf(KindConstraint::Exact(_)) => {
+            let syntax = pattern.syntax();
+            let Pattern::AnonymousNodePattern(node) = syntax.node() else {
+                unreachable!("exact leaf originates at an anonymous node");
+            };
+            Some(format!("`\"{}\"`", node.value()?.text()))
         }
-        Pattern::AnonymousNodePattern(node) => {
-            let value = node.value()?;
-            Some(format!("`\"{}\"`", value.text()))
-        }
-        Pattern::NodeWildcard(_) => Some("any node".to_string()),
+        PatternKind::Leaf(KindConstraint::AnyNode) => Some("any node".to_string()),
         _ => None,
     }
 }
@@ -913,7 +857,7 @@ fn kind_span(node: &Located<NamedNodePattern>) -> Span {
 }
 
 /// Render one kind: a named kind in backticks, an anonymous one as a quoted literal.
-fn render_kind(ctx: AutomatonContext<'_>, kind: NodeKindId) -> String {
+fn render_kind(ctx: Context<'_>, kind: NodeKindId) -> String {
     match ctx.grammar.node_kind(kind) {
         Some(name) if ctx.grammar.is_anonymous_node(kind) => format!("`\"{name}\"`"),
         Some(name) => format!("`{name}`"),
@@ -936,7 +880,7 @@ fn indefinite_article(rendered_kind: &str) -> &'static str {
 
 /// Render a set of kinds as "`a`, `b` or `c`", eliding past `max`, with `empty` when
 /// the set is empty (a node whose boundary the analysis could not pin).
-fn render_kind_list(ctx: AutomatonContext<'_>, kinds: &[NodeKindId], empty: &str) -> String {
+fn render_kind_list(ctx: Context<'_>, kinds: &[NodeKindId], empty: &str) -> String {
     if kinds.is_empty() {
         return empty.to_string();
     }

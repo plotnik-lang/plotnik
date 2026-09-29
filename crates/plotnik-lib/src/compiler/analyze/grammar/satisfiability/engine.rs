@@ -4,8 +4,8 @@
 //!
 //! - `SAT(p, realizer)` — a grammar `realizer` (a token `Leaf`, or a non-terminal
 //!   `Var`) can realize the child structure query node `p` demands.
-//! - `THREAD(p, h, q)` — the visible frontier of hidden variable `h`, spliced into
-//!   `p`'s child list, drives `A_p` from state `q` to the returned set of states.
+//! - `THREAD(p, h, (q, gap))` — the visible frontier of hidden variable `h`, spliced into
+//!   `p`'s child list, drives `A_p` from the input configuration to a set of outputs.
 //!
 //! They are computed as a least fixed point by a demand-driven worklist: every key
 //! starts at bottom (`SAT`→`false`, `THREAD`→∅); recomputing a key records which keys
@@ -15,8 +15,7 @@
 //! The domains are finite but not small: a wide query child list yields an automaton
 //! with as many states, and threading the grammar through it is quadratic in that
 //! width. So the solve carries a work budget; once the per-state work exceeds it the
-//! solve gives up, every pending verdict reads as *accept* (the sound default), and
-//! the pass rejects the whole query as too complex rather than spend unbounded time.
+//! solve returns a resource error. No partial fixed-point value becomes a verdict.
 //! The budget bounds work, not wall-clock, so the cut-off is the same on every
 //! machine — a slow host merely takes proportionally longer to reach it.
 
@@ -25,18 +24,16 @@ use std::sync::Arc;
 
 use indexmap::IndexSet;
 
-use crate::compiler::analyze::Located;
-use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
+use crate::compiler::analyze::anchors::GapClass;
 use crate::compiler::limits::SatisfiabilityLimits;
-use crate::compiler::parse::ast::NamedNodePattern;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::automaton::{
-    self, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId, State,
-};
+use super::super::model::{KindConstraint, Model, PatternId};
+use super::AnalysisLimit;
+use super::automaton::{self, ChildAutomaton, ChildMatcher, State};
+use super::configurations::{Configuration, Configurations};
 use super::facts::{GrammarFacts, NodeRealizer};
-use super::state_set::StateSet;
 
 /// How a production step participates in threading.
 enum StepClass {
@@ -108,31 +105,28 @@ type SatKey = (PatternId, NodeRealizer);
 struct ThreadKey {
     pattern: PatternId,
     hidden_var: VarId,
-    state: State,
+    input: Configuration,
     /// Part of the key: the same frontier entered under different labels admits
     /// different `field:` matchers, so the memo must keep them apart.
     inherited_field: Option<NodeFieldId>,
 }
 
-struct ProductionThread<'f, 'q, 'g> {
+struct ProductionThread<'f, 'q> {
     frozen: &'f Frozen<'q>,
     pattern: PatternId,
     inherited_field: Option<NodeFieldId>,
-    gaps: &'g mut [GapClass],
 }
 
-impl<'f, 'q, 'g> ProductionThread<'f, 'q, 'g> {
+impl<'f, 'q> ProductionThread<'f, 'q> {
     fn new(
         frozen: &'f Frozen<'q>,
         pattern: PatternId,
         inherited_field: Option<NodeFieldId>,
-        gaps: &'g mut [GapClass],
     ) -> Self {
         Self {
             frozen,
             pattern,
             inherited_field,
-            gaps,
         }
     }
 
@@ -140,16 +134,20 @@ impl<'f, 'q, 'g> ProductionThread<'f, 'q, 'g> {
         self.frozen.automaton(self.pattern)
     }
 
+    fn configuration(&self, state: State) -> Configuration {
+        self.frozen.configuration(self.pattern, state)
+    }
+
     fn hidden_key(
         &self,
         hidden_var: VarId,
-        state: State,
+        input: Configuration,
         inherited_field: Option<NodeFieldId>,
     ) -> ThreadKey {
         ThreadKey {
             pattern: self.pattern,
             hidden_var,
-            state,
+            input,
             inherited_field,
         }
     }
@@ -165,24 +163,24 @@ enum Key {
 /// it from the mutable solve state lets the worklist hold `&Frozen` and `&mut Solve`
 /// at once (disjoint borrows) while threading.
 struct Frozen<'a> {
-    ctx: AutomatonContext<'a>,
-    anchor_semantics: AnchorSemantics<'a>,
-    automata: Vec<ChildAutomaton>,
-    table: automaton::PatternTable,
+    grammar: &'a Grammar,
+    model: &'a Model,
+    automata: Vec<Option<ChildAutomaton>>,
     facts: Arc<GrammarFacts>,
-    relax_anchors: bool,
+    relaxed_pattern: Option<PatternId>,
     /// Native-recursion ceiling for automaton construction while inlining references.
     automaton_max_depth: u32,
 }
 
 impl<'a> Frozen<'a> {
     fn automaton(&self, p: PatternId) -> &ChildAutomaton {
-        &self.automata[p.index()]
+        self.automata[p.index()]
+            .as_ref()
+            .expect("solver only reads completed automata")
     }
 
     fn variable(&self, v: VarId) -> &SkeletonVariable {
-        self.ctx
-            .grammar
+        self.grammar
             .structure()
             .variable(v)
             .expect("a VarId from the grammar structure always resolves")
@@ -192,27 +190,20 @@ impl<'a> Frozen<'a> {
         self.facts.realizers_of(kind)
     }
 
-    fn build_automaton(
-        &mut self,
-        node: &Located<NamedNodePattern>,
-        remaining_budget: u64,
-    ) -> ChildAutomaton {
-        automaton::build(
-            node,
-            self.ctx,
-            &mut self.table,
-            &self.anchor_semantics,
-            self.relax_anchors,
-            self.automaton_max_depth,
-            remaining_budget,
-        )
+    fn configuration(&self, pattern: PatternId, state: State) -> Configuration {
+        let gap = if self.relaxed_pattern == Some(pattern) {
+            GapClass::Any
+        } else {
+            self.automaton(pattern).gap(state)
+        };
+        Configuration { state, gap }
     }
 
     /// Whether a child-position kind constraint admits visible grammar kind `k`.
     /// Query supertypes are rejected before this pass runs, and grammar supertype
     /// steps are classified as hidden frontiers before matching.
     fn kind_ok(&self, constraint: KindConstraint, k: NodeKindId) -> bool {
-        let grammar = self.ctx.grammar;
+        let grammar = self.grammar;
         match constraint {
             KindConstraint::Exact(id) => id == k,
             KindConstraint::AnyNamed => !grammar.is_anonymous_node(k),
@@ -224,12 +215,12 @@ impl<'a> Frozen<'a> {
     /// path of [`SatisfiabilitySolver::can_consume_extra`] — answered without materializing the
     /// admitted-extra list, which matters on wide wildcard child lists.
     fn admits_any_extra(&self, constraint: KindConstraint) -> bool {
-        self.facts.admits_any_extra(self.ctx.grammar, constraint)
+        self.facts.admits_any_extra(self.grammar, constraint)
     }
 
     /// The concrete named kinds a wildcard parent could be: every named, non-supertype
     /// kind the grammar can surface. A wildcard with children is satisfiable iff one of
-    /// these takes those children — a token can never be a parent, so it is excluded.
+    /// these realizes its constraints, including a leaf realizing an empty child list.
     fn parent_candidate_kinds(&self) -> &[NodeKindId] {
         self.facts.parent_candidate_kinds()
     }
@@ -241,7 +232,7 @@ impl<'a> Frozen<'a> {
         predicate: impl FnMut(NodeKindId) -> bool,
     ) -> bool {
         self.facts
-            .any_extra_admitted_by(self.ctx.grammar, constraint, predicate)
+            .any_extra_admitted_by(self.grammar, constraint, predicate)
     }
 
     /// The kinds that can be the first (or last) child of a node of `kind`: the
@@ -287,7 +278,7 @@ impl<'a> Frozen<'a> {
         visited: &mut HashSet<VarId>,
     ) {
         for step in steps {
-            match StepClass::of(step, self.ctx.grammar) {
+            match StepClass::of(step, self.grammar) {
                 StepClass::Visible(visible) => {
                     out.push(visible.kind);
                     break;
@@ -325,19 +316,16 @@ pub const DEFAULT_SATISFIABILITY_WORK_BUDGET: u64 = 2_000_000;
 #[derive(Default)]
 struct Solve {
     sat: HashMap<SatKey, bool>,
-    thread: HashMap<ThreadKey, StateSet>,
+    thread: HashMap<ThreadKey, Configurations>,
     /// `dependents[k]` are the keys that read `k` — re-queued when `k` changes.
     dependents: HashMap<Key, IndexSet<Key>>,
     /// The key currently being recomputed, so reads attribute to it.
     current: Option<Key>,
     queue: VecDeque<Key>,
     queued: HashSet<Key>,
-    /// Work units charged so far, the ceiling they may reach, and whether they
-    /// crossed it. Once `exhausted`, callers stop trusting memo values and reject
-    /// the query as too complex instead.
+    /// Work is charged before use. Failure propagates without exposing partial memos.
     work_used: u64,
     budget: u64,
-    exhausted: bool,
 }
 
 pub(super) struct SatisfiabilitySolver<'a> {
@@ -346,25 +334,29 @@ pub(super) struct SatisfiabilitySolver<'a> {
 }
 
 impl<'a> SatisfiabilitySolver<'a> {
-    pub(super) fn checking(ctx: AutomatonContext<'a>, limits: SatisfiabilityLimits) -> Self {
-        let relax_anchors = false;
+    pub(super) fn checking(
+        grammar: &'a Grammar,
+        model: &'a Model,
+        limits: SatisfiabilityLimits,
+    ) -> Self {
         Self::with_anchor_relaxation(
-            ctx,
-            relax_anchors,
+            grammar,
+            model,
+            None,
             limits,
-            Arc::new(GrammarFacts::from_grammar(ctx.grammar)),
+            Arc::new(GrammarFacts::from_grammar(grammar)),
         )
     }
 
-    pub(super) fn relaxing_anchors(&self, work_budget: u64) -> Self {
+    pub(super) fn relaxing_anchors(&self, pattern: PatternId, work_budget: u64) -> Self {
         let limits = SatisfiabilityLimits {
             automaton_max_depth: self.frozen.automaton_max_depth,
             work_budget,
         };
-        let relax_anchors = true;
         Self::with_anchor_relaxation(
-            self.frozen.ctx,
-            relax_anchors,
+            self.frozen.grammar,
+            self.frozen.model,
+            Some(pattern),
             limits,
             Arc::clone(&self.frozen.facts),
         )
@@ -375,19 +367,19 @@ impl<'a> SatisfiabilitySolver<'a> {
     }
 
     fn with_anchor_relaxation(
-        ctx: AutomatonContext<'a>,
-        relax_anchors: bool,
+        grammar: &'a Grammar,
+        model: &'a Model,
+        relaxed_pattern: Option<PatternId>,
         limits: SatisfiabilityLimits,
         facts: Arc<GrammarFacts>,
     ) -> Self {
         Self {
             frozen: Frozen {
-                ctx,
-                anchor_semantics: AnchorSemantics::new(ctx.pattern_facts),
-                automata: Vec::new(),
-                table: automaton::PatternTable::default(),
+                grammar,
+                model,
+                automata: std::iter::repeat_with(|| None).take(model.len()).collect(),
                 facts,
-                relax_anchors,
+                relaxed_pattern,
                 automaton_max_depth: limits.automaton_max_depth,
             },
             solve: Solve {
@@ -397,102 +389,73 @@ impl<'a> SatisfiabilitySolver<'a> {
         }
     }
 
-    /// Whether some realizer of grammar kind `kind` can realize `node`'s child structure.
-    /// Errs toward `true` (accept) whenever the question cannot be decided, so a
-    /// rejection is always sound.
+    /// A completed feasibility result, or a resource failure. A kind without retained
+    /// realizations remains conservatively matchable, as in the grammar model.
     pub(super) fn satisfiable(
         &mut self,
-        node: &Located<NamedNodePattern>,
+        pattern: PatternId,
         kind: NodeKindId,
-    ) -> bool {
-        // Already over budget on an earlier node: accept here too and let the pass
-        // reject the whole query, rather than start a fresh solve we cannot finish.
-        if self.solve.exhausted {
-            return true;
-        }
-        let p = self.frozen.table.intern(node.clone());
-        self.build_pending();
-
+    ) -> Result<bool, AnalysisLimit> {
+        self.build_pending(pattern)?;
         let realizer_count = self.frozen.realizers_of(kind).len();
         if realizer_count == 0 {
-            // No realizer of this kind — we cannot reason about it, so accept.
-            return true;
+            return Ok(true);
         }
+
         for index in 0..realizer_count {
             let realizer = self.frozen.realizers_of(kind)[index];
-            self.solve.seed(Key::Sat((p, realizer)));
+            self.solve.seed(Key::Sat((pattern, realizer)));
         }
-        self.run();
-        // A solve that ran out of budget left its memo partly converged; its `false`s
-        // are not sound rejections, so accept and defer to the too-complex check.
-        if self.solve.exhausted {
-            return true;
-        }
-        for index in 0..realizer_count {
-            let realizer = self.frozen.realizers_of(kind)[index];
-            if self.solve.sat_value((p, realizer)) {
-                return true;
-            }
-        }
-        false
+        self.run()?;
+        Ok(self
+            .frozen
+            .realizers_of(kind)
+            .iter()
+            .any(|&realizer| self.solve.sat_value((pattern, realizer))))
     }
 
-    /// Whether some named kind the grammar surfaces can have `node`'s children — the
-    /// satisfiability question for a wildcard parent `(_ …)`, which fixes no kind of its
-    /// own. Accept on the first candidate that works; only an impossible wildcard pays
-    /// for ruling every candidate out, and only a wildcard with child-structure
-    /// constraints reaches here at all.
-    pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NamedNodePattern>) -> bool {
+    pub(super) fn wildcard_satisfiable(
+        &mut self,
+        pattern: PatternId,
+    ) -> Result<bool, AnalysisLimit> {
         for index in 0..self.frozen.parent_candidate_kinds().len() {
             let kind = self.frozen.parent_candidate_kinds()[index];
-            if self.satisfiable(node, kind) {
-                return true;
+            if self.satisfiable(pattern, kind)? {
+                return Ok(true);
             }
         }
-        false
+        Ok(false)
     }
 
-    /// Build every automaton interned so far (transitively reaching all child
-    /// patterns), so the solve phase reads a frozen automaton set.
-    fn build_pending(&mut self) {
-        while self.frozen.automata.len() < self.frozen.table.len() {
-            let remaining_budget = self.solve.remaining_budget();
-            if remaining_budget == 0 {
-                self.solve.exhausted = true;
-                break;
+    /// Finish all transitively referenced child automata before solving. Inserting
+    /// each completed automaton before its dependencies also handles recursive nodes.
+    fn build_pending(&mut self, pattern: PatternId) -> Result<(), AnalysisLimit> {
+        let mut pending = vec![pattern];
+        while let Some(pattern) = pending.pop() {
+            if self.frozen.automata[pattern.index()].is_some() {
+                continue;
             }
 
-            let index = self.frozen.automata.len();
-            let node = self.frozen.table.node_at(index).clone();
-            let automaton = self.frozen.build_automaton(&node, remaining_budget);
-            self.solve.spend(automaton.state_count() as u64);
-            self.frozen.automata.push(automaton);
+            let automaton = automaton::build(
+                self.frozen.model,
+                pattern,
+                self.frozen.automaton_max_depth,
+                self.solve.remaining_budget(),
+            )?;
+            self.solve.spend(automaton.state_count() as u64)?;
+            pending.extend(automaton.nested_patterns());
+            self.frozen.automata[pattern.index()] = Some(automaton);
         }
+        Ok(())
     }
 
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<(), AnalysisLimit> {
         while let Some(key) = self.solve.dequeue() {
-            // Budget spent: stop draining. The verdict is no longer trusted — the
-            // caller accepts and the pass rejects the query as too complex.
-            if self.solve.exhausted {
-                break;
-            }
-            if self.solve.recompute(&self.frozen, key) {
+            if self.solve.recompute(&self.frozen, key)? {
                 self.solve.requeue_dependents(key);
             }
         }
-    }
-
-    pub(super) fn context(&self) -> AutomatonContext<'a> {
-        self.frozen.ctx
-    }
-
-    /// Whether a resource ceiling tripped: an automaton bailed on construction (state
-    /// cap or recursion depth), or the solve ran past its work budget. Either way the
-    /// query is rejected as too complex, rather than judged on an automaton we declined
-    /// to finish or a fixed point we declined to reach.
-    pub(super) fn is_too_complex(&self) -> bool {
-        self.solve.exhausted || self.frozen.automata.iter().any(|a| a.is_too_complex())
+        Ok(())
     }
 
     /// The kinds a node of `kind` can begin with — for a leading-anchor diagnostic.
@@ -511,32 +474,23 @@ impl Solve {
         self.budget.saturating_sub(self.work_used)
     }
 
-    fn spend(&mut self, work_units: u64) {
+    fn spend(&mut self, work_units: u64) -> Result<(), AnalysisLimit> {
         self.work_used = self.work_used.saturating_add(work_units);
         if self.work_used > self.budget {
-            self.exhausted = true;
+            return Err(AnalysisLimit);
         }
+        Ok(())
     }
 
     fn sat_value(&self, key: SatKey) -> bool {
-        self.sat.get(&key).copied().unwrap_or_else(|| {
-            panic!("satisfiability solver read key {key:?} before `Solve::seed` initialized it")
-        })
+        *self
+            .sat
+            .get(&key)
+            .expect("a satisfiability key is seeded before it is read")
     }
 
-    /// Charge one unit of solver work, returning whether the caller may continue.
-    /// Called in the hot loops so total work — not any single key — is what the
-    /// bound governs.
-    fn charge(&mut self) -> bool {
-        if self.exhausted {
-            return false;
-        }
-        self.work_used = self.work_used.saturating_add(1);
-        if self.work_used > self.budget {
-            self.exhausted = true;
-            return false;
-        }
-        true
+    fn charge(&mut self) -> Result<(), AnalysisLimit> {
+        self.spend(1)
     }
 
     fn seed(&mut self, key: Key) {
@@ -544,7 +498,7 @@ impl Solve {
             Key::Sat(k) => !self.sat.contains_key(&k) && self.sat.insert(k, false).is_none(),
             Key::Thread(k) => {
                 !self.thread.contains_key(&k)
-                    && self.thread.insert(k, StateSet::default()).is_none()
+                    && self.thread.insert(k, Configurations::default()).is_none()
             }
         };
         if fresh {
@@ -589,7 +543,7 @@ impl Solve {
         self.sat_value(key)
     }
 
-    fn get_thread(&mut self, key: ThreadKey) -> StateSet {
+    fn get_thread(&mut self, key: ThreadKey) -> Configurations {
         self.record_read(Key::Thread(key));
         self.seed(Key::Thread(key));
         self.thread.get(&key).cloned().unwrap_or_else(|| {
@@ -597,18 +551,18 @@ impl Solve {
         })
     }
 
-    fn recompute(&mut self, frozen: &Frozen, key: Key) -> bool {
+    fn recompute(&mut self, frozen: &Frozen, key: Key) -> Result<bool, AnalysisLimit> {
         let previous = self.current.replace(key);
         let changed = match key {
             Key::Sat(k) => {
-                let computed = self.compute_sat(frozen, k);
+                let computed = self.compute_sat(frozen, k)?;
                 self.sat_value(k) != computed && {
                     self.sat.insert(k, computed);
                     true
                 }
             }
             Key::Thread(k) => {
-                let computed = self.compute_thread(frozen, k);
+                let computed = self.compute_thread(frozen, k)?;
                 let changed = self.thread.get(&k).unwrap_or_else(|| {
                     panic!(
                         "satisfiability solver dequeued thread {k:?}, but its seeded state was \
@@ -622,49 +576,50 @@ impl Solve {
             }
         };
         self.current = previous;
-        changed
+        Ok(changed)
     }
 
-    fn compute_sat(&mut self, frozen: &Frozen, (p, realizer): SatKey) -> bool {
-        let automaton = frozen.automaton(p);
-        // A construction that bailed on a resource ceiling left a half-built automaton; its
-        // verdicts are not sound, so accept and let the pass reject the query as too complex.
-        if automaton.is_too_complex() {
-            return true;
-        }
-        let start = StateSet::singleton(automaton.start());
+    fn compute_sat(
+        &mut self,
+        frozen: &Frozen,
+        (pattern, realizer): SatKey,
+    ) -> Result<bool, AnalysisLimit> {
+        let automaton = frozen.automaton(pattern);
+        let start = Configurations::singleton(frozen.configuration(pattern, automaton.start()));
         let accept = automaton.accept();
-        match realizer {
-            // A token has no children, not even extras: it realizes `p` only if `p`
-            // accepts the empty child sequence.
-            NodeRealizer::Leaf => eps_closure(automaton, &start).contains(accept),
-            // Some production of the variable threads `A_p` from start to accept. These
-            // are the node's own children, so no field is inherited from above.
-            NodeRealizer::Var(v) => {
-                let production_count = frozen.variable(v).productions.len();
-                let mut gaps = gap_scratch(frozen, p);
-                let mut thread = ProductionThread::new(frozen, p, None, &mut gaps);
-                (0..production_count).any(|i| {
-                    let production = &frozen.variable(v).productions[i];
-                    self.thread_production(&mut thread, production, &start)
-                        .contains(accept)
-                })
+        if realizer == NodeRealizer::Leaf {
+            // Leaves have no children, not even extras.
+            return self.accepts_empty(automaton);
+        }
+
+        let NodeRealizer::Var(variable) = realizer else {
+            unreachable!()
+        };
+        let thread = ProductionThread::new(frozen, pattern, None);
+        for production in &frozen.variable(variable).productions {
+            if self
+                .thread_production(&thread, production, &start)?
+                .contains_state(accept)
+            {
+                return Ok(true);
             }
         }
+        Ok(false)
     }
 
-    fn compute_thread(&mut self, frozen: &Frozen, key: ThreadKey) -> StateSet {
-        let start = StateSet::singleton(key.state);
-        let mut reached = StateSet::default();
-        let mut gaps = gap_scratch(frozen, key.pattern);
-        let mut thread = ProductionThread::new(frozen, key.pattern, key.inherited_field, &mut gaps);
-        let production_count = frozen.variable(key.hidden_var).productions.len();
-        for i in 0..production_count {
-            let production = &frozen.variable(key.hidden_var).productions[i];
-            let states = self.thread_production(&mut thread, production, &start);
+    fn compute_thread(
+        &mut self,
+        frozen: &Frozen,
+        key: ThreadKey,
+    ) -> Result<Configurations, AnalysisLimit> {
+        let start = Configurations::singleton(key.input);
+        let mut reached = Configurations::default();
+        let thread = ProductionThread::new(frozen, key.pattern, key.inherited_field);
+        for production in &frozen.variable(key.hidden_var).productions {
+            let states = self.thread_production(&thread, production, &start)?;
             reached.union_with(&states);
         }
-        reached
+        Ok(reached)
     }
 
     /// Thread one production's steps, left to right, through `A_p` from `start`,
@@ -672,32 +627,29 @@ impl Solve {
     /// step pushed onto this frontier — `None` for a node's own children.
     fn thread_production(
         &mut self,
-        thread: &mut ProductionThread<'_, '_, '_>,
+        thread: &ProductionThread<'_, '_>,
         production: &[SkeletonStep],
-        start: &StateSet,
-    ) -> StateSet {
-        let mut current = self.thread_closure(thread, start);
+        start: &Configurations,
+    ) -> Result<Configurations, AnalysisLimit> {
+        let mut current = self.closure(thread, start)?;
         for step in production {
-            // A dead frontier stays dead; the rest of the production cannot revive it.
-            if self.exhausted || current.is_empty() {
+            if current.is_empty() {
                 break;
             }
-            current = self.thread_step(thread, &current, step);
-            if self.exhausted {
-                break;
-            }
-            current = self.thread_closure(thread, &current);
+
+            current = self.thread_step(thread, &current, step)?;
+            current = self.closure(thread, &current)?;
         }
-        current
+        Ok(current)
     }
 
     fn thread_step(
         &mut self,
-        thread: &mut ProductionThread<'_, '_, '_>,
-        current: &StateSet,
+        thread: &ProductionThread<'_, '_>,
+        current: &Configurations,
         step: &SkeletonStep,
-    ) -> StateSet {
-        match StepClass::of(step, thread.frozen.ctx.grammar) {
+    ) -> Result<Configurations, AnalysisLimit> {
+        match StepClass::of(step, thread.frozen.grammar) {
             // A real child of kind `kind`. Each current state either skips it through a
             // gap self-loop, or consumes it through an edge whose kind and field both
             // admit the step. The step's own label wins over an inherited one.
@@ -707,76 +659,59 @@ impl Solve {
             // inherited (a plain supertype link never relabels what it carries).
             StepClass::HiddenSubtree(hidden) => self.thread_hidden_subtree(thread, current, hidden),
             // A hidden token surfaces nothing and consumes nothing.
-            StepClass::HiddenLeaf => current.clone(),
+            StepClass::HiddenLeaf => Ok(current.clone()),
         }
     }
 
     fn thread_hidden_subtree(
         &mut self,
-        thread: &ProductionThread<'_, '_, '_>,
-        current: &StateSet,
+        thread: &ProductionThread<'_, '_>,
+        current: &Configurations,
         hidden: HiddenStep,
-    ) -> StateSet {
+    ) -> Result<Configurations, AnalysisLimit> {
         let pushed = hidden.pushed_field(thread.inherited_field);
-        let mut next = StateSet::default();
+        let mut next = Configurations::default();
         for q in current.iter() {
-            if !self.charge() {
-                break;
-            }
+            self.charge()?;
             let reached = self.get_thread(thread.hidden_key(hidden.var, q, pushed));
             next.union_with(&reached);
         }
-        next
+        Ok(next)
     }
 
     fn thread_visible_step(
         &mut self,
-        thread: &mut ProductionThread<'_, '_, '_>,
-        current: &StateSet,
+        thread: &ProductionThread<'_, '_>,
+        current: &Configurations,
         visible: VisibleStep,
-    ) -> StateSet {
+    ) -> Result<Configurations, AnalysisLimit> {
         let automaton = thread.automaton();
         let effective = visible.effective_field(thread.inherited_field);
         // The query asserts this field absent (`-field`); a production binding it
         // gives the node a forbidden child, so this whole path is dead — it can be
         // neither consumed nor skipped past.
         if automaton.negates(effective) {
-            return StateSet::default();
+            return Ok(Configurations::default());
         }
-        let node_class = thread.frozen.ctx.grammar.node_class(visible.kind);
-        let mut next = StateSet::default();
+        let node_class = thread.frozen.grammar.node_class(visible.kind);
+        let mut next = Configurations::default();
         for q in current.iter() {
-            if !self.charge() {
-                break;
-            }
-            // The state's *effective* gap (tightest erasure path that reaches it),
-            // so an exact anchor erased into this position still forbids the skip.
-            if thread.gaps[q as usize].admits(node_class) {
+            self.charge()?;
+            // Preserve the pending anchor on this path, including across hidden rules.
+            if q.gap.admits(node_class) {
                 next.insert(q);
             }
-            for (matcher, to) in automaton.pattern_edges(q) {
-                if !self.charge() {
-                    break;
-                }
+            for (matcher, to) in automaton.pattern_edges(q.state) {
+                self.charge()?;
                 if thread.frozen.kind_ok(matcher.kind, visible.kind)
                     && field_ok(matcher.field, effective)
                     && self.child_sat(matcher, visible.realizer)
                 {
-                    next.insert(*to);
+                    next.insert(thread.configuration(*to));
                 }
             }
         }
-        next
-    }
-
-    fn thread_closure(
-        &mut self,
-        thread: &mut ProductionThread<'_, '_, '_>,
-        set: &StateSet,
-    ) -> StateSet {
-        let frozen = thread.frozen;
-        let automaton = frozen.automaton(thread.pattern);
-        self.closure(frozen, automaton, set, thread.gaps)
+        Ok(next)
     }
 
     /// Whether the matched child's own structure is realized by `realizer` — trivially
@@ -794,51 +729,59 @@ impl Solve {
     /// closure only grows the reachable set.
     fn closure(
         &mut self,
-        frozen: &Frozen,
-        automaton: &ChildAutomaton,
-        set: &StateSet,
-        gaps: &mut [GapClass],
-    ) -> StateSet {
-        // Reachability over epsilon edges plus extra-consumable pattern edges (a query
-        // child matching an inserted extra advances without a production step). Alongside
-        // membership, carry each state's effective skip gap: tightest *along* a path
-        // (every erased step bounds what may be skipped after it), loosest *across* paths
-        // (a skip is open if any path opens it). So an exact anchor survives erasure — a
-        // state reached only by erasing optionals under `.!` cannot then skip what the
-        // anchor forbids — while a state also reachable by consuming keeps its own gap.
+        thread: &ProductionThread<'_, '_>,
+        set: &Configurations,
+    ) -> Result<Configurations, AnalysisLimit> {
+        let frozen = thread.frozen;
+        let automaton = thread.automaton();
         let mut result = set.clone();
-        let mut stack: Vec<State> = Vec::new();
-        for q in result.iter() {
-            gaps[q as usize] = automaton.gap(q);
-            stack.push(q);
-        }
-        while let Some(q) = stack.pop() {
-            if !self.charge() {
-                break;
-            }
-            let gq = gaps[q as usize];
-            for &to in automaton.eps_edges(q) {
-                if !self.charge() {
-                    break;
-                }
-                let candidate = gq.tighten(automaton.gap(to));
-                if relax_into(gaps, &mut result, to, candidate) {
-                    stack.push(to);
+        let mut stack: Vec<_> = result.iter().collect();
+        while let Some(input) = stack.pop() {
+            self.charge()?;
+            for &to in automaton.eps_edges(input.state) {
+                self.charge()?;
+                let mut output = thread.configuration(to);
+                output.gap = input.gap.tighten(output.gap);
+                if result.insert(output) {
+                    stack.push(output);
                 }
             }
-            for (matcher, to) in automaton.pattern_edges(q) {
-                if !self.charge() {
-                    break;
-                }
+            for (matcher, to) in automaton.pattern_edges(input.state) {
+                self.charge()?;
                 if self.can_consume_extra(frozen, matcher) {
-                    let candidate = gq.tighten(automaton.gap(*to));
-                    if relax_into(gaps, &mut result, *to, candidate) {
-                        stack.push(*to);
+                    // Consuming an extra satisfies the incoming anchor just as
+                    // consuming any other visible child does.
+                    let output = thread.configuration(*to);
+                    if result.insert(output) {
+                        stack.push(output);
                     }
                 }
             }
         }
-        result
+        Ok(result)
+    }
+
+    /// A leaf realizes only the empty child sequence. Gaps cannot matter without
+    /// children, so this is reachability over epsilon edges alone.
+    fn accepts_empty(&mut self, automaton: &ChildAutomaton) -> Result<bool, AnalysisLimit> {
+        let mut visited = vec![false; automaton.state_count()];
+        let mut stack = vec![automaton.start()];
+        visited[automaton.start() as usize] = true;
+        while let Some(state) = stack.pop() {
+            self.charge()?;
+            if state == automaton.accept() {
+                return Ok(true);
+            }
+
+            for &to in automaton.eps_edges(state) {
+                self.charge()?;
+                if !visited[to as usize] {
+                    visited[to as usize] = true;
+                    stack.push(to);
+                }
+            }
+        }
+        Ok(false)
     }
 
     /// Whether a query child matching an extra kind may advance the automaton without a
@@ -867,46 +810,4 @@ impl Solve {
                 .any(|realizer| self.get_sat((nested_pattern, realizer)))
         })
     }
-}
-
-/// Add `to` to the closure under effective gap `candidate`, returning whether it must be
-/// (re)visited — newly reached, or reached by a more permissive path that loosened its
-/// gap (so its successors must see the wider skip permission).
-fn relax_into(
-    gaps: &mut [GapClass],
-    result: &mut StateSet,
-    to: State,
-    candidate: GapClass,
-) -> bool {
-    if result.insert(to) {
-        gaps[to as usize] = candidate;
-        return true;
-    }
-    let loosened = gaps[to as usize].loosen(candidate);
-    if loosened != gaps[to as usize] {
-        gaps[to as usize] = loosened;
-        return true;
-    }
-    false
-}
-
-/// Pure epsilon closure: no memo reads, so it needs neither the solver nor `Frozen`.
-fn eps_closure(automaton: &ChildAutomaton, set: &StateSet) -> StateSet {
-    let mut result = set.clone();
-    let mut stack: Vec<State> = result.iter().collect();
-    while let Some(q) = stack.pop() {
-        for &to in automaton.eps_edges(q) {
-            if result.insert(to) {
-                stack.push(to);
-            }
-        }
-    }
-    result
-}
-
-/// Effective skip gap per state, recomputed by each `closure` and read by the next
-/// `thread_step`. States outside the live frontier are never read, so stale entries
-/// between productions do not matter.
-fn gap_scratch(frozen: &Frozen, p: PatternId) -> Vec<GapClass> {
-    vec![GapClass::Any; frozen.automaton(p).state_count()]
 }

@@ -76,14 +76,21 @@ impl<'q> GrammarBindInput<'_, 'q> {
         if diagnostics.has_errors() {
             return;
         }
+        let model = super::model::Model::resolve(
+            definitions,
+            pattern_facts,
+            source_map,
+            &node_kind_ids,
+            &node_field_ids,
+        );
         super::satisfiability::check(
-            super::satisfiability::SatisfiabilityInput {
+            super::satisfiability::ReportContext {
                 grammar,
-                definitions,
                 pattern_facts,
                 source_map,
-                limits: satisfiability_limits,
+                model: &model,
             },
+            satisfiability_limits,
             diagnostics,
         );
     }

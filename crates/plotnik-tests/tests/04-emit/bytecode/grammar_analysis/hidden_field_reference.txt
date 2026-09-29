@@ -1,0 +1,82 @@
+Name = (id)
+Func = (func name: (Name))
+Param = (param value: (Name))
+-------------------- GRAMMAR ---------------------
+rules:
+  decl:
+    type: CHOICE
+    members:
+      - {type: SYMBOL, name: func}
+      - {type: SYMBOL, name: param}
+  func:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: _name}
+  param:
+    type: FIELD
+    name: value
+    content: {type: SYMBOL, name: _name}
+  _name: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Func  = 05
+Name  = 02
+Param = 10
+
+[transitions]
+Name:
+  01                                        ▶
+  02   !   (id)                             01
+
+Func:
+  04                                        ▶
+  05   !   (func)                           07
+  06  ─‣┘  _                                04
+  07  └‣─  name: (Name)                     02 : 06
+
+Param:
+  09                                        ▶
+  10   !   (param)                          12
+  11  ─‣┘  _                                09
+  12  └‣─  value: (Name)                    02 : 11
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "func"
+S3 "param"
+S4 "name"
+S5 "value"
+S6 "Name"
+S7 "Func"
+S8 "Param"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Func  = 2 :: T0
+Name  = 0 :: T0
+Param = 6 :: T0
+
+[instructions]
+Name:
+  0   !   (id)                              1
+  1                                         ▶
+
+Func:
+  2   !   (func)                            3
+  3  └‣─  name: (Name)                      0 : 4
+  4  ─‣┘  _                                 5
+  5                                         ▶
+
+Param:
+  6   !   (param)                           7
+  7  └‣─  value: (Name)                     0 : 8
+  8  ─‣┘  _                                 9
+  9                                         ▶
