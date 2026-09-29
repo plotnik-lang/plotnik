@@ -10,7 +10,7 @@ use super::admissibility::{AdmissibilityIndex, KindSet, Reachability};
 use super::json::GrammarError;
 use super::raw::RawGrammar;
 use super::render::TreeGrammar;
-use super::structure::StructureTable;
+use super::structure::{NodeRealizer, StructureTable};
 
 pub(super) struct GrammarTables {
     pub(super) node_shapes: Vec<NodeShape>,
@@ -25,11 +25,6 @@ pub(super) struct NodeKindEntry {
     pub(super) named: bool,
     pub(super) visible: bool,
     pub(super) supertype: bool,
-    /// True when this symbol is a lexical terminal or an external token. A public
-    /// node kind is a leaf token only when *every* contributing symbol is terminal
-    /// (see `token_node_ids`), which distinguishes real leaves like `identifier`
-    /// from childless syntax nodes like `debugger_statement`.
-    pub(super) terminal: bool,
 }
 
 impl NodeKindEntry {
@@ -40,10 +35,6 @@ impl NodeKindEntry {
             named,
             visible: true,
             supertype: false,
-            // Aliases get fresh ids, so this value never reaches the aliased public
-            // id's per-kind accumulation. Token detection also checks node shape, so
-            // `false` is the safe default for alias-only public ids.
-            terminal: false,
         }
     }
 }
@@ -69,21 +60,15 @@ pub struct Grammar {
     field_names: HashMap<NodeFieldId, String>,
     supertype_ids: HashSet<NodeKindId>,
     subtypes: HashMap<NodeKindId, Vec<NodeKindId>>,
-    /// Public node kinds that are leaf tokens (no child nodes are derivable).
-    token_node_ids: HashSet<NodeKindId>,
     /// Public node ids that name anonymous (literal-token) kinds.
     anonymous_node_id_set: HashSet<NodeKindId>,
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
     structure: StructureTable,
-    /// Child/field admissibility model: the node-shape summary for a metadata-only
-    /// grammar, replaced by the [`Reachability`] union (summary ∪ structural
-    /// recovery) on the `from_raw` path.
+    /// Child/field admissibility derived from the node summary and retained productions.
     admissibility: AdmissibilityIndex,
-    /// Tree-shape rendering model for `lang dump` and diagnostics. Populated only
-    /// on the `from_raw` path (the pipeline data it taps does not survive into
-    /// `GrammarTables`); empty otherwise.
+    /// Tree-shape rendering model for `lang dump` and diagnostics.
     tree: TreeGrammar,
 }
 
@@ -170,20 +155,9 @@ impl Grammar {
         let mut node_names = HashMap::new();
         let mut supertype_ids = HashSet::new();
 
-        // A public node kind can be reached by multiple symbols (e.g. via aliases). It is a leaf
-        // token only when every contributing symbol is terminal, so this accumulates per kind with
-        // AND: a single non-terminal contributor (like `debugger_statement` = `"debugger" ";"`)
-        // keeps the kind out of the token set even when it otherwise looks childless.
-        let mut all_terminal: HashMap<NodeKindId, bool> = HashMap::new();
-
         for symbol in tables.symbols {
             let node_id = symbol.id;
             node_names.insert(node_id, symbol.kind_name.clone());
-
-            all_terminal
-                .entry(node_id)
-                .and_modify(|every| *every &= symbol.terminal)
-                .or_insert(symbol.terminal);
 
             if symbol.supertype {
                 supertype_ids.insert(node_id);
@@ -241,26 +215,6 @@ impl Grammar {
         let mut all_field_names = field_ids.keys().cloned().collect::<Vec<_>>();
         all_field_names.sort();
 
-        // A kind is a leaf token only when it is terminal AND its shape declares no children and
-        // no fields. The terminal flag alone is not enough: alias-introduced symbols receive fresh
-        // node ids (see `derive_symbols`), so their non-terminal `terminal: false` never reaches
-        // the public id's per-kind accumulation. A kind reachable both by a terminal symbol and by
-        // children-bearing aliases then accumulates to all-terminal even though it has a real
-        // children slot. Confirming against the node shape handles this: a kind with a
-        // children/fields slot is never a leaf token, so a named child under it is valid.
-        let token_node_ids = all_terminal
-            .into_iter()
-            .filter(|&(_, every_terminal)| every_terminal)
-            .filter_map(|(node_id, _)| {
-                let constraints = node_constraints.get(&node_id);
-                let has_children = constraints
-                    .and_then(|c| c.children.as_ref())
-                    .is_some_and(|children| !children.valid_types.is_empty());
-                let has_fields = constraints.is_some_and(|c| !c.fields.is_empty());
-                (!has_children && !has_fields).then_some(node_id)
-            })
-            .collect::<HashSet<_>>();
-
         let anonymous_node_id_set = anonymous_node_ids.values().copied().collect::<HashSet<_>>();
         let admissibility = AdmissibilityIndex::from_summary(&node_constraints, &field_names);
 
@@ -277,13 +231,11 @@ impl Grammar {
             field_names,
             supertype_ids,
             subtypes,
-            token_node_ids,
             anonymous_node_id_set,
             all_named_node_kinds,
             all_anonymous_node_kinds,
             all_field_names,
-            // Populated only on the `from_raw` path: `GrammarTables` has already
-            // discarded the flattened productions the table distills.
+            // `from_raw` attaches the retained productions before publishing the grammar.
             structure: StructureTable::default(),
             admissibility,
             tree: TreeGrammar::default(),
@@ -411,7 +363,18 @@ impl Grammar {
     /// which never has child nodes (e.g. `identifier`). Childless *syntax* nodes such as
     /// `debugger_statement` are not tokens: extras like comments can still attach beneath them.
     pub fn is_token(&self, node_kind_id: NodeKindId) -> bool {
-        self.token_node_ids.contains(&node_kind_id)
+        !self.is_supertype(node_kind_id)
+            && self.structure.realizers_of(node_kind_id) == [NodeRealizer::Leaf]
+    }
+
+    /// Whether this kind has a terminal realization, even if other occurrences
+    /// with the same public name are syntax nodes. Recovery can insert terminals.
+    pub(crate) fn can_be_token(&self, node_kind_id: NodeKindId) -> bool {
+        !self.is_supertype(node_kind_id)
+            && self
+                .structure
+                .realizers_of(node_kind_id)
+                .contains(&NodeRealizer::Leaf)
     }
 
     /// Whether `node_kind_id` names an anonymous (literal-token) kind, e.g. `"+"`. Used to

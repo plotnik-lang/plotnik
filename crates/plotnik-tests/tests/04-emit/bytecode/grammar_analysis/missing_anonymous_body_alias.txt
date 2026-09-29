@@ -1,0 +1,21 @@
+Q = (MISSING "pass")
+-------------------- GRAMMAR ---------------------
+rules:
+  file:
+    type: ALIAS
+    content: {type: SYMBOL, name: stmt}
+    named: false
+    value: pass
+  stmt:
+    type: SEQ
+    members:
+      - {type: STRING, value: "skip"}
+      - {type: STRING, value: ";"}
+------------------ DIAGNOSTICS -------------------
+error: `pass` is not a token kind. Only tokens can be missing nodes
+ --> query.ptk:1:15
+  |
+1 | Q = (MISSING "pass")
+  |               ^^^^
+  |
+help: use bare `(MISSING)` or a leaf token kind from this grammar

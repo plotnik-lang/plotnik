@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use crate::core::grammar::{Grammar, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::facts::NodeRealizer;
+use crate::core::grammar::NodeRealizer;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct Child {

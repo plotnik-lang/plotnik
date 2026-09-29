@@ -1,0 +1,49 @@
+Q = (MISSING term)
+-------------------- GRAMMAR ---------------------
+rules:
+  expr:
+    type: CHOICE
+    members:
+      - type: ALIAS
+        content: {type: SYMBOL, name: id}
+        named: true
+        value: term
+      - type: ALIAS
+        content: {type: SYMBOL, name: group}
+        named: true
+        value: term
+  group:
+    type: SEQ
+    members:
+      - {type: STRING, value: "("}
+      - {type: SYMBOL, name: id}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (MISSING term)                    1
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "term"
+S2 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (MISSING term)                    2
+  2                                         ▶

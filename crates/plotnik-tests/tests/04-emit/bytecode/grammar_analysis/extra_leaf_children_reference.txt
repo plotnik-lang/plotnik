@@ -1,0 +1,19 @@
+Leaf = (comment (id))
+Q = (file (Leaf))
+-------------------- GRAMMAR ---------------------
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  file: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+  comment: {type: PATTERN, value: "#[^\n]*"}
+------------------ DIAGNOSTICS -------------------
+error: `comment` is a leaf token and has no child nodes
+ --> query.ptk:1:18
+  |
+1 | Leaf = (comment (id))
+  |         -------  ^^
+  |         |
+  |         `comment`
+  |
+help: a leaf token's content is its text. Match `(comment)` directly or add a text predicate to `(comment)`

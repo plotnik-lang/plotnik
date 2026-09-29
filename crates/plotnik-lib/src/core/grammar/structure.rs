@@ -40,12 +40,10 @@
 //!   drift.
 //! - **A visible step is never wholly unknown.** It always resolves to an `id` or a
 //!   `body`: a visible token has an id, a visible non-terminal has a body.
-//!   `classify_step` debug-asserts this, and the corpus test exercises it across
-//!   every shipped grammar; if it ever trips, the classifier has a new gap.
-//! - **Built only via `from_raw`, eagerly and owned.** The flattened grammar is gone
-//!   by `from_metadata`, so a metadata-only `Grammar` has an empty table. The table
-//!   is built eagerly because reachability and satisfiability both consume it, and
-//!   `Grammar` clones deep-copy it; if clone cost shows up, share this owned table.
+//!   Classification fails grammar construction if a visible token has no public id.
+//! - **Built eagerly by `from_raw`.** Productions and token realizations are retained
+//!   before the prepared grammar is dropped. Every constructed grammar has this
+//!   table, shared by reachability, satisfiability, and token classification.
 
 use std::collections::HashMap;
 
@@ -57,6 +55,7 @@ use super::node_shapes::{
     variable_type_for_child_type,
 };
 use super::prepared::{ProductionStep, VariableType};
+use super::rules::{Alias, Symbol};
 use super::types::Grammar;
 
 /// Index of a syntax variable, aligned with [`StructureTable::variables`].
@@ -172,12 +171,6 @@ impl SkeletonStep {
             FieldValueProjection::Empty
         }
     }
-
-    fn surface_realizer(self) -> Option<SurfaceRealizer> {
-        self.target
-            .id
-            .map(|kind| SurfaceRealizer::new(kind, self.target.body))
-    }
 }
 
 /// How a skeleton step surfaces to consumers that reason over visible tree children.
@@ -226,30 +219,30 @@ pub(crate) enum FieldValueProjection {
 /// A grammar variable reduced to its productions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkeletonVariable {
-    /// Public name, kept for diagnostics. Hidden variables have no public id, so
-    /// the name is the only stable handle on them.
+    /// Rule name for diagnostics, including rules hidden behind aliases.
     pub name: String,
-    /// Public id when this variable surfaces in the tree under its own kind — a
-    /// named or anonymous rule, a non-inlined supertype, or a rule tree-sitter
-    /// publishes via a named alias (e.g. swift `_expression`). `None` for variables
-    /// spliced away without an id of their own.
+    /// Public identity after applying the variable's default alias. `None` for
+    /// hidden variables. Individual production occurrences can use other aliases.
     pub id: Option<NodeKindId>,
     pub kind: VariableType,
     /// One inner `Vec` per production, each an ordered list of steps.
     pub productions: Vec<Vec<SkeletonStep>>,
 }
 
-/// A public kind the skeleton can surface, and the variable it descends into when
-/// it is not a leaf token.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct SurfaceRealizer {
-    pub(crate) kind: NodeKindId,
-    pub(crate) body: Option<VarId>,
+/// The child structure behind one occurrence of a public node kind. An alias can
+/// give the same kind to both a token and a syntax variable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum NodeRealizer {
+    Leaf,
+    Var(VarId),
 }
 
-impl SurfaceRealizer {
-    fn new(kind: NodeKindId, body: Option<VarId>) -> Self {
-        Self { kind, body }
+impl NodeRealizer {
+    pub(crate) fn of_body(body: Option<VarId>) -> Self {
+        match body {
+            Some(body) => Self::Var(body),
+            None => Self::Leaf,
+        }
     }
 }
 
@@ -262,6 +255,7 @@ impl SurfaceRealizer {
 #[derive(Clone, Debug, Default)]
 pub struct StructureTable {
     variables: Vec<SkeletonVariable>,
+    realizers: HashMap<NodeKindId, Vec<NodeRealizer>>,
 }
 
 impl StructureTable {
@@ -270,10 +264,13 @@ impl StructureTable {
             .syntax
             .variables
             .iter()
-            .map(|variable| {
+            .enumerate()
+            .map(|(index, variable)| {
+                let symbol = Symbol::non_terminal(index);
+                let target = classify_target(symbol, ctx.aliases.get(&symbol), ctx, grammar)?;
                 let name = public_node_kind(&variable.name);
                 Ok(SkeletonVariable {
-                    id: resolve_visible_id(&name, variable.kind, grammar),
+                    id: target.id,
                     name,
                     kind: variable.kind,
                     productions: variable
@@ -290,7 +287,12 @@ impl StructureTable {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        Ok(Self { variables })
+        let mut table = Self {
+            variables,
+            realizers: HashMap::new(),
+        };
+        table.index_realizers(ctx, grammar)?;
+        Ok(table)
     }
 
     /// Distilled productions, positionally aligned with the grammar's syntax
@@ -313,53 +315,77 @@ impl StructureTable {
             .map(|(index, variable)| (VarId(index as u32), variable))
     }
 
-    /// Every public kind the skeleton can surface, paired with the variable it
-    /// descends into. Includes a variable's own public id and every surfaced
-    /// production step (aliases included), so reachability and satisfiability share
-    /// one traversal of the ordered grammar model.
-    fn surface_realizers(&self) -> impl Iterator<Item = SurfaceRealizer> + '_ {
-        self.iter().flat_map(|(var_id, variable)| {
-            let own_id = variable
-                .id
-                .map(|kind| SurfaceRealizer::new(kind, Some(var_id)));
-            let step_ids = variable
-                .productions
-                .iter()
-                .flatten()
-                .filter_map(|step| step.surface_realizer());
-            own_id.into_iter().chain(step_ids)
-        })
+    pub(crate) fn realizers_of(&self, kind: NodeKindId) -> &[NodeRealizer] {
+        self.realizers
+            .get(&kind)
+            .expect("every queryable concrete kind has a retained realization")
     }
 
-    /// Every surfaced kind grouped to the distinct realizers that can stand behind
-    /// it. This is the shared index for consumers that need to descend from a
-    /// public kind back into the ordered skeleton.
-    pub(crate) fn surface_realizers_by_kind(&self) -> HashMap<NodeKindId, Vec<SurfaceRealizer>> {
-        let mut by_kind: HashMap<NodeKindId, Vec<SurfaceRealizer>> = HashMap::new();
-        for realizer in self.surface_realizers() {
-            let entry = by_kind.entry(realizer.kind).or_default();
+    pub(crate) fn realizers(&self) -> &HashMap<NodeKindId, Vec<NodeRealizer>> {
+        &self.realizers
+    }
+
+    fn index_realizers(
+        &mut self,
+        ctx: GrammarContext<'_>,
+        grammar: &Grammar,
+    ) -> Result<(), String> {
+        let mut insert = |target: StepTarget| {
+            let Some(kind) = target.id else {
+                return;
+            };
+
+            let realizer = NodeRealizer::of_body(target.body);
+            let entry = self.realizers.entry(kind).or_default();
             if !entry.contains(&realizer) {
                 entry.push(realizer);
             }
+        };
+        for (index, variable) in self.variables.iter().enumerate() {
+            insert(StepTarget {
+                id: variable.id,
+                body: Some(VarId(index as u32)),
+            });
+            for step in variable.productions.iter().flatten() {
+                insert(step.target);
+            }
         }
-        by_kind
-    }
-}
 
-fn resolve_visible_id(
-    public_name: &str,
-    kind: VariableType,
-    grammar: &Grammar,
-) -> Option<NodeKindId> {
-    match kind {
-        VariableType::Named => grammar.resolve_named_node(public_name),
-        VariableType::Anonymous => grammar.resolve_anonymous_node(public_name),
-        // Hidden-classified rules normally have no public id, but tree-sitter still
-        // publishes some as named nodes — non-inlined supertypes, and rules surfaced
-        // via a named alias (e.g. swift `_expression`). Probe the named map so those
-        // carry their id; ordinary hidden rules miss and stay `None`.
-        VariableType::Hidden => grammar.resolve_named_node(public_name),
-        VariableType::Auxiliary => None,
+        // Tokens used only as extras have no production occurrence. Include their
+        // public identities, along with external tokens and default token aliases.
+        let tokens = (0..ctx.lexical.variables.len())
+            .map(Symbol::terminal)
+            .chain((0..ctx.syntax.external_tokens.len()).map(Symbol::external));
+        for symbol in tokens {
+            insert(classify_target(
+                symbol,
+                ctx.aliases.get(&symbol),
+                ctx,
+                grammar,
+            )?);
+        }
+
+        let kinds = grammar
+            .all_named_node_kinds()
+            .into_iter()
+            .map(|name| {
+                grammar
+                    .resolve_named_node(name)
+                    .expect("listed named kind resolves")
+            })
+            .chain(grammar.all_anonymous_node_kinds().into_iter().map(|name| {
+                grammar
+                    .resolve_anonymous_node(name)
+                    .expect("listed anonymous kind resolves")
+            }));
+        for kind in kinds {
+            if !grammar.is_supertype(kind) && !self.realizers.contains_key(&kind) {
+                let name = grammar.node_kind(kind).expect("resolved kind has a name");
+                return Err(format!("node kind `{name}` has no retained realization"));
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -368,12 +394,31 @@ fn classify_step(
     ctx: GrammarContext<'_>,
     grammar: &Grammar,
 ) -> Result<SkeletonStep, String> {
-    // Fold the step's own alias and the grammar's default alias into one effective
-    // child type, exactly as node-shape derivation does, so a default-aliased step
-    // resolves to the same public kind here and there.
-    let child_type = effective_step_alias(step, ctx.aliases)
+    Ok(SkeletonStep {
+        target: classify_target(
+            step.symbol,
+            effective_step_alias(step, ctx.aliases),
+            ctx,
+            grammar,
+        )?,
+        field: step
+            .field_name
+            .as_deref()
+            .and_then(|name| grammar.resolve_field(name)),
+    })
+}
+
+fn classify_target(
+    symbol: Symbol,
+    alias: Option<&Alias>,
+    ctx: GrammarContext<'_>,
+    grammar: &Grammar,
+) -> Result<StepTarget, String> {
+    // Use the effective alias supplied by the occurrence, including default aliases,
+    // so production steps and standalone tokens share the node-shape classification.
+    let child_type = alias
         .cloned()
-        .map_or(ChildType::Normal(step.symbol), ChildType::Aliased);
+        .map_or(ChildType::Normal(symbol), ChildType::Aliased);
 
     let variable_type = variable_type_for_child_type(&child_type, ctx.syntax, ctx.lexical);
 
@@ -401,23 +446,17 @@ fn classify_step(
     // Descent: the variable whose productions this step expands into. Derived from
     // the underlying symbol, not the alias, so an aliased non-terminal still points
     // at the body it renames. `None` for tokens (nothing to descend into).
-    let body = step.symbol.is_non_terminal().then(|| {
-        let index = u32::try_from(step.symbol.index).expect("syntax variable index fits in u32");
+    let body = symbol.is_non_terminal().then(|| {
+        let index = u32::try_from(symbol.index).expect("syntax variable index fits in u32");
         VarId(index)
     });
 
     if variable_type.is_visible() && id.is_none() && body.is_none() {
         return Err(format!(
             "visible production step {} resolves to neither a public node kind nor a rule body",
-            step.symbol.index
+            symbol.index
         ));
     }
 
-    Ok(SkeletonStep {
-        target: StepTarget { id, body },
-        field: step
-            .field_name
-            .as_deref()
-            .and_then(|name| grammar.resolve_field(name)),
-    })
+    Ok(StepTarget { id, body })
 }

@@ -1,33 +1,11 @@
-use std::collections::HashMap;
-
 use crate::compiler::analyze::grammar::model::KindConstraint;
 use crate::core::NodeKindId;
-use crate::core::grammar::{Grammar, SurfaceRealizer, VarId};
-
-/// The grammar body that realizes a matched node's child structure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) enum NodeRealizer {
-    Leaf,
-    Var(VarId),
-}
-
-impl NodeRealizer {
-    fn of_surface(surface: SurfaceRealizer) -> Self {
-        Self::of_body(surface.body)
-    }
-
-    pub(super) fn of_body(body: Option<VarId>) -> Self {
-        body.map(NodeRealizer::Var).unwrap_or(NodeRealizer::Leaf)
-    }
-}
+use crate::core::grammar::Grammar;
 
 /// Grammar-wide indexes reused by the primary solve and diagnostic probes. They
 /// are independent of anchor mode and query automata, so relaxed probes can share
 /// them instead of rebuilding the same maps for every reported culprit.
 pub(super) struct GrammarFacts {
-    /// Kind -> realizers that may surface that tree kind: the variable named for it,
-    /// plus every aliased step occurrence surfacing it.
-    realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>>,
     /// Concrete named, non-supertype kinds a wildcard parent could be.
     parent_candidate_kinds: Vec<NodeKindId>,
     /// Visible extra kinds (comments), and the named subset, for extra-consumption.
@@ -38,21 +16,12 @@ pub(super) struct GrammarFacts {
 impl GrammarFacts {
     pub(super) fn from_grammar(grammar: &Grammar) -> Self {
         let (extras, named_extras) = extra_kinds(grammar);
-        let realizers_by_kind = build_realizers_by_kind(grammar);
-        let parent_candidate_kinds = build_parent_candidate_kinds(grammar, &realizers_by_kind);
+        let parent_candidate_kinds = build_parent_candidate_kinds(grammar);
         Self {
-            realizers_by_kind,
             parent_candidate_kinds,
             extras,
             named_extras,
         }
-    }
-
-    pub(super) fn realizers_of(&self, kind: NodeKindId) -> &[NodeRealizer] {
-        self.realizers_by_kind
-            .get(&kind)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
     }
 
     pub(super) fn parent_candidate_kinds(&self) -> &[NodeKindId] {
@@ -83,25 +52,10 @@ impl GrammarFacts {
     }
 }
 
-/// Index every kind to the realizers that can realize it: the variable named for the
-/// kind, and every step occurrence that surfaces it (aliases included).
-fn build_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeRealizer>> {
-    grammar
+fn build_parent_candidate_kinds(grammar: &Grammar) -> Vec<NodeKindId> {
+    let mut candidates: Vec<NodeKindId> = grammar
         .structure()
-        .surface_realizers_by_kind()
-        .into_iter()
-        .map(|(kind, surfaces)| {
-            let realizers = surfaces.into_iter().map(NodeRealizer::of_surface).collect();
-            (kind, realizers)
-        })
-        .collect()
-}
-
-fn build_parent_candidate_kinds(
-    grammar: &Grammar,
-    realizers_by_kind: &HashMap<NodeKindId, Vec<NodeRealizer>>,
-) -> Vec<NodeKindId> {
-    let mut candidates: Vec<NodeKindId> = realizers_by_kind
+        .realizers()
         .keys()
         .copied()
         .filter(|&kind| !grammar.is_anonymous_node(kind) && !grammar.is_supertype(kind))

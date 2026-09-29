@@ -1,0 +1,63 @@
+Leaf = (comment .!)
+
+Q = (file
+  (Leaf)
+  (id)
+)
+-------------------- GRAMMAR ---------------------
+externals:
+  - {type: SYMBOL, name: comment}
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  file: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Leaf = 2
+Q    = 6
+
+[transitions]
+Leaf:
+  1                                         ▶
+  2   !   (comment)                         3
+  3  └!┘  _                                 1
+
+Q:
+  5                                         ▶
+  6   !   (file)                            9
+  7  ─‣┘  _                                 5
+  8  ─‣─  (id)                              7
+  9  └‣─  (Leaf)                            2 : 8
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "comment"
+S2 "file"
+S3 "id"
+S4 "Leaf"
+S5 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Leaf = 0 :: T0
+Q    = 3 :: T0
+
+[instructions]
+Leaf:
+  0   !   (comment)                         1
+  1  └!┘  _                                 2
+  2                                         ▶
+
+Q:
+  3   !   (file)                            4
+  4  └‣─  (Leaf)                            0 : 5
+  5  ─‣─  (id)                              6
+  6  ─‣┘  _                                 7
+  7                                         ▶

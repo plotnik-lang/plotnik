@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::core::{Cardinality, NodeFieldId, NodeKindId};
 
-use super::structure::{AdmissibilityStep, FieldValueProjection, SkeletonVariable, VarId};
+use super::structure::{
+    AdmissibilityStep, FieldValueProjection, NodeRealizer, SkeletonVariable, VarId,
+};
 use super::types::{Grammar, NodeConstraints};
 
 /// Insertion-ordered set of node kinds: dedups while keeping first-seen order, so derived
@@ -365,13 +367,12 @@ impl ReachabilityBuilder<'_> {
 /// Index each public node kind to the skeleton variables that realize it: the
 /// variable named for it, plus every step occurrence (aliases included) that
 /// surfaces it and descends into a variable body. Built from
-/// [`StructureTable::surface_realizers_by_kind`], the same index the satisfiability
-/// engine indexes, so both passes reason over the same model.
+/// the retained realization index shared with satisfiability.
 fn variable_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarId>> {
     let mut realizers_by_kind: HashMap<NodeKindId, Vec<VarId>> = HashMap::new();
-    for (kind, realizers) in grammar.structure().surface_realizers_by_kind() {
-        for realizer in realizers {
-            if let Some(body) = realizer.body {
+    for (&kind, realizers) in grammar.structure().realizers() {
+        for &realizer in realizers {
+            if let NodeRealizer::Var(body) = realizer {
                 realizers_by_kind.entry(kind).or_default().push(body);
             }
         }

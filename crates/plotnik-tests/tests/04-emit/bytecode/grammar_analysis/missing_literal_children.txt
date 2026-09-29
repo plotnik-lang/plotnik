@@ -1,0 +1,17 @@
+Q = (MISSING stmt)
+-------------------- GRAMMAR ---------------------
+rules:
+  file: {type: SYMBOL, name: stmt}
+  stmt:
+    type: SEQ
+    members:
+      - {type: STRING, value: "pass"}
+      - {type: STRING, value: ";"}
+------------------ DIAGNOSTICS -------------------
+error: `stmt` is not a token kind. Only tokens can be missing nodes
+ --> query.ptk:1:14
+  |
+1 | Q = (MISSING stmt)
+  |              ^^^^
+  |
+help: use bare `(MISSING)` or a leaf token kind from this grammar

@@ -1,0 +1,38 @@
+Q = (stmt == "pass;")
+-------------------- GRAMMAR ---------------------
+rules:
+  file: {type: SYMBOL, name: stmt}
+  stmt:
+    type: SEQ
+    members:
+      - {type: STRING, value: "pass"}
+      - {type: STRING, value: ";"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (stmt) == "pass;"                 1
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "pass;"
+S2 "stmt"
+S3 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (stmt) == "pass;"                 2
+  2                                         ▶

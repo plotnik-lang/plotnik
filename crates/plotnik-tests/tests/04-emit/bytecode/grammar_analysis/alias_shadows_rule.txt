@@ -1,0 +1,32 @@
+Q = (group (num))
+-------------------- GRAMMAR ---------------------
+rules:
+  file:
+    type: SEQ
+    members:
+      - type: ALIAS
+        content: {type: SYMBOL, name: group}
+        named: true
+        value: term
+      - type: ALIAS
+        content: {type: SYMBOL, name: id}
+        named: true
+        value: group
+  group:
+    type: SEQ
+    members:
+      - {type: STRING, value: "("}
+      - {type: SYMBOL, name: num}
+      - {type: STRING, value: ")"}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: `group` is a leaf token and has no child nodes
+ --> query.ptk:1:13
+  |
+1 | Q = (group (num))
+  |      -----  ^^^
+  |      |
+  |      `group`
+  |
+help: a leaf token's content is its text. Match `(group)` directly or add a text predicate to `(group)`

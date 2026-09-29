@@ -475,7 +475,7 @@ impl DiagnosticKind {
             }
             Self::UnknownNodeKind => "`{}` is not a valid node kind".to_string(),
             Self::MissingKindNotToken => {
-                "`{}` has children. Only leaf tokens can be missing nodes".to_string()
+                "`{}` is not a token kind. Only tokens can be missing nodes".to_string()
             }
             Self::UnknownGrammarField => "`{}` is not a valid grammar field".to_string(),
             Self::InvalidGrammarFieldChildKind => "{}".to_string(),

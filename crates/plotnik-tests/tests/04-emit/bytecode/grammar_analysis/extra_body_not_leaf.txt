@@ -1,0 +1,27 @@
+Q = (file (comment .!))
+-------------------- GRAMMAR ---------------------
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  file: {type: SYMBOL, name: id}
+  comment:
+    type: SEQ
+    members:
+      - {type: STRING, value: "#"}
+      - {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: the childless exact anchor (`.!`) prevents these children from matching `comment`
+ --> query.ptk:1:20
+  |
+1 | Q = (file (comment .!))
+  |            ------- ^^
+  |            |
+  |            inside `comment`
+  |
+help: remove this anchor to allow these child patterns
+  |
+1 - Q = (file (comment .!))
+1 + Q = (file (comment ))
+  |
+help: `comment` allows `"#" id` (apart from extras)

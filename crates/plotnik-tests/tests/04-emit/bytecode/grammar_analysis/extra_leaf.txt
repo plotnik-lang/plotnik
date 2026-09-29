@@ -1,0 +1,98 @@
+Leaf = (comment .!)
+Direct = (file (comment .!))
+Reference = (file (Leaf))
+
+Wildcard = (file
+  (_ .!)
+  (id)
+)
+-------------------- GRAMMAR ---------------------
+extras:
+  - {type: SYMBOL, name: comment}
+rules:
+  file: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+  comment: {type: PATTERN, value: "#[^\n]*"}
+---------------------- NFA -----------------------
+[entry_points]
+Direct    = 06
+Leaf      = 02
+Reference = 12
+Wildcard  = 17
+
+[transitions]
+Leaf:
+  01                                        ▶
+  02   !   (comment)                        03
+  03  └!┘  _                                01
+
+Direct:
+  05                                        ▶
+  06   !   (file)                           08
+  07  ─‣┘  _                                05
+  08  └‣─  (comment)                        09
+  09  └!┘  _                                07
+
+Reference:
+  11                                        ▶
+  12   !   (file)                           14
+  13  ─‣┘  _                                11
+  14  └‣─  (Leaf)                           02 : 13
+
+Wildcard:
+  16                                        ▶
+  17   !   (file)                           20
+  18  ─‣┘  _                                16
+  19  ─‣─  (id)                             18
+  20  └‣─  (_)                              21
+  21  └!┘  _                                19
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "comment"
+S2 "file"
+S3 "id"
+S4 "Leaf"
+S5 "Direct"
+S6 "Reference"
+S7 "Wildcard"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Direct    = 03 :: T0
+Leaf      = 00 :: T0
+Reference = 08 :: T0
+Wildcard  = 12 :: T0
+
+[instructions]
+Leaf:
+  00   !   (comment)                        01
+  01  └!┘  _                                02
+  02                                        ▶
+
+Direct:
+  03   !   (file)                           04
+  04  └‣─  (comment)                        05
+  05  └!┘  _                                06
+  06  ─‣┘  _                                07
+  07                                        ▶
+
+Reference:
+  08   !   (file)                           09
+  09  └‣─  (Leaf)                           00 : 10
+  10  ─‣┘  _                                11
+  11                                        ▶
+
+Wildcard:
+  12   !   (file)                           13
+  13  └‣─  (_)                              14
+  14  └!┘  _                                15
+  15  ─‣─  (id)                             16
+  16  ─‣┘  _                                17
+  17                                        ▶

@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::bytecode::{CodeAddr, EffectKind, EntryBoundary, Nav, PredicateOp, select_match_opcode};
+use crate::bytecode::{CodeAddr, EffectKind, EntryBoundary, MatchCounts, Nav, PredicateOp};
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::boundary::BoundaryState;
@@ -689,26 +689,16 @@ impl MatchIR {
     }
 
     pub fn size(&self) -> usize {
-        let can_use_match8 = self.effects.is_empty()
-            && self.neg_fields.is_empty()
-            && self.predicate.is_none()
-            && self.successors.len() <= 1;
-
-        if can_use_match8 {
-            return 8;
-        }
-
-        let predicate_slots = if self.predicate.is_some() {
-            crate::bytecode::PREDICATE_SLOTS
-        } else {
-            0
-        };
-        let slots =
-            self.effects.len() + self.neg_fields.len() + predicate_slots + self.successors.len();
-
-        select_match_opcode(slots)
-            .expect("instruction fits a match opcode")
-            .size()
+        MatchCounts::new(
+            self.effects.len(),
+            self.neg_fields.len(),
+            self.successors.len(),
+            self.predicate.as_ref().map(|predicate| predicate.op),
+            self.missing,
+        )
+        .and_then(MatchCounts::opcode)
+        .expect("instruction fits a match opcode")
+        .size()
     }
 
     /// Check if this is an epsilon transition (no node interaction).

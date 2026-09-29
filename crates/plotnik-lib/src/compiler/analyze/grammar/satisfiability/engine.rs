@@ -32,8 +32,9 @@ use super::super::model::{KindConstraint, Model, PatternId, PatternKind};
 use super::AnalysisLimit;
 use super::automaton::{self, ChildAutomaton, ChildMatcher, State};
 use super::configurations::{Configuration, Configurations};
-use super::facts::{GrammarFacts, NodeRealizer};
+use super::facts::GrammarFacts;
 use crate::compiler::parse::ast::QuantifierKind;
+use crate::core::grammar::NodeRealizer;
 
 /// How a production step participates in threading.
 enum StepClass {
@@ -197,7 +198,7 @@ impl<'a> Frozen<'a> {
     }
 
     fn realizers_of(&self, kind: NodeKindId) -> &[NodeRealizer] {
-        self.facts.realizers_of(kind)
+        self.grammar.structure().realizers_of(kind)
     }
 
     fn configuration(&self, pattern: AutomatonId, state: State) -> Configuration {
@@ -364,8 +365,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         }
     }
 
-    /// A completed feasibility result, or a resource failure. A kind without retained
-    /// realizations remains conservatively matchable, as in the grammar model.
+    /// A completed feasibility result, or a resource failure.
     pub(super) fn satisfiable(
         &mut self,
         pattern: PatternId,
@@ -385,10 +385,6 @@ impl<'a> SatisfiabilitySolver<'a> {
         kind: NodeKindId,
     ) -> Result<bool, AnalysisLimit> {
         let realizer_count = self.frozen.realizers_of(kind).len();
-        if realizer_count == 0 {
-            return Ok(true);
-        }
-
         for index in 0..realizer_count {
             let realizer = self.frozen.realizers_of(kind)[index];
             self.solve.seed(Key::Sat((pattern, realizer)));

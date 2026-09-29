@@ -4,7 +4,7 @@ rules:
   expr: {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ------------------ DIAGNOSTICS -------------------
-error: `expr` has children. Only leaf tokens can be missing nodes
+error: `expr` is not a token kind. Only tokens can be missing nodes
  --> query.ptk:1:14
   |
 1 | Q = (MISSING expr)

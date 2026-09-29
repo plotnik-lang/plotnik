@@ -24,6 +24,6 @@ pub use render::{
     Body, DEFAULT_WIDTH, Def, DefKind, DumpOptions, GrammarNodeRef, Quant, Shape, TokenText,
     TreeGrammar,
 };
+pub(crate) use structure::{NodeRealizer, StepProjection};
 pub use structure::{SkeletonStep, SkeletonVariable, StepTarget, StructureTable, VarId};
-pub(crate) use structure::{StepProjection, SurfaceRealizer};
 pub use types::Grammar;

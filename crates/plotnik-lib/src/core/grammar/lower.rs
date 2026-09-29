@@ -376,7 +376,6 @@ pub(super) fn derive_symbols(
             named: visibility.named,
             visible: visibility.visible,
             supertype: visibility.supertype,
-            terminal: symbol.is_terminal() || symbol.is_external(),
         });
     }
 

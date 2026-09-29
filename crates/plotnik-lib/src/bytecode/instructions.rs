@@ -93,6 +93,57 @@ impl MatchCounts {
     const SUCC_MASK: u16 = 0x1F;
     const MISSING_BIT: u16 = 1 << 3;
 
+    pub(crate) fn new(
+        effects: usize,
+        neg: usize,
+        succ: usize,
+        predicate: Option<PredicateOp>,
+        missing: bool,
+    ) -> Result<Self, EncodeError> {
+        if effects > MAX_EFFECTS {
+            return Err(EncodeError::TooManyEffects(effects));
+        }
+
+        if neg > MAX_NEG_FIELDS {
+            return Err(EncodeError::TooManyNegFields(neg));
+        }
+
+        if succ > MAX_SUCCESSORS {
+            return Err(EncodeError::TooManySuccessors(succ));
+        }
+
+        Ok(Self {
+            effects: effects as u8,
+            neg: neg as u8,
+            succ: succ as u8,
+            predicate,
+            missing,
+        })
+    }
+
+    /// Layout and encoding must choose the same width, including the counts word
+    /// required by a missing-node check even when it has no payload.
+    pub(crate) fn opcode(self) -> Result<Opcode, EncodeError> {
+        if self.effects == 0
+            && self.neg == 0
+            && self.predicate.is_none()
+            && !self.missing
+            && self.succ <= 1
+        {
+            return Ok(Opcode::Match8);
+        }
+
+        let slots = usize::from(self.effects)
+            + usize::from(self.neg)
+            + usize::from(self.succ)
+            + usize::from(self.predicate.is_some()) * PREDICATE_SLOTS;
+        match select_match_opcode(slots) {
+            Some(Opcode::Match8) => Ok(Opcode::Match16),
+            Some(opcode) => Ok(opcode),
+            None => Err(EncodeError::PayloadTooLarge(slots)),
+        }
+    }
+
     pub(crate) fn unpack(w: u16) -> Self {
         Self {
             effects: ((w >> Self::EFFECTS_SHIFT) & Self::EFFECTS_MASK) as u8,
@@ -599,13 +650,16 @@ impl MatchInstr {
         let (node_class, node_val) = self.node_kind.to_bytes();
         let node_field_val = self.node_field.map_or(0, u16::from);
 
-        let can_use_match8 = self.effects.is_empty()
-            && self.neg_fields.is_empty()
-            && self.predicate.is_none()
-            && !self.missing
-            && self.successors.len() <= 1;
+        let counts = MatchCounts::new(
+            self.effects.len(),
+            self.neg_fields.len(),
+            self.successors.len(),
+            self.predicate.map(|predicate| predicate.op),
+            self.missing,
+        )?;
+        let opcode = counts.opcode()?;
 
-        if can_use_match8 {
+        if opcode == Opcode::Match8 {
             let mut bytes = vec![0u8; Opcode::Match8.size()];
             bytes[0] = header_byte::pack(0, node_class, Opcode::Match8);
             bytes[1] = self.nav.to_byte();
@@ -616,47 +670,12 @@ impl MatchInstr {
             return Ok(bytes);
         }
 
-        let effects = self.effects.len();
-        let neg = self.neg_fields.len();
-        let succ = self.successors.len();
-        if effects > MAX_EFFECTS {
-            return Err(EncodeError::TooManyEffects(effects));
-        }
-        if neg > MAX_NEG_FIELDS {
-            return Err(EncodeError::TooManyNegFields(neg));
-        }
-        if succ > MAX_SUCCESSORS {
-            return Err(EncodeError::TooManySuccessors(succ));
-        }
-
-        let predicate_slots = if self.predicate.is_some() {
-            PREDICATE_SLOTS
-        } else {
-            0
-        };
-        let slots = effects + neg + predicate_slots + succ;
-        let opcode = match select_match_opcode(slots) {
-            // A missing-only terminal has no payload slots but still needs the
-            // counts word (for its `missing` bit), which the `Match8` fast path
-            // lacks — floor it to the smallest extended variant.
-            Some(Opcode::Match8) => Opcode::Match16,
-            Some(op) => op,
-            None => return Err(EncodeError::PayloadTooLarge(slots)),
-        };
-
         let mut bytes = vec![0u8; opcode.size()];
         bytes[0] = header_byte::pack(0, node_class, opcode);
         bytes[1] = self.nav.to_byte();
         bytes[2..4].copy_from_slice(&node_val.to_le_bytes());
         bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
 
-        let counts = MatchCounts {
-            effects: effects as u8,
-            neg: neg as u8,
-            succ: succ as u8,
-            predicate: self.predicate.map(|p| p.op),
-            missing: self.missing,
-        };
         bytes[6..8].copy_from_slice(&counts.pack().to_le_bytes());
 
         let mut offset = MATCH_PAYLOAD_START;

@@ -36,36 +36,35 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         self.bind_named_kind(located.source(), &type_token);
     }
 
-    /// Validate the optional kind argument of `(MISSING …)`. The argument resolves
-    /// like a normal named/anonymous kind (unknown → `UnknownNodeKind`); a named
-    /// argument must additionally be a leaf token, since tree-sitter's error
-    /// recovery only ever inserts tokens as missing nodes — `(MISSING binary_expression)`
-    /// names a kind with children, can never match, and is rejected here.
+    /// Recovery inserts terminals. Both named and anonymous aliases can name a
+    /// syntax node, so eligibility comes from realizations, not spelling or shape.
     fn resolve_missing_node(&mut self, located: &Located<NamedNodePattern>) {
         let source = located.source();
-        match located.node().missing_arg() {
-            None => {}
-            Some(MissingArg::Named(id_tok)) => {
-                let Some(id) = self.bind_named_kind(source, &id_tok) else {
-                    return;
-                };
-
-                if self.grammar.has_declared_child_structure(id) {
-                    self.diag
-                        .report(
-                            DiagnosticKind::MissingKindNotToken,
-                            Span::new(source, id_tok.text_range()),
-                        )
-                        .detail(id_tok.text())
-                        .emit();
-                }
+        let (token, id) = match located.node().missing_arg() {
+            None => return,
+            Some(MissingArg::Named(token)) => {
+                let id = self.bind_named_kind(source, &token);
+                (token, id)
             }
-            Some(MissingArg::Anonymous(content)) => {
-                // Anonymous kinds are literal tokens by definition, so the leaf check
-                // the named arm performs is always satisfied here.
-                self.bind_anonymous_kind(source, &content);
+            Some(MissingArg::Anonymous(token)) => {
+                let id = self.bind_anonymous_kind(source, &token);
+                (token, id)
             }
+        };
+        let Some(id) = id else {
+            return;
+        };
+        if self.grammar.can_be_token(id) {
+            return;
         }
+
+        self.diag
+            .report(
+                DiagnosticKind::MissingKindNotToken,
+                Span::new(source, token.text_range()),
+            )
+            .detail(token.text())
+            .emit();
     }
 
     /// Resolve and bind a named node kind named by `token`, recording the id for
