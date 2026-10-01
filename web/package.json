@@ -45,7 +45,7 @@
     "@fontsource/iosevka": "5.2.5",
     "@fontsource/spectral": "5.2.8",
     "culori": "4.0.2",
-    "playwright": "1.61.1",
+    "playwright": "1.63.0",
     "shiki": "4.3.1"
   }
 }
