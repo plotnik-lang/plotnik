@@ -175,7 +175,7 @@ enum Key {
 struct Frozen<'a> {
     grammar: &'a Grammar,
     automata: Arc<Vec<Option<ChildAutomaton>>>,
-    roots: Vec<ChildAutomaton>,
+    probe: Option<ChildAutomaton>,
     facts: Arc<GrammarFacts>,
 }
 
@@ -184,14 +184,17 @@ impl<'a> Frozen<'a> {
         Self {
             grammar,
             automata: Arc::new(Vec::new()),
-            roots: Vec::new(),
+            probe: None,
             facts,
         }
     }
 
     fn automaton(&self, p: AutomatonId) -> &ChildAutomaton {
-        if p.0 >= self.automata.len() {
-            return &self.roots[p.0 - self.automata.len()];
+        if p.0 == self.automata.len() {
+            return self
+                .probe
+                .as_ref()
+                .expect("diagnostic probe has a root automaton");
         }
 
         self.automata[p.0]
@@ -203,7 +206,7 @@ impl<'a> Frozen<'a> {
         Self {
             grammar: self.grammar,
             automata: Arc::clone(&self.automata),
-            roots: vec![automaton],
+            probe: Some(automaton),
             facts: Arc::clone(&self.facts),
         }
     }
@@ -293,54 +296,6 @@ pub(super) struct SatisfiabilitySolver<'a> {
     frozen: Frozen<'a>,
     solve: Solve,
     patterns: HashMap<PatternId, bool>,
-}
-
-/// Field-name corrections need the grammar's actual child labels before a valid
-/// query model exists. These small probes use the same production solver, with
-/// no query patterns or nested obligations.
-pub(in crate::compiler::analyze::grammar) struct FieldProbe<'a> {
-    frozen: Frozen<'a>,
-    solve: Solve,
-}
-
-impl<'a> FieldProbe<'a> {
-    pub(in crate::compiler::analyze::grammar) fn new(grammar: &'a Grammar, budget: u64) -> Self {
-        Self {
-            frozen: Frozen::new(grammar, Arc::new(GrammarFacts::from_grammar(grammar))),
-            solve: Solve::new(budget),
-        }
-    }
-
-    pub(in crate::compiler::analyze::grammar) fn accepts(
-        &mut self,
-        parent: NodeKindId,
-        field: NodeFieldId,
-        kind: KindConstraint,
-    ) -> Result<bool, AnalysisLimit> {
-        let automaton =
-            ChildAutomaton::child(ChildMatcher::new(kind, Some(field)), &mut self.solve.budget)?;
-        self.probe(parent, automaton)
-    }
-
-    pub(in crate::compiler::analyze::grammar) fn can_omit(
-        &mut self,
-        parent: NodeKindId,
-        field: NodeFieldId,
-    ) -> Result<bool, AnalysisLimit> {
-        let automaton = ChildAutomaton::without_field(field, &mut self.solve.budget)?;
-        self.probe(parent, automaton)
-    }
-
-    fn probe(
-        &mut self,
-        kind: NodeKindId,
-        automaton: ChildAutomaton,
-    ) -> Result<bool, AnalysisLimit> {
-        self.solve.budget.charge()?;
-        let root = AutomatonId(self.frozen.roots.len());
-        self.frozen.roots.push(automaton);
-        self.solve.solve_automaton(&self.frozen, root, kind)
-    }
 }
 
 impl<'a> SatisfiabilitySolver<'a> {

@@ -20,3 +20,5 @@ error: `vlue` is not a valid grammar field
   |
 1 | Q = (call vlue: (id))
   |           ^^^^
+  |
+help: did you mean the field `value`?

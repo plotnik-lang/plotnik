@@ -60,10 +60,6 @@ impl<'q> GrammarBindInput<'_, 'q> {
                 source_map,
                 definitions,
                 strict_lints,
-                field_probe: super::satisfiability::FieldProbe::new(
-                    grammar,
-                    satisfiability_limits.work_budget,
-                ),
                 node_kind_ids: &mut node_kind_ids,
                 node_field_ids: &mut node_field_ids,
                 output,
@@ -102,7 +98,6 @@ pub(super) struct GrammarBinder<'a, 'q> {
     pub(super) source_map: &'q SourceMap,
     pub(super) definitions: &'a DefinitionGraph,
     pub(super) strict_lints: bool,
-    pub(super) field_probe: super::satisfiability::FieldProbe<'a>,
     pub(super) node_kind_ids: &'a mut HashMap<NodeKind<&'q str>, Option<NodeKindId>>,
     pub(super) node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     pub(super) output: &'a mut GrammarBindingBuilder,

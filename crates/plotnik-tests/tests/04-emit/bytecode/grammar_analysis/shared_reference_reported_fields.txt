@@ -1,0 +1,42 @@
+Expr = (call (call))
+
+Q = (assign
+  name: (Expr)
+  value: (Expr)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  assign:
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: value
+        content: {type: SYMBOL, name: call}
+  call: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `call` is not valid for grammar field `name` of `assign`
+ --> query.ptk:1:9
+  |
+1 | Expr = (call (call))
+  |         ^^^^
+2 |
+3 | Q = (assign
+  |      ------ `assign` starts here
+4 |   name: (Expr)
+  |   ---- grammar field `name`
+  |
+help: `name` accepts: `id`
+
+error: `call` cannot be a child of `call`
+ --> query.ptk:1:15
+  |
+1 | Expr = (call (call))
+  |         ----  ^^^^
+  |         |
+  |         `call` starts here
+  |
+help: named child kinds of `call`: `id`

@@ -1,0 +1,46 @@
+Q = (param name: (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: CHOICE
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+---------------------- NFA -----------------------
+[entry_points]
+Q = 2
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (param)                           4
+  3  ─‣┘  _                                 1
+  4  └‣─  name: (id)                        3
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "param"
+S2 "id"
+S3 "name"
+S4 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entry_points]
+Q = 0 :: T0
+
+[instructions]
+Q:
+  0   !   (param)                           1
+  1  └‣─  name: (id)                        2
+  2  ─‣┘  _                                 3
+  3                                         ▶

@@ -1,0 +1,19 @@
+Q = (param nme: (id))
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: FIELD
+    name: name
+    content: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+--------------------- LIMITS ---------------------
+# Unknown names are reported before structural analysis.
+work_budget: 0
+------------------ DIAGNOSTICS -------------------
+error: `nme` is not a valid grammar field
+ --> query.ptk:1:12
+  |
+1 | Q = (param nme: (id))
+  |            ^^^
+  |
+help: did you mean the field `name`?

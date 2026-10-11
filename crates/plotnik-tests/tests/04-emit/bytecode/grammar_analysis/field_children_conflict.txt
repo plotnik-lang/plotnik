@@ -1,0 +1,26 @@
+Q = (param
+  name: (id)
+  (num)
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  param:
+    type: CHOICE
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - {type: SYMBOL, name: num}
+  id: {type: PATTERN, value: "[a-z]+"}
+  num: {type: PATTERN, value: "[0-9]+"}
+------------------ DIAGNOSTICS -------------------
+error: these child constraints cannot be satisfied together in `param`
+ --> query.ptk:2:3
+  |
+1 |   Q = (param
+  |        ----- inside `param`
+2 | /   name: (id)
+3 | |   (num)
+  | |_______^
+  |
+help: `param` allows `name: id` or `num`

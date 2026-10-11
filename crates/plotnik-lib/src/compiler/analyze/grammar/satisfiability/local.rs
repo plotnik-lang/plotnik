@@ -23,6 +23,11 @@ pub(super) struct LocalDiagnostics<'a, 'q> {
     visited: HashSet<(PatternId, Option<ParentNode>, Option<FieldRef>)>,
 }
 
+enum Visit {
+    Pattern(PatternId, Option<ParentNode>, Option<FieldRef>),
+    FinishNode(PatternId, usize),
+}
+
 impl<'q> LocalDiagnostics<'_, 'q> {
     /// Explain simple structural contradictions only after the solver has rejected
     /// the enclosing pattern. These summaries choose wording, never admission.
@@ -43,97 +48,112 @@ impl<'q> LocalDiagnostics<'_, 'q> {
             reported_nodes,
             visited: HashSet::new(),
         };
-        reporter.walk(pattern, None, None)?;
+        reporter.walk(pattern)?;
         Ok(reporter.reported)
     }
 
-    fn walk(
-        &mut self,
-        pattern: PatternId,
-        parent: Option<ParentNode>,
-        field: Option<FieldRef>,
-    ) -> Result<(), AnalysisLimit> {
-        self.solver.budget().charge()?;
-        if !self.visited.insert((pattern, parent, field)) {
-            return Ok(());
-        }
-
-        match &self.model.pattern(pattern).kind {
-            PatternKind::Node(node) => {
-                if let Some(parent) = parent {
-                    self.child(pattern, node.kind, &parent, field.as_ref())?;
-                }
-                if self.reported_nodes.contains(&pattern) {
-                    self.reported = true;
-                    return Ok(());
-                }
-
-                let before = self.diag.len();
-                let origin = self.model.node_origin(pattern);
-                let KindConstraint::Exact(kind) = node.kind else {
-                    return Ok(());
-                };
-                let token = origin
-                    .node()
-                    .kind_token()
-                    .expect("resolved node has a kind");
-                let ctx = ParentNode {
-                    id: kind,
-                    span: origin.span_of(token.text_range()),
-                };
-                match node.violation {
-                    Some(NodeViolation::PredicateOnNonLeaf) => {
-                        self.emit_predicate_on_non_leaf(&origin, &ctx)
+    fn walk(&mut self, pattern: PatternId) -> Result<(), AnalysisLimit> {
+        let mut pending = vec![Visit::Pattern(pattern, None, None)];
+        while let Some(visit) = pending.pop() {
+            let (pattern, parent, field) = match visit {
+                Visit::Pattern(pattern, parent, field) => (pattern, parent, field),
+                Visit::FinishNode(pattern, before) => {
+                    if self.diag.len() != before {
+                        self.reported_nodes.insert(pattern);
                     }
-                    Some(NodeViolation::FieldNotOnKind(field)) => {
-                        let name = self
-                            .grammar
-                            .field_name(field.id)
-                            .expect("resolved field has a name");
-                        self.emit_negated_field_not_on_node(field.span, name, &ctx);
-                    }
-                    None => {}
+                    continue;
                 }
-                for pattern in node.children.iter().filter_map(|item| item.pattern()) {
-                    self.walk(pattern, Some(ctx), None)?;
-                }
-                if self.diag.len() != before {
-                    self.reported_nodes.insert(pattern);
-                }
+            };
+            self.solver.budget().charge()?;
+            if !self.visited.insert((pattern, parent, field)) {
+                continue;
             }
-            PatternKind::Field(id, inner) => {
-                let origin = self.model.pattern(pattern).syntax();
-                let ast::Pattern::FieldPattern(field) = origin.node() else {
-                    unreachable!("resolved field originates in field syntax");
-                };
-                let token = field.name().expect("resolved field has a name");
-                self.walk(
-                    *inner,
-                    parent,
-                    Some(FieldRef {
-                        id: *id,
+
+            match &self.model.pattern(pattern).kind {
+                PatternKind::Node(node) => {
+                    if let Some(parent) = parent {
+                        self.child(pattern, node.kind, &parent, field.as_ref())?;
+                    }
+                    if self.reported_nodes.contains(&pattern) {
+                        self.reported = true;
+                        continue;
+                    }
+
+                    let before = self.diag.len();
+                    let origin = self.model.node_origin(pattern);
+                    let KindConstraint::Exact(kind) = node.kind else {
+                        continue;
+                    };
+                    let token = origin
+                        .node()
+                        .kind_token()
+                        .expect("resolved node has a kind");
+                    let ctx = ParentNode {
+                        id: kind,
                         span: origin.span_of(token.text_range()),
-                    }),
-                )?;
-            }
-            PatternKind::Sequence(items) => {
-                for pattern in items.iter().filter_map(|item| item.pattern()) {
+                    };
+                    match node.violation {
+                        Some(NodeViolation::PredicateOnNonLeaf) => {
+                            self.emit_predicate_on_non_leaf(&origin, &ctx)
+                        }
+                        Some(NodeViolation::FieldNotOnKind(field)) => {
+                            let name = self
+                                .grammar
+                                .field_name(field.id)
+                                .expect("resolved field has a name");
+                            self.emit_negated_field_not_on_node(field.span, name, &ctx);
+                        }
+                        None => {}
+                    }
+                    self.solver.budget().spend(node.children.len() as u64 + 1)?;
+                    // Finish after the children, so shared definitions retain both
+                    // caller-specific checks and the existing diagnostic deduplication.
+                    pending.push(Visit::FinishNode(pattern, before));
+                    pending.extend(node.children.iter().rev().filter_map(|item| {
+                        item.pattern()
+                            .map(|pattern| Visit::Pattern(pattern, Some(ctx), None))
+                    }));
+                }
+                PatternKind::Field(id, inner) => {
+                    let origin = self.model.pattern(pattern).syntax();
+                    let ast::Pattern::FieldPattern(field) = origin.node() else {
+                        unreachable!("resolved field originates in field syntax");
+                    };
+                    let token = field.name().expect("resolved field has a name");
+                    pending.push(Visit::Pattern(
+                        *inner,
+                        parent,
+                        Some(FieldRef {
+                            id: *id,
+                            span: origin.span_of(token.text_range()),
+                        }),
+                    ));
+                }
+                PatternKind::Sequence(items) => {
+                    self.solver.budget().spend(items.len() as u64)?;
                     // A group does not carry its outer field into its siblings.
-                    self.walk(pattern, parent, None)?;
+                    pending.extend(items.iter().rev().filter_map(|item| {
+                        item.pattern()
+                            .map(|pattern| Visit::Pattern(pattern, parent, None))
+                    }));
                 }
-            }
-            PatternKind::Repeat(repeat) if repeat.kind == QuantifierKind::OneOrMore => {
-                self.walk(repeat.inner, parent, field)?;
-            }
-            PatternKind::Reference(definition) => {
-                self.walk(self.model.definition(*definition), parent, field)?;
-            }
-            PatternKind::Leaf(kind) => {
-                if let Some(parent) = parent {
-                    self.child(pattern, *kind, &parent, field.as_ref())?;
+                PatternKind::Repeat(repeat) if repeat.kind == QuantifierKind::OneOrMore => {
+                    pending.push(Visit::Pattern(repeat.inner, parent, field));
                 }
+                PatternKind::Reference(definition) => {
+                    pending.push(Visit::Pattern(
+                        self.model.definition(*definition),
+                        parent,
+                        field,
+                    ));
+                }
+                PatternKind::Leaf(kind) => {
+                    if let Some(parent) = parent {
+                        self.child(pattern, *kind, &parent, field.as_ref())?;
+                    }
+                }
+                PatternKind::Alternative(_) | PatternKind::Repeat(_) => {}
             }
-            PatternKind::Alternative(_) | PatternKind::Repeat(_) => {}
         }
         Ok(())
     }

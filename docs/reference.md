@@ -203,7 +203,7 @@ A grammar-analysis resource error means checking stopped before it could reach a
 
 ## Filter by text
 
-A predicate inside a leaf node pattern tests that node's source text:
+Put a predicate immediately after the node kind to test the node's text:
 
 | Pattern                     | Text requirement       |
 | --------------------------- | ---------------------- |
@@ -217,7 +217,7 @@ A predicate inside a leaf node pattern tests that node's source text:
 
 A failed predicate rejects that candidate node. It does not stop the search for a later candidate. Predicates add matching constraints without changing the result type.
 
-There is one predicate position, immediately after the node kind. The kind must be a leaf in the grammar. A composite kind such as `expression_statement` cannot take a predicate, even if one particular node has simple text. Wildcards and definition references cannot take predicates either.
+Wildcards and definition references cannot take predicates.
 
 Plotnik does not support Tree-sitter's separate predicates or directives, such as `(#eq? @name "answer")` and `#set!`.
 

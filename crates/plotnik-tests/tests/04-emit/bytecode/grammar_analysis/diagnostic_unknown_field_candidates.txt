@@ -2,12 +2,16 @@ Q = (param nme: (id))
 -------------------- GRAMMAR ---------------------
 rules:
   param:
-    type: FIELD
-    name: name
-    content: {type: SYMBOL, name: id}
+    type: SEQ
+    members:
+      - type: FIELD
+        name: name
+        content: {type: SYMBOL, name: id}
+      - type: FIELD
+        name: default
+        content: {type: SYMBOL, name: num}
   id: {type: PATTERN, value: "[a-z]+"}
---------------------- LIMITS ---------------------
-work_budget: 0
+  num: {type: PATTERN, value: "[0-9]+"}
 ------------------ DIAGNOSTICS -------------------
 error: `nme` is not a valid grammar field
  --> query.ptk:1:12
@@ -15,4 +19,4 @@ error: `nme` is not a valid grammar field
 1 | Q = (param nme: (id))
   |            ^^^
   |
-help: a similarly spelled grammar field is `name`
+help: did you mean the field `name`?

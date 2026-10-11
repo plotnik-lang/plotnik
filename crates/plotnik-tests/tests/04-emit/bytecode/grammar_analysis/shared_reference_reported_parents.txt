@@ -1,0 +1,38 @@
+Expr = (call (call))
+
+Q = (block
+  (stmt (Expr))
+  (ret (Expr))
+)
+-------------------- GRAMMAR ---------------------
+rules:
+  block:
+    type: SEQ
+    members:
+      - {type: SYMBOL, name: stmt}
+      - {type: SYMBOL, name: ret}
+  stmt: {type: SYMBOL, name: call}
+  ret: {type: SYMBOL, name: id}
+  call: {type: SYMBOL, name: id}
+  id: {type: PATTERN, value: "[a-z]+"}
+------------------ DIAGNOSTICS -------------------
+error: `call` cannot be a child of `ret`
+ --> query.ptk:1:9
+  |
+1 | Expr = (call (call))
+  |         ^^^^
+...
+5 |   (ret (Expr))
+  |    --- `ret` starts here
+  |
+help: named child kinds of `ret`: `id`
+
+error: `call` cannot be a child of `call`
+ --> query.ptk:1:15
+  |
+1 | Expr = (call (call))
+  |         ----  ^^^^
+  |         |
+  |         `call` starts here
+  |
+help: named child kinds of `call`: `id`

@@ -12,7 +12,6 @@ mod local;
 mod shapes;
 
 pub use engine::DEFAULT_SATISFIABILITY_WORK_BUDGET;
-pub(super) use engine::FieldProbe;
 
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::limits::SatisfiabilityLimits;

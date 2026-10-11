@@ -24,7 +24,4 @@ error: `labl` is not a valid grammar field
 1 | Q = (stmt -labl)
   |            ^^^^
   |
-help: replace with `label`
-  |
-1 | Q = (stmt -label)
-  |               +
+help: did you mean the field `label`?
