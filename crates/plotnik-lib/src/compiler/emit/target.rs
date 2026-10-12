@@ -264,7 +264,6 @@ pub enum TypeScriptNodeRepresentation {
 pub struct TypeScriptCodegenConfig {
     export: bool,
     emit_node_interface: bool,
-    include_points: bool,
     match_only_type: MatchOnlyType,
     colors: Colors,
     node_representation: TypeScriptNodeRepresentation,
@@ -275,7 +274,6 @@ impl Default for TypeScriptCodegenConfig {
         Self {
             export: true,
             emit_node_interface: true,
-            include_points: false,
             match_only_type: MatchOnlyType::Undefined,
             colors: Colors::OFF,
             node_representation: TypeScriptNodeRepresentation::SerializedValue,
@@ -298,11 +296,6 @@ impl TypeScriptCodegenConfig {
         self
     }
 
-    pub fn include_points(mut self, enabled: bool) -> Self {
-        self.include_points = enabled;
-        self
-    }
-
     pub fn match_only_type(mut self, match_only_type: MatchOnlyType) -> Self {
         self.match_only_type = match_only_type;
         self
@@ -322,7 +315,6 @@ impl TypeScriptCodegenConfig {
         crate::compiler::emit::targets::typescript::Config::new()
             .export(self.export)
             .emit_node_interface(self.emit_node_interface)
-            .include_points(self.include_points)
             .match_only_type(self.match_only_type)
             .colored(!self.colors.blue.is_empty())
     }

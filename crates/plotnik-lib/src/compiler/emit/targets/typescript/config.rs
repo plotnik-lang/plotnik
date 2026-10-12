@@ -16,7 +16,6 @@ pub enum MatchOnlyType {
 pub struct Config {
     pub(crate) export: bool,
     pub(crate) emit_node_interface: bool,
-    pub(crate) include_points: bool,
     pub(crate) match_only_type: MatchOnlyType,
     pub(crate) colors: Colors,
 }
@@ -26,7 +25,6 @@ impl Default for Config {
         Self {
             export: true,
             emit_node_interface: true,
-            include_points: false,
             match_only_type: MatchOnlyType::default(),
             colors: Colors::OFF,
         }
@@ -45,11 +43,6 @@ impl Config {
 
     pub fn emit_node_interface(mut self, value: bool) -> Self {
         self.emit_node_interface = value;
-        self
-    }
-
-    pub fn include_points(mut self, value: bool) -> Self {
-        self.include_points = value;
         self
     }
 

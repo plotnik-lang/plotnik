@@ -440,10 +440,6 @@ impl<'a> SchemaEmitter<'a> {
         emit_node_field(&mut self.sink, "kind", text("string"));
         emit_node_field(&mut self.sink, "text", text("string"));
         emit_node_field(&mut self.sink, "span", span_type());
-        if self.config.include_points {
-            emit_node_field(&mut self.sink, "startPoint", point_type());
-            emit_node_field(&mut self.sink, "endPoint", point_type());
-        }
         self.sink.set_style(Style::Dim);
         self.sink.push("}");
         self.sink.reset_style();
@@ -530,25 +526,6 @@ fn span_type() -> Sink<SemanticTag> {
     out.styled(Style::Dim, ", ");
     out.push("number");
     out.styled(Style::Dim, "]");
-    out
-}
-
-fn point_type() -> Sink<SemanticTag> {
-    let mut out = Sink::new();
-    out.styled(Style::Dim, "{");
-    out.push(" row");
-    out.styled(Style::Dim, ":");
-    out.push(" number");
-    out.set_style(Style::Dim);
-    out.push("; column");
-    out.set_style(Style::Dim);
-    out.push(":");
-    out.reset_style();
-    out.push(" number");
-    out.set_style(Style::Dim);
-    out.push("; ");
-    out.set_style(Style::Dim);
-    out.push("}");
     out
 }
 

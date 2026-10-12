@@ -1,7 +1,6 @@
 //! Command builders for the CLI.
 //!
 //! Each command is built using the shared arg builders from `args.rs`.
-//! Runtime command arguments remain available even while their handlers are stubs.
 
 use clap::Command;
 
@@ -11,7 +10,6 @@ use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
 fn with_hidden_exec_args(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
-        .arg(include_points_arg().hide(true))
 }
 
 fn with_hidden_trace_args(cmd: Command) -> Command {
@@ -89,7 +87,7 @@ binding."#,
 
 pub fn tree_command() -> Command {
     let cmd = Command::new("tree")
-        .about("Query and source tree view (currently unimplemented)")
+        .about("Query and source tree view")
         .override_usage(
             "\
   plotnik tree <FILE>                 # auto-detect by extension
@@ -97,13 +95,13 @@ pub fn tree_command() -> Command {
   plotnik tree -q <TEXT> [SOURCE]
   plotnik tree -s <TEXT> -l <LANG>",
         )
-        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
+        .arg(cache_dir_arg())
         .next_help_heading("Output options")
         .arg(query_view_arg())
         .arg(include_anonymous_arg())
@@ -180,7 +178,6 @@ pub fn infer_command() -> Command {
         .arg(grammar_arg())
         .next_help_heading("Output options")
         .arg(format_arg())
-        .arg(include_points_arg())
         .arg(no_node_type_arg())
         .arg(no_export_arg())
         .arg(match_only_type_arg())
@@ -192,24 +189,23 @@ pub fn infer_command() -> Command {
 pub fn run_command() -> Command {
     let cmd = Command::new("run")
         .alias("exec")
-        .about("Execute a query (currently unimplemented)")
+        .about("Execute a query")
         .override_usage(
             "\
   plotnik run <QUERY> <SOURCE>
   plotnik run -q <TEXT> <SOURCE>
   plotnik run -q <TEXT> -s <TEXT> -l <LANG>",
         )
-        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
+        .arg(cache_dir_arg())
         .arg(entry_arg())
         .next_help_heading("Output options")
         .arg(compact_arg())
-        .arg(include_points_arg().hide(true))
         .next_help_heading("Limit options")
         .arg(fuel_arg())
         .arg(max_memory_arg())
@@ -222,20 +218,20 @@ pub fn run_command() -> Command {
 
 pub fn trace_command() -> Command {
     let cmd = Command::new("trace")
-        .about("Trace query execution (currently unimplemented)")
+        .about("Trace query execution")
         .override_usage(
             "\
   plotnik trace <QUERY> <SOURCE>
   plotnik trace -q <TEXT> <SOURCE>
   plotnik trace -q <TEXT> -s <TEXT> -l <LANG>",
         )
-        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
+        .arg(cache_dir_arg())
         .arg(entry_arg())
         .next_help_heading("Trace options")
         .arg(verbose_arg())
@@ -247,28 +243,25 @@ pub fn trace_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(
-        cmd.arg(compact_arg().hide(true))
-            .arg(include_points_arg().hide(true)),
-    )
+    with_hidden_json_arg(cmd.arg(compact_arg().hide(true)))
 }
 
 pub fn inspect_command() -> Command {
     let cmd = Command::new("inspect")
-        .about("Inspect query execution (currently unimplemented)")
+        .about("Inspect query execution")
         .override_usage(
             "\
   plotnik inspect <QUERY> <SOURCE> [--json]
   plotnik inspect -q <TEXT> <SOURCE> [--json]
   plotnik inspect -q <TEXT> -s <TEXT> -l <LANG> [--json]",
         )
-        .after_help("This command is currently unimplemented.")
         .arg(query_path_arg())
         .arg(source_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
+        .arg(cache_dir_arg())
         .arg(entry_arg())
         .next_help_heading("Inspect options")
         .arg(json_arg().help("Output the full inspect bundle as JSON"))
@@ -281,22 +274,16 @@ pub fn inspect_command() -> Command {
         .arg(color_arg());
 
     cmd.arg(compact_arg().hide(true))
-        .arg(include_points_arg().hide(true))
         .arg(no_result_arg().hide(true))
 }
 
 pub fn lang_command() -> Command {
     Command::new("lang")
-        .about("Language information (currently unimplemented)")
+        .about("Grammar information from plotnik.dev/lang")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .flatten_help(true)
-        .subcommand(lang_list_command())
         .subcommand(lang_dump_command())
-}
-
-fn lang_list_command() -> Command {
-    Command::new("list").about("List languages (currently unimplemented)")
 }
 
 pub fn completions_command() -> Command {
@@ -317,11 +304,12 @@ pub fn completions_command() -> Command {
 
 fn lang_dump_command() -> Command {
     Command::new("dump")
-        .about("Dump grammar tree shapes (currently unimplemented)")
+        .about("Dump grammar tree shapes")
+        .arg(cache_dir_arg())
         .arg(
             clap::Arg::new("lang")
-                .help("Language name or alias")
-                .required(true)
+                .value_name("LANG[@REVISION]")
+                .help(LANGUAGE_HELP)
                 .index(1),
         )
         .arg(

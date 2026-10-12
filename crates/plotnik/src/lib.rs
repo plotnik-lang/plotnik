@@ -32,8 +32,8 @@
 //! link at runtime. The generated module double-checks every tree it is
 //! handed against that grammar and panics on version skew.
 //!
-//! For the dynamic side of Plotnik (running query files against sources,
-//! inspecting syntax trees, tracing execution), use the `plotnik-cli` crate.
+//! Enable `wasm` to compile and run queries at runtime through `dynamic`.
+//! Supply grammar metadata and parser bytes to `WasmParser`.
 
 /// Compile a Plotnik query to a typed Rust module at build time.
 ///
@@ -51,3 +51,9 @@ pub use plotnik_rt as rt;
 /// The tree-sitter runtime this crate is built against, re-exported so
 /// callers parse sources with the exact version the engine links.
 pub use plotnik_rt::tree_sitter;
+
+/// Query compilation and execution.
+#[cfg(feature = "wasm")]
+pub use plotnik_lib as dynamic;
+#[cfg(feature = "wasm")]
+pub use plotnik_lib::{WasmParser, WasmParserError};

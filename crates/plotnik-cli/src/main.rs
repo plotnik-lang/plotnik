@@ -29,7 +29,7 @@ fn main() -> ExitCode {
 
 fn dispatch(matches: &ArgMatches) -> CliResult {
     match matches.subcommand() {
-        Some(("tree", _)) => commands::tree::run(),
+        Some(("tree", m)) => commands::tree::run(m),
         Some(("check", m)) => {
             let params = CheckOpts::from_matches(m);
             commands::check::run(params.into())
@@ -46,12 +46,11 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
             let params = GenerateOpts::from_matches(m);
             commands::generate::run(params.into())
         }
-        Some(("run", _)) => commands::run::run(),
-        Some(("trace", _)) => commands::trace::run(),
-        Some(("inspect", _)) => commands::inspect::run(),
+        Some(("run", m)) => commands::run::run(m, commands::run::Mode::Run),
+        Some(("trace", m)) => commands::run::run(m, commands::run::Mode::Trace),
+        Some(("inspect", m)) => commands::run::run(m, commands::run::Mode::Inspect),
         Some(("lang", m)) => match m.subcommand() {
-            Some(("list", _)) => commands::lang::run_list(),
-            Some(("dump", _)) => commands::lang::run_dump(),
+            Some(("dump", m)) => commands::lang::run_dump(m),
             _ => unreachable!("clap should have caught this"),
         },
         Some(("completions", m)) => {

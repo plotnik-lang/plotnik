@@ -40,12 +40,23 @@ pub fn source_text_arg() -> Arg {
         .help("Inline source text")
 }
 
+pub const LANGUAGE_HELP: &str =
+    "Language alias or owner/repo[/grammar-directory], optionally followed by @revision";
+
 pub fn lang_arg() -> Arg {
     Arg::new("lang")
         .short('l')
         .long("lang")
-        .value_name("LANG")
-        .help("Source language")
+        .value_name("LANG[@REVISION]")
+        .help(LANGUAGE_HELP)
+}
+
+pub fn cache_dir_arg() -> Arg {
+    Arg::new("cache_dir")
+        .long("cache-dir")
+        .value_name("DIR")
+        .value_parser(value_parser!(PathBuf))
+        .help("Override the OS cache directory for grammar artifacts")
 }
 
 pub fn color_arg() -> Arg {
@@ -93,13 +104,6 @@ pub fn format_arg() -> Arg {
         .value_name("FORMAT")
         .default_value("typescript")
         .help("Output format (typescript, ts)")
-}
-
-pub fn include_points_arg() -> Arg {
-    Arg::new("include_points")
-        .long("include-points")
-        .action(ArgAction::SetTrue)
-        .help("Include zero-based row/byte-column points in nodes")
 }
 
 pub fn no_node_type_arg() -> Arg {

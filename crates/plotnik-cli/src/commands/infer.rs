@@ -13,7 +13,6 @@ pub struct InferArgs {
     pub query_text: Option<String>,
     pub grammar: PathBuf,
     pub format: String,
-    pub include_points: bool,
     pub no_node_type: bool,
     pub export: bool,
     pub output: Option<PathBuf>,
@@ -45,7 +44,6 @@ pub fn run(args: InferArgs) -> CliResult {
     let config = TypeScriptCodegenConfig::new()
         .export(args.export)
         .emit_node_interface(!args.no_node_type)
-        .include_points(args.include_points)
         .match_only_type(match_only_type)
         .colored(use_colors);
     let emission = compiled

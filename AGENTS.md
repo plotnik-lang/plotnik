@@ -68,7 +68,7 @@ crates/
   plotnik/                     # facade: query! + rt + tree_sitter re-exports
   plotnik-macros/              # proc-macro shell: args, grammar resolution, expansion
   plotnik-cli/
-    src/cli/                   # clap defs, compiler dispatch, retained limit flags
+    src/cli/                   # clap defs, compiler dispatch, runtime limit flags
     src/commands/              # one module per CLI subcommand
       grammar.rs               # external grammar.json loader and identity
   plotnik-lib/
@@ -197,8 +197,6 @@ cargo run -p plotnik-cli -- infer query.ptk --grammar path/to/grammar.json
 cargo run -p plotnik-cli -- gen query.ptk --grammar path/to/grammar.json --target rust
 cargo run -p plotnik-cli -- dump query.ptk --grammar path/to/grammar.json
 ```
-
-`run`, `trace`, `inspect`, `tree`, and `lang` retain their arguments but have unimplemented handlers.
 
 - Exit codes:
   - `0`: yes/success

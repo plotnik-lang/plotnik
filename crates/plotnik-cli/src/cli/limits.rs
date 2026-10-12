@@ -1,6 +1,27 @@
-//! Parse the retained runtime command flags without linking the VM.
+//! Runtime command limits.
 
 use clap::Arg;
+use plotnik_lib::{Limit, RuntimeLimitSpec};
+
+pub fn runtime_limits(m: &clap::ArgMatches) -> RuntimeLimitSpec {
+    let preset = match m.get_one::<String>("limits").map(String::as_str) {
+        Some("unbounded") => Limit::Unbounded,
+        _ => Limit::Auto,
+    };
+    let limit = |name: &str, parse: fn(&str) -> Result<u64, String>| match m
+        .get_one::<String>(name)
+        .map(|s| s.trim().to_ascii_lowercase())
+    {
+        None => preset,
+        Some(raw) if raw == "auto" => Limit::Auto,
+        Some(raw) if raw == "unbounded" => Limit::Unbounded,
+        Some(raw) => Limit::Of(parse(&raw).expect("clap validated the runtime limit")),
+    };
+    RuntimeLimitSpec {
+        fuel_limit: limit("fuel", |s| s.parse::<u64>().map_err(|e| e.to_string())),
+        memory: limit("max_memory", parse_size),
+    }
+}
 
 pub fn fuel_arg() -> Arg {
     Arg::new("fuel")

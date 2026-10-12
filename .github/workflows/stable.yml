@@ -97,7 +97,7 @@ jobs:
           prefix-key: v0-rust-stable
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
-      - name: Compiler-only CLI
+      - name: CLI
         run: cargo clippy -p plotnik-cli --no-default-features -- -D warnings
 
       - name: No-default-features lib (C-free compiler)

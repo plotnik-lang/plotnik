@@ -22,6 +22,10 @@ mod compiler;
 mod core;
 #[cfg(feature = "vm")]
 mod vm;
+#[cfg(feature = "wasm")]
+mod wasm;
+#[cfg(feature = "wasm")]
+pub use wasm::{WasmParser, WasmParserError};
 
 pub use crate::bytecode::type_system;
 pub use crate::core::colors;

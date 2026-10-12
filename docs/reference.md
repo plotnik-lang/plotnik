@@ -257,7 +257,7 @@ The default capture of a node is a `Node` value. Its JSON form contains the kind
 }
 ```
 
-In the introductory example, removing `:: text` changes `name` from `"answer"` to this object. A byte offset is not a character index. If point information is requested when generating node types, `startPoint` and `endPoint` use zero-based rows and byte columns.
+In the introductory example, removing `:: text` changes `name` from `"answer"` to this object. A byte offset is not a character index.
 
 ### Flat captures and nested records
 

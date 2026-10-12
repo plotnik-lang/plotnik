@@ -85,7 +85,6 @@ pub struct InferOpts {
     pub query_text: Option<String>,
     pub grammar: PathBuf,
     pub format: String,
-    pub include_points: bool,
     pub no_node_type: bool,
     pub no_export: bool,
     pub match_only_type: Option<String>,
@@ -103,7 +102,6 @@ impl InferOpts {
                 .get_one::<String>("format")
                 .expect("clap supplies the format default")
                 .clone(),
-            include_points: m.get_flag("include_points"),
             no_node_type: m.get_flag("no_node_type"),
             no_export: m.get_flag("no_export"),
             match_only_type: m.get_one::<String>("match_only_type").cloned(),
@@ -120,7 +118,6 @@ impl From<InferOpts> for InferArgs {
             query_text: p.query_text,
             grammar: p.grammar,
             format: p.format,
-            include_points: p.include_points,
             no_node_type: p.no_node_type,
             export: !p.no_export,
             output: p.output,
