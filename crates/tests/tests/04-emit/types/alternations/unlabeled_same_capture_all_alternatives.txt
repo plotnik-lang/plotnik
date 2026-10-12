@@ -1,0 +1,15 @@
+Q = [
+  (identifier) @x
+  (number) @x
+]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  x: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: Node<'t>,
+}

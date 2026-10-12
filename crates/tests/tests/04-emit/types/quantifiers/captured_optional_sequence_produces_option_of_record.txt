@@ -1,0 +1,28 @@
+Q = (program
+  {
+    (lexical_declaration) @decl
+    (debugger_statement) @dbg
+  }? @attrs
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  attrs: QAttrs | null;
+}
+
+export interface QAttrs {
+  dbg: Node;
+  decl: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub attrs: ::core::option::Option<QAttrs<'t>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QAttrs<'t> {
+    pub decl: Node<'t>,
+    pub dbg: Node<'t>,
+}

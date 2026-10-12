@@ -1,0 +1,25 @@
+Q = (program
+  (expression_statement
+    (identifier) @id
+  )? @x
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  x: QX | null;
+}
+
+export interface QX {
+  id: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: ::core::option::Option<QX<'t>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QX<'t> {
+    pub id: Node<'t>,
+}

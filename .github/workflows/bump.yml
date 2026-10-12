@@ -54,21 +54,21 @@ jobs:
         run: |
           next="${{ steps.version.outputs.next }}"
           tomato set workspace.package.version "$next" Cargo.toml
-          tomato set workspace.dependencies.plotnik-lib.version "$next" Cargo.toml
-          tomato set workspace.dependencies.plotnik-rt.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-compiler.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-runtime.version "$next" Cargo.toml
           # explicit path+version dependencies (default-features / feature overrides
           # that can't inherit from the workspace) need local version bumps too
-          tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
-          tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-macros/Cargo.toml
-          tomato set dependencies.plotnik-rt.version "$next" crates/plotnik-macros/Cargo.toml
+          tomato set dependencies.plotnik-compiler.version "$next" crates/cli/Cargo.toml
+          tomato set dependencies.plotnik-compiler.version "$next" crates/macros/Cargo.toml
+          tomato set dependencies.plotnik-runtime.version "$next" crates/macros/Cargo.toml
           tomato set dependencies.plotnik-macros.version "$next" crates/plotnik/Cargo.toml
-          tomato set dependencies.plotnik-rt.version "$next" crates/plotnik/Cargo.toml
-          tomato set dependencies.plotnik-rt.version "$next" crates/plotnik-lib/Cargo.toml
+          tomato set dependencies.plotnik-runtime.version "$next" crates/plotnik/Cargo.toml
+          tomato set dependencies.plotnik-runtime.version "$next" crates/compiler/Cargo.toml
 
       - name: Update lockfile
         run: |
           cargo check --workspace
-          cargo check --manifest-path crates/plotnik-tests/codegen/rust/Cargo.toml
+          cargo check --manifest-path crates/tests/codegen/rust/Cargo.toml
 
       - name: Create PR
         env:
@@ -81,11 +81,11 @@ jobs:
           git add \
             Cargo.toml \
             Cargo.lock \
-            crates/plotnik-cli/Cargo.toml \
-            crates/plotnik-lib/Cargo.toml \
-            crates/plotnik-macros/Cargo.toml \
+            crates/cli/Cargo.toml \
+            crates/compiler/Cargo.toml \
+            crates/macros/Cargo.toml \
             crates/plotnik/Cargo.toml \
-            crates/plotnik-tests/codegen/rust/Cargo.lock
+            crates/tests/codegen/rust/Cargo.lock
           git commit -m "chore: Bump version to \`$next\`"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
           git push -u origin "bump/v$next"

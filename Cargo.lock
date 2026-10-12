@@ -1256,9 +1256,9 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 name = "plotnik"
 version = "0.4.0"
 dependencies = [
- "plotnik-lib",
+ "plotnik-compiler",
  "plotnik-macros",
- "plotnik-rt",
+ "plotnik-runtime",
 ]
 
 [[package]]
@@ -1270,14 +1270,14 @@ dependencies = [
  "dirs",
  "libc",
  "percent-encoding",
- "plotnik-lib",
+ "plotnik-compiler",
  "serde_json",
  "tempfile",
  "ureq",
 ]
 
 [[package]]
-name = "plotnik-lib"
+name = "plotnik-compiler"
 version = "0.4.0"
 dependencies = [
  "annotate-snippets",
@@ -1288,7 +1288,7 @@ dependencies = [
  "insta",
  "log",
  "logos",
- "plotnik-rt",
+ "plotnik-runtime",
  "proptest",
  "regex-automata",
  "regex-syntax",
@@ -1310,13 +1310,13 @@ dependencies = [
  "cargo_metadata",
  "crc32fast",
  "litrs",
- "plotnik-lib",
- "plotnik-rt",
+ "plotnik-compiler",
+ "plotnik-runtime",
  "serde_json",
 ]
 
 [[package]]
-name = "plotnik-rt"
+name = "plotnik-runtime"
 version = "0.4.0"
 dependencies = [
  "regex-automata",
@@ -1333,8 +1333,8 @@ dependencies = [
  "criterion",
  "indoc",
  "plotnik",
- "plotnik-lib",
- "plotnik-rt",
+ "plotnik-compiler",
+ "plotnik-runtime",
  "proptest",
  "serde",
  "serde-saphyr",
@@ -1348,12 +1348,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "plotnik-wasm"
+name = "plotnik-web"
 version = "0.4.0"
 dependencies = [
  "cargo_metadata",
  "cc",
- "plotnik-lib",
+ "plotnik-compiler",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

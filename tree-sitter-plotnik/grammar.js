@@ -2,7 +2,7 @@
  * Tree-sitter grammar for the Plotnik query language (.ptk files).
  *
  * Mirrors the reference implementation in
- * `crates/plotnik-lib/src/compiler/parse/` at the syntax level: what the
+ * `crates/compiler/src/compiler/parse/` at the syntax level: what the
  * reference parser accepts without error-level diagnostics parses cleanly
  * here, while analyze/bind-stage rejections (unknown node kinds, empty
  * trees, dimensionality, ...) are out of scope, as is usual for editor

@@ -1,0 +1,19 @@
+Q = (program
+  (expression_statement
+    (array
+      .
+      (identifier) @first
+    )
+  )
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  first: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub first: Node<'t>,
+}

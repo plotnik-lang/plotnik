@@ -101,12 +101,12 @@ jobs:
         run: cargo clippy -p plotnik-cli --no-default-features -- -D warnings
 
       - name: No-default-features lib (C-free compiler)
-        run: cargo clippy -p plotnik-lib --no-default-features --all-targets -- -D warnings
+        run: cargo clippy -p plotnik-compiler --no-default-features --all-targets -- -D warnings
 
       - name: Runtime without debug
         run: |
-          cargo check -p plotnik-rt
-          cargo check -p plotnik-rt --no-default-features
+          cargo check -p plotnik-runtime
+          cargo check -p plotnik-runtime --no-default-features
 
       - name: All-features workspace
         run: cargo check --workspace --all-targets --all-features

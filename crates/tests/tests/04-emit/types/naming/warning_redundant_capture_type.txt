@@ -1,0 +1,31 @@
+Q = (program
+  {
+    (expression_statement) @stmt
+  } @info :: QInfo
+)
+------------------ DIAGNOSTICS -------------------
+warning: this capture already has type `QInfo`. Naming it `QInfo` has no effect
+ --> query.ptk:4:14
+  |
+4 |   } @info :: QInfo
+  |              ^^^^^
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  info: QInfo;
+}
+
+export interface QInfo {
+  stmt: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub info: QInfo<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QInfo<'t> {
+    pub stmt: Node<'t>,
+}

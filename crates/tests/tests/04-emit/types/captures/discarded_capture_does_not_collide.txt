@@ -1,0 +1,17 @@
+Q = (program
+  (expression_statement
+    (identifier) @x
+  ) @_
+  (debugger_statement) @x
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  x: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: Node<'t>,
+}

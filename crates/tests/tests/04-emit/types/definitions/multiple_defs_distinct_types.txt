@@ -1,0 +1,38 @@
+Name = (identifier) @name
+Value = (number) @value
+
+Both = (pair
+  (property_identifier) @key
+  (number) @val
+)
+------------------- TYPESCRIPT -------------------
+export interface Name {
+  name: Node;
+}
+
+export interface Value {
+  value: Node;
+}
+
+export interface Both {
+  key: Node;
+  val: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Name<'t> {
+    pub name: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Value<'t> {
+    pub value: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Both<'t> {
+    pub key: Node<'t>,
+    pub val: Node<'t>,
+}

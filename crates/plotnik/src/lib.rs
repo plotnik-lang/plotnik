@@ -42,18 +42,18 @@
 /// [`::plotnik::rt`](rt), which is why this facade is the intended way in.
 pub use plotnik_macros::query;
 
-pub use plotnik_rt::{LimitExceeded, Matches, Parse, matches, parse};
+pub use plotnik_runtime::{LimitExceeded, Matches, Parse, matches, parse};
 
 /// The shared runtime engine generated query modules run on. Generated code
 /// spells every runtime path as `::plotnik::rt::...`.
-pub use plotnik_rt as rt;
+pub use plotnik_runtime as rt;
 
 /// The tree-sitter runtime this crate is built against, re-exported so
 /// callers parse sources with the exact version the engine links.
-pub use plotnik_rt::tree_sitter;
+pub use plotnik_runtime::tree_sitter;
 
 /// Query compilation and execution.
 #[cfg(feature = "wasm")]
-pub use plotnik_lib as dynamic;
+pub use plotnik_compiler as dynamic;
 #[cfg(feature = "wasm")]
-pub use plotnik_lib::{WasmParser, WasmParserError};
+pub use plotnik_compiler::{WasmParser, WasmParserError};

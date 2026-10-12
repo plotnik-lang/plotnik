@@ -17,11 +17,11 @@ workspace = true
 [features]
 # Serde support end to end: the macro emits `SerializeWithSource` impls and
 # the runtime provides the trait. One flag so they can never drift apart.
-serde = ["plotnik-macros/serde", "plotnik-rt/serde"]
+serde = ["plotnik-macros/serde", "plotnik-runtime/serde"]
 # Query compilation and execution with WASM grammars.
-wasm = ["dep:plotnik-lib", "plotnik-lib/wasm"]
+wasm = ["dep:plotnik-compiler", "plotnik-compiler/wasm"]
 
 [dependencies]
-plotnik-macros = { path = "../plotnik-macros", version = "0.4.0" }
-plotnik-rt = { path = "../plotnik-rt", version = "0.4.0" }
-plotnik-lib = { path = "../plotnik-lib", version = "0.4.0", default-features = false, optional = true }
+plotnik-macros = { path = "../macros", version = "0.4.0" }
+plotnik-runtime = { path = "../runtime", version = "0.4.0" }
+plotnik-compiler = { path = "../compiler", version = "0.4.0", default-features = false, optional = true }

@@ -1,5 +1,5 @@
 /* Wire types, mirrored by hand from the Rust side — every payload here is
-   assembled in `crates/plotnik-wasm/src/wire.rs`; change the two together.
+   assembled in `crates/web/src/wire.rs`; change the two together.
 
    All offsets are BYTE offsets into the exact text that produced them;
    convert with byte-offsets.ts at the point of use, never store UTF-16
@@ -7,7 +7,7 @@
    column is a Unicode-scalar count — a third unit; the playground only ever
    reads `offset`.) */
 
-/** `tokenize()` output — crates/plotnik-lib/src/compiler/parse/mod.rs `QueryToken`. */
+/** `tokenize()` output — crates/compiler/src/compiler/parse/mod.rs `QueryToken`. */
 export interface QueryToken {
   kind:
     | "whitespace"
@@ -21,7 +21,7 @@ export interface QueryToken {
   span: [number, number];
 }
 
-/** Diagnostics — crates/plotnik-lib/src/compiler/diagnostics/report/json.rs. */
+/** Diagnostics — crates/compiler/src/compiler/diagnostics/report/json.rs. */
 export interface WirePosition {
   line: number;
   column: number;
@@ -116,7 +116,7 @@ export type RunResult =
     }
   | { error: string; execution_trace?: unknown };
 
-/** `tree()` output from crates/plotnik-lib/src/core/tree_dump.rs.
+/** `tree()` output from crates/compiler/src/core/tree_dump.rs.
     A pre-rendered dump of the source tree in Plotnik pattern syntax. */
 export interface DumpChunk {
   kind: "text" | "punct" | "kind" | "field" | "string" | "comment";

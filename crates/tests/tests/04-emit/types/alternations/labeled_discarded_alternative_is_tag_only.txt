@@ -1,0 +1,38 @@
+Inner = (expression_statement (call_expression) @call)
+
+Q = (program
+  [
+    Call: (Inner) @_
+    Decl: (lexical_declaration) @d
+  ] @item
+)
+------------------- TYPESCRIPT -------------------
+export interface Inner {
+  call: Node;
+}
+
+export interface Q {
+  item: QItem;
+}
+
+export type QItem =
+  | { $tag: "Call" }
+  | { $tag: "Decl"; $data: { d: Node } };
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Inner<'t> {
+    pub call: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub item: QItem<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum QItem<'t> {
+    Call,
+    Decl { d: Node<'t> },
+}

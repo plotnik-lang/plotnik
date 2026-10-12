@@ -1,0 +1,16 @@
+Q = [
+  Str: (string) @s
+  Num: (number) @n
+]
+------------------- TYPESCRIPT -------------------
+export type Q =
+  | { $tag: "Str"; $data: { s: Node } }
+  | { $tag: "Num"; $data: { n: Node } };
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Q<'t> {
+    Str { s: Node<'t> },
+    Num { n: Node<'t> },
+}

@@ -1,0 +1,30 @@
+Q = (program
+  {
+    (expression_statement) @stmt
+  } @a :: Info
+  {
+    (expression_statement) @stmt
+  } @b :: Info
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: Info;
+  b: Info;
+}
+
+export interface Info {
+  stmt: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub a: Info<'t>,
+    pub b: Info<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Info<'t> {
+    pub stmt: Node<'t>,
+}

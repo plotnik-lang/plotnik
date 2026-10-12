@@ -56,7 +56,7 @@ Do not add:
 | `make test [FILTER=...]` | full test suite via native Rust test harnesses |
 | `make shot [FILTER=...]` | update custom + Insta snapshots, then re-run   |
 | `make fmt`               | `cargo fmt` + prettier                         |
-| `make coverage-lines`    | per-file missing lines for `plotnik-lib`       |
+| `make coverage-lines`    | per-file missing lines for `plotnik-compiler`  |
 
 Check your changes: `make test`
 Before commit: `make fmt`
@@ -66,12 +66,12 @@ Before commit: `make fmt`
 ```
 crates/
   plotnik/                     # facade: query! + rt + tree_sitter re-exports
-  plotnik-macros/              # proc-macro shell: args, grammar resolution, expansion
-  plotnik-cli/
+  macros/                      # proc-macro shell: args, grammar resolution, expansion
+  cli/
     src/cli/                   # clap defs, compiler dispatch, runtime limit flags
     src/commands/              # one module per CLI subcommand
       grammar.rs               # external grammar.json loader and identity
-  plotnik-lib/
+  compiler/
     src/bytecode/              # bytecode format, instruction set, module loading
     src/compiler/
       parse/                   # lexer, grammar, AST
@@ -84,8 +84,10 @@ crates/
       diagnostics/             # user-facing error reporting
     src/core/                  # grammar metadata, node-kind database, interner
     src/vm/                    # runtime engine, backtracking, materialization
-  plotnik-rt/                  # shared runtime engine (VM + generated matchers)
-  plotnik-tests/
+  runtime/                     # shared runtime engine (VM + generated matchers)
+  web/                         # unpublished browser/WASM bindings
+  tests/
+    codegen/rust/              # isolated generated-code test workspace
     tests/                     # snapshot tests
       mod.rs                   # test harness + docs
       01-lexer/

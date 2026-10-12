@@ -1,0 +1,17 @@
+Q = [
+  (identifier) @a
+  (number) @b
+]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: Node | null;
+  b: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub a: ::core::option::Option<Node<'t>>,
+    pub b: ::core::option::Option<Node<'t>>,
+}

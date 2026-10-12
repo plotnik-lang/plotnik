@@ -1,0 +1,19 @@
+NestedCall = (call_expression
+  function: [
+    (identifier) @name
+    (NestedCall) @inner
+  ]
+)
+------------------- TYPESCRIPT -------------------
+export interface NestedCall {
+  inner: NestedCall | null;
+  name: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct NestedCall<'t> {
+    pub name: ::core::option::Option<Node<'t>>,
+    pub inner: ::core::option::Option<::std::boxed::Box<NestedCall<'t>>>,
+}

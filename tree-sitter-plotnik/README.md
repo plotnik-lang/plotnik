@@ -17,7 +17,7 @@ tree-sitter parse q.ptk
 ## Acceptance contract
 
 The source of truth is the reference parser in
-`crates/plotnik-lib/src/compiler/parse/`. This grammar mirrors it at the
+`crates/compiler/src/compiler/parse/`. This grammar mirrors it at the
 **syntax level**: anything the reference parser accepts without error-level
 diagnostics parses cleanly here, with the deliberate exceptions below.
 Later-stage rejections (analyze/link: unknown node kinds, empty `()`/`[]`/

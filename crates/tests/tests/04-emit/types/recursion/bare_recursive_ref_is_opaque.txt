@@ -1,0 +1,25 @@
+Rec = [
+  A: (program
+    (expression_statement (Rec) @inner)
+  )
+  B: (identifier) @id
+]
+
+Q = (Rec)
+------------------- TYPESCRIPT -------------------
+export type Rec =
+  | { $tag: "A"; $data: { inner: Rec } }
+  | { $tag: "B"; $data: { id: Node } };
+
+export type Q = undefined;
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Rec<'t> {
+    A { inner: ::std::boxed::Box<Rec<'t>> },
+    B { id: Node<'t> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q;

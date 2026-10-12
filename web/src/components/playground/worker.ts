@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
-import init, { Session, tokenize, tree } from "@/lib/plotnik-wasm/plotnik_wasm";
+import init, { Session, tokenize, tree } from "@/lib/plotnik-web/plotnik_web";
 import type {
   GeneratedCode,
   PlotnikApi,
