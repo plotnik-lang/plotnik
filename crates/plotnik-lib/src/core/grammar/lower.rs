@@ -601,7 +601,7 @@ fn metadata_for_symbol<'a>(
     symbol: Symbol,
 ) -> (&'a str, VariableType) {
     match symbol.kind {
-        SymbolType::End | SymbolType::EndOfNonTerminalExtra => ("end", VariableType::Hidden),
+        SymbolType::End => ("end", VariableType::Hidden),
         SymbolType::NonTerminal => {
             let variable = &syntax_grammar.variables[symbol.index];
             (&variable.name, variable.kind)

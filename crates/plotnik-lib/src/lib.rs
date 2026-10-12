@@ -33,9 +33,7 @@ pub use crate::core::grammar;
 pub use crate::core::utils as text_utils;
 pub use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 #[cfg(feature = "vm")]
-pub use crate::core::{
-    DumpChunk, DumpChunkKind, DumpNode, TreeDump, dump_tree, dump_tree_text, tree_to_json,
-};
+pub use crate::core::{DumpChunk, DumpChunkKind, DumpNode, TreeDump, dump_tree, dump_tree_text};
 
 pub mod diagnostics {
     pub use crate::compiler::diagnostics::report::{

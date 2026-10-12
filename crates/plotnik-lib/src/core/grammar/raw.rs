@@ -1,43 +1,43 @@
 //! Raw tree-sitter grammar source-format types.
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::GrammarError;
 
 /// Direct parsed representation of tree-sitter `grammar.json`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct RawGrammar {
     /// Grammar name (e.g., "javascript", "rust").
     pub name: String,
     /// Production rules, preserving definition order.
     pub rules: IndexMap<String, RawRule>,
     /// Rules admitted as Tree-sitter extras, such as comments or whitespace.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub extras: Vec<RawRule>,
     /// Precedence orderings.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub precedences: Vec<Vec<RawPrecedenceEntry>>,
     /// Expected conflicts.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub conflicts: Vec<Vec<String>>,
     /// External scanner tokens.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub externals: Vec<RawRule>,
     /// Rules to inline (hidden).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub inline: Vec<String>,
     /// Supertype rules.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub supertypes: Vec<String>,
     /// Keyword identifier rule.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub word: Option<String>,
     /// Reserved word contexts.
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[serde(default)]
     pub reserved: IndexMap<String, Vec<RawRule>>,
     /// Parent grammar name (for inheritance).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub inherits: Option<String>,
 }
 
@@ -46,15 +46,10 @@ impl RawGrammar {
     pub fn from_json(json: &str) -> Result<Self, GrammarError> {
         serde_json::from_str(json).map_err(GrammarError::Json)
     }
-
-    /// Serialize this raw grammar to compact JSON.
-    pub fn to_json(&self) -> Result<String, GrammarError> {
-        serde_json::to_string(self).map_err(GrammarError::Json)
-    }
 }
 
 /// Raw rule matching tree-sitter's `grammar.json` format.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(tag = "type")]
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 pub enum RawRule {
@@ -64,7 +59,7 @@ pub enum RawRule {
     },
     PATTERN {
         value: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
         flags: Option<String>,
     },
     SYMBOL {
@@ -120,7 +115,7 @@ pub enum RawRule {
 }
 
 /// Raw precedence value (integer or named).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
 pub enum RawPrecedence {
     Integer(i32),
@@ -128,7 +123,7 @@ pub enum RawPrecedence {
 }
 
 /// Raw entry in a precedence ordering.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(tag = "type")]
 #[allow(clippy::upper_case_acronyms)]
 pub enum RawPrecedenceEntry {

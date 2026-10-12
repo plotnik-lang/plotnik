@@ -31,7 +31,7 @@ impl AliasUsageTable {
             SymbolType::External => &mut self.externals[symbol.index],
             SymbolType::NonTerminal => &mut self.non_terminals[symbol.index],
             SymbolType::Terminal => &mut self.terminals[symbol.index],
-            SymbolType::End | SymbolType::EndOfNonTerminalExtra => panic!("Unexpected end token"),
+            SymbolType::End => panic!("Unexpected end token"),
         }
     }
 

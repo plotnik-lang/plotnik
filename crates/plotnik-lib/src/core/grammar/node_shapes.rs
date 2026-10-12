@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::types::{NodeKindRef, NodeShape, NodeSlot};
@@ -44,20 +43,14 @@ pub struct VariableSummary {
     pub has_multi_step_production: bool,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, Default, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Default, PartialOrd, Ord)]
 pub struct NodeShapeRecord {
-    #[serde(rename = "type")]
     kind: String,
     named: bool,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
     root: bool,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
     extra: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     fields: Option<BTreeMap<String, SlotRecord>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     children: Option<SlotRecord>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     subtypes: Option<Vec<NodeKindRecord>>,
 }
 
@@ -87,14 +80,13 @@ impl NodeShapeRecord {
     }
 }
 
-#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeKindRecord {
-    #[serde(rename = "type")]
     kind: String,
     named: bool,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SlotRecord {
     multiple: bool,
     required: bool,
@@ -213,7 +205,7 @@ impl ChildCardinality {
     }
 }
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub enum VariableSummaryError {
     #[error(
         "Grammar error: Supertype symbols must always have a single visible child, but `{0}` can have multiple"
@@ -444,7 +436,7 @@ fn retain_visible_child_types(
     }
 }
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub struct SupertypeCycleError {
     cycle: Vec<String>,
 }
@@ -463,7 +455,7 @@ impl std::fmt::Display for SupertypeCycleError {
     }
 }
 
-pub fn generate_node_shapes_json(
+fn generate_node_shape_records(
     ctx: GrammarContext<'_>,
     variable_info: &[VariableSummary],
 ) -> Result<Vec<NodeShapeRecord>, SupertypeCycleError> {
@@ -473,21 +465,21 @@ pub fn generate_node_shapes_json(
         aliases: default_aliases,
     } = ctx;
 
-    let mut node_shapes_json = BTreeMap::new();
+    let mut node_shapes = BTreeMap::new();
 
-    let populate_field_info_json = |json: &mut SlotRecord, info: &FieldSummary| {
+    let populate_field_info = |slot: &mut SlotRecord, info: &FieldSummary| {
         if info.types.is_empty() {
-            json.required = false;
+            slot.required = false;
         } else {
-            json.multiple |= info.quantity.multiple;
-            json.required &= info.quantity.required;
-            json.types.extend(
+            slot.multiple |= info.quantity.multiple;
+            slot.required &= info.quantity.required;
+            slot.types.extend(
                 info.types
                     .iter()
                     .map(|child_type| child_type_to_node_kind(child_type, ctx)),
             );
-            json.types.sort_unstable();
-            json.types.dedup();
+            slot.types.sort_unstable();
+            slot.types.dedup();
         }
     };
 
@@ -500,15 +492,13 @@ pub fn generate_node_shapes_json(
         let symbol = Symbol::non_terminal(i);
         let variable = &syntax_grammar.variables[i];
         if syntax_grammar.supertype_symbols.contains(&symbol) {
-            let node_shape_json = node_shapes_json
-                .entry(variable.name.clone())
-                .or_insert_with(|| {
-                    NodeShapeRecord::bare(
-                        variable.name.clone(),
-                        true,
-                        extra_names.contains(variable.name.as_str()),
-                    )
-                });
+            let node_shape = node_shapes.entry(variable.name.clone()).or_insert_with(|| {
+                NodeShapeRecord::bare(
+                    variable.name.clone(),
+                    true,
+                    extra_names.contains(variable.name.as_str()),
+                )
+            });
             let mut subtypes = info
                 .children
                 .types
@@ -518,7 +508,7 @@ pub fn generate_node_shapes_json(
             subtypes.sort_unstable();
             subtypes.dedup();
             let supertype = NodeKindRecord {
-                kind: node_shape_json.kind.clone(),
+                kind: node_shape.kind.clone(),
                 named: true,
             };
 
@@ -528,10 +518,10 @@ pub fn generate_node_shapes_json(
             if !subtypes.is_empty() {
                 subtype_map.push((supertype, subtypes.clone()));
             }
-            node_shape_json.subtypes = Some(subtypes);
+            node_shape.subtypes = Some(subtypes);
         } else if !syntax_grammar.variables_to_inline.contains(&symbol) {
             // If a rule is aliased under multiple names, then its information
-            // contributes to multiple entries in the final JSON.
+            // contributes to multiple node-shape records.
             for alias in aliases_by_symbol.get(&symbol).unwrap_or(&BTreeSet::new()) {
                 let (kind, is_named) = if let Some(alias) = alias {
                     (&alias.value, alias.is_named)
@@ -544,7 +534,7 @@ pub fn generate_node_shapes_json(
                 // There may already be an entry with this name, because multiple
                 // rules may be aliased with the same name.
                 let mut node_kind_existed = true;
-                let node_shape_json = node_shapes_json.entry(kind.clone()).or_insert_with(|| {
+                let node_shape = node_shapes.entry(kind.clone()).or_insert_with(|| {
                     node_kind_existed = false;
                     NodeShapeRecord::concrete(
                         kind.clone(),
@@ -554,32 +544,30 @@ pub fn generate_node_shapes_json(
                     )
                 });
 
-                let fields_json = node_shape_json.fields.get_or_insert_with(BTreeMap::new);
+                let fields = node_shape.fields.get_or_insert_with(BTreeMap::new);
                 for (new_field, field_info) in &info.fields {
-                    let field_json = fields_json.entry(new_field.clone()).or_insert_with(|| {
+                    let field = fields.entry(new_field.clone()).or_insert_with(|| {
                         // If another rule is aliased with the same name, and does *not* have this
                         // field, then this field cannot be required.
-                        let mut field_json = SlotRecord::default();
+                        let mut field = SlotRecord::default();
                         if node_kind_existed {
-                            field_json.required = false;
+                            field.required = false;
                         }
-                        field_json
+                        field
                     });
-                    populate_field_info_json(field_json, field_info);
+                    populate_field_info(field, field_info);
                 }
 
                 // If another rule is aliased with the same name, any fields that aren't present in
                 // this cannot be required.
-                for (existing_field, field_json) in fields_json.iter_mut() {
+                for (existing_field, field) in fields.iter_mut() {
                     if !info.fields.contains_key(existing_field) {
-                        field_json.required = false;
+                        field.required = false;
                     }
                 }
 
-                populate_field_info_json(
-                    node_shape_json
-                        .children
-                        .get_or_insert_with(SlotRecord::default),
+                populate_field_info(
+                    node_shape.children.get_or_insert_with(SlotRecord::default),
                     &info.children_without_fields,
                 );
             }
@@ -588,19 +576,19 @@ pub fn generate_node_shapes_json(
 
     sort_subtypes_topologically(&mut subtype_map)?;
 
-    for node_shape_json in node_shapes_json.values_mut() {
-        if node_shape_json
+    for node_shape in node_shapes.values_mut() {
+        if node_shape
             .children
             .as_ref()
             .is_some_and(|c| c.types.is_empty())
         {
-            node_shape_json.children = None;
+            node_shape.children = None;
         }
 
-        if let Some(children) = &mut node_shape_json.children {
+        if let Some(children) = &mut node_shape.children {
             process_supertypes(children, &subtype_map);
         }
-        if let Some(fields) = &mut node_shape_json.fields {
+        if let Some(fields) = &mut node_shape.fields {
             for field_info in fields.values_mut() {
                 process_supertypes(field_info, &subtype_map);
             }
@@ -608,17 +596,14 @@ pub fn generate_node_shapes_json(
     }
 
     let anonymous_node_shapes = add_token_node_shapes(
-        &mut node_shapes_json,
+        &mut node_shapes,
         syntax_grammar,
         lexical_grammar,
         &aliases_by_symbol,
         &extra_names,
     );
 
-    let mut result = node_shapes_json
-        .into_iter()
-        .map(|e| e.1)
-        .collect::<Vec<_>>();
+    let mut result = node_shapes.into_iter().map(|e| e.1).collect::<Vec<_>>();
     result.extend(anonymous_node_shapes);
     let is_leaf = |node: &NodeShapeRecord| node.children.is_none() && node.fields.is_none();
     // Keep output deterministic and close to Tree-sitter's node metadata: supertypes first,
@@ -641,7 +626,7 @@ pub fn generate_node_shapes(
     ctx: GrammarContext<'_>,
     variable_info: &[VariableSummary],
 ) -> Result<Vec<NodeShape>, SupertypeCycleError> {
-    generate_node_shapes_json(ctx, variable_info)
+    generate_node_shape_records(ctx, variable_info)
         .map(|shapes| shapes.into_iter().map(Into::into).collect())
 }
 
@@ -742,7 +727,7 @@ fn collect_extra_names<'a>(
 }
 
 fn add_token_node_shapes(
-    node_shapes_json: &mut BTreeMap<String, NodeShapeRecord>,
+    node_shapes: &mut BTreeMap<String, NodeShapeRecord>,
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
     aliases_by_symbol: &FxHashMap<Symbol, BTreeSet<Option<Alias>>>,
@@ -761,7 +746,7 @@ fn add_token_node_shapes(
                 |alias| (alias.value.as_str(), alias.kind()),
             );
             add_token_node_shape(
-                node_shapes_json,
+                node_shapes,
                 &mut anonymous_node_shapes,
                 name,
                 kind,
@@ -780,7 +765,7 @@ fn add_token_node_shapes(
                 |alias| (alias.value.as_str(), alias.kind()),
             );
             add_token_node_shape(
-                node_shapes_json,
+                node_shapes,
                 &mut anonymous_node_shapes,
                 name,
                 kind,
@@ -793,7 +778,7 @@ fn add_token_node_shapes(
 }
 
 fn add_token_node_shape(
-    node_shapes_json: &mut BTreeMap<String, NodeShapeRecord>,
+    node_shapes: &mut BTreeMap<String, NodeShapeRecord>,
     anonymous_node_shapes: &mut Vec<NodeShapeRecord>,
     name: &str,
     kind: VariableType,
@@ -801,13 +786,13 @@ fn add_token_node_shape(
 ) {
     match kind {
         VariableType::Named => {
-            let node_shape_json = node_shapes_json.entry(name.to_string()).or_insert_with(|| {
+            let node_shape = node_shapes.entry(name.to_string()).or_insert_with(|| {
                 NodeShapeRecord::bare(name.to_string(), true, extra_names.contains(name))
             });
-            if let Some(children) = &mut node_shape_json.children {
+            if let Some(children) = &mut node_shape.children {
                 children.required = false;
             }
-            if let Some(fields) = &mut node_shape_json.fields {
+            if let Some(fields) = &mut node_shape.fields {
                 for field in fields.values_mut() {
                     field.required = false;
                 }
@@ -840,7 +825,7 @@ pub(super) fn symbol_node_metadata<'a>(
             let token = &syntax_grammar.external_tokens[symbol.index];
             (&token.name, token.kind)
         }
-        SymbolType::End | SymbolType::EndOfNonTerminalExtra => panic!("Unexpected symbol type"),
+        SymbolType::End => panic!("Unexpected symbol type"),
     }
 }
 
@@ -907,10 +892,7 @@ pub(super) fn variable_type_for_child_type(
             if syntax_grammar.supertype_symbols.contains(symbol) {
                 VariableType::Named
             } else if syntax_grammar.variables_to_inline.contains(symbol)
-                || matches!(
-                    symbol.kind,
-                    SymbolType::End | SymbolType::EndOfNonTerminalExtra
-                )
+                || symbol.kind == SymbolType::End
             {
                 VariableType::Hidden
             } else {

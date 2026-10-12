@@ -68,13 +68,6 @@ pub fn color_arg() -> Arg {
         .help("Colorize output")
 }
 
-pub fn json_arg() -> Arg {
-    Arg::new("json")
-        .long("json")
-        .action(ArgAction::SetTrue)
-        .help("Output diagnostics as JSON")
-}
-
 pub fn query_view_arg() -> Arg {
     Arg::new("query_view")
         .long("query-view")

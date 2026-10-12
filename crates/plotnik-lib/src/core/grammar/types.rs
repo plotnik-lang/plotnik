@@ -1,8 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
-use serde::{Deserialize, Serialize};
-
 use crate::core::{Cardinality, NodeClass, NodeFieldId, NodeKind, NodeKindId};
 
 use super::GrammarIdentity;
@@ -556,16 +554,12 @@ impl<'a> SubtypeResolver<'a> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NodeShape {
-    #[serde(rename = "type")]
     pub(crate) kind_name: String,
     pub(crate) named: bool,
-    #[serde(default)]
     pub(crate) root: bool,
-    #[serde(default)]
     pub(crate) extra: bool,
-    #[serde(default)]
     pub(crate) fields: HashMap<String, NodeSlot>,
     pub(crate) children: Option<NodeSlot>,
     pub(crate) subtypes: Option<Vec<NodeKindRef>>,
@@ -582,16 +576,15 @@ impl NodeShape {
 }
 
 /// Cardinality constraints for a field or children slot.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NodeSlot {
     pub(crate) multiple: bool,
     pub(crate) required: bool,
     pub(crate) types: Vec<NodeKindRef>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NodeKindRef {
-    #[serde(rename = "type")]
     pub(crate) kind_name: String,
     pub(crate) named: bool,
 }

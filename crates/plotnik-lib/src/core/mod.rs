@@ -6,16 +6,12 @@ mod interner;
 mod invariants;
 #[cfg(feature = "vm")]
 mod tree_dump;
-#[cfg(feature = "vm")]
-mod tree_json;
 pub mod utils;
 
 pub use colors::Colors;
 pub use interner::{Interner, Symbol};
 #[cfg(feature = "vm")]
 pub use tree_dump::{DumpChunk, DumpChunkKind, DumpNode, TreeDump, dump_tree, dump_tree_text};
-#[cfg(feature = "vm")]
-pub use tree_json::tree_to_json;
 
 // Shared with the runtime crate: the compiler resolves names to these ids and
 // classes; the engine (VM or generated code) consumes them against live trees.

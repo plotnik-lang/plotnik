@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::prepared::{ExtractedLexicalGrammar, LexicalGrammar, LexicalVariable};
 
 pub type ExpandTokensResult<T> = Result<T, ExpandTokensError>;
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub enum ExpandTokensError {
     #[error(
         "The rule `{0}` matches the empty string.

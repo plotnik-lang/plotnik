@@ -190,10 +190,6 @@ impl Diagnostics {
             .collect()
     }
 
-    pub fn render_json(&self, sources: &SourceMap) -> String {
-        serde_json::to_string(&self.to_wire(sources)).expect("diagnostics serialize to JSON")
-    }
-
     pub fn extend(&mut self, other: Diagnostics) {
         self.messages.extend(other.messages);
     }

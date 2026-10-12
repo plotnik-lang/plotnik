@@ -1,6 +1,5 @@
 use rustc_hash::FxHashSet;
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::{
@@ -12,7 +11,7 @@ use super::super::{
 
 pub type FlattenGrammarResult<T> = Result<T, FlattenGrammarError>;
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub enum FlattenGrammarError {
     #[error("No such reserved word set: {0}")]
     NoReservedWordSet(String),

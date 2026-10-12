@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use sha2::{Digest, Sha256};
 
 /// Exact grammar artifact used to bind a query.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GrammarIdentity {
     pub(crate) name: String,
     pub(crate) sha256: String,

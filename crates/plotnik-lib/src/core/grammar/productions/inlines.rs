@@ -1,6 +1,5 @@
 use rustc_hash::FxHashMap;
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::{
@@ -10,7 +9,7 @@ use super::super::{
 
 pub type ProcessInlinesResult<T> = Result<T, ProcessInlinesError>;
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub enum ProcessInlinesError {
     #[error("External token `{0}` cannot be inlined")]
     ExternalToken(String),

@@ -1,31 +1,28 @@
 use std::{collections::BTreeMap, fmt, hash::Hash};
 
-use serde::{Deserialize, Serialize};
-
 use super::prepared::VariableType;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolType {
     External = 0,
     End = 1,
-    EndOfNonTerminalExtra = 2,
     Terminal = 3,
     NonTerminal = 4,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Associativity {
     Left,
     Right,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Alias {
     pub value: String,
     pub is_named: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum Precedence {
     #[default]
     None,
@@ -35,7 +32,7 @@ pub enum Precedence {
 
 pub type AliasMap = BTreeMap<Symbol, Alias>;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct MetadataParams {
     pub precedence: Precedence,
     pub dynamic_precedence: i32,
@@ -46,13 +43,13 @@ pub struct MetadataParams {
     pub field_name: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Symbol {
     pub kind: SymbolType,
     pub index: usize,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Rule {
     #[default]
     Blank,

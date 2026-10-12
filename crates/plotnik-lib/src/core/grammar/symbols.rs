@@ -1,6 +1,5 @@
 use log::warn;
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
@@ -9,7 +8,7 @@ use super::{
     rules::{Rule, Symbol},
 };
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub enum InternSymbolsError {
     #[error("A grammar must define a start rule.")]
     MissingStartRule,

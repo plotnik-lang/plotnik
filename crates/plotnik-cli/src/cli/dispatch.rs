@@ -21,7 +21,6 @@ pub struct CheckOpts {
     pub query_text: Option<String>,
     pub grammar: PathBuf,
     pub strict: bool,
-    pub json: bool,
     pub color: ColorChoice,
 }
 
@@ -32,7 +31,6 @@ impl CheckOpts {
             query_text: m.get_one::<String>("query_text").cloned(),
             grammar: grammar_path(m),
             strict: m.get_flag("strict"),
-            json: m.get_flag("json"),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -45,7 +43,6 @@ impl From<CheckOpts> for CheckArgs {
             query_text: p.query_text,
             grammar: p.grammar,
             strict: p.strict,
-            json: p.json,
             color: p.color.should_colorize(),
         }
     }

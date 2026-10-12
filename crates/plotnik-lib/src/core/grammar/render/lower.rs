@@ -473,7 +473,7 @@ impl<'a> LowerCtx<'a> {
                     }),
                 }
             }
-            SymbolType::End | SymbolType::EndOfNonTerminalExtra => Shape::Empty,
+            SymbolType::End => Shape::Empty,
         }
     }
 }

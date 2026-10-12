@@ -82,7 +82,6 @@ struct Artifact {
 
 pub struct Artifacts {
     pub grammar: plotnik_lib::grammar::Grammar,
-    pub json: Vec<u8>,
     parser: WasmParser,
 }
 
@@ -255,11 +254,7 @@ fn artifacts(dir: &Path, json: &[u8], wasm: &[u8]) -> Result<Artifacts, CliError
     let grammar = grammar::from_bytes(json, &source)?;
     let parser = WasmParser::new(grammar.clone(), wasm)
         .map_err(|error| CliError::fatal(error.to_string()))?;
-    Ok(Artifacts {
-        grammar,
-        json: json.to_vec(),
-        parser,
-    })
+    Ok(Artifacts { grammar, parser })
 }
 
 fn is_hex(value: &str, len: usize) -> bool {

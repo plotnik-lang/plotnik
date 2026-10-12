@@ -24,10 +24,6 @@ fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
         .arg(limits_preset_arg().hide(true))
 }
 
-fn with_hidden_json_arg(cmd: Command) -> Command {
-    cmd.arg(json_arg().hide(true))
-}
-
 pub fn build_cli() -> Command {
     Command::new("plotnik")
         .about("Query language for tree-sitter syntax trees with type inference")
@@ -50,7 +46,6 @@ Run 'plotnik <command> --help' for options."#,
         .subcommand(generate_command())
         .subcommand(dump_command())
         .subcommand(trace_command())
-        .subcommand(inspect_command())
         .subcommand(lang_command())
         .subcommand(completions_command())
 }
@@ -105,7 +100,6 @@ pub fn tree_command() -> Command {
         .next_help_heading("Output options")
         .arg(query_view_arg())
         .arg(include_anonymous_arg())
-        .arg(json_arg().help("Output trees as JSON"))
         .next_help_heading("Global options")
         .arg(color_arg());
 
@@ -124,7 +118,7 @@ pub fn check_command() -> Command {
             r#"EXAMPLES:
   plotnik check query.ptk --grammar path/to/grammar.json
   plotnik check queries/ --grammar path/to/grammar.json
-  plotnik check -q 'Q = ...' --grammar path/to/grammar.json --json"#,
+  plotnik check -q 'Q = ...' --grammar path/to/grammar.json"#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
@@ -132,7 +126,6 @@ pub fn check_command() -> Command {
         .arg(grammar_arg())
         .next_help_heading("Check options")
         .arg(strict_arg())
-        .arg(json_arg())
         .next_help_heading("Global options")
         .arg(color_arg())
 }
@@ -213,7 +206,7 @@ pub fn run_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_trace_args(cmd))
+    with_hidden_trace_args(cmd)
 }
 
 pub fn trace_command() -> Command {
@@ -243,38 +236,7 @@ pub fn trace_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(cmd.arg(compact_arg().hide(true)))
-}
-
-pub fn inspect_command() -> Command {
-    let cmd = Command::new("inspect")
-        .about("Inspect query execution")
-        .override_usage(
-            "\
-  plotnik inspect <QUERY> <SOURCE> [--json]
-  plotnik inspect -q <TEXT> <SOURCE> [--json]
-  plotnik inspect -q <TEXT> -s <TEXT> -l <LANG> [--json]",
-        )
-        .arg(query_path_arg())
-        .arg(source_path_arg())
-        .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(source_text_arg())
-        .arg(lang_arg())
-        .arg(cache_dir_arg())
-        .arg(entry_arg())
-        .next_help_heading("Inspect options")
-        .arg(json_arg().help("Output the full inspect bundle as JSON"))
-        .arg(verbose_arg().help("Include the VM execution trace in the JSON bundle"))
-        .next_help_heading("Limit options")
-        .arg(fuel_arg())
-        .arg(max_memory_arg())
-        .arg(limits_preset_arg())
-        .next_help_heading("Global options")
-        .arg(color_arg());
-
     cmd.arg(compact_arg().hide(true))
-        .arg(no_result_arg().hide(true))
 }
 
 pub fn lang_command() -> Command {
@@ -316,12 +278,6 @@ fn lang_dump_command() -> Command {
             clap::Arg::new("no-legend")
                 .long("no-legend")
                 .help("Omit the legend header")
-                .action(clap::ArgAction::SetTrue),
-        )
-        .arg(
-            clap::Arg::new("json")
-                .long("json")
-                .help("Emit the raw grammar.json instead of tree shapes")
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(

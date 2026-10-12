@@ -6,7 +6,6 @@ use std::{
 
 use indexmap::IndexMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
@@ -14,14 +13,14 @@ use super::{
     rules::{Precedence, Rule},
 };
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 #[error(transparent)]
 pub enum ValidatePrecedenceError {
     Undeclared(#[from] UndeclaredPrecedenceError),
     Ordering(#[from] ConflictingPrecedenceOrderingError),
 }
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub struct IndirectRecursionError(pub Vec<String>);
 
 impl std::fmt::Display for IndirectRecursionError {
@@ -37,7 +36,7 @@ impl std::fmt::Display for IndirectRecursionError {
     }
 }
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub struct UndeclaredPrecedenceError {
     pub precedence: String,
     pub rule: String,
@@ -54,7 +53,7 @@ impl std::fmt::Display for UndeclaredPrecedenceError {
     }
 }
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Debug, Error)]
 pub struct ConflictingPrecedenceOrderingError {
     pub precedence_1: String,
     pub precedence_2: String,

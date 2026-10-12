@@ -48,7 +48,6 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
         }
         Some(("run", m)) => commands::run::run(m, commands::run::Mode::Run),
         Some(("trace", m)) => commands::run::run(m, commands::run::Mode::Trace),
-        Some(("inspect", m)) => commands::run::run(m, commands::run::Mode::Inspect),
         Some(("lang", m)) => match m.subcommand() {
             Some(("dump", m)) => commands::lang::run_dump(m),
             _ => unreachable!("clap should have caught this"),

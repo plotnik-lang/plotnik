@@ -1,7 +1,6 @@
 //! Canonical serializable form of diagnostics.
 //!
-//! The terminal renderer, CLI `--json` output, WASM API, and future LSP are
-//! all views over this schema. Field semantics:
+//! The WASM API returns diagnostics in this schema. Field semantics:
 //!
 //! - `code`: stable snake_case identifier derived from [`DiagnosticKind`]
 //! - `line`/`column`: 1-based; columns count Unicode scalar values
