@@ -1,5 +1,6 @@
-use crate::compiler::diagnostics::{Diagnostics, Error, SourceId, SourceMap};
+use crate::compiler::diagnostics::{Diagnostics, Error, Source, SourceId, SourceKind, SourceMap};
 use crate::compiler::parse::{ParseConfig, Root, parse_lossless};
+use crate::compiler::query::parse_grammar_declaration;
 
 use super::{model, render};
 
@@ -63,6 +64,21 @@ fn format_query_impl(source: &str, config: ParseConfig) -> FormatResult<(String,
         !output.ends_with('\n'),
         "the renderer returns a body without a terminal newline"
     );
+    let has_declaration = |content| {
+        !matches!(
+            parse_grammar_declaration(Source {
+                id: SourceId::default(),
+                kind: &SourceKind::Inline,
+                content,
+            }),
+            Ok(None)
+        )
+    };
+    // Removing leading blank lines or moving a trailing comment must not give
+    // an ordinary comment a new meaning. Invalid candidates count too.
+    if !has_declaration(source) && has_declaration(&output) {
+        output.insert(0, '\n');
+    }
     output.push('\n');
     Ok((output, file.normalization_work + rendered.work))
 }

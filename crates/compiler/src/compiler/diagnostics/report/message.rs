@@ -30,6 +30,7 @@ pub enum DiagnosticKind {
     ExpectedGrammarFieldName,
     ExpectedSubtype,
     ExpectedPredicateValue,
+    InvalidGrammarDeclaration,
 
     EmptyTree,
     EmptyAnonymousNode,
@@ -427,6 +428,7 @@ impl DiagnosticKind {
             Self::NegatedRequiredField => "this grammar field is always present",
             Self::UnsatisfiablePattern => "pattern can never match",
             Self::QueryTooComplex => "query too complex to compile",
+            Self::InvalidGrammarDeclaration => "invalid grammar declaration",
             Self::MissingDefName => "definition must be named",
             Self::TargetLimitExceeded => "emission target limit exceeded",
             Self::NoEntryPoints => "query defines no selectable entry point",

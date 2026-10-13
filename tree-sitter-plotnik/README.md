@@ -42,6 +42,8 @@ field values or branches, negated fields in sequences — as well as any
 children in `(ERROR)` and `(MISSING)`, and this grammar matches those
 rejections.
 
+First-line language declarations remain ordinary comments in this grammar. The compiler interprets and validates their selectors during source analysis, not syntax parsing.
+
 Known micro-divergences on inputs that never compile anyway:
 
 - `=~ //` lexes as an empty predicate followed by a comment (reference:

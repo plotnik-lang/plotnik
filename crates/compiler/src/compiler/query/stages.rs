@@ -139,6 +139,15 @@ pub(crate) struct QueryParsed {
 
 impl QueryParsed {
     pub(crate) fn analyze(mut self) -> crate::compiler::QueryResult<Query> {
+        for source in self.source_map.iter() {
+            if let Err(error) = super::parse_grammar_declaration(source) {
+                self.diag
+                    .report(DiagnosticKind::InvalidGrammarDeclaration, error.span)
+                    .hint(error.message)
+                    .emit();
+            }
+        }
+
         let Some(validated) = validate_ast(ShapeValidationInput {
             source_map: &self.source_map,
             ast_map: &self.ast_map,

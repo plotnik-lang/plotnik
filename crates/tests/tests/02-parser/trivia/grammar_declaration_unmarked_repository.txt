@@ -1,0 +1,21 @@
+// owner//repo@
+Q = (identifier)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  LineComment "// owner//repo@"
+  Newline "\n"
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

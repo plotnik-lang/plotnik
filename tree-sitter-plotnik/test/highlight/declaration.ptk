@@ -1,0 +1,3 @@
+// !typescript@main
+; <- @comment
+Q = (program)

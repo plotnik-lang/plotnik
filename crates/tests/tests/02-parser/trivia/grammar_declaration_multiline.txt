@@ -1,0 +1,22 @@
+/* !javascript@
+*/
+Q = (identifier)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  BlockComment "/* !javascript@\n*/"
+  Newline "\n"
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

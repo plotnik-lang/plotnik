@@ -1,0 +1,23 @@
+ 	/* !tsx */ 	
+Q = (identifier)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Whitespace " \t"
+  BlockComment "/* !tsx */"
+  Whitespace " \t"
+  Newline "\n"
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

@@ -1,0 +1,11 @@
+// !
+Q = (identifier)
+------------------ DIAGNOSTICS -------------------
+error: invalid grammar declaration
+ --> query.ptk:1:5
+  |
+1 | // !
+  |     ^
+  |
+help: expected language name or owner/repo[/grammar-directory] without empty or traversal components
+------------------ DEFINITIONS -------------------

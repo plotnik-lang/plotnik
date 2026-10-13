@@ -1,0 +1,21 @@
+// !javascript@ABCDEF0123456789ABCDEF0123456789ABCDEF01
+Q = (identifier)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  LineComment "// !javascript@ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+  Newline "\n"
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

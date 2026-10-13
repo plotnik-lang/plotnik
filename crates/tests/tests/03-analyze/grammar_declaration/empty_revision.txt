@@ -1,0 +1,11 @@
+// !javascript@
+Q = (identifier)
+------------------ DIAGNOSTICS -------------------
+error: invalid grammar declaration
+ --> query.ptk:1:5
+  |
+1 | // !javascript@
+  |     ^^^^^^^^^^^
+  |
+help: expected language@revision with a nonempty revision
+------------------ DEFINITIONS -------------------

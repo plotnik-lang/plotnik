@@ -1,4 +1,6 @@
-use plotnik_compiler::{FormatError, QueryToken, format_query, tokenize};
+use plotnik_compiler::{
+    FormatError, QueryToken, SourceMap, format_query, parse_grammar_declaration, tokenize,
+};
 use similar::TextDiff;
 
 pub enum Assessment {
@@ -48,6 +50,17 @@ pub fn evaluate(query: &str, name: &str) -> Result<Assessment, String> {
 }
 
 fn assert_contract(input: &str, output: &str, name: &str) -> Result<(), String> {
+    let declaration = |content| {
+        parse_grammar_declaration(SourceMap::from_inline(content).source(Default::default()))
+            .map(|declaration| declaration.map(|declaration| declaration.selector))
+            .map_err(|error| error.message)
+    };
+    if declaration(input) != declaration(output) {
+        return Err(format!(
+            "formatter changed grammar declaration for `{name}`"
+        ));
+    }
+
     let input_tokens = tokenize(input);
     let output_tokens = tokenize(output);
     let input_significant = significant_token_signature(input, &input_tokens);
