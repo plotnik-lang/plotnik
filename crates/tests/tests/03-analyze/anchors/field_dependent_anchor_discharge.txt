@@ -1,0 +1,13 @@
+Tail = {
+  (_)
+  .
+}
+
+Discharge = {
+  (Tail)
+  left: (_)
+}
+------------------ DEFINITIONS -------------------
+Tail
+Discharge
+  Tail

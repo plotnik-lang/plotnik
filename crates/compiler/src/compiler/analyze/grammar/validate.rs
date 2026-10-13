@@ -122,8 +122,8 @@ impl GrammarBinder<'_, '_> {
 
                 self.pattern_can_match_root(&located.wrap(first), grammar_root, seen_refs)
             }
-            // Bare fields are already reported by grammar validation; avoid piling a
-            // entry point root warning onto malformed structure.
+            // Incoming fields are supplied by enclosing nodes. Standalone
+            // eligibility handles this context requirement.
             Pattern::FieldPattern(_) => true,
         }
     }

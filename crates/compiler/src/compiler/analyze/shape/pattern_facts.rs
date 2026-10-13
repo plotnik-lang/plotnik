@@ -14,13 +14,13 @@ use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{Pattern, QuantifierKind, SeqItem};
 
 use super::RootExtent;
-use super::anchor_context::{self, AnchorContextRelation};
+use super::context::{self, ContextRelation};
 
 #[derive(Clone, PartialEq, Eq)]
 struct PatternSummary {
     nullable: bool,
     root_extent: RootExtent,
-    anchor_context: AnchorContextRelation,
+    context: ContextRelation,
     boundary: BoundaryRelation,
     may_match_anonymous_node: bool,
 }
@@ -30,7 +30,7 @@ impl PatternSummary {
         Self {
             nullable: false,
             root_extent: RootExtent::SingleNode,
-            anchor_context: AnchorContextRelation::impossible(),
+            context: ContextRelation::impossible(),
             boundary: BoundaryRelation::empty(),
             may_match_anonymous_node: false,
         }
@@ -40,7 +40,7 @@ impl PatternSummary {
         Self {
             nullable: false,
             root_extent: RootExtent::SingleNode,
-            anchor_context: AnchorContextRelation::atom(),
+            context: ContextRelation::atom(),
             boundary: BoundaryRelation::atom(class),
             may_match_anonymous_node: matches!(class, FirstClass::Anonymous | FirstClass::Either),
         }
@@ -50,7 +50,7 @@ impl PatternSummary {
         Self {
             nullable: false,
             root_extent: RootExtent::SingleNode,
-            anchor_context: AnchorContextRelation::identity(),
+            context: ContextRelation::identity(),
             boundary: BoundaryRelation::identity(),
             may_match_anonymous_node: false,
         }
@@ -60,7 +60,7 @@ impl PatternSummary {
         Self {
             nullable: true,
             root_extent: RootExtent::SingleNode,
-            anchor_context: AnchorContextRelation::identity(),
+            context: ContextRelation::identity(),
             boundary: BoundaryRelation::identity(),
             may_match_anonymous_node: false,
         }
@@ -70,7 +70,7 @@ impl PatternSummary {
         Self {
             nullable: false,
             root_extent: RootExtent::SingleNode,
-            anchor_context: AnchorContextRelation::atom(),
+            context: ContextRelation::atom(),
             boundary: BoundaryRelation::empty(),
             may_match_anonymous_node: false,
         }
@@ -80,7 +80,7 @@ impl PatternSummary {
         DefinitionFacts {
             nullable: self.nullable,
             root_extent: self.root_extent,
-            anchor_context: self.anchor_context,
+            context: self.context,
             boundary: self.boundary,
         }
     }
@@ -98,7 +98,7 @@ impl PatternSummary {
 struct DefinitionFacts {
     nullable: bool,
     root_extent: RootExtent,
-    anchor_context: AnchorContextRelation,
+    context: ContextRelation,
     boundary: BoundaryRelation,
 }
 
@@ -177,14 +177,13 @@ impl PatternFacts {
 
     pub(crate) fn is_entry_point_eligible(&self, def_id: DefId) -> bool {
         let facts = self.definition(def_id);
-        facts.root_extent == RootExtent::SingleNode
-            && !facts.anchor_context.requires_external_context()
+        facts.root_extent == RootExtent::SingleNode && !facts.context.requires_external_context()
     }
 
     pub(crate) fn definition_requires_external_anchor_context(&self, def_id: DefId) -> bool {
         self.definition(def_id)
-            .anchor_context
-            .requires_external_context()
+            .context
+            .requires_external_anchor_context()
     }
 
     pub(crate) fn exported_anchor_ranges(
@@ -192,7 +191,7 @@ impl PatternFacts {
         def_id: DefId,
         definitions: &DefinitionGraph,
     ) -> Vec<TextRange> {
-        anchor_context::exported_anchor_ranges(self, def_id, definitions)
+        context::exported_anchor_ranges(self, def_id, definitions)
     }
 
     pub(crate) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
@@ -230,8 +229,8 @@ impl PatternFacts {
         &self.definition(def_id).boundary
     }
 
-    pub(super) fn definition_anchor_context(&self, def_id: DefId) -> &AnchorContextRelation {
-        &self.definition(def_id).anchor_context
+    pub(super) fn definition_context(&self, def_id: DefId) -> &ContextRelation {
+        &self.definition(def_id).context
     }
 
     fn definition(&self, def_id: DefId) -> &DefinitionFacts {
@@ -311,6 +310,7 @@ fn summarize_pattern(
             // their definition-level extent and nullability conservative.
             summary.nullable = false;
             summary.root_extent = RootExtent::SingleNode;
+            summary.context = summary.context.with_incoming_field();
             summary
         }
         Pattern::SeqPattern(sequence) => {
@@ -319,9 +319,7 @@ fn summarize_pattern(
             for item in sequence.items() {
                 match item {
                     SeqItem::Anchor(anchor) => {
-                        summary.anchor_context = summary
-                            .anchor_context
-                            .then(&AnchorContextRelation::anchor());
+                        summary.context = summary.context.then(&ContextRelation::anchor());
                         summary.boundary = summary.boundary.anchor(if anchor.is_exact() {
                             PendingAnchor::Exact
                         } else {
@@ -336,7 +334,7 @@ fn summarize_pattern(
                             0 => child.root_extent,
                             _ => RootExtent::NotSingleNode,
                         };
-                        summary.anchor_context = summary.anchor_context.then(&child.anchor_context);
+                        summary.context = summary.context.then(&child.context);
                         summary.boundary = summary.boundary.then(&child.boundary);
                         summary.may_match_anonymous_node |= child.may_match_anonymous_node;
                         pattern_count += 1;
@@ -353,12 +351,12 @@ fn summarize_pattern(
                 let child = summarize_child(&body, definition_summaries, definitions, patterns);
                 summary.nullable |= child.nullable;
                 summary.root_extent = summary.root_extent.combine(child.root_extent);
-                summary.anchor_context.union_with(&child.anchor_context);
+                summary.context.union_with(&child.context);
                 summary.boundary.union_with(&child.boundary);
                 summary.may_match_anonymous_node |= child.may_match_anonymous_node;
             }
             if !had_alternative {
-                summary.anchor_context = AnchorContextRelation::identity();
+                summary.context = ContextRelation::identity();
                 summary.boundary = BoundaryRelation::identity();
             }
             summary
@@ -372,7 +370,7 @@ fn summarize_pattern(
             if let Some(kind) = quantified.quantifier_kind() {
                 summary.nullable =
                     matches!(kind, QuantifierKind::Optional | QuantifierKind::ZeroOrMore);
-                summary.anchor_context = summary.anchor_context.quantified(kind);
+                summary.context = summary.context.quantified(kind);
                 summary.boundary = summary.boundary.quantified(kind);
             }
             summary

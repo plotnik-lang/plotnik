@@ -1,0 +1,80 @@
+error[E0599]: no associated function or constant named `parse` found for struct `__plotnik_341c25db::Left<'t>` in the current scope
+  --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:15:19
+   |
+ 1 | / plotnik::query! {
+ 2 | |     grammar = "tree-sitter-javascript",
+ 3 | |     r#"
+ 4 | |     Left = left: (_) @node
+...  |
+11 | |     "#
+12 | | }
+   | |_- associated function or constant `parse` not found for this struct
+...
+15 |       let _ = Left::parse(tree, source);
+   |                     ^^^^^ associated function or constant not found in `__plotnik_341c25db::Left<'_>`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following traits define an item `parse`, perhaps you need to implement one of them:
+           candidate #1: `ciborium_ll::seg::Parser`
+           candidate #2: `clap::Parser`
+           candidate #3: `clap::builder::TypedValueParser`
+           candidate #4: `plotnik::Parse`
+
+error[E0599]: no associated function or constant named `matches` found for struct `__plotnik_341c25db::Wrapped<'t>` in the current scope
+  --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:16:22
+   |
+ 1 | / plotnik::query! {
+ 2 | |     grammar = "tree-sitter-javascript",
+ 3 | |     r#"
+ 4 | |     Left = left: (_) @node
+...  |
+11 | |     "#
+12 | | }
+   | |_- associated function or constant `matches` not found for this struct
+...
+16 |       let _ = Wrapped::matches(tree, source);
+   |                        ^^^^^^^ associated function or constant not found in `__plotnik_341c25db::Wrapped<'_>`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `matches`, perhaps you need to implement it:
+           candidate #1: `plotnik::Matches`
+
+error[E0599]: no associated function or constant named `matches` found for struct `__plotnik_341c25db::Choice<'t>` in the current scope
+  --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:17:21
+   |
+ 1 | / plotnik::query! {
+ 2 | |     grammar = "tree-sitter-javascript",
+ 3 | |     r#"
+ 4 | |     Left = left: (_) @node
+...  |
+11 | |     "#
+12 | | }
+   | |_- associated function or constant `matches` not found for this struct
+...
+17 |       let _ = Choice::matches(tree, source);
+   |                       ^^^^^^^ associated function or constant not found in `__plotnik_341c25db::Choice<'_>`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `matches`, perhaps you need to implement it:
+           candidate #1: `plotnik::Matches`
+
+error[E0433]: cannot find type `Mixed` in this scope
+  --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:18:13
+   |
+18 |     let _ = Mixed::matches(tree, source);
+   |             ^^^^^ use of undeclared type `Mixed`
+
+error[E0425]: cannot find function `left_journal` in this scope
+  --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:19:13
+   |
+ 1 | plotnik::query! {
+   | --------------- similarly named function `q_journal` defined here
+...
+19 |     let _ = left_journal(tree, source);
+   |             ^^^^^^^^^^^^
+   |
+help: a function with a similar name exists
+   |
+19 -     let _ = left_journal(tree, source);
+19 +     let _ = q_journal(tree, source);
+   |

@@ -1,10 +1,8 @@
-//! External sibling context required by definition bodies.
+//! Caller context required by definition bodies.
 //!
-//! A boundary anchor in a reusable definition is not inherently invalid. Its
-//! predecessor or follower may live at the call site, just as it would after
-//! syntactically inlining the body. This analysis records whether successful
-//! paths still require the caller's leading or trailing boundary after groups,
-//! references, nullable paths, alternations, and quantifiers have composed.
+//! Consuming neighbors satisfy exposed anchors, but incoming fields require
+//! a parent edge. An enclosing node supplies its children's context. Outcomes
+//! retain consumption and outstanding requirements through composition.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -20,31 +18,36 @@ use super::PatternFacts;
 ///
 /// `needs_left` and `needs_right` describe anchors that remain exposed at this
 /// pattern's boundaries. A consuming neighbor supplied by sequence composition
-/// discharges the corresponding need.
+/// discharges the corresponding need. An incoming field remains required
+/// throughout same-level composition.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct AnchorContextOutcome {
+pub(super) struct ContextOutcome {
     consumed: bool,
     needs_left: bool,
     needs_right: bool,
+    needs_incoming_field: bool,
 }
 
-impl AnchorContextOutcome {
+impl ContextOutcome {
     pub(super) const IDENTITY: Self = Self {
         consumed: false,
         needs_left: false,
         needs_right: false,
+        needs_incoming_field: false,
     };
 
     pub(super) const ATOM: Self = Self {
         consumed: true,
         needs_left: false,
         needs_right: false,
+        needs_incoming_field: false,
     };
 
     pub(super) const ANCHOR: Self = Self {
         consumed: false,
         needs_left: true,
         needs_right: true,
+        needs_incoming_field: false,
     };
 
     pub(super) fn then(self, next: Self) -> Self {
@@ -52,38 +55,52 @@ impl AnchorContextOutcome {
             consumed: self.consumed || next.consumed,
             needs_left: self.needs_left || (!self.consumed && next.needs_left),
             needs_right: next.needs_right || (!next.consumed && self.needs_right),
+            needs_incoming_field: self.needs_incoming_field || next.needs_incoming_field,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct AnchorContextRelation {
-    outcomes: BTreeSet<AnchorContextOutcome>,
+pub(super) struct ContextRelation {
+    outcomes: BTreeSet<ContextOutcome>,
 }
 
-impl AnchorContextRelation {
+impl ContextRelation {
     pub(super) fn impossible() -> Self {
         Self {
             outcomes: BTreeSet::new(),
         }
     }
 
-    pub(super) fn singleton(outcome: AnchorContextOutcome) -> Self {
+    pub(super) fn singleton(outcome: ContextOutcome) -> Self {
         Self {
             outcomes: BTreeSet::from([outcome]),
         }
     }
 
     pub(super) fn identity() -> Self {
-        Self::singleton(AnchorContextOutcome::IDENTITY)
+        Self::singleton(ContextOutcome::IDENTITY)
     }
 
     pub(super) fn atom() -> Self {
-        Self::singleton(AnchorContextOutcome::ATOM)
+        Self::singleton(ContextOutcome::ATOM)
     }
 
     pub(super) fn anchor() -> Self {
-        Self::singleton(AnchorContextOutcome::ANCHOR)
+        Self::singleton(ContextOutcome::ANCHOR)
+    }
+
+    pub(super) fn with_incoming_field(self) -> Self {
+        Self {
+            outcomes: self
+                .outcomes
+                .into_iter()
+                .map(|outcome| ContextOutcome {
+                    needs_incoming_field: true,
+                    ..outcome
+                })
+                .collect(),
+        }
     }
 
     pub(super) fn union_with(&mut self, other: &Self) {
@@ -147,6 +164,12 @@ impl AnchorContextRelation {
     }
 
     pub(super) fn requires_external_context(&self) -> bool {
+        self.outcomes.iter().any(|outcome| {
+            outcome.needs_left || outcome.needs_right || outcome.needs_incoming_field
+        })
+    }
+
+    pub(super) fn requires_external_anchor_context(&self) -> bool {
         self.outcomes
             .iter()
             .any(|outcome| outcome.needs_left || outcome.needs_right)
@@ -168,12 +191,7 @@ impl BoundaryAnchorRanges {
         }
     }
 
-    fn then(
-        &self,
-        prefix: AnchorContextOutcome,
-        next: &Self,
-        suffix: AnchorContextOutcome,
-    ) -> Self {
+    fn then(&self, prefix: ContextOutcome, next: &Self, suffix: ContextOutcome) -> Self {
         let mut combined = Self::default();
         combined.left.extend(self.left.iter().copied());
         if !prefix.consumed {
@@ -195,12 +213,12 @@ impl BoundaryAnchorRanges {
 
 /// Context outcomes annotated with authored anchors that remain exposed.
 ///
-/// Ranges are grouped by `AnchorContextOutcome`: composition only consults that
+/// Ranges are grouped by anchor-only `ContextOutcome`: composition only consults that
 /// outcome's consumption flags, so merging ranges for equivalent outcomes
 /// preserves path sensitivity without retaining every syntactic path.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct AnchorRangeRelation {
-    outcomes: BTreeMap<AnchorContextOutcome, BoundaryAnchorRanges>,
+    outcomes: BTreeMap<ContextOutcome, BoundaryAnchorRanges>,
 }
 
 impl AnchorRangeRelation {
@@ -210,37 +228,38 @@ impl AnchorRangeRelation {
         }
     }
 
-    fn singleton(outcome: AnchorContextOutcome, ranges: BoundaryAnchorRanges) -> Self {
+    fn singleton(outcome: ContextOutcome, ranges: BoundaryAnchorRanges) -> Self {
         Self {
             outcomes: BTreeMap::from([(outcome, ranges)]),
         }
     }
 
     fn identity() -> Self {
-        Self::singleton(
-            AnchorContextOutcome::IDENTITY,
-            BoundaryAnchorRanges::default(),
-        )
+        Self::singleton(ContextOutcome::IDENTITY, BoundaryAnchorRanges::default())
     }
 
     pub(super) fn atom() -> Self {
-        Self::singleton(AnchorContextOutcome::ATOM, BoundaryAnchorRanges::default())
+        Self::singleton(ContextOutcome::ATOM, BoundaryAnchorRanges::default())
     }
 
     pub(super) fn anchor(range: TextRange) -> Self {
-        Self::singleton(
-            AnchorContextOutcome::ANCHOR,
-            BoundaryAnchorRanges::anchor(range),
-        )
+        Self::singleton(ContextOutcome::ANCHOR, BoundaryAnchorRanges::anchor(range))
     }
 
-    fn from_anchor_context(relation: &AnchorContextRelation) -> Self {
+    fn from_context(relation: &ContextRelation) -> Self {
         Self {
             outcomes: relation
                 .outcomes
                 .iter()
-                .copied()
-                .map(|outcome| (outcome, BoundaryAnchorRanges::default()))
+                .map(|&outcome| {
+                    (
+                        ContextOutcome {
+                            needs_incoming_field: false,
+                            ..outcome
+                        },
+                        BoundaryAnchorRanges::default(),
+                    )
+                })
                 .collect(),
         }
     }
@@ -393,9 +412,7 @@ fn compute_anchor_ranges(
             let Some(def_id) = definitions.reference_target(reference) else {
                 return AnchorRangeRelation::atom();
             };
-            AnchorRangeRelation::from_anchor_context(
-                pattern_facts.definition_anchor_context(def_id),
-            )
+            AnchorRangeRelation::from_context(pattern_facts.definition_context(def_id))
         }
     }
 }

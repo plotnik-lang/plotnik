@@ -1,0 +1,201 @@
+Left = left: (_) @node
+Alias = (Left) @value
+Wrapped = {(Alias) @value}
+
+Choice = [
+  {
+    left: (_) @node
+  }
+  {
+    right: (_) @node
+  }
+]
+
+Mixed = [
+  (Left)
+  (_)
+]
+
+Q = (program
+  (expression_statement
+    (binary_expression
+      (Wrapped) @left
+      (Choice) @right
+    )
+  )
+)
+--------------------- INPUT ----------------------
+x + 42;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  left: Wrapped;
+  right: Choice;
+}
+
+export interface Wrapped {
+  value: Alias;
+}
+
+export interface Alias {
+  value: Left;
+}
+
+export interface Left {
+  node: Node;
+}
+
+export interface Choice {
+  node: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "left": {
+    "value": {
+      "value": {
+        "node": {
+          "kind": "identifier",
+          "span": [0, 1],
+          "text": "x"
+        }
+      }
+    }
+  },
+  "right": {
+    "node": {
+      "kind": "number",
+      "span": [4, 6],
+      "text": "42"
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "node"
+S02 "value"
+S03 "left"
+S04 "right"
+S05 "Left"
+S06 "Alias"
+S07 "Wrapped"
+S08 "Choice"
+S09 "Q"
+S10 "program"
+S11 "expression_statement"
+S12 "binary_expression"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { node }
+T2 = Record  M1:1  ; { value }
+T3 = Record  M2:1  ; { value }
+T4 = Record  M3:1  ; { node }
+T5 = Record  M4:2  ; { left, right }
+
+[type_members]
+M0: S01 → T0  ; node: <Node>
+M1: S02 → T1  ; value: Left
+M2: S02 → T2  ; value: Alias
+M3: S01 → T0  ; node: <Node>
+M4: S03 → T3  ; left: Wrapped
+M5: S04 → T4  ; right: Choice
+
+[type_names]
+N0: S05 → T1  ; Left
+N1: S06 → T2  ; Alias
+N2: S07 → T3  ; Wrapped
+N3: S08 → T4  ; Choice
+N4: S09 → T5  ; Q
+
+[entry_points]
+Q = 00 :: T5
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (binary_expression) [RecordOpen]  04
+  04  └‣─  (@35)                            35 : 05
+  05  -ε-  [RecordClose RecordSet(M4) RecordOpen]  07
+  07  ─‣─  (@18)                            18 : 08
+  08  -ε-  [RecordClose]                    10
+  10  ─‣┘³ _ [RecordSet(M5)]                12
+  12                                        ▶
+  13                                        ▶
+  14   !   left: (_) [Node RecordSet(M3)]   13
+  16   !   right: (_) [Node RecordSet(M3)]  13
+  18  -ε-                                   14, 16
+  20                                        ▶
+  21                                        ▶
+  22                                        ▶
+  23  ...
+  24   !   left: (_) [Node RecordSet(M0)]   22
+  26  -ε-  [RecordClose RecordSet(M1)]      21
+  28   !   (@24)                            24 : 26
+  29  -ε-  [RecordOpen]                     28
+  31  ...
+  32  -ε-  [RecordClose RecordSet(M2)]      20
+  34   !   (@29)                            29 : 32
+  35  -ε-  [RecordOpen]                     34
+--------------------- TRACE ----------------------
+Q:
+  00       (program)                        01
+       ●   program
+  01       (expression_statement)           02
+       ●   expression_statement
+  02       (binary_expression) [RecordOpen]  04
+       ●   binary_expression
+  04       (@35)                            35 : 05
+       ▶   (@35)
+
+@35:
+  35  -ε-  [RecordOpen]                     34
+  34       (@29)                            29 : 32
+       ▶   (@29)
+
+@29:
+  29  -ε-  [RecordOpen]                     28
+  28       (@24)                            24 : 26
+       ▶   (@24)
+
+@24:
+  24       left: (_) [Node RecordSet(M0)]   22
+       ●   identifier
+  22   ◀   (@24)                            
+
+@29:
+  26  -ε-  [RecordClose RecordSet(M1)]      21
+  21   ◀   (@29)                            
+
+@35:
+  32  -ε-  [RecordClose RecordSet(M2)]      20
+  20   ◀   (@35)                            
+
+Q:
+  05  -ε-  [RecordClose RecordSet(M4) RecordOpen]  07
+  07       (@18)                            18 : 08
+       ▶   (@18)
+
+@18:
+  18  -ε-                                   14, 16
+  14       left: (_) [Node RecordSet(M3)]   13
+       ○   +
+  18  ❮❮❮ 
+  16       right: (_) [Node RecordSet(M3)]  13
+       ○   +
+  07  ❮❮❮ 
+       ▶   (@18)
+
+@18:
+  18  -ε-                                   14, 16
+  14       left: (_) [Node RecordSet(M3)]   13
+  18  ❮❮❮ 
+  16       right: (_) [Node RecordSet(M3)]  13
+       ●   number
+  13   ◀   (@18)                            
+
+Q:
+  08  -ε-  [RecordClose]                    10
+  10       _ [RecordSet(M5)]                12
+       ●   program
+  12   ◀   (Q)                              ◼
