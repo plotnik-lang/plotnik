@@ -1,8 +1,8 @@
-/* !javascript */ Q = (identifier)
+/* @javascript */ Q = (identifier)
 ---------------------- CST -----------------------
 # query.ptk
 Root
-  BlockComment "/* !javascript */"
+  BlockComment "/* @javascript */"
   Whitespace " "
   Def
     Id "Q"

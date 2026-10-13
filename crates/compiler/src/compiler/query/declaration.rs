@@ -4,69 +4,13 @@ use rowan::TextRange;
 use crate::compiler::diagnostics::{Source, Span};
 use crate::compiler::parse::SyntaxKind;
 
-/// A language name or repository path with an optional Git revision.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LanguageSelector {
-    pub name: String,
-    pub revision: Option<String>,
-}
-
-impl LanguageSelector {
-    /// Parse exactly the selector accepted by CLI `--lang`, without trimming.
-    pub fn parse(input: &str) -> Result<Self, &'static str> {
-        let (name, revision) = match input.split_once('@') {
-            Some((name, revision)) => {
-                if revision.is_empty()
-                    || revision.contains('@')
-                    || revision.chars().any(char::is_whitespace)
-                    || revision.chars().any(char::is_control)
-                {
-                    return Err("expected language@revision with a nonempty revision");
-                }
-
-                let revision =
-                    if revision.len() == 40 && revision.bytes().all(|c| c.is_ascii_hexdigit()) {
-                        revision.to_ascii_lowercase()
-                    } else {
-                        revision.to_owned()
-                    };
-                (name, Some(revision))
-            }
-            None => (input, None),
-        };
-        if name.split('/').any(|part| {
-            part.is_empty()
-                || matches!(part, "." | "..")
-                || part.contains('\\')
-                || part.chars().any(char::is_control)
-        }) {
-            return Err(
-                "expected language name or owner/repo[/grammar-directory] without empty or traversal components",
-            );
-        }
-
-        Ok(Self {
-            name: name.to_owned(),
-            revision,
-        })
-    }
-}
-
 /// A first-line declaration. Raw spelling and spans exclude the line terminator.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GrammarDeclaration<'q> {
     pub raw: &'q str,
-    pub selector: LanguageSelector,
+    pub language: &'q str,
     pub span: Span,
-    pub selector_span: Span,
-}
-
-impl<'q> GrammarDeclaration<'q> {
-    pub fn raw_selector(&self) -> &'q str {
-        let start = usize::from(self.selector_span.range.start() - self.span.range.start());
-        let end = usize::from(self.selector_span.range.end() - self.span.range.start());
-        &self.raw[start..end]
-    }
+    pub language_span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,10 +59,10 @@ pub fn parse_grammar_declaration(
         &raw[padding..]
     };
     let payload = payload.trim_matches([' ', '\t']);
-    let Some(selector) = payload.strip_prefix('!') else {
+    let Some(language) = payload.strip_prefix('@') else {
         return Ok(None);
     };
-    let raw_selector = selector.trim_matches([' ', '\t']);
+    let language = language.trim_matches([' ', '\t']);
 
     let span_at = |start: usize, end: usize| {
         Span::new(
@@ -133,19 +77,24 @@ pub fn parse_grammar_declaration(
             ),
         )
     };
-    let selector_start = raw_selector.as_ptr() as usize - line.as_ptr() as usize;
+    let language_start = language.as_ptr() as usize - line.as_ptr() as usize;
     let span = span_at(comment.start, comment.end);
-    let selector_span = span_at(selector_start, selector_start + raw_selector.len());
-    let selector =
-        LanguageSelector::parse(raw_selector).map_err(|message| GrammarDeclarationError {
-            message,
-            span: selector_span,
-        })?;
+    let language_span = span_at(language_start, language_start + language.len());
+    if !language.starts_with(|c: char| c.is_ascii_alphabetic())
+        || !language
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
+    {
+        return Err(GrammarDeclarationError {
+            message: "expected a language name: a letter followed by letters, digits, '-' or '_'",
+            span: language_span,
+        });
+    }
 
     Ok(Some(GrammarDeclaration {
         raw,
-        selector,
+        language,
         span,
-        selector_span,
+        language_span,
     }))
 }

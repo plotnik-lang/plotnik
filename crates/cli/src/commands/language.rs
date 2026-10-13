@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use plotnik_compiler::{LanguageSelector, WasmParser};
+use plotnik_compiler::WasmParser;
 
 use super::grammar;
 use crate::error::CliError;
@@ -17,6 +17,51 @@ const CACHE_COMPONENT: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'_')
     .remove(b'.')
     .remove(b'@');
+
+struct LanguageSelector {
+    name: String,
+    revision: Option<String>,
+}
+
+impl LanguageSelector {
+    fn parse(input: &str) -> Result<Self, &'static str> {
+        let (name, revision) = match input.split_once('@') {
+            Some((name, revision)) => {
+                if revision.is_empty()
+                    || revision.contains('@')
+                    || revision.chars().any(char::is_whitespace)
+                    || revision.chars().any(char::is_control)
+                {
+                    return Err("expected language@revision with a nonempty revision");
+                }
+
+                let revision =
+                    if revision.len() == 40 && revision.bytes().all(|c| c.is_ascii_hexdigit()) {
+                        revision.to_ascii_lowercase()
+                    } else {
+                        revision.to_owned()
+                    };
+                (name, Some(revision))
+            }
+            None => (input, None),
+        };
+        if name.split('/').any(|part| {
+            part.is_empty()
+                || matches!(part, "." | "..")
+                || part.contains('\\')
+                || part.chars().any(char::is_control)
+        }) {
+            return Err(
+                "expected language name or owner/repo[/grammar-directory] without empty or traversal components",
+            );
+        }
+
+        Ok(Self {
+            name: name.to_owned(),
+            revision,
+        })
+    }
+}
 
 struct Artifact {
     build: String,

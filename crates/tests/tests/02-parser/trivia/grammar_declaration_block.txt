@@ -1,10 +1,10 @@
- 	/* !tsx */ 	
+ 	/* @tsx */ 	
 Q = (identifier)
 ---------------------- CST -----------------------
 # query.ptk
 Root
   Whitespace " \t"
-  BlockComment "/* !tsx */"
+  BlockComment "/* @tsx */"
   Whitespace " \t"
   Newline "\n"
   Def

@@ -1,9 +1,9 @@
-// !custom grammar
+// @custom-language
 Q = (identifier)
 ---------------------- CST -----------------------
 # query.ptk
 Root
-  LineComment "// !custom grammar"
+  LineComment "// @custom-language"
   Newline "\n"
   Def
     Id "Q"

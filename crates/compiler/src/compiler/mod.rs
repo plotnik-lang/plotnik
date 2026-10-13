@@ -33,6 +33,6 @@ pub use emit::{
 pub use fmt::{FormatError, FormatResult, format_query};
 pub use parse::{QueryToken, tokenize};
 pub use query::{
-    CompiledQuery, GrammarDeclaration, GrammarDeclarationError, LanguageSelector, Query,
-    QueryBuilder, parse_grammar_declaration,
+    CompiledQuery, GrammarDeclaration, GrammarDeclarationError, Query, QueryBuilder,
+    parse_grammar_declaration,
 };

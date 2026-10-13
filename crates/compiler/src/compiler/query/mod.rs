@@ -5,7 +5,5 @@ mod dump;
 mod printer;
 mod stages;
 
-pub use declaration::{
-    GrammarDeclaration, GrammarDeclarationError, LanguageSelector, parse_grammar_declaration,
-};
+pub use declaration::{GrammarDeclaration, GrammarDeclarationError, parse_grammar_declaration};
 pub use stages::{CompiledQuery, Query, QueryBuilder};

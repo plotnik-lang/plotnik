@@ -1,9 +1,9 @@
-//  ! 	javascript 	
+//  @ 	javascript 	
 ------------------ DIAGNOSTICS -------------------
 error: query defines nothing
  --> query.ptk:1:1
   |
-1 | //  !     javascript     
+1 | //  @     javascript     
   | ^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: add a definition, e.g. `Q = (identifier) @id`

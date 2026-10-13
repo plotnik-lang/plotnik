@@ -1,10 +1,10 @@
-﻿// !javascript
+﻿// @javascript
 Q = (identifier)
 ------------------ DIAGNOSTICS -------------------
 error: expected a pattern
  --> query.ptk:1:1
   |
-1 | ﻿// !javascript
+1 | ﻿// @javascript
   | ^
   |
 help: start with `(` for a node, `[` for an alternation, `{` for a sequence, a quote for a literal token, or `_` for a wildcard

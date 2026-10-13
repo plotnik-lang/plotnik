@@ -1,22 +1,22 @@
-// !javascript@
+// @javascript@main
 Q = (identifier)
 --------------------- INPUT ----------------------
 --------------- QUERY (other.ptk) ----------------
-; !
+; @owner/repo
 R = (identifier)
 ------------------ DIAGNOSTICS -------------------
 error: invalid grammar declaration
  --> query.ptk:1:5
   |
-1 | // !javascript@
-  |     ^^^^^^^^^^^
+1 | // @javascript@main
+  |     ^^^^^^^^^^^^^^^
   |
-help: expected language@revision with a nonempty revision
+help: expected a language name: a letter followed by letters, digits, '-' or '_'
 
 error: invalid grammar declaration
  --> other.ptk:1:4
   |
-1 | ; !
-  |    ^
+1 | ; @owner/repo
+  |    ^^^^^^^^^^
   |
-help: expected language name or owner/repo[/grammar-directory] without empty or traversal components
+help: expected a language name: a letter followed by letters, digits, '-' or '_'

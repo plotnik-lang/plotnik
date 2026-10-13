@@ -52,7 +52,7 @@ pub fn evaluate(query: &str, name: &str) -> Result<Assessment, String> {
 fn assert_contract(input: &str, output: &str, name: &str) -> Result<(), String> {
     let declaration = |content| {
         parse_grammar_declaration(SourceMap::from_inline(content).source(Default::default()))
-            .map(|declaration| declaration.map(|declaration| declaration.selector))
+            .map(|declaration| declaration.map(|declaration| declaration.language.to_owned()))
             .map_err(|error| error.message)
     };
     if declaration(input) != declaration(output) {

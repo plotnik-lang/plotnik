@@ -1,11 +1,11 @@
-// !javascript@main extra
+// @
 Q = (identifier)
 ------------------ DIAGNOSTICS -------------------
 error: invalid grammar declaration
  --> query.ptk:1:5
   |
-1 | // !javascript@main extra
-  |     ^^^^^^^^^^^^^^^^^^^^^
+1 | // @
+  |     ^
   |
-help: expected language@revision with a nonempty revision
+help: expected a language name: a letter followed by letters, digits, '-' or '_'
 ------------------ DEFINITIONS -------------------

@@ -1,11 +1,11 @@
 
-// !javascript
+// @javascript
 Q = (identifier)
 ---------------------- CST -----------------------
 # query.ptk
 Root
   Newline "\n"
-  LineComment "// !javascript"
+  LineComment "// @javascript"
   Newline "\n"
   Def
     Id "Q"

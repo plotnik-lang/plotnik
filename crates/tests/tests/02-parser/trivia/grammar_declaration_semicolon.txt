@@ -1,9 +1,9 @@
-; !typescript@main
+; @typescript
 Q = (identifier)
 ---------------------- CST -----------------------
 # query.ptk
 Root
-  LineComment "; !typescript@main"
+  LineComment "; @typescript"
   Newline "\n"
   Def
     Id "Q"

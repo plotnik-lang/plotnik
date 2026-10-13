@@ -914,6 +914,8 @@ Unicode escape digits are hexadecimal, as in `\u{1F600}`. Other string escapes a
 
 `//` and `;` begin line comments. `/* ... */` encloses a block comment.
 
+A first-line comment can declare a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. Use language names, not aliases, revisions, or repository paths. Declarations do not yet select the CLI grammar.
+
 ### Compile a file or directory
 
 The compiler needs the source language's `grammar.json` to check node kinds, field names, and possible tree shapes:
