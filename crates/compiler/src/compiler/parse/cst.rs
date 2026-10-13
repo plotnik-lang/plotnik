@@ -147,11 +147,6 @@ pub enum SyntaxKind {
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
     BlockComment,
 
-    /// Shebang line: `#!/usr/bin/env -S plotnik run -l typescript`.
-    /// Trivia only at offset 0; the lexer downgrades mid-file matches to `Garbage`.
-    #[regex(r"#![^\n]*", allow_greedy = true)]
-    Shebang,
-
     #[token("==")]
     OpEq,
 
@@ -248,10 +243,7 @@ fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
 impl SyntaxKind {
     #[inline]
     pub fn is_trivia(self) -> bool {
-        matches!(
-            self,
-            Whitespace | Newline | LineComment | BlockComment | Shebang
-        )
+        matches!(self, Whitespace | Newline | LineComment | BlockComment)
     }
 
     #[inline]

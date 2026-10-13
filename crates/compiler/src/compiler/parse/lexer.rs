@@ -77,10 +77,6 @@ pub fn lex(source: &str) -> Vec<Token> {
 
                 let span = lexer.span();
                 match kind {
-                    // A shebang is only meaningful on line 1; elsewhere `#!` is garbage.
-                    SyntaxKind::Shebang if span.start != 0 => {
-                        tokens.push(Token::new(SyntaxKind::Garbage, range_to_text_range(span)));
-                    }
                     SyntaxKind::StringLiteral => {
                         split_string_literal(Lexeme::new(source, span), &mut tokens);
                     }

@@ -912,7 +912,7 @@ Single- and double-quoted strings have the same meaning. They are used for anony
 
 Unicode escape digits are hexadecimal, as in `\u{1F600}`. Other string escapes are errors. Regex literals use regex escaping instead.
 
-`//` and `;` begin line comments. `/* ... */` encloses a block comment. A `#!` line is accepted only at the very beginning of the file. The compiler ignores it rather than using it to select a grammar or entry point.
+`//` and `;` begin line comments. `/* ... */` encloses a block comment.
 
 ### Compile a file or directory
 

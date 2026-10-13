@@ -14,7 +14,6 @@ export const plotnikGrammar: LanguageRegistration = {
   fileTypes: ["ptk"],
   patterns: [
     { include: "#comment" },
-    { include: "#shebang" },
     { include: "#definition" },
     { include: "#capture" },
     { include: "#capture-type" },
@@ -35,12 +34,9 @@ export const plotnikGrammar: LanguageRegistration = {
     comment: {
       patterns: [
         { name: "comment.line.double-slash.plotnik", match: "//.*$" },
+        { name: "comment.line.semicolon.plotnik", match: ";.*$" },
         { name: "comment.block.plotnik", begin: "/\\*", end: "\\*/" },
       ],
-    },
-    shebang: {
-      name: "comment.line.shebang.plotnik",
-      match: "^#!.*$",
     },
     definition: {
       // `Name =` at a definition site

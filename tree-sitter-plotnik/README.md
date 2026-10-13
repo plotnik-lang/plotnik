@@ -44,8 +44,6 @@ rejections.
 
 Known micro-divergences on inputs that never compile anyway:
 
-- a shebang after leading comments/blank lines parses (reference: garbage
-  unless at offset 0)
 - `=~ //` lexes as an empty predicate followed by a comment (reference:
   empty regex, then "empty regex pattern" at analyze)
 

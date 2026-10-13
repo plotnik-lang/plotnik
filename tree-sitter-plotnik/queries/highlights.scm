@@ -55,4 +55,3 @@
 ] @punctuation.delimiter
 
 (comment) @comment
-(shebang) @comment

@@ -90,7 +90,7 @@ pub fn tokenize(text: &str) -> Vec<QueryToken> {
 fn class_name(kind: SyntaxKind) -> &'static str {
     match kind {
         SyntaxKind::Whitespace | SyntaxKind::Newline => "whitespace",
-        SyntaxKind::LineComment | SyntaxKind::BlockComment | SyntaxKind::Shebang => "comment",
+        SyntaxKind::LineComment | SyntaxKind::BlockComment => "comment",
         SyntaxKind::DoubleQuote
         | SyntaxKind::SingleQuote
         | SyntaxKind::StringContent

@@ -257,9 +257,6 @@ impl NodeLayout {
                             Some(FilePart::Definition(index))
                         }
                         Element::Comment(_) => Some(FilePart::Comment(index)),
-                        Element::Token(token) if token.kind == SyntaxKind::Shebang => {
-                            Some(FilePart::Shebang(index))
-                        }
                         Element::Node(_) | Element::Token(_) => None,
                     })
                     .collect(),
@@ -300,7 +297,6 @@ impl NodeLayout {
 pub(super) enum FilePart {
     Definition(usize),
     Comment(usize),
-    Shebang(usize),
 }
 
 #[derive(Debug, Clone)]

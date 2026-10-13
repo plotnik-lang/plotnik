@@ -1,7 +1,0 @@
-(a)
-#!/usr/bin/env plotnik
---------------------- TOKENS ---------------------
-ParenOpen "("
-Id "a"
-ParenClose ")"
-Garbage "#!/usr/bin/env plotnik"

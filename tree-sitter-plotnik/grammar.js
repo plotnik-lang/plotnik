@@ -21,7 +21,7 @@ module.exports = grammar({
   extras: ($) => [/[ \t]+/, /\r?\n/, $.comment],
 
   rules: {
-    source_file: ($) => seq(optional($.shebang), repeat($.definition)),
+    source_file: ($) => repeat($.definition),
 
     definition: ($) =>
       seq(field("name", $.type_identifier), "=", field("body", $._pattern)),
@@ -285,9 +285,5 @@ module.exports = grammar({
     // and is not one here.
     comment: (_) =>
       token(choice(/\/\/[^\n]*/, /;[^\n]*/, /\/\*([^*]|\*[^\/])*\*\//)),
-
-    // Only meaningful on the first line; elsewhere `#!` is garbage. The
-    // grammar approximates "first line" as "before any definition".
-    shebang: (_) => /#![^\n]*/,
   },
 });

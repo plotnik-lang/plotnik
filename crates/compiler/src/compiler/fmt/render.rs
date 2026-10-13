@@ -2,7 +2,7 @@ use super::comments::{Comment, CommentKind, CommentPlacement};
 use super::contract;
 use super::ir::{
     Element, FilePart, FormatFile, GroupLayout, GroupPart, LandmarkCount, ModelNode, NodeKind,
-    NodeLayout, PrefixKind, SuffixKind, Token, Width, WorkCounter,
+    NodeLayout, PrefixKind, SuffixKind, Width, WorkCounter,
 };
 use super::tokens::{Atom, format_atoms};
 
@@ -231,7 +231,6 @@ fn comments_after_are_multiline(comments: &[&Comment]) -> bool {
 }
 
 enum FileBody<'a> {
-    Shebang(&'a Token),
     Definition(DefinitionPlan<'a>),
     CommentBlock(Vec<&'a Comment>),
 }
@@ -331,16 +330,6 @@ impl Renderer {
                         .push(root.comment_at(index));
                 }
                 FilePart::Comment(index) => pending_comments.push(root.comment_at(index)),
-                FilePart::Shebang(index) => {
-                    let Element::Token(token) = &root.elements[index] else {
-                        unreachable!("shebang file part points at a token")
-                    };
-                    plans.push(FilePlan {
-                        body: FileBody::Shebang(token),
-                        leading_comments: Vec::new(),
-                        trailing_comments: Vec::new(),
-                    });
-                }
             }
         }
         if !pending_comments.is_empty() {
@@ -356,7 +345,7 @@ impl Renderer {
     fn file_plan_is_multiline(plan: &FilePlan<'_>) -> bool {
         let body_is_multiline = match &plan.body {
             FileBody::Definition(plan) => plan.multiline,
-            FileBody::Shebang(_) | FileBody::CommentBlock(_) => false,
+            FileBody::CommentBlock(_) => false,
         };
         body_is_multiline || comments_after_are_multiline(&plan.trailing_comments)
     }
@@ -367,10 +356,6 @@ impl Renderer {
             output.newline(IndentLevel::default());
         }
         match &plan.body {
-            FileBody::Shebang(token) => {
-                output.ensure_indent(IndentLevel::default());
-                output.append(token.text().trim_end_matches(['\r', '\n']));
-            }
             FileBody::Definition(definition) => self.render_definition(definition, output),
             FileBody::CommentBlock(comments) => {
                 self.emit_comment_block(comments, IndentLevel::default(), output);
