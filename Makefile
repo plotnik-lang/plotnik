@@ -38,18 +38,12 @@ test:
 codegen-rust:
 	@cargo build \
 		--locked \
-		--package plotnik-cli \
-		--no-default-features \
-		--target-dir "$(CODEGEN_TARGET_DIR)"
-	@cargo build \
-		--locked \
 		--package plotnik-tests \
 		--bin plotnik-codegen-tests \
 		--features codegen-tests \
 		--target-dir "$(CODEGEN_TARGET_DIR)"
 	@CARGO_TARGET_DIR="$(CODEGEN_TARGET_DIR)" \
 		"$(CODEGEN_TARGET_DIR)/debug/plotnik-codegen-tests" rust \
-		--plotnik "$(CODEGEN_TARGET_DIR)/debug/plotnik" \
 		$(if $(strip $(FILTER)),--filter "$(FILTER)",)
 
 lint-codegen-rust:

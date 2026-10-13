@@ -1,5 +1,5 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 use std::time::Instant;
 
@@ -10,7 +10,6 @@ mod rust;
 
 struct Args {
     target: String,
-    plotnik: PathBuf,
     filter: Option<String>,
 }
 
@@ -35,24 +34,12 @@ fn run() -> Result<(), String> {
     }
 
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let repo_root = manifest_dir
-        .parent()
-        .and_then(Path::parent)
-        .expect("plotnik-tests must live under <repo>/crates");
-    let plotnik = absolute_from(repo_root, &args.plotnik);
-    if !plotnik.is_file() {
-        return Err(format!(
-            "plotnik executable does not exist at {}",
-            plotnik.display()
-        ));
-    }
-
     let corpus = corpus::discover(manifest_dir, args.filter.as_deref())?;
     if corpus.cases.is_empty() {
         return Err("codegen corpus selection contains no runnable snapshots".to_string());
     }
 
-    rust::generate(manifest_dir, &plotnik, &corpus.cases)?;
+    rust::generate(manifest_dir, &corpus.cases)?;
     eprintln!(
         "generated {} Rust tests from {} snapshots ({} diagnostic-only skipped) in {:.2?}",
         corpus.cases.len(),
@@ -66,18 +53,10 @@ fn run() -> Result<(), String> {
 fn parse_args() -> Result<Args, String> {
     let mut values = env::args().skip(1);
     let target = values.next().ok_or_else(usage)?;
-    let mut plotnik = None;
     let mut filter = None;
 
     while let Some(argument) = values.next() {
         match argument.as_str() {
-            "--plotnik" => {
-                plotnik = Some(PathBuf::from(
-                    values
-                        .next()
-                        .ok_or_else(|| "`--plotnik` requires a path".to_string())?,
-                ));
-            }
             "--filter" => {
                 filter = Some(
                     values
@@ -90,20 +69,9 @@ fn parse_args() -> Result<Args, String> {
         }
     }
 
-    Ok(Args {
-        target,
-        plotnik: plotnik.ok_or_else(|| "missing required `--plotnik <PATH>`".to_string())?,
-        filter,
-    })
+    Ok(Args { target, filter })
 }
 
 fn usage() -> String {
-    "usage: plotnik-codegen-tests rust --plotnik <PATH> [--filter <TEXT>]".to_string()
-}
-
-fn absolute_from(root: &Path, path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        return path.to_path_buf();
-    }
-    root.join(path)
+    "usage: plotnik-codegen-tests rust [--filter <TEXT>]".to_string()
 }

@@ -43,23 +43,19 @@ struct CargoDependency {
     pkg: String,
 }
 
-pub(crate) fn generate(manifest_dir: &Path, plotnik: &Path, cases: &[Case]) -> Result<(), String> {
+pub(crate) fn generate(manifest_dir: &Path, cases: &[Case]) -> Result<(), String> {
     let cases = prepare_cases(cases)?;
     let project = manifest_dir.join("codegen/rust");
     verify_grammar_dependencies(&project, &cases)?;
-    generate_and_promote(&project, plotnik, &cases)
+    generate_and_promote(&project, &cases)
 }
 
-fn generate_and_promote(
-    project: &Path,
-    plotnik: &Path,
-    cases: &[RustCase<'_>],
-) -> Result<(), String> {
+fn generate_and_promote(project: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
     let tests = project.join("tests");
     let pending = project.join(format!("tests.pending-{}", std::process::id()));
     remove_stale_staging(project)?;
 
-    let result = stage(&pending, plotnik, cases);
+    let result = stage(&pending, cases);
     if let Err(error) = result {
         let _ = fs::remove_dir_all(&pending);
         return Err(error);
@@ -123,7 +119,7 @@ fn prepare_cases(cases: &[Case]) -> Result<Vec<RustCase<'_>>, String> {
     Ok(prepared)
 }
 
-fn stage(root: &Path, plotnik: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
+fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
     fs::create_dir_all(root.join("generated"))
         .map_err(|error| format!("create Rust staging tree: {error}"))?;
     let mut shards: BTreeMap<&str, Vec<&RustCase<'_>>> = BTreeMap::new();
@@ -149,7 +145,7 @@ fn stage(root: &Path, plotnik: &Path, cases: &[RustCase<'_>]) -> Result<(), Stri
                 case.case.relative
             )
         })?;
-        let matcher = generate::source(plotnik, "rust", case.case, &query_path)?;
+        let matcher = generate::source(case.case, &query_path)?;
         fs::write(directory.join("matcher.rs"), matcher.as_bytes())
             .map_err(|error| format!("write matcher for `{}`: {error}", case.case.relative))?;
     }
@@ -293,7 +289,7 @@ fn verify_grammar_dependencies(project: &Path, cases: &[RustCase<'_>]) -> Result
             continue;
         }
         return Err(format!(
-            "grammar package mismatch for `{package_name}`: `plotnik gen` used {}, native Rust resolved {}",
+            "grammar package mismatch for `{package_name}`: compiler used {}, native Rust resolved {}",
             expected_root.display(),
             actual_root.display()
         ));

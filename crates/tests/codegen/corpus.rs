@@ -131,8 +131,8 @@ fn classify_expected(body: &str) -> Result<Expected, String> {
 
 fn input_language(name: &str) -> Option<SourceLanguage> {
     match name {
-        "input" | "input.js" | "input.javascript" | "input.jsx" => Some(SourceLanguage::JavaScript),
-        "input.ts" | "input.typescript" => Some(SourceLanguage::TypeScript),
+        "input" | "input.javascript" => Some(SourceLanguage::JavaScript),
+        "input.typescript" => Some(SourceLanguage::TypeScript),
         "input.dart" => Some(SourceLanguage::Dart),
         _ => None,
     }
