@@ -5,7 +5,12 @@ use plotnik_compiler::{
     BytecodeConfig, Colors, PrintTracer, RuntimeError, VM, Verbosity, materialize_verified,
 };
 
-use super::{compile, inputs::Inputs, language, query_loader::load_query};
+use super::{
+    compile,
+    inputs::{Inputs, load_source},
+    language::LanguageOptions,
+    query_loader::load_query,
+};
 use crate::cli::{ColorChoice, runtime_limits};
 use crate::error::{CliError, CliResult, write_stdout, writeln_stderr, writeln_stdout};
 
@@ -21,9 +26,11 @@ pub fn run(m: &ArgMatches, mode: Mode) -> CliResult {
     if loaded.sources.is_empty() {
         return Err(CliError::fatal("query cannot be empty"));
     }
-    let source = inputs.source()?;
-    let mut parser = language::load(m, inputs.source_path)?.parser()?;
+    let source = load_source(inputs.source_path, inputs.source_text)?;
     let color = ColorChoice::from_matches(m).should_colorize();
+    let artifacts =
+        LanguageOptions::from_matches(m).load_query(&loaded, inputs.source_path, color)?;
+    let mut parser = artifacts.parser()?;
     let compiled = compile::compile_query(loaded.sources, parser.grammar(), color)?;
     let module = compile::emit_module(&compiled, BytecodeConfig::new(), color)?;
     let entry = m

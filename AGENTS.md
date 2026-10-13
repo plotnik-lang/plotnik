@@ -194,10 +194,10 @@ Expr = [
 `cargo run -p plotnik-cli -- <command>`.
 
 ```sh
-cargo run -p plotnik-cli -- check query.ptk --grammar path/to/grammar.json
-cargo run -p plotnik-cli -- infer query.ptk --grammar path/to/grammar.json
-cargo run -p plotnik-cli -- gen query.ptk --grammar path/to/grammar.json --target rust
-cargo run -p plotnik-cli -- dump query.ptk --grammar path/to/grammar.json
+cargo run -p plotnik-cli -- check query.ptk --lang javascript
+cargo run -p plotnik-cli -- infer query.ptk --lang javascript
+cargo run -p plotnik-cli -- gen query.ptk --lang javascript --target rust
+cargo run -p plotnik-cli -- dump query.ptk --lang javascript
 ```
 
 - Exit codes:

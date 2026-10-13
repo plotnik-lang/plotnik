@@ -914,20 +914,24 @@ Unicode escape digits are hexadecimal, as in `\u{1F600}`. Other string escapes a
 
 `//` and `;` begin line comments. `/* ... */` encloses a block comment.
 
-A first-line comment can declare a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. Use language names, not aliases, revisions, or repository paths. Declarations do not yet select the CLI grammar.
+A first-line comment can declare a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. Names use `[A-Za-z][A-Za-z0-9_-]*`. When compiling or parsing source with an individual query, `--lang` selects the grammar, with the declaration as its default. The declaration must match the loaded grammar's name exactly, including case.
 
 ### Compile a file or directory
 
-The compiler needs the source language's `grammar.json` to check node kinds, field names, and possible tree shapes:
+The compiler loads the source language's grammar from the service or cache to check node kinds, field names, and possible tree shapes:
 
 ```sh
-plotnik check query.ptk --grammar path/to/grammar.json
-plotnik infer query.ptk --grammar path/to/grammar.json
+plotnik check query.ptk --lang javascript
+plotnik infer query.ptk --lang javascript
 ```
 
-`check` validates the query. `infer` shows its result types. A directory in place of `query.ptk` loads its `.ptk` files in filename order into one namespace. No imports are needed between them, and subdirectories are not loaded recursively.
+`check` validates the query. `infer` shows its result types. `dump` shows bytecode, and `gen --target rust` generates a matcher. Supply `--lang` or a first-line declaration for individual files, inline queries, and stdin (`-`). `--lang` accepts a language name or `owner/repo[/grammar-directory]`, optionally followed by `@revision` for a Git branch, tag, or commit. `--cache-dir` overrides the grammar cache location.
 
-Passing `-q 'Q = ...'` supplies query text instead of a file. It uses the same language rules and does not add a root pattern. The CLI's execution commands are not implemented, so these compiler commands do not run the query on a source file.
+A directory in place of `query.ptk` requires `--lang`. Its immediate `.ptk` files load in filename order into one namespace and compile together using that grammar. Language declarations in these files receive syntax validation.
+
+Passing `-q 'Q = ...'` supplies literal query text instead of a file path. `-s 'const answer = 42;'` supplies literal source text. `run` and `trace` use the same individual-query selection and agreement rules, with the source file extension as a fallback when both `--lang` and the declaration are absent.
+
+`tree` takes one file path or literal text through `-q` or `-s`. `plotnik tree query.ptk` renders Plotnik syntax locally. Use `--query-view ast` (default) or `--query-view cst`. `plotnik tree input.js` parses source using `--lang` or its extension. Use `-` in place of a file path to read stdin. Stdin and extensionless files require `--lang`: `plotnik` displays Plotnik syntax, and source selectors parse source.
 
 ## A complete example
 

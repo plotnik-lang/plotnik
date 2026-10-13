@@ -9,17 +9,12 @@ use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
 use crate::commands::generate::{GenerateArgs, GenerateTarget};
 use crate::commands::infer::InferArgs;
-
-fn grammar_path(m: &ArgMatches) -> PathBuf {
-    m.get_one::<PathBuf>("grammar")
-        .cloned()
-        .expect("clap requires --grammar")
-}
+use crate::commands::language::LanguageOptions;
 
 pub struct CheckOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub grammar: PathBuf,
+    pub language: LanguageOptions,
     pub strict: bool,
     pub color: ColorChoice,
 }
@@ -29,7 +24,7 @@ impl CheckOpts {
         Self {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
             query_text: m.get_one::<String>("query_text").cloned(),
-            grammar: grammar_path(m),
+            language: LanguageOptions::from_matches(m),
             strict: m.get_flag("strict"),
             color: ColorChoice::from_matches(m),
         }
@@ -41,7 +36,7 @@ impl From<CheckOpts> for CheckArgs {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
-            grammar: p.grammar,
+            language: p.language,
             strict: p.strict,
             color: p.color.should_colorize(),
         }
@@ -51,7 +46,7 @@ impl From<CheckOpts> for CheckArgs {
 pub struct DumpOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub grammar: PathBuf,
+    pub language: LanguageOptions,
     pub color: ColorChoice,
 }
 
@@ -60,7 +55,7 @@ impl DumpOpts {
         Self {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
             query_text: m.get_one::<String>("query_text").cloned(),
-            grammar: grammar_path(m),
+            language: LanguageOptions::from_matches(m),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -71,7 +66,7 @@ impl From<DumpOpts> for DumpArgs {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
-            grammar: p.grammar,
+            language: p.language,
             color: p.color.should_colorize(),
         }
     }
@@ -80,7 +75,7 @@ impl From<DumpOpts> for DumpArgs {
 pub struct InferOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub grammar: PathBuf,
+    pub language: LanguageOptions,
     pub format: String,
     pub no_node_type: bool,
     pub no_export: bool,
@@ -94,7 +89,7 @@ impl InferOpts {
         Self {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
             query_text: m.get_one::<String>("query_text").cloned(),
-            grammar: grammar_path(m),
+            language: LanguageOptions::from_matches(m),
             format: m
                 .get_one::<String>("format")
                 .expect("clap supplies the format default")
@@ -113,7 +108,7 @@ impl From<InferOpts> for InferArgs {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
-            grammar: p.grammar,
+            language: p.language,
             format: p.format,
             no_node_type: p.no_node_type,
             export: !p.no_export,
@@ -127,7 +122,7 @@ impl From<InferOpts> for InferArgs {
 pub struct GenerateOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub grammar: PathBuf,
+    pub language: LanguageOptions,
     pub target: GenerateTarget,
     pub output: Option<PathBuf>,
     pub debug: bool,
@@ -139,7 +134,7 @@ impl GenerateOpts {
         Self {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
             query_text: m.get_one::<String>("query_text").cloned(),
-            grammar: grammar_path(m),
+            language: LanguageOptions::from_matches(m),
             target: m
                 .get_one::<GenerateTarget>("target")
                 .copied()
@@ -156,7 +151,7 @@ impl From<GenerateOpts> for GenerateArgs {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
-            grammar: p.grammar,
+            language: p.language,
             target: p.target,
             output: p.output,
             debug: p.debug,

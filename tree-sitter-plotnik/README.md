@@ -23,7 +23,7 @@ diagnostics parses cleanly here, with the deliberate exceptions below.
 Later-stage rejections (analyze/link: unknown node kinds, empty `()`/`[]`/
 `{}`, supertype refinements, dimensionality, anchor placement semantics)
 are out of scope, as usual for editor grammars — files may parse here and
-still fail `plotnik check` when compiled against a source grammar with `--grammar`.
+still fail `plotnik check` when compiled against a source grammar selected with `--lang`.
 
 Deliberately rejected despite being warn-accepted (deprecated) upstream:
 
@@ -42,7 +42,7 @@ field values or branches, negated fields in sequences — as well as any
 children in `(ERROR)` and `(MISSING)`, and this grammar matches those
 rejections.
 
-First-line language declarations remain ordinary comments in this grammar. The compiler interprets and validates their selectors during source analysis, not syntax parsing.
+First-line language declarations such as `// @javascript` are ordinary comments in this grammar. The compiler reads and validates their language names during source analysis.
 
 Known micro-divergences on inputs that never compile anyway:
 

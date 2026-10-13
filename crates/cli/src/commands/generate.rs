@@ -6,7 +6,7 @@ use plotnik_compiler::{CodegenProvenance, RustCodegenConfig};
 use clap::ValueEnum;
 
 use super::compile::compile_query;
-use super::grammar;
+use super::language::LanguageOptions;
 use super::query_loader::load_query;
 use crate::error::{CliError, CliResult, write_stderr, write_stdout, writeln_stderr};
 
@@ -18,7 +18,7 @@ pub enum GenerateTarget {
 pub struct GenerateArgs {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub grammar: PathBuf,
+    pub language: LanguageOptions,
     pub target: GenerateTarget,
     pub output: Option<PathBuf>,
     pub debug: bool,
@@ -45,8 +45,8 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let grammar = grammar::load(&args.grammar)?;
-    let compiled = compile_query(loaded.sources, &grammar, args.color)?;
+    let artifacts = args.language.load_query(&loaded, None, args.color)?;
+    let compiled = compile_query(loaded.sources, &artifacts.grammar, args.color)?;
 
     match args.target {
         GenerateTarget::Rust => {

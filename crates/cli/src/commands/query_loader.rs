@@ -8,6 +8,7 @@ use crate::error::CliError;
 
 pub struct QuerySources {
     pub sources: SourceMap,
+    pub is_directory: bool,
 }
 
 pub fn load_query(
@@ -17,7 +18,10 @@ pub fn load_query(
     if let Some(text) = query_text {
         let mut sources = SourceMap::new();
         sources.add_inline(text);
-        return Ok(QuerySources { sources });
+        return Ok(QuerySources {
+            sources,
+            is_directory: false,
+        });
     }
 
     if let Some(path) = query_path {
@@ -31,7 +35,7 @@ pub fn load_query(
     }
 
     Err(CliError::fatal(
-        "query is required: use positional argument or -q/--query",
+        "query required: supply a file, directory, '-' for stdin, or --query for inline text",
     ))
 }
 
@@ -42,7 +46,10 @@ fn load_stdin() -> Result<QuerySources, CliError> {
         .map_err(|error| CliError::fatal(format!("failed to read stdin: {error}")))?;
     let mut sources = SourceMap::new();
     sources.add_stdin(&buf);
-    Ok(QuerySources { sources })
+    Ok(QuerySources {
+        sources,
+        is_directory: false,
+    })
 }
 
 fn load_file(path: &Path) -> Result<QuerySources, CliError> {
@@ -50,7 +57,10 @@ fn load_file(path: &Path) -> Result<QuerySources, CliError> {
     let mut sources = SourceMap::new();
     let source_path = path.to_string_lossy();
     sources.add_file(SourcePath::new(&source_path), &content);
-    Ok(QuerySources { sources })
+    Ok(QuerySources {
+        sources,
+        is_directory: false,
+    })
 }
 
 /// Merge all `.ptk` files in a directory into one namespace.
@@ -91,7 +101,10 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
         sources.add_file(SourcePath::new(&source_path), &content);
     }
 
-    Ok(QuerySources { sources })
+    Ok(QuerySources {
+        sources,
+        is_directory: true,
+    })
 }
 
 fn read_file(path: &Path) -> Result<String, CliError> {

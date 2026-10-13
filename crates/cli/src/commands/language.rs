@@ -3,10 +3,11 @@ use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use plotnik_compiler::WasmParser;
+use plotnik_compiler::{DiagnosticKind, Diagnostics, WasmParser, parse_grammar_declaration};
 
 use super::grammar;
-use crate::error::CliError;
+use super::query_loader::QuerySources;
+use crate::error::{CliError, write_stderr};
 
 const ENDPOINT: &str = "https://plotnik.dev/lang";
 const MAX_DOWNLOAD: u64 = 64 * 1024 * 1024;
@@ -81,62 +82,160 @@ impl Artifacts {
     }
 }
 
-pub fn load(m: &ArgMatches, source: Option<&Path>) -> Result<Artifacts, CliError> {
-    let input = m
-        .get_one::<String>("lang")
-        .map(String::as_str)
-        .or_else(|| {
-            let extension = source?.extension()?.to_str()?;
-            Some(match extension {
-                "js" | "jsx" | "mjs" | "cjs" => "javascript",
-                "ts" => "typescript",
-                "py" => "python",
-                "rs" => "rust",
-                "h" => "c",
-                other => other,
+pub struct LanguageOptions {
+    pub lang: Option<String>,
+    cache_dir: Option<PathBuf>,
+}
+
+impl LanguageOptions {
+    pub fn from_matches(m: &ArgMatches) -> Self {
+        Self {
+            lang: m.get_one::<String>("lang").cloned(),
+            cache_dir: m.get_one::<PathBuf>("cache_dir").cloned(),
+        }
+    }
+
+    pub fn load(&self, source: Option<&Path>) -> Result<Artifacts, CliError> {
+        let input = self
+            .lang
+            .as_deref()
+            .or_else(|| {
+                let extension = source?.extension()?.to_str()?;
+                Some(match extension {
+                    "js" | "jsx" | "mjs" | "cjs" => "javascript",
+                    "ts" => "typescript",
+                    "py" => "python",
+                    "rs" => "rust",
+                    "h" => "c",
+                    other => other,
+                })
             })
-        })
-        .ok_or_else(|| CliError::fatal("source language required: use --lang"))?;
-    let selection = LanguageSelector::parse(input).map_err(CliError::fatal)?;
-    let cache = cache_path(&cache_dir(m)?, &selection);
-    if let Some(artifacts) = read_cache(&cache)? {
-        return Ok(artifacts);
+            .ok_or_else(|| CliError::fatal("source language required: use --lang"))?;
+        self.load_selected(input)
     }
 
-    let path = selection
-        .name
-        .split('/')
-        .map(|part| utf8_percent_encode(part, NON_ALPHANUMERIC).to_string())
-        .collect::<Vec<_>>()
-        .join("/");
-    let url = format!("{ENDPOINT}/{path}");
-    let query = match &selection.revision {
-        Some(revision) => format!("?ref={}", utf8_percent_encode(revision, NON_ALPHANUMERIC)),
-        None => String::new(),
-    };
-    let json_url = format!("{url}/grammar.json{query}");
+    pub fn load_query(
+        &self,
+        query: &QuerySources,
+        source: Option<&Path>,
+        color: bool,
+    ) -> Result<Artifacts, CliError> {
+        if query.is_directory {
+            if self.lang.is_none() {
+                return Err(CliError::fatal("query directories require --lang"));
+            }
 
-    // Each GET can resolve a moving branch or a new toolchain build. Never mix them.
-    for _ in 0..PAIR_ATTEMPTS {
-        let json = fetch(&json_url)?;
-        let wasm = fetch(&format!("{url}/parser.wasm{query}"))?;
-        if json.build != wasm.build || json.commit != wasm.commit {
-            continue;
+            return self.load(None);
         }
-        if let Some(revision) = &selection.revision
-            && is_hex(revision, 40)
-            && json.commit != *revision
+
+        let query_source = query.sources.iter().next().expect("query has one source");
+        let declaration = match parse_grammar_declaration(query_source) {
+            Ok(declaration) => declaration,
+            Err(error) => {
+                let mut diagnostics = Diagnostics::new();
+                diagnostics
+                    .report(DiagnosticKind::InvalidGrammarDeclaration, error.span)
+                    .hint(error.message)
+                    .emit();
+                write_stderr(format_args!(
+                    "{}",
+                    diagnostics.render_colored(&query.sources, color)
+                ))?;
+                return Err(CliError::No);
+            }
+        };
+        let artifacts = if let Some(input) = self
+            .lang
+            .as_deref()
+            .or_else(|| declaration.as_ref().map(|declaration| declaration.language))
         {
+            self.load_selected(input)?
+        } else if source.is_some() {
+            self.load(source)?
+        } else {
             return Err(CliError::fatal(
-                "service returned a different commit than requested",
+                "query language required: use --lang or a first-line @language declaration",
             ));
+        };
+        if let Some(declaration) = declaration
+            && declaration.language != artifacts.grammar.name()
+        {
+            let mut diagnostics = Diagnostics::new();
+            let selection = match &self.lang {
+                Some(lang) => format!(" selected by --lang '{lang}'"),
+                None => String::new(),
+            };
+            diagnostics
+                .report(
+                    DiagnosticKind::InvalidGrammarDeclaration,
+                    declaration.language_span,
+                )
+                .detail(format!(
+                    "declared language '{}' does not match loaded grammar '{}'{}",
+                    declaration.language,
+                    artifacts.grammar.name(),
+                    selection,
+                ))
+                .emit();
+            write_stderr(format_args!(
+                "{}",
+                diagnostics.render_colored(&query.sources, color)
+            ))?;
+            return Err(CliError::No);
         }
 
-        return write_cache(&cache, json.bytes, wasm.bytes);
+        Ok(artifacts)
     }
-    Err(CliError::fatal(format!(
-        "service artifact build/commit mismatch after {PAIR_ATTEMPTS} attempts",
-    )))
+
+    fn load_selected(&self, input: &str) -> Result<Artifacts, CliError> {
+        let selection = LanguageSelector::parse(input).map_err(CliError::fatal)?;
+        let cache = cache_path(&self.cache_dir()?, &selection);
+        if let Some(artifacts) = read_cache(&cache)? {
+            return Ok(artifacts);
+        }
+
+        let path = selection
+            .name
+            .split('/')
+            .map(|part| utf8_percent_encode(part, NON_ALPHANUMERIC).to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        let url = format!("{ENDPOINT}/{path}");
+        let query = match &selection.revision {
+            Some(revision) => format!("?ref={}", utf8_percent_encode(revision, NON_ALPHANUMERIC)),
+            None => String::new(),
+        };
+        let json_url = format!("{url}/grammar.json{query}");
+
+        // Each GET can resolve a moving branch or a new toolchain build. Never mix them.
+        for _ in 0..PAIR_ATTEMPTS {
+            let json = fetch(&json_url)?;
+            let wasm = fetch(&format!("{url}/parser.wasm{query}"))?;
+            if json.build != wasm.build || json.commit != wasm.commit {
+                continue;
+            }
+            if let Some(revision) = &selection.revision
+                && is_hex(revision, 40)
+                && json.commit != *revision
+            {
+                return Err(CliError::fatal(
+                    "service returned a different commit than requested",
+                ));
+            }
+
+            return write_cache(&cache, json.bytes, wasm.bytes);
+        }
+        Err(CliError::fatal(format!(
+            "service artifact build/commit mismatch after {PAIR_ATTEMPTS} attempts",
+        )))
+    }
+
+    fn cache_dir(&self) -> Result<PathBuf, CliError> {
+        self.cache_dir
+            .clone()
+            .or_else(|| dirs::cache_dir().map(|dir| dir.join("plotnik").join("grammars")))
+            .ok_or_else(|| CliError::fatal("OS cache directory unavailable; use --cache-dir"))
+    }
 }
 
 fn fetch(url: &str) -> Result<Artifact, CliError> {
@@ -264,13 +363,6 @@ fn is_hex(value: &str, len: usize) -> bool {
 
 fn io_error(error: std::io::Error) -> CliError {
     CliError::fatal(format!("service artifact IO error: {error}"))
-}
-
-fn cache_dir(m: &ArgMatches) -> Result<PathBuf, CliError> {
-    m.get_one::<PathBuf>("cache_dir")
-        .cloned()
-        .or_else(|| dirs::cache_dir().map(|dir| dir.join("plotnik").join("grammars")))
-        .ok_or_else(|| CliError::fatal("OS cache directory unavailable; use --cache-dir"))
 }
 
 fn request(url: &str) -> Result<ureq::http::Response<ureq::Body>, CliError> {

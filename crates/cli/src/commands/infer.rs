@@ -4,14 +4,14 @@ use std::path::PathBuf;
 use plotnik_compiler::{TypeScriptCodegenConfig, TypeScriptMatchOnlyType};
 
 use super::compile::compile_query;
-use super::grammar;
+use super::language::LanguageOptions;
 use super::query_loader::load_query;
 use crate::error::{CliError, CliResult, write_stderr, write_stdout, writeln_stderr};
 
 pub struct InferArgs {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub grammar: PathBuf,
+    pub language: LanguageOptions,
     pub format: String,
     pub no_node_type: bool,
     pub export: bool,
@@ -32,8 +32,8 @@ pub fn run(args: InferArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let grammar = grammar::load(&args.grammar)?;
-    let compiled = compile_query(loaded.sources, &grammar, args.color)?;
+    let artifacts = args.language.load_query(&loaded, None, args.color)?;
+    let compiled = compile_query(loaded.sources, &artifacts.grammar, args.color)?;
 
     let match_only_type = match args.match_only_type.as_deref() {
         Some("null") => TypeScriptMatchOnlyType::Null,

@@ -1,11 +1,11 @@
 use clap::ArgMatches;
 use plotnik_compiler::grammar::DumpOptions;
 
-use super::language;
+use super::language::LanguageOptions;
 use crate::error::{CliResult, write_stdout};
 
 pub fn run_dump(m: &ArgMatches) -> CliResult {
-    let artifacts = language::load(m, None)?;
+    let artifacts = LanguageOptions::from_matches(m).load(None)?;
     let options = DumpOptions {
         legend: !m.get_flag("no-legend"),
         width: m

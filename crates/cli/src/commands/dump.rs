@@ -4,14 +4,14 @@ use plotnik_compiler::Colors;
 use plotnik_compiler::bytecode::dump;
 
 use super::compile::compile_module;
-use super::grammar;
+use super::language::LanguageOptions;
 use super::query_loader::load_query;
 use crate::error::{CliError, CliResult, write_stdout};
 
 pub struct DumpArgs {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
-    pub grammar: PathBuf,
+    pub language: LanguageOptions,
     pub color: bool,
 }
 
@@ -22,8 +22,8 @@ pub fn run(args: DumpArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let grammar = grammar::load(&args.grammar)?;
-    let module = compile_module(loaded.sources, &grammar, args.color)?;
+    let artifacts = args.language.load_query(&loaded, None, args.color)?;
+    let module = compile_module(loaded.sources, &artifacts.grammar, args.color)?;
     let colors = Colors::new(args.color);
     write_stdout(format_args!("{}", dump(&module, colors)))?;
 

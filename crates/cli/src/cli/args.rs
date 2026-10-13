@@ -12,31 +12,31 @@ use crate::commands::generate::GenerateTarget;
 
 pub fn query_path_arg() -> Arg {
     Arg::new("query_path")
-        .value_name("QUERY")
+        .value_name("PATH")
         .value_parser(value_parser!(PathBuf))
-        .help("Query file or workspace directory")
+        .help("Query file, directory of .ptk files, or '-' for stdin")
 }
 
 pub fn query_text_arg() -> Arg {
     Arg::new("query_text")
         .short('q')
         .long("query")
-        .value_name("TEXT")
+        .value_name("QUERY")
         .help("Inline query text")
 }
 
 pub fn source_path_arg() -> Arg {
     Arg::new("source_path")
-        .value_name("SOURCE")
+        .value_name("FILE")
         .value_parser(value_parser!(PathBuf))
-        .help("Source file to parse")
+        .help("Source file or '-' for stdin")
 }
 
 pub fn source_text_arg() -> Arg {
     Arg::new("source_text")
         .short('s')
         .long("source")
-        .value_name("TEXT")
+        .value_name("SOURCE")
         .help("Inline source text")
 }
 
@@ -137,15 +137,6 @@ pub fn target_arg() -> Arg {
         .value_parser(value_parser!(GenerateTarget))
         .required(true)
         .help("Generated-code target (rust)")
-}
-
-pub fn grammar_arg() -> Arg {
-    Arg::new("grammar")
-        .long("grammar")
-        .value_name("GRAMMAR_JSON")
-        .value_parser(value_parser!(PathBuf))
-        .required(true)
-        .help("Bind query names using this grammar.json")
 }
 
 pub fn debug_arg() -> Arg {

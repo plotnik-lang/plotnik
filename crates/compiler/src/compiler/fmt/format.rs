@@ -74,8 +74,8 @@ fn format_query_impl(source: &str, config: ParseConfig) -> FormatResult<(String,
             Ok(None)
         )
     };
-    // Removing leading blank lines or moving a trailing comment must not give
-    // an ordinary comment a new meaning. Invalid candidates count too.
+    // Preserve declaration eligibility when moving comments or removing blank
+    // lines, including comments with malformed language names.
     if !has_declaration(source) && has_declaration(&output) {
         output.insert(0, '\n');
     }

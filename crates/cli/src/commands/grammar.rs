@@ -1,20 +1,7 @@
-use std::fs;
-use std::path::Path;
-
 use plotnik_compiler::GrammarIdentity;
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 
 use crate::error::CliError;
-
-pub fn load(path: &Path) -> Result<Grammar, CliError> {
-    let bytes = fs::read(path).map_err(|error| {
-        CliError::fatal(format!(
-            "failed to read grammar '{}': {error}",
-            path.display()
-        ))
-    })?;
-    from_bytes(&bytes, &path.display().to_string())
-}
 
 pub fn from_bytes(bytes: &[u8], source: &str) -> Result<Grammar, CliError> {
     let json = std::str::from_utf8(bytes).map_err(|error| {

@@ -2,7 +2,9 @@
 //!
 //! Each command is built using the shared arg builders from `args.rs`.
 
-use clap::Command;
+use std::path::PathBuf;
+
+use clap::{Arg, ArgGroup, Command, value_parser};
 
 use super::args::*;
 use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
@@ -17,7 +19,7 @@ fn with_hidden_trace_args(cmd: Command) -> Command {
         .arg(no_result_arg().hide(true))
 }
 
-// The tree command retains its hidden runtime-limit arguments.
+// Hidden runtime-limit options for tree.
 fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
     cmd.arg(fuel_arg().hide(true))
         .arg(max_memory_arg().hide(true))
@@ -56,13 +58,13 @@ pub fn generate_command() -> Command {
         .about("Generate a compiled matcher module")
         .override_usage(
             "\
-  plotnik gen <QUERY> --grammar <grammar.json> --target rust
-  plotnik gen -q <TEXT> --grammar <grammar.json> --target rust",
+  plotnik gen <PATH> [--lang <LANG>] --target rust
+  plotnik gen -q <QUERY> [--lang <LANG>] --target rust",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik gen query.ptk --grammar path/to/grammar.json --target rust
-  plotnik gen query.ptk --grammar path/to/grammar.json --target rust -o query.rs
+  plotnik gen query.ptk --lang javascript --target rust
+  plotnik gen query.ptk --lang javascript --target rust -o query.rs
 
 The generated module imports `plotnik_runtime`. Depend on `plotnik-runtime` to use it.
 The module records the exact grammar name, SHA-256, and source used during
@@ -71,7 +73,8 @@ binding."#,
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(grammar_arg())
+        .arg(lang_arg())
+        .arg(cache_dir_arg())
         .next_help_heading("Generation options")
         .arg(target_arg())
         .arg(debug_arg())
@@ -82,16 +85,30 @@ binding."#,
 
 pub fn tree_command() -> Command {
     let cmd = Command::new("tree")
-        .about("Query and source tree view")
+        .about("Display the syntax tree")
         .override_usage(
             "\
-  plotnik tree <FILE>                 # auto-detect by extension
-  plotnik tree <QUERY> <SOURCE>       # both trees
-  plotnik tree -q <TEXT> [SOURCE]
-  plotnik tree -s <TEXT> -l <LANG>",
+  plotnik tree <FILE>                 # .ptk query or source file path
+  plotnik tree - --lang <LANG>        # stdin, plotnik for query syntax
+  plotnik tree -q <QUERY>
+  plotnik tree -s <SOURCE> -l <LANG>",
         )
-        .arg(query_path_arg())
-        .arg(source_path_arg())
+        .after_help(
+            "Plotnik syntax is displayed locally.\n\
+             Source syntax uses --lang or the source file extension.\n\
+             Stdin and extensionless files require --lang; use plotnik for query syntax.",
+        )
+        .arg(
+            Arg::new("input_path")
+                .value_name("FILE")
+                .value_parser(value_parser!(PathBuf))
+                .help("File path (.ptk query or source), or '-' for stdin"),
+        )
+        .group(
+            ArgGroup::new("input")
+                .args(["input_path", "query_text", "source_text"])
+                .required(true),
+        )
         .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
@@ -111,19 +128,23 @@ pub fn check_command() -> Command {
         .about("Validate a query")
         .override_usage(
             "\
-  plotnik check <QUERY> --grammar <grammar.json>
-  plotnik check -q <TEXT> --grammar <grammar.json>",
+  plotnik check <PATH> [--lang <LANG>]
+  plotnik check -q <QUERY> [--lang <LANG>]",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik check query.ptk --grammar path/to/grammar.json
-  plotnik check queries/ --grammar path/to/grammar.json
-  plotnik check -q 'Q = ...' --grammar path/to/grammar.json"#,
+  plotnik check query.ptk --lang javascript
+  plotnik check queries/ --lang javascript
+  plotnik check -q 'Q = ...' --lang javascript
+
+Individual queries can select a language with a first-line @language comment.
+Directories require --lang."#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(grammar_arg())
+        .arg(lang_arg())
+        .arg(cache_dir_arg())
         .next_help_heading("Check options")
         .arg(strict_arg())
         .next_help_heading("Global options")
@@ -135,18 +156,19 @@ pub fn dump_command() -> Command {
         .about("Show compiled bytecode for debugging")
         .override_usage(
             "\
-  plotnik dump <QUERY> --grammar <grammar.json>
-  plotnik dump -q <TEXT> --grammar <grammar.json>",
+  plotnik dump <PATH> [--lang <LANG>]
+  plotnik dump -q <QUERY> [--lang <LANG>]",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik dump query.ptk --grammar path/to/grammar.json
-  plotnik dump -q 'Q = ...' --grammar path/to/grammar.json"#,
+  plotnik dump query.ptk --lang javascript
+  plotnik dump -q 'Q = ...' --lang javascript"#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(grammar_arg())
+        .arg(lang_arg())
+        .arg(cache_dir_arg())
         .next_help_heading("Global options")
         .arg(color_arg())
 }
@@ -156,19 +178,20 @@ pub fn infer_command() -> Command {
         .about("Generate type definitions from a query")
         .override_usage(
             "\
-  plotnik infer <QUERY> --grammar <grammar.json>
-  plotnik infer -q <TEXT> --grammar <grammar.json>",
+  plotnik infer <PATH> [--lang <LANG>]
+  plotnik infer -q <QUERY> [--lang <LANG>]",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik infer query.ptk --grammar path/to/grammar.json
-  plotnik infer -q 'Q = ...' --grammar path/to/grammar.json
-  plotnik infer query.ptk --grammar path/to/grammar.json -o types.d.ts"#,
+  plotnik infer query.ptk --lang javascript
+  plotnik infer -q 'Q = ...' --lang javascript
+  plotnik infer query.ptk --lang javascript -o types.d.ts"#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
         .arg(query_text_arg())
-        .arg(grammar_arg())
+        .arg(lang_arg())
+        .arg(cache_dir_arg())
         .next_help_heading("Output options")
         .arg(format_arg())
         .arg(no_node_type_arg())
@@ -185,9 +208,9 @@ pub fn run_command() -> Command {
         .about("Execute a query")
         .override_usage(
             "\
-  plotnik run <QUERY> <SOURCE>
-  plotnik run -q <TEXT> <SOURCE>
-  plotnik run -q <TEXT> -s <TEXT> -l <LANG>",
+  plotnik run <PATH> <FILE>
+  plotnik run -q <QUERY> <FILE>
+  plotnik run -q <QUERY> -s <SOURCE> -l <LANG>",
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
@@ -214,9 +237,9 @@ pub fn trace_command() -> Command {
         .about("Trace query execution")
         .override_usage(
             "\
-  plotnik trace <QUERY> <SOURCE>
-  plotnik trace -q <TEXT> <SOURCE>
-  plotnik trace -q <TEXT> -s <TEXT> -l <LANG>",
+  plotnik trace <PATH> <FILE>
+  plotnik trace -q <QUERY> <FILE>
+  plotnik trace -q <QUERY> -s <SOURCE> -l <LANG>",
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
