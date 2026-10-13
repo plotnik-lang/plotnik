@@ -39,3 +39,6 @@ lcov.info
 PRODUCT.md
 .impeccable/
 /.github/hooks/impeccable.json
+
+# Orb portal metadata is local to each thread.
+/.amp/portals/*
