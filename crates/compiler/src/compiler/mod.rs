@@ -32,4 +32,4 @@ pub use emit::{
 };
 pub use fmt::{FormatError, FormatResult, format_query};
 pub use parse::{QueryToken, tokenize};
-pub use query::{CompiledQuery, Query, QueryBuilder};
+pub use query::{CompiledQuery, LanguageSelector, Query, QueryBuilder};

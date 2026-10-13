@@ -11,7 +11,7 @@ TrailingSkip = (program
     (expression_statement)?
   }
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
 [entry_points]
 LeadingSkip  = 02

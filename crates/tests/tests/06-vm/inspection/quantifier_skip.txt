@@ -4,7 +4,7 @@ Q = (program
     name: (identifier) @name
   )
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 function f() {}
 ------------------- TYPESCRIPT -------------------
 export interface Q {

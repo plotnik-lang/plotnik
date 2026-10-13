@@ -3,7 +3,7 @@ Q = (program
     (identifier == "y") @id
   )
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 x
 ------------------- TYPESCRIPT -------------------
 export interface Q {

@@ -4,7 +4,7 @@ Bare = (program (expression_statement (Name)))
 Captured = (program
   (expression_statement (Name) @item)
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
 [entry_points]
 Bare     = 05

@@ -34,7 +34,7 @@ fn capture_name(language: &str, source: &str) -> serde_json::Value {
 #[cfg(feature = "lang-javascript")]
 #[test]
 fn javascript_parser_matches_embedded_grammar() {
-    let result = capture_name("JS", "const value = 1;");
+    let result = capture_name("javascript", "const value = 1;");
 
     assert_eq!(result, serde_json::json!({"name": "value"}));
     assert_eq!(
@@ -49,7 +49,7 @@ fn javascript_parser_matches_embedded_grammar() {
 #[cfg(feature = "lang-typescript")]
 #[test]
 fn typescript_parser_matches_embedded_grammar() {
-    let result = capture_name("TS", "const value: number = 1;");
+    let result = capture_name("typescript", "const value: number = 1;");
 
     assert_eq!(result, serde_json::json!({"name": "value"}));
     assert_eq!(

@@ -3,7 +3,7 @@ Ident = (identifier) @name
 Q = (program
   (expression_statement (Ident) @item)
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
 [entry_points]
 Ident = 02

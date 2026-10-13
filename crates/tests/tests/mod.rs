@@ -7,8 +7,8 @@
 //!
 //! Sections are separated by a centered 50-column rule — `----- DIAGNOSTICS -----`.
 //! The `INPUT` rule's parenthesized grammar selects what a query compiles against:
-//! `INPUT (ts)` picks TypeScript, `INPUT (dart)` dart, plain `INPUT` JavaScript
-//! (see `Lang::resolve`). Authors may dash the rule loosely (`--- INPUT (ts) ---`);
+//! `INPUT (typescript)` picks TypeScript, `INPUT (dart)` dart, plain `INPUT` JavaScript
+//! (see `Lang::resolve`). Authors may dash the rule loosely (`--- INPUT (typescript) ---`);
 //! `GRAMMAR` supplies a small compiler-only grammar as YAML using the Tree-sitter
 //! grammar schema, with `name` omitted. It replaces `INPUT`, never accompanies it.
 //! `make shot` normalizes it. For a 06-vm snapshot the body is the source the VM
@@ -720,11 +720,11 @@ enum Lang {
 impl Lang {
     fn resolve(ext: Option<&str>) -> Result<Lang, String> {
         match ext {
-            None | Some("js") | Some("javascript") | Some("jsx") => Ok(Self::Source {
+            None | Some("javascript") => Ok(Self::Source {
                 grammar: javascript_grammar(),
                 ts: tree_sitter_javascript::LANGUAGE.into(),
             }),
-            Some("ts") | Some("typescript") => Ok(Self::Source {
+            Some("typescript") => Ok(Self::Source {
                 grammar: typescript_grammar(),
                 ts: tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
             }),

@@ -6,7 +6,7 @@ Expr = [
 Q = (program
   (expression_statement (Expr) @expr)
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 42
 ------------------- TYPESCRIPT -------------------
 export type Expr =

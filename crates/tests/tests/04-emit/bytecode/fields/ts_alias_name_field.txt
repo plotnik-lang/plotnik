@@ -2,7 +2,7 @@ Q = (type_alias_declaration
   name: (type_identifier) @name
   value: (predefined_type) @value
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2

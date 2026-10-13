@@ -40,7 +40,6 @@ macro_rules! define_grammars {
         dependency: $dependency:literal,
         parser_dir: $parser_dir:literal,
         symbol: $symbol:ident,
-        aliases: [$($alias:literal),* $(,)?],
     }),* $(,)?) => {
         #[cfg(any($(feature = $feature),*))]
         fn load_grammar(json: &str, source: &str) -> Grammar {
@@ -74,10 +73,10 @@ macro_rules! define_grammars {
         )*
 
         fn from_name(input: &str) -> Option<&'static Lang> {
-            match input.to_ascii_lowercase().as_str() {
+            match input {
                 $(
                     #[cfg(feature = $feature)]
-                    stringify!($name) $(| $alias)* => Some($name()),
+                    stringify!($name) => Some($name()),
                 )*
                 _ => None,
             }
@@ -96,7 +95,7 @@ macro_rules! define_grammars {
 
 include!("../grammars.rs");
 
-/// Resolve a user-supplied language name or alias.
+/// Resolve an exact canonical language name.
 pub fn resolve(input: &str) -> Result<&'static Lang, String> {
     if let Some(lang) = from_name(input) {
         return Ok(lang);

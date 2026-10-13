@@ -41,7 +41,7 @@ pub fn source_text_arg() -> Arg {
 }
 
 pub const LANGUAGE_HELP: &str =
-    "Language alias or owner/repo[/grammar-directory], optionally followed by @revision";
+    "Language name or owner/repo[/grammar-directory], optionally followed by @revision";
 
 pub fn lang_arg() -> Arg {
     Arg::new("lang")

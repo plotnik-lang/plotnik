@@ -1,5 +1,5 @@
 Q = (interface_declaration) @decl
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2

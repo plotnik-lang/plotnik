@@ -8,7 +8,7 @@ Q = (program
     )
   ] @expr
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 x
 ------------------- TYPESCRIPT -------------------
 export interface Q {

@@ -8,7 +8,7 @@ Q = (program
     (array (Tail) @tail)
   )
 )
-------------------- INPUT (js) -------------------
+--------------- INPUT (javascript) ---------------
 [x, y];
 ------------------- TYPESCRIPT -------------------
 export interface Q {

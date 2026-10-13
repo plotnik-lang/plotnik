@@ -6,7 +6,7 @@ Q = (program
     ] @value
   )
 )
-------------------- INPUT (js) -------------------
+--------------- INPUT (javascript) ---------------
 x;
 ------------------- TYPESCRIPT -------------------
 export interface Q {

@@ -3,7 +3,7 @@ Expr = [
   Num: (number) @num
   Str: (string)
 ]
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
 [entry_points]
 Expr = 0

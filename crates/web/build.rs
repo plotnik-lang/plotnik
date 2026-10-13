@@ -13,7 +13,6 @@ macro_rules! define_grammars {
         dependency: $dependency:literal,
         parser_dir: $parser_dir:literal,
         symbol: $symbol:ident,
-        aliases: [$($alias:literal),* $(,)?],
     }),* $(,)?) => {
         const GRAMMARS: &[GrammarPackage] = &[$(GrammarPackage {
             name: stringify!($name),

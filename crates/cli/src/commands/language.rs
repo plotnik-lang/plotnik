@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use plotnik_compiler::WasmParser;
+use plotnik_compiler::{LanguageSelector, WasmParser};
 
 use super::grammar;
 use crate::error::CliError;
@@ -17,62 +17,6 @@ const CACHE_COMPONENT: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'_')
     .remove(b'.')
     .remove(b'@');
-
-#[derive(Debug, PartialEq, Eq)]
-struct Selection {
-    name: String,
-    revision: Option<String>,
-}
-
-impl Selection {
-    fn parse(input: &str) -> Result<Self, CliError> {
-        let (name, revision) = match input.split_once('@') {
-            Some((name, revision)) => {
-                if revision.is_empty()
-                    || revision.contains('@')
-                    || revision.chars().any(char::is_whitespace)
-                    || revision.chars().any(char::is_control)
-                {
-                    return Err(CliError::fatal(
-                        "expected language@revision with a nonempty revision",
-                    ));
-                }
-
-                let revision =
-                    if revision.len() == 40 && revision.bytes().all(|c| c.is_ascii_hexdigit()) {
-                        revision.to_ascii_lowercase()
-                    } else {
-                        revision.to_owned()
-                    };
-                (name, Some(revision))
-            }
-            None => (input, None),
-        };
-        if name.split('/').any(|part| {
-            part.is_empty()
-                || matches!(part, "." | "..")
-                || part.contains('\\')
-                || part.chars().any(char::is_control)
-        }) {
-            return Err(CliError::fatal(
-                "expected language alias or owner/repo[/grammar-directory] without empty or traversal components",
-            ));
-        }
-
-        let name = match name {
-            "js" | "jsx" | "mjs" | "cjs" => "javascript",
-            "ts" => "typescript",
-            "py" => "python",
-            "rs" => "rust",
-            "h" => "c",
-            other => other,
-        };
-        Ok(Self {
-            name: name.to_owned(),
-            revision,
-        })
-    }
-}
 
 struct Artifact {
     build: String,
@@ -95,9 +39,19 @@ pub fn load(m: &ArgMatches, source: Option<&Path>) -> Result<Artifacts, CliError
     let input = m
         .get_one::<String>("lang")
         .map(String::as_str)
-        .or_else(|| source?.extension()?.to_str())
+        .or_else(|| {
+            let extension = source?.extension()?.to_str()?;
+            Some(match extension {
+                "js" | "jsx" | "mjs" | "cjs" => "javascript",
+                "ts" => "typescript",
+                "py" => "python",
+                "rs" => "rust",
+                "h" => "c",
+                other => other,
+            })
+        })
         .ok_or_else(|| CliError::fatal("source language required: use --lang"))?;
-    let selection = Selection::parse(input)?;
+    let selection = LanguageSelector::parse(input).map_err(CliError::fatal)?;
     let cache = cache_path(&cache_dir(m)?, &selection);
     if let Some(artifacts) = read_cache(&cache)? {
         return Ok(artifacts);
@@ -214,7 +168,7 @@ fn fetch(url: &str) -> Result<Artifact, CliError> {
     })
 }
 
-fn cache_path(root: &Path, selection: &Selection) -> PathBuf {
+fn cache_path(root: &Path, selection: &LanguageSelector) -> PathBuf {
     let name = match &selection.revision {
         Some(revision) => format!("{}@{revision}", selection.name),
         None => selection.name.clone(),

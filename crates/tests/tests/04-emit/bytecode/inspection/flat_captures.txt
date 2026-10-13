@@ -1,7 +1,7 @@
 Q = (program
   (expression_statement (identifier) @id)
 )
-------------------- INPUT (ts) -------------------
+--------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
 [entry_points]
 Q = 2

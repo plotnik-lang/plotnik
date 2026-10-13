@@ -2,7 +2,7 @@ Q = (program
   (comment)
   (expression_statement) @statement
 )
-------------------- INPUT (js) -------------------
+--------------- INPUT (javascript) ---------------
 /* c */ let x = 1; x;
 ------------------- TYPESCRIPT -------------------
 export interface Q {
