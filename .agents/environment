@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# Sourced by orb setup and repository-scoped login shells, not local development.
+# Keep debug assertions and overflow checks; omit only compiler debug information.
+export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-0}"
+export CARGO_PROFILE_TEST_DEBUG="${CARGO_PROFILE_TEST_DEBUG:-0}"
+
+_plotnik_orb_jobs="$(
+    cpus="$(nproc)"
+    memory="$(awk '/^MemTotal:/ {printf "%.0f", $2 * 1024}' /proc/meminfo)"
+
+    # Limits can live on a parent cgroup, not the individual command's scope.
+    # Include Amp's shared workload budget even when login runs in the agent scope.
+    for group in "$(sed -n 's/^0:://p' /proc/self/cgroup)" /amp.slice/amp-workload.slice; do
+        while :; do
+            directory="/sys/fs/cgroup$group"
+            if [[ -r "$directory/memory.max" ]]; then
+                read -r limit < "$directory/memory.max"
+                if [[ "$limit" != max ]] && ((limit < memory)); then
+                    memory="$limit"
+                fi
+            fi
+            if [[ -r "$directory/cpu.max" ]]; then
+                read -r quota period < "$directory/cpu.max"
+                if [[ "$quota" != max ]]; then
+                    available=$((quota / period))
+                    ((available > 0)) || available=1
+                    ((available >= cpus)) || cpus="$available"
+                fi
+            fi
+            [[ "$group" != / ]] || break
+            group="$(dirname "$group")"
+        done
+    done
+
+    # Start conservatively: reserve 25% of the budget, then allow 2 GiB per job.
+    # One job is the minimum; this is a concurrency cap, not an OOM guarantee.
+    jobs=$((memory * 3 / 4 / (2 * 1024 * 1024 * 1024)))
+    ((jobs > 0)) || jobs=1
+    ((jobs <= cpus)) || jobs="$cpus"
+    printf '%s' "$jobs"
+)"
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-$_plotnik_orb_jobs}"
+export RUST_TEST_THREADS="${RUST_TEST_THREADS:-$_plotnik_orb_jobs}"
+unset _plotnik_orb_jobs

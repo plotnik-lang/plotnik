@@ -60,6 +60,19 @@ EOF
 fi
 export LLVM_PREFIX=/usr
 
+# Recalculate concurrency in new login shells instead of caching one machine's limits.
+resource_marker='# Plotnik orb resource limits'
+if ! grep -Fqx "$resource_marker" "$HOME/.bash_profile" 2>/dev/null; then
+    cat >> "$HOME/.bash_profile" <<EOF
+
+$resource_marker
+case "\$PWD" in
+    "$repo_root"|"$repo_root"/*) source "$repo_root/.agents/environment" ;;
+esac
+EOF
+fi
+source "$repo_root/.agents/environment"
+
 # Download official CLI binaries instead of compiling each tool in every cold orb.
 tools_dir="$(mktemp -d)"
 trap 'rm -rf "$tools_dir"' EXIT
