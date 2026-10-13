@@ -71,12 +71,13 @@ struct Artifact {
 
 pub struct Artifacts {
     pub grammar: plotnik_compiler::grammar::Grammar,
-    parser: WasmParser,
+    wasm: Vec<u8>,
 }
 
 impl Artifacts {
-    pub fn parser(self) -> WasmParser {
-        self.parser
+    pub fn parser(self) -> Result<WasmParser, CliError> {
+        WasmParser::new(self.grammar, &self.wasm)
+            .map_err(|error| CliError::fatal(error.to_string()))
     }
 }
 
@@ -228,17 +229,17 @@ fn read_cache(dir: &Path) -> Result<Option<Artifacts>, CliError> {
 
     let json = fs::read(dir.join("grammar.json")).map_err(io_error)?;
     let wasm = fs::read(dir.join("parser.wasm")).map_err(io_error)?;
-    artifacts(dir, &json, &wasm).map(Some)
+    artifacts(dir, &json, wasm).map(Some)
 }
 
 fn write_cache(dir: &Path, json: Vec<u8>, wasm: Vec<u8>) -> Result<Artifacts, CliError> {
-    let artifacts = artifacts(dir, &json, &wasm)?;
+    let artifacts = artifacts(dir, &json, wasm)?;
 
     let parent = dir.parent().expect("cache path has a language directory");
     fs::create_dir_all(parent).map_err(io_error)?;
     let pending = tempfile::tempdir_in(parent).map_err(io_error)?;
     fs::write(pending.path().join("grammar.json"), json).map_err(io_error)?;
-    fs::write(pending.path().join("parser.wasm"), wasm).map_err(io_error)?;
+    fs::write(pending.path().join("parser.wasm"), &artifacts.wasm).map_err(io_error)?;
 
     match fs::rename(pending.path(), dir) {
         Ok(()) => Ok(artifacts),
@@ -248,12 +249,10 @@ fn write_cache(dir: &Path, json: Vec<u8>, wasm: Vec<u8>) -> Result<Artifacts, Cl
     }
 }
 
-fn artifacts(dir: &Path, json: &[u8], wasm: &[u8]) -> Result<Artifacts, CliError> {
+fn artifacts(dir: &Path, json: &[u8], wasm: Vec<u8>) -> Result<Artifacts, CliError> {
     let source = dir.join("grammar.json").display().to_string();
     let grammar = grammar::from_bytes(json, &source)?;
-    let parser = WasmParser::new(grammar.clone(), wasm)
-        .map_err(|error| CliError::fatal(error.to_string()))?;
-    Ok(Artifacts { grammar, parser })
+    Ok(Artifacts { grammar, wasm })
 }
 
 fn is_hex(value: &str, len: usize) -> bool {

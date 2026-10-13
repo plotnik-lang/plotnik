@@ -50,7 +50,7 @@ pub fn run(m: &ArgMatches) -> CliResult {
     }
     if has_source {
         let source = inputs.source()?;
-        let mut parser = language::load(m, inputs.source_path)?.parser();
+        let mut parser = language::load(m, inputs.source_path)?.parser()?;
         let tree = parser
             .parse(&source)
             .map_err(|error| CliError::fatal(error.to_string()))?;

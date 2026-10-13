@@ -22,7 +22,7 @@ pub fn run(m: &ArgMatches, mode: Mode) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
     let source = inputs.source()?;
-    let mut parser = language::load(m, inputs.source_path)?.parser();
+    let mut parser = language::load(m, inputs.source_path)?.parser()?;
     let color = ColorChoice::from_matches(m).should_colorize();
     let compiled = compile::compile_query(loaded.sources, parser.grammar(), color)?;
     let module = compile::emit_module(&compiled, BytecodeConfig::new(), color)?;
