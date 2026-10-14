@@ -42,8 +42,9 @@ Plotnik matches Tree-sitter syntax trees and builds typed results from the parts
   - [Names](#names)
   - [Suffix order](#suffix-order)
   - [Strings and comments](#strings-and-comments)
-  - [Compile a file or directory](#compile-a-file-or-directory)
+  - [Check a query](#check-a-query)
 - [A complete example](#a-complete-example)
+- [Rust API](#rust-api)
 
 ## A query from tree to result
 
@@ -91,9 +92,9 @@ Q = (program
 { "name": "answer" }
 ```
 
-Matching starts at the supplied tree's root. Here that node is `program`, so `Q = (identifier) @name` would not find `answer`. The path to it belongs in the query. Plotnik does not quietly insert a search through every descendant.
+Each query application starts at a supplied node. Here, the query follows child patterns from `program` to `answer`. `Q = (identifier) @name` would match at the identifier, not at `program`. A subtree search applies the query at candidate starting nodes. See the [Rust API](#rust-api).
 
-One execution returns the first complete match. If a later part fails, Plotnik backtracks and tries another way to satisfy the query. To collect several matches in one result, use repetition.
+One application returns the first complete match. If a later part fails, Plotnik backtracks and tries another way to satisfy the query. Repetition collects several values inside that one result.
 
 The examples below use the JavaScript grammar. A block without `Name =` is a pattern fragment to place at the appropriate level of the tree. Node kinds and grammar fields come from the selected source language's grammar.
 
@@ -114,7 +115,7 @@ A quoted token matches its grammar kind. To require a named identifier's text to
 
 `(_ ...)` can constrain the children of any named node. Bare `_` matches one node and has no child list.
 
-Plotnik rejects abstract grammar supertypes, such as JavaScript's `expression`, including refinements such as `(expression#binary_expression)`. To choose between concrete kinds, use an [alternation](#choose-an-alternative).
+Abstract grammar supertypes, such as JavaScript's `expression`, are not supported. Use an [alternation](#choose-an-alternative) of concrete kinds.
 
 ### Children and sibling sequences
 
@@ -191,15 +192,13 @@ Tree-sitter can return a tree even when the source is incomplete or malformed:
 | `(MISSING identifier)` | An inserted identifier token   |
 | `(MISSING ";")`        | An inserted semicolon token    |
 
-These patterns accept no child constraints. An `ERROR` node can cover source text. A `MISSING` node has a zero-width source range. The kind in `(MISSING kind)` must be one the parser can insert as a token, so `(MISSING binary_expression)` is rejected. An aliased kind can qualify even if other occurrences of that kind have children.
+These patterns accept no child constraints. An `ERROR` node can cover source text. A `MISSING` node has a zero-width source range. The kind in `(MISSING kind)` must be one the parser can insert as a token, so `(MISSING binary_expression)` is rejected.
 
 ### What grammar checking establishes
 
 The compiler checks node kinds, field names, and structural constraints against the selected language's grammar. An unknown name is an error even inside an optional pattern or a branch that matching could skip. A known pattern whose constraints are impossible can be bypassed by a live alternative, `?`, or `*`. Each definition is also checked in its own right, so an impossible definition is rejected even when a caller could skip it.
 
-Passing these checks means the grammar model has not ruled out a match. It does not guarantee that the query matches your source, or that some source produces the requested tree. Structural checking does not solve text predicates or fully model lexical competition, parser conflicts, and recovery. Recursive sibling patterns can also be approximated more broadly than they match.
-
-A grammar-analysis resource error means checking stopped before it could reach a verdict. It does not mean the query is impossible. Simplify the child constraints or, when using the Rust API, increase the relevant analysis limit.
+A query can pass these checks and still match no source.
 
 ## Filter by text
 
@@ -226,8 +225,10 @@ Plotnik does not support Tree-sitter's separate predicates or directives, such a
 `/pattern/` searches anywhere in the node's text. Use `^` and `$` to constrain the beginning and end of that text:
 
 ```ptk
-(identifier =~ /^[A-Z][a-z]+(?:[A-Z][a-z]+)*$/)
+(identifier =~ /^test_[0-9]+$/)
 ```
+
+`test_12` matches, but `my_test_12` does not.
 
 Regex matching supports Unicode characters and properties, character classes, groups, alternation, and repetition. Put flags inside the expression, as in `/(?i)answer/` or `/(?i:answer)/`. A slash inside the pattern is escaped as `\/`.
 
@@ -236,7 +237,6 @@ The details that affect matches are:
 - `^` and `$` refer to the node's text boundaries. Multiline mode is unavailable.
 - `.` excludes newline by default. `(?s)` lets it match newline too.
 - `\b` and `\B` use ASCII word characters, even though the rest of the expression supports Unicode.
-- Case folding and Unicode properties are resolved by Plotnik's compiler, so they do not depend on a host application's regex engine.
 - Parenthesized groups affect regex matching only. They do not create Plotnik result fields.
 
 Backreferences, lookahead, lookbehind, named groups, multiline mode `(?m)`, CRLF mode `(?R)`, and directional or half word boundaries such as `\<` and `\b{start}` are rejected. An empty regex literal `//` is also rejected. A nonempty expression that can match an empty string, such as `/a*/`, is valid.
@@ -266,9 +266,7 @@ Nesting node patterns does not nest the result:
 ```ptk
 (function_declaration
   name: (identifier) @name
-  body: (statement_block
-    (return_statement (_) @value)
-  )
+  body: (statement_block) @body
 ) @node
 ```
 
@@ -279,12 +277,12 @@ result
 |
 +-- name: Node
 |
-+-- value: Node
++-- body: Node
 |
 `-- node: Node
 ```
 
-`@node` captures the function node itself. It does not gather `@name` and `@value` into an object. To make an object, capture a sequence containing those captures:
+`@node` captures the function node itself. It does not gather `@name` and `@body` into an object. To make an object, capture a sequence containing those captures:
 
 ```ptk
 {
@@ -391,7 +389,7 @@ Q = (program
 
 Each element has `id: Node` and `node: Node`. A captured repetition of a sequence without captures is invalid unless each iteration matches exactly one node.
 
-Result fields are always present in their record. An absent optional value is `null`, and a zero-length list is `[]`. In TypeScript, an option is `T | null`, a list is `T[]`, and a nonempty list is `[T, ...T[]]`.
+Result fields are always present in their record. An absent optional value is `null`, and a zero-length list is `[]`.
 
 ### Greedy and lazy matching
 
@@ -400,7 +398,7 @@ Greedy quantifiers try to match before continuing. Lazy quantifiers try the cont
 ```ptk
 Q = (program
   (expression_statement)* @prefix :: text
-  (expression_statement) @last :: text
+  (expression_statement) @next :: text
 )
 ```
 
@@ -408,13 +406,13 @@ For `a; b; c;`, the greedy `*` first takes all three statements. The required fi
 
 ```text
 greedy *     a;  b; | c;
-             prefix  last
+             prefix  next
 
 lazy *?            | a;        b; c; need not match
-             prefix  last
+             prefix  next
 ```
 
-With `*`, the result is `{ "prefix": ["a;", "b;"], "last": "c;" }`. Replacing it with `*?` gives `{ "prefix": [], "last": "a;" }`. The name `last` is just a capture name. Add a trailing anchor to require the last child.
+With `*`, the result is `{ "prefix": ["a;", "b;"], "next": "c;" }`. Replacing it with `*?` gives `{ "prefix": [], "next": "a;" }`.
 
 An unanchored repeat can skip nonmatching siblings between iterations. It does not mean "a contiguous run". [Anchoring the repeat](#anchors-with-optional-or-repeated-patterns) restricts those gaps.
 
@@ -424,7 +422,7 @@ A pattern is _nullable_ if it can succeed without matching a node. `?` and `*` a
 
 An empty match leaves the next sibling available for the following pattern. It is different from a `MISSING` token: the latter is an actual tree node with an empty source range.
 
-Each successful repetition must match a tree node. Empty outcomes do not become list elements or satisfy `+`. For example, repeating a record-producing pattern with only optional contents collects records only for iterations that actually match a node. This also prevents a repeat from succeeding forever without moving.
+Each successful repetition must match a tree node. Empty outcomes do not become list elements or satisfy `+`. For example, repeating a record-producing pattern with only optional contents collects records only for iterations that actually match a node.
 
 References preserve their definitions' greedy or lazy preference. There is one separate restriction for collecting repeats of [nullable list- or option-valued definitions](#definitions-that-return-lists-or-options).
 
@@ -474,7 +472,7 @@ A list that can be omitted is no longer guaranteed nonempty. A definition refere
 
 Captures with the same name must have compatible types. `[(identifier) @x (number) @x]` gives one required `x: Node`. Options can admit absence and list types can relax their minimum, but Plotnik does not merge different nested record shapes field by field. Distinct named record or variant types remain distinct even if their fields look identical. Use labeled alternatives when the possible values have different shapes.
 
-The compiler checks these ordinary capture types before applying `:: text` or `:: bool`. Converting two incompatible values to the same primitive does not make their merge valid.
+Adding `:: text` or `:: bool` does not make incompatible captures mergeable.
 
 Capturing the whole alternation moves its merged fields into a nested record. With no inner captures, a capture can instead take the matched node, provided every alternative matches exactly one node.
 
@@ -571,13 +569,13 @@ IdentifierValue = (identifier) @node
 
 `(Identifier)` is a useful constraint, but `(Identifier) @x` is an error because there is no value to capture. `(IdentifierValue) @x` returns `x: { node: Node }`. A bare alias such as `Alias = (IdentifierValue)` also discards the referenced result. It does not create a type alias.
 
-A successful match-only query renders as `null` in debug JSON and as `undefined` in generated TypeScript. This is still a successful match. Failure to match is a separate outcome.
+A match-only definition can still succeed. Producing no data is different from failing to match.
 
 ### Entry points and fragments
 
-An entry point is a definition that can start execution on the tree's root. Its body must match exactly one top-level node and need no surrounding anchor context. Captures do not affect that eligibility. An alternation or reference qualifies when its possible matches meet the same condition. A sequence containing just one such pattern can qualify too.
+An entry point is a definition run independently. It must match exactly one outer node without needing a field or anchor boundary from its caller. Its children can still contain sequences and repetitions. Captures do not affect eligibility. References, alternatives, and groups qualify under the same rule.
 
-A definition matching several siblings, an optional node, or a repetition is a fragment. Use it inside another pattern:
+Definitions that can match no node or several siblings, or need context from their caller, are fragments. Use them inside another pattern:
 
 ```ptk
 Documented = {
@@ -588,7 +586,11 @@ Documented = {
 Q = (program (Documented)* @functions)
 ```
 
-`Documented` cannot run at the root by itself. `Q` can, because it matches one `program` node. Entry-point selection belongs to the caller. Definition order does not imply an automatic traversal or root wrapper.
+`Documented` matches two siblings. `Q` can run independently because its outer pattern matches one `program` node, even though its child pattern repeats.
+
+`Left = left: (identifier)` is also a fragment: its caller must supply the parent whose `left` field is tested. A field inside a node pattern, such as `(binary_expression left: (identifier))`, gets that context from the node itself. Definitions can also [leave anchor boundaries for their callers](#anchors-in-groups-and-definitions).
+
+Fragments have no standalone Rust execution methods.
 
 ### Definitions that return lists or options
 
@@ -647,8 +649,6 @@ The progress check needs a node match before the recursive call, as shown by `me
 ## Constrain sibling positions
 
 An anchor restricts the gap between matched siblings, or between a matched child and the beginning or end of its parent's child list. It constrains syntax-tree nodes, not source characters. Whitespace that Tree-sitter leaves out of the tree cannot break an anchor.
-
-The patterns that actually consume nodes determine the gap's boundaries. A sequence uses its first and last consuming patterns, and an alternation uses the selected alternative. A pattern that matches nothing supplies no new boundary node. Groups, captures, and definition references do not insert nodes of their own.
 
 Tree-sitter marks some nodes as _extras_, commonly comments. Extras can be named or anonymous. The rules below distinguish nodes skipped in a gap from nodes explicitly matched by a pattern.
 
@@ -850,7 +850,7 @@ Q
     `-- details             QFunctionsDetails
 ```
 
-Lists and options do not add a name component. Inside a variant case, the case label is kept verbatim: a `details` record in the `Call` case of `QStatement` is `QStatementCallDetails`. The case's immediate payload stays inline.
+Lists and options do not add a name component. Inside a variant case, the case label is kept verbatim: a `details` record in the `Call` case of `QStatement` is `QStatementCallDetails`.
 
 Use `:: Name` to choose a name without changing the value:
 
@@ -894,8 +894,6 @@ There is one quantifier, one capture, and one capture-type position at each leve
 
 Empty `()`, `{}`, and `[]` are errors. Use an optional pattern for a match that can take nothing, or an anchor-only child list to test emptiness.
 
-Write sibling groups as `{...}`. The parser still recognizes Tree-sitter's `((...)(...))` grouping and `!field` negation with warnings directing you to braces and `-field`. Supertype refinements are unsupported in either `#` or `/` spelling.
-
 ### Strings and comments
 
 Single- and double-quoted strings have the same meaning. They are used for anonymous tokens and string predicate values. Supported escapes are:
@@ -914,24 +912,16 @@ Unicode escape digits are hexadecimal, as in `\u{1F600}`. Other string escapes a
 
 `//` and `;` begin line comments. `/* ... */` encloses a block comment.
 
-A first-line comment can declare a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. Names use `[A-Za-z][A-Za-z0-9_-]*`. When compiling or parsing source with an individual query, `--lang` selects the grammar, with the declaration as its default. The declaration must match the loaded grammar's name exactly, including case.
+A first-line comment can declare a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. The declaration must match the loaded grammar's name exactly, including case.
 
-### Compile a file or directory
+### Check a query
 
-The compiler loads the source language's grammar from the service or cache to check node kinds, field names, and possible tree shapes:
+Use `check` to validate a query against a grammar and `infer` to show its result types:
 
 ```sh
 plotnik check query.ptk --lang javascript
 plotnik infer query.ptk --lang javascript
 ```
-
-`check` validates the query. `infer` shows its result types. `dump` shows bytecode, and `gen --target rust` generates a matcher. Supply `--lang` or a first-line declaration for individual files, inline queries, and stdin (`-`). `--lang` accepts a language name or `owner/repo[/grammar-directory]`, optionally followed by `@revision` for a Git branch, tag, or commit. `--cache-dir` overrides the grammar cache location.
-
-A directory in place of `query.ptk` requires `--lang`. Its immediate `.ptk` files load in filename order into one namespace and compile together using that grammar. Language declarations in these files receive syntax validation.
-
-Passing `-q 'Q = ...'` supplies literal query text instead of a file path. `-s 'const answer = 42;'` supplies literal source text. `run` and `trace` use the same individual-query selection and agreement rules, with the source file extension as a fallback when both `--lang` and the declaration are absent.
-
-`tree` takes one file path or literal text through `-q` or `-s`. `plotnik tree query.ptk` renders Plotnik syntax locally. Use `--query-view ast` (default) or `--query-view cst`. `plotnik tree input.js` parses source using `--lang` or its extension. Use `-` in place of a file path to read stdin. Stdin and extensionless files require `--lang`: `plotnik` displays Plotnik syntax, and source selectors parse source.
 
 ## A complete example
 
@@ -992,3 +982,38 @@ The result is:
 ```
 
 The outer `*` can skip statements that do not match `Statement`, and the argument repeat can skip arguments that do not match `Expression`. These are extraction patterns, so unmentioned syntax remains unconstrained. To require complete coverage of a child list, use the boundary and adjacency anchors described above.
+
+## Rust API
+
+Generated Rust can apply an entry point to one node or search a subtree with it. Pass the source text used to parse the tree.
+
+| To...                             | Use                             |
+| --------------------------------- | ------------------------------- |
+| Match at a supplied node          | `Call::exec(node, source)`      |
+| Find the first match in a subtree | `Call::find(scope, source)`     |
+| Collect all subtree matches       | `Call::find_all(scope, source)` |
+| Iterate subtree matches lazily    | `Call::each(scope, source)`     |
+
+For a subtree search, write the pattern for the node you want to find:
+
+```ptk
+Call = (call_expression
+  function: (identifier) @name :: text
+  arguments: (arguments (identifier)* @arguments :: text)
+)
+```
+
+With `source` equal to `f(a, b); g(c);` and `tree` parsed from it, `Call::find_all(tree.root_node(), source)` finds two calls:
+
+```text
+name    arguments
+
+"f"     ["a", "b"]
+"g"     ["c"]
+```
+
+Each call contributes one record. The `*` fills that record's `arguments` list; the search keeps those lists separate.
+
+`Call::exec(tree.root_node(), source)` would not find these calls. It checks only the supplied node and its specified children, and the root is a `program`.
+
+Search visits the scope node first, then each child's subtree from left to right, including nested matches. On `f(g(a)); h(b);`, `Call` finds `f`, then `g`, then `h`. Each node contributes at most one match, using the query's usual backtracking rules.
