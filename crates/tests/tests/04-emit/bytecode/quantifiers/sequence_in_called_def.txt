@@ -6,7 +6,7 @@ Collect = {
 
 Q = (array (Collect))
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Item = 02
 Q    = 05
 
@@ -55,7 +55,7 @@ N0: S4 → T2  ; Item
 N1: S5 → T3  ; CollectItems
 N2: S6 → T5  ; Collect
 
-[entry_points]
+[entrypoints]
 Item = 00 :: T2
 Q    = 03 :: T0
 

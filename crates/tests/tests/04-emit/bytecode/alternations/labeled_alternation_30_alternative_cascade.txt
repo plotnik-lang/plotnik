@@ -31,7 +31,7 @@ Q = [
   A29: (identifier) @x29
 ]
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 00
 
 [transitions]
@@ -233,7 +233,7 @@ M59: S60 → T30  ; A29: T30
 [type_names]
 N0: S61 → T31  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 000 :: T31
 
 [instructions]

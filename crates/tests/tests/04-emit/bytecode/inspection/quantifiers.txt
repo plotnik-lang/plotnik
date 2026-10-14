@@ -21,7 +21,7 @@ Funcs = (program
 )
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Funcs = 58
 Lazy  = 42
 Many  = 12
@@ -125,7 +125,7 @@ N3: S08 → T07  ; Lazy
 N4: S09 → T08  ; FuncsFuncs
 N5: S10 → T10  ; Funcs
 
-[entry_points]
+[entrypoints]
 Funcs = 16 :: T10
 Lazy  = 12 :: T07
 Many  = 04 :: T04

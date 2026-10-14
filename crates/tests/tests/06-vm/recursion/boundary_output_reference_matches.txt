@@ -77,7 +77,7 @@ M7: S01 → T0  ; b: <Node>
 N0: S08 → T4  ; Chain
 N1: S09 → T5  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T5
 
 [instructions]

@@ -12,7 +12,7 @@ Test = (program
   (expression_statement (Expr) @expr)
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Expr = 00
 Test = 14
 
@@ -72,7 +72,7 @@ M5: S06 → T3  ; expr: Expr
 N0: S07 → T3  ; Expr
 N1: S08 → T4  ; Test
 
-[entry_points]
+[entrypoints]
 Expr = 00 :: T3
 Test = 02 :: T4
 

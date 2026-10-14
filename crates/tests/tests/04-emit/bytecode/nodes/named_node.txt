@@ -1,6 +1,6 @@
 Q = (identifier)
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 2
 
 [transitions]
@@ -20,7 +20,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T0
 
 [instructions]

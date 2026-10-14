@@ -32,7 +32,7 @@ M0: S1 → T0  ; comment: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T1
 
 [instructions]

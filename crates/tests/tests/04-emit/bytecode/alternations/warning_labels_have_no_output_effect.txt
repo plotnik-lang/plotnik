@@ -16,7 +16,7 @@ warning: alternative labels have no output effect here: captures from the altern
   |
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 2
 
 [transitions]
@@ -43,7 +43,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T0
 
 [instructions]

@@ -122,7 +122,7 @@ M0: S1 → T1  ; name: <Node>
 [type_names]
 N0: S2 → T2  ; Name
 
-[entry_points]
+[entrypoints]
 Name = 00 :: T2
 Q    = 05 :: T0
 

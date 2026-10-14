@@ -3,7 +3,7 @@ Q = [
   B: (number) @b
 ]
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 0
 
 [transitions]
@@ -38,7 +38,7 @@ M3: S4 → T2  ; B: T2
 [type_names]
 N0: S5 → T3  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T3
 
 [instructions]

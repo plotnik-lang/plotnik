@@ -1,6 +1,6 @@
 Q = .
 ------------------ DIAGNOSTICS -------------------
-error: `Q` cannot be an entry point because its body does not match exactly one root node
+error: `Q` cannot be an entrypoint because its body does not match exactly one root node
  --> query.ptk:1:1
   |
 1 | Q = .

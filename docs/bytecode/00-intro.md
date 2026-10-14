@@ -38,7 +38,7 @@ Inspection adds another use for effects: recording which part of the query match
 ## Implementation
 
 1. [Layout](01-layout.md): header, sections, padding, checksum, and references.
-2. [Instructions](02-instructions.md): entry points, matching, and control flow.
+2. [Instructions](02-instructions.md): entrypoints, matching, and control flow.
 3. [Types](03-types.md): result shapes, members, and names.
 4. [Effects](04-effects.md): result construction and suppression.
 5. [Spans](05-spans.md): query locations and what they matched in the document.

@@ -2,7 +2,7 @@ Q = (array
   (identifier ^= "a")* @xs
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -35,7 +35,7 @@ M0: S2 → T1  ; xs: T1
 [type_names]
 N0: S3 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T2
 
 [instructions]

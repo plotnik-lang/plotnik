@@ -8,7 +8,7 @@ rules:
     content: {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Name = 2
 Q    = 5
 
@@ -38,7 +38,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Name = 0 :: T0
 Q    = 2 :: T0
 

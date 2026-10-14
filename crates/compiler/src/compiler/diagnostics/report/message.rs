@@ -93,7 +93,7 @@ pub enum DiagnosticKind {
     CaptureTypeReplacesData,
     RedundantCaptureType,
     InspectionSpansDegraded,
-    EntryPointNeverMatchesRoot,
+    EntrypointNeverMatchesRoot,
 
     PredicateOnNonLeaf,
     UnknownStringEscape,
@@ -126,7 +126,7 @@ pub enum DiagnosticKind {
     // Placed last (lowest priority): emission reports these only when no
     // earlier-stage error exists.
     TargetLimitExceeded,
-    NoEntryPoints,
+    NoEntrypoints,
     EmptyQuery,
 }
 
@@ -137,7 +137,7 @@ impl DiagnosticKind {
             | Self::CaptureTypeReplacesData
             | Self::RedundantCaptureType
             | Self::InspectionSpansDegraded
-            | Self::EntryPointNeverMatchesRoot
+            | Self::EntrypointNeverMatchesRoot
             | Self::TreeSitterSequenceSyntaxDeprecated
             | Self::NegationSyntaxDeprecated
             | Self::SupertypeSlashDeprecated => Severity::Warning,
@@ -393,8 +393,8 @@ impl DiagnosticKind {
             Self::CaptureTypeReplacesData => "capture type replaces data",
             Self::RedundantCaptureType => "redundant capture type",
             Self::InspectionSpansDegraded => "query too large for full inspection detail",
-            Self::EntryPointNeverMatchesRoot => {
-                "entry point can never match: matching starts at the syntax-tree root"
+            Self::EntrypointNeverMatchesRoot => {
+                "entrypoint can never match: matching starts at the syntax-tree root"
             }
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
@@ -431,7 +431,7 @@ impl DiagnosticKind {
             Self::InvalidGrammarDeclaration => "invalid grammar declaration",
             Self::MissingDefName => "definition must be named",
             Self::TargetLimitExceeded => "emission target limit exceeded",
-            Self::NoEntryPoints => "query defines no selectable entry point",
+            Self::NoEntrypoints => "query defines no selectable entrypoint",
             Self::EmptyQuery => "query defines nothing",
         }
     }
@@ -460,7 +460,7 @@ impl DiagnosticKind {
             Self::NullableRepeat => "{}".to_string(),
             Self::IncompatibleCaptureTypes => "{}".to_string(),
             Self::PredicateValueMismatch | Self::PredicateOnNonLeaf => "{}".to_string(),
-            Self::EntryPointNeverMatchesRoot | Self::NoEntryPoints => "{}".to_string(),
+            Self::EntrypointNeverMatchesRoot | Self::NoEntrypoints => "{}".to_string(),
             Self::GrammarFieldNotOnNodeKind | Self::InvalidChildType => "{}".to_string(),
             Self::TypeNameConflict => {
                 "type name `{}` is already used for a different type".to_string()

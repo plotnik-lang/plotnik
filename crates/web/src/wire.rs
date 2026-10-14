@@ -10,7 +10,7 @@
 //! passed in; the web side converts to UTF-16 at its edge (`byte-offsets.ts`).
 
 use plotnik_compiler::bytecode::{
-    EntryPoint, Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind,
+    Entrypoint, Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind,
 };
 use plotnik_compiler::{
     Colors, MatchJournal, RunStats, RuntimeError, extract_result_provenance, materialize_verified,
@@ -35,7 +35,7 @@ pub struct InfoParts<'a> {
     pub diagnostics: JsonValue,
     pub typescript_declarations: String,
     pub typescript_bindings: JsonValue,
-    pub entry_points: &'a [String],
+    pub entrypoints: &'a [String],
     pub bytecode_size_bytes: Option<usize>,
 }
 
@@ -48,7 +48,7 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
         "diagnostics": parts.diagnostics,
         "typescript_declarations": parts.typescript_declarations,
         "typescript_bindings": parts.typescript_bindings,
-        "entry_points": parts.entry_points,
+        "entrypoints": parts.entrypoints,
         "bytecode_size_bytes": parts.bytecode_size_bytes,
     })
 }
@@ -58,7 +58,7 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
 /// trace attached when tracing.
 pub fn result_json(
     module: &Module,
-    entry_point: &EntryPoint,
+    entrypoint: &Entrypoint,
     source: &str,
     result: (Result<MatchJournal<'_>, RuntimeError>, RunStats),
     execution_trace: Option<JsonValue>,
@@ -68,7 +68,7 @@ pub fn result_json(
         Ok(journal) => {
             let colors = Colors::new(false);
             let result =
-                materialize_verified(source, module, entry_point, journal.output_events(), colors);
+                materialize_verified(source, module, entrypoint, journal.output_events(), colors);
             let result_provenance =
                 (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, module));
             json!({

@@ -57,7 +57,7 @@ impl GrammarBinder<'_, '_> {
         builder.emit();
     }
 
-    /// Conservative entry point root admissibility: return `false` only when the
+    /// Conservative entrypoint root admissibility: return `false` only when the
     /// definition's outermost node-consuming pattern is known not to be the grammar root.
     pub(super) fn pattern_can_match_root(
         &self,

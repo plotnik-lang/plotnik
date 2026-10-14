@@ -147,7 +147,7 @@ mod debug_impl {
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum WalkRoot {
-        EntryPoint(DefId, EntryBoundary),
+        Entrypoint(DefId, EntryBoundary),
         Def(DefSpecialization),
     }
 
@@ -588,7 +588,7 @@ mod debug_impl {
         Ok(())
     }
 
-    /// Structural invariants independent of any entry point: every label is unique
+    /// Structural invariants independent of any entrypoint: every label is unique
     /// and every reference resolves to a real instruction.
     fn check_labels(instructions: &[InstructionIR]) -> Result<(), String> {
         let mut index = std::collections::HashMap::with_capacity(instructions.len());
@@ -635,7 +635,7 @@ mod debug_impl {
 
         for (root, entry) in entries(nfa) {
             let (route, ports) = match &root {
-                WalkRoot::EntryPoint(..) => (DefRoute::Caller, vec![ExitPort::ConsumedOtherNone]),
+                WalkRoot::Entrypoint(..) => (DefRoute::Caller, vec![ExitPort::ConsumedOtherNone]),
                 WalkRoot::Def(specialization) => (
                     specialization.route(),
                     specialization.ports().ports().to_vec(),
@@ -654,9 +654,9 @@ mod debug_impl {
         let instr_map: HashMap<Label, &InstructionIR> =
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
 
-        for (&def_id, entry) in &nfa.entry_points {
+        for (&def_id, entry) in &nfa.entrypoints {
             check_empty_root(
-                WalkRoot::EntryPoint(def_id, entry.boundary),
+                WalkRoot::Entrypoint(def_id, entry.boundary),
                 entry.target,
                 entry.boundary == EntryBoundary::Node,
                 &instr_map,
@@ -867,8 +867,8 @@ mod debug_impl {
 
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = Vec::new();
-        for (&def_id, entry) in &nfa.entry_points {
-            v.push((WalkRoot::EntryPoint(def_id, entry.boundary), entry.target));
+        for (&def_id, entry) in &nfa.entrypoints {
+            v.push((WalkRoot::Entrypoint(def_id, entry.boundary), entry.target));
         }
         for (specialization, &label) in &nfa.def_entries {
             v.push((WalkRoot::Def(specialization.clone()), label));
@@ -950,7 +950,7 @@ mod debug_impl {
     }
 
     /// Run a pass that may intentionally remove internal definition roots.
-    /// Entry-point behavior and every surviving definition body must remain
+    /// Entrypoint behavior and every surviving definition body must remain
     /// unchanged; fingerprints for roots the pass deleted are discarded.
     pub fn run_root_pruning_verified(
         name: &str,
@@ -961,7 +961,7 @@ mod debug_impl {
         let mut before = snapshot(nfa, ctx);
         pass(nfa);
         before.fingerprints.retain(|(root, _, _)| match root {
-            WalkRoot::EntryPoint(..) => true,
+            WalkRoot::Entrypoint(..) => true,
             WalkRoot::Def(specialization) => nfa.def_entries.contains_key(specialization),
         });
         verify_after_pass(name, &before, nfa, ctx);

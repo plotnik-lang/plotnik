@@ -163,7 +163,7 @@ fn plan_merges(instructions: &[InstructionIR], norm: SuccNorm) -> HashMap<Label,
 }
 
 /// Rewrite every reference in the graph through `remap`: successor lists, call
-/// continuations and targets, and entry points themselves.
+/// continuations and targets, and entrypoints themselves.
 fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     if let Some((&label, &representative)) = remap
         .iter()
@@ -195,7 +195,7 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     for entry in nfa.def_entries.values_mut() {
         *entry = resolve(*entry);
     }
-    for entry in nfa.entry_points.values_mut() {
+    for entry in nfa.entrypoints.values_mut() {
         entry.target = resolve(entry.target);
     }
 }

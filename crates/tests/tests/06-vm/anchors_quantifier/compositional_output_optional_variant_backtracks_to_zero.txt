@@ -67,7 +67,7 @@ M3: S01 → T1  ; b: <Node>
 N0: S07 → T2  ; QChoice
 N1: S08 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [instructions]

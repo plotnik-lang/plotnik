@@ -154,9 +154,9 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     }
 
     /// Independent execution methods are emitted only for eligible entries.
-    pub(super) fn execution_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
+    pub(super) fn execution_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
-        for def_id in entry_points {
+        for def_id in entrypoints {
             let name = self.definitions.definition(def_id).name();
             let def = self.interner.resolve(name).to_string();
             out.push('\n');

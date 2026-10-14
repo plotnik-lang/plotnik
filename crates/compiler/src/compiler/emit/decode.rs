@@ -26,7 +26,7 @@ impl ResultDecodePlan {
     pub(super) fn build(schema: &ResultSchema<'_>) -> Self {
         let builder = DecodePlanBuilder { schema };
         let items = schema
-            .entry_point_items()
+            .entrypoint_items()
             .iter()
             .map(|item| {
                 let item = builder.item(*item);

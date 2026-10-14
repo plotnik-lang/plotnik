@@ -5,7 +5,7 @@ Q = (program
 )
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Ident = 02
 Q     = 05
 
@@ -45,7 +45,7 @@ M1: S2 → T1  ; item: Ident
 N0: S3 → T1  ; Ident
 N1: S4 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Ident = 00 :: T1
 Q     = 05 :: T2
 

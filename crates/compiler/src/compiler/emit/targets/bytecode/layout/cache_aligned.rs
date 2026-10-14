@@ -246,7 +246,7 @@ impl Graph {
 pub struct CacheAligned;
 
 impl CacheAligned {
-    /// Compute layout for instructions with given entry points.
+    /// Compute layout for instructions with given entrypoints.
     ///
     /// Returns the label-to-address mapping and total bytecode-word count.
     pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutMap {
@@ -444,7 +444,7 @@ fn extract_chains(
     let mut visited = HashSet::new();
     let mut chains = Vec::new();
 
-    // Start with entry points (hot paths)
+    // Start with entrypoints (hot paths)
     for &entry in entries {
         if visited.contains(&entry) {
             continue;
@@ -492,7 +492,7 @@ fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label
             entry_set.contains(chain.first().unwrap_or_else(|| {
                 panic!(
                     "cache-aligned layout produced an empty instruction chain while \
-                             ordering entry points"
+                             ordering entrypoints"
                 )
             }))
         });

@@ -60,7 +60,7 @@ M2: S06 → T2  ; right: B
 N0: S07 → T2  ; B
 N1: S08 → T3  ; Q
 
-[entry_points]
+[entrypoints]
 B = 00 :: T2
 Q = 03 :: T3
 

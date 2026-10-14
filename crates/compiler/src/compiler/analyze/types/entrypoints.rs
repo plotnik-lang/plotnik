@@ -1,4 +1,4 @@
-//! Entry-point admission checks.
+//! Entrypoint admission checks.
 
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::core::Interner;
@@ -14,7 +14,7 @@ use crate::compiler::parse::ast::Root;
 /// Positional assertions (`.`, `-field`, `.!`) are not patterns by themselves,
 /// so definitions containing only one are absent from the definition graph. The
 /// AST remains the source of truth for the original definition list.
-pub fn check_entry_points(
+pub fn check_entrypoints(
     ast_map: &IndexMap<SourceId, Root>,
     interner: &Interner,
     definitions: &DefinitionGraph,
@@ -27,11 +27,11 @@ pub fn check_entry_points(
             let Some(name) = def.name() else { continue };
             if definitions.id_for_name(interner, name.text()).is_none() {
                 diag.report(
-                    DiagnosticKind::NoEntryPoints,
+                    DiagnosticKind::NoEntrypoints,
                     Span::new(*source_id, name.text_range()),
                 )
                 .detail(format!(
-                    "`{}` cannot be an entry point because its body does not match exactly one root node",
+                    "`{}` cannot be an entrypoint because its body does not match exactly one root node",
                     name.text()
                 ))
                 .hint(format!(

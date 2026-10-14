@@ -1,7 +1,7 @@
 Inner = (identifier) @name
 Q = (expression_statement (Inner))
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Inner = 2
 Q     = 5
 
@@ -35,7 +35,7 @@ M0: S1 → T1  ; name: <Node>
 [type_names]
 N0: S2 → T2  ; Inner
 
-[entry_points]
+[entrypoints]
 Inner = 0 :: T2
 Q     = 3 :: T0
 

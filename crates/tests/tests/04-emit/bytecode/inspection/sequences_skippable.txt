@@ -13,7 +13,7 @@ TrailingSkip = (program
 )
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 LeadingSkip  = 02
 TrailingSkip = 13
 
@@ -58,7 +58,7 @@ M1: S1 → T0  ; fn: <Node>
 N0: S2 → T1  ; LeadingSkip
 N1: S3 → T2  ; TrailingSkip
 
-[entry_points]
+[entrypoints]
 LeadingSkip  = 00 :: T1
 TrailingSkip = 04 :: T2
 

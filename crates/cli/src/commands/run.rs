@@ -36,12 +36,12 @@ pub fn run(m: &ArgMatches, mode: Mode) -> CliResult {
     let entry = m
         .get_one::<String>("entry")
         .map(String::as_str)
-        .or_else(|| module.entry_point_names().last())
-        .ok_or_else(|| CliError::fatal("query has no callable entry points"))?;
-    let entry_point = module.entry_point(entry).ok_or_else(|| {
+        .or_else(|| module.entrypoint_names().last())
+        .ok_or_else(|| CliError::fatal("query has no callable entrypoints"))?;
+    let entrypoint = module.entrypoint(entry).ok_or_else(|| {
         CliError::fatal(format!(
-            "unknown entry point {entry:?}; available: {}",
-            module.entry_point_names().collect::<Vec<_>>().join(", ")
+            "unknown entrypoint {entry:?}; available: {}",
+            module.entrypoint_names().collect::<Vec<_>>().join(", ")
         ))
     })?;
     let tree = parser
@@ -61,11 +61,11 @@ pub fn run(m: &ArgMatches, mode: Mode) -> CliResult {
             .verbosity(verbosity)
             .colored(color)
             .build();
-        let result = vm.execute_with(&module, &entry_point, &mut tracer);
+        let result = vm.execute_with(&module, &entrypoint, &mut tracer);
         write_stdout(format_args!("{}", tracer.render()))?;
         result
     } else {
-        vm.execute(&module, &entry_point)
+        vm.execute(&module, &entrypoint)
     };
     let journal = match result {
         Ok(journal) => journal,
@@ -82,7 +82,7 @@ pub fn run(m: &ArgMatches, mode: Mode) -> CliResult {
     let value = materialize_verified(
         &source,
         &module,
-        &entry_point,
+        &entrypoint,
         journal.output_events(),
         colors,
     );

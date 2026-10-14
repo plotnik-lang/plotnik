@@ -5,7 +5,7 @@ Nested = [
 
 Q = (array (Nested) @top)
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Nested = 00
 Q      = 12
 
@@ -52,7 +52,7 @@ M2: S3 → T3  ; top: Nested
 N0: S4 → T3  ; Nested
 N1: S5 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Nested = 00 :: T3
 Q      = 02 :: T4
 

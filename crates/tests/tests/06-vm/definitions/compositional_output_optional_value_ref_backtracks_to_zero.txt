@@ -82,7 +82,7 @@ N0: S08 → T4  ; Elem
 N1: S09 → T5  ; Maybe
 N2: S10 → T6  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T6
 
 [instructions]

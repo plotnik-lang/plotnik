@@ -6,7 +6,7 @@ Q = [
   (call_expression) @e
 ]
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 0
 
 [transitions]
@@ -48,7 +48,7 @@ M4: S05 → T1  ; e: T1
 [type_names]
 N0: S06 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T2
 
 [instructions]

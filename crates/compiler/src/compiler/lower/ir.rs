@@ -979,7 +979,7 @@ pub(crate) enum LabelOrigin {
 
 /// One selectable definition and the result effects owned by its execution boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct EntryPointIR {
+pub(crate) struct EntrypointIR {
     pub(crate) target: Label,
     pub(crate) boundary: EntryBoundary,
 }
@@ -991,7 +991,7 @@ pub struct NfaGraph {
     /// Entry labels for every emitted definition specialization.
     pub(in crate::compiler::lower) def_entries: IndexMap<DefSpecialization, Label>,
     /// Selectable definitions in `DefId` order.
-    pub(in crate::compiler::lower) entry_points: IndexMap<DefId, EntryPointIR>,
+    pub(in crate::compiler::lower) entrypoints: IndexMap<DefId, EntrypointIR>,
     /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
     /// Origin per label id (index = `Label.0`), recorded at allocation.
@@ -1003,8 +1003,8 @@ impl NfaGraph {
         &self.instructions
     }
 
-    pub(crate) fn entry_points(&self) -> &IndexMap<DefId, EntryPointIR> {
-        &self.entry_points
+    pub(crate) fn entrypoints(&self) -> &IndexMap<DefId, EntrypointIR> {
+        &self.entrypoints
     }
 
     pub(crate) fn specialization_for_entry(&self, entry: Label) -> Option<&DefSpecialization> {

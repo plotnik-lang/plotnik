@@ -23,7 +23,7 @@ T2 = Option(T1)  ; <Node>?
 [type_names]
 N0: S1 → T2  ; A
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T0
 
 [instructions]

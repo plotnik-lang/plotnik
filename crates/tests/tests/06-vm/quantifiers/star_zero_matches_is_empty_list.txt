@@ -30,7 +30,7 @@ M0: S1 → T1  ; stmts: T1
 [type_names]
 N0: S2 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T2
 
 [instructions]

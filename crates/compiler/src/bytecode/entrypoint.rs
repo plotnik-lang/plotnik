@@ -1,9 +1,9 @@
-//! Entry-point section types.
+//! Entrypoint section types.
 
 use super::instructions::CodeAddr;
 use super::{StringId, TypeId};
 
-/// Output effects owned by an entry point rather than its shared definition body.
+/// Output effects owned by an entrypoint rather than its shared definition body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub(crate) enum EntryBoundary {
@@ -30,10 +30,10 @@ impl EntryBoundary {
     }
 }
 
-/// Named query definition entry point (8 bytes).
+/// Named query definition entrypoint (8 bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
-pub struct EntryPoint {
+pub struct Entrypoint {
     /// Definition name.
     name: StringId,
     /// Starting instruction address.
@@ -44,9 +44,9 @@ pub struct EntryPoint {
     boundary: u16,
 }
 
-const _: () = assert!(std::mem::size_of::<EntryPoint>() == EntryPoint::SIZE);
+const _: () = assert!(std::mem::size_of::<Entrypoint>() == Entrypoint::SIZE);
 
-impl EntryPoint {
+impl Entrypoint {
     /// Serialized size in bytes.
     pub const SIZE: usize = 8;
 
@@ -67,7 +67,7 @@ impl EntryPoint {
     pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
         Self {
             name: StringId::try_from(u16::from_le_bytes([bytes[0], bytes[1]]))
-                .expect("entry point name id must be non-zero"),
+                .expect("entrypoint name id must be non-zero"),
             target: CodeAddr::from(u16::from_le_bytes([bytes[2], bytes[3]])),
             result_type: TypeId::from(u16::from_le_bytes([bytes[4], bytes[5]])),
             boundary: u16::from_le_bytes([bytes[6], bytes[7]]),
@@ -90,6 +90,6 @@ impl EntryPoint {
 
     pub(crate) fn boundary(&self) -> EntryBoundary {
         self.try_boundary()
-            .expect("validated entry point has a known boundary mode")
+            .expect("validated entrypoint has a known boundary mode")
     }
 }

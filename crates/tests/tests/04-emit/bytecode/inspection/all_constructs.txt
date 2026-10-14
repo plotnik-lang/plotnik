@@ -19,7 +19,7 @@ Q = (program
 )
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q     = 07
 Value = 00
 
@@ -92,7 +92,7 @@ N0: S08 → T3  ; Value
 N1: S09 → T4  ; Name
 N2: S10 → T6  ; Q
 
-[entry_points]
+[entrypoints]
 Q     = 02 :: T6
 Value = 00 :: T3
 

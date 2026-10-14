@@ -5,7 +5,7 @@ Even = [
   (array (Odd) @next)
 ]
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Even = 00
 Odd  = 07
 
@@ -53,7 +53,7 @@ M2: S1 → T3  ; next: T3
 N0: S3 → T4  ; Even
 N1: S4 → T2  ; Odd
 
-[entry_points]
+[entrypoints]
 Even = 00 :: T4
 Odd  = 02 :: T2
 

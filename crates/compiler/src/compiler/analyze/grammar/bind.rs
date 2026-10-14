@@ -116,7 +116,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         }
         if self.strict_lints {
             for &def_id in definition_ids {
-                self.check_entry_point_root(def_id);
+                self.check_entrypoint_root(def_id);
             }
         }
         for &def_id in definition_ids {
@@ -124,7 +124,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         }
     }
 
-    fn check_entry_point_root(&mut self, def_id: DefId) {
+    fn check_entrypoint_root(&mut self, def_id: DefId) {
         let Some(grammar_root) = self.grammar.root() else {
             return;
         };
@@ -146,11 +146,11 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
 
         self.diag
             .report(
-                DiagnosticKind::EntryPointNeverMatchesRoot,
+                DiagnosticKind::EntrypointNeverMatchesRoot,
                 Span::new(located.source(), located.node().text_range()),
             )
             .detail(format!(
-                "entry point `{name}` cannot match the `{grammar_root_name}` syntax-tree root"
+                "entrypoint `{name}` cannot match the `{grammar_root_name}` syntax-tree root"
             ))
             .hint(format!(
                 "make `{name}` start with a `{grammar_root_name}` node pattern because matching begins at the syntax-tree root"

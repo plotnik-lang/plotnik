@@ -5,7 +5,7 @@ use tree_sitter::{Node, Tree};
 use crate::bytecode::type_system::TYPE_NO_VALUE;
 use crate::bytecode::{
     CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind,
-    EntryBoundary, EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp,
+    EntryBoundary, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp,
 };
 
 use crate::core::{Colors, NodeFieldId};
@@ -101,10 +101,10 @@ impl<'s, 't> VM<'s, 't> {
     pub fn apply(
         self,
         module: &'s Module,
-        entry_point: &EntryPoint,
+        entrypoint: &Entrypoint,
     ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
         let mut budget = ExecutionBudget::new(self.limits);
-        self.apply_budgeted(module, entry_point, &mut budget)
+        self.apply_budgeted(module, entrypoint, &mut budget)
     }
 
     /// Lazily apply one preferred result per candidate in inclusive preorder.
@@ -113,7 +113,7 @@ impl<'s, 't> VM<'s, 't> {
     pub fn traverse(
         self,
         module: &'s Module,
-        entry_point: EntryPoint,
+        entrypoint: Entrypoint,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
         Traversal::new(
             self.engine.node(),
@@ -121,7 +121,7 @@ impl<'s, 't> VM<'s, 't> {
             move |node, budget: &mut ExecutionBudget| {
                 Self::at_node(self.source, node, budget.limits()).apply_budgeted(
                     module,
-                    &entry_point,
+                    &entrypoint,
                     budget,
                 )
             },
@@ -131,12 +131,12 @@ impl<'s, 't> VM<'s, 't> {
     fn apply_budgeted(
         self,
         module: &'s Module,
-        entry_point: &EntryPoint,
+        entrypoint: &Entrypoint,
         budget: &mut ExecutionBudget,
     ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
         let node = self.engine.node();
         let source = self.source;
-        let (result, _) = self.execute_budgeted(module, entry_point, &mut NoopTracer, budget);
+        let (result, _) = self.execute_budgeted(module, entrypoint, &mut NoopTracer, budget);
         let journal = match result {
             Ok(journal) => journal,
             Err(RuntimeError::NoMatch) => return Ok(None),
@@ -148,14 +148,14 @@ impl<'s, 't> VM<'s, 't> {
         };
 
         // NoValue is the emitted match-only capability, not an absent capture.
-        if u16::from(entry_point.result_type()) == TYPE_NO_VALUE {
+        if u16::from(entrypoint.result_type()) == TYPE_NO_VALUE {
             return Ok(Some(Value::Node(NodeValue::from_node(node, source))));
         }
 
         Ok(Some(materialize_verified(
             source,
             module,
-            entry_point,
+            entrypoint,
             journal.output_events(),
             Colors::new(false),
         )))
@@ -167,16 +167,16 @@ impl<'s, 't> VM<'s, 't> {
         Checkpoint::call_retry(self.engine.checkpoint_state(), u16::from(call_ip), resume)
     }
 
-    /// Execute a query from an entry point, returning its committed match journal.
+    /// Execute a query from an entrypoint, returning its committed match journal.
     ///
     /// This is a convenience method that uses `NoopTracer`, which gets
     /// completely optimized away at compile time.
     pub fn execute(
         self,
         module: &Module,
-        entry_point: &EntryPoint,
+        entrypoint: &Entrypoint,
     ) -> Result<MatchJournal<'t>, RuntimeError> {
-        self.execute_with(module, entry_point, &mut NoopTracer)
+        self.execute_with(module, entrypoint, &mut NoopTracer)
     }
 
     /// Execute query with a tracer for debugging.
@@ -187,10 +187,10 @@ impl<'s, 't> VM<'s, 't> {
     pub fn execute_with<T: Tracer>(
         self,
         module: &Module,
-        entry_point: &EntryPoint,
+        entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<MatchJournal<'t>, RuntimeError> {
-        let (result, _) = self.execute_with_stats(module, entry_point, tracer);
+        let (result, _) = self.execute_with_stats(module, entrypoint, tracer);
         result
     }
 
@@ -198,25 +198,25 @@ impl<'s, 't> VM<'s, 't> {
     pub fn execute_with_stats<T: Tracer>(
         self,
         module: &Module,
-        entry_point: &EntryPoint,
+        entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
         let mut budget = ExecutionBudget::new(self.limits);
-        self.execute_budgeted(module, entry_point, tracer, &mut budget)
+        self.execute_budgeted(module, entrypoint, tracer, &mut budget)
     }
 
     fn execute_budgeted<T: Tracer>(
         mut self,
         module: &Module,
-        entry_point: &EntryPoint,
+        entrypoint: &Entrypoint,
         tracer: &mut T,
         budget: &mut ExecutionBudget,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
-        self.ip = entry_point.target();
+        self.ip = entrypoint.target();
         if T::ENABLED {
-            tracer.trace_enter_entry_point(self.ip);
+            tracer.trace_execution_started(self.ip);
         }
-        let boundary = entry_point.boundary();
+        let boundary = entrypoint.boundary();
         self.begin_entry(boundary, tracer);
 
         let mut peak_live_heap_bytes = self.engine.heap_bytes();
@@ -690,12 +690,12 @@ impl<'s, 't> VM<'s, 't> {
             tracer.trace_return(port);
         }
 
-        // If no frames, we're returning from the top-level entry point → Accept
+        // If no frames, we're returning from the top-level entrypoint → Accept
         if self.engine.frames_empty() {
             assert_eq!(
                 port.to_byte(),
                 0,
-                "entry point returned through a non-zero call port"
+                "entrypoint returned through a non-zero call port"
             );
             return Err(ControlFlow::Accept.into());
         }

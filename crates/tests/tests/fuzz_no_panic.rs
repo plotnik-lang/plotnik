@@ -77,7 +77,7 @@ fn parse_js(source: &str) -> Tree {
 fn run_source_smoke(source: &str) {
     let module = source_smoke_module();
     let tree = parse_js(source);
-    let entry = module.entry_point("Q").expect("Q entry point exists");
+    let entry = module.entrypoint("Q").expect("Q entrypoint exists");
     let journal = VM::builder(source, &tree)
         .build()
         .execute(module, &entry)

@@ -1,4 +1,4 @@
-# Instructions and entry points
+# Instructions and entrypoints
 
 - [Design](#design)
 - [Implementation](#implementation)
@@ -14,7 +14,7 @@
     - [CallN](#calln)
     - [Return](#return)
     - [Execution contract](#execution-contract)
-  - [Entry points](#entry-points)
+  - [Entrypoints](#entrypoints)
   - [Valid control flow](#valid-control-flow)
     - [Cursor depth](#cursor-depth)
     - [Empty paths](#empty-paths)
@@ -22,7 +22,7 @@
 
 ## Design
 
-The program follows a cursor through the syntax tree. The cursor identifies the node currently being examined. Execution begins at the tree root, using the starting instruction selected by the entry point. A query reaches descendants only through explicit navigation.
+The program follows a cursor through the syntax tree. The cursor identifies the node currently being examined. Execution begins at the tree root, using the starting instruction selected by the entrypoint. A query reaches descendants only through explicit navigation.
 
 A `Match` instruction selects a candidate node and tests its constraints. If the node passes, its [effects](04-effects.md) perform actions such as capturing the node or adding a field to the result. Its successor addresses then select the instructions that can continue the match. These explicit links form the program's control-flow graph, so physical adjacency in the bytecode does not imply execution order.
 
@@ -80,7 +80,7 @@ The call also declares who selects its entry node. With caller ownership, the ca
 
 If the body can match nothing, navigating first could fail before it reaches that empty path, for example when `Down` finds no child. Callee ownership lets the body decide whether navigation is needed.
 
-An entry point also chooses how to finish the body's result, its boundary mode. It can retain the body's result, capture the final cursor node, or collect the body's fields into an outer record. Ordinary calls to the same body do not apply this boundary again. This lets one body serve both entry execution and nested calls without adding an extra outer value at every call.
+An entrypoint also chooses how to finish the body's result, its boundary mode. It can retain the body's result, capture the final cursor node, or collect the body's fields into an outer record. Ordinary calls to the same body do not apply this boundary again. This lets one body serve both entry execution and nested calls without adding an extra outer value at every call.
 
 ## Implementation
 
@@ -345,11 +345,11 @@ Header bit 4 stores ownership and bit 5 is zero. The local port is 0–7, and bo
 
 A caller-owned `Stay` call checks its field only at the current node. A caller-owned `Down`/`Next` call selects the first candidate satisfying its field, under the navigation's skip policy. Non-exact `Down`/`Next` calls permit later legal candidates if the callee or subsequent continuation fails. `Stay` and exact calls have one candidate. Callee-owned calls delegate all entry selection and retry behavior to their target.
 
-Each active call retains its call site. A `Return` through port `i` selects that site's continuation `i`. It does not restore the cursor or apply entry boundary effects. `Return` contract metadata and consumed bits are validation data, not additional runtime movement. With no active call, only port zero accepts the entry point.
+Each active call retains its call site. A `Return` through port `i` selects that site's continuation `i`. It does not restore the cursor or apply entry boundary effects. `Return` contract metadata and consumed bits are validation data, not additional runtime movement. With no active call, only port zero accepts the entrypoint.
 
-### Entry points
+### Entrypoints
 
-The `EntryPoints` section contains `entry_points_count` records of 8 bytes:
+The `Entrypoints` section contains `entrypoints_count` records of 8 bytes:
 
 ```text
 byte    0..1       2..3       4..5          6..7

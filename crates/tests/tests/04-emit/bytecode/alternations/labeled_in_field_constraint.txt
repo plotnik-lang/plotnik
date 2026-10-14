@@ -5,7 +5,7 @@ Q = (pair
   ] @kind
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 2
 
 [transitions]
@@ -47,7 +47,7 @@ M3: S04 → T3  ; kind: QKind
 N0: S05 → T3  ; QKind
 N1: S06 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [instructions]

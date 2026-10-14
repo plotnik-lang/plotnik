@@ -25,7 +25,7 @@ pub fn dump(module: &Module, colors: Colors) -> String {
     dump_types_defs(&mut out, module, &ctx);
     dump_types_members(&mut out, module, &ctx);
     dump_types_names(&mut out, module, &ctx);
-    dump_entry_points(&mut out, module, &ctx);
+    dump_entrypoints(&mut out, module, &ctx);
     dump_spans(&mut out, module, &ctx);
     dump_code(&mut out, module, &ctx);
 
@@ -33,7 +33,7 @@ pub fn dump(module: &Module, colors: Colors) -> String {
 }
 
 struct DumpContext {
-    /// Maps instruction addresses to entry point names for labeling.
+    /// Maps instruction addresses to entrypoint names for labeling.
     addr_labels: BTreeMap<CodeAddr, String>,
     /// Shared symbol/string decoding and match rendering.
     render: ModuleRenderContext,
@@ -49,10 +49,10 @@ impl DumpContext {
     fn new(module: &Module, colors: Colors) -> Self {
         let header = module.header();
         let strings = module.strings();
-        let entry_points = module.entry_points();
+        let entrypoints = module.entrypoints();
 
         let mut addr_labels = BTreeMap::new();
-        for ep in entry_points.iter() {
+        for ep in entrypoints.iter() {
             let name = strings.get(ep.name()).to_string();
             addr_labels.insert(ep.target(), name);
         }
@@ -278,17 +278,16 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
     format!("T{:0tw$}", u16::from(type_id))
 }
 
-fn dump_entry_points(out: &mut String, module: &Module, ctx: &DumpContext) {
+fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let strings = module.strings();
-    let entry_points = module.entry_points();
+    let entrypoints = module.entrypoints();
     let stw = ctx.addr_width;
     let tw = ctx.type_width;
 
-    writeln!(out, "{}[entry_points]{}", c.blue, c.reset)
-        .expect("writing to a String is infallible");
+    writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
-    let mut entries: Vec<_> = entry_points
+    let mut entries: Vec<_> = entrypoints
         .iter()
         .map(|ep| {
             let name = strings.get(ep.name());

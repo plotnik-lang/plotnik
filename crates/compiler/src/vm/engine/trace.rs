@@ -107,8 +107,8 @@ pub trait Tracer {
     /// (the checkpoint's `recursion_depth`, before the cursor/frames are reset).
     fn trace_backtrack(&mut self, depth: u32);
 
-    /// Called when entering an entry point (for section labels).
-    fn trace_enter_entry_point(&mut self, target_ip: CodeAddr);
+    /// Called when execution starts at the selected entrypoint (for section labels).
+    fn trace_execution_started(&mut self, target_ip: CodeAddr);
 }
 
 /// No-op tracer that gets optimized away completely.
@@ -166,7 +166,7 @@ impl Tracer for NoopTracer {
     fn trace_backtrack(&mut self, _depth: u32) {}
 
     #[inline(always)]
-    fn trace_enter_entry_point(&mut self, _target_ip: CodeAddr) {}
+    fn trace_execution_started(&mut self, _target_ip: CodeAddr) {}
 }
 
 pub struct PrintTracer<'s> {
@@ -330,13 +330,13 @@ impl<'s> PrintTracer<'s> {
         })
     }
 
-    /// The definition name for a call or entry target. Only entry points carry a
+    /// The definition name for a call or entry target. Only entrypoints carry a
     /// name; a call into an internal body (or an entry that isn't a named
     /// definition) falls back to its address `@{ip}`, exactly as the bytecode
     /// dump renders the same target.
     fn def_ref_name(&self, ip: CodeAddr) -> String {
         self.render
-            .entry_point_name(ip.get())
+            .entrypoint_name(ip.get())
             .map(str::to_string)
             .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.addr_width))
     }
@@ -670,7 +670,7 @@ impl Tracer for PrintTracer<'_> {
             (false, 0) => String::new(),
             (false, port) => format!("p{port}"),
             (true, _) => {
-                unreachable!("entry points return only through port zero")
+                unreachable!("entrypoints return only through port zero")
             }
         };
         self.add_instruction(ip, trace::RETURN, &content, &successor);
@@ -710,7 +710,7 @@ impl Tracer for PrintTracer<'_> {
         self.lines.push(line);
     }
 
-    fn trace_enter_entry_point(&mut self, target_ip: CodeAddr) {
+    fn trace_execution_started(&mut self, target_ip: CodeAddr) {
         let name = self.def_ref_name(target_ip);
         self.push_def_header(&name);
         self.call_stack.push(name);

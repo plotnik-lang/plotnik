@@ -6,7 +6,7 @@ Outer = (array
   }* @items
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Inner = 02
 Outer = 07
 
@@ -59,7 +59,7 @@ N0: S4 → T1  ; Inner
 N1: S5 → T2  ; OuterItems
 N2: S6 → T4  ; Outer
 
-[entry_points]
+[entrypoints]
 Inner = 00 :: T1
 Outer = 05 :: T4
 

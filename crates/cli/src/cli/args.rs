@@ -150,7 +150,7 @@ pub fn entry_arg() -> Arg {
     Arg::new("entry")
         .long("entry")
         .value_name("NAME")
-        .help("Entry point name (definition to match from)")
+        .help("Entrypoint name (definition to match from)")
 }
 
 pub fn verbose_arg() -> Arg {

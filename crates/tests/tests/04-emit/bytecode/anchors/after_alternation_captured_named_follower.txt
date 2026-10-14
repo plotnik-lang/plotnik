@@ -7,7 +7,7 @@ Q = {
   (identifier) @id
 }
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 
 [transitions]
 -------------------- BYTECODE --------------------
@@ -23,6 +23,6 @@ S3 "identifier"
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 
 [instructions]

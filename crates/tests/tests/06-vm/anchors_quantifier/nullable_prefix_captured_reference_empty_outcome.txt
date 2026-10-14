@@ -68,7 +68,7 @@ M3: S01 → T0  ; b: <Node>
 N0: S05 → T2  ; Prefix
 N1: S06 → T3  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T3
 
 [instructions]

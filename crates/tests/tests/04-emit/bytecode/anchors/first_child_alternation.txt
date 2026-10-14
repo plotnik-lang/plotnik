@@ -9,7 +9,7 @@ Q = (program
   )
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -42,7 +42,7 @@ M0: S1 → T0  ; arg: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T1
 
 [instructions]

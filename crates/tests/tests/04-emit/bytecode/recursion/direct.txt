@@ -6,7 +6,7 @@ Expr = [
   )
 ]
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Expr = 0
 
 [transitions]
@@ -49,7 +49,7 @@ M4: S05 → T2  ; Rec: T2
 [type_names]
 N0: S06 → T3  ; Expr
 
-[entry_points]
+[entrypoints]
 Expr = 00 :: T3
 
 [instructions]

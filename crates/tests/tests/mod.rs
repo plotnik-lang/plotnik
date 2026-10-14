@@ -477,7 +477,7 @@ fn render_compiled(
             let input = input.ok_or_else(|| {
                 "06-vm snapshots require an `INPUT` section; compile-only snapshots belong in 04-emit".to_string()
             })?;
-            if module.entry_point("Q").is_none() {
+            if module.entrypoint("Q").is_none() {
                 return Err("06-vm snapshots require a callable definition named `Q`".to_string());
             }
             let entry = "Q";
@@ -564,14 +564,14 @@ fn emit_bytecode(
     };
     let emission = compiled.emit(config).expect("bytecode emission answers");
     if let Some(module) = emission.artifact() {
-        let analyzed = compiled.entry_point_names().collect::<Vec<_>>();
+        let analyzed = compiled.entrypoint_names().collect::<Vec<_>>();
         let emitted = module
-            .entry_point_names()
+            .entrypoint_names()
             .map(str::to_string)
             .collect::<Vec<_>>();
         assert_eq!(
             emitted, analyzed,
-            "emitted module entry points must preserve the analyzed entry-point list",
+            "emitted module entrypoints must preserve the analyzed entrypoint list",
         );
     }
     emission
@@ -620,16 +620,16 @@ enum VmArtifacts {
 
 fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let tree = scenario.lang.parse(scenario.source)?;
-    let entry_point = scenario
+    let entrypoint = scenario
         .module
-        .entry_point(scenario.entry)
-        .expect("selected definition must be an entry point");
+        .entrypoint(scenario.entry)
+        .expect("selected definition must be an entrypoint");
 
     let vm = VM::builder(scenario.source, &tree).build();
 
     if matches!(scenario.mode, VmMode::StructuredTrace) {
         let mut tracer = TraceRecorder::new(scenario.module, 65_536);
-        let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
+        let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
         let execution_trace = tracer.finish();
         let mut execution_trace_json = serde_json::to_string_pretty(&execution_trace)
             .expect("execution-trace serialization cannot fail");
@@ -642,7 +642,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 let value = materialize_verified(
                     scenario.source,
                     scenario.module,
-                    &entry_point,
+                    &entrypoint,
                     journal.output_events(),
                     Colors::new(false),
                 );
@@ -671,7 +671,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         .colored(false)
         .build();
 
-    let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
+    let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
     let trace = tracer.render();
     let (output, inspection) = match result {
         Ok(journal) => {
@@ -687,7 +687,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
             let value = materialize_verified(
                 scenario.source,
                 scenario.module,
-                &entry_point,
+                &entrypoint,
                 journal.output_events(),
                 Colors::new(false),
             );

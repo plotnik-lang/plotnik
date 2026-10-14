@@ -78,7 +78,7 @@ pub(crate) fn validate(module: &Module) -> Result<(), ModuleError> {
     }
 
     let entries = module
-        .entry_points()
+        .entrypoints()
         .iter()
         .map(|entry| VerifyEntry::new(entry.target(), entry.boundary()))
         .collect();

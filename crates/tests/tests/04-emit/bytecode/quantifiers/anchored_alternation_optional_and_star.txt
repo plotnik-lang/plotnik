@@ -18,7 +18,7 @@ Star = (array
   ]*
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Optional = 02
 Star     = 14
 
@@ -60,7 +60,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Optional = 00 :: T0
 Star     = 02 :: T0
 

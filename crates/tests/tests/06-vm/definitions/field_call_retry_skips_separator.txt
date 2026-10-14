@@ -58,7 +58,7 @@ M1: S03 → T1  ; m: Member
 N0: S04 → T1  ; Member
 N1: S05 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Member = 00 :: T1
 Q      = 05 :: T2
 

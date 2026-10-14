@@ -274,7 +274,7 @@ M3: S01 → T0  ; b: <Node>
 N0: S05 → T2  ; QPrefixes
 N1: S06 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [spans]

@@ -7,7 +7,7 @@ Q = {
   ","
 }
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 
 [transitions]
 -------------------- BYTECODE --------------------
@@ -23,6 +23,6 @@ S3 ","
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 
 [instructions]

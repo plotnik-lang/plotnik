@@ -10,7 +10,7 @@
 
 ## Design
 
-The type tables describe the values a query can produce. An entry point selects a result type, and [effects](04-effects.md) describe how to construct the result when a match succeeds. The tables contain the shape of the result, while its values come from the matched document and syntax tree.
+The type tables describe the values a query can produce. An entrypoint selects a result type, and [effects](04-effects.md) describe how to construct the result when a match succeeds. The tables contain the shape of the result, while its values come from the matched document and syntax tree.
 
 A result can combine nodes, text, and booleans through records, lists, options, and variants. `NoValue` describes a match that produces no result value.
 

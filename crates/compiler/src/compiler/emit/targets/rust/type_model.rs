@@ -38,7 +38,7 @@ impl<'a> TypeModel<'a> {
     pub(crate) fn new(schema: ResultSchema<'a>) -> Self {
         let facts = TypeFacts::compute(schema.types);
         let interner = schema.interner;
-        let items = schema.entry_point_items();
+        let items = schema.entrypoint_items();
         let idents = rust_scope_idents(items.iter().map(|item| interner.resolve(item.name)));
         let item_idents = items
             .iter()
@@ -57,7 +57,7 @@ impl<'a> TypeModel<'a> {
     }
 
     pub(crate) fn items(&self) -> &[ResultItem] {
-        self.schema.entry_point_items()
+        self.schema.entrypoint_items()
     }
 
     pub(crate) fn item_ident(&self, name: Symbol) -> &str {

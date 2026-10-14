@@ -55,7 +55,7 @@ M1: S2 → T1  ; head: Head
 N0: S3 → T1  ; Head
 N1: S4 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T2
 
 [instructions]

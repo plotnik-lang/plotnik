@@ -44,7 +44,7 @@ pub enum TraceEvent {
     Return,
     CheckpointNew,
     Backtrack { to_record: u32 },
-    EnterEntryPoint { target: u16 },
+    ExecutionStarted { target: u16 },
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -347,10 +347,10 @@ impl Tracer for TraceRecorder {
         );
     }
 
-    fn trace_enter_entry_point(&mut self, target_ip: CodeAddr) {
+    fn trace_execution_started(&mut self, target_ip: CodeAddr) {
         self.current_ip = target_ip;
         self.add_record(
-            TraceEvent::EnterEntryPoint {
+            TraceEvent::ExecutionStarted {
                 target: target_ip.get(),
             },
             None,

@@ -11,7 +11,7 @@ use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::analyze::shape::validation::{
     AnchorValidationInput, ShapeValidationInput, validate_anchors, validate_ast,
 };
-use crate::compiler::analyze::types::check_entry_points;
+use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::analyze::types::type_check::{self, TypeAnalysis};
 #[cfg(test)]
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
@@ -180,7 +180,7 @@ impl QueryParsed {
         let type_analysis =
             type_check::infer_types(&mut interner, &definitions, &pattern_facts, &mut self.diag);
         if !self.diag.has_errors() {
-            check_entry_points(validated.ast_map(), &interner, &definitions, &mut self.diag);
+            check_entrypoints(validated.ast_map(), &interner, &definitions, &mut self.diag);
         }
 
         let analysis = Analysis {
@@ -548,11 +548,11 @@ impl CompiledQuery {
         self.bound.definition_names()
     }
 
-    pub fn entry_point_names(&self) -> impl Iterator<Item = String> + '_ {
+    pub fn entrypoint_names(&self) -> impl Iterator<Item = String> + '_ {
         self.bound.bound().into_iter().flat_map(|bound| {
             bound
                 .analysis_input()
-                .iter_entry_point_outputs()
+                .iter_entrypoint_outputs()
                 .map(|(definition, _)| {
                     bound
                         .interner()

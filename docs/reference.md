@@ -25,7 +25,7 @@ Plotnik matches Tree-sitter syntax trees and builds typed results from the parts
   - [Alternatives that can match nothing](#alternatives-that-can-match-nothing)
 - [Reuse patterns](#reuse-patterns)
   - [Capture a definition's result](#capture-a-definitions-result)
-  - [Entry points and fragments](#entry-points-and-fragments)
+  - [Entrypoints and fragments](#entrypoints-and-fragments)
   - [Definitions that return lists or options](#definitions-that-return-lists-or-options)
   - [Recursion](#recursion)
 - [Constrain sibling positions](#constrain-sibling-positions)
@@ -571,9 +571,9 @@ IdentifierValue = (identifier) @node
 
 A match-only definition can still succeed. Producing no data is different from failing to match.
 
-### Entry points and fragments
+### Entrypoints and fragments
 
-An entry point is a definition run independently. It must match exactly one outer node without needing a field or anchor boundary from its caller. Its children can still contain sequences and repetitions. Captures do not affect eligibility. References, alternatives, and groups qualify under the same rule.
+An entrypoint is a definition run independently. It must match exactly one outer node without needing a field or anchor boundary from its caller. Its children can still contain sequences and repetitions. Captures do not affect eligibility. References, alternatives, and groups qualify under the same rule.
 
 Definitions that can match no node or several siblings, or need context from their caller, are fragments. Use them inside another pattern:
 
@@ -985,7 +985,7 @@ The outer `*` can skip statements that do not match `Statement`, and the argumen
 
 ## Rust API
 
-Generated Rust can apply an entry point to one node or search a subtree with it. Pass the source text used to parse the tree.
+Generated Rust can apply an entrypoint to one node or search a subtree with it. Pass the source text used to parse the tree.
 
 | To...                             | Use                             |
 | --------------------------------- | ------------------------------- |

@@ -84,7 +84,7 @@ M6: S07 → T3  ; choice: QChoice
 N0: S08 → T3  ; QChoice
 N1: S09 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [instructions]

@@ -9,7 +9,7 @@ Q = (program
 )
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -51,7 +51,7 @@ M1: S2 → T1  ; num: T1
 [type_names]
 N0: S3 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T2
 
 [spans]

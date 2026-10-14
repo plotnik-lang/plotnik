@@ -9,7 +9,7 @@ Q = [
   (object) @h
 ]
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 0
 
 [transitions]
@@ -63,7 +63,7 @@ M7: S08 → T1  ; h: T1
 [type_names]
 N0: S09 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T2
 
 [instructions]

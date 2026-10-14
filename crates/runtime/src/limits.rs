@@ -23,7 +23,7 @@ use crate::frame::CallFrameError;
 
 /// A safe run exceeded a configured limit or a fixed runtime capacity.
 ///
-/// The generated matchers' safe entry points report through this; the VM
+/// The generated matchers' safe entrypoints report through this; the VM
 /// reports the same trips through its own `RuntimeError`. The wording of the
 /// two must stay aligned — both describe the same enforcement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

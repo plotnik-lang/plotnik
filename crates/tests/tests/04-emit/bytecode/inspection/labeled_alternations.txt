@@ -5,7 +5,7 @@ Expr = [
 ]
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Expr = 0
 
 [transitions]
@@ -45,7 +45,7 @@ M4: S5 → T0  ; Str: <NoValue>
 [type_names]
 N0: S6 → T4  ; Expr
 
-[entry_points]
+[entrypoints]
 Expr = 00 :: T4
 
 [spans]

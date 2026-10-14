@@ -36,7 +36,7 @@ M0: S1 → T0  ; X: <NoValue>
 [type_names]
 N0: S2 → T1  ; A
 
-[entry_points]
+[entrypoints]
 A = 00 :: T1
 Q = 03 :: T0
 

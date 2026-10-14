@@ -1,7 +1,7 @@
 //! Result-type inference over the query AST.
 
 mod capture;
-mod entry_points;
+mod entrypoints;
 mod naming;
 pub mod type_analysis;
 pub mod type_check;
@@ -12,6 +12,6 @@ pub use capture::{
     BuiltInCaptureType, CaptureFact, CaptureKind, CaptureTypePlan, CaptureTypePlanKind,
     FieldCompletion, FieldCompletions, OptionMode, RawCaptureFact, TerminalData,
 };
-pub use entry_points::check_entry_points;
+pub use entrypoints::check_entrypoints;
 pub use type_analysis::TypeAnalysis;
 pub use type_shape::TypeShape;

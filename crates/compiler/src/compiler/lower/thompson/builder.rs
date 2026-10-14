@@ -1,4 +1,4 @@
-//! Core compiler state and entry points.
+//! Core compiler state and entrypoints.
 
 use std::collections::HashSet;
 
@@ -12,7 +12,7 @@ use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::boundary::ExitMap;
 use crate::compiler::lower::ir::{
-    DefBodyMode, DefOutputMode, DefSpecialization, EffectIR, EntryPointIR, InstructionIR, Label,
+    DefBodyMode, DefOutputMode, DefSpecialization, EffectIR, EntrypointIR, InstructionIR, Label,
     LabelOrigin, NfaGraph, ReturnIR,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
@@ -151,8 +151,8 @@ impl<'a> NfaBuilder<'a> {
         let mut compiler = NfaBuilder::new(ctx);
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
-        let mut entry_points = IndexMap::new();
-        for (def_id, output) in ctx.analysis.iter_entry_point_outputs() {
+        let mut entrypoints = IndexMap::new();
+        for (def_id, output) in ctx.analysis.iter_entrypoint_outputs() {
             let target = compiler.ensure_def_specialization(DefSpecialization::ordinary(def_id));
             let output_shape = output
                 .value()
@@ -162,7 +162,7 @@ impl<'a> NfaBuilder<'a> {
                 Some(TypeShape::Node) => EntryBoundary::Node,
                 _ => EntryBoundary::Passthrough,
             };
-            entry_points.insert(def_id, EntryPointIR { target, boundary });
+            entrypoints.insert(def_id, EntrypointIR { target, boundary });
         }
 
         verify_fresh_build(&compiler.instructions);
@@ -176,7 +176,7 @@ impl<'a> NfaBuilder<'a> {
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
-            entry_points,
+            entrypoints,
             spans: compiler.spans,
             label_origins: compiler.label_origins,
         }

@@ -1,6 +1,6 @@
 Q = (identifier) @identifier
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 2
 
 [transitions]
@@ -23,7 +23,7 @@ M0: S1 → T0  ; identifier: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T1
 
 [instructions]

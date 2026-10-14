@@ -8,7 +8,7 @@ use plotnik_runtime::{Limit, RuntimeLimitSpec};
 pub struct Config {
     /// Rust output-type configuration shared with the type renderer.
     pub(crate) rust_types: RustTypesConfig,
-    /// The limit policy compiled into the module's safe entry points.
+    /// The limit policy compiled into the module's safe entrypoints.
     /// Chosen at generation time, never at the call site: the query is
     /// trusted, the input is not, and the query's author is the one who knows
     /// the budget it deserves.
@@ -54,7 +54,7 @@ impl Config {
         self
     }
 
-    /// Override the compiled-in limit policy for the safe entry points.
+    /// Override the compiled-in limit policy for the safe entrypoints.
     pub fn limits(mut self, limits: RuntimeLimitSpec) -> Self {
         self.limits = limits;
         self

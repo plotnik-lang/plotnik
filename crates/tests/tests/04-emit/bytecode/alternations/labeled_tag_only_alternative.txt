@@ -5,7 +5,7 @@ Q = (expression_statement
   ] @kind
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -47,7 +47,7 @@ M3: S4 → T3  ; kind: QKind
 N0: S5 → T3  ; QKind
 N1: S6 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [instructions]

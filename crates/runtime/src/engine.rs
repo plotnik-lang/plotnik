@@ -288,7 +288,7 @@ impl<'t> Engine<'t> {
     /// amortized).
     ///
     /// Panics if no frame is active; executors gate on [`Engine::frames_empty`]
-    /// (an empty frame stack at Return means entry point acceptance).
+    /// (an empty frame stack at Return means entrypoint acceptance).
     pub fn exit_frame(&mut self) -> u16 {
         let call_site = self.frames.pop();
         self.recursion_depth = self

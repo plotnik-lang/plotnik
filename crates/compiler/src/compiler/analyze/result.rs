@@ -369,7 +369,7 @@ pub(crate) struct ResultModel {
     reachable_defs: DefinitionReachability,
     type_layout: ResultTypeLayout,
     type_name_bindings: Vec<TypeNameBinding>,
-    entry_point_items: Vec<ResultItem>,
+    entrypoint_items: Vec<ResultItem>,
     capture_layout: CaptureLayout,
     public_result_groups: BTreeMap<Symbol, PublicResultGroup>,
 }
@@ -399,7 +399,7 @@ impl ResultModel {
         let definitions = artifacts.definitions;
         let reachable_defs = definitions.reachable_from(
             artifacts
-                .iter_entry_point_outputs()
+                .iter_entrypoint_outputs()
                 .map(|(def_id, _)| def_id),
         );
         let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
@@ -424,10 +424,10 @@ impl ResultModel {
         }
         type_name_bindings.sort_by_key(|binding| (binding.type_id, binding.name));
         type_name_bindings.dedup();
-        let entry_point_items =
-            ItemCollector::new(types, definitions).collect(artifacts.iter_entry_point_outputs());
+        let entrypoint_items =
+            ItemCollector::new(types, definitions).collect(artifacts.iter_entrypoint_outputs());
         let mut public_result_groups = BTreeMap::new();
-        for item in entry_point_items
+        for item in entrypoint_items
             .iter()
             .copied()
             .filter(|item| item.is_composite())
@@ -454,7 +454,7 @@ impl ResultModel {
             reachable_defs,
             type_layout,
             type_name_bindings,
-            entry_point_items,
+            entrypoint_items,
             capture_layout,
             public_result_groups,
         })
@@ -520,8 +520,8 @@ impl<'a> ResultSchema<'a> {
     /// for matching. A source-code target, however, must not publish an
     /// unspecialized fragment type merely because a capture-type-specialized call
     /// uses the same matcher body.
-    pub(crate) fn entry_point_items(&self) -> &[ResultItem] {
-        &self.model.entry_point_items
+    pub(crate) fn entrypoint_items(&self) -> &[ResultItem] {
+        &self.model.entrypoint_items
     }
 
     pub(crate) fn layout(&self) -> &CaptureLayout {
@@ -554,9 +554,9 @@ impl<'a> ItemCollector<'a> {
 
     fn collect(
         mut self,
-        entry_points: impl IntoIterator<Item = (DefId, DefinitionOutput)>,
+        entrypoints: impl IntoIterator<Item = (DefId, DefinitionOutput)>,
     ) -> Vec<ResultItem> {
-        for (def_id, output) in entry_points {
+        for (def_id, output) in entrypoints {
             let name = self.definitions.definition(def_id).name();
             match output {
                 DefinitionOutput::MatchOnly => {

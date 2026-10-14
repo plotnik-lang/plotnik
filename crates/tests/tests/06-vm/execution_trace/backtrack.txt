@@ -38,7 +38,7 @@ export type QExpr =
     {
       "ip": 0,
       "event": {
-        "kind": "enter_entry_point",
+        "kind": "execution_started",
         "target": 0
       },
       "query_span_id": null,
@@ -706,7 +706,7 @@ M4: S06 → T3  ; expr: QExpr
 N0: S07 → T3  ; QExpr
 N1: S08 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [spans]

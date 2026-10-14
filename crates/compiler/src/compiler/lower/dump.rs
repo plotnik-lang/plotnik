@@ -32,7 +32,7 @@ pub(crate) fn dump_nfa(
     dumper.colors = colors;
 
     let mut out = String::new();
-    dumper.dump_entry_points(&mut out);
+    dumper.dump_entrypoints(&mut out);
     dumper.dump_transitions(&mut out);
     out
 }
@@ -92,14 +92,14 @@ impl<'a> NfaDumper<'a> {
 }
 
 impl NfaDumper<'_> {
-    fn dump_entry_points(&self, out: &mut String) {
+    fn dump_entrypoints(&self, out: &mut String) {
         let c = &self.colors;
-        writeln!(out, "{}[entry_points]{}", c.blue, c.reset)
+        writeln!(out, "{}[entrypoints]{}", c.blue, c.reset)
             .expect("writing to a String is infallible");
 
         let mut entries: Vec<(&str, Label)> = self
             .graph
-            .entry_points()
+            .entrypoints()
             .iter()
             .map(|(&def_id, entry)| (self.def_name(def_id), entry.target))
             .collect();

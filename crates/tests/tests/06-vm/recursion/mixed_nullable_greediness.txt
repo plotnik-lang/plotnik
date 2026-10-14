@@ -98,7 +98,7 @@ N0: S10 → T6  ; B
 N1: S11 → T4  ; Body
 N2: S12 → T8  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T8
 
 [instructions]

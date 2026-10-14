@@ -3,7 +3,7 @@ Used = (comment)+
 Q = (program (Used))
 --------------------- INPUT ----------------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -39,7 +39,7 @@ T2 = ListOneOrMore(T1)  ; <Node>+
 [type_names]
 N0: S1 → T2  ; Used
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T0
 
 [instructions]

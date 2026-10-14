@@ -17,8 +17,8 @@ pub(crate) struct AnalysisArtifacts<'a> {
 }
 
 impl<'a> AnalysisArtifacts<'a> {
-    /// Entry-point-eligible outputs in the existing `DefId` order.
-    pub(crate) fn iter_entry_point_outputs(
+    /// Entrypoint-eligible outputs in the existing `DefId` order.
+    pub(crate) fn iter_entrypoint_outputs(
         self,
     ) -> impl Iterator<Item = (DefId, DefinitionOutput)> + 'a {
         let type_analysis = self.type_analysis;
@@ -26,6 +26,6 @@ impl<'a> AnalysisArtifacts<'a> {
 
         type_analysis
             .iter_def_output()
-            .filter(move |&(def_id, _)| pattern_facts.is_entry_point_eligible(def_id))
+            .filter(move |&(def_id, _)| pattern_facts.is_entrypoint_eligible(def_id))
     }
 }

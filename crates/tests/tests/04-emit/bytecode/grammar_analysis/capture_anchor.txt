@@ -17,7 +17,7 @@ rules:
       - {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Arg = 02
 Q   = 05
 
@@ -70,7 +70,7 @@ M2: S3 → T1  ; last: Arg
 N0: S4 → T1  ; Arg
 N1: S5 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Arg = 00 :: T1
 Q   = 03 :: T2
 

@@ -13,7 +13,7 @@ fn capture_name(language: &str, source: &str) -> serde_json::Value {
         .unwrap()
         .into_artifact()
         .unwrap();
-    let entry = module.entry_point("Q").unwrap();
+    let entry = module.entrypoint("Q").unwrap();
     let tree = lang.parse_source(source);
     assert!(!tree.root_node().has_error());
 

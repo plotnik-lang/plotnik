@@ -16,7 +16,7 @@ export interface Q {
     {
       "ip": 0,
       "event": {
-        "kind": "enter_entry_point",
+        "kind": "execution_started",
         "target": 0
       },
       "query_span_id": null,
@@ -217,7 +217,7 @@ M0: S1 → T0  ; n: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T1
 
 [spans]

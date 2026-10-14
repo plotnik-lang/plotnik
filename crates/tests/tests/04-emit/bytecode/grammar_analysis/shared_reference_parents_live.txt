@@ -19,7 +19,7 @@ Value = [
   (num)
 ]
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q     = 07
 Value = 00
 
@@ -57,7 +57,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Q     = 02 :: T0
 Value = 00 :: T0
 

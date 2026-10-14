@@ -54,7 +54,7 @@ pub(crate) fn source(case: &Case, query_path: &Path) -> Result<(String, bool), S
         .into_artifact()
         .expect("valid corpus query emits bytecode");
     let match_only = module
-        .entry_point("Q")
+        .entrypoint("Q")
         .expect("corpus entry Q exists")
         .result_type()
         == TYPE_NO_VALUE.into();

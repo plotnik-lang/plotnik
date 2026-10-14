@@ -26,7 +26,7 @@ mod wire_tests;
 use std::cell::OnceCell;
 
 use langs::Lang;
-use plotnik_compiler::bytecode::{EntryPoint, Module};
+use plotnik_compiler::bytecode::{Entrypoint, Module};
 use plotnik_compiler::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
     RuntimeLimitSpec, RustCodegenConfig, TraceRecorder, TypeScriptCodegenConfig, VM, dump_tree,
@@ -44,7 +44,7 @@ pub struct Session {
     lang: &'static Lang,
     compiled: CompiledQuery,
     module: Option<Module>,
-    entry_points: Vec<String>,
+    entrypoints: Vec<String>,
     info: JsonValue,
     generated_rust: OnceCell<Option<String>>,
 }
@@ -79,14 +79,14 @@ impl Session {
             .into_artifact()
             .map(|output| output.into_parts())
             .unwrap_or_else(|| (String::new(), Vec::new()));
-        let entry_points = module.as_ref().map(entry_point_names).unwrap_or_default();
+        let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
         let info = info_json(InfoParts {
             module: module.as_ref(),
             query_tokens: json_value!(tokens),
             diagnostics,
             typescript_declarations,
             typescript_bindings: json_value!(typescript_bindings),
-            entry_points: &entry_points,
+            entrypoints: &entrypoints,
             bytecode_size_bytes,
         });
 
@@ -94,7 +94,7 @@ impl Session {
             lang,
             compiled,
             module,
-            entry_points,
+            entrypoints,
             info,
             generated_rust: OnceCell::new(),
         })
@@ -171,8 +171,8 @@ impl Session {
             return error_json("query did not compile");
         };
 
-        let entry_point = match resolve_entry_point(module, entry, &self.entry_points) {
-            Ok(entry_point) => entry_point,
+        let entrypoint = match resolve_entrypoint(module, entry, &self.entrypoints) {
+            Ok(entrypoint) => entrypoint,
             Err(error) => return error_json(error),
         };
 
@@ -183,16 +183,16 @@ impl Session {
         match trace {
             TraceMode::None => {
                 let mut tracer = NoopTracer;
-                let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
-                result_json(module, &entry_point, source, result, None)
+                let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
+                result_json(module, &entrypoint, source, result, None)
             }
             TraceMode::Structured(max_records) => {
                 let mut tracer = TraceRecorder::new(module, max_records);
-                let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
+                let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
                 let execution_trace = tracer.finish();
                 result_json(
                     module,
-                    &entry_point,
+                    &entrypoint,
                     source,
                     result,
                     Some(json_value!(execution_trace)),
@@ -207,29 +207,29 @@ enum TraceMode {
     Structured(usize),
 }
 
-fn resolve_entry_point(
+fn resolve_entrypoint(
     module: &Module,
     requested: Option<&str>,
-    entry_points: &[String],
-) -> Result<EntryPoint, String> {
+    entrypoints: &[String],
+) -> Result<Entrypoint, String> {
     let selected = match requested {
         Some(name) => name.to_string(),
-        None => entry_points
+        None => entrypoints
             .last()
             .cloned()
-            .ok_or_else(|| "bytecode module exports no entry points".to_string())?,
+            .ok_or_else(|| "bytecode module exports no entrypoints".to_string())?,
     };
 
-    let Some(entry_point) = module.entry_point(&selected) else {
+    let Some(entrypoint) = module.entrypoint(&selected) else {
         return Err(format!(
-            "invalid entry point: {}; available entry points: {}",
+            "invalid entrypoint: {}; available entrypoints: {}",
             selected,
-            entry_points.join(", ")
+            entrypoints.join(", ")
         ));
     };
-    Ok(entry_point)
+    Ok(entrypoint)
 }
 
-fn entry_point_names(module: &Module) -> Vec<String> {
-    module.entry_point_names().map(str::to_string).collect()
+fn entrypoint_names(module: &Module) -> Vec<String> {
+    module.entrypoint_names().map(str::to_string).collect()
 }

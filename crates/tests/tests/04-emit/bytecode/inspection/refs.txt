@@ -6,7 +6,7 @@ Captured = (program
 )
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Bare     = 05
 Captured = 14
 Name     = 02
@@ -56,7 +56,7 @@ M1: S2 → T2  ; item: Name
 N0: S3 → T2  ; Name
 N1: S4 → T3  ; Captured
 
-[entry_points]
+[entrypoints]
 Bare     = 05 :: T0
 Captured = 16 :: T3
 Name     = 00 :: T2

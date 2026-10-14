@@ -64,7 +64,7 @@ StringBlob ... ------+-------------------------+
 
 Equal adjacent offsets represent an empty string. The sentinel is not a string. Every string is valid UTF-8, including entry 0.
 
-A `StringId` is a nonzero `StringTable` index below `str_table_count`. Grammar names, type names, member names, entry-point names, and real regex pattern names use these IDs. [String predicates](02-instructions.md#predicates) have a separate operand range.
+A `StringId` is a nonzero `StringTable` index below `str_table_count`. Grammar names, type names, member names, entrypoint names, and real regex pattern names use these IDs. [String predicates](02-instructions.md#predicates) have a separate operand range.
 
 Writers emit 1 through 65534 counted strings and start the first at offset zero. Entry 0 is the 25-byte ASCII string `Beauty will save the world`. A modest ambition for a reserved entry. Real strings start at index 1 and share an entry when their bytes are identical. A real string equal to entry 0 still has a separate nonzero ID.
 

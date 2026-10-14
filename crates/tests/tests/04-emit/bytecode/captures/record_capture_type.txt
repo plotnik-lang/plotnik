@@ -2,7 +2,7 @@ Q = {
   (identifier) @fn
 } @outer :: FunctionInfo
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 3
 
 [transitions]
@@ -31,7 +31,7 @@ M1: S2 → T1  ; outer: FunctionInfo
 N0: S3 → T1  ; FunctionInfo
 N1: S4 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T2
 
 [instructions]

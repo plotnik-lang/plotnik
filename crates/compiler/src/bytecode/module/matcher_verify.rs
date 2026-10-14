@@ -159,7 +159,7 @@ impl BodyContract {
         }
     }
 
-    fn entry_point() -> Self {
+    fn entrypoint() -> Self {
         Self::new(CalleeContract::CallerOwned, 1, PortId::ZERO.bit())
     }
 
@@ -226,7 +226,7 @@ where
 
         let mut roots = HashMap::new();
         for entry in &entries {
-            insert_root(&mut roots, entry.target, BodyContract::entry_point())?;
+            insert_root(&mut roots, entry.target, BodyContract::entrypoint())?;
         }
         for instruction in instruction_map.values() {
             if let Instruction::Call(call) = instruction {

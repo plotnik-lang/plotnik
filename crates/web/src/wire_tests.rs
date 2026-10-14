@@ -20,7 +20,7 @@ fn session_info_uses_domain_names_at_the_protocol_boundary() {
             type_id: 2,
             member_id: Some(3),
         }]),
-        entry_points: &[],
+        entrypoints: &[],
         bytecode_size_bytes: None,
     });
 
@@ -37,7 +37,7 @@ fn session_info_uses_domain_names_at_the_protocol_boundary() {
                 "type_id": 2,
                 "member_id": 3,
             }],
-            "entry_points": [],
+            "entrypoints": [],
             "bytecode_size_bytes": null,
         })
     );

@@ -1,7 +1,7 @@
 Blank = (identifier)
 Q = (expression_statement (Blank))
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Blank = 2
 Q     = 5
 
@@ -30,7 +30,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Blank = 0 :: T0
 Q     = 2 :: T0
 

@@ -1,6 +1,6 @@
 //! Materializes committed match journals into result values.
 
-use crate::bytecode::{EntryPoint, Module};
+use crate::bytecode::{Entrypoint, Module};
 use crate::core::Colors;
 
 use super::value::{NodeValue, Value};
@@ -33,7 +33,7 @@ impl<'a> ValueMaterializer<'a> {
 }
 
 /// Materialize the journal events into a [`Value`], then check it against the
-/// entry point's declared type.
+/// entrypoint's declared type.
 ///
 /// The type check is the trailing half of materialization, not an optional
 /// follow-up: it catches materializer/typegen drift and compiles to a no-op in
@@ -42,13 +42,13 @@ impl<'a> ValueMaterializer<'a> {
 pub fn materialize_verified<'s, 't>(
     source: &'s str,
     module: &'s Module,
-    entry_point: &EntryPoint,
+    entrypoint: &Entrypoint,
     events: OutputEvents<'_, 't>,
     colors: Colors,
 ) -> Value<'s, 't> {
     let materializer = ValueMaterializer::new(source, module);
     let value = materializer.materialize(events);
-    debug_verify_type(&value, entry_point.result_type(), module, colors);
+    debug_verify_type(&value, entrypoint.result_type(), module, colors);
     value
 }
 

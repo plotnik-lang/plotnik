@@ -5,7 +5,7 @@ rules:
   expr: {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Leaf = 2
 Q    = 6
 
@@ -35,7 +35,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Leaf = 0 :: T0
 Q    = 3 :: T0
 

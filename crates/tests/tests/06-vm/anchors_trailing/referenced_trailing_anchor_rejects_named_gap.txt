@@ -43,7 +43,7 @@ M0: S1 → T1  ; b: <Node>
 [type_names]
 N0: S3 → T2  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T2
 
 [instructions]

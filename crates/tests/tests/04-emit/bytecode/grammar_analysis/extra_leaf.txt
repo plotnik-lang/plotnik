@@ -14,7 +14,7 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
   comment: {type: PATTERN, value: "#[^\n]*"}
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Direct    = 06
 Leaf      = 02
 Reference = 12
@@ -64,7 +64,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Direct    = 03 :: T0
 Leaf      = 00 :: T0
 Reference = 08 :: T0

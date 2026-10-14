@@ -63,7 +63,7 @@ M1: S2 → T3  ; ids: T3
 N0: S3 → T2  ; QIds
 N1: S4 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [instructions]

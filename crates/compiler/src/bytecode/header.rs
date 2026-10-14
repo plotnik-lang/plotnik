@@ -2,10 +2,10 @@
 //!
 //! Offsets are computed from counts + SECTION_ALIGN (64 bytes); no stored offsets.
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
-//! NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames → EntryPoints →
+//! NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
 //! Instructions → Spans
 
-use super::entry_point::EntryPoint;
+use super::entrypoint::Entrypoint;
 use super::sections::SYMBOL_NAME_ENTRY_SIZE;
 use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
 use super::{
@@ -49,7 +49,7 @@ pub struct Header {
     pub type_defs_count: u16,
     pub type_members_count: u16,
     pub type_names_count: u16,
-    pub entry_points_count: u16,
+    pub entrypoints_count: u16,
     pub instruction_word_count: u16,
 
     // Bytes 42-43: Spans section count.
@@ -77,7 +77,7 @@ impl Default for Header {
             type_defs_count: 0,
             type_members_count: 0,
             type_names_count: 0,
-            entry_points_count: 0,
+            entrypoints_count: 0,
             instruction_word_count: 0,
             spans_count: 0,
             _reserved: [0; 20],
@@ -88,7 +88,7 @@ impl Default for Header {
 /// Computed section offsets derived from header counts.
 ///
 /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-/// NodeFields → TypeDefs → TypeMembers → TypeNames → EntryPoints → Instructions → Spans
+/// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Instructions → Spans
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SectionOffsets {
     pub(crate) str_blob: u32,
@@ -100,7 +100,7 @@ pub struct SectionOffsets {
     pub(crate) type_defs: u32,
     pub(crate) type_members: u32,
     pub(crate) type_names: u32,
-    pub(crate) entry_points: u32,
+    pub(crate) entrypoints: u32,
     pub(crate) instructions: u32,
     pub(crate) spans: u32,
 }
@@ -118,7 +118,7 @@ impl SectionOffsets {
             type_defs: o[6],
             type_members: o[7],
             type_names: o[8],
-            entry_points: o[9],
+            entrypoints: o[9],
             instructions: o[10],
             spans: o[11],
         }
@@ -136,7 +136,7 @@ impl SectionOffsets {
             self.type_defs,
             self.type_members,
             self.type_names,
-            self.entry_points,
+            self.entrypoints,
             self.instructions,
             self.spans,
         ]
@@ -164,7 +164,7 @@ impl Header {
             type_defs_count: u16::from_le_bytes([bytes[32], bytes[33]]),
             type_members_count: u16::from_le_bytes([bytes[34], bytes[35]]),
             type_names_count: u16::from_le_bytes([bytes[36], bytes[37]]),
-            entry_points_count: u16::from_le_bytes([bytes[38], bytes[39]]),
+            entrypoints_count: u16::from_le_bytes([bytes[38], bytes[39]]),
             instruction_word_count: u16::from_le_bytes([bytes[40], bytes[41]]),
             spans_count: u16::from_le_bytes([bytes[42], bytes[43]]),
             _reserved: reserved,
@@ -186,7 +186,7 @@ impl Header {
         bytes[32..34].copy_from_slice(&self.type_defs_count.to_le_bytes());
         bytes[34..36].copy_from_slice(&self.type_members_count.to_le_bytes());
         bytes[36..38].copy_from_slice(&self.type_names_count.to_le_bytes());
-        bytes[38..40].copy_from_slice(&self.entry_points_count.to_le_bytes());
+        bytes[38..40].copy_from_slice(&self.entrypoints_count.to_le_bytes());
         bytes[40..42].copy_from_slice(&self.instruction_word_count.to_le_bytes());
         bytes[42..44].copy_from_slice(&self.spans_count.to_le_bytes());
         bytes[44..HEADER_SIZE].copy_from_slice(&self._reserved);
@@ -209,7 +209,7 @@ impl Header {
     /// Widened to `u64` so a corrupt header cannot overflow a running layout.
     ///
     /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-    /// NodeFields → TypeDefs → TypeMembers → TypeNames → EntryPoints →
+    /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
     /// Instructions → Spans
     pub(crate) fn section_data_sizes(&self) -> [u64; SECTION_COUNT] {
         // Tables carry a trailing sentinel entry, hence the `+ 1`.
@@ -223,7 +223,7 @@ impl Header {
             self.type_defs_count as u64 * TypeDef::SIZE as u64,
             self.type_members_count as u64 * TypeMember::SIZE as u64,
             self.type_names_count as u64 * TypeNameEntry::SIZE as u64,
-            self.entry_points_count as u64 * EntryPoint::SIZE as u64,
+            self.entrypoints_count as u64 * Entrypoint::SIZE as u64,
             self.instruction_word_count as u64 * BYTECODE_WORD_SIZE as u64,
             self.spans_count as u64 * SPAN_ENTRY_SIZE as u64,
         ]

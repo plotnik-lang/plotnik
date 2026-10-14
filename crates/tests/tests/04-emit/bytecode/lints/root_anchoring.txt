@@ -8,7 +8,7 @@ Bad = (identifier) @bad
 --------------- INPUT (typescript) ---------------
 let x = 1;
 ------------------ DIAGNOSTICS -------------------
-warning: entry point `Bad` cannot match the `program` syntax-tree root
+warning: entrypoint `Bad` cannot match the `program` syntax-tree root
  --> query.ptk:7:7
   |
 7 | Bad = (identifier) @bad
@@ -16,7 +16,7 @@ warning: entry point `Bad` cannot match the `program` syntax-tree root
   |
 help: make `Bad` start with a `program` node pattern because matching begins at the syntax-tree root
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Bad  = 15
 Leaf = 02
 Q    = 05
@@ -66,7 +66,7 @@ N0: S4 → T1  ; Leaf
 N1: S5 → T2  ; Q
 N2: S6 → T3  ; Bad
 
-[entry_points]
+[entrypoints]
 Bad  = 13 :: T3
 Leaf = 00 :: T1
 Q    = 03 :: T2

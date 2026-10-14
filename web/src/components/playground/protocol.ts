@@ -73,7 +73,7 @@ export interface SessionInfo {
   diagnostics: WireDiagnostic[];
   typescript_declarations: string;
   typescript_bindings: TypeScriptBinding[];
-  entry_points: string[];
+  entrypoints: string[];
   bytecode_size_bytes: number | null;
 }
 

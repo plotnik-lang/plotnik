@@ -15,7 +15,7 @@ rules:
   id: {type: PATTERN, value: "[a-z]+"}
   num: {type: PATTERN, value: "[0-9]+"}
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 0
 
 [transitions]
@@ -42,7 +42,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T0
 
 [instructions]

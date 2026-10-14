@@ -7,7 +7,7 @@ Q = (object
   }* @items
 )
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -61,7 +61,7 @@ N0: S07 → T3  ; QItemsItem
 N1: S08 → T4  ; QItems
 N2: S09 → T6  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T6
 
 [instructions]

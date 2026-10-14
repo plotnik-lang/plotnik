@@ -16,7 +16,7 @@ mod aligned_vec;
 mod constants;
 mod dump;
 mod effects;
-mod entry_point;
+mod entrypoint;
 mod format;
 mod header;
 mod ids;
@@ -31,10 +31,10 @@ mod type_meta;
 pub mod type_system;
 
 pub use dump::dump;
-pub use entry_point::EntryPoint;
+pub use entrypoint::Entrypoint;
 pub use ids::{StringId, TypeId};
 pub use instructions::{CodeAddr, EncodeError};
-pub use module::{EntryPointsView, Module, StringsView, TypesView};
+pub use module::{EntrypointsView, Module, StringsView, TypesView};
 pub use spans::{Labeling, SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 pub use type_system::{PrimitiveType, TypeKind};
@@ -45,7 +45,7 @@ pub(crate) use constants::{
     VERSION,
 };
 pub(crate) use effects::{Effect, EffectKind, EffectSuppression, FrameAction, ValueFrameKind};
-pub(crate) use entry_point::EntryBoundary;
+pub(crate) use entrypoint::EntryBoundary;
 pub(crate) use format::{
     LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };

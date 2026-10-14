@@ -8,7 +8,7 @@ Q = (program
 )
 --------------- INPUT (typescript) ---------------
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -57,7 +57,7 @@ M2: S3 → T2  ; second: MaybeName
 N0: S4 → T2  ; MaybeName
 N1: S5 → T3  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T3
 
 [spans]

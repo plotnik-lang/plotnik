@@ -19,7 +19,7 @@ rules:
   _name: {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Func  = 05
 Name  = 02
 Param = 10
@@ -59,7 +59,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Func  = 2 :: T0
 Name  = 0 :: T0
 Param = 6 :: T0

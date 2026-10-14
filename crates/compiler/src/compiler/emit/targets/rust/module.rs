@@ -252,7 +252,7 @@ impl<'a> Generator<'a> {
             &decoders.execution_api(
                 self.plan
                     .matcher()
-                    .entry_points()
+                    .entrypoints()
                     .iter()
                     .map(|entry| entry.definition),
             ),
@@ -308,14 +308,14 @@ impl<'a> Generator<'a> {
         );
     }
 
-    /// `pub use` every journal entry point at module root, so the public
+    /// `pub use` every journal entrypoint at module root, so the public
     /// surface (`{def}_journal`, per [`journal_fn_name`]) doesn't move when the
     /// machinery does.
     fn entry_reexports(&self, out: &mut String) {
         let mut names: Vec<String> = self
             .plan
             .matcher()
-            .entry_points()
+            .entrypoints()
             .iter()
             .map(|entry| journal_fn_name(&entry.name))
             .collect();
@@ -490,7 +490,7 @@ impl<'a> Generator<'a> {
         let memory_metered = limits.memory != Limit::Unbounded;
         let fuel_metered = if fuel_metered { "true" } else { "false" };
         let memory_metered = if memory_metered { "true" } else { "false" };
-        for entry in self.plan.matcher().entry_points() {
+        for entry in self.plan.matcher().entrypoints() {
             let def = entry.name.as_str();
             let name = self
                 .plan
@@ -587,7 +587,7 @@ impl<'a> Generator<'a> {
                     let top_level = if port == 0 {
                         "Flow::Accept".to_owned()
                     } else {
-                        format!("panic!(\"entry point returned through nonzero port {port}\")")
+                        format!("panic!(\"entrypoint returned through nonzero port {port}\")")
                     };
                     let port = port.to_string();
                     let template = if self.has_calls {
@@ -1245,7 +1245,7 @@ const _: () = assert!(
 const MOD_HEADER: &str = r#"
 use @RT@ as rt;
 
-/// The limit policy compiled into the safe entry points, resolved against
+/// The limit policy compiled into the safe entrypoints, resolved against
 /// each input's node count. Chosen at generation time, never at the call
 /// site: the query is trusted, the input is not.
 const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
@@ -1253,7 +1253,7 @@ const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
     memory: @MEMORY@,
 };
 
-/// No ceilings — what the unmetered journal entry points run under.
+/// No ceilings — what the unmetered journal entrypoints run under.
 const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
     fuel_limit: None,
     max_memory: None,
@@ -1349,7 +1349,7 @@ fn verify_language(node: rt::Node<'_>) {
 "#;
 
 const JOURNAL_ENTRY_FN: &str = r#"
-/// Match the `@DEF@` entry point against `tree`. `Some` carries the committed
+/// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
 /// match journal — the same event sequence the VM commits for this query.
 pub fn @JOURNAL_FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
     let entry = @ENTRY@;
@@ -1403,7 +1403,7 @@ impl EntryBoundary {
 enum Flow {
     /// Continue at this state.
     Jump(u16),
-    /// The entry point accepted; the match journal is committed.
+    /// The entrypoint accepted; the match journal is committed.
     Accept,
     /// The state failed; unwind the checkpoint stack.
     Backtrack,@FLOW_CALL_ERROR_VARIANT@
@@ -1416,7 +1416,7 @@ enum Unwound {
     NoMatch,@UNWOUND_CALL_ERROR_VARIANT@
 }
 
-/// One dispatch loop serves every entry point; `entry` selects the definition
+/// One dispatch loop serves every entrypoint; `entry` selects the definition
 /// body and `boundary` supplies its root result effects.
 /// The metering constants come from the compiled-in policy. A fully unbounded
 /// policy skips budget accounting. Memory checks read `heap_bytes` only when

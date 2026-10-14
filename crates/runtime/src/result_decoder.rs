@@ -30,7 +30,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
         }
     }
 
-    /// Assert the whole output-event stream was consumed — the entry point's
+    /// Assert the whole output-event stream was consumed — the entrypoint's
     /// value is the entire stream, so leftovers mean the decoder lost sync.
     pub fn finish(self) {
         assert!(

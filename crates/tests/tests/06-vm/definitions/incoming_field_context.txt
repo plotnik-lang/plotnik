@@ -107,7 +107,7 @@ N2: S07 → T3  ; Wrapped
 N3: S08 → T4  ; Choice
 N4: S09 → T5  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T5
 
 [instructions]

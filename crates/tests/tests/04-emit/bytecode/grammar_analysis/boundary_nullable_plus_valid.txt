@@ -13,7 +13,7 @@ rules:
       - {type: SYMBOL, name: id}
   id: {type: PATTERN, value: "[a-z]+"}
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -40,7 +40,7 @@ T0 = <NoValue>
 
 [type_names]
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T0
 
 [instructions]

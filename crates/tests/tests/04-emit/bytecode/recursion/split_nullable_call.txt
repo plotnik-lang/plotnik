@@ -13,7 +13,7 @@ B = {
 
 Q = (program (B))
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -76,7 +76,7 @@ M1: S2 → T0  ; Base: <NoValue>
 [type_names]
 N0: S3 → T1  ; Body
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T0
 
 [instructions]

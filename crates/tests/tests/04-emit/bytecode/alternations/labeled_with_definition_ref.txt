@@ -5,7 +5,7 @@ Q = [
   B: (number) @b
 ] @item
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Inner = 02
 Q     = 03
 
@@ -55,7 +55,7 @@ N0: S06 → T2  ; Inner
 N1: S07 → T4  ; QItem
 N2: S08 → T5  ; Q
 
-[entry_points]
+[entrypoints]
 Inner = 00 :: T2
 Q     = 03 :: T5
 

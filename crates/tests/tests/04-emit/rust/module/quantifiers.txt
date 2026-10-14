@@ -161,7 +161,7 @@ pub use self::matcher::q_journal;
 mod matcher {
     use ::plotnik_runtime as rt;
 
-    /// The limit policy compiled into the safe entry points, resolved against
+    /// The limit policy compiled into the safe entrypoints, resolved against
     /// each input's node count. Chosen at generation time, never at the call
     /// site: the query is trusted, the input is not.
     const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
@@ -169,7 +169,7 @@ mod matcher {
         memory: rt::Limit::Auto,
     };
 
-    /// No ceilings — what the unmetered journal entry points run under.
+    /// No ceilings — what the unmetered journal entrypoints run under.
     const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
         fuel_limit: None,
         max_memory: None,
@@ -243,7 +243,7 @@ mod matcher {
     const S14_Q: u16 = 9;
     const S19_Q: u16 = 10;
 
-    /// Match the `Q` entry point against `tree`. `Some` carries the committed
+    /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn q_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
         let entry = S02_Q;
@@ -298,7 +298,7 @@ mod matcher {
     enum Flow {
         /// Continue at this state.
         Jump(u16),
-        /// The entry point accepted; the match journal is committed.
+        /// The entrypoint accepted; the match journal is committed.
         Accept,
         /// The state failed; unwind the checkpoint stack.
         Backtrack,
@@ -311,7 +311,7 @@ mod matcher {
         NoMatch,
     }
 
-    /// One dispatch loop serves every entry point; `entry` selects the definition
+    /// One dispatch loop serves every entrypoint; `entry` selects the definition
     /// body and `boundary` supplies its root result effects.
     /// The metering constants come from the compiled-in policy. A fully unbounded
     /// policy skips budget accounting. Memory checks read `heap_bytes` only when

@@ -233,7 +233,7 @@ pub(crate) struct EntryPlan {
 #[derive(Clone, Debug)]
 pub(crate) struct MatcherPlan {
     states: Vec<StatePlan>,
-    entry_points: Vec<EntryPlan>,
+    entrypoints: Vec<EntryPlan>,
     expected_kinds: Vec<ExpectedKind>,
     /// Fields in first-appearance order. Target representation passes use
     /// this order when resolving identifier collisions.
@@ -269,8 +269,8 @@ impl MatcherPlan {
                 (instruction.label(), StateId(raw))
             })
             .collect::<BTreeMap<_, _>>();
-        let entry_points = graph
-            .entry_points()
+        let entrypoints = graph
+            .entrypoints()
             .iter()
             .map(|(&definition, entry)| {
                 let symbol = artifacts.definitions.definition(definition).name();
@@ -292,7 +292,7 @@ impl MatcherPlan {
 
         Ok(Self {
             states,
-            entry_points,
+            entrypoints,
             expected_kinds: builder.expected_kinds.into_values().collect(),
             fields: builder.fields,
             regexes: builder.regexes,
@@ -306,8 +306,8 @@ impl MatcherPlan {
         &self.states
     }
 
-    pub(crate) fn entry_points(&self) -> &[EntryPlan] {
-        &self.entry_points
+    pub(crate) fn entrypoints(&self) -> &[EntryPlan] {
+        &self.entrypoints
     }
 
     pub(crate) fn expected_kinds(&self) -> &[ExpectedKind] {

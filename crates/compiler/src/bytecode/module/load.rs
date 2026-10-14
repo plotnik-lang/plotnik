@@ -51,8 +51,8 @@ pub enum ModuleError {
     InvalidTypeDef(usize),
     #[error("invalid type name at index {0}")]
     InvalidTypeName(usize),
-    #[error("invalid entry point at index {0}")]
-    InvalidEntryPoint(usize),
+    #[error("invalid entrypoint at index {0}")]
+    InvalidEntrypoint(usize),
     #[error("invalid opcode {opcode:#x} at instruction address {addr}")]
     InvalidOpcode { addr: CodeAddr, opcode: u8 },
     #[error("string id out of range at index {0}")]
@@ -193,12 +193,12 @@ impl Module {
         self.validate_type_names()?;
         self.validate_spans()?;
         // Bound every embedded `StringId` before any later check constructs a
-        // (`NonZero`) `StringId` from one — e.g. `validate_entry_points` builds an
-        // `EntryPoint`, which would otherwise panic on a malformed zero name.
+        // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
+        // `Entrypoint`, which would otherwise panic on a malformed zero name.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
         let is_start = self.validate_instructions()?;
-        self.validate_entry_points(&is_start)?;
+        self.validate_entrypoints(&is_start)?;
         // Structural validity is now established, so the matcher verifier can
         // safely project the typed instruction stream.
         super::verify::validate(self)?;
@@ -451,19 +451,19 @@ impl Module {
         Ok(())
     }
 
-    /// Entry-point targets must address a real instruction so the VM's first
+    /// Entrypoint targets must address a real instruction so the VM's first
     /// [`decode_instruction`](Self::decode_instruction) cannot read out of bounds.
     /// `is_start` is the instruction-start bitmap from
     /// [`Self::validate_instructions`]: a `target` that lands inside a multi-word
     /// instruction would make the VM start decoding mid-instruction, so it must
     /// be an instruction start, not merely in range.
-    fn validate_entry_points(&self, is_start: &[bool]) -> Result<(), ModuleError> {
-        let entry_points = self.entry_points();
+    fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
+        let entrypoints = self.entrypoints();
         let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
-        for i in 0..entry_points.len() {
-            let invalid = || ModuleError::InvalidEntryPoint(i);
-            let ep = entry_points.get(i);
+        for i in 0..entrypoints.len() {
+            let invalid = || ModuleError::InvalidEntrypoint(i);
+            let ep = entrypoints.get(i);
             let target = ep.target();
 
             if target.get() >= word_count {
@@ -504,13 +504,13 @@ impl Module {
             Ok(())
         };
 
-        // Entry-point name: u16 at entry+0
+        // Entrypoint name: u16 at entry+0
         check(
-            self.offsets.entry_points,
-            EntryPoint::SIZE,
+            self.offsets.entrypoints,
+            Entrypoint::SIZE,
             0,
             0,
-            self.header.entry_points_count as usize,
+            self.header.entrypoints_count as usize,
         )?;
         // node/field symbol name: u16 at entry+2
         check(
@@ -591,7 +591,7 @@ impl Module {
     ///
     /// Jump validation needs two passes: collect instruction starts while
     /// checking each slot, then reject targets that land inside a slot or
-    /// outside the stream. Entry-point validation reuses the returned bitmap.
+    /// outside the stream. Entrypoint validation reuses the returned bitmap.
     fn validate_instructions(&self) -> Result<Vec<bool>, ModuleError> {
         let storage: &[u8] = &self.storage;
         let base = self.offsets.instructions as usize;

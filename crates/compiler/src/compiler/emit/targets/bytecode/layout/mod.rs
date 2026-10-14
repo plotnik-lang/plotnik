@@ -12,7 +12,7 @@ use crate::compiler::lower::ir::{Label, NfaGraph};
 /// Assign a cache-aligned bytecode-word address to every label.
 pub fn compute_layout(ir: &NfaGraph) -> Result<LayoutMap, EmitError> {
     let entry_labels: Vec<Label> = ir
-        .entry_points()
+        .entrypoints()
         .values()
         .map(|entry| entry.target)
         .collect();

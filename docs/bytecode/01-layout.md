@@ -10,10 +10,10 @@
 
 ## Design
 
-The bytecode stores a compiled query as a program and the data that program uses. An entry point lets the caller choose a named query to run, such as `Q` in the introduction. It stores the starting instruction and result type. Several entry points can share the same bytecode. The VM runs the chosen entry against a document and its syntax tree.
+The bytecode stores a compiled query as a program and the data that program uses. An entrypoint lets the caller choose a named query to run, such as `Q` in the introduction. It stores the starting instruction and result type. Several entrypoints can share the same bytecode. The VM runs the chosen entry against a document and its syntax tree.
 
 ```text
-Bytecode + entry point --+
+Bytecode + entrypoint ---+
                          |
 Document text -----------+--> VM --> Match results
                          |
@@ -67,7 +67,7 @@ Bytecode integers are little-endian. The embedded [regex automata](06-tables.md#
 | 32          | `u16`    | `type_defs_count`        |
 | 34          | `u16`    | `type_members_count`     |
 | 36          | `u16`    | `type_names_count`       |
-| 38          | `u16`    | `entry_points_count`     |
+| 38          | `u16`    | `entrypoints_count`      |
 | 40          | `u16`    | `instruction_word_count` |
 | 42          | `u16`    | `spans_count`            |
 | 44          | 20 bytes | Reserved                 |
@@ -91,7 +91,7 @@ Bytecode integers are little-endian. The embedded [regex automata](06-tables.md#
 | [TypeDefs]     | `type_defs_count`        | 4              |
 | [TypeMembers]  | `type_members_count`     | 4              |
 | [TypeNames]    | `type_names_count`       | 4              |
-| [EntryPoints]  | `entry_points_count`     | 8              |
+| [Entrypoints]  | `entrypoints_count`      | 8              |
 | [Instructions] | `instruction_word_count` | 8              |
 | [Spans]        | `spans_count`            | 16             |
 
@@ -130,7 +130,7 @@ The loader copies the bytes into immutable storage whose starting address is a m
 [TypeDefs]: 03-types.md
 [TypeMembers]: 03-types.md
 [TypeNames]: 03-types.md
-[EntryPoints]: 02-instructions.md#entry-points
+[Entrypoints]: 02-instructions.md#entrypoints
 [Instructions]: 02-instructions.md
 [Spans]: 05-spans.md
 

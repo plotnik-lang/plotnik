@@ -51,7 +51,7 @@ M1: S02 → T0  ; retval: <Node>
 [type_names]
 N0: S03 → T1  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 0 :: T1
 
 [instructions]

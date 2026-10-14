@@ -3,7 +3,7 @@ Q = [
   B: (number) @num
 ] @expr :: Expression
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 0
 
 [transitions]
@@ -43,7 +43,7 @@ M4: S5 → T3  ; expr: Expression
 N0: S6 → T3  ; Expression
 N1: S7 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T4
 
 [instructions]

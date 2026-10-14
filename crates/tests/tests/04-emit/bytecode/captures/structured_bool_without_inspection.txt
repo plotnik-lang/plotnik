@@ -17,7 +17,7 @@ warning: capture type `bool` replaces the record value captured by `@seen` with 
   |
 help: remove `:: bool` to return the record value instead
 ---------------------- NFA -----------------------
-[entry_points]
+[entrypoints]
 Q = 02
 
 [transitions]
@@ -48,7 +48,7 @@ M0: S1 → T0  ; seen: <Bool>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 00 :: T1
 
 [instructions]

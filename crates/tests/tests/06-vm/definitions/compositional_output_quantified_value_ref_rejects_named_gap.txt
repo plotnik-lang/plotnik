@@ -65,7 +65,7 @@ N0: S05 → T2  ; Elem
 N1: S06 → T3  ; Items
 N2: S07 → T4  ; Q
 
-[entry_points]
+[entrypoints]
 Q = 000 :: T4
 
 [instructions]

@@ -129,7 +129,7 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
     let reload_analyses = loader_body_analyses();
     assert_linear_body_analyses("module reload", reload_analyses);
 
-    assert_eq!(module.entry_points().len(), MANY_DEFINITIONS);
+    assert_eq!(module.entrypoints().len(), MANY_DEFINITIONS);
 }
 
 /// Byte offset of the first predicated Match's u16 operand in the instruction stream.
@@ -162,7 +162,7 @@ fn find_predicate_off(bytes: &[u8]) -> usize {
 }
 
 #[test]
-fn forged_invalid_entry_point_name_is_rejected() {
+fn forged_invalid_entrypoint_name_is_rejected() {
     // `0` is the reserved easter-egg index (never a real reference) and `u16::MAX`
     // is past the table; both must yield a clean error, not panic during StringId decoding.
     for forged in [0u16, u16::MAX] {
@@ -170,13 +170,13 @@ fn forged_invalid_entry_point_name_is_rejected() {
         let ep_off = Module::validate_and_load(&bytes)
             .expect("module validates before tampering")
             .offsets()
-            .entry_points as usize;
+            .entrypoints as usize;
 
         bytes[ep_off..ep_off + 2].copy_from_slice(&forged.to_le_bytes());
         reseal(&mut bytes);
 
-        let err = Module::validate_and_load(&bytes)
-            .expect_err("forged entry point name must be rejected");
+        let err =
+            Module::validate_and_load(&bytes).expect_err("forged entrypoint name must be rejected");
         assert!(
             matches!(err, ModuleError::InvalidStringId(_)),
             "forged name {forged}: expected InvalidStringId, got {err:?}"
@@ -451,7 +451,7 @@ fn first_section_gap(bytes: &[u8]) -> usize {
         (o.type_defs, h.type_defs_count as u32 * 4),
         (o.type_members, h.type_members_count as u32 * 4),
         (o.type_names, h.type_names_count as u32 * 4),
-        (o.entry_points, h.entry_points_count as u32 * 8),
+        (o.entrypoints, h.entrypoints_count as u32 * 8),
         (o.instructions, h.instruction_word_count as u32 * 8),
         (o.spans, h.spans_count as u32 * SPAN_ENTRY_SIZE as u32),
         (h.total_size, 0),
@@ -1015,29 +1015,29 @@ fn forged_corrupt_regex_dfa_is_rejected() {
 }
 
 #[test]
-fn forged_entry_point_into_instruction_interior_is_rejected() {
-    // Issue #457: an entry point `target` that lands inside a multi-word
+fn forged_entrypoint_into_instruction_interior_is_rejected() {
+    // Issue #457: an entrypoint `target` that lands inside a multi-word
     // instruction (not on a recorded instruction start) makes the VM begin
     // decoding mid-instruction. `target < word_count` is not enough — the load-time
-    // check holds entry points to the same instruction-start rule as successors.
+    // check holds entrypoints to the same instruction-start rule as successors.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, interior) = {
         let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
         (
-            m.offsets().entry_points as usize,
+            m.offsets().entrypoints as usize,
             first_multiword_interior_addr(&bytes).get(),
         )
     };
 
-    // `target` is the second u16 of the 8-byte entry point, after the name.
+    // `target` is the second u16 of the 8-byte entrypoint, after the name.
     bytes[ep_off + 2..ep_off + 4].copy_from_slice(&interior.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::validate_and_load(&bytes)
-        .expect_err("forged interior entry point must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged interior entrypoint must be rejected");
     assert!(
-        matches!(err, ModuleError::InvalidEntryPoint(_)),
-        "expected InvalidEntryPoint, got {err:?}"
+        matches!(err, ModuleError::InvalidEntrypoint(_)),
+        "expected InvalidEntrypoint, got {err:?}"
     );
 }
 
@@ -1045,7 +1045,7 @@ fn forged_entry_point_into_instruction_interior_is_rejected() {
 fn entry_and_call_targets_may_address_word_zero() {
     let bytes = emit_bytes(CALLER_OWNED_CALL_QUERY);
     let module = Module::validate_and_load(&bytes).expect("compiler output validates");
-    let first_entry = module.entry_points().get(0);
+    let first_entry = module.entrypoints().get(0);
     let call = first_call(&bytes, false);
 
     assert_eq!(first_entry.target(), CodeAddr::ZERO);
@@ -1284,7 +1284,7 @@ fn forged_record_entry_without_root_boundary_is_rejected() {
     let ep_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
-        .entry_points as usize;
+        .entrypoints as usize;
     bytes[ep_off + 6..ep_off + 8].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
@@ -1570,63 +1570,60 @@ fn forged_unknown_type_def_kind_is_rejected() {
 }
 
 #[test]
-fn forged_out_of_range_entry_point_target_is_rejected() {
+fn forged_out_of_range_entrypoint_target_is_rejected() {
     // The plain out-of-range case (vs the interior-target case above): `target >=
     // word_count` must be rejected before `is_start` is indexed.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let ep_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
-        .entry_points as usize;
+        .entrypoints as usize;
     bytes[ep_off + 2..ep_off + 4].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
 
     let err =
         Module::validate_and_load(&bytes).expect_err("forged out-of-range target must be rejected");
     assert!(
-        matches!(err, ModuleError::InvalidEntryPoint(_)),
-        "expected InvalidEntryPoint, got {err:?}"
+        matches!(err, ModuleError::InvalidEntrypoint(_)),
+        "expected InvalidEntrypoint, got {err:?}"
     );
 }
 
 #[test]
-fn forged_invalid_entry_point_boundary_is_rejected() {
+fn forged_invalid_entrypoint_boundary_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let ep_off = Module::validate_and_load(&bytes)
         .expect("module validates before tampering")
         .offsets()
-        .entry_points as usize;
+        .entrypoints as usize;
     bytes[ep_off + 6..ep_off + 8].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::validate_and_load(&bytes)
-        .expect_err("forged entry point boundary must be rejected");
+    let err =
+        Module::validate_and_load(&bytes).expect_err("forged entrypoint boundary must be rejected");
     assert!(
-        matches!(err, ModuleError::InvalidEntryPoint(_)),
-        "expected InvalidEntryPoint, got {err:?}"
+        matches!(err, ModuleError::InvalidEntrypoint(_)),
+        "expected InvalidEntrypoint, got {err:?}"
     );
 }
 
 #[test]
-fn forged_out_of_range_entry_point_result_type_is_rejected() {
+fn forged_out_of_range_entrypoint_result_type_is_rejected() {
     // `result_type` (u16 at entry+4) must address a real TypeDef, or the
     // materializer's root-frame TypeId lookup reads out of bounds. `type_defs_count`
     // is one past the last valid index.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, type_defs) = {
         let m = Module::validate_and_load(&bytes).expect("module validates before tampering");
-        (
-            m.offsets().entry_points as usize,
-            m.header().type_defs_count,
-        )
+        (m.offsets().entrypoints as usize, m.header().type_defs_count)
     };
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&type_defs.to_le_bytes());
     reseal(&mut bytes);
 
     let err = Module::validate_and_load(&bytes).expect_err("forged result_type must be rejected");
     assert!(
-        matches!(err, ModuleError::InvalidEntryPoint(_)),
-        "expected InvalidEntryPoint, got {err:?}"
+        matches!(err, ModuleError::InvalidEntrypoint(_)),
+        "expected InvalidEntrypoint, got {err:?}"
     );
 }
 
@@ -1836,7 +1833,7 @@ fn forged_oob_type_name_type_id_is_rejected() {
 /// Build a minimal-but-valid module whose only populated section is Instructions,
 /// carrying `instruction_word_count` bytecode words drawn from `instructions`.
 ///
-/// Everything else (strings, regex, types, entry points) is empty, which the
+/// Everything else (strings, regex, types, entrypoints) is empty, which the
 /// other `validate_*` passes accept: the empty string/regex tables collapse to a
 /// single zero sentinel that already lives in the zero-filled body. The checksum
 /// is recomputed the same way `Module::validate` checks it (CRC32 over the

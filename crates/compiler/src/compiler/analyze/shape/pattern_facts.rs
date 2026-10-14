@@ -175,7 +175,7 @@ impl PatternFacts {
         self.definition(def_id).nullable
     }
 
-    pub(crate) fn is_entry_point_eligible(&self, def_id: DefId) -> bool {
+    pub(crate) fn is_entrypoint_eligible(&self, def_id: DefId) -> bool {
         let facts = self.definition(def_id);
         facts.root_extent == RootExtent::SingleNode && !facts.context.requires_external_context()
     }
