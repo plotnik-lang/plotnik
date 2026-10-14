@@ -122,10 +122,9 @@ fn prepare_cases(cases: &[Case]) -> Result<Vec<RustCase<'_>>, String> {
 fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
     fs::create_dir_all(root.join("generated"))
         .map_err(|error| format!("create Rust staging tree: {error}"))?;
-    let mut shards: BTreeMap<&str, Vec<&RustCase<'_>>> = BTreeMap::new();
+    let mut shards: BTreeMap<&str, Vec<(&RustCase<'_>, bool)>> = BTreeMap::new();
 
     for case in cases {
-        shards.entry(&case.shard).or_default().push(case);
         let directory = case_directory(root, case);
         fs::create_dir_all(&directory).map_err(|error| {
             format!("create snapshot directory {}: {error}", directory.display())
@@ -145,9 +144,13 @@ fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
                 case.case.relative
             )
         })?;
-        let matcher = generate::source(case.case, &query_path)?;
+        let (matcher, match_only) = generate::source(case.case, &query_path)?;
         fs::write(directory.join("matcher.rs"), matcher.as_bytes())
             .map_err(|error| format!("write matcher for `{}`: {error}", case.case.relative))?;
+        shards
+            .entry(&case.shard)
+            .or_default()
+            .push((case, match_only));
     }
 
     for (shard, cases) in shards {
@@ -167,9 +170,9 @@ fn case_directory(root: &Path, case: &RustCase<'_>) -> PathBuf {
     root.join("generated").join(stem)
 }
 
-fn render_shard(cases: &[&RustCase<'_>]) -> String {
+fn render_shard(cases: &[(&RustCase<'_>, bool)]) -> String {
     let mut out = String::from("use plotnik_codegen_rust_tests::{Language, parse};\n\n");
-    for (index, case) in cases.iter().enumerate() {
+    for (index, (case, _)) in cases.iter().enumerate() {
         let relative = case
             .case
             .relative
@@ -182,7 +185,7 @@ fn render_shard(cases: &[&RustCase<'_>]) -> String {
         );
     }
     out.push('\n');
-    for (index, case) in cases.iter().enumerate() {
+    for (index, (case, match_only)) in cases.iter().enumerate() {
         let relative = case
             .case
             .relative
@@ -199,18 +202,40 @@ fn render_shard(cases: &[&RustCase<'_>]) -> String {
             &format!("generated/{relative}/expected"),
         );
         let _ = writeln!(out, "    let tree = parse(Language::{language}, source);");
-        let _ = writeln!(
-            out,
-            "    let actual = {module}::Q::parse_to_json(&tree, source)"
-        );
+        if *match_only {
+            let _ = writeln!(
+                out,
+                "    let actual = if {module}::Q::matches(&tree, source)"
+            );
+        } else {
+            let _ = writeln!(out, "    let actual = {module}::Q::parse(&tree, source)");
+        }
         let _ = writeln!(
             out,
             "        .expect(\"snapshot must stay within generated runtime limits\")"
         );
-        let _ = writeln!(
-            out,
-            "        .unwrap_or_else(|| \"<no match>\".to_string());"
-        );
+        if *match_only {
+            let _ = writeln!(out, "    {{");
+            let _ = writeln!(out, "        \"null\".to_string()");
+            let _ = writeln!(out, "    }} else {{");
+            let _ = writeln!(out, "        \"<no match>\".to_string()");
+            let _ = writeln!(out, "    }};");
+        } else {
+            let _ = writeln!(out, "        .map(|value| {{");
+            let _ = writeln!(
+                out,
+                "            plotnik_runtime::debug::to_json(&plotnik_runtime::WithSource::new(&value, source))"
+            );
+            let _ = writeln!(
+                out,
+                "                .expect(\"generated result serializes\")"
+            );
+            let _ = writeln!(out, "        }})");
+            let _ = writeln!(
+                out,
+                "        .unwrap_or_else(|| \"<no match>\".to_string());"
+            );
+        }
         let _ = writeln!(out);
         let _ = writeln!(out, "    assert_eq!(expected, actual);");
         let _ = writeln!(out, "}}\n");

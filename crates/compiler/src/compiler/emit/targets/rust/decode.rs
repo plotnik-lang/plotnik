@@ -160,11 +160,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
 
     /// The `parse`/`matches` surface, one block per selectable definition.
     /// Selectable definitions are nominal (`parse` + `matches`) or match-only (`matches`).
-    pub(super) fn parse_api(
-        &self,
-        entry_points: impl Iterator<Item = DefId>,
-        debug: bool,
-    ) -> String {
+    pub(super) fn parse_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entry_points {
             let name = self.definitions.definition(def_id).name();
@@ -173,14 +169,12 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             let item = self.decode.item(name);
             match item.kind {
                 DecodeItemKind::Record(_) | DecodeItemKind::Variant(_) => {
-                    self.parse_impl(&mut out, &def, item, debug);
+                    self.parse_impl(&mut out, &def, item);
                 }
                 DecodeItemKind::Alias(_) => {
                     unreachable!("selectable definitions are nominal or match-only")
                 }
-                DecodeItemKind::MatchOnlyDefinition => {
-                    self.matches_impl(&mut out, &def, item, debug)
-                }
+                DecodeItemKind::MatchOnlyDefinition => self.matches_impl(&mut out, &def, item),
             }
         }
         out
@@ -188,21 +182,17 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
 
     /// `matches` for a match-only definition: it can only answer matched-or-not, and
     /// the public API is always metered.
-    fn matches_impl(&self, out: &mut String, def: &str, item: &DecodeItem, debug: bool) {
+    fn matches_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
         let ident = self.model.item_ident(item.name);
         let _ = writeln!(out, "impl {ident} {{");
         self.inherent_matches_method(out, def);
-        if debug {
-            let _ = writeln!(out);
-            self.match_only_debug_method(out);
-        }
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
         self.matches_trait_impl(out, item);
     }
 
     /// Inherent `parse`/`matches` on a nominal Rust result type (`struct` or `enum`).
-    fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem, debug: bool) {
+    fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
         let sig = InherentParseSignature::for_item(self.model, item);
         let decoder_fn = self.decoder_fn(item.name);
         let journal_fn = limited_journal_fn_name(def);
@@ -259,10 +249,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out);
         self.inherent_matches_method(out, def);
-        if debug {
-            let _ = writeln!(out);
-            self.result_debug_method(out, &sig);
-        }
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
         self.matches_trait_impl(out, item);
@@ -284,60 +270,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             "    ) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
         );
         let _ = writeln!(out, "        matcher::{matches_fn}(tree, source)");
-        let _ = writeln!(out, "    }}");
-    }
-
-    fn result_debug_method(&self, out: &mut String, sig: &InherentParseSignature) {
-        let _ = writeln!(
-            out,
-            "    /// Parse and render this result as canonical debug JSON."
-        );
-        let _ = writeln!(out, "    pub fn parse_to_json(");
-        let _ = writeln!(out, "        tree: {},", sig.tree_ref);
-        let _ = writeln!(out, "        source: {},", sig.source_ref);
-        let _ = writeln!(
-            out,
-            "    ) -> ::core::result::Result<::core::option::Option<::std::string::String>, rt::LimitExceeded>"
-        );
-        let _ = writeln!(out, "    {{");
-        let _ = writeln!(
-            out,
-            "        let Some(value) = Self::parse(tree, source)? else {{"
-        );
-        let _ = writeln!(out, "            return Ok(None);");
-        let _ = writeln!(out, "        }};");
-        let _ = writeln!(
-            out,
-            "        let json = rt::debug::to_json(&rt::WithSource::new(&value, source))"
-        );
-        let _ = writeln!(
-            out,
-            "            .expect(\"generated result must serialize to debug JSON\");"
-        );
-        let _ = writeln!(out, "        Ok(Some(json))");
-        let _ = writeln!(out, "    }}");
-    }
-
-    fn match_only_debug_method(&self, out: &mut String) {
-        let _ = writeln!(
-            out,
-            "    /// Match and render the match-only result as debug JSON null."
-        );
-        let _ = writeln!(out, "    pub fn parse_to_json(");
-        let _ = writeln!(out, "        tree: &rt::Tree,");
-        let _ = writeln!(out, "        source: &str,");
-        let _ = writeln!(
-            out,
-            "    ) -> ::core::result::Result<::core::option::Option<::std::string::String>, rt::LimitExceeded>"
-        );
-        let _ = writeln!(out, "    {{");
-        let _ = writeln!(out, "        if !Self::matches(tree, source)? {{");
-        let _ = writeln!(out, "            return Ok(None);");
-        let _ = writeln!(out, "        }}");
-        let _ = writeln!(
-            out,
-            "        Ok(Some(::std::string::String::from(\"null\")))"
-        );
         let _ = writeln!(out, "    }}");
     }
 

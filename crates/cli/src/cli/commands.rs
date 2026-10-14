@@ -77,7 +77,6 @@ binding."#,
         .arg(cache_dir_arg())
         .next_help_heading("Generation options")
         .arg(target_arg())
-        .arg(debug_arg())
         .arg(output_file_arg())
         .next_help_heading("Global options")
         .arg(color_arg())

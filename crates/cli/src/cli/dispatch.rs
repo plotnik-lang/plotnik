@@ -125,7 +125,6 @@ pub struct GenerateOpts {
     pub language: LanguageOptions,
     pub target: GenerateTarget,
     pub output: Option<PathBuf>,
-    pub debug: bool,
     pub color: ColorChoice,
 }
 
@@ -140,7 +139,6 @@ impl GenerateOpts {
                 .copied()
                 .expect("clap guarantees --target is present"),
             output: m.get_one::<PathBuf>("output").cloned(),
-            debug: m.get_flag("debug"),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -154,7 +152,6 @@ impl From<GenerateOpts> for GenerateArgs {
             language: p.language,
             target: p.target,
             output: p.output,
-            debug: p.debug,
             color: p.color.should_colorize(),
         }
     }

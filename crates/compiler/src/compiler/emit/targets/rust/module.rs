@@ -255,7 +255,6 @@ impl<'a> Generator<'a> {
                     .entry_points()
                     .iter()
                     .map(|entry| entry.definition),
-                self.config.debug,
             ),
         );
         out.push_str(&decoders.decoders());

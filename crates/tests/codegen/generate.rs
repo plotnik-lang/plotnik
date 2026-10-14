@@ -1,14 +1,16 @@
 use std::fs;
 use std::path::Path;
 
+use plotnik_compiler::bytecode::type_system::TYPE_NO_VALUE;
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 use plotnik_compiler::{
-    CodegenProvenance, GrammarIdentity, QueryBuilder, RustCodegenConfig, SourceMap, SourcePath,
+    BytecodeConfig, CodegenProvenance, GrammarIdentity, QueryBuilder, RustCodegenConfig, SourceMap,
+    SourcePath,
 };
 
 use crate::corpus::Case;
 
-pub(crate) fn source(case: &Case, query_path: &Path) -> Result<String, String> {
+pub(crate) fn source(case: &Case, query_path: &Path) -> Result<(String, bool), String> {
     let bytes = fs::read(&case.grammar_json)
         .map_err(|error| format!("read grammar {}: {error}", case.grammar_json.display()))?;
     let json = std::str::from_utf8(&bytes).map_err(|error| {
@@ -44,10 +46,23 @@ pub(crate) fn source(case: &Case, query_path: &Path) -> Result<String, String> {
         return Err(format!("compilation failed for `{}`", case.relative));
     }
 
+    // The VM corpus renders match-only success as null. Project only that
+    // presentation difference, using the query's result type, not its expected output.
+    let module = compiled
+        .emit(BytecodeConfig::new())
+        .map_err(|error| format!("emit corpus metadata for `{}`: {error}", case.relative))?
+        .into_artifact()
+        .expect("valid corpus query emits bytecode");
+    let match_only = module
+        .entry_point("Q")
+        .expect("corpus entry Q exists")
+        .result_type()
+        == TYPE_NO_VALUE.into();
+
     let emission = compiled
         .emit(
             RustCodegenConfig::new()
-                .debug(true)
+                .serde(true)
                 .provenance(CodegenProvenance::Full),
         )
         .map_err(|error| format!("emit Rust matcher for `{}`: {error}", case.relative))?;
@@ -65,6 +80,6 @@ pub(crate) fn source(case: &Case, query_path: &Path) -> Result<String, String> {
 
     emission
         .into_artifact()
-        .map(|artifact| artifact.into_source())
+        .map(|artifact| (artifact.into_source(), match_only))
         .ok_or_else(|| format!("Rust emission produced no matcher for `{}`", case.relative))
 }

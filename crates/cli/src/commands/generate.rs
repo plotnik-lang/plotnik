@@ -21,7 +21,6 @@ pub struct GenerateArgs {
     pub language: LanguageOptions,
     pub target: GenerateTarget,
     pub output: Option<PathBuf>,
-    pub debug: bool,
     pub color: bool,
 }
 
@@ -51,11 +50,7 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
     match args.target {
         GenerateTarget::Rust => {
             let emission = compiled
-                .emit(
-                    RustCodegenConfig::new()
-                        .debug(args.debug)
-                        .provenance(CodegenProvenance::Full),
-                )
+                .emit(RustCodegenConfig::new().provenance(CodegenProvenance::Full))
                 .map_err(|error| CliError::fatal(error.to_string()))?;
             let has_errors = emission.diagnostics().has_errors();
             if !emission.diagnostics().is_empty() {

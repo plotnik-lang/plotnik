@@ -139,13 +139,6 @@ pub fn target_arg() -> Arg {
         .help("Generated-code target (rust)")
 }
 
-pub fn debug_arg() -> Arg {
-    Arg::new("debug")
-        .long("debug")
-        .action(ArgAction::SetTrue)
-        .help("Include target-specific debug support in generated code")
-}
-
 pub fn compact_arg() -> Arg {
     Arg::new("compact")
         .long("compact")
