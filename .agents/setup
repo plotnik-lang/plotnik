@@ -13,14 +13,14 @@ step() {
 
 # Stale snapshots already contain these packages; avoid refreshing apt there.
 packages=()
-for package in build-essential cmake curl ca-certificates pkg-config libssl-dev clang llvm xz-utils; do
+for package in build-essential cmake curl ca-certificates xz-utils; do
     if [[ "$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)" != 'install ok installed' ]]; then
         packages+=("$package")
     fi
 done
 if ((${#packages[@]})); then
     step 'Refresh system package index' sudo apt-get update
-    step 'Install native and WebAssembly build tools' sudo env DEBIAN_FRONTEND=noninteractive \
+    step 'Install native Rust build prerequisites' sudo env DEBIAN_FRONTEND=noninteractive \
         apt-get install -y --no-install-recommends "${packages[@]}"
 fi
 
@@ -36,17 +36,11 @@ toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
 if ! rustup run "$toolchain" rustc --version >/dev/null 2>&1; then
     step 'Install repository Rust toolchain' rustup toolchain install "$toolchain" --profile minimal
 fi
-step 'Ensure Rust lint, format, coverage and WASM components' rustup component add \
-    --toolchain "$toolchain" rustfmt clippy llvm-tools-preview
-step 'Ensure WASM target' rustup target add --toolchain "$toolchain" wasm32-unknown-unknown
-if ! rustup run nightly rustc --version >/dev/null 2>&1; then
-    step 'Install nightly coverage toolchain' rustup toolchain install nightly \
-        --profile minimal
-fi
-step 'Ensure nightly coverage components' rustup component add --toolchain nightly llvm-tools-preview
+step 'Ensure Rust lint and format components' rustup component add \
+    --toolchain "$toolchain" rustfmt clippy
 
 # Amp and supervised services use new login shells, not this setup process.
-# The Makefile defaults to Homebrew LLVM; Debian's tools live under /usr.
+# Optional WASM tasks use Debian LLVM under /usr, not the Makefile's Homebrew default.
 profile_marker='# Plotnik orb toolchain'
 if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
     cat >> "$HOME/.bash_profile" <<EOF
@@ -73,46 +67,22 @@ EOF
 fi
 source "$repo_root/.agents/environment"
 
-# Download official CLI binaries instead of compiling each tool in every cold orb.
-tools_dir="$(mktemp -d)"
-trap 'rm -rf "$tools_dir"' EXIT
-install_tool() {
-    local name="$1" url="$2" strip="$3"
-    curl -fsSL --retry 3 "$url" -o "$tools_dir/archive"
-    tar -xf "$tools_dir/archive" -C "$tools_dir" --strip-components="$strip"
-    install -m 0755 "$tools_dir/$name" "$CARGO_HOME/bin/$name"
-}
-
+# Snapshot updates are part of ordinary Rust development. Use the official binary
+# rather than compiling the CLI in each cold orb.
 insta_version="$(sed -n '/^name = "insta"$/ {n;s/^version = "\(.*\)"/\1/p;}' Cargo.lock)"
 if [[ "$(cargo insta --version 2>/dev/null || true)" != "cargo-insta $insta_version" ]]; then
-    step 'Install snapshot CLI matching Cargo.lock' install_tool cargo-insta \
-        "https://github.com/mitsuhiko/insta/releases/download/$insta_version/cargo-insta-x86_64-unknown-linux-gnu.tar.xz" 1
-fi
-if ! command -v cargo-llvm-cov >/dev/null; then
-    step 'Install coverage CLI' install_tool cargo-llvm-cov \
-        'https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.9.1/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz' 0
-fi
-wasm_version="$(sed -n '/^name = "wasm-bindgen"$/ {n;s/^version = "\(.*\)"/\1/p;}' Cargo.lock)"
-if [[ "$(wasm-bindgen --version 2>/dev/null || true)" != "wasm-bindgen $wasm_version" ]]; then
-    step 'Install WASM bindings CLI matching Cargo.lock' install_tool wasm-bindgen \
-        "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$wasm_version/wasm-bindgen-$wasm_version-x86_64-unknown-linux-musl.tar.gz" 1
-fi
-# Upstream's Linux binary requires glibc 2.39; Debian 12 has 2.36.
-# A debug build avoids optimizing this development-only CLI. Node handles grammar.js
-# instead of compiling the optional embedded JavaScript runtime.
-if [[ "$(tree-sitter --version 2>/dev/null || true)" != 'tree-sitter 0.26.10'* ]]; then
-    step 'Build Debian-compatible grammar CLI matching CI' cargo install --locked --debug \
-        --version 0.26.10 --no-default-features tree-sitter-cli
+    tools_dir="$(mktemp -d)"
+    trap 'rm -rf "$tools_dir"' EXIT
+    step 'Download snapshot CLI matching Cargo.lock' curl -fsSL --retry 3 \
+        "https://github.com/mitsuhiko/insta/releases/download/$insta_version/cargo-insta-x86_64-unknown-linux-gnu.tar.xz" \
+        -o "$tools_dir/archive"
+    tar -xf "$tools_dir/archive" -C "$tools_dir" --strip-components=1
+    install -m 0755 "$tools_dir/cargo-insta" "$CARGO_HOME/bin/cargo-insta"
 fi
 
+# Fetch dependencies without compiling source-dependent artifacts at startup.
 step 'Cache workspace Rust dependencies' cargo fetch --locked
 step 'Cache generated-code test dependencies' cargo fetch --locked \
     --manifest-path crates/tests/codegen/rust/Cargo.toml
-step 'Install locked web dependencies' npm ci --prefix web --no-audit --no-fund
-step 'Cache repository formatter' npx --yes prettier --version
 
-# The playground imports these ignored files, so npm dependencies alone are insufficient.
-# Cargo reuses the restored target directory when neither source nor toolchain changed.
-step 'Generate playground WASM bindings' make wasm-web
-
-printf '\nPlotnik orb dependencies are ready.\n'
+printf '\nPlotnik Rust development dependencies are ready.\n'
