@@ -19,9 +19,6 @@ edition = "2024"
 plotnik-compiler = { path = "crates/compiler", version = "0.4.0" }
 plotnik-runtime = { path = "crates/runtime", version = "0.4.0" }
 
-[workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
-
 [workspace.lints.clippy]
 unwrap_used = "deny"
 

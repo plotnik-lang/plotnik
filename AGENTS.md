@@ -56,7 +56,6 @@ Do not add:
 | `make test [FILTER=...]` | full test suite via native Rust test harnesses |
 | `make shot [FILTER=...]` | update custom + Insta snapshots, then re-run   |
 | `make fmt`               | `cargo fmt` + prettier                         |
-| `make coverage-lines`    | per-file missing lines for `plotnik-compiler`  |
 
 Check your changes: `make test`
 Before commit: `make fmt`

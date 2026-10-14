@@ -14,8 +14,6 @@
 //! eprintln!("{}", query.diagnostics().render(query.source_map()));
 //! ```
 
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 #[doc(hidden)]
 pub mod bytecode;
 mod compiler;

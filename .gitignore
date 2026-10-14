@@ -28,13 +28,6 @@ tmp/
 /crates/tests/codegen/rust/tests/
 /crates/tests/codegen/rust/tests.pending-*/
 
-# Code coverage
-lcov.info
-*.profraw
-*.profdata
-/target/llvm-cov-target/
-/target/coverage/
-
 # Impeccable
 PRODUCT.md
 .impeccable/

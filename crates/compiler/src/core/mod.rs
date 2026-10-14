@@ -3,7 +3,6 @@
 pub mod colors;
 pub mod grammar;
 mod interner;
-mod invariants;
 #[cfg(feature = "vm")]
 mod tree_dump;
 pub mod utils;

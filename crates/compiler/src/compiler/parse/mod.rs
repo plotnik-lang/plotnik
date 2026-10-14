@@ -28,7 +28,6 @@ pub(crate) mod strings;
 mod token_set;
 
 mod grammar;
-mod invariants;
 mod parser;
 
 #[cfg(test)]

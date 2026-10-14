@@ -1,7 +1,6 @@
 //! Mixed-labeling alternation diagnostic.
 
 use super::ValidationInput;
-use crate::compiler::analyze::shape::invariants::ensure_both_labeling_kinds;
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{Alternative, Labeling, Pattern};
@@ -28,7 +27,10 @@ pub fn validate_alternative_labels(input: ValidationInput) {
         let alternatives: Vec<Alternative> = alternation.alternatives().collect();
         let first_labeled = alternatives.iter().find(|a| a.label().is_some());
         let first_unlabeled = alternatives.iter().find(|a| a.label().is_none());
-        let (labeled, unlabeled) = ensure_both_labeling_kinds(first_labeled, first_unlabeled);
+        let (labeled, unlabeled) = match (first_labeled, first_unlabeled) {
+            (Some(labeled), Some(unlabeled)) => (labeled, unlabeled),
+            _ => panic!("mixed labeling without both labeled and unlabeled alternatives"),
+        };
 
         let labeled_range = labeled
             .label()

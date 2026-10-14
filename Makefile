@@ -1,4 +1,4 @@
-.PHONY: check clippy test codegen-rust lint-codegen-rust test-codegen-rust bench coverage coverage-lines check-wasm wasm-web clean
+.PHONY: check clippy test codegen-rust lint-codegen-rust test-codegen-rust bench check-wasm wasm-web clean
 
 LLVM_PREFIX ?= /opt/homebrew/opt/llvm
 WASM_CC ?= $(LLVM_PREFIX)/bin/clang
@@ -119,13 +119,6 @@ bench:
 		--bench $(BENCH) \
 		-- $(FILTER)
 
-coverage-lines:
-	@cargo llvm-cov \
-		--workspace \
-		--text \
-		--show-missing-lines \
-		2>/dev/null | grep '\.rs: [0-9]' | sed 's|.*/crates/|crates/|'
-
 check-wasm:
 	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
 		AR_wasm32_unknown_unknown="$(WASM_AR)" \
@@ -144,15 +137,6 @@ wasm-web:
 		--target web \
 		--out-dir web/src/lib/plotnik-web \
 		target/wasm32-unknown-unknown/release/plotnik_web.wasm
-
-coverage:
-	@cargo +nightly llvm-cov \
-		--all-features \
-		--workspace \
-		--lcov \
-		--output-path lcov.info \
-		-- \
-		--skip macro_diagnostics
 
 fmt:
 	@cargo fmt --quiet

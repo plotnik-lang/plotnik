@@ -89,7 +89,7 @@ pub struct Parser<'q, 'd> {
     pub(super) depth: u32,
     pub(super) reported_diagnostic_starts: HashSet<TextSize>,
     delimiter_stack: Vec<OpenDelimiter>,
-    pub(super) stall_guard: std::cell::Cell<u32>,
+    stall_guard: std::cell::Cell<u32>,
     pub(crate) fuel_remaining: u32,
     pub(crate) max_depth: u32,
     pub(crate) fatal_error: Option<Error>,
@@ -145,12 +145,27 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.nth_raw(0)
     }
 
+    #[inline]
+    pub(super) fn assert_current(&mut self, expected_kind: SyntaxKind) {
+        let current_kind = self.current();
+        assert_eq!(
+            current_kind, expected_kind,
+            "broken parser invariant: expected {:?} but found {:?} (upstream caller's responsibility)",
+            expected_kind, current_kind,
+        );
+    }
+
     fn reset_stall_guard(&self) {
         self.stall_guard.set(MAX_STALL_LOOKAHEADS);
     }
 
     pub(super) fn nth_raw(&self, lookahead: usize) -> SyntaxKind {
-        self.ensure_progress();
+        assert!(
+            self.stall_guard.get() != 0,
+            "parser is stuck: too many lookaheads"
+        );
+        self.stall_guard.set(self.stall_guard.get() - 1);
+
         self.tokens
             .get(self.pos + lookahead)
             .map_or(SyntaxKind::Error, |t| t.kind)
