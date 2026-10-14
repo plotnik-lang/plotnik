@@ -163,9 +163,9 @@ impl Default for RuntimeLimitSpec {
 }
 
 impl RuntimeLimitSpec {
-    /// Resolve `Auto` limits against the source tree's node count, producing the
-    /// concrete ceilings the VM enforces. `source_nodes` is
-    /// `tree.root_node().descendant_count()` (O(1) in tree-sitter).
+    /// Resolve `Auto` limits once against the operation scope's node count.
+    /// `source_nodes` is `scope.descendant_count()` (O(1) in Tree-sitter).
+    /// Traversal and all candidate applications share the resulting fuel.
     pub fn resolve(self, source_nodes: u32) -> ResolvedRuntimeLimits {
         ResolvedRuntimeLimits {
             fuel_limit: self.fuel_limit.resolve(auto_fuel(source_nodes)),
@@ -177,7 +177,7 @@ impl RuntimeLimitSpec {
 /// The concrete per-resource ceilings for one run. `None` means unbounded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ResolvedRuntimeLimits {
-    /// Available matcher fuel, or `None` for unbounded.
+    /// Available operation fuel, or `None` for unbounded.
     pub fuel_limit: Option<u64>,
     /// Maximum live runtime heap in bytes, or `None` for unbounded.
     pub max_memory: Option<u64>,

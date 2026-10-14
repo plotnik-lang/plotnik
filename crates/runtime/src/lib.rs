@@ -24,6 +24,8 @@ mod cursor;
 #[cfg(feature = "execution")]
 mod engine;
 #[cfg(feature = "execution")]
+mod execution;
+#[cfg(feature = "execution")]
 mod journal;
 #[cfg(feature = "execution")]
 mod result_decoder;
@@ -49,6 +51,9 @@ pub use node_class::{NodeClass, SkipClass};
 pub use cursor::CursorWrapper;
 #[cfg(feature = "execution")]
 pub use engine::Engine;
+#[cfg(feature = "execution")]
+#[doc(hidden)]
+pub use execution::{ExecutionBudget, Traversal};
 #[cfg(feature = "execution")]
 pub use journal::{JournalEvent, MatchJournal, OutputEvents, node_text, source_text};
 #[cfg(feature = "execution")]

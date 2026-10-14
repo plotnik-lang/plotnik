@@ -1,31 +1,29 @@
 //! Virtual machine for executing compiled Plotnik queries.
 
-use tree_sitter::Tree;
+use tree_sitter::{Node, Tree};
 
+use crate::bytecode::type_system::TYPE_NO_VALUE;
 use crate::bytecode::{
     CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind,
     EntryBoundary, EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp,
 };
 
-use crate::core::NodeFieldId;
+use crate::core::{Colors, NodeFieldId};
 
 use plotnik_runtime::{
-    CallResume, Checkpoint, Engine, JournalEvent, MatchJournal, PortId, ResolvedRuntimeLimits,
-    Resume, RuntimeLimitSpec, SkipPolicy,
+    CallResume, Checkpoint, Engine, ExecutionBudget, JournalEvent, LimitExceeded, MatchJournal,
+    PortId, ResolvedRuntimeLimits, Resume, RuntimeLimitSpec, SkipPolicy, Traversal,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
+use super::materializer::materialize_verified;
 use super::trace::{NoopTracer, Tracer};
-use super::value::node_text;
-
-/// Bitmask selecting the matcher dispatches on which the memory ceiling is
-/// sampled; must be a power of two minus one.
-const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
+use super::value::{NodeValue, Value, node_text};
 
 /// Resource usage observed during one VM run.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct RunStats {
-    /// Fuel consumed by matcher execution. Each matcher dispatch currently
+    /// Fuel consumed by execution. Each matcher dispatch currently
     /// consumes one unit; this is not a stable cross-version performance metric.
     pub fuel_used: u64,
     /// Peak live runtime heap observed at memory-sampling points and run exit.
@@ -44,7 +42,6 @@ pub struct VM<'s, 't> {
     /// Current address in the decoded instruction stream.
     pub(crate) ip: CodeAddr,
 
-    pub(crate) fuel_used: u64,
     pub(crate) limits: ResolvedRuntimeLimits,
 
     pub(crate) source: &'s str,
@@ -52,43 +49,116 @@ pub struct VM<'s, 't> {
 
 pub struct VMBuilder<'s, 't> {
     source: &'s str,
-    tree: &'t Tree,
+    node: Node<'t>,
     spec: RuntimeLimitSpec,
 }
 
 impl<'s, 't> VMBuilder<'s, 't> {
     pub fn new(source: &'s str, tree: &'t Tree) -> Self {
+        Self::at_node(source, tree.root_node())
+    }
+
+    /// Start at a supplied node. Matching cannot leave this node's subtree.
+    pub fn at_node(source: &'s str, node: Node<'t>) -> Self {
         Self {
             source,
-            tree,
+            node,
             spec: RuntimeLimitSpec::default(),
         }
     }
 
     /// Set the runtime limit policy. `Auto` limits are sized from the source
-    /// tree's node count when [`Self::build`] resolves them.
+    /// scope's node count when [`Self::build`] resolves them.
     pub fn limits(mut self, spec: RuntimeLimitSpec) -> Self {
         self.spec = spec;
         self
     }
 
-    /// Build the VM, resolving `Auto` limits against the source's node count.
+    /// Build the VM, resolving `Auto` limits once against the scope's node count.
     pub fn build(self) -> VM<'s, 't> {
-        let source_nodes =
-            u32::try_from(self.tree.root_node().descendant_count()).unwrap_or(u32::MAX);
-        VM {
-            engine: Engine::new(self.tree.walk()),
-            ip: CodeAddr::ZERO,
-            fuel_used: 0,
-            limits: self.spec.resolve(source_nodes),
-            source: self.source,
-        }
+        let source_nodes = u32::try_from(self.node.descendant_count()).unwrap_or(u32::MAX);
+        VM::at_node(self.source, self.node, self.spec.resolve(source_nodes))
     }
 }
 
 impl<'s, 't> VM<'s, 't> {
+    fn at_node(source: &'s str, node: Node<'t>, limits: ResolvedRuntimeLimits) -> Self {
+        VM {
+            engine: Engine::new(node.walk()),
+            ip: CodeAddr::ZERO,
+            limits,
+            source,
+        }
+    }
+
     pub fn builder(source: &'s str, tree: &'t Tree) -> VMBuilder<'s, 't> {
         VMBuilder::new(source, tree)
+    }
+
+    /// Apply an emitted, independently eligible entry at the supplied node.
+    /// Match-only entries return that node in the VM's existing value format.
+    /// A suitable entry applied to the wrong node is ordinary `None`.
+    pub fn apply(
+        self,
+        module: &'s Module,
+        entry_point: &EntryPoint,
+    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
+        let mut budget = ExecutionBudget::new(self.limits);
+        self.apply_budgeted(module, entry_point, &mut budget)
+    }
+
+    /// Lazily apply one preferred result per candidate in inclusive preorder.
+    /// All traversal and matching work shares the limits already resolved for
+    /// this VM's scope. Quantifier collections remain inside each result.
+    pub fn traverse(
+        self,
+        module: &'s Module,
+        entry_point: EntryPoint,
+    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
+        Traversal::new(
+            self.engine.node(),
+            ExecutionBudget::new(self.limits),
+            move |node, budget: &mut ExecutionBudget| {
+                Self::at_node(self.source, node, budget.limits()).apply_budgeted(
+                    module,
+                    &entry_point,
+                    budget,
+                )
+            },
+        )
+    }
+
+    fn apply_budgeted(
+        self,
+        module: &'s Module,
+        entry_point: &EntryPoint,
+        budget: &mut ExecutionBudget,
+    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
+        let node = self.engine.node();
+        let source = self.source;
+        let (result, _) = self.execute_budgeted(module, entry_point, &mut NoopTracer, budget);
+        let journal = match result {
+            Ok(journal) => journal,
+            Err(RuntimeError::NoMatch) => return Ok(None),
+            Err(RuntimeError::OutOfFuel(limit)) => return Err(LimitExceeded::OutOfFuel(limit)),
+            Err(RuntimeError::MemoryLimitExceeded { used, limit }) => {
+                return Err(LimitExceeded::Memory { used, limit });
+            }
+            Err(RuntimeError::CallFrame(error)) => return Err(error.into()),
+        };
+
+        // NoValue is the emitted match-only capability, not an absent capture.
+        if u16::from(entry_point.result_type()) == TYPE_NO_VALUE {
+            return Ok(Some(Value::Node(NodeValue::from_node(node, source))));
+        }
+
+        Ok(Some(materialize_verified(
+            source,
+            module,
+            entry_point,
+            journal.output_events(),
+            Colors::new(false),
+        )))
     }
 
     /// Checkpoint that, on backtrack, advances the cursor and re-enters the
@@ -126,10 +196,21 @@ impl<'s, 't> VM<'s, 't> {
 
     /// Execute query with a tracer and report run statistics.
     pub fn execute_with_stats<T: Tracer>(
+        self,
+        module: &Module,
+        entry_point: &EntryPoint,
+        tracer: &mut T,
+    ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
+        let mut budget = ExecutionBudget::new(self.limits);
+        self.execute_budgeted(module, entry_point, tracer, &mut budget)
+    }
+
+    fn execute_budgeted<T: Tracer>(
         mut self,
         module: &Module,
         entry_point: &EntryPoint,
         tracer: &mut T,
+        budget: &mut ExecutionBudget,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
         self.ip = entry_point.target();
         if T::ENABLED {
@@ -142,27 +223,23 @@ impl<'s, 't> VM<'s, 't> {
 
         loop {
             // One matcher dispatch currently consumes one fuel unit.
-            if let Some(limit) = self.limits.fuel_limit
-                && self.fuel_used >= limit
-            {
-                let stats = self.finish_stats(&mut peak_live_heap_bytes);
+            if let Err(error) = budget.charge() {
+                let LimitExceeded::OutOfFuel(limit) = error else {
+                    unreachable!("charging fuel only reports fuel exhaustion");
+                };
+                let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);
                 return (Err(RuntimeError::OutOfFuel(limit)), stats);
             }
-            self.fuel_used += 1;
 
-            // Memory ceiling: bound the live runtime heap, sampled every
-            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-dispatch growth is bounded
-            // (≤30 checkpoints + ≤15 effects + 1 frame + ≤1 pooled snapshot
-            // ≈ 4.4 KiB), so sampling every 1024 dispatches bounds the unobserved
-            // overshoot to ~4.5 MiB — noise against the ≥64 MiB auto ceiling.
-            // `None` opts out (Unbounded), but the sample still feeds stats.
-            if self.fuel_used & MEMORY_SAMPLE_MASK == 0 {
+            // The shared budget schedules live matcher-heap samples across
+            // applications. Unbounded memory still samples for run statistics.
+            if budget.memory_sample_due() {
                 let used = self.engine.heap_bytes();
                 peak_live_heap_bytes = peak_live_heap_bytes.max(used);
                 if let Some(max) = self.limits.max_memory
                     && used > max
                 {
-                    let stats = self.finish_stats_with(&mut peak_live_heap_bytes, used);
+                    let stats = self.finish_stats_with(&mut peak_live_heap_bytes, used, budget);
                     return (
                         Err(RuntimeError::MemoryLimitExceeded { used, limit: max }),
                         stats,
@@ -202,11 +279,11 @@ impl<'s, 't> VM<'s, 't> {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
                 Err(Signal::Flow(ControlFlow::Accept)) => {
                     self.finish_entry(boundary, tracer);
-                    let stats = self.finish_stats(&mut peak_live_heap_bytes);
+                    let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);
                     return (Ok(self.engine.into_journal()), stats);
                 }
                 Err(Signal::Error(e)) => {
-                    let stats = self.finish_stats(&mut peak_live_heap_bytes);
+                    let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);
                     return (Err(e), stats);
                 }
             }
@@ -228,15 +305,20 @@ impl<'s, 't> VM<'s, 't> {
         self.emit_effect(Effect::new(kind, 0), tracer);
     }
 
-    fn finish_stats(&self, peak_live_heap_bytes: &mut u64) -> RunStats {
+    fn finish_stats(&self, peak_live_heap_bytes: &mut u64, budget: &ExecutionBudget) -> RunStats {
         let used = self.engine.heap_bytes();
-        self.finish_stats_with(peak_live_heap_bytes, used)
+        self.finish_stats_with(peak_live_heap_bytes, used, budget)
     }
 
-    fn finish_stats_with(&self, peak_live_heap_bytes: &mut u64, used: u64) -> RunStats {
+    fn finish_stats_with(
+        &self,
+        peak_live_heap_bytes: &mut u64,
+        used: u64,
+        budget: &ExecutionBudget,
+    ) -> RunStats {
         *peak_live_heap_bytes = (*peak_live_heap_bytes).max(used);
         RunStats {
-            fuel_used: self.fuel_used,
+            fuel_used: budget.fuel_used(),
             peak_live_heap_bytes: *peak_live_heap_bytes,
         }
     }

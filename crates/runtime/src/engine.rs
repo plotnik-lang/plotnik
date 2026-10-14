@@ -23,9 +23,9 @@ use crate::{
 
 /// Execution state shared by the bytecode VM and generated matchers.
 ///
-/// Instruction pointers, fuel budgets, and limit policy stay with the
-/// executor: they are dispatch concerns, and each executor represents "where
-/// am I" differently (decoded code address vs. generated state id).
+/// Instruction pointers stay with the executor, which represents the current
+/// instruction differently (decoded code address vs. generated state id).
+/// The operation's budget lives outside this rollbackable application state.
 pub struct Engine<'t> {
     cursor: CursorWrapper<'t>,
     frames: FrameArena,
@@ -52,8 +52,8 @@ pub struct Engine<'t> {
 }
 
 impl<'t> Engine<'t> {
-    /// Start an engine at `cursor`'s position (executors pass a root cursor;
-    /// see [`CursorWrapper`]'s shared-root invariant).
+    /// Start an engine with a cursor rooted at the application node.
+    /// See [`CursorWrapper`]'s shared-root invariant.
     pub fn new(cursor: TreeCursor<'t>) -> Self {
         Self::with_initial_suppression(cursor, 0)
     }

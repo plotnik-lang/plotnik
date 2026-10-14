@@ -58,10 +58,10 @@ impl UpMode {
 
 /// Wrapper around TreeCursor with Plotnik navigation semantics.
 ///
-/// Critical: The cursor is created at tree root; pooled snapshots are clones of
-/// that root-created cursor, and `reset_to` copies the root along with the
-/// stack. Every cursor in play therefore shares a root, so `descendant_index`
-/// stays root-relative for O(1) checkpoint saves and O(depth) restores.
+/// Critical: The cursor is rooted at the application node, which need not be
+/// the tree root. Pooled snapshots clone that cursor, and `reset_to` copies its
+/// root along with the stack. Every cursor within an application shares a root,
+/// so descendant indices remain scope-relative and navigation cannot escape.
 pub struct CursorWrapper<'t> {
     cursor: TreeCursor<'t>,
     snapshots: SnapshotPool<'t>,

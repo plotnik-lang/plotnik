@@ -105,10 +105,6 @@ mod matcher {
         max_memory: None,
     };
 
-    /// Bitmask selecting the matcher dispatches on which the memory ceiling is
-    /// sampled; must be a power of two minus one. Twin of the VM's constant.
-    const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
-
     /// Resolve [`LIMITS`] against this input's node count, exactly like
     /// `VM::builder(...).build()` resolves the VM's.
     fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
@@ -136,8 +132,8 @@ mod matcher {
     /// noise next to a match — so the guarantee holds per call, not per process:
     /// a process that mixes languages (or grammar versions of one language) must
     /// fail on the wrong tree, not only on the first one it ever saw.
-    fn verify_language(tree: &rt::Tree) {
-        let language = tree.language();
+    fn verify_language(node: rt::Node<'_>) {
+        let language = node.language();
         for &(id, name, named) in EXPECTED_KINDS {
             let found = language.node_kind_for_id(id);
             if found != Some(name) || language.node_kind_is_named(id) != named {
@@ -307,10 +303,9 @@ mod matcher {
 
     /// One dispatch loop serves every entry point; `entry` selects the definition
     /// body and `boundary` supplies its root result effects.
-    /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
-    /// independently: each folds away when its resource is unbounded, so a fully
-    /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
-    /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
+    /// The metering constants come from the compiled-in policy. A fully unbounded
+    /// policy skips budget accounting. Memory checks read `heap_bytes` only when
+    /// memory is bounded. Metered dispatches use the same budget as the VM.
     /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
     /// disables it to avoid output allocation and decode-depth failures. (No
     /// let-chains: generated code targets the embedding crate's edition.)
@@ -326,34 +321,48 @@ mod matcher {
         boundary: EntryBoundary,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        verify_language(tree);
+        let mut budget = rt::ExecutionBudget::new(limits);
+        run_at_node::<METERED_FUEL, METERED_MEMORY, RECORD_OUTPUT_EVENTS>(
+            tree.root_node(),
+            source,
+            entry,
+            boundary,
+            &mut budget,
+        )
+    }
+
+    /// Internal application boundary. The caller owns the operation budget, so
+    /// applying at another candidate never resets fuel or memory sampling.
+    fn run_at_node<
+        't,
+        const METERED_FUEL: bool,
+        const METERED_MEMORY: bool,
+        const RECORD_OUTPUT_EVENTS: bool,
+    >(
+        node: rt::Node<'t>,
+        source: &str,
+        entry: u16,
+        boundary: EntryBoundary,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        verify_language(node);
         let mut eng = if RECORD_OUTPUT_EVENTS {
-            rt::Engine::new(tree.walk())
+            rt::Engine::new(node.walk())
         } else {
-            rt::Engine::new_match_only(tree.walk())
+            rt::Engine::new_match_only(node.walk())
         };
         boundary.begin(&mut eng);
-        let mut fuel_used: u64 = 0;
         let mut ip = entry;
         loop {
             if METERED_FUEL || METERED_MEMORY {
-                // One matcher dispatch currently consumes one fuel unit. The check
-                // folds out when fuel is unbounded; the counter still advances under
-                // a memory-only policy because the sample cadence below rides on it.
-                match limits.fuel_limit {
-                    Some(limit) if METERED_FUEL && fuel_used >= limit => {
-                        return Err(rt::LimitExceeded::OutOfFuel(limit));
-                    }
-                    _ => {}
-                }
-                fuel_used += 1;
-                // Memory ceiling: the live runtime heap, sampled every
-                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-dispatch growth is bounded,
-                // so the unobserved overshoot is noise (see the VM loop). Folded
-                // out when memory is unbounded, so no `heap_bytes` read survives.
-                if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
+                // One matcher dispatch consumes one unit of the operation budget.
+                // Memory-only policies still charge to retain the sample cadence.
+                budget.charge()?;
+                // The shared budget schedules live matcher-heap samples.
+                // Unbounded memory policies skip sampling and heap measurement.
+                if METERED_MEMORY && budget.memory_sample_due() {
                     let used = eng.heap_bytes();
-                    match limits.max_memory {
+                    match budget.limits().max_memory {
                         Some(max) if used > max => {
                             return Err(rt::LimitExceeded::Memory { used, limit: max });
                         }
