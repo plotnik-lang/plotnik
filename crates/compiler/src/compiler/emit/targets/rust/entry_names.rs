@@ -7,12 +7,7 @@ pub fn journal_fn_name(def_name: &str) -> String {
     format!("{}_journal", snake_ident(def_name))
 }
 
-/// Limit-applying journal entry used by the generated typed API.
-pub(crate) fn limited_journal_fn_name(def_name: &str) -> String {
-    format!("{}_journal_limited", snake_ident(def_name))
-}
-
-/// Limit-applying yes/no entry used by generated `matches` APIs.
-pub(crate) fn matches_fn_name(def_name: &str) -> String {
-    format!("{}_matches", snake_ident(def_name))
+/// Candidate application used by generated execution APIs.
+pub(crate) fn apply_fn_name(def_name: &str) -> String {
+    format!("{}_apply", snake_ident(def_name))
 }

@@ -13,7 +13,7 @@ pub struct Config {
     /// trusted, the input is not, and the query's author is the one who knows
     /// the budget it deserves.
     pub(crate) limits: RuntimeLimitSpec,
-    /// The decode-depth policy for safe `parse`. Not part of
+    /// The decode-depth policy for generated results. Not part of
     /// [`RuntimeLimitSpec`] — that spec is shared with the VM, whose output
     /// rendering is iterative; decode depth is a generated-executor resource
     /// (its typed decoder recurses once per nested value).
@@ -60,7 +60,7 @@ impl Config {
         self
     }
 
-    /// Override the compiled-in decode-depth policy for safe `parse` (see the
+    /// Override the compiled-in decode-depth policy for generated results (see the
     /// field's doc for why it lives outside the shared spec).
     pub fn decode_depth(mut self, depth: Limit) -> Self {
         self.decode_depth = depth;

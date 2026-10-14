@@ -1,6 +1,6 @@
 Probe = (program)
 -------------------- MATCHER ---------------------
-// Generated Plotnik query module: typed result types, `parse`/`matches` entry
+// Generated Plotnik query module: typed result types, supplied-node execution
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format.
@@ -17,18 +17,73 @@ const _: () = assert!(
 pub struct Probe;
 
 impl Probe {
-    /// Whether `Probe` matches `tree` under the module's compiled-in limits.
-    pub fn matches(
-        tree: &rt::Tree,
+    /// Apply `Probe` once at a suitable node. A wrong node kind is no-match.
+    pub fn exec<'t>(
+        node: rt::Node<'t>,
         source: &str,
-    ) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        matcher::probe_matches(tree, source)
+    ) -> ::core::result::Result<::core::option::Option<rt::Node<'t>>, rt::LimitExceeded> {
+        let mut budget = matcher::execution_budget(node);
+        Self::apply(node, source, &mut budget)
+    }
+
+    /// Search inclusively in source-order DFS preorder, retaining nested matches.
+    /// Matching and traversal share compiled-in limits. An error ends iteration.
+    pub fn each<'t, 's>(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> impl ::core::iter::FusedIterator<
+        Item = ::core::result::Result<rt::Node<'t>, rt::LimitExceeded>,
+    > + use<'t, 's> {
+        rt::Traversal::new(
+            scope,
+            matcher::execution_budget(scope),
+            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {
+                Self::apply(node, source, budget)
+            },
+        )
+    }
+
+    /// Consume the first item of `each`.
+    pub fn find<'t>(
+        scope: rt::Node<'t>,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<rt::Node<'t>>, rt::LimitExceeded> {
+        <Self as rt::Execute<'_, '_>>::find(scope, source)
+    }
+
+    /// Collect `each`, returning an error rather than a partial vector.
+    pub fn find_all<'t>(
+        scope: rt::Node<'t>,
+        source: &str,
+    ) -> ::core::result::Result<::std::vec::Vec<rt::Node<'t>>, rt::LimitExceeded> {
+        <Self as rt::Execute<'_, '_>>::find_all(scope, source)
+    }
+
+    fn apply<'t>(
+        node: rt::Node<'t>,
+        source: &str,
+        budget: &mut rt::ExecutionBudget,
+    ) -> ::core::result::Result<::core::option::Option<rt::Node<'t>>, rt::LimitExceeded> {
+        Ok(matcher::probe_apply(node, source, budget)?.map(|_| node))
     }
 }
 
-impl rt::Matches for Probe {
-    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        Probe::matches(tree, source)
+impl<'t, 's> rt::Execute<'t, 's> for Probe {
+    type Item = rt::Node<'t>;
+
+    fn exec(
+        node: rt::Node<'t>,
+        source: &'s str,
+    ) -> ::core::result::Result<::core::option::Option<rt::Node<'t>>, rt::LimitExceeded> {
+        Self::exec(node, source)
+    }
+
+    fn each(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<rt::Node<'t>, rt::LimitExceeded>>
+    {
+        Self::each(scope, source)
     }
 }
 
@@ -53,11 +108,10 @@ mod matcher {
         max_memory: None,
     };
 
-    /// Resolve [`LIMITS`] against this input's node count, exactly like
-    /// `VM::builder(...).build()` resolves the VM's.
-    fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
-        let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
-        LIMITS.resolve(source_nodes)
+    /// Resolve compiled-in limits once for a supplied application or search scope.
+    pub(super) fn execution_budget(scope: rt::Node<'_>) -> rt::ExecutionBudget {
+        let source_nodes = u32::try_from(scope.descendant_count()).unwrap_or(u32::MAX);
+        rt::ExecutionBudget::new(LIMITS.resolve(source_nodes))
     }
 
     /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
@@ -116,16 +170,19 @@ mod matcher {
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
-    /// Whether `Probe` accepts under [`LIMITS`] without recording output events.
-    pub(super) fn probe_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
-        Ok(run::<true, true, false>(
-            tree,
+    /// Apply one candidate using the operation's cumulative budget.
+    pub(super) fn probe_apply<'t>(
+        node: rt::Node<'t>,
+        source: &str,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        run_at_node::<true, true, false>(
+            node,
             source,
             S2_PROBE,
             EntryBoundary::new(false, false),
-            resolved_limits(tree),
-        )?
-        .is_some())
+            budget,
+        )
     }
     #[derive(Clone, Copy)]
     struct EntryBoundary {
@@ -177,8 +234,7 @@ mod matcher {
     /// The metering constants come from the compiled-in policy. A fully unbounded
     /// policy skips budget accounting. Memory checks read `heap_bytes` only when
     /// memory is bounded. Metered dispatches use the same budget as the VM.
-    /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
-    /// disables it to avoid output allocation and decode-depth failures. (No
+    /// `RECORD_OUTPUT_EVENTS` disables output allocation for match-only entries. (No
     /// let-chains: generated code targets the embedding crate's edition.)
     fn run<
         't,

@@ -2,7 +2,7 @@
 //!
 //! This crate is the developer entry point: [`query!`](query) compiles a
 //! Plotnik query at build time into typed output structs/enums with
-//! `parse`/`matches` entry points — no bytecode, no dynamic values.
+//! `exec`/`each`/`find`/`find_all` methods, with no bytecode or dynamic values.
 //!
 //! ```ignore
 //! // `query!` defines types, so invoke it at module scope — not inside a function.
@@ -19,7 +19,7 @@
 //!     parser.set_language(&language).unwrap();
 //!     let source = "x;";
 //!     let tree = parser.parse(source, None).unwrap();
-//!     let q = Q::parse(&tree, source)
+//!     let q = Q::exec(tree.root_node(), source)
 //!         .expect("auto limits fit")
 //!         .expect("matches");
 //! }
@@ -42,7 +42,7 @@
 /// [`::plotnik::rt`](rt), which is why this facade is the intended way in.
 pub use plotnik_macros::query;
 
-pub use plotnik_runtime::{LimitExceeded, Matches, Parse, matches, parse};
+pub use plotnik_runtime::{Execute, LimitExceeded, each, exec, find, find_all};
 
 /// The shared runtime engine generated query modules run on. Generated code
 /// spells every runtime path as `::plotnik::rt::...`.

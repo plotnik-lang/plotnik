@@ -61,7 +61,7 @@ pub use result_decoder::ResultDecoder;
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
 #[cfg(feature = "execution")]
-pub use surface::{Matches, Parse, matches, parse};
+pub use surface::{Execute, each, exec, find, find_all};
 
 /// Tree-sitter types used by the execution engine.
 #[cfg(feature = "execution")]

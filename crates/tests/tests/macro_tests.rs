@@ -1,5 +1,4 @@
-//! Compile-time boundaries that the snapshot corpus cannot exercise: proc-macro
-//! grammar resolution, facade wiring, baked-in limits, and grammar skew.
+//! Public generated-Rust contracts beyond the root-based snapshot corpus.
 
 use plotnik::LimitExceeded;
 use plotnik::tree_sitter::{Language, Parser, Tree};
@@ -69,6 +68,40 @@ mod depth_limited {
     }
 }
 
+mod nodes {
+    plotnik::query! {
+        r#"
+        Id = (identifier) @text :: text
+        Probe = (identifier)
+        Token = "+"
+        Binary = [
+          First: (binary_expression left: (_) @left)
+          Second: (binary_expression right: (_) @right)
+        ]
+        Args = (arguments (identifier)* @ids :: text)
+        Left = left: (identifier) @node
+        Pair = (binary_expression (Left) @left right: (identifier) @text :: text)
+        "#,
+        grammar = "tree-sitter-javascript",
+    }
+}
+
+mod walk_limited {
+    plotnik::query! {
+        "Probe = (_)",
+        grammar = "tree-sitter-javascript",
+        fuel = 8,
+    }
+}
+
+mod application_limited {
+    plotnik::query! {
+        "Probe = (_)",
+        grammar = "tree-sitter-javascript",
+        fuel = 2,
+    }
+}
+
 mod skew {
     plotnik::query! {
         "Q = (program (expression_statement (identifier) @id))",
@@ -81,16 +114,33 @@ fn facade_executes_generated_types_from_multiple_expansions() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    let value = plotnik::parse::<queries::Idents>(&tree, source)
+    let value = plotnik::exec::<queries::Idents>(tree.root_node(), source)
         .expect("auto limits fit")
         .expect("matches");
     let json =
         serde_json::to_string(&plotnik::rt::WithSource::new(&value, source)).expect("serializes");
 
     assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
-    assert!(plotnik::matches::<queries::Idents>(&tree, source).expect("auto limits fit"));
-    assert!(plotnik::matches::<queries::Probe>(&tree, source).expect("auto limits fit"));
-    assert!(json.contains("\"id\""), "got: {json}");
+    assert_eq!(
+        plotnik::find::<queries::Idents>(tree.root_node(), source),
+        Ok(Some(value.clone()))
+    );
+    assert_eq!(
+        plotnik::find_all::<queries::Idents>(tree.root_node(), source),
+        Ok(vec![value.clone()])
+    );
+    assert_eq!(
+        plotnik::each::<queries::Idents>(tree.root_node(), source).collect::<Result<Vec<_>, _>>(),
+        Ok(vec![value])
+    );
+    assert_eq!(
+        plotnik::exec::<queries::Probe>(tree.root_node(), source),
+        Ok(Some(tree.root_node()))
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&json).expect("valid JSON"),
+        serde_json::json!({"id": {"kind": "identifier", "span": [0, 1], "text": "x"}})
+    );
 }
 
 #[test]
@@ -99,9 +149,30 @@ fn grammar_packages_and_file_form_resolve() {
     let javascript_tree = parse(&tree_sitter_javascript::LANGUAGE.into(), source);
     let tsx_tree = parse(&tree_sitter_typescript::LANGUAGE_TSX.into(), source);
 
-    assert!(from_file::Q::matches(&javascript_tree, source).expect("auto limits fit"));
-    assert!(tree_sitter_package::Q::matches(&javascript_tree, source).expect("auto limits fit"));
-    assert!(tsx::Q::matches(&tsx_tree, source).expect("auto limits fit"));
+    assert_eq!(
+        from_file::Q::exec(javascript_tree.root_node(), source)
+            .unwrap()
+            .unwrap()
+            .id
+            .utf8_text(source.as_bytes()),
+        Ok("x")
+    );
+    assert_eq!(
+        tree_sitter_package::Q::exec(javascript_tree.root_node(), source)
+            .unwrap()
+            .unwrap()
+            .id
+            .utf8_text(source.as_bytes()),
+        Ok("x")
+    );
+    assert_eq!(
+        tsx::Q::exec(tsx_tree.root_node(), source)
+            .unwrap()
+            .unwrap()
+            .id
+            .utf8_text(source.as_bytes()),
+        Ok("x")
+    );
 }
 
 #[test]
@@ -110,14 +181,181 @@ fn compiled_limits_reject_work_at_their_distinct_boundaries() {
     let tree = parse(&js(), source);
 
     assert!(matches!(
-        limited::Q::matches(&tree, source),
+        limited::Q::exec(tree.root_node(), source),
         Err(LimitExceeded::OutOfFuel(1))
     ));
     assert!(matches!(
-        depth_limited::Q::parse(&tree, source),
+        depth_limited::Q::exec(tree.root_node(), source),
         Err(LimitExceeded::DecodeDepth(1))
     ));
-    assert!(depth_limited::Q::matches(&tree, source).expect("matches skips decoding"));
+    let mut each = depth_limited::Q::each(tree.root_node(), source);
+    assert_eq!(each.next(), Some(Err(LimitExceeded::DecodeDepth(1))));
+    assert_eq!(each.next(), None);
+    assert_eq!(each.next(), None);
+    assert_eq!(
+        depth_limited::Q::find(tree.root_node(), source),
+        Err(LimitExceeded::DecodeDepth(1))
+    );
+    assert_eq!(
+        depth_limited::Q::find_all(tree.root_node(), source),
+        Err(LimitExceeded::DecodeDepth(1))
+    );
+}
+
+#[test]
+fn suitable_nonroot_application_and_context_composition() {
+    let source = "alpha + beta; gamma;";
+    let tree = parse(&js(), source);
+    let binary = tree
+        .root_node()
+        .named_child(0)
+        .unwrap()
+        .named_child(0)
+        .unwrap();
+    let alpha = binary.child_by_field_name("left").unwrap();
+
+    assert_eq!(
+        nodes::Id::exec(alpha, source).unwrap().unwrap().text,
+        "alpha"
+    );
+    assert_eq!(nodes::Probe::exec(alpha, source), Ok(Some(alpha)));
+    assert_eq!(nodes::Id::exec(binary, source), Ok(None));
+    assert_eq!(nodes::Id::exec(tree.root_node(), source), Ok(None));
+    assert_eq!(
+        nodes::Probe::find_all(binary, source)
+            .unwrap()
+            .iter()
+            .map(|node| node.utf8_text(source.as_bytes()).unwrap())
+            .collect::<Vec<_>>(),
+        vec!["alpha", "beta"]
+    );
+    let pair = nodes::Pair::exec(binary, source).unwrap().unwrap();
+    assert_eq!(pair.left.node, alpha);
+    assert_eq!(pair.text, "beta");
+    let token = nodes::Token::find(binary, source).unwrap().unwrap();
+    assert!(!token.is_named());
+    assert_eq!(token.utf8_text(source.as_bytes()), Ok("+"));
+    assert_eq!(nodes::Token::find_all(alpha, source), Ok(vec![]));
+    assert_eq!(nodes::Token::find(alpha, source), Ok(None));
+    assert_eq!(nodes::Token::each(alpha, source).next(), None);
+}
+
+#[test]
+fn search_retains_nested_matches_in_preorder_with_one_preferred_result() {
+    let source = "alpha + (beta * gamma); delta - epsilon;";
+    let tree = parse(&js(), source);
+    let scope = tree.root_node();
+
+    let values = nodes::Binary::each(scope, source)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let lefts = values
+        .iter()
+        .map(|value| match value {
+            nodes::Binary::First { left } => left.utf8_text(source.as_bytes()).unwrap(),
+            nodes::Binary::Second { .. } => panic!("source-order preference selects First"),
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(lefts, vec!["alpha", "beta", "delta"]);
+    assert_eq!(
+        nodes::Binary::find(scope, source),
+        Ok(Some(values[0].clone()))
+    );
+    assert_eq!(nodes::Binary::find_all(scope, source), Ok(values.clone()));
+    let outer = scope.named_child(0).unwrap().named_child(0).unwrap();
+    assert_eq!(
+        nodes::Binary::exec(outer, source),
+        Ok(Some(values[0].clone()))
+    );
+    assert_eq!(
+        nodes::Binary::find_all(outer, source),
+        Ok(values[..2].to_vec())
+    );
+}
+
+#[test]
+fn quantifier_lists_stay_inside_independent_results() {
+    let source = "f(alpha, beta); g(gamma);";
+    let tree = parse(&js(), source);
+
+    let mut each = nodes::Args::each(tree.root_node(), source);
+    let first = each.next().unwrap().unwrap();
+    let second = each.next().unwrap().unwrap();
+    assert_eq!(each.next(), None);
+    drop(each);
+
+    assert_eq!(first.ids, vec!["alpha", "beta"]);
+    assert_eq!(second.ids, vec!["gamma"]);
+    assert_eq!(
+        nodes::Args::find_all(tree.root_node(), source),
+        Ok(vec![first, second])
+    );
+}
+
+#[test]
+fn result_borrows_follow_payload_not_iterator_scratch() {
+    let source = String::from("alpha + beta;");
+    let text = {
+        let tree = parse(&js(), &source);
+        nodes::Id::find(tree.root_node(), &source).unwrap().unwrap()
+    };
+    assert_eq!(text.text, "alpha");
+
+    let tree = parse(&js(), &source);
+    let node = {
+        let temporary_source = source.clone();
+        nodes::Probe::find(tree.root_node(), &temporary_source)
+            .unwrap()
+            .unwrap()
+    };
+    assert_eq!(node.byte_range(), 0..5);
+
+    let mut each = nodes::Pair::each(tree.root_node(), &source);
+    let pair = each.next().unwrap().unwrap();
+    assert_eq!(each.next(), None);
+    drop(each);
+    assert_eq!(pair.left.node, node);
+    assert_eq!(pair.text, "beta");
+}
+
+#[test]
+fn lazy_search_shares_fuel_and_fuses_after_a_terminal_error() {
+    let source = "alpha; beta; gamma; delta;";
+    let tree = parse(&js(), source);
+    let scope = tree.root_node();
+
+    assert_eq!(
+        application_limited::Probe::exec(scope, source),
+        Ok(Some(scope))
+    );
+    assert_eq!(
+        application_limited::Probe::each(scope, source).next(),
+        Some(Err(LimitExceeded::OutOfFuel(2)))
+    );
+    let mut each = walk_limited::Probe::each(scope, source);
+    let first = each.next().unwrap().unwrap();
+    assert_eq!(first, scope);
+    assert_eq!(walk_limited::Probe::find(scope, source), Ok(Some(scope)));
+    let mut successes = vec![first];
+    loop {
+        match each.next() {
+            Some(Ok(node)) => successes.push(node),
+            Some(Err(error)) => {
+                assert_eq!(error, LimitExceeded::OutOfFuel(8));
+                break;
+            }
+            None => panic!("the complete traversal exceeds the compiled fuel limit"),
+        }
+    }
+    assert_eq!(each.next(), None);
+    assert_eq!(each.next(), None);
+    drop(each);
+    assert_eq!(successes[0].utf8_text(source.as_bytes()), Ok(source));
+    assert_eq!(
+        walk_limited::Probe::find_all(scope, source),
+        Err(LimitExceeded::OutOfFuel(8))
+    );
 }
 
 #[test]
@@ -125,7 +363,7 @@ fn wrong_language_tree_panics_with_version_skew() {
     let source = "void main() {}";
     let tree = parse(&tree_sitter_dart::LANGUAGE.into(), source);
 
-    let panic = std::panic::catch_unwind(|| skew::Q::parse(&tree, source))
+    let panic = std::panic::catch_unwind(|| skew::Q::exec(tree.root_node(), source))
         .expect_err("the language check must reject a Dart tree");
     let message = panic
         .downcast_ref::<String>()

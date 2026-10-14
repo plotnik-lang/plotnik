@@ -1,6 +1,6 @@
 //! Proc-macro shell for Plotnik: `query!` runs the full compiler pipeline at
 //! build time and expands to the generated query module (typed result types,
-//! `parse`/`matches` entry points, and the compiled matcher).
+//! supplied-node execution methods, and the compiled matcher).
 //!
 //! All compilation logic lives in `plotnik-compiler` (built compiler-only, no C);
 //! this crate only parses macro arguments, locates the grammar, and splices
@@ -38,13 +38,16 @@ mod grammar_source;
 ///   invoking file) instead of an inline literal.
 /// - `fuel = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`,
 ///   `depth = <n> | auto` — the limit policy compiled into the safe entry
-///   points (default `auto`). `fuel` bounds matcher work,
-///   `memory` bounds live backtracking state, `depth` bounds the committed
+///   points (default `auto`). `fuel` bounds cumulative traversal and matcher work,
+///   `memory` samples live matcher state, `depth` bounds the committed
 ///   value's nesting (typed decoding recurses once per nested value, so
 ///   this is its native-stack guard).
 ///
 /// The expansion is item-position only (it defines types); invoke it at
 /// module scope, not inside a function body.
+/// Eligible entries expose `exec(node, source)`, `each(scope, source)`,
+/// `find(scope, source)`, and `find_all(scope, source)`. Match-only entries
+/// return the matched node. Data-producing entries return their generated type.
 #[proc_macro]
 pub fn query(input: TokenStream) -> TokenStream {
     expand::expand(input)

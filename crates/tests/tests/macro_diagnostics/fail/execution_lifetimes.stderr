@@ -1,0 +1,29 @@
+error[E0515]: cannot return value referencing local variable `tree`
+  --> tests/macro_diagnostics/fail/execution_lifetimes.rs:10:5
+   |
+10 |     Probe::find(tree.root_node(), source).unwrap().unwrap()
+   |     ^^^^^^^^^^^^----^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |     |           |
+   |     |           `tree` is borrowed here
+   |     returns a value referencing data owned by the current function
+
+error[E0515]: cannot return value referencing local variable `source`
+  --> tests/macro_diagnostics/fail/execution_lifetimes.rs:15:5
+   |
+15 |     Text::exec(node, &source).unwrap().unwrap()
+   |     ^^^^^^^^^^^^^^^^^-------^^^^^^^^^^^^^^^^^^^
+   |     |                |
+   |     |                `source` is borrowed here
+   |     returns a value referencing data owned by the current function
+
+error[E0597]: `source` does not live long enough
+  --> tests/macro_diagnostics/fail/execution_lifetimes.rs:22:34
+   |
+21 |         let source = String::from("name");
+   |             ------ binding `source` declared here
+22 |         each = Probe::each(node, &source);
+   |                                  ^^^^^^^ borrowed value does not live long enough
+23 |     }
+   |     - `source` dropped here while still borrowed
+24 |     let _ = each.next();
+   |             ---- borrow later used here

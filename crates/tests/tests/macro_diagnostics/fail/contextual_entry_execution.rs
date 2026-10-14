@@ -12,10 +12,10 @@ plotnik::query! {
 }
 
 fn standalone(tree: &plotnik::rt::Tree, source: &str) {
-    let _ = Left::parse(tree, source);
-    let _ = Wrapped::matches(tree, source);
-    let _ = Choice::matches(tree, source);
-    let _ = Mixed::matches(tree, source);
+    let _ = Left::exec(tree.root_node(), source);
+    let _ = Wrapped::each(tree.root_node(), source);
+    let _ = Choice::find(tree.root_node(), source);
+    let _ = Mixed::find_all(tree.root_node(), source);
     let _ = left_journal(tree, source);
 }
 

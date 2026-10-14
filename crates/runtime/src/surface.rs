@@ -2,25 +2,55 @@
 //!
 //! Generated modules provide inherent methods as the primary API. These traits
 //! and helpers are the generic door: callers can name a query type parameter
-//! and still get the same safe `parse`/`matches` behavior.
+//! and use the same supplied-node execution and lazy subtree search.
 
-use crate::{LimitExceeded, Tree};
+use std::iter::FusedIterator;
 
-pub trait Matches {
-    fn matches(tree: &Tree, source: &str) -> Result<bool, LimitExceeded>;
+use crate::{LimitExceeded, Node};
+
+pub trait Execute<'t, 's> {
+    type Item;
+
+    fn exec(node: Node<'t>, source: &'s str) -> Result<Option<Self::Item>, LimitExceeded>;
+
+    fn each(
+        scope: Node<'t>,
+        source: &'s str,
+    ) -> impl FusedIterator<Item = Result<Self::Item, LimitExceeded>>;
+
+    fn find(scope: Node<'t>, source: &'s str) -> Result<Option<Self::Item>, LimitExceeded> {
+        Self::each(scope, source).next().transpose()
+    }
+
+    fn find_all(scope: Node<'t>, source: &'s str) -> Result<Vec<Self::Item>, LimitExceeded> {
+        Self::each(scope, source).collect::<Result<Vec<_>, _>>()
+    }
 }
 
-pub trait Parse<'t, 's>: Matches + Sized {
-    fn parse(tree: &'t Tree, source: &'s str) -> Result<Option<Self>, LimitExceeded>;
-}
-
-pub fn parse<'t, 's, Q: Parse<'t, 's>>(
-    tree: &'t Tree,
+pub fn exec<'t, 's, Q: Execute<'t, 's>>(
+    node: Node<'t>,
     source: &'s str,
-) -> Result<Option<Q>, LimitExceeded> {
-    Q::parse(tree, source)
+) -> Result<Option<Q::Item>, LimitExceeded> {
+    Q::exec(node, source)
 }
 
-pub fn matches<Q: Matches>(tree: &Tree, source: &str) -> Result<bool, LimitExceeded> {
-    Q::matches(tree, source)
+pub fn each<'t, 's, Q: Execute<'t, 's>>(
+    scope: Node<'t>,
+    source: &'s str,
+) -> impl FusedIterator<Item = Result<Q::Item, LimitExceeded>> {
+    Q::each(scope, source)
+}
+
+pub fn find<'t, 's, Q: Execute<'t, 's>>(
+    scope: Node<'t>,
+    source: &'s str,
+) -> Result<Option<Q::Item>, LimitExceeded> {
+    Q::find(scope, source)
+}
+
+pub fn find_all<'t, 's, Q: Execute<'t, 's>>(
+    scope: Node<'t>,
+    source: &'s str,
+) -> Result<Vec<Q::Item>, LimitExceeded> {
+    Q::find_all(scope, source)
 }

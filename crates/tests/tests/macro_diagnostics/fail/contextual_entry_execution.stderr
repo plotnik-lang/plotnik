@@ -1,4 +1,4 @@
-error[E0599]: no associated function or constant named `parse` found for struct `__plotnik_341c25db::Left<'t>` in the current scope
+error[E0599]: no associated function or constant named `exec` found for struct `__plotnik_341c25db::Left<'t>` in the current scope
   --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:15:19
    |
  1 | / plotnik::query! {
@@ -8,19 +8,17 @@ error[E0599]: no associated function or constant named `parse` found for struct 
 ...  |
 11 | |     "#
 12 | | }
-   | |_- associated function or constant `parse` not found for this struct
+   | |_- associated function or constant `exec` not found for this struct
 ...
-15 |       let _ = Left::parse(tree, source);
-   |                     ^^^^^ associated function or constant not found in `__plotnik_341c25db::Left<'_>`
+15 |       let _ = Left::exec(tree.root_node(), source);
+   |                     ^^^^ associated function or constant not found in `__plotnik_341c25db::Left<'_>`
    |
    = help: items from traits can only be used if the trait is implemented and in scope
-   = note: the following traits define an item `parse`, perhaps you need to implement one of them:
-           candidate #1: `ciborium_ll::seg::Parser`
-           candidate #2: `clap::Parser`
-           candidate #3: `clap::builder::TypedValueParser`
-           candidate #4: `plotnik::Parse`
+   = note: the following traits define an item `exec`, perhaps you need to implement one of them:
+           candidate #1: `Execute`
+           candidate #2: `std::os::unix::process::CommandExt`
 
-error[E0599]: no associated function or constant named `matches` found for struct `__plotnik_341c25db::Wrapped<'t>` in the current scope
+error[E0599]: no associated function or constant named `each` found for struct `__plotnik_341c25db::Wrapped<'t>` in the current scope
   --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:16:22
    |
  1 | / plotnik::query! {
@@ -30,16 +28,16 @@ error[E0599]: no associated function or constant named `matches` found for struc
 ...  |
 11 | |     "#
 12 | | }
-   | |_- associated function or constant `matches` not found for this struct
+   | |_- associated function or constant `each` not found for this struct
 ...
-16 |       let _ = Wrapped::matches(tree, source);
-   |                        ^^^^^^^ associated function or constant not found in `__plotnik_341c25db::Wrapped<'_>`
+16 |       let _ = Wrapped::each(tree.root_node(), source);
+   |                        ^^^^ associated function or constant not found in `__plotnik_341c25db::Wrapped<'_>`
    |
    = help: items from traits can only be used if the trait is implemented and in scope
-   = note: the following trait defines an item `matches`, perhaps you need to implement it:
-           candidate #1: `plotnik::Matches`
+   = note: the following trait defines an item `each`, perhaps you need to implement it:
+           candidate #1: `Execute`
 
-error[E0599]: no associated function or constant named `matches` found for struct `__plotnik_341c25db::Choice<'t>` in the current scope
+error[E0599]: `__plotnik_341c25db::Choice<'_>` is not an iterator
   --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:17:21
    |
  1 | / plotnik::query! {
@@ -49,19 +47,28 @@ error[E0599]: no associated function or constant named `matches` found for struc
 ...  |
 11 | |     "#
 12 | | }
-   | |_- associated function or constant `matches` not found for this struct
+   | |_- associated function or constant `find` not found for this struct because it doesn't satisfy `__plotnik_341c25db::Choice<'_>: Iterator`
 ...
-17 |       let _ = Choice::matches(tree, source);
-   |                       ^^^^^^^ associated function or constant not found in `__plotnik_341c25db::Choice<'_>`
+17 |       let _ = Choice::find(tree.root_node(), source);
+   |                       ^^^^ `__plotnik_341c25db::Choice<'_>` is not an iterator
    |
+   = note: the following trait bounds were not satisfied:
+           `__plotnik_341c25db::Choice<'_>: Iterator`
+           which is required by `&mut __plotnik_341c25db::Choice<'_>: Iterator`
+note: the trait `Iterator` must be implemented
+  --> $RUST/core/src/iter/traits/iterator.rs
    = help: items from traits can only be used if the trait is implemented and in scope
-   = note: the following trait defines an item `matches`, perhaps you need to implement it:
-           candidate #1: `plotnik::Matches`
+   = note: the following traits define an item `find`, perhaps you need to implement one of them:
+           candidate #1: `Execute`
+           candidate #2: `Iterator`
+           candidate #3: `StreamingIterator`
+           candidate #4: `clap_lex::OsStrExt`
+           candidate #5: `rayon::iter::ParallelIterator`
 
 error[E0433]: cannot find type `Mixed` in this scope
   --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:18:13
    |
-18 |     let _ = Mixed::matches(tree, source);
+18 |     let _ = Mixed::find_all(tree.root_node(), source);
    |             ^^^^^ use of undeclared type `Mixed`
 
 error[E0425]: cannot find function `left_journal` in this scope

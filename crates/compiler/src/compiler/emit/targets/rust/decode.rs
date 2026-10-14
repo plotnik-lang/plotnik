@@ -1,4 +1,4 @@
-//! Typed result-decoder emission and the `parse`/`matches` surface.
+//! Typed result-decoder emission and supplied-node execution.
 //!
 //! The committed match journal is a tiny event format whose schema *is* the
 //! query's result type, so decoding is generated deserialization (serde-derive
@@ -39,7 +39,8 @@ use crate::compiler::ids::{DefId, ResultMemberId};
 use crate::core::{Interner, Symbol};
 
 use super::decoder_frame::DecoderFrameEstimator;
-use super::entry_names::{limited_journal_fn_name, matches_fn_name};
+use super::entry_names::apply_fn_name;
+use super::representation::LifetimeUsage;
 
 pub(super) struct DecoderGen<'m, 'a> {
     model: &'m TypeModel<'a>,
@@ -74,15 +75,14 @@ impl DecoderTables {
     }
 }
 
-struct InherentParseSignature {
+struct ExecutionSignature {
     ident: String,
-    impl_generics: &'static str,
     type_generics: &'static str,
-    tree_ref: &'static str,
-    source_ref: &'static str,
+    method_generics: &'static str,
+    usage: LifetimeUsage,
 }
 
-impl InherentParseSignature {
+impl ExecutionSignature {
     fn for_item(model: &TypeModel<'_>, item: &DecodeItem) -> Self {
         let ident = model.item_ident(item.name).to_string();
         let usage = item
@@ -90,22 +90,17 @@ impl InherentParseSignature {
             .value()
             .map(|type_id| model.lifetime_usage(type_id))
             .unwrap_or_default();
-        let (impl_generics, type_generics) = match (usage.tree, usage.source) {
-            (false, false) => ("", ""),
-            (true, false) => ("<'t>", "<'t>"),
-            (false, true) => ("<'s>", "<'s>"),
-            (true, true) => ("<'t, 's>", "<'t, 's>"),
+        let (type_generics, method_generics) = match (usage.tree, usage.source) {
+            (false, false) => ("", "<'t, 's>"),
+            (true, false) => ("<'t>", "<'s>"),
+            (false, true) => ("<'s>", "<'t>"),
+            (true, true) => ("<'t, 's>", ""),
         };
         Self {
             ident,
-            impl_generics,
             type_generics,
-            tree_ref: if usage.tree {
-                "&'t rt::Tree"
-            } else {
-                "&rt::Tree"
-            },
-            source_ref: if usage.source { "&'s str" } else { "&str" },
+            method_generics,
+            usage,
         }
     }
 }
@@ -158,73 +153,173 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             .any(|item| item.has_decoder() && item.fallible)
     }
 
-    /// The `parse`/`matches` surface, one block per selectable definition.
-    /// Selectable definitions are nominal (`parse` + `matches`) or match-only (`matches`).
-    pub(super) fn parse_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
+    /// Independent execution methods are emitted only for eligible entries.
+    pub(super) fn execution_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entry_points {
             let name = self.definitions.definition(def_id).name();
             let def = self.interner.resolve(name).to_string();
             out.push('\n');
             let item = self.decode.item(name);
-            match item.kind {
-                DecodeItemKind::Record(_) | DecodeItemKind::Variant(_) => {
-                    self.parse_impl(&mut out, &def, item);
-                }
-                DecodeItemKind::Alias(_) => {
-                    unreachable!("selectable definitions are nominal or match-only")
-                }
-                DecodeItemKind::MatchOnlyDefinition => self.matches_impl(&mut out, &def, item),
-            }
+            self.execution_impl(&mut out, &def, item);
         }
         out
     }
 
-    /// `matches` for a match-only definition: it can only answer matched-or-not, and
-    /// the public API is always metered.
-    fn matches_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
-        let ident = self.model.item_ident(item.name);
-        let _ = writeln!(out, "impl {ident} {{");
-        self.inherent_matches_method(out, def);
-        let _ = writeln!(out, "}}");
-        let _ = writeln!(out);
-        self.matches_trait_impl(out, item);
-    }
-
-    /// Inherent `parse`/`matches` on a nominal Rust result type (`struct` or `enum`).
-    fn parse_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
-        let sig = InherentParseSignature::for_item(self.model, item);
-        let decoder_fn = self.decoder_fn(item.name);
-        let journal_fn = limited_journal_fn_name(def);
-        let fallible_decoder = item.fallible;
+    fn execution_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
+        let sig = ExecutionSignature::for_item(self.model, item);
+        let apply_fn = apply_fn_name(def);
+        let result_type = if item.has_decoder() {
+            "Self"
+        } else {
+            "rt::Node<'t>"
+        };
+        let application_generics = if item.has_decoder() { "" } else { "<'t>" };
+        let node_type = if sig.usage.tree || !item.has_decoder() {
+            "rt::Node<'t>"
+        } else {
+            "rt::Node<'_>"
+        };
+        let source_ref = if sig.usage.source { "&'s str" } else { "&str" };
         let _ = writeln!(
             out,
             "impl{} {}{} {{",
-            sig.impl_generics, sig.ident, sig.type_generics
+            sig.type_generics, sig.ident, sig.type_generics
+        );
+        let generics = sig.method_generics;
+        let _ = writeln!(
+            out,
+            "    /// Apply `{def}` once at a suitable node. A wrong node kind is no-match."
+        );
+        let _ = writeln!(out, "    pub fn exec{application_generics}(");
+        let _ = writeln!(out, "        node: {node_type},");
+        let _ = writeln!(out, "        source: {source_ref},");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<::core::option::Option<{result_type}>, rt::LimitExceeded> {{"
         );
         let _ = writeln!(
             out,
-            "    /// Match `{def}` against `tree` and decode its output events into"
+            "        let mut budget = matcher::execution_budget(node);"
+        );
+        let _ = writeln!(out, "        Self::apply(node, source, &mut budget)");
+        let _ = writeln!(out, "    }}\n");
+        let _ = writeln!(
+            out,
+            "    /// Search inclusively in source-order DFS preorder, retaining nested matches."
         );
         let _ = writeln!(
             out,
-            "    /// the typed result. `None` is the no-match outcome."
+            "    /// Matching and traversal share compiled-in limits. An error ends iteration."
+        );
+        let _ = writeln!(out, "    pub fn each{generics}(");
+        let _ = writeln!(out, "        scope: rt::Node<'t>,");
+        let _ = writeln!(out, "        source: &'s str,");
+        if item.has_decoder() {
+            let _ = writeln!(
+                out,
+                "    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>"
+            );
+            let _ = writeln!(out, "    + use<'t, 's> {{");
+        } else {
+            let _ = writeln!(out, "    ) -> impl ::core::iter::FusedIterator<");
+            let _ = writeln!(
+                out,
+                "        Item = ::core::result::Result<{result_type}, rt::LimitExceeded>,"
+            );
+            let _ = writeln!(out, "    > + use<'t, 's> {{");
+        }
+        let _ = writeln!(out, "        rt::Traversal::new(");
+        let _ = writeln!(out, "            scope,");
+        let _ = writeln!(out, "            matcher::execution_budget(scope),");
+        let _ = writeln!(
+            out,
+            "            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {{"
+        );
+        let _ = writeln!(out, "                Self::apply(node, source, budget)");
+        let _ = writeln!(out, "            }},");
+        let _ = writeln!(out, "        )");
+        let _ = writeln!(out, "    }}\n");
+        let _ = writeln!(out, "    /// Consume the first item of `each`.");
+        let _ = writeln!(out, "    pub fn find{application_generics}(");
+        let _ = writeln!(out, "        scope: {node_type},");
+        let _ = writeln!(out, "        source: {source_ref},");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<::core::option::Option<{result_type}>, rt::LimitExceeded> {{"
         );
         let _ = writeln!(
             out,
-            "    /// The module's compiled-in limits bound total work, live"
+            "        <Self as rt::Execute<'_, '_>>::find(scope, source)"
         );
-        let _ = writeln!(out, "    /// backtracking state, and typed decode depth.");
-        let _ = writeln!(out, "    pub fn parse(");
-        let _ = writeln!(out, "        tree: {},", sig.tree_ref);
-        let _ = writeln!(out, "        source: {},", sig.source_ref);
+        let _ = writeln!(out, "    }}\n");
         let _ = writeln!(
             out,
-            "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
+            "    /// Collect `each`, returning an error rather than a partial vector."
+        );
+        let _ = writeln!(out, "    pub fn find_all{application_generics}(");
+        let _ = writeln!(out, "        scope: {node_type},");
+        let _ = writeln!(out, "        source: {source_ref},");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<::std::vec::Vec<{result_type}>, rt::LimitExceeded> {{"
         );
         let _ = writeln!(
             out,
-            "        let Some(journal) = matcher::{journal_fn}(tree, source)? else {{"
+            "        <Self as rt::Execute<'_, '_>>::find_all(scope, source)"
+        );
+        let _ = writeln!(out, "    }}\n");
+        let _ = writeln!(out, "    fn apply{application_generics}(");
+        let _ = writeln!(out, "        node: {node_type},");
+        let _ = writeln!(out, "        source: {source_ref},");
+        let _ = writeln!(out, "        budget: &mut rt::ExecutionBudget,");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<::core::option::Option<{result_type}>, rt::LimitExceeded> {{"
+        );
+        if !item.has_decoder() {
+            let _ = writeln!(
+                out,
+                "        Ok(matcher::{apply_fn}(node, source, budget)?.map(|_| node))"
+            );
+        } else {
+            self.decode_application(out, item, &apply_fn);
+        }
+        let _ = writeln!(out, "    }}");
+        let _ = writeln!(out, "}}\n");
+        let _ = writeln!(
+            out,
+            "impl<'t, 's> rt::Execute<'t, 's> for {}{} {{",
+            sig.ident, sig.type_generics
+        );
+        let _ = writeln!(out, "    type Item = {result_type};\n");
+        let _ = writeln!(out, "    fn exec(");
+        let _ = writeln!(out, "        node: rt::Node<'t>,");
+        let _ = writeln!(out, "        source: &'s str,");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<::core::option::Option<{result_type}>, rt::LimitExceeded> {{"
+        );
+        let _ = writeln!(out, "        Self::exec(node, source)");
+        let _ = writeln!(out, "    }}\n");
+        let _ = writeln!(out, "    fn each(");
+        let _ = writeln!(out, "        scope: rt::Node<'t>,");
+        let _ = writeln!(out, "        source: &'s str,");
+        let _ = writeln!(
+            out,
+            "    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<{result_type}, rt::LimitExceeded>>"
+        );
+        let _ = writeln!(out, "    {{");
+        let _ = writeln!(out, "        Self::each(scope, source)");
+        let _ = writeln!(out, "    }}");
+        let _ = writeln!(out, "}}");
+    }
+
+    fn decode_application(&self, out: &mut String, item: &DecodeItem, apply_fn: &str) {
+        let decoder_fn = self.decoder_fn(item.name);
+        let _ = writeln!(
+            out,
+            "        let Some(journal) = matcher::{apply_fn}(node, source, budget)? else {{"
         );
         let _ = writeln!(out, "            return Ok(None);");
         let _ = writeln!(out, "        }};");
@@ -232,7 +327,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);"
         );
-        if fallible_decoder {
+        if item.fallible {
             let _ = writeln!(
                 out,
                 "        let depth = rt::DecodeDepth::new(matcher::MAX_DECODE_DEPTH);"
@@ -246,73 +341,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         }
         let _ = writeln!(out, "        decoder.finish();");
         let _ = writeln!(out, "        Ok(Some(value))");
-        let _ = writeln!(out, "    }}");
-        let _ = writeln!(out);
-        self.inherent_matches_method(out, def);
-        let _ = writeln!(out, "}}");
-        let _ = writeln!(out);
-        self.matches_trait_impl(out, item);
-        let _ = writeln!(out);
-        self.parse_trait_impl(out, item);
-    }
-
-    fn inherent_matches_method(&self, out: &mut String, def: &str) {
-        let matches_fn = matches_fn_name(def);
-        let _ = writeln!(
-            out,
-            "    /// Whether `{def}` matches `tree` under the module's compiled-in limits."
-        );
-        let _ = writeln!(out, "    pub fn matches(");
-        let _ = writeln!(out, "        tree: &rt::Tree,");
-        let _ = writeln!(out, "        source: &str,");
-        let _ = writeln!(
-            out,
-            "    ) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
-        );
-        let _ = writeln!(out, "        matcher::{matches_fn}(tree, source)");
-        let _ = writeln!(out, "    }}");
-    }
-
-    fn matches_trait_impl(&self, out: &mut String, item: &DecodeItem) {
-        let ident = self.model.item_ident(item.name).to_string();
-        let (impl_generics, type_generics) =
-            if matches!(item.kind, DecodeItemKind::MatchOnlyDefinition) {
-                ("", "")
-            } else {
-                let sig = InherentParseSignature::for_item(self.model, item);
-                (sig.impl_generics, sig.type_generics)
-            };
-        let _ = writeln!(
-            out,
-            "impl{} rt::Matches for {}{} {{",
-            impl_generics, ident, type_generics
-        );
-        let _ = writeln!(
-            out,
-            "    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
-        );
-        let _ = writeln!(out, "        {ident}::matches(tree, source)");
-        let _ = writeln!(out, "    }}");
-        let _ = writeln!(out, "}}");
-    }
-
-    fn parse_trait_impl(&self, out: &mut String, item: &DecodeItem) {
-        let sig = InherentParseSignature::for_item(self.model, item);
-        let _ = writeln!(
-            out,
-            "impl<'t, 's> rt::Parse<'t, 's> for {}{} {{",
-            sig.ident, sig.type_generics
-        );
-        let _ = writeln!(out, "    fn parse(");
-        let _ = writeln!(out, "        tree: &'t rt::Tree,");
-        let _ = writeln!(out, "        source: &'s str,");
-        let _ = writeln!(
-            out,
-            "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
-        );
-        let _ = writeln!(out, "        {}::parse(tree, source)", sig.ident);
-        let _ = writeln!(out, "    }}");
-        let _ = writeln!(out, "}}");
     }
 
     /// Every decoder fn, in item order.

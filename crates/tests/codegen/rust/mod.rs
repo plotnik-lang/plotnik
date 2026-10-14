@@ -202,24 +202,19 @@ fn render_shard(cases: &[(&RustCase<'_>, bool)]) -> String {
             &format!("generated/{relative}/expected"),
         );
         let _ = writeln!(out, "    let tree = parse(Language::{language}, source);");
-        if *match_only {
-            let _ = writeln!(
-                out,
-                "    let actual = if {module}::Q::matches(&tree, source)"
-            );
-        } else {
-            let _ = writeln!(out, "    let actual = {module}::Q::parse(&tree, source)");
-        }
+        let _ = writeln!(
+            out,
+            "    let actual = {module}::Q::exec(tree.root_node(), source)"
+        );
         let _ = writeln!(
             out,
             "        .expect(\"snapshot must stay within generated runtime limits\")"
         );
         if *match_only {
-            let _ = writeln!(out, "    {{");
-            let _ = writeln!(out, "        \"null\".to_string()");
-            let _ = writeln!(out, "    }} else {{");
-            let _ = writeln!(out, "        \"<no match>\".to_string()");
-            let _ = writeln!(out, "    }};");
+            let _ = writeln!(out, "        .map(|node| {{");
+            let _ = writeln!(out, "            assert_eq!(node, tree.root_node());");
+            let _ = writeln!(out, "            \"null\".to_string()");
+            let _ = writeln!(out, "        }})");
         } else {
             let _ = writeln!(out, "        .map(|value| {{");
             let _ = writeln!(
@@ -231,11 +226,11 @@ fn render_shard(cases: &[(&RustCase<'_>, bool)]) -> String {
                 "                .expect(\"generated result serializes\")"
             );
             let _ = writeln!(out, "        }})");
-            let _ = writeln!(
-                out,
-                "        .unwrap_or_else(|| \"<no match>\".to_string());"
-            );
         }
+        let _ = writeln!(
+            out,
+            "        .unwrap_or_else(|| \"<no match>\".to_string());"
+        );
         let _ = writeln!(out);
         let _ = writeln!(out, "    assert_eq!(expected, actual);");
         let _ = writeln!(out, "}}\n");

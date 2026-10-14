@@ -97,10 +97,10 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
         .map_err(|message| ExpandError::new(args.grammar.span, message))?;
     anchors.grammar(&spec, &args.grammar.value, &loaded_grammar.path);
 
-    // Mirror `plotnik check --strict`: a compile-time-committed query must be
-    // clean — proc macros have no warning channel, so warnings fail too.
+    // Generated entries can run at supplied nonroot nodes, so the CLI's strict
+    // root-only lint does not apply. Proc macros have no warning channel.
     let query_span = query.span;
-    let compiled = compile_strict_query(query, &loaded_grammar.grammar)?;
+    let compiled = compile_query(query, &loaded_grammar.grammar)?;
     reject_colliding_entry_names(&compiled, query_span)?;
 
     let config = RustCodegenConfig::new()
@@ -124,13 +124,12 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
         .ok_or_else(|| ExpandError::new(query_span, "query did not emit a Rust module"))
 }
 
-fn compile_strict_query(
+fn compile_query(
     query: QueryInput,
     grammar: &plotnik_compiler::grammar::Grammar,
 ) -> Result<CompiledQuery, ExpandError> {
     let span = query.span;
     let compiled = QueryBuilder::new(query.source_map)
-        .with_strict_lints(true)
         .compile(grammar)
         .map_err(|error| ExpandError::new(span, error.to_string()))?;
     let diagnostics = compiled.diagnostics();
@@ -146,7 +145,7 @@ fn compile_strict_query(
 }
 
 /// Every definition becomes snake_case items (`{def}_trace`, the
-/// `parse`/`matches` surface). Distinct PascalCase names can collapse to one
+/// execution surface). Distinct PascalCase names can collapse to one
 /// snake form (`HTTPServer` / `HttpServer`); generated code would then fail
 /// with a bare rustc duplicate-definition error, so refuse the query with the
 /// real diagnosis instead.

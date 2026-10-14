@@ -3,7 +3,7 @@ Q = (program
   (expression_statement)? @has_statement :: bool
 )
 -------------------- MATCHER ---------------------
-// Generated Plotnik query module: typed result types, `parse`/`matches` entry
+// Generated Plotnik query module: typed result types, supplied-node execution
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format.
@@ -23,15 +23,53 @@ pub struct Q<'s> {
 }
 
 impl<'s> Q<'s> {
-    /// Match `Q` against `tree` and decode its output events into
-    /// the typed result. `None` is the no-match outcome.
-    /// The module's compiled-in limits bound total work, live
-    /// backtracking state, and typed decode depth.
-    pub fn parse(
-        tree: &rt::Tree,
+    /// Apply `Q` once at a suitable node. A wrong node kind is no-match.
+    pub fn exec(
+        node: rt::Node<'_>,
         source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let Some(journal) = matcher::q_journal_limited(tree, source)? else {
+        let mut budget = matcher::execution_budget(node);
+        Self::apply(node, source, &mut budget)
+    }
+
+    /// Search inclusively in source-order DFS preorder, retaining nested matches.
+    /// Matching and traversal share compiled-in limits. An error ends iteration.
+    pub fn each<'t>(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
+    + use<'t, 's> {
+        rt::Traversal::new(
+            scope,
+            matcher::execution_budget(scope),
+            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {
+                Self::apply(node, source, budget)
+            },
+        )
+    }
+
+    /// Consume the first item of `each`.
+    pub fn find(
+        scope: rt::Node<'_>,
+        source: &'s str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        <Self as rt::Execute<'_, '_>>::find(scope, source)
+    }
+
+    /// Collect `each`, returning an error rather than a partial vector.
+    pub fn find_all(
+        scope: rt::Node<'_>,
+        source: &'s str,
+    ) -> ::core::result::Result<::std::vec::Vec<Self>, rt::LimitExceeded> {
+        <Self as rt::Execute<'_, '_>>::find_all(scope, source)
+    }
+
+    fn apply(
+        node: rt::Node<'_>,
+        source: &'s str,
+        budget: &mut rt::ExecutionBudget,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        let Some(journal) = matcher::q_apply(node, source, budget)? else {
             return Ok(None);
         };
         let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);
@@ -39,28 +77,24 @@ impl<'s> Q<'s> {
         decoder.finish();
         Ok(Some(value))
     }
-
-    /// Whether `Q` matches `tree` under the module's compiled-in limits.
-    pub fn matches(
-        tree: &rt::Tree,
-        source: &str,
-    ) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        matcher::q_matches(tree, source)
-    }
 }
 
-impl<'s> rt::Matches for Q<'s> {
-    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        Q::matches(tree, source)
-    }
-}
+impl<'t, 's> rt::Execute<'t, 's> for Q<'s> {
+    type Item = Self;
 
-impl<'t, 's> rt::Parse<'t, 's> for Q<'s> {
-    fn parse(
-        tree: &'t rt::Tree,
+    fn exec(
+        node: rt::Node<'t>,
         source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        Q::parse(tree, source)
+        Self::exec(node, source)
+    }
+
+    fn each(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
+    {
+        Self::each(scope, source)
     }
 }
 
@@ -118,11 +152,10 @@ mod matcher {
         max_memory: None,
     };
 
-    /// Resolve [`LIMITS`] against this input's node count, exactly like
-    /// `VM::builder(...).build()` resolves the VM's.
-    fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
-        let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
-        LIMITS.resolve(source_nodes)
+    /// Resolve compiled-in limits once for a supplied application or search scope.
+    pub(super) fn execution_budget(scope: rt::Node<'_>) -> rt::ExecutionBudget {
+        let source_nodes = u32::try_from(scope.descendant_count()).unwrap_or(u32::MAX);
+        rt::ExecutionBudget::new(LIMITS.resolve(source_nodes))
     }
 
     /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
@@ -197,30 +230,19 @@ mod matcher {
         outcome.expect("an unmetered run cannot exceed a limit")
     }
 
-    /// [`q_journal`] under the module's compiled-in limits ([`LIMITS`]).
-    pub(super) fn q_journal_limited<'t>(
-        tree: &'t rt::Tree,
+    /// Apply one candidate using the operation's cumulative budget.
+    pub(super) fn q_apply<'t>(
+        node: rt::Node<'t>,
         source: &str,
+        budget: &mut rt::ExecutionBudget,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        run::<true, true, true>(
-            tree,
+        run_at_node::<true, true, true>(
+            node,
             source,
             S02_Q,
             EntryBoundary::new(true, false),
-            resolved_limits(tree),
+            budget,
         )
-    }
-
-    /// Whether `Q` accepts under [`LIMITS`] without recording output events.
-    pub(super) fn q_matches(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
-        Ok(run::<true, true, false>(
-            tree,
-            source,
-            S02_Q,
-            EntryBoundary::new(true, false),
-            resolved_limits(tree),
-        )?
-        .is_some())
     }
     #[derive(Clone, Copy)]
     struct EntryBoundary {
@@ -272,8 +294,7 @@ mod matcher {
     /// The metering constants come from the compiled-in policy. A fully unbounded
     /// policy skips budget accounting. Memory checks read `heap_bytes` only when
     /// memory is bounded. Metered dispatches use the same budget as the VM.
-    /// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
-    /// disables it to avoid output allocation and decode-depth failures. (No
+    /// `RECORD_OUTPUT_EVENTS` disables output allocation for match-only entries. (No
     /// let-chains: generated code targets the embedding crate's edition.)
     fn run<
         't,

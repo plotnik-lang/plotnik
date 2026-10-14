@@ -1,7 +1,7 @@
 //! The query-module emitter: fork-point NFA → Rust source.
 //!
 //! The output is one self-contained module: typed output structs/enums (the
-//! Rust type renderer's text, verbatim), the `parse`/`matches` surface and
+//! Rust type renderer's text, verbatim), supplied-node execution and
 //! per-type result decoders (`decode.rs`), and the compiled matcher itself —
 //! shielded inside a nested `mod matcher` so its machinery names (`Flow`,
 //! state consts) can never collide with a query's own type names.
@@ -39,7 +39,7 @@ use crate::compiler::regex::compile_native_dfa;
 use crate::core::NodeFieldId;
 use plotnik_runtime::{Limit, Nav, SkipPolicy};
 
-use super::entry_names::{journal_fn_name, limited_journal_fn_name, matches_fn_name};
+use super::entry_names::{apply_fn_name, journal_fn_name};
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
 ///
@@ -249,7 +249,7 @@ impl<'a> Generator<'a> {
             rust_config,
         ));
         out.push_str(
-            &decoders.parse_api(
+            &decoders.execution_api(
                 self.plan
                     .matcher()
                     .entry_points()
@@ -484,17 +484,10 @@ impl<'a> Generator<'a> {
 
     fn entry_fns(&self, out: &mut String) {
         // An unbounded resource emits `false` for its metering const, folding
-        // the check out of `run`. With both unbounded there is no ceiling to
-        // resolve, so the safe entries pass `NO_LIMITS` rather than pay for a
-        // per-call node count that nothing reads.
+        // the check out of candidate application.
         let limits = self.limits;
         let fuel_metered = limits.fuel != Limit::Unbounded;
         let memory_metered = limits.memory != Limit::Unbounded;
-        let safe_limits = if fuel_metered || memory_metered {
-            "resolved_limits(tree)"
-        } else {
-            "NO_LIMITS"
-        };
         let fuel_metered = if fuel_metered { "true" } else { "false" };
         let memory_metered = if memory_metered { "true" } else { "false" };
         for entry in self.plan.matcher().entry_points() {
@@ -512,25 +505,30 @@ impl<'a> Generator<'a> {
                 EntryBoundary::Node => "EntryBoundary::new(false, true)",
                 EntryBoundary::Record => "EntryBoundary::new(true, false)",
             };
+            let record_output = if has_decoder { "true" } else { "false" };
+            let driver =
+                format!("run_at_node::<{fuel_metered}, {memory_metered}, {record_output}>");
+            let state = &info.const_name;
+            let compact = format!("    {driver}(node, source, {state}, {boundary}, budget)");
+            let apply_call = if compact.len() + 4 <= 100 {
+                compact
+            } else {
+                format!(
+                    "    {driver}(\n        node,\n        source,\n        {state},\n        {boundary},\n        budget,\n    )"
+                )
+            };
             let subs = [
                 ("DEF", def),
                 ("JOURNAL_FN", &journal_fn_name(def)),
-                ("LIMITED_JOURNAL_FN", &limited_journal_fn_name(def)),
-                ("MATCHES_FN", &matches_fn_name(def)),
+                ("APPLY_FN", &apply_fn_name(def)),
+                ("APPLY_CALL", apply_call.as_str()),
                 ("ENTRY", info.const_name.as_str()),
                 ("BOUNDARY", boundary),
-                ("FUEL_METERED", fuel_metered),
-                ("MEMORY_METERED", memory_metered),
-                ("SAFE_LIMITS", safe_limits),
             ];
             out.push('\n');
             splice(out, "", JOURNAL_ENTRY_FN, &subs);
-            if has_decoder {
-                out.push('\n');
-                splice(out, "", LIMITED_JOURNAL_ENTRY_FN, &subs);
-            }
             out.push('\n');
-            splice(out, "", LIMITED_MATCHES_ENTRY_FN, &subs);
+            splice(out, "", APPLY_ENTRY_FN, &subs);
         }
     }
 
@@ -1230,7 +1228,7 @@ pub(super) fn depth_expr(limit: Limit, max_decoder_frame_bytes: u64) -> String {
 }
 
 const HEADER: &str = r#"
-// Generated Plotnik query module: typed result types, `parse`/`matches` entry
+// Generated Plotnik query module: typed result types, supplied-node execution
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format.
@@ -1261,16 +1259,15 @@ const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
     max_memory: None,
 };
 
-/// Resolve [`LIMITS`] against this input's node count, exactly like
-/// `VM::builder(...).build()` resolves the VM's.
-fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
-    let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
-    LIMITS.resolve(source_nodes)
+/// Resolve compiled-in limits once for a supplied application or search scope.
+pub(super) fn execution_budget(scope: rt::Node<'_>) -> rt::ExecutionBudget {
+    let source_nodes = u32::try_from(scope.descendant_count()).unwrap_or(u32::MAX);
+    rt::ExecutionBudget::new(LIMITS.resolve(source_nodes))
 }
 "#;
 
 const DECODE_DEPTH_CONST: &str = r#"
-/// Ceiling on recursive typed decoding for safe `parse` (`None` opts out). The
+/// Ceiling on recursive typed decoding (`None` opts out). The
 /// matcher itself is iterative; only decoder recursion enters this guard.
 pub(super) const MAX_DECODE_DEPTH: Option<u64> = @DEPTH@;
 "#;
@@ -1362,38 +1359,14 @@ pub fn @JOURNAL_FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJou
 }
 "#;
 
-// The metering const generics (`@FUEL_METERED@`, `@MEMORY_METERED@`) are fixed
-// at generation time from the compiled-in policy: an unbounded resource emits
-// `false`, folding its check out of the monomorphized `run`. When both are
-// unbounded there is nothing to resolve, so the entries pass `NO_LIMITS` and
-// skip the per-call node count entirely.
-const LIMITED_JOURNAL_ENTRY_FN: &str = r#"
-/// [`@JOURNAL_FN@`] under the module's compiled-in limits ([`LIMITS`]).
-pub(super) fn @LIMITED_JOURNAL_FN@<'t>(
-    tree: &'t rt::Tree,
+const APPLY_ENTRY_FN: &str = r#"
+/// Apply one candidate using the operation's cumulative budget.
+pub(super) fn @APPLY_FN@<'t>(
+    node: rt::Node<'t>,
     source: &str,
+    budget: &mut rt::ExecutionBudget,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    run::<@FUEL_METERED@, @MEMORY_METERED@, true>(
-        tree,
-        source,
-        @ENTRY@,
-        @BOUNDARY@,
-        @SAFE_LIMITS@,
-    )
-}
-"#;
-
-const LIMITED_MATCHES_ENTRY_FN: &str = r#"
-/// Whether `@DEF@` accepts under [`LIMITS`] without recording output events.
-pub(super) fn @MATCHES_FN@(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
-    Ok(run::<@FUEL_METERED@, @MEMORY_METERED@, false>(
-        tree,
-        source,
-        @ENTRY@,
-        @BOUNDARY@,
-        @SAFE_LIMITS@,
-    )?
-    .is_some())
+@APPLY_CALL@
 }
 "#;
 
@@ -1448,8 +1421,7 @@ enum Unwound {
 /// The metering constants come from the compiled-in policy. A fully unbounded
 /// policy skips budget accounting. Memory checks read `heap_bytes` only when
 /// memory is bounded. Metered dispatches use the same budget as the VM.
-/// `RECORD_OUTPUT_EVENTS` controls whether output events are journaled; `matches`
-/// disables it to avoid output allocation and decode-depth failures. (No
+/// `RECORD_OUTPUT_EVENTS` disables output allocation for match-only entries. (No
 /// let-chains: generated code targets the embedding crate's edition.)
 fn run<
     't,
