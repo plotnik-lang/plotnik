@@ -70,7 +70,6 @@ pub fn parse_section_header(line: &str) -> Option<String> {
         || matches!(
             name.as_str(),
             "grammar"
-                | "limits"
                 | "cst"
                 | "ast"
                 | "definitions"

@@ -26,10 +26,8 @@
 //! | `06-vm`      | typescript, output, inspection if enabled, bytecode, trace (requires input) |
 //!
 //! Compiler snapshots may add `QUERY (file.ptk)` sections after the grammar/input
-//! to compile additional query files alongside the initial `query.ptk`. An optional
-//! YAML `LIMITS` section sets `work_budget` and optionally `automaton_max_depth`
-//! through the compiler's public API.
-//! `make shot` formats every query file and preserves the authored limit settings.
+//! to compile additional query files alongside the initial `query.ptk`.
+//! `make shot` formats every query file.
 //!
 //! Compile-stage snapshots under an `inspection/` folder compile with
 //! `BytecodeConfig::inspection(BytecodeInspection::Spans)`.
@@ -60,6 +58,8 @@
 //! contain unrelated behavior merely to exercise several features at once. Stage and
 //! folder boundaries follow the current compiler pipeline and subsystem ownership,
 //! not historical implementation phases.
+
+mod grammar_limits;
 
 use std::fs;
 use std::path::Path;
@@ -104,7 +104,6 @@ struct Parsed {
     query: String,
     source: Option<Source>,
     files: Vec<Section>,
-    limits: Option<String>,
 }
 
 impl Parsed {
@@ -227,19 +226,16 @@ fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Parsed, S
     };
 
     let mut files = Vec::new();
-    let mut limits = None;
     let mut generated_start = generated_start;
     while let Some(section) = sections.get(generated_start) {
-        if !section.name.starts_with("query.") && section.name != "limits" {
+        if !section.name.starts_with("query.") {
             break;
         }
         if matches!(
             kind,
             SnapshotKind::Parser { .. } | SnapshotKind::Analyze | SnapshotKind::Vm { .. }
         ) {
-            return Err(
-                "QUERY and LIMITS sections are only supported in compiler snapshots".into(),
-            );
+            return Err("QUERY sections are only supported in compiler snapshots".into());
         }
         if let Some(path) = section.name.strip_prefix("query.") {
             if path.is_empty()
@@ -249,8 +245,6 @@ fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Parsed, S
                 return Err(format!("duplicate or empty query path `{path}`"));
             }
             files.push(section.clone());
-        } else if limits.replace(section.body.clone()).is_some() {
-            return Err("duplicate LIMITS section".into());
         }
         generated_start += 1;
     }
@@ -260,7 +254,6 @@ fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Parsed, S
         query: document.query,
         source,
         files,
-        limits,
     })
 }
 
@@ -357,22 +350,7 @@ fn render_compile(kind: SnapshotKind, parsed: &Parsed) -> Result<Vec<GeneratedSe
         }
         _ => Lang::resolve(input.and_then(|input| input.ext.as_deref()))?,
     };
-    let mut builder = QueryBuilder::new(parsed.source_map()).with_strict_lints(kind.strict_lints());
-    if let Some(yaml) = &parsed.limits {
-        #[derive(serde::Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Limits {
-            work_budget: u64,
-            automaton_max_depth: Option<u32>,
-        }
-
-        let limits: Limits =
-            serde_saphyr::from_str(yaml).map_err(|error| format!("invalid LIMITS: {error}"))?;
-        builder = builder.with_satisfiability_work_budget(limits.work_budget);
-        if let Some(depth) = limits.automaton_max_depth {
-            builder = builder.with_satisfiability_automaton_max_depth(depth);
-        }
-    }
+    let builder = QueryBuilder::new(parsed.source_map()).with_strict_lints(kind.strict_lints());
     let compiled = builder
         .compile(lang.grammar())
         .expect("query parsing should not exhaust fuel");
@@ -806,9 +784,6 @@ fn canonical(input: &Parsed, generated: &[GeneratedSection]) -> String {
     }
     for file in &input.files {
         push_authored_section(&mut out, &file.name, &file.body);
-    }
-    if let Some(limits) = &input.limits {
-        push_authored_section(&mut out, "limits", limits);
     }
     for section in generated {
         push_section(&mut out, section.kind.as_str(), &section.body);
