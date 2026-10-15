@@ -1,15 +1,3 @@
-//! Query-shaped rendering for parsed source trees.
-//!
-//! Renders a tree-sitter tree as indented S-expressions that are also valid
-//! Plotnik patterns, so any line of the dump can be copy-pasted into a query:
-//! leaf text becomes a string predicate (`(identifier == "x")`), a leaf whose
-//! text equals its kind collapses to `(this)`, and nodes the grammar allows
-//! children for stay bare (`(statement_block)`) — a predicate there would be
-//! rejected by the analyzer's leaf check.
-//!
-//! Output is a list of typed chunks so the playground can colorize without
-//! re-parsing; the CLI concatenates the chunk texts.
-
 use std::fmt::Write as _;
 
 use serde::Serialize;
@@ -59,7 +47,6 @@ pub struct TreeDump {
     pub nodes: Vec<DumpNode>,
 }
 
-/// One emission for the iterative dumper's work stack.
 enum Step<'t> {
     Node {
         node: tree_sitter::Node<'t>,
@@ -67,7 +54,6 @@ enum Step<'t> {
         depth: usize,
     },
     Chunk(DumpChunkKind, &'static str),
-    /// Emit the closing paren and seal `nodes[index]`'s dump range.
     Close {
         index: usize,
     },
@@ -106,8 +92,6 @@ pub fn dump_tree(
             Step::Node { node, field, depth } => (node, field, depth),
         };
 
-        // Children are pre-filtered below, so this only guards a
-        // (hypothetical) anonymous root.
         if !include_anonymous && !node.is_named() {
             continue;
         }
@@ -136,7 +120,6 @@ pub fn dump_tree(
 
         out.push(DumpChunkKind::Punct, "(");
         out.push(DumpChunkKind::Kind, node.kind());
-        // Queue, in source order, a newline + each child, then the closing paren.
         let mut deferred = Vec::with_capacity(children.len() * 2 + 1);
         for (child, child_field) in children {
             deferred.push(Step::Chunk(DumpChunkKind::Text, "\n"));
@@ -177,8 +160,6 @@ fn dump_leaf(out: &mut ChunkWriter, node: tree_sitter::Node<'_>, source: &str, g
         .utf8_text(source.as_bytes())
         .unwrap_or("<invalid utf8>");
 
-    // Anonymous nodes are bare string tokens (`"("`) in a pattern, matched
-    // by kind.
     if !node.is_named() {
         out.push(DumpChunkKind::String, quoted(kind));
         return;
@@ -188,8 +169,6 @@ fn dump_leaf(out: &mut ChunkWriter, node: tree_sitter::Node<'_>, source: &str, g
         out.push(DumpChunkKind::Punct, "(");
         out.push(DumpChunkKind::Kind, "ERROR");
         out.push(DumpChunkKind::Punct, ")");
-        // `(ERROR)` accepts neither children nor predicates in a query, but
-        // the unparsed text is the payload here — carry it in a comment.
         if !text.is_empty() {
             out.push(DumpChunkKind::Text, " ");
             out.push(DumpChunkKind::Comment, format!("; {}", quoted(text)));
@@ -197,7 +176,6 @@ fn dump_leaf(out: &mut ChunkWriter, node: tree_sitter::Node<'_>, source: &str, g
         return;
     }
 
-    // Keyword-ish leaf (`this`, `true`): the kind alone pins the text.
     if text == kind {
         out.push(DumpChunkKind::Punct, "(");
         out.push(DumpChunkKind::Kind, kind);
@@ -205,9 +183,6 @@ fn dump_leaf(out: &mut ChunkWriter, node: tree_sitter::Node<'_>, source: &str, g
         return;
     }
 
-    // A text predicate is only valid where the grammar proves a leaf shape
-    // (the analyzer's PredicateOnNonLeaf rule); anything else — empty
-    // containers, kinds the grammar can't resolve — stays bare.
     let leaf = grammar
         .resolve_named_node(kind)
         .is_some_and(|id| !grammar.has_declared_child_structure(id));
@@ -221,8 +196,6 @@ fn dump_leaf(out: &mut ChunkWriter, node: tree_sitter::Node<'_>, source: &str, g
     out.push(DumpChunkKind::Punct, ")");
 }
 
-/// Quote and escape text as a Plotnik string literal. The escape set matches
-/// `compiler/parse/strings.rs::unescape`, so the dump round-trips.
 fn quoted(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
@@ -256,7 +229,6 @@ impl ChunkWriter {
         self.chunks.push(DumpChunk { kind, text });
     }
 
-    /// Byte length of everything written so far.
     fn len(&self) -> usize {
         self.len
     }
@@ -266,7 +238,6 @@ impl ChunkWriter {
     }
 }
 
-/// Collect a node's children, paired with their field names.
 fn collect_children<'t>(
     node: tree_sitter::Node<'t>,
     include_anonymous: bool,

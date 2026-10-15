@@ -58,15 +58,12 @@ pub struct Grammar {
     field_names: HashMap<NodeFieldId, String>,
     supertype_ids: HashSet<NodeKindId>,
     subtypes: HashMap<NodeKindId, Vec<NodeKindId>>,
-    /// Public node ids that name anonymous (literal-token) kinds.
     anonymous_node_id_set: HashSet<NodeKindId>,
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
     structure: StructureTable,
-    /// Child/field admissibility derived from the node summary and retained productions.
     admissibility: AdmissibilityIndex,
-    /// Tree-shape rendering model for `lang dump` and diagnostics.
     tree: TreeGrammar,
 }
 
@@ -95,11 +92,6 @@ impl Grammar {
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
         let (syntax_grammar, lexical_grammar) = extract_tokens(resolved_grammar)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
-        // Tap the pipeline here: nested Seq/Choice/Repeat structure is intact and
-        // tokens are split out, but `expand_repeats`/`flatten` (which consume these
-        // grammars below) would render them unusable as documentation. Lower the
-        // shapes now, in place, so the grammars never have to be cloned; the
-        // closure-dependent bits are attached from `node_shapes` further down.
         let rule_order: Vec<String> = raw.rules.keys().cloned().collect();
         let (mut tree, tree_aliases) = super::render::lower(
             raw.name.clone(),
@@ -233,7 +225,6 @@ impl Grammar {
             all_named_node_kinds,
             all_anonymous_node_kinds,
             all_field_names,
-            // `from_raw` attaches the retained productions before publishing the grammar.
             structure: StructureTable::default(),
             admissibility,
             tree: TreeGrammar::default(),
@@ -261,17 +252,12 @@ impl Grammar {
         self.identity.as_ref()
     }
 
-    /// Distilled structural skeleton of the grammar's productions — ordered,
-    /// visibility-classified step sequences retained from the flattened grammar
-    /// before it is discarded. Empty for grammars built directly from metadata:
-    /// the flattened productions it distills do not survive into `GrammarTables`,
-    /// so only the `from_raw` path can populate it.
+    /// Ordered, visibility-classified step sequences for the grammar's productions.
     pub fn structure(&self) -> &StructureTable {
         &self.structure
     }
 
-    /// Tree-shape rendering model for `lang dump` and diagnostics. Empty for
-    /// grammars built directly from metadata rather than through `from_raw`.
+    /// Tree-shape rendering model for `lang dump` and diagnostics.
     pub fn tree(&self) -> &TreeGrammar {
         &self.tree
     }
@@ -341,9 +327,8 @@ impl Grammar {
             .unwrap_or(&[])
     }
 
-    /// Transitive closure of a supertype's subtypes (direct and indirect), excluding the
-    /// supertype itself. `subtypes` is direct-only, so structural validation expands it here.
-    /// Sequence validation calls it too; centralized here to avoid duplicating the traversal.
+    /// Transitive closure of a supertype's subtypes (direct and indirect), excluding
+    /// the supertype itself. Unlike `subtypes`, this includes indirect subtypes.
     pub fn collect_subtypes(&self, supertype: NodeKindId) -> HashSet<NodeKindId> {
         let mut closure = HashSet::new();
         let mut stack = vec![supertype];
@@ -365,8 +350,6 @@ impl Grammar {
             && self.structure.realizers_of(node_kind_id) == [NodeRealizer::Leaf]
     }
 
-    /// Whether this kind has a terminal realization, even if other occurrences
-    /// with the same public name are syntax nodes. Recovery can insert terminals.
     pub(crate) fn can_be_token(&self, node_kind_id: NodeKindId) -> bool {
         !self.is_supertype(node_kind_id)
             && self
@@ -396,10 +379,8 @@ impl Grammar {
         }
     }
 
-    /// The visible extra kinds (comments and the like) the parser may insert between
-    /// siblings at any level. Most are lexical tokens, so they are absent from the
-    /// syntax-variable structure; sequence validation enumerates them here to model
-    /// optional extras a query child may match.
+    /// The visible extra kinds (such as comments) the parser may insert between
+    /// siblings at any level.
     pub fn extra_node_kinds(&self) -> &[NodeKindId] {
         &self.extra_node_kinds
     }
@@ -467,11 +448,6 @@ impl Grammar {
     }
 
     fn node_constraints_for(&self, node_kind_id: NodeKindId) -> &NodeConstraints {
-        // Leaf-token kinds (and some alias-produced ids) carry no node shape, so they have no
-        // constraints entry. Treat them as having no children/fields rather than panicking: a
-        // token has no children, so an empty view is correct, and any named child under it is
-        // already handled by the `is_token` leaf check. Returning empty keeps every constraint lookup
-        // (admissibility, predicate-on-leaf, hints) total instead of crashing on such ids.
         static EMPTY: LazyLock<NodeConstraints> = LazyLock::new(|| NodeConstraints {
             fields: HashMap::new(),
             children: None,
@@ -480,9 +456,6 @@ impl Grammar {
     }
 }
 
-/// Resolve a node kind to its id via the public name maps. Equivalent to the former
-/// `node_ids: HashMap<NodeKind<&str>, _>`: both maps are populated in lockstep with it, so the
-/// lookups match — but these own their keys, freeing the symbol loop to consume `tables.symbols`.
 fn resolve_node_id(
     named_node_ids: &HashMap<String, NodeKindId>,
     anonymous_node_ids: &HashMap<String, NodeKindId>,
@@ -494,13 +467,6 @@ fn resolve_node_id(
     }
 }
 
-/// Expands a supertype to the concrete member ids it stands for, splicing any *inlined*
-/// supertype member — one tree-sitter gives no public id (go's `_type`) — through to its
-/// own members. Without the splice those members are lost, so [`Grammar::collect_subtypes`]
-/// under-reports and a field or child typed by a supertype that reaches members through one
-/// rejects a legitimate concrete value (java `field_declaration.type: (integral_type)`). A
-/// kept (id-bearing) sub-supertype is returned as its id; the transitive `collect_subtypes`
-/// closure expands it through its own map entry.
 struct SubtypeResolver<'a> {
     shapes_by_kind: HashMap<NodeKind<&'a str>, &'a NodeShape>,
     named_node_ids: &'a HashMap<String, NodeKindId>,
@@ -575,7 +541,6 @@ impl NodeShape {
     }
 }
 
-/// Cardinality constraints for a field or children slot.
 #[derive(Debug, Clone)]
 pub(crate) struct NodeSlot {
     pub(crate) multiple: bool,

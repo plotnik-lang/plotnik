@@ -4,9 +4,6 @@ fn is_separator(c: char) -> bool {
     matches!(c, '_' | '-' | '.')
 }
 
-/// A new word starts at a lower/digit→upper transition (`fooBar`) or at the
-/// last capital of an acronym run followed by lowercase (`HTTPServer` →
-/// `HTTP` + `Server`).
 fn is_word_boundary(prev: char, cur: char, next: Option<char>) -> bool {
     cur.is_ascii_uppercase()
         && (prev.is_ascii_lowercase()
@@ -113,8 +110,6 @@ pub fn find_similar<'a>(name: &str, candidates: &[&'a str]) -> Option<&'a str> {
 pub fn escape_json_into(out: &mut String, s: &str) {
     let needs_escape = |c: char| matches!(c, '"' | '\\' | '\n' | '\r' | '\t') || c.is_control();
 
-    // Copy the unescaped prefix in one shot, then escape from the first
-    // offending char onward.
     let Some((split, _)) = s.char_indices().find(|&(_, c)| needs_escape(c)) else {
         out.push_str(s);
         return;

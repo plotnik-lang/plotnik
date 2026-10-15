@@ -1,26 +1,13 @@
-//! Width-aware layout of shapes and categories.
-//!
-//! A composite group renders inline (`{ a b c }`) when its single-line form fits
-//! within the baseline width at the column it starts on, and breaks one member
-//! per line otherwise. The decision is funnelled through [`fits`] — the single
-//! width knob — so the policy lives in one place: `width = 0` forces every group
-//! to break (the old always-break behaviour), a very large width keeps everything
-//! inline. Quantifiers and fields never separate from their operand.
-
 use std::fmt::Write;
 
 use super::{GrammarNodeRef, Shape};
 
 const INDENT: &str = "  ";
 
-/// Whether `flat_len` characters starting at column `col` fit within `width`.
-/// The one place the width policy is decided.
 fn fits(col: usize, flat_len: usize, width: usize) -> bool {
     col + flat_len <= width
 }
 
-/// Render a shape as a pattern body. `col` is the column its first character
-/// lands on; `indent` is the level its continuation and closing lines align to.
 pub(super) fn render_shape(shape: &Shape, col: usize, indent: usize, width: usize) -> String {
     let flat = flat_shape(shape);
     if fits(col, flat.chars().count(), width) {
@@ -29,8 +16,6 @@ pub(super) fn render_shape(shape: &Shape, col: usize, indent: usize, width: usiz
     expand_shape(shape, col, indent, width)
 }
 
-/// Render a borrowed slice of shapes as a bracketed `[...]` group (the extras
-/// list), folding inline when it fits.
 pub(super) fn render_list(members: &[Shape], col: usize, indent: usize, width: usize) -> String {
     let flat = flat_group('[', ']', members);
     if fits(col, flat.chars().count(), width) {
@@ -39,7 +24,6 @@ pub(super) fn render_list(members: &[Shape], col: usize, indent: usize, width: u
     expand_group('[', ']', members, indent, width)
 }
 
-/// The single-line form of a shape, with no width checks.
 fn flat_shape(shape: &Shape) -> String {
     match shape {
         Shape::Node(node) => node.to_string(),
@@ -61,9 +45,6 @@ fn flat_group(open: char, close: char, members: &[Shape]) -> String {
     format!("{open} {inner} {close}")
 }
 
-/// Render a shape across multiple lines — reached only when its flat form did
-/// not fit. Members re-decide their own fit at the deeper indent, so a short
-/// member stays inline inside a broken parent.
 fn expand_shape(shape: &Shape, col: usize, indent: usize, width: usize) -> String {
     match shape {
         Shape::Seq(members) => expand_group('{', '}', members, indent, width),
@@ -80,7 +61,6 @@ fn expand_shape(shape: &Shape, col: usize, indent: usize, width: usize) -> Strin
             let inner_col = col + prefix.chars().count();
             format!("{prefix}{}", render_shape(inner, inner_col, indent, width))
         }
-        // Atoms have no multi-line form.
         _ => flat_shape(shape),
     }
 }
@@ -102,7 +82,6 @@ fn expand_group(open: char, close: char, members: &[Shape], indent: usize, width
     out
 }
 
-/// The single-line form of a category's members: `a | b | c#`.
 pub(super) fn flat_category(members: &[GrammarNodeRef]) -> String {
     members
         .iter()
@@ -111,7 +90,6 @@ pub(super) fn flat_category(members: &[GrammarNodeRef]) -> String {
         .join(" | ")
 }
 
-/// The broken form of a category: one member per line with a leading `|`.
 pub(super) fn expand_category(members: &[GrammarNodeRef]) -> String {
     let mut out = String::new();
     for member in members {
@@ -120,7 +98,6 @@ pub(super) fn expand_category(members: &[GrammarNodeRef]) -> String {
     out
 }
 
-/// A category member is written bare (no parens); a nested category keeps its `#`.
 fn category_member(node_ref: &GrammarNodeRef) -> String {
     if node_ref.category {
         format!("{}#", node_ref.name)

@@ -232,12 +232,6 @@ fn promote_extracted_tokens(
     lexical_variables: &mut [Variable],
     extracted_usage_counts: &[usize],
 ) -> (Vec<Variable>, SymbolReplacer) {
-    // If a variable's entire rule was extracted as a token and that token didn't
-    // appear within any other rule, then remove that variable from the syntax
-    // grammar, giving its name to the token in the lexical grammar. Any symbols
-    // that pointed to that variable will need to be updated to point to the
-    // variable in the lexical grammar. Symbols that pointed to later variables
-    // will need to have their indices decremented.
     let mut retained_variables = Vec::with_capacity(variables.len());
     let mut symbol_replacer = SymbolReplacer {
         replacements: FxHashMap::default(),

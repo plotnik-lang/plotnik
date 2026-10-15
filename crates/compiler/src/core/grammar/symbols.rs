@@ -118,7 +118,6 @@ pub(super) fn intern_symbols(
 
     for (i, variable) in variables.iter_mut().enumerate() {
         if supertype_symbols.contains(&Symbol::non_terminal(i)) {
-            // Supertypes group concrete rules but are not emitted as concrete CST nodes.
             variable.kind = VariableType::Hidden;
         }
     }
@@ -135,8 +134,6 @@ pub(super) fn intern_symbols(
 }
 
 struct Interner<'a> {
-    /// Name → Symbol. Variables take priority over external rules, and the
-    /// lowest index wins within each group, matching the original ordered scan.
     name_map: FxHashMap<&'a str, Symbol>,
 }
 
@@ -197,8 +194,6 @@ impl<'a> Interner<'a> {
         self.name_map.get(name).copied()
     }
 
-    // In the case of a seq or choice rule of 1 element in a hidden rule, weird
-    // inconsistent behavior with queries can occur. So we should warn the user about it.
     fn check_single(elements: &[Rule], name: Option<&str>, kind: &str) {
         if elements.len() == 1 && matches!(elements[0], Rule::String(_) | Rule::Pattern(_, _)) {
             warn!(

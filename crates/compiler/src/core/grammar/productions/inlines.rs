@@ -53,9 +53,6 @@ pub(in crate::core::grammar) fn process_inlines(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct ProductionStepId {
-    // A `None` value here means that the production itself was produced via inlining,
-    // and is stored in the builder's `productions` vector, as opposed to being
-    // stored in one of the grammar's variables.
     variable: Option<usize>,
     production: usize,
     step: usize,

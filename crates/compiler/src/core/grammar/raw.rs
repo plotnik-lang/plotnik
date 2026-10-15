@@ -1,5 +1,3 @@
-//! Raw tree-sitter grammar source-format types.
-
 use indexmap::IndexMap;
 use serde::Deserialize;
 

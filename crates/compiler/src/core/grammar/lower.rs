@@ -1,5 +1,3 @@
-//! Raw grammar lowering helpers.
-
 use std::collections::BTreeSet;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -399,7 +397,7 @@ pub(super) fn derive_symbols(
 }
 
 pub(super) fn public_node_kind(name: &str) -> String {
-    // Tree-sitter appends private disambiguators after NUL; public node names stop before it.
+    // Tree-sitter exposes node-kind names as NUL-terminated C strings.
     name.split(TREE_SITTER_PUBLIC_NAME_SEPARATOR)
         .next()
         .unwrap_or(name)
@@ -528,8 +526,6 @@ fn public_symbol_map(
     symbol_map
 }
 
-/// The public symbol id assignment paired with the canonical-symbol map that
-/// `unique_aliases` consults to decide whether an alias already names an existing symbol.
 #[derive(Clone, Copy)]
 struct SymbolResolution<'a> {
     ids: &'a rustc_hash::FxHashMap<Symbol, NodeKindId>,

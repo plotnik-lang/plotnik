@@ -1,11 +1,3 @@
-//! Assembling the full `lang dump` document from a [`TreeGrammar`].
-//!
-//! Layout: an optional legend, the `extras` line, then three grouped sections —
-//! externals, categories, and the node/hidden/token definitions in grammar order.
-//! Each definition carries its annotations (`; root`, `; extra`, `; inlined`,
-//! `; alias of …`) as a trailing comment on one-liners or a leading `;` line on
-//! multi-line bodies.
-
 use super::layout;
 use super::{Body, Def, DefKind, TreeGrammar};
 
@@ -41,8 +33,6 @@ impl TreeGrammar {
         if let Some(extras) = self.render_extras(width) {
             blocks.push(extras);
         }
-        // Most useful first: categories and node shapes the author copies from,
-        // with the opaque external tokens pushed to the end.
         blocks.extend(self.section(width, |kind| matches!(kind, DefKind::Category)));
         blocks.extend(self.section(width, |kind| {
             matches!(
@@ -123,8 +113,6 @@ fn render_def(def: &Def, width: usize) -> String {
     }
 }
 
-/// The `name = ` head and the rendered body for a definition. The body starts at
-/// the column just past the head, so folding accounts for the head's width.
 fn head_and_body(def: &Def, width: usize) -> (String, String) {
     match &def.body {
         Body::Pattern(shape) => {
@@ -142,7 +130,6 @@ fn head_and_body(def: &Def, width: usize) -> (String, String) {
             }
         }
         Body::Token(token) => (format!("{} = ", def.name), token.to_string()),
-        // An external token (directly, or aliased under a new name) has no rule body.
         Body::None => (format!("{} = ", def.name), "external".to_string()),
     }
 }
@@ -155,8 +142,6 @@ fn annotation(def: &Def) -> Option<String> {
     if def.extra {
         notes.push("extra".to_string());
     }
-    // The only hidden rule not already self-marked by a leading underscore is a
-    // non-underscore rule placed in the grammar's `inline` list (e.g. devicetree).
     if def.kind == DefKind::Hidden && !def.name.starts_with('_') {
         notes.push("inlined".to_string());
     }

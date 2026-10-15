@@ -1,5 +1,3 @@
-//! Core data structures for Plotnik grammar-derived node information.
-
 pub mod colors;
 pub mod grammar;
 mod interner;
@@ -12,8 +10,6 @@ pub use interner::{Interner, Symbol};
 #[cfg(feature = "vm")]
 pub use tree_dump::{DumpChunk, DumpChunkKind, DumpNode, TreeDump, dump_tree, dump_tree_text};
 
-// Shared with the runtime crate: the compiler resolves names to these ids and
-// classes; the engine (VM or generated code) consumes them against live trees.
 pub use plotnik_runtime::{NodeFieldId, NodeKindId, ZeroIdError};
 
 pub(crate) use plotnik_runtime::{NodeClass, SkipClass};

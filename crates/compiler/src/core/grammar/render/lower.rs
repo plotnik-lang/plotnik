@@ -1,18 +1,3 @@
-//! Lowering the grammar pipeline into a [`TreeGrammar`].
-//!
-//! The renderer taps the pipeline **after `extract_tokens`, before
-//! `expand_repeats`**: nested `Seq`/`Choice`/`Repeat` structure is intact, symbols
-//! are resolved, and tokens are split out. Lowering happens in two passes so the
-//! grammars never need to be cloned:
-//!
-//! 1. [`lower`] reads the still-owned extracted grammars in place and produces the
-//!    pattern/token/external definitions and the extras list (no closures yet).
-//! 2. [`attach_node_shapes`] joins in the visible subtype closures (and the
-//!    `root`/`extra` flags) once `node_shapes` has been computed downstream.
-//!
-//! Lowering `Rule → Shape` is the one place every string-language construct
-//! (precedence, reserved contexts, token metadata, blanks) is normalized away.
-
 use std::collections::HashSet;
 
 use super::super::prepared::{ExtractedLexicalGrammar, ExtractedSyntaxGrammar, VariableType};
@@ -21,21 +6,13 @@ use super::super::types::{NodeKindRef, NodeShape};
 use super::lexical::synthesize;
 use super::{Body, Def, DefKind, GrammarNodeRef, Quant, Shape, TreeGrammar};
 
-/// A kind that exists only by aliasing another: `(alias_name)` displays the
-/// `underlying` rule under a new name.
 pub(in crate::core::grammar) struct AliasInfo {
     name: String,
     named: bool,
     underlying: String,
-    /// The underlying rule's reference shape, used when it has no own definition
-    /// to borrow a body from (e.g. an aliased anonymous token).
     underlying_shape: Shape,
 }
 
-/// Pass 1: build the tree-shape model's definitions and extras from the tapped
-/// grammars. Categories are emitted with empty member lists; `root`/`extra` are
-/// left unset until [`attach_node_shapes`]. The collected alias usages are
-/// returned for the same pass to turn into alias-only definitions.
 pub(in crate::core::grammar) fn lower(
     name: String,
     order: &[String],
@@ -51,7 +28,6 @@ pub(in crate::core::grammar) fn lower(
         }
     }
     for token in &syntax.external_tokens {
-        // Internal-token-backed externals render through their lexical token, not here.
         if token.corresponding_internal_token.is_none() {
             defs.push(Def {
                 name: token.name.clone(),
@@ -72,8 +48,6 @@ pub(in crate::core::grammar) fn lower(
     (tree, ctx.collect_aliases())
 }
 
-/// Pass 2: fill category member lists from the visible subtype closures, set the
-/// `root`/`extra` annotation flags, and append alias-only kinds as definitions.
 pub(in crate::core::grammar) fn attach_node_shapes(
     tree: &mut TreeGrammar,
     node_shapes: &[NodeShape],
@@ -116,10 +90,6 @@ pub(in crate::core::grammar) fn attach_node_shapes(
     append_alias_defs(tree, node_shapes, aliases, &extra_names);
 }
 
-/// Reconstruct alias-only kinds (e.g. `property_identifier`, an alias of
-/// `identifier`) as definitions, so the dump's discovery surface is complete. A
-/// kind already produced directly keeps its own definition; this only adds the
-/// ones that exist *solely* as aliases.
 fn append_alias_defs(
     tree: &mut TreeGrammar,
     node_shapes: &[NodeShape],
@@ -135,7 +105,6 @@ fn append_alias_defs(
         .map(|shape| shape.kind_name.as_str())
         .collect();
 
-    // Sorted + deduplicated so output is deterministic and each alias is defined once.
     let mut pending: BTreeMap<&str, &AliasInfo> = BTreeMap::new();
     for alias in aliases {
         if alias.named
@@ -217,11 +186,7 @@ impl<'a> LowerCtx<'a> {
         }
     }
 
-    /// Build a definition for one declared rule name, or `None` if it was dropped
-    /// as unreachable (and so is absent from both grammars).
     fn lower_def(&self, rule_name: &str) -> Option<Def> {
-        // Categories first: a supertype renders from its closure (attached later),
-        // not from its rule body.
         if self.supertype_names.contains(rule_name) {
             return Some(Def {
                 name: de_underscore(rule_name).to_string(),
@@ -272,8 +237,6 @@ impl<'a> LowerCtx<'a> {
             .find(|(_, variable)| variable.name == rule_name)
     }
 
-    /// Find every alias that renames a single symbol, so alias-only kinds can be
-    /// reconstructed as their own definitions.
     fn collect_aliases(&self) -> Vec<AliasInfo> {
         let mut aliases = Vec::new();
         for variable in &self.syntax.variables {
@@ -309,8 +272,6 @@ impl<'a> LowerCtx<'a> {
         }
     }
 
-    /// The public name and reference shape of the single symbol a rule reduces
-    /// to, if any.
     fn single_symbol(&self, rule: &Rule) -> Option<(String, Shape)> {
         let Rule::Symbol(symbol) = peel(rule) else {
             return None;
@@ -356,8 +317,6 @@ impl<'a> LowerCtx<'a> {
                 }
             }
             Rule::Reserved { rule, .. } => self.lower_shape(rule),
-            // No String/Pattern/NamedSymbol survive into a syntax rule after
-            // `extract_tokens`; handled defensively so lowering is total.
             Rule::String(value) => Shape::Node(GrammarNodeRef {
                 name: value.clone(),
                 named: false,
@@ -375,9 +334,6 @@ impl<'a> LowerCtx<'a> {
         for member in members {
             match self.lower_shape(member) {
                 Shape::Empty => {}
-                // A bare sequence directly inside a sequence adds no grouping —
-                // concatenation is associative, so splice its members in. (Only
-                // an unquantified `Seq` matches; `X*` is `Quantified(Seq, …)`.)
                 Shape::Seq(inner) => shapes.extend(inner),
                 other => shapes.push(other),
             }
@@ -389,7 +345,6 @@ impl<'a> LowerCtx<'a> {
         let has_blank = members.iter().any(is_blank);
         let non_blank: Vec<&Rule> = members.iter().filter(|m| !is_blank(m)).collect();
 
-        // `choice(repeat(X), blank)` is tree-sitter's encoding of `X*`.
         if has_blank
             && let [single] = non_blank.as_slice()
             && let Rule::Repeat(inner) = peel(single)
@@ -446,8 +401,6 @@ impl<'a> LowerCtx<'a> {
                         named: false,
                         category: false,
                     }),
-                    // An auxiliary/hidden regex token has no queryable name; splice
-                    // its synthesized text inline.
                     VariableType::Auxiliary | VariableType::Hidden => {
                         Shape::Token(synthesize(&variable.rule))
                     }
@@ -461,8 +414,6 @@ impl<'a> LowerCtx<'a> {
                         named: false,
                         category: false,
                     }),
-                    // A hidden external (underscore-prefixed) is consumed but never
-                    // a node a query can match, so it splices like any hidden rule.
                     VariableType::Hidden | VariableType::Auxiliary => {
                         Shape::Splice(token.name.clone())
                     }
@@ -478,7 +429,6 @@ impl<'a> LowerCtx<'a> {
     }
 }
 
-/// Collapse a single-member group to its member and an empty group to `Empty`.
 fn collapse(mut shapes: Vec<Shape>, wrap: impl FnOnce(Vec<Shape>) -> Shape) -> Shape {
     match shapes.len() {
         0 => Shape::Empty,
@@ -487,8 +437,6 @@ fn collapse(mut shapes: Vec<Shape>, wrap: impl FnOnce(Vec<Shape>) -> Shape) -> S
     }
 }
 
-/// Peel transparent precedence/reserved wrappers (but keep field/alias metadata,
-/// which changes the shape).
 fn peel(rule: &Rule) -> &Rule {
     match rule {
         Rule::Reserved { rule, .. } => peel(rule),
@@ -505,9 +453,6 @@ fn is_blank(rule: &Rule) -> bool {
     matches!(peel(rule), Rule::Blank)
 }
 
-/// A named reference whose name starts with `_` is a hidden rule the query
-/// language cannot write (`_` is the wildcard), so it splices rather than render
-/// as the un-queryable `(_name)`. Anonymous tokens keep their literal text.
 fn ref_shape(name: String, named: bool) -> Shape {
     if named && name.starts_with('_') {
         Shape::Splice(name)
@@ -520,7 +465,6 @@ fn ref_shape(name: String, named: bool) -> Shape {
     }
 }
 
-/// Strip the leading underscores tree-sitter uses to mark hidden categories.
 fn de_underscore(name: &str) -> &str {
     let trimmed = name.trim_start_matches('_');
     if trimmed.is_empty() { name } else { trimmed }

@@ -1,5 +1,3 @@
-//! Provenance for one exact `grammar.json` artifact.
-
 use std::fmt::Write as _;
 
 use sha2::{Digest, Sha256};

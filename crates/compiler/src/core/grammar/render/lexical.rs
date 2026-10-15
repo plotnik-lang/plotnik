@@ -1,18 +1,6 @@
-//! Token text synthesis: a lexical `Rule` AST → [`TokenText`].
-//!
-//! After `extract_tokens`, every lexical body is a closed AST over
-//! `String | Pattern | Seq | Choice | Repeat | Blank` plus transparent `prec`/
-//! `token` metadata — exactly a regex AST. Synthesis is mechanical and lossless:
-//! `String` is regex-escaped, `Pattern` spliced verbatim (with `/` escaped),
-//! `Seq` concatenates, `Choice` becomes `a|b`, `Repeat` becomes `(…)+`, and a
-//! choice-with-`Blank` becomes `(…)?` (or `(…)*` over a repeat). Sub-patterns are
-//! parenthesized only where precedence demands it.
-
 use super::super::rules::Rule;
 use super::TokenText;
 
-/// Synthesize a token's text. A token whose whole body is a single string renders
-/// as a string literal; anything else renders as a regex.
 pub(super) fn synthesize(rule: &Rule) -> TokenText {
     match strip(rule) {
         Rule::String(value) => TokenText::Str(value.clone()),
@@ -20,7 +8,6 @@ pub(super) fn synthesize(rule: &Rule) -> TokenText {
     }
 }
 
-/// Regex binding strength, loosest to tightest, used to decide parenthesization.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Prec {
     Alt,
@@ -34,8 +21,6 @@ struct Piece {
 }
 
 impl Piece {
-    /// The text wrapped so it binds as a single atom (for use under a quantifier
-    /// or wherever a unit is required).
     fn atom(&self) -> String {
         if self.prec == Prec::Atom {
             self.text.clone()
@@ -45,8 +30,6 @@ impl Piece {
     }
 }
 
-/// Peel transparent wrappers and single-member groups so the caller sees the real
-/// shape (e.g. a lone `Seq([String])` reduces to the string).
 fn strip(rule: &Rule) -> &Rule {
     match rule {
         Rule::Metadata { rule, .. } | Rule::Reserved { rule, .. } => strip(rule),
@@ -72,8 +55,6 @@ fn synth(rule: &Rule) -> Piece {
         },
         Rule::Seq(members) => synth_seq(members),
         Rule::Choice(members) => synth_choice(members),
-        // Token bodies are closed after `extract_tokens`: a lexical rule cannot
-        // reference another symbol. Anything else is empty by construction.
         _ => Piece {
             text: String::new(),
             prec: Prec::Concat,
@@ -103,7 +84,6 @@ fn synth_seq(members: &[Rule]) -> Piece {
             continue;
         }
         let piece = synth(member);
-        // A sub-alternation must be grouped so its `|` does not escape the concat.
         if piece.prec == Prec::Alt {
             parts.push(format!("({})", piece.text));
         } else {
@@ -134,7 +114,6 @@ fn synth_choice(members: &[Rule]) -> Piece {
         .filter(|m| !matches!(m, Rule::Blank))
         .collect();
 
-    // `choice(repeat(X), blank)` is tree-sitter's encoding of `X*`.
     if has_blank && let [Rule::Repeat(inner)] = non_blank.as_slice() {
         return Piece {
             text: format!("{}*", synth(inner).atom()),
@@ -175,7 +154,6 @@ fn join_alternatives(members: &[&Rule]) -> Piece {
     }
 }
 
-/// A single-character string is an atom; a longer one concatenates its characters.
 fn literal_prec(value: &str) -> Prec {
     if value.chars().count() == 1 {
         Prec::Atom
@@ -184,7 +162,6 @@ fn literal_prec(value: &str) -> Prec {
     }
 }
 
-/// Escape a string so it matches literally in a regex (and escape the `/` delimiter).
 fn escape_literal(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
@@ -203,7 +180,6 @@ fn escape_literal(value: &str) -> String {
     out
 }
 
-/// Escape every unescaped `/` (the regex delimiter), leaving existing `\/` intact.
 fn escape_slashes(pattern: &str) -> String {
     let mut out = String::with_capacity(pattern.len());
     let mut pending_backslashes = 0usize;
@@ -221,9 +197,6 @@ fn escape_slashes(pattern: &str) -> String {
     out
 }
 
-/// Classify a raw regex fragment so the caller knows whether to parenthesize it.
-/// A top-level unescaped `|` makes it an alternation; a lone atom needs no parens;
-/// everything else is treated as a concatenation.
 fn pattern_prec(pattern: &str) -> Prec {
     let mut depth = 0i32;
     let mut in_class = false;
@@ -250,8 +223,6 @@ fn pattern_prec(pattern: &str) -> Prec {
     }
 }
 
-/// Whether a regex fragment is a single atomic unit: one character, an escaped
-/// character, a `[...]` class, or a `(...)` group.
 fn is_single_atom(pattern: &str) -> bool {
     let chars: Vec<char> = pattern.chars().collect();
     match chars.as_slice() {
@@ -264,8 +235,6 @@ fn is_single_atom(pattern: &str) -> bool {
     }
 }
 
-/// Whether the opening bracket closes only at the final character (so the whole
-/// fragment is one bracketed group, not two adjacent ones like `(a)(b)`).
 fn balanced_until_end(chars: &[char], open: char, close: char) -> bool {
     let mut depth = 0i32;
     let mut escaped = false;

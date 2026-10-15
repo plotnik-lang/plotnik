@@ -1,18 +1,3 @@
-//! Tree-shape rendering of a tree-sitter grammar.
-//!
-//! Where `grammar.json` describes how *text parses*, a [`TreeGrammar`] describes
-//! how *trees are shaped* — the artifact a query author needs. It is lowered once
-//! from the grammar pipeline (see [`lower`]) and retained on
-//! [`Grammar`](super::Grammar); the CLI renders the whole document with
-//! [`TreeGrammar::dump`], and diagnostics render fragments, all from this one model.
-//!
-//! Every definition body belongs to exactly one *register*, each with a distinct
-//! surface syntax so the three are lexically impossible to confuse:
-//!
-//! - **pattern** — node/hidden shapes, in query-flavored pattern notation;
-//! - **type** — categories (tree-sitter supertypes), `|`-unions of member kinds;
-//! - **text** — tokens, a synthesized string literal or regex.
-
 mod dump;
 mod layout;
 mod lexical;
@@ -165,7 +150,6 @@ impl fmt::Display for TokenText {
     }
 }
 
-/// Escape a string for display inside a `"..."` literal.
 fn escape_literal(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {

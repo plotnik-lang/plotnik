@@ -1,11 +1,3 @@
-//! ANSI color codes for terminal output.
-//!
-//! Four semantic colors with orthogonal dim modifier:
-//! - Blue: Definition names, keys, type names
-//! - Green: String literals, terminal markers
-//! - Dim: Structure, nav, effects, metadata
-//! - Reset: Return to default
-
 /// ANSI color palette for CLI output.
 ///
 /// Designed for jq-inspired colorization that works in both light and dark themes.

@@ -48,10 +48,7 @@ impl AliasUsageTable {
     }
 }
 
-// Promotes a "default alias" for any symbol that appears exclusively under aliases.
-// Two reasons: (1) avoids storing per-production alias info in the parse table, and
-// (2) `ERROR` nodes skip context-specific aliases, so without a default alias those
-// children would have no alias at all — a visible inconsistency.
+// Children directly within ERROR nodes have no production-specific aliases.
 pub(super) fn extract_default_aliases(
     syntax_grammar: &mut SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
@@ -96,7 +93,6 @@ pub(super) fn extract_default_aliases(
             return;
         }
 
-        // On ties, keep the earliest alias so selection is deterministic across grammars.
         if let Some((_, default_entry)) = status
             .aliases
             .drain(..)
@@ -110,7 +106,6 @@ pub(super) fn extract_default_aliases(
         }
     });
 
-    // The default alias is now implicit, so remove the per-step alias where it matches.
     let mut alias_positions_to_clear = Vec::new();
     for variable in &mut syntax_grammar.variables {
         alias_positions_to_clear.clear();

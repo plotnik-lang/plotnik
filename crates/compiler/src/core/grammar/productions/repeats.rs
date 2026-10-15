@@ -21,8 +21,6 @@ pub(in crate::core::grammar) fn expand_repeats(
     for (i, variable) in grammar.variables.iter_mut().enumerate() {
         let expanded_top_level_repetition = expander.expand_variable(i, variable);
 
-        // If a hidden variable had a top-level repetition and it was converted to
-        // a recursive rule, then it can't be inlined.
         if expanded_top_level_repetition {
             grammar
                 .variables_to_inline
@@ -50,9 +48,6 @@ impl Expander {
         let mut rule = Rule::Blank;
         mem::swap(&mut rule, &mut variable.rule);
 
-        // In the special case of a hidden variable with a repetition at its top level,
-        // convert that rule itself into a binary tree structure instead of introducing
-        // another auxiliary rule.
         if let (VariableType::Hidden, Rule::Repeat(repeated_content)) = (variable.kind, &rule) {
             let inner_rule = self.expand_rule(repeated_content);
             variable.rule = Self::wrap_rule_in_binary_tree(Symbol::non_terminal(index), inner_rule);
@@ -90,8 +85,6 @@ impl Expander {
                 context_name: context_name.clone(),
             },
 
-            // For repetitions, introduce an auxiliary rule that contains the
-            // repeated content, but can also contain a recursive binary tree structure.
             Rule::Repeat(content) => {
                 let inner_rule = self.expand_rule(content);
 

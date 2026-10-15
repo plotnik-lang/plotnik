@@ -7,9 +7,6 @@ use super::structure::{
 };
 use super::types::{Grammar, NodeConstraints};
 
-/// Insertion-ordered set of node kinds: dedups while keeping first-seen order, so derived
-/// reachability lists are deterministic. [`into_sorted`](Self::into_sorted) reorders by
-/// public name for legible diagnostics.
 #[derive(Default)]
 pub(super) struct KindSet {
     kinds: Vec<NodeKindId>,
@@ -38,17 +35,12 @@ impl KindSet {
 pub(super) struct AdmissibilityIndex {
     children: HashMap<NodeKindId, Vec<NodeKindId>>,
     fields: HashMap<(NodeKindId, NodeFieldId), AdmissibleField>,
-    /// Per-node field-id index backing [`Grammar::field_ids_for_node_kind`],
-    /// pre-grouped so the lookup is O(fields-on-node) rather than a scan of every
-    /// `(node, field)` key.
     fields_by_node: HashMap<NodeKindId, Vec<NodeFieldId>>,
 }
 
 #[derive(Debug, Clone)]
 struct AdmissibleField {
     valid_types: Vec<NodeKindId>,
-    /// Summary-derived cardinality, or `None` when the field exists only because
-    /// structural reachability recovered it.
     cardinality: Option<Cardinality>,
 }
 
@@ -146,36 +138,9 @@ impl AdmissibilityIndex {
     }
 }
 
-/// Child- and field-kind reachability for every node kind — the model the structural
-/// grammar check queries for local admissibility. It is derived from the same ordered
-/// skeleton that satisfiability threads, so the two checks stay conservatively aligned
-/// without sharing one runtime model.
-///
-/// It is the **union of two derivations of the same grammar, each correct but lossy in a
-/// different place**, so either one alone would reject queries the grammar actually allows:
-///
-/// - The **node-shape summary** applies tree-sitter's full field/child resolution — including
-///   bubbling a sibling field out of a hidden field-value rule (gleam `let.assign`, carried by
-///   the hidden `_pattern` that is `let`'s `pattern` value) — but flattens supertypes away.
-/// - The **structural skeleton** *points* (a step records a public id and/or a descent body);
-///   descending it recovers what the summary drops by expanding **transparent** positions,
-///   whose contents tree-sitter surfaces on the enclosing concrete node:
-///   - an *id-less inlined rule* is fully transparent: its children and fields both surface on
-///     the parent (python `(module (match_statement))`, via the hidden `_statement` chain);
-///   - a *supertype* is inlined at runtime, so a field on one of its members surfaces on the
-///     parent (lua `chunk.local_declaration`). Its children are already covered by recording
-///     the supertype id and expanding it via `collect_subtypes`, so it is descended for member
-///     fields alone;
-///   - an *inlined-supertype field value* surfaces concrete kinds the summary never resolved
-///     (go `var_spec.type: (slice_type)`, typed by the inlined `_type`).
-///
-/// Their union over-approximates possibility — sound, since over-listing only widens
-/// admissibility (a tolerated false accept), never rejects a valid query.
 pub(super) struct Reachability {
     children: HashMap<NodeKindId, Vec<NodeKindId>>,
     fields: HashMap<(NodeKindId, NodeFieldId), AdmissibleField>,
-    /// The `fields` keys grouped by node into a name-sorted per-node index, so
-    /// [`Grammar::field_ids_for_node_kind`] is a single map lookup rather than a scan of every key.
     fields_by_node: HashMap<NodeKindId, Vec<NodeFieldId>>,
 }
 
@@ -214,8 +179,6 @@ struct FieldReachability {
 }
 
 impl ReachabilityBuilder<'_> {
-    /// Baseline of the union: every child and field the node-shape summary already resolved,
-    /// so the structural pass can only widen the result, never list fewer than the summary.
     fn seed_from_summary(&mut self) {
         for (&node, constraints) in self.node_constraints {
             if let Some(children) = &constraints.children {
@@ -276,8 +239,6 @@ impl ReachabilityBuilder<'_> {
         }
     }
 
-    /// Record the children and fields that surface directly on `node`, descending fully
-    /// transparent id-less inlined rules (whose children and fields both surface here).
     fn collect_node(&mut self, node: NodeKindId, var: VarId, seen: &mut HashSet<VarId>) {
         if !seen.insert(var) {
             return;
@@ -307,10 +268,6 @@ impl ReachabilityBuilder<'_> {
         }
     }
 
-    /// Collect, into `node`'s field set, fields that surface on it through a transparent
-    /// subtree — a supertype or id-less inlined rule entered without crossing into a
-    /// concrete child. A concrete child is opaque: its own fields stay with it, so it is not
-    /// descended.
     fn collect_transparent_fields(
         &mut self,
         node: NodeKindId,
@@ -342,11 +299,6 @@ impl ReachabilityBuilder<'_> {
         }
     }
 
-    /// Record the kinds a fielded step's value can take. A value under a public id —
-    /// concrete kind, alias, or kept supertype — is recorded whole; a kept supertype is
-    /// expanded downstream by `collect_subtypes`. An id-less inlined value (go's `_type`) is
-    /// transparent: descend it to the concrete kinds it stands for. Anonymous kinds are kept
-    /// — a field value may be a literal token (`operator: "+"`).
     fn collect_field_value(
         &mut self,
         node: NodeKindId,
@@ -364,10 +316,6 @@ impl ReachabilityBuilder<'_> {
     }
 }
 
-/// Index each public node kind to the skeleton variables that realize it: the
-/// variable named for it, plus every step occurrence (aliases included) that
-/// surfaces it and descends into a variable body. Built from
-/// the retained realization index shared with satisfiability.
 fn variable_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarId>> {
     let mut realizers_by_kind: HashMap<NodeKindId, Vec<VarId>> = HashMap::new();
     for (&kind, realizers) in grammar.structure().realizers() {
@@ -380,11 +328,6 @@ fn variable_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarI
     realizers_by_kind
 }
 
-/// Descend an id-less inlined field value to the concrete kinds it can surface as. Keeps
-/// anonymous kinds (a field value may be a token) and ignores labels — a label inside an
-/// inlined value still names a candidate value kind, and over-listing only widens
-/// admissibility, never narrows it. A kept supertype within is recorded by id (expanded
-/// downstream).
 fn collect_value_frontier(
     grammar: &Grammar,
     var: VarId,

@@ -70,8 +70,6 @@ impl std::fmt::Display for ConflictingPrecedenceOrderingError {
     }
 }
 
-/// Detects cycles through chains of single-symbol productions (A→B, B→A), which cause
-/// infinite loops at parse time because no input is consumed between transitions.
 pub(super) fn validate_indirect_recursion(
     variables: &[Variable],
 ) -> Result<(), IndirectRecursionError> {
@@ -79,8 +77,6 @@ pub(super) fn validate_indirect_recursion(
 
     for variable in variables {
         let productions = single_symbol_productions(&variable.rule);
-        // Filter out rules that *directly* reference themselves, as this doesn't
-        // cause a parsing loop.
         let filtered: BTreeSet<String> = productions
             .into_iter()
             .filter(|s| s != &variable.name)
@@ -153,8 +149,6 @@ pub(super) fn validate_precedences(
     Ok(())
 }
 
-// For any two precedence names `a` and `b`, if `a` comes before `b`
-// in some list, then it cannot come *after* `b` in any list.
 fn validate_conflicting_precedence_orderings(
     precedence_orderings: &[Vec<PrecedenceEntry>],
 ) -> Result<(), ValidatePrecedenceError> {

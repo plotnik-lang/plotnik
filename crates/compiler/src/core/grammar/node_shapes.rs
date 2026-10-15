@@ -14,8 +14,6 @@ use super::{
 
 const START_RULE_INDEX: usize = 0;
 
-/// Borrowed view of the grammar tables that node-shape derivation threads
-/// together: the syntax grammar, the lexical grammar, and the default aliases.
 #[derive(Clone, Copy)]
 pub struct GrammarContext<'a> {
     pub syntax: &'a SyntaxGrammar,
@@ -213,27 +211,6 @@ pub enum VariableSummaryError {
     InvalidSupertype(String),
 }
 
-/// Compute a summary of the public-facing structure of each variable in the
-/// grammar. Each variable in the grammar corresponds to a distinct public-facing
-/// node kind.
-///
-/// The information collected about each node kind `N` is:
-/// 1. `child_types` - The types of visible children that can appear within `N`.
-/// 2. `fields` - The fields that `N` can have. Data regarding each field:
-///    * `types` - The types of visible children the field can contain.
-///    * `optional` - Do `N` nodes always have this field?
-///    * `multiple` - Can `N` nodes have multiple children for this field?
-/// 3. `children_without_fields` - The *other* named children of `N` that are not associated with
-///    fields. Data regarding these children:
-///    * `types` - The types of named children with no field.
-///    * `optional` - Do `N` nodes always have at least one named child with no field?
-///    * `multiple` - Can `N` nodes have multiple named children with no field?
-///
-/// Each summary must account for some indirect factors:
-/// 1. hidden nodes. When a parent node `N` has a hidden child `C`, the visible children of `C`
-///    *appear* to be direct children of `N`.
-/// 2. aliases. If a parent node kind `M` is aliased as some other kind `N`, then nodes which
-///    *appear* to have kind `N` may have internal structure based on `M`.
 pub fn derive_variable_summaries(
     ctx: GrammarContext<'_>,
 ) -> Result<Vec<VariableSummary>, VariableSummaryError> {
@@ -251,9 +228,6 @@ pub fn derive_variable_summaries(
         variable_type_for_child_type(t, syntax_grammar, lexical_grammar) == VariableType::Named
     };
 
-    // Each variable's summary can depend on the summaries of other hidden variables,
-    // and variables can have mutually recursive structure. So we compute the summaries
-    // iteratively, in a loop that terminates only when no more changes are possible.
     let mut did_change = true;
     let mut all_initialized = false;
     let mut result = vec![VariableSummary::default(); syntax_grammar.variables.len()];
@@ -512,16 +486,11 @@ fn generate_node_shape_records(
                 named: true,
             };
 
-            // We only add to the subtype map if there are visible subtypes.
-            // A supertype may have zero subtypes if its children are all
-            // hidden (e.g., wrapping a hidden external token).
             if !subtypes.is_empty() {
                 subtype_map.push((supertype, subtypes.clone()));
             }
             node_shape.subtypes = Some(subtypes);
         } else if !syntax_grammar.variables_to_inline.contains(&symbol) {
-            // If a rule is aliased under multiple names, then its information
-            // contributes to multiple node-shape records.
             for alias in aliases_by_symbol.get(&symbol).unwrap_or(&BTreeSet::new()) {
                 let (kind, is_named) = if let Some(alias) = alias {
                     (&alias.value, alias.is_named)
@@ -531,8 +500,6 @@ fn generate_node_shape_records(
                     continue;
                 };
 
-                // There may already be an entry with this name, because multiple
-                // rules may be aliased with the same name.
                 let mut node_kind_existed = true;
                 let node_shape = node_shapes.entry(kind.clone()).or_insert_with(|| {
                     node_kind_existed = false;
@@ -547,8 +514,6 @@ fn generate_node_shape_records(
                 let fields = node_shape.fields.get_or_insert_with(BTreeMap::new);
                 for (new_field, field_info) in &info.fields {
                     let field = fields.entry(new_field.clone()).or_insert_with(|| {
-                        // If another rule is aliased with the same name, and does *not* have this
-                        // field, then this field cannot be required.
                         let mut field = SlotRecord::default();
                         if node_kind_existed {
                             field.required = false;
@@ -558,8 +523,6 @@ fn generate_node_shape_records(
                     populate_field_info(field, field_info);
                 }
 
-                // If another rule is aliased with the same name, any fields that aren't present in
-                // this cannot be required.
                 for (existing_field, field) in fields.iter_mut() {
                     if !info.fields.contains_key(existing_field) {
                         field.required = false;
@@ -606,8 +569,6 @@ fn generate_node_shape_records(
     let mut result = node_shapes.into_iter().map(|e| e.1).collect::<Vec<_>>();
     result.extend(anonymous_node_shapes);
     let is_leaf = |node: &NodeShapeRecord| node.children.is_none() && node.fields.is_none();
-    // Keep output deterministic and close to Tree-sitter's node metadata: supertypes first,
-    // structured concrete nodes next, leaf tokens last, then stable scalar tie-breakers.
     result.sort_unstable_by(|a, b| {
         b.subtypes
             .is_some()
