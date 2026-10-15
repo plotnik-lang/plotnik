@@ -1,20 +1,27 @@
 //! Snapshot test suite.
 //!
-//! Each file under `tests/0N-stage/` is one snapshot: an authored Plotnik query,
-//! an optional `INPUT` or `GRAMMAR` section, and generated artifact sections
-//! the harness rewrites in place on accept. The stage directory selects which
-//! artifacts render.
+//! Each file under `tests/0N-stage/` is one snapshot. Write a query at the top,
+//! then add inputs as needed. The harness generates the remaining sections.
+//! `make shot` updates them in place.
 //!
-//! Sections are separated by a centered 50-column rule — `----- DIAGNOSTICS -----`.
-//! The `INPUT` rule's parenthesized grammar selects what a query compiles against:
-//! `INPUT (typescript)` picks TypeScript, `INPUT (dart)` dart, plain `INPUT` JavaScript
-//! (see `Lang::resolve`). Authors may dash the rule loosely (`--- INPUT (typescript) ---`);
-//! `GRAMMAR` supplies a small compiler-only grammar as YAML using the Tree-sitter
-//! grammar schema, with `name` omitted. It replaces `INPUT`, never accompanies it.
-//! `make shot` normalizes it. For a 06-vm snapshot the body is the source the VM
-//! runs; for a compile-only emission snapshot only the grammar matters,
-//! so the body is left empty — the rule is a pure grammar selector. The stage
-//! directory selects which artifacts render:
+//! Usually the opening query defines `Q`. It may instead be a bare expression.
+//! VM tests run that expression when present, otherwise `Q`. A missing or
+//! non-callable `Q` fails the test, not the query.
+//!
+//! `INPUT` contains JavaScript source. Use a filename to select another language:
+//! `INPUT (index.ts)` for TypeScript or `INPUT (index.dart)` for Dart.
+//! `INPUT (file.ptk)` adds query definitions to the same workspace. Use multiple
+//! PTK inputs only when testing workspace composition. Each keeps its filename
+//! and line numbers in diagnostics. Put all inputs before generated sections.
+//!
+//! Compiler-only snapshots can leave the programming input empty to select its
+//! grammar, or replace it with `GRAMMAR`: a small YAML Tree-sitter grammar with
+//! `name` omitted. `GRAMMAR` can accompany PTK inputs, but not programming input.
+//!
+//! Section rules are centered in 50 columns, such as `----- DIAGNOSTICS -----`.
+//! Loose padding (`--- INPUT (index.ts) ---`) is accepted and normalized by
+//! `make shot`. It also formats query modules, but preserves bare expressions.
+//! The stage directory selects the generated sections:
 //!
 //! | dir          | sections                                                                     |
 //! | ------------ | ---------------------------------------------------------------------------- |
@@ -24,10 +31,6 @@
 //! | `04-emit/types` | typescript, rust types (serde impls under a `serde/` folder)             |
 //! | `04-emit/rust/module` | generated Rust matcher module                                      |
 //! | `06-vm`      | typescript, output, inspection if enabled, bytecode, trace (requires input) |
-//!
-//! Compiler snapshots may add `QUERY (file.ptk)` sections after the grammar/input
-//! to compile additional query files alongside the initial `query.ptk`.
-//! `make shot` formats every query file.
 //!
 //! Compile-stage snapshots under an `inspection/` folder compile with
 //! `BytecodeConfig::inspection(BytecodeInspection::Spans)`.
@@ -68,15 +71,15 @@ use std::sync::LazyLock;
 use similar::TextDiff;
 use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
-use plotnik_compiler::bytecode::{Module, dump as dump_bytecode};
+use plotnik_compiler::bytecode::{Entrypoint, Module, dump as dump_bytecode};
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 use plotnik_compiler::{
-    BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, PrintTracer, QueryBuilder,
-    RuntimeError, RustCodegenConfig, SourceCollection, SourceMap, SourcePath, TraceRecorder,
-    TypeScriptBinding, TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance,
-    materialize_verified,
+    BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, InputKind, PrintTracer,
+    QueryBuilder, RuntimeError, RustCodegenConfig, SourceCollection, SourceMap, SourcePath,
+    TraceRecorder, TypeScriptBinding, TypeScriptCodegenConfig, VM, Verbosity,
+    extract_result_provenance, materialize_verified,
 };
-use plotnik_tests::snapshot::{Section, parse_document};
+use plotnik_tests::snapshot::{Fixture, Language, Section};
 use support::snapshots::{
     GeneratedOutput, GeneratedSection, InspectionPolicy, MappingPolicy, SectionKind, SerdePolicy,
     Snapshot, SnapshotKind, SnapshotMode, TriviaPolicy, VmMode, snapshot,
@@ -99,62 +102,21 @@ fn snapshot_mode() -> Result<SnapshotMode, String> {
     }
 }
 
-/// The authored half of a snapshot; generated sections are recomputed, not parsed back.
-#[derive(Clone)]
-struct Parsed {
-    query: String,
-    source: Option<Source>,
-    files: Vec<Section>,
-}
-
-impl Parsed {
-    fn formatted(&self, kind: SnapshotKind, name: &str) -> Result<Self, String> {
-        let mut formatted = self.clone();
-        for query in std::iter::once(&mut formatted.query)
-            .chain(formatted.files.iter_mut().map(|file| &mut file.body))
-        {
-            let evaluated = support::formatter::evaluate(query, name)?;
-            if !kind.preserves_query_layout() {
-                *query = evaluated.into_query_or(query.clone());
-            }
-        }
-
-        Ok(formatted)
-    }
-
-    fn source_map(&self) -> SourceMap {
-        let mut sources = SourceMap::new();
-        sources.add_file(SourcePath::new("query.ptk"), &self.query);
-        for file in &self.files {
-            let path = file
-                .name
-                .strip_prefix("query.")
-                .expect("validated query section");
-            sources.add_file(SourcePath::new(path), &file.body);
-        }
-        sources
-    }
-}
-
-#[derive(Clone)]
-enum Source {
-    Input(Input),
-    Grammar(String),
-}
-
-impl Source {
-    fn input(&self) -> Option<&Input> {
-        match self {
-            Self::Input(input) => Some(input),
-            Self::Grammar(_) => None,
+fn formatted(parsed: &Fixture, kind: SnapshotKind, name: &str) -> Result<Fixture, String> {
+    let mut formatted = parsed.clone();
+    let opening = (formatted.kind == Some(InputKind::Module)).then_some(&mut formatted.query);
+    for query in opening.into_iter().chain(
+        formatted
+            .inputs
+            .iter_mut()
+            .filter_map(|input| input.is_module().then_some(&mut input.body)),
+    ) {
+        let evaluated = support::formatter::evaluate(query, name)?;
+        if !kind.preserves_query_layout() {
+            *query = evaluated.into_query_or(query.clone());
         }
     }
-}
-
-#[derive(Clone)]
-struct Input {
-    ext: Option<String>,
-    text: String,
+    Ok(formatted)
 }
 
 fn check(snapshot: &Snapshot, mode: SnapshotMode) -> Result<(), String> {
@@ -162,7 +124,7 @@ fn check(snapshot: &Snapshot, mode: SnapshotMode) -> Result<(), String> {
         .map_err(|e| format!("read {}: {e}", snapshot.path.display()))?;
     let parsed = parse_snapshot(&raw, snapshot.kind, snapshot.name.as_str())?;
     let actual = raw.replace("\r\n", "\n");
-    let formatted = parsed.formatted(snapshot.kind, snapshot.name.as_str())?;
+    let formatted = formatted(&parsed, snapshot.kind, snapshot.name.as_str())?;
 
     let accepting = matches!(mode, SnapshotMode::AcceptAll);
     let input = if accepting { &formatted } else { &parsed };
@@ -188,7 +150,7 @@ fn check(snapshot: &Snapshot, mode: SnapshotMode) -> Result<(), String> {
         ));
     }
 
-    if parsed.query == formatted.query && parsed.files == formatted.files {
+    if parsed.query == formatted.query && parsed.inputs == formatted.inputs {
         return Ok(());
     }
 
@@ -199,63 +161,26 @@ fn check(snapshot: &Snapshot, mode: SnapshotMode) -> Result<(), String> {
     ))
 }
 
-fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Parsed, String> {
-    let document = parse_document(raw)?;
-    let sections = document.sections;
-
-    let (source, generated_start) = match sections.first() {
-        Some(section) if section.name == "grammar" => {
-            if matches!(
-                kind,
-                SnapshotKind::Parser { .. } | SnapshotKind::Analyze | SnapshotKind::Vm { .. }
-            ) {
-                return Err("GRAMMAR is only supported in compiler snapshots".into());
-            }
-            (Some(Source::Grammar(section.body.clone())), 1)
-        }
-        Some(section) if section.name == "input" || section.name.starts_with("input.") => {
-            let ext = section.name.strip_prefix("input.").map(str::to_string);
-            (
-                Some(Source::Input(Input {
-                    ext,
-                    text: section.body.clone(),
-                })),
-                1,
-            )
-        }
-        _ => (None, 0),
-    };
-
-    let mut files = Vec::new();
-    let mut generated_start = generated_start;
-    while let Some(section) = sections.get(generated_start) {
-        if !section.name.starts_with("query.") {
-            break;
-        }
-        if matches!(
+fn parse_snapshot(raw: &str, kind: SnapshotKind, name: &str) -> Result<Fixture, String> {
+    let fixture = Fixture::parse(raw)?;
+    if fixture.grammar().is_some()
+        && matches!(
             kind,
             SnapshotKind::Parser { .. } | SnapshotKind::Analyze | SnapshotKind::Vm { .. }
-        ) {
-            return Err("QUERY sections are only supported in compiler snapshots".into());
-        }
-        if let Some(path) = section.name.strip_prefix("query.") {
-            if path.is_empty()
-                || path == "query.ptk"
-                || files.iter().any(|file: &Section| file.name == section.name)
-            {
-                return Err(format!("duplicate or empty query path `{path}`"));
-            }
-            files.push(section.clone());
-        }
-        generated_start += 1;
+        )
+    {
+        return Err("GRAMMAR is only supported in compiler snapshots".into());
     }
-    validate_generated_headers(kind, name, &sections[generated_start..])?;
-
-    Ok(Parsed {
-        query: document.query,
-        source,
-        files,
-    })
+    if fixture.kind == Some(InputKind::Expression)
+        && !matches!(
+            kind,
+            SnapshotKind::Vm { .. } | SnapshotKind::Bytecode { .. }
+        )
+    {
+        return Err("expression fixtures require bytecode compilation or execution".into());
+    }
+    validate_generated_headers(kind, name, &fixture.generated)?;
+    Ok(fixture)
 }
 
 fn validate_generated_headers(
@@ -285,12 +210,12 @@ fn validate_generated_headers(
     Ok(())
 }
 
-fn render(kind: SnapshotKind, input: &Parsed) -> Result<Vec<GeneratedSection>, String> {
+fn render(kind: SnapshotKind, input: &Fixture) -> Result<Vec<GeneratedSection>, String> {
     let sections = match kind {
         SnapshotKind::Parser { trivia } => {
-            render_frontend(input.source_map(), FrontendMode::Parser(trivia))?
+            render_frontend(input.collection().0, FrontendMode::Parser(trivia))?
         }
-        SnapshotKind::Analyze => render_frontend(input.source_map(), FrontendMode::Analyze)?,
+        SnapshotKind::Analyze => render_frontend(input.collection().0, FrontendMode::Analyze)?,
         compile => render_compile(compile, input)?,
     };
     Ok(GeneratedOutput::validate(kind, sections)?.into_sections())
@@ -302,10 +227,10 @@ enum FrontendMode {
 }
 
 fn render_frontend(
-    sources: SourceMap,
+    sources: SourceCollection,
     kind: FrontendMode,
 ) -> Result<Vec<GeneratedSection>, String> {
-    let analyzed = QueryBuilder::new(sources)
+    let analyzed = QueryBuilder::from_sources(sources)
         .analyze()
         .expect("query parsing should not exhaust fuel");
     let diagnostics = analyzed.diagnostics();
@@ -338,31 +263,34 @@ fn render_frontend(
     Ok(out)
 }
 
-fn render_compile(kind: SnapshotKind, parsed: &Parsed) -> Result<Vec<GeneratedSection>, String> {
-    let source = parsed.source.as_ref();
-    let input = source.and_then(Source::input);
-    let lang = match source {
-        Some(Source::Grammar(yaml)) => {
+fn render_compile(kind: SnapshotKind, parsed: &Fixture) -> Result<Vec<GeneratedSection>, String> {
+    let lang = match parsed.grammar() {
+        Some(yaml) => {
             let raw: RawGrammar = serde_saphyr::from_str(&format!("name: snapshot\n{yaml}"))
                 .map_err(|error| format!("invalid GRAMMAR: {error}"))?;
             let grammar =
                 Grammar::from_raw(&raw).map_err(|error| format!("invalid GRAMMAR: {error}"))?;
             Lang::Model(Box::new(grammar))
         }
-        _ => Lang::resolve(input.and_then(|input| input.ext.as_deref()))?,
+        None => Lang::resolve(parsed.language()),
     };
-    let builder = QueryBuilder::new(parsed.source_map()).with_strict_lints(kind.strict_lints());
-    let compiled = builder
-        .compile(lang.grammar())
-        .expect("query parsing should not exhaust fuel");
-    render_compiled(kind, &compiled, &lang, input)
+    let (collection, expression) = parsed.collection();
+    let builder = QueryBuilder::from_sources(collection).with_strict_lints(kind.strict_lints());
+    let compiled = match expression {
+        Some(expression) => builder
+            .with_expression(expression)
+            .compile_dynamic(lang.grammar()),
+        None => builder.compile(lang.grammar()),
+    }
+    .map_err(|error| error.to_string())?;
+    render_compiled(kind, &compiled, &lang, parsed.program())
 }
 
 fn render_compiled(
     kind: SnapshotKind,
     compiled: &CompiledQuery,
     lang: &Lang,
-    input: Option<&Input>,
+    input: Option<&Section>,
 ) -> Result<Vec<GeneratedSection>, String> {
     let diagnostics = compiled.diagnostics();
     let mut out = Vec::new();
@@ -456,21 +384,26 @@ fn render_compiled(
             let input = input.ok_or_else(|| {
                 "06-vm snapshots require an `INPUT` section; compile-only snapshots belong in 04-emit".to_string()
             })?;
-            if module.entrypoint("Q").is_none() {
-                return Err("06-vm snapshots require a callable definition named `Q`".to_string());
-            }
-            let entry = "Q";
-            let run = run_vm(VmScenario {
+            let entry = module
+                .expression_entrypoint()
+                .or_else(|| module.entrypoint("Q"))
+                .ok_or_else(|| {
+                    "06-vm snapshots require an expression or a callable definition named `Q`"
+                        .to_string()
+                })?;
+            let scenario = VmScenario {
                 lang,
                 module,
-                entry,
-                source: &input.text,
+                entry: &entry,
+                source: &input.body,
                 mode,
-            })?;
-            out.push(GeneratedSection::new(
-                SectionKind::TypeScript,
-                render_typescript(compiled),
-            ));
+            };
+            if module.expression_entrypoint().is_none() {
+                out.push(GeneratedSection::new(
+                    SectionKind::TypeScript,
+                    render_typescript(compiled),
+                ));
+            }
             out.extend(diag);
             if emission.diagnostics().has_warnings() {
                 out.push(GeneratedSection::new(
@@ -478,43 +411,50 @@ fn render_compiled(
                     emission.diagnostics().render(compiled.source_map()),
                 ));
             }
-            match run {
-                VmArtifacts::StructuredTrace {
-                    output,
-                    execution_trace,
-                } => {
-                    out.push(GeneratedSection::new(SectionKind::Output, output));
-                    out.push(GeneratedSection::new(
-                        SectionKind::ExecutionTrace,
-                        execution_trace,
-                    ));
-                }
-                VmArtifacts::TextTrace {
-                    output,
-                    trace,
-                    inspection,
-                } => {
-                    out.push(GeneratedSection::new(SectionKind::Output, output));
-                    if let Some(inspection) = inspection {
-                        out.push(GeneratedSection::new(SectionKind::Inspection, inspection));
-                    }
-                    out.push(GeneratedSection::new(
-                        SectionKind::Bytecode,
-                        dump_bytecode(module, Colors::new(false)),
-                    ));
-                    out.push(GeneratedSection::new(SectionKind::Trace, trace));
-                    return Ok(out);
-                }
-            }
-            out.push(GeneratedSection::new(
-                SectionKind::Bytecode,
-                dump_bytecode(module, Colors::new(false)),
-            ));
+            out.extend(render_vm(scenario)?);
         }
         SnapshotKind::Parser { .. } | SnapshotKind::Analyze => {
             unreachable!("frontend snapshots do not reach compilation")
         }
     }
+    Ok(out)
+}
+
+fn render_vm(scenario: VmScenario<'_>) -> Result<Vec<GeneratedSection>, String> {
+    let module = scenario.module;
+    let mut out = Vec::new();
+    match run_vm(scenario)? {
+        VmArtifacts::StructuredTrace {
+            output,
+            execution_trace,
+        } => {
+            out.push(GeneratedSection::new(SectionKind::Output, output));
+            out.push(GeneratedSection::new(
+                SectionKind::ExecutionTrace,
+                execution_trace,
+            ));
+        }
+        VmArtifacts::TextTrace {
+            output,
+            trace,
+            inspection,
+        } => {
+            out.push(GeneratedSection::new(SectionKind::Output, output));
+            if let Some(inspection) = inspection {
+                out.push(GeneratedSection::new(SectionKind::Inspection, inspection));
+            }
+            out.push(GeneratedSection::new(
+                SectionKind::Bytecode,
+                dump_bytecode(module, Colors::new(false)),
+            ));
+            out.push(GeneratedSection::new(SectionKind::Trace, trace));
+            return Ok(out);
+        }
+    }
+    out.push(GeneratedSection::new(
+        SectionKind::Bytecode,
+        dump_bytecode(module, Colors::new(false)),
+    ));
     Ok(out)
 }
 
@@ -580,7 +520,7 @@ fn render_mapped(dts: &str, bindings: &[TypeScriptBinding]) -> String {
 struct VmScenario<'a> {
     lang: &'a Lang,
     module: &'a Module,
-    entry: &'a str,
+    entry: &'a Entrypoint,
     source: &'a str,
     mode: VmMode,
 }
@@ -599,16 +539,13 @@ enum VmArtifacts {
 
 fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let tree = scenario.lang.parse(scenario.source)?;
-    let entrypoint = scenario
-        .module
-        .entrypoint(scenario.entry)
-        .expect("selected definition must be an entrypoint");
+    let entrypoint = scenario.entry;
 
     let vm = VM::builder(scenario.source, &tree).build();
 
     if matches!(scenario.mode, VmMode::StructuredTrace) {
         let mut tracer = TraceRecorder::new(scenario.module, 65_536);
-        let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
+        let result = vm.execute_with(scenario.module, entrypoint, &mut tracer);
         let execution_trace = tracer.finish();
         let mut execution_trace_json = serde_json::to_string_pretty(&execution_trace)
             .expect("execution-trace serialization cannot fail");
@@ -621,7 +558,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 let value = materialize_verified(
                     scenario.source,
                     scenario.module,
-                    &entrypoint,
+                    entrypoint,
                     journal.output_events(),
                     Colors::new(false),
                 );
@@ -632,7 +569,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
             // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
             // not — fail the trial rather than accept a resource limit as expected output.
             Err(err) => {
-                return Err(format!("VM run failed for `{}`: {err}", scenario.entry));
+                return Err(format!("VM run failed: {err}"));
             }
         };
 
@@ -650,7 +587,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         .colored(false)
         .build();
 
-    let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
+    let result = vm.execute_with(scenario.module, entrypoint, &mut tracer);
     let trace = tracer.render();
     let (output, inspection) = match result {
         Ok(journal) => {
@@ -666,7 +603,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
             let value = materialize_verified(
                 scenario.source,
                 scenario.module,
-                &entrypoint,
+                entrypoint,
                 journal.output_events(),
                 Colors::new(false),
             );
@@ -679,7 +616,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
         // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
         // not — fail the trial rather than accept a resource limit as expected output.
-        Err(err) => return Err(format!("VM run failed for `{}`: {err}", scenario.entry)),
+        Err(err) => return Err(format!("VM run failed: {err}")),
     };
     Ok(VmArtifacts::TextTrace {
         output,
@@ -697,23 +634,20 @@ enum Lang {
 }
 
 impl Lang {
-    fn resolve(ext: Option<&str>) -> Result<Lang, String> {
-        match ext {
-            None | Some("javascript") => Ok(Self::Source {
+    fn resolve(language: Language) -> Lang {
+        match language {
+            Language::JavaScript => Self::Source {
                 grammar: javascript_grammar(),
                 ts: tree_sitter_javascript::LANGUAGE.into(),
-            }),
-            Some("typescript") => Ok(Self::Source {
+            },
+            Language::TypeScript => Self::Source {
                 grammar: typescript_grammar(),
                 ts: tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-            }),
-            Some("dart") => Ok(Self::Source {
+            },
+            Language::Dart => Self::Source {
                 grammar: dart_grammar(),
                 ts: tree_sitter_dart::LANGUAGE.into(),
-            }),
-            Some(other) => Err(format!(
-                "source language `{other}` is not wired into the snapshot suite yet (have: javascript, typescript, dart)"
-            )),
+            },
         }
     }
 
@@ -766,25 +700,14 @@ grammar_loader!(
 /// The canonical file text every snapshot is compared against. Rebuilding the whole
 /// file each run, rather than editing sections in place, is what drops stale
 /// sections on accept.
-fn canonical(input: &Parsed, generated: &[GeneratedSection]) -> String {
-    let source = input.source.as_ref();
+fn canonical(input: &Fixture, generated: &[GeneratedSection]) -> String {
     let mut out = String::new();
     out.push_str(&input.query);
     if !out.ends_with('\n') {
         out.push('\n');
     }
-    if let Some(Source::Grammar(yaml)) = source {
-        push_authored_section(&mut out, "grammar", yaml);
-    }
-    if let Some(input) = source.and_then(Source::input) {
-        let header = match &input.ext {
-            Some(ext) => format!("input.{ext}"),
-            None => "input".to_string(),
-        };
-        push_authored_section(&mut out, &header, &input.text);
-    }
-    for file in &input.files {
-        push_authored_section(&mut out, &file.name, &file.body);
+    for section in &input.inputs {
+        push_authored_section(&mut out, &section.name, &section.body);
     }
     for section in generated {
         push_section(&mut out, section.kind.as_str(), &section.body);
@@ -812,14 +735,12 @@ fn push_section(out: &mut String, name: &str, body: &str) {
 }
 
 /// A section boundary: the name centered in a 50-column dash rule. `input` and
-/// `input.<ext>` render the grammar as `INPUT` / `INPUT (<ext>)`; every other
+/// `input.<filename>` render as `INPUT` / `INPUT (<filename>)`; every other
 /// section is the uppercased name.
 fn section_rule(name: &str) -> String {
     const WIDTH: usize = 50;
     let label = if let Some(ext) = name.strip_prefix("input.") {
         format!("INPUT ({ext})")
-    } else if let Some(path) = name.strip_prefix("query.") {
-        format!("QUERY ({path})")
     } else {
         name.to_ascii_uppercase()
     };
@@ -842,7 +763,7 @@ fn unified_diff(actual: &str, expected: &str) -> String {
 
 #[test]
 fn one_module_runs_named_and_expression_entrypoints() {
-    let lang = Lang::resolve(None).unwrap();
+    let lang = Lang::resolve(Language::JavaScript);
     let mut storage = SourceMap::new();
     storage.add_file(
         SourcePath::new("entries.ptk"),

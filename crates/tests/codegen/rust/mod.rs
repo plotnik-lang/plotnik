@@ -129,10 +129,19 @@ fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
         fs::create_dir_all(&directory).map_err(|error| {
             format!("create snapshot directory {}: {error}", directory.display())
         })?;
-        let query_path = directory.join("query.ptk");
-        fs::write(&query_path, case.case.query.as_bytes())
-            .map_err(|error| format!("write {}: {error}", query_path.display()))?;
-        fs::write(directory.join("input"), case.case.source.as_bytes())
+        for (filename, body) in case.case.fixture.modules() {
+            let path = directory.join("queries").join(filename);
+            fs::create_dir_all(path.parent().expect("query path has a parent"))
+                .map_err(|error| format!("create query directory: {error}"))?;
+            fs::write(&path, body.as_bytes())
+                .map_err(|error| format!("write {}: {error}", path.display()))?;
+        }
+        let input = case
+            .case
+            .fixture
+            .program()
+            .expect("native fixture has programming input");
+        fs::write(directory.join("input"), input.body.as_bytes())
             .map_err(|error| format!("write input for `{}`: {error}", case.case.relative))?;
         fs::write(
             directory.join("expected"),
@@ -144,7 +153,7 @@ fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
                 case.case.relative
             )
         })?;
-        let (matcher, match_only) = generate::source(case.case, &query_path)?;
+        let (matcher, match_only) = generate::source(case.case)?;
         fs::write(directory.join("matcher.rs"), matcher.as_bytes())
             .map_err(|error| format!("write matcher for `{}`: {error}", case.case.relative))?;
         shards

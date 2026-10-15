@@ -1,0 +1,28 @@
+// @html
+Ignored = (element
+--------------------- INPUT ----------------------
+--------------- INPUT (shared.ptk) ---------------
+Shared = (identifier) @text :: text
+-------------- INPUT (selected.ptk) --------------
+// @javascript
+Root = (program
+  (expression_statement (Shared) @value)
+)
+------------------- TYPESCRIPT -------------------
+export interface Shared {
+  text: string;
+}
+
+export interface Root {
+  value: Shared;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Shared<'s> {
+    pub text: &'s str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Root<'s> {
+    pub value: Shared<'s>,
+}

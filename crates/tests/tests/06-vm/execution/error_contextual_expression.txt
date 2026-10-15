@@ -1,0 +1,11 @@
+(Alias)
+--------------- INPUT (query.ptk) ----------------
+Root = (program)
+Left = left: (identifier)
+Alias = (Left)
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: a field constraint needs an enclosing node
+  |
+1 | (Alias)
+  | ^^^^^^^

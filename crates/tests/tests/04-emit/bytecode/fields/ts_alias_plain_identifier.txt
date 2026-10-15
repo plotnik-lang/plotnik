@@ -1,7 +1,7 @@
 Q = (type_alias_declaration
   name: (identifier) @name
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 ------------------ DIAGNOSTICS -------------------
 error: `identifier` is not valid for grammar field `name` of `type_alias_declaration`
  --> query.ptk:2:10

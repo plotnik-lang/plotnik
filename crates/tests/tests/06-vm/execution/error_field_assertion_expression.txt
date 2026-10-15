@@ -1,0 +1,7 @@
+-left
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: a negated field needs an enclosing node
+  |
+1 | -left
+  | ^^^^^

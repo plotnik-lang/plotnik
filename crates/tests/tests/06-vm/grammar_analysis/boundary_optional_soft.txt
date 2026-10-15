@@ -7,7 +7,7 @@ Q = (program
     )
   )
 )
---------------- INPUT (javascript) ---------------
+---------------- INPUT (index.js) ----------------
 [x];
 ------------------- TYPESCRIPT -------------------
 export interface Q {

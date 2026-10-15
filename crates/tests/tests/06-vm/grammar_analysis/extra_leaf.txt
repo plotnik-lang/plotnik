@@ -1,7 +1,7 @@
 Q = (program
   (comment .!) @comment
 )
---------------- INPUT (javascript) ---------------
+---------------- INPUT (index.js) ----------------
 /* c */ x;
 ------------------- TYPESCRIPT -------------------
 export interface Q {

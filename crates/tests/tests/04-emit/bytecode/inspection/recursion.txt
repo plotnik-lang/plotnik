@@ -6,7 +6,7 @@ Expr = [
 Q = (program
   (expression_statement (Expr) @expr)
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 02

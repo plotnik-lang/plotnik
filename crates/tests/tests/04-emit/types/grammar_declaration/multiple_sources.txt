@@ -1,7 +1,7 @@
 // @javascript@main
 Q = (identifier)
 --------------------- INPUT ----------------------
---------------- QUERY (other.ptk) ----------------
+--------------- INPUT (other.ptk) ----------------
 ; @owner/repo
 R = (identifier)
 ------------------ DIAGNOSTICS -------------------

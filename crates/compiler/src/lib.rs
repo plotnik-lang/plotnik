@@ -56,9 +56,9 @@ pub use crate::compiler::{
     Span, TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
 };
 pub use crate::compiler::{
-    CompiledQuery, GrammarDeclaration, GrammarDeclarationError, Query, QueryBuilder, QueryToken,
-    Source, SourceCollection, SourceId, SourceKind, SourceMap, SourcePath, format_query,
-    parse_grammar_declaration, tokenize,
+    CompiledQuery, GrammarDeclaration, GrammarDeclarationError, InputKind, Query, QueryBuilder,
+    QueryToken, Source, SourceCollection, SourceId, SourceKind, SourceMap, SourcePath,
+    format_query, parse_grammar_declaration, parse_input_kind, tokenize,
 };
 
 #[cfg(feature = "vm")]

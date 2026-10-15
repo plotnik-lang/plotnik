@@ -1,0 +1,9 @@
+(identifier) (number)
+--------------- INPUT (query.ptk) ----------------
+Root = (program)
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: expected a single expression
+  |
+1 | (identifier) (number)
+  |              ^

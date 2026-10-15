@@ -12,3 +12,5 @@ error: `condition` is not a valid grammar field
   |
 1 | Q = (param condition: (id))
   |            ^^^^^^^^^
+  |
+help: if this file is for another language, set its first-line language tag

@@ -1,0 +1,18 @@
+(Root)
+--------------- INPUT (query.ptk) ----------------
+// @html
+Ignored = (element
+--------------------- INPUT ----------------------
+-------------- INPUT (selected.ptk) --------------
+// @javascript
+Root = (program)
+-------------- INPUT (untagged.ptk) --------------
+Unselected = (element)
+------------------ DIAGNOSTICS -------------------
+error: `element` is not a valid node kind
+ --> untagged.ptk:1:15
+  |
+1 | Unselected = (element)
+  |               ^^^^^^^
+  |
+help: if this file is for another language, set its first-line language tag

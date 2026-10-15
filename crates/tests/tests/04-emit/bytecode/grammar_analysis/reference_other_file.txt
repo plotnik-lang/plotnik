@@ -9,7 +9,7 @@ rules:
       - {type: SYMBOL, name: id}
       - {type: STRING, value: "]"}
   id: {type: PATTERN, value: "[a-z]+"}
----------------- QUERY (list.ptk) ----------------
+---------------- INPUT (list.ptk) ----------------
 // The error belongs to this definition, not its caller.
 List = (list .! (id))
 ------------------ DIAGNOSTICS -------------------

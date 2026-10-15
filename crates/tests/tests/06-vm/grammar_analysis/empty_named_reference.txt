@@ -3,7 +3,7 @@ Leaf = (identifier .!)
 Q = (program
   (expression_statement (Leaf)) @expression
 )
---------------- INPUT (javascript) ---------------
+---------------- INPUT (index.js) ----------------
 x;
 ------------------- TYPESCRIPT -------------------
 export type Leaf = undefined;

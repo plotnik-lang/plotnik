@@ -13,3 +13,5 @@ error: `return` is not a valid node kind
   |
 1 | Q = (func "return")
   |            ^^^^^^
+  |
+help: if this file is for another language, set its first-line language tag

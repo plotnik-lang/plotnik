@@ -1,7 +1,7 @@
 Q = (program
   (expression_statement)* @stmts
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 a
 b
 c

@@ -31,7 +31,7 @@ pub use emit::{
     TypeScriptNodeRepresentation, TypeScriptTypesOutput, journal_fn_name,
 };
 pub use fmt::{FormatError, FormatResult, format_query};
-pub use parse::{QueryToken, tokenize};
+pub use parse::{InputKind, QueryToken, parse_input_kind, tokenize};
 pub use query::{
     CompiledQuery, GrammarDeclaration, GrammarDeclarationError, Query, QueryBuilder,
     SourceCollection, parse_grammar_declaration,

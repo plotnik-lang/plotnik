@@ -1,3 +1,5 @@
+
+--------------- INPUT (query.ptk) ----------------
 @val : string
 ------------------ DIAGNOSTICS -------------------
 error: expected a pattern

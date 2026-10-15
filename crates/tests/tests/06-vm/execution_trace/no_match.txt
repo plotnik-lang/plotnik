@@ -1,7 +1,7 @@
 Q = (program
   (expression_statement (number) @n)
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 x
 ------------------- TYPESCRIPT -------------------
 export interface Q {

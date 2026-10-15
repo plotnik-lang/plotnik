@@ -2,7 +2,7 @@ Q = (list_literal
   "]"
   "["
 )
------------------- INPUT (dart) ------------------
+--------------- INPUT (index.dart) ---------------
 ------------------ DIAGNOSTICS -------------------
 error: the grammar places `"["` before `"]"` in `list_literal`
  --> query.ptk:2:3

@@ -20,3 +20,5 @@ error: `ghost` is not a valid node kind
   |
 2 |   (func value: (ghost))
   |                 ^^^^^
+  |
+help: if this file is for another language, set its first-line language tag

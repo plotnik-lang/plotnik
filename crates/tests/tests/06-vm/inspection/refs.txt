@@ -1,6 +1,6 @@
 Name = (identifier) @name
 Q = (program (expression_statement (Name)))
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 x
 ------------------- TYPESCRIPT -------------------
 export interface Name {

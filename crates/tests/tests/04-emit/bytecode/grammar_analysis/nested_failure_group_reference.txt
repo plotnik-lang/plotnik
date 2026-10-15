@@ -9,7 +9,7 @@ rules:
       - {type: SYMBOL, name: num}
   id: {type: PATTERN, value: "[a-z]+"}
   num: {type: PATTERN, value: "[0-9]+"}
--------------- QUERY (entries.ptk) ---------------
+-------------- INPUT (entries.ptk) ---------------
 Entries = {
   (pair
     (num)

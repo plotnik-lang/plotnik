@@ -43,6 +43,41 @@ pub use parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 
 pub use lexer::lex;
 
+/// The syntax role of a source supplied without an explicit role.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InputKind {
+    Module,
+    Expression,
+}
+
+/// Parse unclassified input using the ordinary parser limits.
+///
+/// Named definitions and empty modules select module parsing. Otherwise the
+/// expression parser checks the input. Syntax diagnostics are left to the
+/// caller's normal compilation path. Fatal resource failures are returned.
+pub fn parse_input_kind(source: crate::compiler::Source<'_>) -> Result<InputKind, Error> {
+    let mut diagnostics = crate::compiler::Diagnostics::new();
+    let root = parse_lossless(
+        source.content,
+        source.id,
+        &mut diagnostics,
+        ParseConfig::default(),
+    )?;
+    if root.defs().next().is_none() || root.defs().any(|definition| definition.name().is_some()) {
+        return Ok(InputKind::Module);
+    }
+
+    Parser::new(
+        source.content,
+        source.id,
+        lex(source.content),
+        &mut crate::compiler::Diagnostics::new(),
+        ParseConfig::default(),
+    )
+    .parse_expression()?;
+    Ok(InputKind::Expression)
+}
+
 /// Parse one lossless query CST with caller-owned diagnostics and resource limits.
 ///
 /// Syntax diagnostics remain in `diagnostics`; only fatal parser resource failures

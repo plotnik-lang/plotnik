@@ -1,0 +1,9 @@
+.
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: anchor needs an enclosing node
+  |
+1 | .
+  | ^
+  |
+help: move the anchor and its neighboring pattern inside a named node

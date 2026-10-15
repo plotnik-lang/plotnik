@@ -1,0 +1,64 @@
+[Name: (program (expression_statement (identifier) @text :: text)) Number: (program (expression_statement (number) @number :: text))]
+--------------------- INPUT ----------------------
+chosen;
+--------------------- OUTPUT ---------------------
+{
+  "$data": {
+    "text": "chosen"
+  },
+  "$tag": "Name"
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "text"
+S2 "number"
+S3 "Name"
+S4 "Number"
+S5 "program"
+S6 "expression_statement"
+S7 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Record  M0:1  ; { text }
+T2 = Record  M1:1  ; { number }
+T3 = Variant M2:2  ; Name | Number
+
+[type_members]
+M0: S1 → T0  ; text: <Text>
+M1: S2 → T0  ; number: <Text>
+M2: S3 → T1  ; Name: T1
+M3: S4 → T2  ; Number: T2
+
+[type_names]
+
+[entrypoints]
+<expression> = 00 :: T3
+
+[instructions]
+<expression>:
+  00  -ε-                                   09, 14
+  02  ─‣┘  _                                03
+  03  ─‣┘  _ [VariantClose]                 05
+  05                                        ▶
+  06  └‣─  (identifier) [NodeText RecordSet(M0)]  02
+  08  └‣─  (expression_statement)           06
+  09   !   (program) [VariantOpen(M2)]      08
+  11  └‣─  (number) [NodeText RecordSet(M1)]  02
+  13  └‣─  (expression_statement)           11
+  14   !   (program) [VariantOpen(M3)]      13
+--------------------- TRACE ----------------------
+<expression>:
+  00  -ε-                                   09, 14
+  09       (program) [VariantOpen(M2)]      08
+       ●   program
+  08       (expression_statement)           06
+       ●   expression_statement
+  06       (identifier) [NodeText RecordSet(M0)]  02
+       ●   identifier
+  02       _                                03
+       ●   expression_statement
+  03       _ [VariantClose]                 05
+       ●   program
+  05   ◀   (<expression>)                   ◼

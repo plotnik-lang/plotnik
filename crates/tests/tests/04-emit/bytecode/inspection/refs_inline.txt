@@ -6,7 +6,7 @@ Q = (program
     (expression_statement (MaybeName) @second)
   }
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 02

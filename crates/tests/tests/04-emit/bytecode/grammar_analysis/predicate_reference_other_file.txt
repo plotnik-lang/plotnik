@@ -13,7 +13,7 @@ rules:
       - {type: STRING, value: "("}
       - {type: STRING, value: ")"}
   id: {type: PATTERN, value: "[a-z]+"}
----------------- QUERY (call.ptk) ----------------
+---------------- INPUT (call.ptk) ----------------
 Call = (call == "f()")
 ------------------ DIAGNOSTICS -------------------
 error: predicate `call == "f()"` cannot test `call` because this node kind can contain children

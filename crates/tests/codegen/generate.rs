@@ -1,16 +1,14 @@
 use std::fs;
-use std::path::Path;
 
 use plotnik_compiler::bytecode::type_system::TYPE_NO_VALUE;
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 use plotnik_compiler::{
-    BytecodeConfig, CodegenProvenance, GrammarIdentity, QueryBuilder, RustCodegenConfig, SourceMap,
-    SourcePath,
+    BytecodeConfig, CodegenProvenance, GrammarIdentity, QueryBuilder, RustCodegenConfig,
 };
 
 use crate::corpus::Case;
 
-pub(crate) fn source(case: &Case, query_path: &Path) -> Result<(String, bool), String> {
+pub(crate) fn source(case: &Case) -> Result<(String, bool), String> {
     let bytes = fs::read(&case.grammar_json)
         .map_err(|error| format!("read grammar {}: {error}", case.grammar_json.display()))?;
     let json = std::str::from_utf8(&bytes).map_err(|error| {
@@ -29,9 +27,9 @@ pub(crate) fn source(case: &Case, query_path: &Path) -> Result<(String, bool), S
     let grammar = Grammar::from_raw(&raw)
         .map_err(|error| format!("load grammar {}: {error:?}", case.grammar_json.display()))?
         .with_identity(identity);
-    let mut sources = SourceMap::new();
-    sources.add_file(SourcePath::new(&query_path.to_string_lossy()), &case.query);
-    let compiled = QueryBuilder::new(sources)
+    let (sources, expression) = case.fixture.collection();
+    assert!(expression.is_none(), "static corpus excludes expressions");
+    let compiled = QueryBuilder::from_sources(sources)
         .compile(&grammar)
         .map_err(|error| format!("compile `{}`: {error}", case.relative))?;
     if !compiled.diagnostics().is_empty() {

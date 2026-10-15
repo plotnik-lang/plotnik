@@ -3,7 +3,7 @@ Inner = (identifier) @x
 Q = (program
   (expression_statement (Inner) @v)
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 ---------------------- NFA -----------------------
 [entrypoints]
 Inner = 02

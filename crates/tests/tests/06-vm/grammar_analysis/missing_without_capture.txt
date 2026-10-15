@@ -3,7 +3,7 @@ Q = (program
     consequence: (statement_block (MISSING "}"))
   )
 )
---------------- INPUT (javascript) ---------------
+---------------- INPUT (index.js) ----------------
 if (x) { y
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;

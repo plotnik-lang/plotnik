@@ -1,3 +1,5 @@
+
+--------------- INPUT (query.ptk) ----------------
 ERROR
 ------------------ DIAGNOSTICS -------------------
 error: `ERROR` and `MISSING` must be parenthesized

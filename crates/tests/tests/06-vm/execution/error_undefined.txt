@@ -1,0 +1,16 @@
+// @bad/name
+(Missing)
+--------------- INPUT (query.ptk) ----------------
+// @html
+Missing = (element)
+--------------------- INPUT ----------------------
+-------------- INPUT (selected.ptk) --------------
+// @javascript
+Root = (program)
+------------------ DIAGNOSTICS -------------------
+error: `Missing` is not defined
+  |
+2 | (Missing)
+  |  ^^^^^^^
+  |
+help: define `Missing` before using `(Missing)`, or change the reference to an existing definition

@@ -5,3 +5,5 @@ error: `interface_declaration` is not a valid node kind
   |
 1 | Q = (interface_declaration) @decl
   |      ^^^^^^^^^^^^^^^^^^^^^
+  |
+help: if this file is for another language, set its first-line language tag

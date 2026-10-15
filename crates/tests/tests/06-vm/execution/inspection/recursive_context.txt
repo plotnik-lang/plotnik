@@ -1,0 +1,602 @@
+(program (expression_statement (Part) @part) (expression_statement (Chain) @value))
+--------------- INPUT (query.ptk) ----------------
+Part = {
+  .
+  (identifier) @text :: text
+  .
+}
+
+Expression = (program)
+--------------------- INPUT ----------------------
+first;
+((chosen));
+------------- INPUT (recursive.ptk) --------------
+Chain = [
+  Id: (identifier) @text :: text
+  Rec: (parenthesized_expression
+    (Chain) @inner
+  )
+]
+--------------------- OUTPUT ---------------------
+{
+  "part": {
+    "text": "first"
+  },
+  "value": {
+    "$data": {
+      "inner": {
+        "$data": {
+          "inner": {
+            "$data": {
+              "text": "chosen"
+            },
+            "$tag": "Id"
+          }
+        },
+        "$tag": "Rec"
+      }
+    },
+    "$tag": "Rec"
+  }
+}
+------------------- INSPECTION -------------------
+[
+  {
+    "query_span_id": 17,
+    "parent": null,
+    "source_span": [
+      0,
+      18
+    ],
+    "bindings": [],
+    "range": [
+      1,
+      69
+    ]
+  },
+  {
+    "query_span_id": 18,
+    "parent": 0,
+    "source_span": [
+      0,
+      6
+    ],
+    "bindings": [],
+    "range": [
+      2,
+      17
+    ]
+  },
+  {
+    "query_span_id": 0,
+    "parent": 1,
+    "source_span": [
+      0,
+      5
+    ],
+    "bindings": [],
+    "range": [
+      4,
+      12
+    ]
+  },
+  {
+    "query_span_id": 2,
+    "parent": 2,
+    "source_span": [
+      0,
+      5
+    ],
+    "bindings": [
+      {
+        "path": "/text",
+        "event_index": 8
+      }
+    ],
+    "range": [
+      5,
+      11
+    ]
+  },
+  {
+    "query_span_id": 4,
+    "parent": 3,
+    "source_span": [
+      0,
+      5
+    ],
+    "bindings": [],
+    "range": [
+      6,
+      10
+    ]
+  },
+  {
+    "query_span_id": 19,
+    "parent": 1,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/part",
+        "event_index": 14
+      }
+    ],
+    "range": [
+      13,
+      16
+    ]
+  },
+  {
+    "query_span_id": 21,
+    "parent": 0,
+    "source_span": [
+      7,
+      18
+    ],
+    "bindings": [],
+    "range": [
+      17,
+      68
+    ]
+  },
+  {
+    "query_span_id": 23,
+    "parent": 6,
+    "source_span": [
+      7,
+      17
+    ],
+    "bindings": [],
+    "range": [
+      18,
+      67
+    ]
+  },
+  {
+    "query_span_id": 7,
+    "parent": 7,
+    "source_span": [
+      7,
+      17
+    ],
+    "bindings": [],
+    "range": [
+      19,
+      63
+    ]
+  },
+  {
+    "query_span_id": 8,
+    "parent": 8,
+    "source_span": [
+      7,
+      17
+    ],
+    "bindings": [],
+    "range": [
+      20,
+      62
+    ]
+  },
+  {
+    "query_span_id": 13,
+    "parent": 9,
+    "source_span": [
+      7,
+      17
+    ],
+    "bindings": [
+      {
+        "path": "/$tag",
+        "event_index": 22
+      }
+    ],
+    "range": [
+      21,
+      61
+    ]
+  },
+  {
+    "query_span_id": 14,
+    "parent": 10,
+    "source_span": [
+      7,
+      17
+    ],
+    "bindings": [],
+    "range": [
+      23,
+      59
+    ]
+  },
+  {
+    "query_span_id": 16,
+    "parent": 11,
+    "source_span": [
+      8,
+      16
+    ],
+    "bindings": [],
+    "range": [
+      24,
+      58
+    ]
+  },
+  {
+    "query_span_id": 7,
+    "parent": 12,
+    "source_span": [
+      8,
+      16
+    ],
+    "bindings": [],
+    "range": [
+      25,
+      54
+    ]
+  },
+  {
+    "query_span_id": 8,
+    "parent": 13,
+    "source_span": [
+      8,
+      16
+    ],
+    "bindings": [],
+    "range": [
+      26,
+      53
+    ]
+  },
+  {
+    "query_span_id": 13,
+    "parent": 14,
+    "source_span": [
+      8,
+      16
+    ],
+    "bindings": [
+      {
+        "path": "/$data/$tag",
+        "event_index": 28
+      }
+    ],
+    "range": [
+      27,
+      52
+    ]
+  },
+  {
+    "query_span_id": 14,
+    "parent": 15,
+    "source_span": [
+      8,
+      16
+    ],
+    "bindings": [],
+    "range": [
+      29,
+      50
+    ]
+  },
+  {
+    "query_span_id": 16,
+    "parent": 16,
+    "source_span": [
+      9,
+      15
+    ],
+    "bindings": [],
+    "range": [
+      30,
+      49
+    ]
+  },
+  {
+    "query_span_id": 7,
+    "parent": 17,
+    "source_span": [
+      9,
+      15
+    ],
+    "bindings": [],
+    "range": [
+      31,
+      45
+    ]
+  },
+  {
+    "query_span_id": 8,
+    "parent": 18,
+    "source_span": [
+      9,
+      15
+    ],
+    "bindings": [],
+    "range": [
+      32,
+      44
+    ]
+  },
+  {
+    "query_span_id": 9,
+    "parent": 19,
+    "source_span": [
+      9,
+      15
+    ],
+    "bindings": [
+      {
+        "path": "/$data/$data/$tag",
+        "event_index": 34
+      }
+    ],
+    "range": [
+      33,
+      43
+    ]
+  },
+  {
+    "query_span_id": 10,
+    "parent": 20,
+    "source_span": [
+      9,
+      15
+    ],
+    "bindings": [
+      {
+        "path": "/$data/$data/$data/text",
+        "event_index": 38
+      }
+    ],
+    "range": [
+      35,
+      41
+    ]
+  },
+  {
+    "query_span_id": 12,
+    "parent": 21,
+    "source_span": [
+      9,
+      15
+    ],
+    "bindings": [],
+    "range": [
+      36,
+      40
+    ]
+  },
+  {
+    "query_span_id": 15,
+    "parent": 17,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/$data/$data/inner",
+        "event_index": 46
+      }
+    ],
+    "range": [
+      45,
+      48
+    ]
+  },
+  {
+    "query_span_id": 15,
+    "parent": 12,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/$data/inner",
+        "event_index": 55
+      }
+    ],
+    "range": [
+      54,
+      57
+    ]
+  },
+  {
+    "query_span_id": 22,
+    "parent": 7,
+    "source_span": null,
+    "bindings": [
+      {
+        "path": "/value",
+        "event_index": 64
+      }
+    ],
+    "range": [
+      63,
+      66
+    ]
+  }
+]
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "text"
+S02 "inner"
+S03 "Id"
+S04 "Rec"
+S05 "part"
+S06 "value"
+S07 "Part"
+S08 "Chain"
+S09 "identifier"
+S10 "program"
+S11 "parenthesized_expression"
+S12 "expression_statement"
+S13 "Expression"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Text>
+T2 = Record  M0:1  ; { text }
+T3 = Record  M1:1  ; { text }
+T4 = Record  M2:1  ; { inner }
+T5 = Variant M3:2  ; Id | Rec
+T6 = Record  M5:2  ; { part, value }
+
+[type_members]
+M0: S01 → T1  ; text: <Text>
+M1: S01 → T1  ; text: <Text>
+M2: S02 → T5  ; inner: Chain
+M3: S03 → T3  ; Id: T3
+M4: S04 → T4  ; Rec: T4
+M5: S05 → T2  ; part: Part
+M6: S06 → T5  ; value: Chain
+
+[type_names]
+N0: S07 → T2  ; Part
+N1: S08 → T5  ; Chain
+
+[entrypoints]
+<expression> = 06 :: T6
+Chain        = 04 :: T5
+Expression   = 00 :: T0
+
+[spans]
+P00 def        0..47  source_id=0  T2
+P01 sequence   7..47  source_id=0
+P02 capture    28..33  source_id=0  T2.M0
+P03 capture_type 34..41  source_id=0  T1
+P04 pattern    15..27  source_id=0
+P05 def        49..71  source_id=0
+P06 pattern    62..71  source_id=0
+P07 def        0..100  source_id=1  T5
+P08 labeled_alternation 8..100  source_id=1
+P09 alternative 12..42  source_id=1  T5.M3
+P10 capture    29..34  source_id=1  T3.M1
+P11 capture_type 35..42  source_id=1  T1
+P12 pattern    16..28  source_id=1
+P13 alternative 45..98  source_id=1  T5.M4
+P14 pattern    50..98  source_id=1
+P15 capture    88..94  source_id=1  T4.M2
+P16 ref        80..87  source_id=1  T5
+P17 pattern    0..83  source_id=2
+P18 pattern    9..44  source_id=2
+P19 capture    38..43  source_id=2  T6.M5
+P20 ref        31..37  source_id=2  T2
+P21 pattern    45..82  source_id=2
+P22 capture    75..81  source_id=2  T6.M6
+P23 ref        67..74  source_id=2  T5
+
+[instructions]
+Expression:
+  00   !   (program) [SpanStart#5 SpanStartAt#6 SpanEnd#6 SpanEnd#5]  03
+  03                                        ▶
+
+Chain:
+  04  -ε-  [SpanStart#7]                    32, 29
+
+<expression>:
+  06   !   (program) [SpanStartAt#17]       08
+  08  └‣─  (expression_statement) [SpanStartAt#18 RecordOpen]  10
+  10       (@48)                            48 : 11
+  11  ─•┘  _ [RecordClose SpanStart#19 RecordSet(M5) SpanEnd#19]  14
+  14  ─‣─  (expression_statement) [SpanEnd#18 SpanStartAt#21 SpanStart#23]  16
+  16  └‣─  (Chain)                          04 : 17
+  17  ─‣┘  _ [SpanStart#22 RecordSet(M6) SpanEnd#22 SpanEnd#23]  20
+  20  ─‣┘  _ [SpanEnd#21 SpanEnd#17]        22
+  22                                        ▶
+  23  └‣─  (Chain)                          04 : 24
+  24  ─‣┘  _ [SpanStart#15 RecordSet(M2) SpanEnd#15 SpanEnd#16 SpanEnd#14 VariantClose SpanEnd#13 SpanEnd#8 SpanEnd#7]  28
+  28                                        ▶
+  29   !   (parenthesized_expression) [SpanStart#8 SpanStart#13 VariantOpen(M4) SpanStartAt#14 SpanStart#16]  23
+  32   !   (identifier) [SpanStart#8 SpanStart#9 VariantOpen(M3) SpanStart#10 SpanStartAt#12 NodeText RecordSet(M1) SpanEnd#12 SpanEnd#10 VariantClose SpanEnd#9 SpanEnd#8 SpanEnd#7]  28
+  38  ...
+  39  ...
+  40                                        ▶
+  41  └•─  (identifier) [SpanStart#2 SpanStartAt#4 NodeText RecordSet(M0) SpanEnd#4 SpanEnd#2 SpanEnd#0]  40
+  44  ...
+  45  ...
+  46  ...
+  47  ...
+  48  -ε-  [SpanStart#0]                    41
+--------------------- TRACE ----------------------
+<expression>:
+  06       (program) [SpanStartAt#17]       08
+       ●   program
+  08       (expression_statement) [SpanStartAt#18 RecordOpen]  10
+       ●   expression_statement
+  10       (@48)                            48 : 11
+       ▶   (@48)
+
+@48:
+  48  -ε-  [SpanStart#0]                    41
+  41       (identifier) [SpanStart#2 SpanStartAt#4 NodeText RecordSet(M0) SpanEnd#4 SpanEnd#2 SpanEnd#0]  40
+       ●   identifier
+  40   ◀   (@48)                            
+
+<expression>:
+  11       _ [RecordClose SpanStart#19 RecordSet(M5) SpanEnd#19]  14
+       ●   expression_statement
+  14       (expression_statement) [SpanEnd#18 SpanStartAt#21 SpanStart#23]  16
+       ●   expression_statement
+  16       (Chain)                          04 : 17
+       ▶   (Chain)
+
+Chain:
+  04  -ε-  [SpanStart#7]                    32, 29
+  32       (identifier) [SpanStart#8 SpanStart#9 VariantOpen(M3) SpanStart#10 SpanStartAt#12 NodeText RecordSet(M1) SpanEnd#12 SpanEnd#10 VariantClose SpanEnd#9 SpanEnd#8 SpanEnd#7]  28
+       ○   parenthesized_expression
+  04  ❮❮❮ 
+  29       (parenthesized_expression) [SpanStart#8 SpanStart#13 VariantOpen(M4) SpanStartAt#14 SpanStart#16]  23
+       ●   parenthesized_expression
+  23       (Chain)                          04 : 24
+       ▶   (Chain)
+
+Chain:
+  04  -ε-  [SpanStart#7]                    32, 29
+  32       (identifier) [SpanStart#8 SpanStart#9 VariantOpen(M3) SpanStart#10 SpanStartAt#12 NodeText RecordSet(M1) SpanEnd#12 SpanEnd#10 VariantClose SpanEnd#9 SpanEnd#8 SpanEnd#7]  28
+       ○   (
+  04  ❮❮❮ 
+  29       (parenthesized_expression) [SpanStart#8 SpanStart#13 VariantOpen(M4) SpanStartAt#14 SpanStart#16]  23
+       ○   (
+  23  ❮❮❮ 
+       ▶   (Chain)
+
+Chain:
+  04  -ε-  [SpanStart#7]                    32, 29
+  32       (identifier) [SpanStart#8 SpanStart#9 VariantOpen(M3) SpanStart#10 SpanStartAt#12 NodeText RecordSet(M1) SpanEnd#12 SpanEnd#10 VariantClose SpanEnd#9 SpanEnd#8 SpanEnd#7]  28
+       ○   parenthesized_expression
+  04  ❮❮❮ 
+  29       (parenthesized_expression) [SpanStart#8 SpanStart#13 VariantOpen(M4) SpanStartAt#14 SpanStart#16]  23
+       ●   parenthesized_expression
+  23       (Chain)                          04 : 24
+       ▶   (Chain)
+
+Chain:
+  04  -ε-  [SpanStart#7]                    32, 29
+  32       (identifier) [SpanStart#8 SpanStart#9 VariantOpen(M3) SpanStart#10 SpanStartAt#12 NodeText RecordSet(M1) SpanEnd#12 SpanEnd#10 VariantClose SpanEnd#9 SpanEnd#8 SpanEnd#7]  28
+       ○   (
+  04  ❮❮❮ 
+  29       (parenthesized_expression) [SpanStart#8 SpanStart#13 VariantOpen(M4) SpanStartAt#14 SpanStart#16]  23
+       ○   (
+  23  ❮❮❮ 
+       ▶   (Chain)
+
+Chain:
+  04  -ε-  [SpanStart#7]                    32, 29
+  32       (identifier) [SpanStart#8 SpanStart#9 VariantOpen(M3) SpanStart#10 SpanStartAt#12 NodeText RecordSet(M1) SpanEnd#12 SpanEnd#10 VariantClose SpanEnd#9 SpanEnd#8 SpanEnd#7]  28
+       ●   identifier
+  28   ◀   (Chain)                          
+
+Chain:
+  24       _ [SpanStart#15 RecordSet(M2) SpanEnd#15 SpanEnd#16 SpanEnd#14 VariantClose SpanEnd#13 SpanEnd#8 SpanEnd#7]  28
+       ●   parenthesized_expression
+  28   ◀   (Chain)                          
+
+Chain:
+  24       _ [SpanStart#15 RecordSet(M2) SpanEnd#15 SpanEnd#16 SpanEnd#14 VariantClose SpanEnd#13 SpanEnd#8 SpanEnd#7]  28
+       ●   parenthesized_expression
+  28   ◀   (Chain)                          
+
+<expression>:
+  17       _ [SpanStart#22 RecordSet(M6) SpanEnd#22 SpanEnd#23]  20
+       ●   expression_statement
+  20       _ [SpanEnd#21 SpanEnd#17]        22
+       ●   program
+  22   ◀   (<expression>)                   ◼

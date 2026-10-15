@@ -5,7 +5,7 @@ Q = (program
 )
 
 Bad = (identifier) @bad
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 let x = 1;
 ------------------ DIAGNOSTICS -------------------
 warning: entrypoint `Bad` cannot match the `program` syntax-tree root

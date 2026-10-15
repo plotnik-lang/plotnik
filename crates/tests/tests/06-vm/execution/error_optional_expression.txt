@@ -1,0 +1,7 @@
+(identifier)?
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: the expression must match exactly one node
+  |
+1 | (identifier)?
+  | ^^^^^^^^^^^^^

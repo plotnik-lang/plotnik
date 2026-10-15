@@ -1,0 +1,14 @@
+(program {(expression_statement (identifier) @text :: text)} @value :: Data)
+--------------- INPUT (query.ptk) ----------------
+Data = (identifier)
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: type name `Data` is already used for a different type
+  |
+1 | (program {(expression_statement (identifier) @text :: text)} @value :: Data)
+  |                                                                        ^^^^
+  |
+ ::: query.ptk:1:1
+  |
+1 | Data = (identifier)
+  | ------------------- already used here

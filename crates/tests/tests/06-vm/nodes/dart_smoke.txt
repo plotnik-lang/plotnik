@@ -5,7 +5,7 @@ Q = (source_file
     )
   )
 )
------------------- INPUT (dart) ------------------
+--------------- INPUT (index.dart) ---------------
 void f() {}
 ------------------- TYPESCRIPT -------------------
 export interface Q {

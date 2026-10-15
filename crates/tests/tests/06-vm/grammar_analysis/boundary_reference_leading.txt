@@ -9,7 +9,7 @@ Q = (program
     (array (Head) @head)
   )
 )
---------------- INPUT (javascript) ---------------
+---------------- INPUT (index.js) ----------------
 [x, y];
 ------------------- TYPESCRIPT -------------------
 export interface Q {

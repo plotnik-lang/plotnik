@@ -1,0 +1,17 @@
+(A)
+--------------- INPUT (query.ptk) ----------------
+A = (identifier)
+--------------------- INPUT ----------------------
+--------------- INPUT (second.ptk) ---------------
+A = (number)
+------------------ DIAGNOSTICS -------------------
+error: `A` is already defined
+ --> second.ptk:1:1
+  |
+1 | A = (number)
+  | ^^^^^^^^^^^^
+  |
+ ::: query.ptk:1:1
+  |
+1 | A = (identifier)
+  | ---------------- first defined here

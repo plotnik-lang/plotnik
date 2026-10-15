@@ -41,10 +41,11 @@ fn run() -> Result<(), String> {
 
     rust::generate(manifest_dir, &corpus.cases)?;
     eprintln!(
-        "generated {} Rust tests from {} snapshots ({} diagnostic-only skipped) in {:.2?}",
+        "generated {} Rust tests from {} snapshots ({} diagnostic-only skipped, {} expression cases inapplicable) in {:.2?}",
         corpus.cases.len(),
         corpus.selected,
         corpus.skipped,
+        corpus.inapplicable,
         started.elapsed()
     );
     Ok(())

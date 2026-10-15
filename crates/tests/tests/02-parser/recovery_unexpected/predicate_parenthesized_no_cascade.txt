@@ -1,3 +1,5 @@
+
+--------------- INPUT (query.ptk) ----------------
 (call (#eq? @x "foo"))
 ------------------ DIAGNOSTICS -------------------
 error: Tree-sitter predicates are not supported

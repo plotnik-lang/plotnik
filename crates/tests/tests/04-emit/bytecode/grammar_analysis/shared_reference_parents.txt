@@ -13,7 +13,7 @@ rules:
   ret: {type: SYMBOL, name: num}
   id: {type: PATTERN, value: "[a-z]+"}
   num: {type: PATTERN, value: "[0-9]+"}
---------------- QUERY (value.ptk) ----------------
+--------------- INPUT (value.ptk) ----------------
 Value = (id)
 ------------------ DIAGNOSTICS -------------------
 error: `id` cannot be a child of `ret`

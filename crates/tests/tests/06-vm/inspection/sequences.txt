@@ -6,7 +6,7 @@ Q = (program
     )
   }
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 function f() {}
 ------------------- TYPESCRIPT -------------------
 export interface Q {

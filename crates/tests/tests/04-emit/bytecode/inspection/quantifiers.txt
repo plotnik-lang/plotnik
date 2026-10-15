@@ -19,7 +19,7 @@ Funcs = (program
     name: (identifier) @name
   )* @funcs
 )
---------------- INPUT (typescript) ---------------
+---------------- INPUT (index.ts) ----------------
 ---------------------- NFA -----------------------
 [entrypoints]
 Funcs = 58

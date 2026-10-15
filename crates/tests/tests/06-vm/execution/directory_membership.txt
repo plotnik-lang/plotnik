@@ -1,0 +1,92 @@
+// @html
+(program (expression_statement (Name) @name))
+--------------- INPUT (query.ptk) ----------------
+// @html
+Name = (html_element
+--------------------- INPUT ----------------------
+chosen;
+--------------- INPUT (shared.ptk) ---------------
+Name = (identifier) @text :: text
+-------------- INPUT (selected.ptk) --------------
+// @javascript
+Saved = (program)
+------------- INPUT (malformed.ptk) --------------
+// @bad/name
+Additional = (number)
+--------------------- OUTPUT ---------------------
+{
+  "name": {
+    "text": "chosen"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "text"
+S2 "name"
+S3 "Name"
+S4 "identifier"
+S5 "program"
+S6 "number"
+S7 "expression_statement"
+S8 "Saved"
+S9 "Additional"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Text>
+T2 = Record  M0:1  ; { text }
+T3 = Record  M1:1  ; { name }
+
+[type_members]
+M0: S1 → T1  ; text: <Text>
+M1: S2 → T2  ; name: Name
+
+[type_names]
+N0: S3 → T2  ; Name
+
+[entrypoints]
+<expression> = 07 :: T3
+Additional   = 05 :: T0
+Name         = 00 :: T2
+Saved        = 03 :: T0
+
+[instructions]
+Name:
+  00   !   (identifier) [NodeText RecordSet(M0)]  02
+  02                                        ▶
+
+Saved:
+  03   !   (program)                        04
+  04                                        ▶
+
+Additional:
+  05   !   (number)                         06
+  06                                        ▶
+
+<expression>:
+  07   !   (program)                        08
+  08  └‣─  (expression_statement) [RecordOpen]  10
+  10  └‣─  (Name)                           00 : 11
+  11  -ε-  [RecordClose]                    13
+  13  ─‣┘² _ [RecordSet(M1)]                15
+  15                                        ▶
+--------------------- TRACE ----------------------
+<expression>:
+  07       (program)                        08
+       ●   program
+  08       (expression_statement) [RecordOpen]  10
+       ●   expression_statement
+  10       (Name)                           00 : 11
+       ▶   (Name)
+
+Name:
+  00       (identifier) [NodeText RecordSet(M0)]  02
+       ●   identifier
+  02   ◀   (Name)                           
+
+<expression>:
+  11  -ε-  [RecordClose]                    13
+  13       _ [RecordSet(M1)]                15
+       ●   program
+  15   ◀   (<expression>)                   ◼

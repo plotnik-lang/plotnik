@@ -2,7 +2,7 @@ Q = (list_literal
   (list_literal) @outer
   (list_literal) @inner
 )
------------------- INPUT (dart) ------------------
+--------------- INPUT (index.dart) ---------------
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 2

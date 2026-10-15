@@ -1,25 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use plotnik_tests::snapshot::{Document, Section, parse_document};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SourceLanguage {
-    JavaScript,
-    TypeScript,
-    Dart,
-}
-
-impl SourceLanguage {
-    fn grammar_json(self) -> PathBuf {
-        let path = match self {
-            Self::JavaScript => env!("PLOTNIK_TEST_GRAMMAR_JAVASCRIPT"),
-            Self::TypeScript => env!("PLOTNIK_TEST_GRAMMAR_TYPESCRIPT"),
-            Self::Dart => env!("PLOTNIK_TEST_GRAMMAR_DART"),
-        };
-        PathBuf::from(path)
-    }
-}
+use plotnik_compiler::InputKind;
+pub(crate) use plotnik_tests::snapshot::Language as SourceLanguage;
+use plotnik_tests::snapshot::{Fixture, Section};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Expected {
@@ -39,8 +23,7 @@ impl Expected {
 #[derive(Debug)]
 pub(crate) struct Case {
     pub(crate) relative: String,
-    pub(crate) query: String,
-    pub(crate) source: String,
+    pub(crate) fixture: Fixture,
     pub(crate) language: SourceLanguage,
     pub(crate) grammar_json: PathBuf,
     pub(crate) expected: Expected,
@@ -49,6 +32,7 @@ pub(crate) struct Case {
 pub(crate) struct Corpus {
     pub(crate) selected: usize,
     pub(crate) skipped: usize,
+    pub(crate) inapplicable: usize,
     pub(crate) cases: Vec<Case>,
 }
 
@@ -60,6 +44,7 @@ pub(crate) fn discover(manifest_dir: &Path, filter: Option<&str>) -> Result<Corp
 
     let mut selected = 0;
     let mut skipped = 0;
+    let mut inapplicable = 0;
     let mut cases = Vec::new();
 
     for path in paths {
@@ -70,9 +55,13 @@ pub(crate) fn discover(manifest_dir: &Path, filter: Option<&str>) -> Result<Corp
         selected += 1;
         let raw = fs::read_to_string(&path)
             .map_err(|error| format!("read snapshot {}: {error}", path.display()))?;
-        let document = parse_document(&raw)
+        let fixture = Fixture::parse(&raw)
             .map_err(|error| format!("parse snapshot `{relative}`: {error}"))?;
-        match case_from_document(&relative, document)? {
+        if fixture.kind == Some(InputKind::Expression) {
+            inapplicable += 1;
+            continue;
+        }
+        match case_from_fixture(&relative, fixture)? {
             Some(case) => cases.push(case),
             None => skipped += 1,
         }
@@ -81,19 +70,18 @@ pub(crate) fn discover(manifest_dir: &Path, filter: Option<&str>) -> Result<Corp
     Ok(Corpus {
         selected,
         skipped,
+        inapplicable,
         cases,
     })
 }
 
-fn case_from_document(relative: &str, document: Document) -> Result<Option<Case>, String> {
-    let input = document.sections.first().ok_or_else(|| {
+fn case_from_fixture(relative: &str, fixture: Fixture) -> Result<Option<Case>, String> {
+    fixture.program().ok_or_else(|| {
         format!("snapshot `{relative}` has no `INPUT` section and cannot run natively")
     })?;
-    let language = input_language(&input.name).ok_or_else(|| {
-        format!("snapshot `{relative}` must begin with a supported `INPUT` section")
-    })?;
-    let output = unique_section(&document.sections, "output", relative)?;
-    let diagnostics = unique_section(&document.sections, "diagnostics", relative)?;
+    let language = fixture.language();
+    let output = unique_section(&fixture.generated, "output", relative)?;
+    let diagnostics = unique_section(&fixture.generated, "diagnostics", relative)?;
     let Some(output) = output else {
         let Some(diagnostics) = diagnostics else {
             return Err(format!(
@@ -112,10 +100,13 @@ fn case_from_document(relative: &str, document: Document) -> Result<Option<Case>
 
     Ok(Some(Case {
         relative: relative.to_string(),
-        query: document.query,
-        source: input.body.clone(),
+        fixture,
         language,
-        grammar_json: language.grammar_json(),
+        grammar_json: PathBuf::from(match language {
+            SourceLanguage::JavaScript => env!("PLOTNIK_TEST_GRAMMAR_JAVASCRIPT"),
+            SourceLanguage::TypeScript => env!("PLOTNIK_TEST_GRAMMAR_TYPESCRIPT"),
+            SourceLanguage::Dart => env!("PLOTNIK_TEST_GRAMMAR_DART"),
+        }),
         expected,
     }))
 }
@@ -127,15 +118,6 @@ fn classify_expected(body: &str) -> Result<Expected, String> {
     serde_json::from_str::<serde_json::Value>(body)
         .map_err(|error| format!("expected JSON or `<no match>`: {error}"))?;
     Ok(Expected::Json(body.to_string()))
-}
-
-fn input_language(name: &str) -> Option<SourceLanguage> {
-    match name {
-        "input" | "input.javascript" => Some(SourceLanguage::JavaScript),
-        "input.typescript" => Some(SourceLanguage::TypeScript),
-        "input.dart" => Some(SourceLanguage::Dart),
-        _ => None,
-    }
 }
 
 fn unique_section<'a>(

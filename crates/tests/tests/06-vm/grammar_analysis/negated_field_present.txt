@@ -6,7 +6,7 @@ Q = (program
     ) @declaration
   )
 )
---------------- INPUT (javascript) ---------------
+---------------- INPUT (index.js) ----------------
 let a=b;
 ------------------- TYPESCRIPT -------------------
 export interface Q {

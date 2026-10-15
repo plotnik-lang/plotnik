@@ -1,3 +1,5 @@
+
+--------------- INPUT (query.ptk) ----------------
 (program (identifier) @id)
 ------------------ DIAGNOSTICS -------------------
 error: expected a definition

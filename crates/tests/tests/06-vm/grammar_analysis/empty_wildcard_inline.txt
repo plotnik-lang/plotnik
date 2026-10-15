@@ -3,7 +3,7 @@ Q = (program
     (_ .!)
   ) @expression
 )
---------------- INPUT (javascript) ---------------
+---------------- INPUT (index.js) ----------------
 x;
 ------------------- TYPESCRIPT -------------------
 export interface Q {
