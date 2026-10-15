@@ -1,5 +1,3 @@
-//! Node classification for sibling-skipping decisions.
-
 /// Runtime/analyzer view of a tree node for sibling-skipping decisions.
 ///
 /// At runtime these bits come from one tree-sitter node instance. In grammar

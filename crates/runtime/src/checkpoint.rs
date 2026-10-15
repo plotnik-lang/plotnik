@@ -1,17 +1,8 @@
-//! Checkpoints for backtracking.
-//!
-//! When the VM encounters a fork (multiple successors), it saves
-//! a checkpoint for each non-preferred successor. On failure, it restores the
-//! most recent checkpoint and continues.
-
 use std::num::NonZeroU64;
 
 use crate::{NodeFieldId, SkipPolicy};
 
 /// Effect-control depths restored together on backtracking.
-///
-/// Both counters are bounded by the `u32` call/effect structure, so two lanes
-/// retain the post-`u16` suppression range without padding every checkpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EffectDepths {
     suppression: u32,
@@ -51,12 +42,7 @@ pub struct CallResume {
     pub policy: SkipPolicy,
 }
 
-/// What backtracking does after restoring a checkpoint's state. Every retryable
-/// choice leaves a checkpoint whose resume says how to take the
-/// next one — successor checkpoints jump, sibling searches (Match or Call)
-/// advance the cursor and re-try. This uniform discipline is what makes every
-/// candidate acceptance revisitable; a search with no live resume checkpoint
-/// would silently commit (the historical sibling-retry hole).
+/// What backtracking does after restoring a checkpoint's state.
 #[derive(Clone, Copy, Debug)]
 pub enum Resume {
     /// Resume dispatch at the checkpoint's successor address.
@@ -98,9 +84,6 @@ pub struct Checkpoint {
     pub ip: u16,
     /// How backtracking continues after restoring `state`.
     pub resume: Resume,
-    /// Maximum `frame_index` over this checkpoint and everything beneath it on
-    /// the stack. The whole stack's max is therefore the top's `max_frame_idx_below`,
-    /// so pruning never has to scan.
     pub(crate) max_frame_idx_below: Option<u32>,
 }
 
@@ -157,7 +140,6 @@ impl Checkpoint {
 pub struct CheckpointStack {
     stack: Vec<Checkpoint>,
     snapshots: Vec<CheckpointSnapshot>,
-    /// Highest frame index referenced by any checkpoint.
     max_frame_idx: Option<u32>,
 }
 
@@ -251,7 +233,7 @@ impl CheckpointStack {
         self.max_frame_idx
     }
 
-    /// Live heap bytes: checkpoint count × checkpoint size.
+    /// Occupied checkpoint and snapshot-metadata bytes, excluding spare capacity.
     #[inline]
     pub fn byte_footprint(&self) -> u64 {
         (self.stack.len() * std::mem::size_of::<Checkpoint>()

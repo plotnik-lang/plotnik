@@ -1,7 +1,3 @@
-//! TreeCursor wrapper with Plotnik navigation semantics.
-//!
-//! The wrapper handles tree movement and sibling search under each skip policy.
-
 use std::collections::VecDeque;
 use std::num::NonZeroU64;
 
@@ -9,39 +5,19 @@ use tree_sitter::{Node, TreeCursor};
 
 use crate::{Nav, NodeClass, NodeFieldId, SkipClass, SkipPolicy};
 
-/// Upper bound on live snapshots. Restores overwhelmingly hit the newest
-/// checkpoints (LIFO unwinding), so a small window captures nearly all hits
-/// while bounding memory to CAP cursors regardless of checkpoint-stack depth.
 const SNAPSHOT_CAP: usize = 64;
 
-/// Flat per-cursor estimate for the memory ceiling: a cursor's heap is its
-/// entry stack (~28 bytes per tree level, capacity high-watered). 2 KiB covers
-/// ~70 levels; deeper trees under-account, but the CAP bounds the absolute
-/// error to noise against the >=64 MiB ceiling.
 const SNAPSHOT_FOOTPRINT_ESTIMATE: u64 = 2048;
 
-/// Snapshot creation is lazy because match-heavy workloads create many
-/// checkpoints that restore in-place or move only a few nodes. Storms are
-/// distinguished by repeated wide lateral jumps, then get the O(depth)
-/// snapshot path for the hot part of the run.
 const SNAPSHOT_ACTIVATION_WIDE_MISSES: u32 = 32;
 
-/// Below this distance, `goto_descendant` is cheap enough that snapshotting at
-/// creation costs more than it saves. The storm probe averaged 64 descendant
-/// indices per non-same restore; match-heavy workloads stayed near zero.
 const SNAPSHOT_ACTIVATION_MIN_JUMP: u32 = 32;
 
-/// Exit constraint for Up navigation, checked at *each* level ascended (so
-/// same-mode `Up*` instructions compose; see [`CursorWrapper::go_up`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum UpMode {
-    /// No constraint - just ascend.
     Any,
-    /// Each node left must be its parent's last non-trivia child.
     SkipTrivia,
-    /// Each node left must be its parent's last non-extra child.
     SkipExtras,
-    /// Each node left must be its parent's last child.
     Exact,
 }
 
@@ -67,24 +43,15 @@ pub struct CursorWrapper<'t> {
     snapshots: SnapshotPool<'t>,
 }
 
-/// Pool of cursor snapshots keyed by a monotonically increasing sequence
-/// number. `live` is ordered oldest to newest (seq strictly increasing), so the
-/// newest snapshot is at the back, where LIFO restores look. Evicted or
-/// consumed cursors go to `free` and are recycled by `reset_to`, so the pool
-/// stops allocating once warm.
 pub(crate) struct SnapshotPool<'t> {
     live: VecDeque<SnapshotEntry<'t>>,
     free: Vec<TreeCursor<'t>>,
-    /// u64: one seq per checkpoint push once active — a u32 could plausibly
-    /// wrap within a long unlimited-budget run and panic mid-query.
     next_seq: u64,
     wide_restore_misses: u32,
 }
 
 struct SnapshotEntry<'t> {
     seq: NonZeroU64,
-    /// Checkpoints on the stack still holding this seq. A successor fan-out shares
-    /// one snapshot across all its alternative checkpoints.
     refs: u32,
     cursor: TreeCursor<'t>,
 }
@@ -99,7 +66,6 @@ impl<'t> SnapshotPool<'t> {
         }
     }
 
-    /// Bytes charged against the VM memory ceiling (estimate; see constant).
     fn byte_footprint(&self) -> u64 {
         (self.live.len() + self.free.len()) as u64 * SNAPSHOT_FOOTPRINT_ESTIMATE
     }
@@ -199,13 +165,10 @@ impl<'t> CursorWrapper<'t> {
         self.snapshots.byte_footprint()
     }
 
-    /// True if the snapshot was found and the cursor restored from it.
     fn consume_snapshot(&mut self, seq: NonZeroU64, index: u32, current_index: u32) -> bool {
         let cursor_is_at_index = current_index == index;
         let pool = &mut self.snapshots;
 
-        // Anything newer than `seq` belongs to checkpoints already popped
-        // (LIFO); their refs must have hit zero.
         while let Some(back) = pool.live.back()
             && back.seq > seq
         {
@@ -293,7 +256,6 @@ impl<'t> CursorWrapper<'t> {
     /// or None if navigation failed (no children/siblings).
     pub fn navigate(&mut self, nav: Nav) -> Option<SkipPolicy> {
         let moved = match nav {
-            // Epsilon should never reach here - VM skips navigate for epsilon
             Nav::Epsilon => unreachable!(
                 "runtime cursor received `Nav::Epsilon`; executors must bypass cursor navigation \
                  for epsilon transitions"
@@ -320,10 +282,6 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_first_child()
     }
 
-    /// Whether every child of the current node is `skip_class`-skippable —
-    /// i.e. the node is childless once trivia/extras are ignored (`Exact`
-    /// admits nothing, so it requires true childlessness). The child scan is
-    /// undone before returning, so the cursor stays on the current node.
     fn childless_holds(&mut self, skip_class: SkipClass) -> bool {
         let origin = self.descendant_index();
         if !self.cursor.goto_first_child() {
@@ -346,18 +304,6 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_next_sibling()
     }
 
-    /// Ascend `levels` levels, validating the exit constraint at *every* level.
-    ///
-    /// Same-mode `Up*` instructions compose: `Up*(a)` then `Up*(b)` is `Up*(a+b)`,
-    /// because each node being exited is checked in turn. This is what makes a
-    /// nested trailing anchor — `(array (object (pair) .) .)`, "pair last in
-    /// object AND object last in array" — sound when `collapse_up` merges the two
-    /// single-level ascents (and why merging caps at the encoding limit rather
-    /// than dropping checks).
-    ///
-    /// On any failure the cursor is restored to where it started, so a failed
-    /// navigation leaves no net movement (the VM also backtracks to a checkpoint,
-    /// but keeping this self-contained avoids relying on that).
     fn go_up(&mut self, levels: u8, mode: UpMode) -> bool {
         let origin = self.descendant_index();
         for _ in 0..levels {
@@ -369,9 +315,6 @@ impl<'t> CursorWrapper<'t> {
         true
     }
 
-    /// Whether the current node satisfies `mode`'s last-child constraint. Any
-    /// sibling probe is undone before returning, so the cursor stays on the
-    /// current node either way — ready for the caller to ascend.
     fn exit_constraint_holds(&mut self, mode: UpMode) -> bool {
         match mode {
             UpMode::Any => true,
@@ -388,7 +331,6 @@ impl<'t> CursorWrapper<'t> {
                 }
                 true
             }
-            // Last child once trailing trivia / extras are ignored.
             UpMode::SkipTrivia => self.is_last_child_skipping(Self::is_trivia),
             UpMode::SkipExtras => {
                 let skip_class = mode.skip_class();
@@ -397,9 +339,6 @@ impl<'t> CursorWrapper<'t> {
         }
     }
 
-    /// Whether no non-`skippable` sibling follows the current node — i.e. it is
-    /// the last child once trailing `skippable` siblings are ignored. The sibling
-    /// scan is undone before returning, so the cursor stays on the current node.
     fn is_last_child_skipping(&mut self, skippable: impl Fn(&Node<'t>) -> bool) -> bool {
         let saved = self.descendant_index();
         while self.cursor.goto_next_sibling() {

@@ -1,7 +1,3 @@
-//! Navigation command encoding for bytecode instructions.
-//!
-//! Navigation determines how the VM moves through the Tree-sitter syntax tree.
-
 use crate::SkipClass;
 
 /// What a sibling search may skip while looking for (or retrying past) a
@@ -76,12 +72,9 @@ pub enum Nav {
     UpExact(u8),
 }
 
-/// Bit 7 of a Nav byte marks the Up family; a clear bit 7 is a standard command.
 const UP_FLAG: u8 = 0b1000_0000;
-/// The Up mode tag occupies bits 6-5, just above the level field.
 const UP_MODE_SHIFT: u8 = 5;
 
-/// Up mode tags (bits 6-5 of an Up byte), in `Nav` declaration order.
 const UP_ANY: u8 = 0b00;
 const UP_SKIP_TRIVIA: u8 = 0b01;
 const UP_SKIP_EXTRAS: u8 = 0b10;
@@ -120,7 +113,7 @@ impl Nav {
                 UP_ANY => Self::Up(level),
                 UP_SKIP_TRIVIA => Self::UpSkipTrivia(level),
                 UP_SKIP_EXTRAS => Self::UpSkipExtras(level),
-                _ => Self::UpExact(level), // UP_EXACT
+                _ => Self::UpExact(level),
             };
             return Some(nav);
         }
@@ -192,7 +185,6 @@ impl Nav {
         }
     }
 
-    /// Pack an Up command: family flag, 2-bit mode, 5-bit level.
     fn up_byte(mode: u8, level: u8) -> u8 {
         assert!(
             (1..=Self::MAX_UP_LEVEL).contains(&level),
@@ -252,16 +244,11 @@ impl Nav {
         }
     }
 
-    /// The skip policy this nav's match attempt runs under — the single source
-    /// of truth for what a search may skip (`CursorWrapper::navigate`
-    /// returns it after moving; backtrack resume re-derives it from the
-    /// re-decoded instruction).
+    /// The skip policy for this navigation's match attempt.
     ///
-    /// Non-searching navs (`Stay`, `Up*`) report `Any`: their match runs at a
-    /// position chosen by someone else, so the policy is only consulted if the
-    /// constraint fails and the engine wanders — pre-existing semantics kept
-    /// as-is. `Childless*` and the `*Exact` family report `Exact`: they have
-    /// exactly one candidate.
+    /// `Epsilon`, `Stay`, and all `Up*` variants, including `UpExact`, report
+    /// `Any`. `StayExact`, `DownExact`, `NextExact`, and all `Childless*`
+    /// variants report `Exact`.
     pub fn skip_policy(self) -> SkipPolicy {
         match self {
             Self::Epsilon | Self::Stay | Self::Next | Self::Down => SkipPolicy::Any,
@@ -303,14 +290,10 @@ impl Nav {
         )
     }
 
-    /// Navigation that advances to the next sibling while preserving this nav's
-    /// skip policy.
+    /// Navigation that advances to the next sibling.
     ///
-    /// Shared source of truth for the two places that advance a sibling search
-    /// forward: the VM's in-instruction `continue_search`, and the compiler's
-    /// quantifier repeat iteration. A `Down*` entry and its `Next*` continuation
-    /// share a skip policy (trivia/extras/exact), so both map to the same
-    /// `Next*`; navs that drive no sibling search default to `Next`.
+    /// `Down*` and `Next*` preserve their skip policy. All other variants
+    /// return `Next`, whose skip policy is `Any`.
     pub fn sibling_continuation(self) -> Self {
         match self {
             Self::Down | Self::Next => Self::Next,
@@ -340,8 +323,6 @@ impl Nav {
             Self::Next | Self::NextSkip | Self::NextSkipExtras => Self::NextExact,
             Self::Stay => Self::StayExact,
             Self::Up(n) | Self::UpSkipTrivia(n) | Self::UpSkipExtras(n) => Self::UpExact(n),
-            // Childless asserts at the current position with no search to strip;
-            // its skip class is the assertion itself, not a search policy.
             Self::DownExact
             | Self::NextExact
             | Self::StayExact

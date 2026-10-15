@@ -1,9 +1,3 @@
-//! Generic Rust surface for generated query types.
-//!
-//! Generated modules provide inherent methods as the primary API. These traits
-//! and helpers are the generic door: callers can name a query type parameter
-//! and use the same supplied-node execution and lazy subtree search.
-
 use std::iter::FusedIterator;
 
 use crate::{LimitExceeded, Node};

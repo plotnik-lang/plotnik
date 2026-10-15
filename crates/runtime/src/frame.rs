@@ -1,8 +1,3 @@
-//! Call frame arena for recursion support.
-//!
-//! Implements the cactus stack pattern: frames are append-only,
-//! with a current pointer that can be restored for backtracking.
-
 /// Dense callee-local return port.
 ///
 /// Generalized callees expose only the ports they can reach, numbered from
@@ -128,9 +123,8 @@ impl std::error::Error for CallFrameError {}
 
 /// Append-only arena for frames (cactus stack implementation).
 ///
-/// Frames are never deallocated during execution - "pop" just moves
-/// the current pointer. This allows checkpoint restoration without
-/// invalidating frames referenced by other checkpoints.
+/// Popping moves the current pointer. Pruning removes frames no active
+/// checkpoint can restore.
 #[derive(Debug)]
 pub struct FrameArena {
     frames: Vec<Frame>,
@@ -187,9 +181,7 @@ impl FrameArena {
         self.current
     }
 
-    /// Live heap bytes for the append-only frame arena: frame count × frame
-    /// size. The arena is never deallocated mid-run (only pruned), so its
-    /// `len()` is the true live span.
+    /// Occupied frame bytes, excluding spare arena capacity.
     #[inline]
     pub fn byte_footprint(&self) -> u64 {
         (self.frames.len() * std::mem::size_of::<Frame>()) as u64

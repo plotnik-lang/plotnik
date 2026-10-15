@@ -1,9 +1,3 @@
-//! Grammar-derived id newtypes shared by the compiler and the runtime.
-//!
-//! The values are tree-sitter's own numeric ids: the compiler resolves names to
-//! ids during grammar binding by replicating tree-sitter's symbol numbering, and the
-//! runtime compares them against live `Node`s without further translation.
-
 use std::num::NonZeroU16;
 
 /// A raw `0` was supplied where a non-zero id is required.

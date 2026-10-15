@@ -1,8 +1,3 @@
-//! Rollbackable journal entries recorded during matching.
-//!
-//! Journal events carry actual node references, unlike bytecode `Effect`
-//! which only stores kind + payload.
-
 use std::ops::Index;
 
 use tree_sitter::Node;

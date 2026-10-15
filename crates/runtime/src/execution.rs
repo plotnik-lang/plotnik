@@ -1,13 +1,9 @@
-//! Operation-wide work accounting and lazy subtree traversal.
-
 use std::iter::FusedIterator;
 
 use tree_sitter::{Node, TreeCursor};
 
 use crate::{LimitExceeded, ResolvedRuntimeLimits};
 
-// Retain the existing cadence to amortize live-heap measurements. Enforcement
-// can lag between samples, so this is not a hard allocation ceiling.
 const MEMORY_SAMPLE_INTERVAL: u64 = 1024;
 
 /// One budget shared by traversal and every candidate application.

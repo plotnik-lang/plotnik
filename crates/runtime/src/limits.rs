@@ -1,41 +1,17 @@
-//! Runtime execution limits.
-//!
-//! A run is bounded by two orthogonal resources: **fuel** (work budget) and
-//! **memory** (live runtime heap). Each is governed by a [`Limit`] — `Auto`
-//! (sized from the input), `Of(n)` (an explicit ceiling), or `Unbounded` (opt
-//! out). A [`RuntimeLimitSpec`] is the policy chosen before a run; resolving it
-//! against the source's node count yields the concrete [`ResolvedRuntimeLimits`]
-//! the VM enforces.
-//!
-//! Fuel bounds time-like blowup (catastrophic backtracking); memory bounds
-//! space-like blowup (unbounded checkpoint or journal growth). *Call* depth
-//! needs no ceiling of its own: backtracking is iterative, so it is pure heap —
-//! the frame arena, already part of the memory sum — not a native-stack risk.
-//!
-//! Generated matchers meter one more resource the VM does not: **decode
-//! depth**. The VM materializes output iteratively, but generated typed decoding
-//! can recurse through user-visible recursive result types, so recursive
-//! decoders enter a [`DecodeDepth`] guard before constructing each nested value.
-
 use std::cell::Cell;
 
 use crate::frame::CallFrameError;
 
 /// A safe run exceeded a configured limit or a fixed runtime capacity.
-///
-/// The generated matchers' safe entrypoints report through this; the VM
-/// reports the same trips through its own `RuntimeError`. The wording of the
-/// two must stay aligned — both describe the same enforcement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LimitExceeded {
     /// The matcher exhausted its fuel before the run finished. The value is
     /// the resolved fuel limit for that run.
     OutOfFuel(u64),
-    /// A memory sample found the live runtime heap above the ceiling. `used`
-    /// is the measurement at the trip point; because the arenas grow
-    /// geometrically it can overshoot `limit` by up to a doubling, so it is
-    /// reported alongside the ceiling to make the limit tunable.
+    /// A memory sample exceeded the ceiling. `used` counts occupied arena
+    /// entries and estimated cursor storage, not allocated heap bytes.
+    /// Sampling can overshoot `limit` without a fixed bound.
     Memory { used: u64, limit: u64 },
     /// The committed value's nesting exceeded the decode-depth ceiling.
     /// Reported only by generated matchers (the VM renders output
@@ -132,8 +108,6 @@ pub enum Limit {
 }
 
 impl Limit {
-    /// Resolve to a concrete ceiling, falling back to `auto` for [`Limit::Auto`].
-    /// `Unbounded` resolves to `None`.
     fn resolve(self, auto: u64) -> Option<u64> {
         match self {
             Limit::Auto => Some(auto),
@@ -148,12 +122,12 @@ impl Limit {
 pub struct RuntimeLimitSpec {
     /// Matcher work budget, in fuel units.
     pub fuel_limit: Limit,
-    /// Bound on live runtime heap, in bytes.
+    /// Sampled memory-accounting ceiling in bytes, not a hard allocation limit.
     pub memory: Limit,
 }
 
 impl Default for RuntimeLimitSpec {
-    /// Both resources auto-sized from the input — the safety net is on by default.
+    /// Defaults to `Auto` for both fuel and memory.
     fn default() -> Self {
         Self {
             fuel_limit: Limit::Auto,
@@ -179,27 +153,12 @@ impl RuntimeLimitSpec {
 pub struct ResolvedRuntimeLimits {
     /// Available operation fuel, or `None` for unbounded.
     pub fuel_limit: Option<u64>,
-    /// Maximum live runtime heap in bytes, or `None` for unbounded.
+    /// Sampled memory-accounting ceiling in bytes, or `None` for unbounded.
     pub max_memory: Option<u64>,
 }
 
-// Both auto ceilings grow linearly with the source node count. A legitimate
-// query's work and live state are ~linear in input size, so a linear ceiling
-// stays invisible to it while still catching super-linear blowup (catastrophic
-// backtracking for fuel, unbounded checkpoint growth for memory). The constants
-// are generous headroom over measured legitimate usage, not tight targets.
-
-/// Native stack budget reserved for generated typed decoding.
-///
-/// This is intentionally lower than a typical main-thread stack: callers can
-/// run generated matchers on worker threads, and Rust's default worker stack is
-/// commonly 2 MiB.
 const DECODE_STACK_BUDGET_BYTES: u64 = 2 * 1024 * 1024;
 
-/// Per-call overhead that the source-level decoder estimate cannot see:
-/// return address, saved registers, argument passing, and compiler-chosen
-/// temporaries. The emitter supplies the locals it knows about; this padding
-/// keeps the formula conservative without requiring backend-specific stack maps.
 const DECODE_FRAME_OVERHEAD_BYTES: u64 = 512;
 
 /// Space reserved for one native node handle in generated decoder frames.

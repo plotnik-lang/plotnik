@@ -1,5 +1,3 @@
-//! Sparse DFA storage and deserialization for regex predicates.
-
 use std::sync::OnceLock;
 
 use regex_automata::Input;
@@ -23,15 +21,6 @@ pub fn deserialize_dfa(bytes: &[u8]) -> Result<DFA<&[u8]>, String> {
 
 /// A module's regex-predicate DFAs, deserialized once at load and reused on
 /// every evaluation (issue #426).
-///
-/// `DFA::from_bytes` re-validates the whole serialized automaton, so the old
-/// path — deserializing inside the VM's match loop — re-paid that cost on every
-/// predicate test, thousands of times over a quantified pattern on a large file.
-/// These owned automata are built once, folded into load-time validation
-/// that already deserialized each DFA, then searched directly thereafter. The
-/// owned copy duplicates bytes still resident in the module's serialized blob —
-/// that blob is one immutable, contiguous allocation backing every section, so
-/// the duplication is inherent rather than separately reclaimable.
 ///
 /// Indexed in parallel with the regex table: slot 0 is the reserved sentinel
 /// (`None`); every real pattern `1..count` holds its owned DFA.
@@ -64,8 +53,6 @@ impl RegexDfas {
 
 impl std::fmt::Debug for RegexDfas {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // The inner sparse DFAs are not `Debug`; the slot count is enough to keep
-        // the enclosing `Module`'s derived `Debug` meaningful.
         f.debug_struct("RegexDfas")
             .field("count", &self.dfas.len())
             .finish()

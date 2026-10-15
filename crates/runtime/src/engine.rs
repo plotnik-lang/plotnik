@@ -1,17 +1,3 @@
-//! Shared execution-state core for query executors.
-//!
-//! [`Engine`] bundles the mutable state a query run threads through every
-//! instruction — cursor, call frames, backtracking checkpoints, the match
-//! journal, and the suppression gate — together with the transitions that
-//! must stay in lockstep: checkpoint save/restore, frame entry/exit, and
-//! gated journal event emission. The bytecode VM drives this core from its dispatch
-//! loop; generated matchers (the proc-macro backend) drive the same core from
-//! compiled per-state code. Keeping the checkpoint contract in one place is
-//! the point: a state field added here cannot silently escape save/restore
-//! (the exhaustive destructure in [`Engine::restore_checkpoint_state`] will
-//! not compile until the field is classified), and both executors inherit the
-//! discipline instead of re-implementing it.
-
 use std::num::NonZeroU64;
 
 use tree_sitter::{Node, TreeCursor};
@@ -32,22 +18,9 @@ pub struct Engine<'t> {
     checkpoints: CheckpointStack,
     journal: MatchJournal<'t>,
     recursion_depth: u32,
-    /// Suppression nesting on the active match path: when `> 0`, output events
-    /// are suppressed (not appended to the journal). `SuppressBegin` increments,
-    /// `SuppressEnd` decrements. Each open scope lives inside an active call
-    /// frame, so it is bounded by call-nesting depth (`recursion_depth`) times
-    /// a per-query constant — and call depth is itself capped by the
-    /// `u32`-indexed frame arena. A `u16` was far too narrow (deep `@_`
-    /// recursion overflowed it at 65_536).
     suppress_depth: u32,
-    /// Immutable suppression floor: zero for materializing runs, one for
-    /// match-only runs.
     base_suppress_depth: u32,
-    /// Number of non-suppressed `ScalarOpen`s on the current journal path.
     scalar_depth: u32,
-    /// Whether the cursor's lazy snapshot pool has activated (see
-    /// [`CursorWrapper::snapshot`]); once true, every checkpoint push pairs
-    /// with a pooled cursor snapshot.
     snapshot_cursor_active: bool,
 }
 
@@ -160,27 +133,18 @@ impl<'t> Engine<'t> {
         self.assert_checkpoint_restored(&state);
     }
 
-    /// Assert the post-restore engine state matches the checkpoint snapshot,
-    /// and classify every engine field as restored-from or
-    /// intentionally-excluded-from [`CheckpointState`]. The exhaustive
-    /// destructure is the point: a newly-added engine field will not compile
-    /// until it is classified here, so it cannot silently escape the
-    /// checkpoint contract. Executor-side state (instruction pointer, fuel
-    /// budget) is resumed separately by the executor's backtrack. Debug-only.
     #[cfg(debug_assertions)]
     fn assert_checkpoint_restored(&self, state: &CheckpointState) {
         let Engine {
-            // Restored — must equal the snapshot the checkpoint captured.
             cursor,
             frames,
             journal,
             recursion_depth,
             suppress_depth,
-            base_suppress_depth: _, // immutable execution mode
+            base_suppress_depth: _,
             scalar_depth,
-            // Deliberately outside `CheckpointState`:
-            checkpoints: _, // the stack this checkpoint was just popped from
-            snapshot_cursor_active: _, // cumulative optimization state
+            checkpoints: _,
+            snapshot_cursor_active: _,
         } = self;
 
         debug_assert_eq!(
@@ -410,8 +374,8 @@ impl<'t> Engine<'t> {
         Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
-    /// Live bytes across the growable runtime arenas — the quantity a memory
-    /// ceiling bounds. A sum of element-count × element-size; never allocates.
+    /// Occupied arena bytes plus estimated cursor-snapshot storage.
+    /// Excludes spare arena capacity and does not allocate.
     pub fn heap_bytes(&self) -> u64 {
         self.frames.byte_footprint()
             + self.checkpoints.byte_footprint()

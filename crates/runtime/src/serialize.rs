@@ -1,14 +1,3 @@
-//! Source-threading serialization for query result values.
-//!
-//! Generated query outputs hold `tree_sitter::Node` handles, and a node's text
-//! lives in the source buffer — a plain `serde::Serialize` impl has no way to
-//! receive it. [`SerializeWithSource`] threads the source through the
-//! serialization walk, and [`WithSource`] adapts any implementor into an
-//! ordinary `serde::Serialize` value. Node handles serialize as
-//! `{kind, text, span: [start, end]}` — the same JSON shape the VM's
-//! materialized values use, which is what lets generated output be diffed
-//! against VM output byte-for-byte.
-
 use serde::Serialize;
 use serde::ser::{Error as _, SerializeSeq, Serializer};
 
@@ -16,6 +5,7 @@ use serde::ser::{Error as _, SerializeSeq, Serializer};
 ///
 /// Generated query modules implement this for their output structs/enums;
 /// the leaf and container impls below cover everything those types contain.
+/// Node handles serialize as `{kind, text, span: [start, end]}`.
 pub trait SerializeWithSource {
     fn serialize_with_source<S: Serializer>(
         &self,

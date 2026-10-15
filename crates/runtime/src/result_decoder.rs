@@ -1,22 +1,13 @@
-//! The typed decoder's cursor over an output-event stream.
-//!
-//! Generated decoders turn the winning match journal into typed results.
-//! Matcher verification guarantees the event structure, so an unexpected event
-//! is a compiler bug and panics.
-
 use tree_sitter::Node;
 
 use crate::{JournalEvent, OutputEvents, node_text, source_text};
 
-/// `record_set_index` sentinel: no `RecordSet` closes a value starting here.
 const NO_RECORD_SET: u32 = u32::MAX;
 
 pub struct ResultDecoder<'a, 't, 's> {
     events: OutputEvents<'a, 't>,
     source: &'s str,
     pos: usize,
-    /// Precomputed answers for [`Self::peek_record_set`]. Rescanning nested
-    /// values on each peek would make decoding quadratic in nesting depth.
     record_set_index: Vec<u32>,
 }
 
@@ -262,18 +253,6 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
     }
 }
 
-/// For each position, the position of the first `RecordSet` past the balanced
-/// composite values starting there — the `RecordSet` that closes a field value
-/// beginning at that entry, or [`NO_RECORD_SET`] where none does (positions no
-/// decoder ever peeks at: closes, and value starts whose `RecordSet` lives in an
-/// enclosing scope).
-///
-/// One backward pass. `cur` is the answer for the level being scanned;
-/// meeting a `*Close` right-to-left *enters* that group, so the outer level's
-/// answer is parked on `outer` and `cur` restarts; meeting the matching
-/// `*Open` leaves the group, and the parked answer — the first `RecordSet` after
-/// the group — is exactly the answer *at* the open (a composite field value
-/// starts there) and for whatever precedes it on the outer level.
 fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
     assert!(
         u32::try_from(events.len()).is_ok_and(|len| len < NO_RECORD_SET),
