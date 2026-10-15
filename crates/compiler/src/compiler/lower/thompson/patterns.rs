@@ -59,7 +59,7 @@ impl CaptureRequest {
                 .inner()
                 .expect("ordinary capture request has an inner pattern"),
             nav,
-            capture_effects: compiler.build_capture_effects(captured_pattern, Some(mechanism)),
+            capture_effects: compiler.build_capture_effects(captured_pattern, mechanism),
             outer_capture,
         }
     }
@@ -95,7 +95,7 @@ impl NfaBuilder<'_> {
             let has_scalar_close = !scalar_close.is_empty();
             let matched_exit = if has_scalar_close {
                 let final_exit = self.emit_trailing_effects_exit(exit, std::mem::take(&mut post));
-                self.emit_effects_epsilon(final_exit, scalar_close, CaptureEffects::default())
+                self.emit_effects_epsilon(final_exit, scalar_close)
             } else {
                 exit
             };
@@ -207,7 +207,7 @@ impl NfaBuilder<'_> {
         let after_node = if scalar_close.is_empty() {
             items_entry
         } else {
-            self.emit_effects_epsilon(items_entry, scalar_close, CaptureEffects::default())
+            self.emit_effects_epsilon(items_entry, scalar_close)
         };
         let mut entry_match = MatchIR::epsilon(entry, after_node)
             .nav(nav)
@@ -230,7 +230,7 @@ impl NfaBuilder<'_> {
         if post.is_empty() {
             exit
         } else {
-            self.emit_effects_epsilon(exit, post, CaptureEffects::default())
+            self.emit_effects_epsilon(exit, post)
         }
     }
 }
@@ -342,7 +342,7 @@ impl NfaBuilder<'_> {
         let has_scalar_close = !scalar_close.is_empty();
         let matched_exit = if has_scalar_close {
             let final_exit = self.emit_trailing_effects_exit(exit, std::mem::take(&mut post));
-            self.emit_effects_epsilon(final_exit, scalar_close, CaptureEffects::default())
+            self.emit_effects_epsilon(final_exit, scalar_close)
         } else {
             exit
         };
@@ -578,34 +578,27 @@ impl NfaBuilder<'_> {
 
         let call_entry = match lowering {
             RefLowering::ScopedValue => {
-                let capture_state =
-                    self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
+                let capture_state = self.emit_effects_epsilon(exit, capture.post);
                 let record_close = self.emit_record_close(capture_state);
                 let call_label = emit_call(self, ReturnAddr(record_close));
                 self.emit_record_open(call_label)
             }
             RefLowering::PendingValue => {
-                let return_addr =
-                    self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
+                let return_addr = self.emit_effects_epsilon(exit, capture.post);
                 emit_call(self, ReturnAddr(return_addr))
             }
             RefLowering::SuppressedCall => {
                 let mut close_effects = vec![EffectIR::suppress_end()];
                 close_effects.extend(capture.post);
-                let suppress_end =
-                    self.emit_effects_epsilon(exit, close_effects, CaptureEffects::default());
+                let suppress_end = self.emit_effects_epsilon(exit, close_effects);
                 let call_label = emit_call(self, ReturnAddr(suppress_end));
-                self.emit_effects_epsilon(
-                    call_label,
-                    vec![EffectIR::suppress_begin()],
-                    CaptureEffects::default(),
-                )
+                self.emit_effects_epsilon(call_label, [EffectIR::suppress_begin()])
             }
             RefLowering::PlainCall => {
                 let return_addr = if capture.post.is_empty() {
                     exit
                 } else {
-                    self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default())
+                    self.emit_effects_epsilon(exit, capture.post)
                 };
                 emit_call(self, ReturnAddr(return_addr))
             }
@@ -615,7 +608,7 @@ impl NfaBuilder<'_> {
             return call_entry;
         }
 
-        self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
+        self.emit_effects_epsilon(call_entry, capture.pre)
     }
 
     fn ref_call_lowering(
@@ -866,11 +859,7 @@ impl NfaBuilder<'_> {
             CalleeEntry(target),
         );
         let call = if suppresses_output {
-            self.emit_effects_epsilon(
-                call,
-                vec![EffectIR::suppress_begin()],
-                CaptureEffects::default(),
-            )
+            self.emit_effects_epsilon(call, [EffectIR::suppress_begin()])
         } else {
             call
         };
@@ -1045,14 +1034,11 @@ impl NfaBuilder<'_> {
         outer_capture: CaptureEffects,
         exits: CaptureExits,
     ) -> Label {
-        let inner_opt = captured_pattern.inner();
+        let inner = captured_pattern
+            .inner()
+            .expect("validated capture must have an inner pattern");
         if captured_pattern.capture().is_discard() || self.is_suppressed() {
-            return self.compile_suppressed_region(
-                inner_opt.as_ref(),
-                nav_override,
-                outer_capture,
-                exits,
-            );
+            return self.compile_suppressed_region(&inner, nav_override, outer_capture, exits);
         }
 
         let pattern = Pattern::CapturedPattern(captured_pattern.clone());
@@ -1061,19 +1047,14 @@ impl NfaBuilder<'_> {
             .analysis
             .type_analysis
             .expect_capture_fact(&pattern);
-        let mechanism = inner_opt.as_ref().map(|_| fact.kind());
+        let mechanism = fact.kind();
         let capture_type_plan = fact.built_in_plan().map(|(_, plan)| plan.clone());
 
-        if let (Some(_), Some(plan)) = (inner_opt.as_ref(), capture_type_plan.as_ref()) {
+        if let Some(plan) = capture_type_plan.as_ref() {
             return self
                 .capture_type(plan, nav_override, exits)
                 .captured(captured_pattern, outer_capture);
         }
-
-        let Some(mechanism) = mechanism else {
-            let capture_effects = self.build_capture_effects(captured_pattern, None);
-            return self.emit_effects_epsilon(exits.match_exit(), capture_effects, outer_capture);
-        };
 
         let req = CaptureRequest::for_capture(
             self,
@@ -1131,7 +1112,7 @@ impl NfaBuilder<'_> {
         } = req;
         let CaptureEffects { pre, post } = outer_capture;
         let capture_state =
-            self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
+            self.emit_effects_epsilon(exit, capture_effects.into_iter().chain(post));
         let inner_entry = self.dispatch_pattern(
             &inner,
             PatternCtx::observing_value(capture_state, nav_override),
@@ -1185,28 +1166,19 @@ impl NfaBuilder<'_> {
 
     fn compile_suppressed_region(
         &mut self,
-        inner: Option<&Pattern>,
+        inner: &Pattern,
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
         exits: CaptureExits,
     ) -> Label {
         let CaptureEffects { pre, post } = outer_capture;
 
-        let Some(inner) = inner else {
-            let exit = exits.match_exit();
-            if pre.is_empty() && post.is_empty() {
-                return exit;
-            }
-            let entry = self.emit_effects_epsilon(exit, vec![], CaptureEffects::new_post(post));
-            return self.wrap_entry_pre(entry, pre);
-        };
-
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
                 let end_label = if post.is_empty() {
                     exit
                 } else {
-                    self.emit_effects_epsilon(exit, vec![], CaptureEffects::new_post(post))
+                    self.emit_effects_epsilon(exit, post)
                 };
                 self.with_suppression(|this| {
                     this.dispatch_pattern(inner, PatternCtx::with_nav(end_label, nav_override))
@@ -1219,17 +1191,9 @@ impl NfaBuilder<'_> {
                 let (end_match, end_skip) = if post.is_empty() {
                     (match_exit, skip_exit)
                 } else {
-                    let end_match = self.emit_effects_epsilon(
-                        match_exit,
-                        vec![],
-                        CaptureEffects::new_post(post.clone()),
-                    );
+                    let end_match = self.emit_effects_epsilon(match_exit, post.clone());
                     let end_skip = match skip_exit {
-                        SkipExit::To(skip) => SkipExit::To(self.emit_effects_epsilon(
-                            skip,
-                            vec![],
-                            CaptureEffects::new_post(post),
-                        )),
+                        SkipExit::To(skip) => SkipExit::To(self.emit_effects_epsilon(skip, post)),
                         SkipExit::Fail => SkipExit::Fail,
                     };
                     (end_match, end_skip)

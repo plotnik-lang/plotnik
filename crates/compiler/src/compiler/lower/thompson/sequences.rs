@@ -187,11 +187,7 @@ impl NfaBuilder<'_> {
         let last_post = if last_is_skippable {
             let tail_effects = split_sequence_tail_effects(capture.post);
             if !tail_effects.exit_post.is_empty() {
-                current_exit = self.emit_effects_epsilon(
-                    current_exit,
-                    tail_effects.exit_post,
-                    CaptureEffects::default(),
-                );
+                current_exit = self.emit_effects_epsilon(current_exit, tail_effects.exit_post);
             }
             tail_effects.item_post
         } else {
@@ -595,7 +591,9 @@ impl NfaBuilder<'_> {
         entry: EntryObligation,
         targets: &ExitMap<Label>,
     ) -> Option<Label> {
-        let inner = captured_pattern.inner()?;
+        let inner = captured_pattern
+            .inner()
+            .expect("validated capture must have an inner pattern");
         if captured_pattern.capture().is_discard() || self.is_suppressed() {
             return self.with_suppression(|this| {
                 this.compile_boundary_pattern_to(&inner, input, entry, targets, false)
@@ -619,7 +617,7 @@ impl NfaBuilder<'_> {
                 targets,
             );
         }
-        let capture_effects = self.build_capture_effects(captured_pattern, Some(mechanism));
+        let capture_effects = self.build_capture_effects(captured_pattern, mechanism);
 
         if let Pattern::QuantifiedPattern(quantified) = &inner {
             return match mechanism {

@@ -287,11 +287,7 @@ impl NfaBuilder<'_> {
                 let exit = if alternative_capture.post.is_empty() {
                     alternative_exit
                 } else {
-                    self.emit_effects_epsilon(
-                        alternative_exit,
-                        vec![],
-                        CaptureEffects::new_post(alternative_capture.post.clone()),
-                    )
+                    self.emit_effects_epsilon(alternative_exit, alternative_capture.post.clone())
                 };
                 let pattern_ctx = PatternCtx {
                     exit,
@@ -331,11 +327,7 @@ impl NfaBuilder<'_> {
                 } else {
                     capture.clone().with_pre_values(completion_effects)
                 };
-                let empty_exit = self.emit_effects_epsilon(
-                    skip,
-                    vec![],
-                    CaptureEffects::new_post(alternative_capture.post),
-                );
+                let empty_exit = self.emit_effects_epsilon(skip, alternative_capture.post);
                 let pattern_ctx = PatternCtx {
                     exit: empty_exit,
                     nav: alternative_nav,
@@ -469,8 +461,7 @@ impl NfaBuilder<'_> {
                     }
                     let close_exit = this.emit_effects_epsilon(
                         alternative_exit,
-                        close_effects,
-                        CaptureEffects::new_post(capture.post.clone()),
+                        close_effects.into_iter().chain(capture.post.clone()),
                     );
                     let pattern_ctx = PatternCtx {
                         exit: close_exit,
@@ -523,11 +514,7 @@ impl NfaBuilder<'_> {
                             .clone()
                             .nest_scope(e_effect, EffectIR::end_variant())
                     };
-                let empty_exit = self.emit_effects_epsilon(
-                    skip,
-                    vec![],
-                    CaptureEffects::new_post(alternative_capture.post),
-                );
+                let empty_exit = self.emit_effects_epsilon(skip, alternative_capture.post);
                 let empty_entry = self.with_scope_if_present(payload.type_id(), |this| {
                     let pattern_ctx = PatternCtx {
                         exit: empty_exit,

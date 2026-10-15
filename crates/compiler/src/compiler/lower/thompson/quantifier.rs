@@ -1013,9 +1013,7 @@ impl NfaBuilder<'_> {
             capture,
             observe_value,
         } = self.bracket_pattern_ctx(pattern, matched);
-        if let Pattern::CapturedPattern(cap) = pattern
-            && cap.inner().is_some()
-        {
+        if let Pattern::CapturedPattern(cap) = pattern {
             return self.compile_captured(
                 cap,
                 nav_override,

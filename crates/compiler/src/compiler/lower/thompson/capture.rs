@@ -152,14 +152,13 @@ impl NfaBuilder<'_> {
     pub(super) fn build_capture_effects(
         &mut self,
         captured_pattern: &ast::CapturedPattern,
-        mechanism: Option<CaptureKind>,
+        mechanism: CaptureKind,
     ) -> Vec<EffectIR> {
         let capture = captured_pattern.capture();
         let mut effects = Vec::with_capacity(4);
         let mut member_ref = None;
 
-        let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
-        if is_node_mechanism {
+        if mechanism == CaptureKind::Node {
             effects.push(EffectIR::node());
         }
 

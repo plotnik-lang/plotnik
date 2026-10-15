@@ -601,11 +601,7 @@ impl<'a> NfaBuilder<'a> {
             return (exit, None);
         };
 
-        let close = self.emit_effects_epsilon(
-            exit,
-            vec![EffectIR::span_end(id.0)],
-            CaptureEffects::default(),
-        );
+        let close = self.emit_effects_epsilon(exit, [EffectIR::span_end(id.0)]);
         (close, Some(id))
     }
 

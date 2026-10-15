@@ -99,16 +99,11 @@ impl NfaBuilder<'_> {
     pub(super) fn emit_effects_epsilon(
         &mut self,
         exit: Label,
-        effects: Vec<EffectIR>,
-        outer: CaptureEffects,
+        effects: impl IntoIterator<Item = EffectIR>,
     ) -> Label {
         let entry = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(entry, exit)
-                .append_effects(effects)
-                .append_effects(outer.post)
-                .into(),
-        );
+        self.instructions
+            .push(MatchIR::epsilon(entry, exit).append_effects(effects).into());
         entry
     }
 
@@ -205,7 +200,7 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        self.emit_effects_epsilon(exit, effects, CaptureEffects::default())
+        self.emit_effects_epsilon(exit, effects)
     }
 
     pub(super) fn emit_epsilon(&mut self, label: Label, successors: Vec<Label>) {

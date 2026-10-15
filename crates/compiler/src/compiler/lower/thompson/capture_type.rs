@@ -314,11 +314,7 @@ impl<'a> NfaBuilder<'a> {
                 this.compile_boundary_pattern_to(pattern, input, entry, &inner_targets, false)
             })
         })?;
-        Some(self.emit_effects_epsilon(
-            inner,
-            vec![EffectIR::scalar_open()],
-            CaptureEffects::default(),
-        ))
+        Some(self.emit_effects_epsilon(inner, [EffectIR::scalar_open()]))
     }
 
     fn compile_boundary_capture_option(
@@ -546,11 +542,8 @@ impl CaptureTypeLowerer<'_, '_> {
                 })
             }
         };
-        self.compiler.emit_effects_epsilon(
-            entry,
-            vec![EffectIR::scalar_open()],
-            CaptureEffects::default(),
-        )
+        self.compiler
+            .emit_effects_epsilon(entry, [EffectIR::scalar_open()])
     }
 
     fn bool_without_provenance(
@@ -589,8 +582,7 @@ impl CaptureTypeLowerer<'_, '_> {
     fn bool_value(&mut self, exit: Label, destination: ValueDestination, value: bool) -> Label {
         let mut effects = vec![EffectIR::bool_value(value)];
         effects.extend(destination.into_effects());
-        self.compiler
-            .emit_effects_epsilon(exit, effects, CaptureEffects::default())
+        self.compiler.emit_effects_epsilon(exit, effects)
     }
 
     fn node_terminal(
@@ -618,8 +610,7 @@ impl CaptureTypeLowerer<'_, '_> {
     ) -> Label {
         let mut effects = vec![terminal.close()];
         effects.extend(destination.into_effects());
-        self.compiler
-            .emit_effects_epsilon(exit, effects, CaptureEffects::default())
+        self.compiler.emit_effects_epsilon(exit, effects)
     }
 
     fn option(
@@ -655,14 +646,12 @@ impl CaptureTypeLowerer<'_, '_> {
                 OptionMode::Preserve => {
                     let mut effects = vec![EffectIR::absent()];
                     effects.extend(destination.into_effects());
-                    self.compiler
-                        .emit_effects_epsilon(exit, effects, CaptureEffects::default())
+                    self.compiler.emit_effects_epsilon(exit, effects)
                 }
                 OptionMode::Bool => {
                     let mut effects = vec![EffectIR::bool_value(false)];
                     effects.extend(destination.into_effects());
-                    self.compiler
-                        .emit_effects_epsilon(exit, effects, CaptureEffects::default())
+                    self.compiler.emit_effects_epsilon(exit, effects)
                 }
             }),
             SkipExit::Fail => None,
@@ -689,7 +678,7 @@ impl CaptureTypeLowerer<'_, '_> {
         let close = |compiler: &mut NfaBuilder<'_>, exit, destination: ValueDestination| {
             let mut effects = vec![EffectIR::list_close()];
             effects.extend(destination.into_effects());
-            compiler.emit_effects_epsilon(exit, effects, CaptureEffects::default())
+            compiler.emit_effects_epsilon(exit, effects)
         };
         let closed_exits = match self.exits {
             CaptureExits::Single(exit) => {
@@ -712,11 +701,8 @@ impl CaptureTypeLowerer<'_, '_> {
             closed_exits,
             self.nav,
         );
-        self.compiler.emit_effects_epsilon(
-            iterations,
-            vec![EffectIR::list_open()],
-            CaptureEffects::default(),
-        )
+        self.compiler
+            .emit_effects_epsilon(iterations, [EffectIR::list_open()])
     }
 
     fn specialized_reference(&mut self, pattern: &Pattern, destination: ValueDestination) -> Label {
