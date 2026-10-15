@@ -1,17 +1,11 @@
-//! Entrypoint section types.
-
 use super::instructions::CodeAddr;
 use super::{StringId, TypeId};
 
-/// Output effects owned by an entrypoint rather than its shared definition body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub(crate) enum EntryBoundary {
-    /// The definition body already produces the complete result.
     Passthrough = 0,
-    /// Capture the current node after the definition returns successfully.
     Node = 1,
-    /// Open a root record before execution and close it after a successful return.
     Record = 2,
 }
 
@@ -50,11 +44,8 @@ impl EntrypointIdentity {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Entrypoint {
     identity: EntrypointIdentity,
-    /// Starting instruction address.
     target: CodeAddr,
-    /// Result type.
     result_type: TypeId,
-    /// Entry-owned result boundary effects.
     boundary: u16,
 }
 

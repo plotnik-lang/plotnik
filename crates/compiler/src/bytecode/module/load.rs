@@ -1,9 +1,3 @@
-//! Loading and validation of raw bytecode.
-//!
-//! The in-process compiler is currently the only producer, but this boundary
-//! treats its bytes as untrusted. Malformed bytes return [`ModuleError`]; they
-//! never become a [`Module`] or reach execution.
-
 use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
     MATCH_PAYLOAD_START, MatchCounts, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE, PREDICATE_SLOTS,
@@ -18,11 +12,6 @@ use super::super::{
 use super::*;
 use plotnik_runtime::{Nav, NodeFieldId, NodeKindId, PortId};
 
-/// Bytecode validation error.
-///
-/// Every variant is raised at the loader or matcher-verifier trust boundary;
-/// the reader side never constructs one. Re-exported as
-/// `super::ModuleError` for the rest of the crate.
 #[derive(Debug, thiserror::Error)]
 pub enum ModuleError {
     #[error("invalid magic: expected PTKQ")]
@@ -79,11 +68,6 @@ pub enum ModuleError {
     SpanImbalance(CodeAddr),
 }
 
-/// Round `value` up to the next multiple of `align` in `u64` (overflow-free).
-///
-/// The `u64` width lets [`Module::validate_section_bounds`] re-derive the section
-/// layout from a possibly-corrupt header without the overflow the real `u32`
-/// [`Header::compute_offsets`] would hit.
 #[inline]
 fn align_up_u64(value: u64, align: u64) -> u64 {
     (value + align - 1) & !(align - 1)
@@ -133,13 +117,8 @@ impl Module {
             });
         }
 
-        // Bound every section against the buffer in u64 *before* `compute_offsets`
-        // does its u32 arithmetic: a corrupt header with a near-`u32::MAX` blob
-        // size or count would otherwise overflow that arithmetic and panic
-        // (debug) instead of returning an error.
         Self::validate_section_bounds(&header)?;
 
-        // Section bounds held, so the u32 offset arithmetic cannot wrap.
         let offsets = header.compute_offsets();
 
         let mut module = Self {
@@ -151,13 +130,8 @@ impl Module {
             #[cfg(debug_assertions)]
             instr_start_bitmap: Vec::new(),
         };
-        // Validation deserializes every regex DFA to prove it well-formed and
-        // builds the instruction-start bitmap; it hands the owned automata back so
-        // the VM reuses them instead of re-deserializing per evaluation (#426).
         let (regex_dfas, is_start) = module.validate()?;
         module.regex_dfas = regex_dfas;
-        // Retain the start bitmap only in debug builds, where it backs the VM's
-        // pre-decode IP assertion; release carries no extra per-module memory.
         #[cfg(debug_assertions)]
         {
             module.instr_start_bitmap = is_start;
@@ -168,11 +142,7 @@ impl Module {
         Ok(module)
     }
 
-    /// Section bounds must already be checked before these methods slice data.
-    /// A valid checksum alone does not prove that encodings, references, or
-    /// control flow are safe for the trusting views and VM.
     fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
-        // The CRC excludes the header, so check its reserved bytes separately.
         if self.header._reserved != [0u8; 20] {
             return Err(ModuleError::MalformedHeader);
         }
@@ -192,26 +162,14 @@ impl Module {
         self.validate_type_defs()?;
         self.validate_type_names()?;
         self.validate_spans()?;
-        // Bound embedded string references before trusting typed table views.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
         let is_start = self.validate_instructions()?;
         self.validate_entrypoints(&is_start)?;
-        // Structural validity is now established, so the matcher verifier can
-        // safely project the typed instruction stream.
         super::verify::validate(self)?;
         Ok((regex_dfas, is_start))
     }
 
-    /// Recompute the section layout in `u64` (no overflow) and ensure every
-    /// section, up to and including the final one (Spans), fits inside the buffer.
-    ///
-    /// Runs on the raw header *before* [`Header::compute_offsets`], so a corrupt
-    /// header cannot drive that u32 arithmetic to overflow. Sections are laid
-    /// out consecutively with alignment padding, so verifying the final
-    /// section's end also bounds every earlier section. Passing this check
-    /// also proves the `u32` [`SectionOffsets`] will not wrap, so the view
-    /// methods can trust them.
     fn validate_section_bounds(h: &Header) -> Result<(), ModuleError> {
         let total = h.total_size;
         let align = SECTION_ALIGN as u64;
@@ -222,10 +180,7 @@ impl Module {
             .split_last()
             .expect("section layout has at least one section");
 
-        // Every section but the last is alignment-padded; folding them leaves
-        // the cursor at the start of the final section, whose unaligned end
-        // bounds the buffer.
-        let mut cursor = HEADER_SIZE as u64; // sections begin right after the header
+        let mut cursor = HEADER_SIZE as u64;
         for &size in rest {
             cursor = align_up_u64(cursor + size, align);
         }
@@ -237,18 +192,10 @@ impl Module {
         Ok(())
     }
 
-    /// Every inter-section alignment gap and the final tail up to `total_size`
-    /// must be zero. The emitter aligns each section to `SECTION_ALIGN` by
-    /// zero-filling the gap before it (`pad_to_section`), so a non-zero byte at a
-    /// section boundary is smuggled state riding a gap the CRC alone would carry.
-    /// Section bounds are already proven by [`Self::validate_section_bounds`], so
-    /// the slicing here stays in range.
     fn validate_section_padding(&self) -> Result<(), ModuleError> {
         let starts = self.offsets.as_starts();
         let sizes = self.header.section_data_sizes();
 
-        // The gap after each section's data, up to the next section's start (or
-        // the buffer end for the last section), must be all zero.
         for i in 0..starts.len() {
             let gap_start = (starts[i] + sizes[i] as u32) as usize;
             let gap_end = match starts.get(i + 1) {
@@ -262,8 +209,6 @@ impl Module {
         Ok(())
     }
 
-    /// The string offset table is `count + 1` ascending `u32` offsets ending at
-    /// the blob length; each delimited slice must be valid UTF-8.
     fn validate_string_table(&self) -> Result<(), ModuleError> {
         let table = self.string_table_slice();
         let blob_len = self.header.str_blob_size;
@@ -287,8 +232,6 @@ impl Module {
         Ok(())
     }
 
-    /// The regex table is `count + 1` entries whose DFA offsets ascend and end
-    /// at the blob length, so [`RegexView::at`] never slices OOB.
     fn validate_regex_table(&self) -> Result<(), ModuleError> {
         let table = self.regex_table_slice();
         let blob_len = self.header.regex_blob_size;
@@ -296,9 +239,6 @@ impl Module {
 
         let mut prev = 0u32;
         for i in 0..=count {
-            // Entry layout: string_id (u16) | reserved (u16) | offset (u32).
-            // The reserved u16 is pinned to zero (docs/bytecode/06-tables.md);
-            // a non-zero value is smuggled state.
             if read_u16_le(table, i * 8 + 2) != 0 {
                 return Err(ModuleError::MalformedRegexTable);
             }
@@ -314,25 +254,11 @@ impl Module {
         Ok(())
     }
 
-    /// Deserialize every regex DFA once, validating each and caching the owned
-    /// automaton for the VM to reuse on every evaluation (issue #426).
-    ///
-    /// [`deserialize_dfa`](crate::bytecode::deserialize_dfa) (`DFA::from_bytes`) validates
-    /// the whole serialized automaton — rejecting empty or corrupt bytes — so
-    /// this single pass *is* the validation: a deserializable DFA for every real
-    /// entry is the invariant the VM's hot predicate path relies on, after which
-    /// `RegexDfas::is_match` searches the cached automaton with no further
-    /// deserialization. The owned copy detaches the DFA from `self.storage`, so
-    /// the cache lives in `Module` without a self-referential borrow. Index 0 is
-    /// the reserved sentinel — never evaluated — so it stays `None` and the scan
-    /// starts at 1. The offset table is already bounded by
-    /// [`Self::validate_regex_table`], so `at` here cannot slice out of
-    /// range.
     fn load_regex_dfas(&self) -> Result<RegexDfas, ModuleError> {
         let regexes = self.regexes();
         let count = self.header.regex_table_count as usize;
         let mut dfas = Vec::with_capacity(count);
-        dfas.push(None); // index 0: reserved sentinel, never evaluated
+        dfas.push(None);
         for i in 1..count {
             let bytes = regexes.at(i);
             let dfa = crate::bytecode::deserialize_dfa(bytes)
@@ -343,11 +269,6 @@ impl Module {
         Ok(RegexDfas::new(dfas))
     }
 
-    /// Validate every TypeDef: a known kind, member runs that stay inside the
-    /// TypeMembers section, and every referenced TypeId — a wrapper/alias inner
-    /// type or a record/variant member type — addressing a real def, so the
-    /// materializer never resolves a type out of range
-    /// (`docs/bytecode/03-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
         let types = self.types();
         let members = self.header.type_members_count as u32;
@@ -356,12 +277,9 @@ impl Module {
         for i in 0..types.defs_count() {
             let invalid = || ModuleError::InvalidTypeDef(i);
             let def = types.def(i);
-            // Reject an unknown kind here, so the typed reads below cannot panic.
             let Some(data) = def.try_decode() else {
                 return Err(invalid());
             };
-            // Fields the kind does not name are reserved-zero
-            // (docs/bytecode/03-types.md); smuggled state there must not pass validation.
             let (raw_data, raw_count) = def.member_range();
             match data {
                 TypeDefKind::Primitive(_) => {
@@ -382,7 +300,6 @@ impl Module {
                     member_start,
                     member_count,
                 } => {
-                    // Member-run bounds are identical for record and variant types.
                     if member_start as u32 + member_count as u32 > members {
                         return Err(invalid());
                     }
@@ -398,8 +315,6 @@ impl Module {
         Ok(())
     }
 
-    /// Every TypeNameEntry must target a real TypeDef; its name `StringId` is checked
-    /// separately by [`validate_string_ids`](Self::validate_string_ids).
     fn validate_type_names(&self) -> Result<(), ModuleError> {
         let types = self.types();
         let type_defs = self.header.type_defs_count;
@@ -440,8 +355,6 @@ impl Module {
             if member != SPAN_NO_BINDING && member >= type_members {
                 return Err(ModuleError::InvalidSpanEntry(i));
             }
-            // A member without a type is smuggled state: the emitter never
-            // writes it and every consumer keys the binding off `type_id`.
             if type_id == SPAN_NO_BINDING && member != SPAN_NO_BINDING {
                 return Err(ModuleError::InvalidSpanEntry(i));
             }
@@ -449,12 +362,6 @@ impl Module {
         Ok(())
     }
 
-    /// Entrypoint targets must address a real instruction so the VM's first
-    /// [`decode_instruction`](Self::decode_instruction) cannot read out of bounds.
-    /// `is_start` is the instruction-start bitmap from
-    /// [`Self::validate_instructions`]: a `target` that lands inside a multi-word
-    /// instruction would make the VM start decoding mid-instruction, so it must
-    /// be an instruction start, not merely in range.
     fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
         let entrypoints = self.entrypoints();
         let word_count = self.header.instruction_word_count;
@@ -490,14 +397,10 @@ impl Module {
         Ok(())
     }
 
-    /// Required names must reference a string in `1..str_table_count`.
-    /// Table views trust these IDs without rechecking them.
     fn validate_string_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
         let n = self.header.str_table_count;
 
-        // Typed accessors would panic on zero before we could reject it.
-        // Section bounds have already been checked.
         let check = |base: u32, stride: usize, name_off: usize, start: usize, count: usize| {
             let base = base as usize;
             for i in start..count {
@@ -509,7 +412,6 @@ impl Module {
             Ok(())
         };
 
-        // Identity zero denotes the expression, not a string reference.
         for i in 0..self.header.entrypoints_count as usize {
             let identity = read_u16_le(
                 storage,
@@ -520,7 +422,6 @@ impl Module {
             }
         }
 
-        // node/field symbol name: u16 at entry+2
         check(
             self.offsets.node_kinds,
             SYMBOL_NAME_ENTRY_SIZE,
@@ -535,7 +436,6 @@ impl Module {
             0,
             self.header.node_fields_count as usize,
         )?;
-        // type name / member name: u16 at entry+0
         check(
             self.offsets.type_names,
             TypeNameEntry::SIZE,
@@ -550,7 +450,6 @@ impl Module {
             0,
             self.header.type_members_count as usize,
         )?;
-        // Regex entry 0 is a sentinel with no pattern name.
         check(
             self.offsets.regex_table,
             REGEX_TABLE_ENTRY_SIZE,
@@ -561,10 +460,6 @@ impl Module {
         Ok(())
     }
 
-    /// Node-kind symbols must be regular grammar ids: zero is Tree-sitter's end
-    /// symbol, while `0xfffe` and `0xffff` are its built-in `_ERROR` and `ERROR`
-    /// symbols. Field symbols only reserve zero. The table views construct typed
-    /// IDs after this boundary, so malformed values must stop here.
     fn validate_symbol_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
         let check = |base: u32, count: usize, node_kinds: bool| {
@@ -595,11 +490,6 @@ impl Module {
         Ok(())
     }
 
-    /// Check encodings and operands before the trusting decoders read them.
-    ///
-    /// Jump validation needs two passes: collect instruction starts while
-    /// checking each slot, then reject targets that land inside a slot or
-    /// outside the stream. Entrypoint validation reuses the returned bitmap.
     fn validate_instructions(&self) -> Result<Vec<bool>, ModuleError> {
         let storage: &[u8] = &self.storage;
         let base = self.offsets.instructions as usize;
@@ -611,7 +501,6 @@ impl Module {
                 .copied()
                 .ok_or(ModuleError::MalformedInstructionStream)
         };
-        // A reserved padding run inside an instruction slot must be all zero.
         let check_zero = |off: usize, len: usize| match storage.get(off..off + len) {
             Some(run) if run.iter().all(|&b| b == 0) => Ok(()),
             _ => Err(ModuleError::MalformedInstructionStream),
@@ -633,8 +522,6 @@ impl Module {
                     opcode: nibble,
                 });
             };
-            // Every opcode reserves the segment bits; the call/return
-            // decoders `assert!` segment == 0, and a non-zero segment is unused.
             if header_byte::segment(header) != 0 {
                 return Err(ModuleError::MalformedInstructionStream);
             }
@@ -733,7 +620,6 @@ impl Module {
                     }
 
                     if opcode == Opcode::Match8 {
-                        // bytes 6-7 hold the single successor; `0` means terminal.
                         let next = read_operand_u16(storage, instr_off + 6)?;
                         if next != 0 {
                             targets.push(CodeAddr::from(next));
@@ -750,9 +636,6 @@ impl Module {
                 .ok_or(ModuleError::MalformedInstructionStream)?;
         }
 
-        // A well-formed stream tiles the section in whole instructions. An
-        // overrun means a trailing instruction's slot crosses the section end,
-        // so a successor pointing into it could later decode past the buffer.
         if addr.get() != word_count {
             return Err(ModuleError::MalformedInstructionStream);
         }
@@ -765,9 +648,6 @@ impl Module {
         Ok(is_start)
     }
 
-    /// Validate the payload of one extended `Match` (`Match16`..`Match64`):
-    /// effects, predicate, and successors. Appends each successor to `targets`
-    /// for the pass-2 jump-target check in [`Self::validate_instructions`].
     fn validate_extended_match(
         &self,
         opcode: Opcode,
@@ -784,16 +664,11 @@ impl Module {
         let succ = c.succ as usize;
         let has_predicate = c.predicate.is_some();
 
-        // Every payload slot the decoders read — effects, predicate, successors —
-        // must lie within this instruction's fixed-size slot, or the iterators
-        // read into the next instruction (or past the buffer at the stream end).
         let used = effects + neg + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
         if used > opcode.payload_slots() {
             return Err(ModuleError::MalformedInstructionStream);
         }
 
-        // Every decoded effect validates its payload through `EffectKind`'s
-        // metadata contract before any trusting consumer sees it.
         let members = usize::from(self.header.type_members_count);
         let spans = usize::from(self.header.spans_count);
         let check_effect = |slot: usize| -> Result<(), ModuleError> {
@@ -818,9 +693,6 @@ impl Module {
             check_effect(i)?;
         }
 
-        // Neg-field slots hold raw `NodeFieldId`s (`NonZeroU16`); the decoder's
-        // `neg_fields()` rebuilds them via `try_from(..).expect(..)`
-        // (`instructions.rs`), so a malformed zero must not pass validation.
         for i in 0..neg {
             let off = instr_off + MATCH_PAYLOAD_START + (effects + i) * PAYLOAD_SLOT_SIZE;
             let b = storage
@@ -834,7 +706,6 @@ impl Module {
         if let Some(op) = c.predicate {
             let pred_off = instr_off + MATCH_PAYLOAD_START + (effects + neg) * PAYLOAD_SLOT_SIZE;
             let value_ref = read_operand_u16(storage, pred_off)?;
-            // Regex zero is an empty sentinel. String zero names a real reserved string.
             let operand_ok = if op.is_regex_op() {
                 (1..self.header.regex_table_count).contains(&value_ref)
             } else {
@@ -851,8 +722,6 @@ impl Module {
             + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
             let next = read_operand_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;
-            // An extended successor decodes through `SuccessorAddr`, which panics
-            // on zero; `0` is the terminal marker only for the `Match8` slot.
             if next == 0 {
                 return Err(ModuleError::MalformedInstructionStream);
             }

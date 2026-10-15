@@ -1,5 +1,3 @@
-//! Projection from structurally valid bytecode into control-flow validation.
-
 #[cfg(test)]
 use std::cell::Cell;
 

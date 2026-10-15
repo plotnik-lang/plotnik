@@ -1,15 +1,6 @@
-//! Bytecode format and runtime types for Plotnik.
-//!
-//! The compiler emits bytecode in memory for the VM. It is not
-//! a user-facing file or interchange format. The public views support compiler
-//! diagnostics, `plotnik dump`, and other teaching or debugging tools.
+//! Compiler-owned, in-memory bytecode, not a user-facing file or interchange format.
 
 #![allow(clippy::comparison_chain)]
-// Without the `vm` feature the engine-serving half of this module (the
-// pre-decoded instruction stream, trace rendering) has no callers. It stays
-// compiled anyway so `Module` is the same object in every configuration —
-// load-time validation must not drift between the compiler-only build and the
-// executing one.
 #![cfg_attr(not(feature = "vm"), allow(dead_code, unused_imports))]
 
 mod aligned_vec;
@@ -56,8 +47,6 @@ pub(crate) use instructions::{
 };
 pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Instruction};
 pub(crate) use node_kind_constraint::NodeKindConstraint;
-// Nav and the regex DFA runtime live in `plotnik-runtime` (shared with generated
-// code); re-exported here because they are part of the bytecode vocabulary.
 pub(crate) use plotnik_runtime::{Nav, deserialize_dfa};
 pub(crate) use predicate_op::PredicateOp;
 pub(crate) use render::ModuleRenderContext;

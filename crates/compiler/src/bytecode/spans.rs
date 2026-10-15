@@ -1,5 +1,3 @@
-//! Inspection span metadata section.
-
 use crate::bytecode::SPAN_ENTRY_SIZE;
 
 /// Classifies the query construct covered by an inspection span.

@@ -1,5 +1,3 @@
-//! Canonical type kind definitions.
-
 /// Semantic type kind.
 ///
 /// Primitive types are stored as `TypeDef`s like any other

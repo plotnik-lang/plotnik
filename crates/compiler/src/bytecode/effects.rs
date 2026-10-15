@@ -1,10 +1,5 @@
-//! Effect operations for bytecode.
-
-/// An effect word packs the kind in the high bits and a payload in the low
-/// [`EFFECT_PAYLOAD_BITS`].
 pub const EFFECT_PAYLOAD_BITS: u32 = 10;
 
-/// Largest representable effect payload (the low [`EFFECT_PAYLOAD_BITS`]).
 pub const EFFECT_PAYLOAD_MAX: usize = (1 << EFFECT_PAYLOAD_BITS) - 1;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -22,25 +17,15 @@ pub enum EffectKind {
     Absent = 9,
     SuppressBegin = 10,
     SuppressEnd = 11,
-    /// Open an inspection span and snapshot the current cursor node.
     SpanStartAt = 12,
-    /// Open an inspection span without reading the cursor.
     SpanStart = 13,
-    /// Close the innermost inspection span.
     SpanEnd = 14,
-    /// Open one value-local scalar provenance frame.
     ScalarOpen = 15,
-    /// Mark the current explicit node-pattern match in every open scalar frame.
     ScalarMark = 16,
-    /// Close a scalar frame and produce source text (or null with no marks).
     TextClose = 17,
-    /// Close a scalar frame and produce the boolean encoded in the payload.
     BoolClose = 18,
-    /// Produce the current node's source text directly.
     NodeText = 19,
-    /// Produce `true` for the current matched node directly.
     NodeBool = 20,
-    /// Produce the boolean encoded in the payload without provenance.
     BoolValue = 21,
 }
 
@@ -70,8 +55,6 @@ impl EffectKind {
         Self::try_from_u8(v).unwrap_or_else(|| panic!("invalid effect opcode: {v}"))
     }
 
-    /// Non-panicking decode, for validating an untrusted instruction stream at
-    /// load time before the VM decodes its effect payload.
     pub(crate) fn try_from_u8(v: u8) -> Option<Self> {
         let op = match v {
             0 => Self::Node,
@@ -203,8 +186,6 @@ impl EffectKind {
         Some(action)
     }
 
-    /// Validate the payload using the two tables an effect may index. All
-    /// effects decoded at the trust boundary pass through this one contract.
     pub fn accepts_payload(self, payload: usize, member_count: usize, span_count: usize) -> bool {
         match self {
             Self::RecordSet | Self::VariantOpen => payload < member_count,
@@ -247,8 +228,6 @@ impl Effect {
         Self { kind, payload }
     }
 
-    /// Non-panicking decode, for validating an untrusted instruction stream at
-    /// load time. Returns `None` when the kind field is not a known effect.
     pub(crate) fn try_from_bytes(bytes: [u8; 2]) -> Option<Self> {
         let raw = u16::from_le_bytes(bytes);
         let kind = EffectKind::try_from_u8((raw >> EFFECT_PAYLOAD_BITS) as u8)?;

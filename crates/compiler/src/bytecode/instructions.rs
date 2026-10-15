@@ -1,8 +1,3 @@
-//! Bytecode instruction definitions.
-//!
-//! Instructions are runtime-friendly structs with `from_bytes`/`to_bytes`
-//! methods for bytecode serialization.
-
 use std::num::NonZeroU16;
 
 use crate::core::{NodeFieldId, ZeroIdError};
@@ -19,24 +14,14 @@ use plotnik_runtime::{Nav, PortId};
 #[path = "instructions_tests.rs"]
 mod instructions_tests;
 
-/// Fixed header bytes before an extended Match's payload — exactly the first
-/// bytecode word. Effects, negated fields, an optional predicate, and successors follow,
-/// each occupying [`PAYLOAD_SLOT_SIZE`] bytes.
 pub(crate) const MATCH_PAYLOAD_START: usize = BYTECODE_WORD_SIZE;
 
-/// Each Match payload slot is one little-endian `u16`.
 pub(crate) const PAYLOAD_SLOT_SIZE: usize = size_of::<u16>();
 
-/// A predicate occupies one payload slot: its string or regex index.
 pub(crate) const PREDICATE_SLOTS: usize = 1;
 
-/// A predicate's size in bytes within the payload.
 pub(crate) const PREDICATE_SIZE: usize = PREDICATE_SLOTS * PAYLOAD_SLOT_SIZE;
 
-/// The first byte of every instruction: `segment(2) | node_class(2) | opcode(4)`.
-///
-/// One source of truth for the header-byte field positions, shared by every
-/// instruction decoder/encoder and the load-time validator.
 pub(crate) mod header_byte {
     use super::Opcode;
 
@@ -45,36 +30,27 @@ pub(crate) mod header_byte {
     const NODE_CLASS_SHIFT: u32 = 4;
     const SEGMENT_SHIFT: u32 = 6;
 
-    /// The raw opcode nibble (low 4 bits), without validating it.
     pub(crate) fn opcode_nibble(b: u8) -> u8 {
         b & OPCODE_MASK
     }
 
-    /// The opcode, or `None` if the nibble is unassigned (untrusted input).
     pub(crate) fn opcode(b: u8) -> Option<Opcode> {
         Opcode::from_u8(opcode_nibble(b))
     }
 
-    /// The 2-bit segment field (bits 7-6).
     pub(crate) fn segment(b: u8) -> u8 {
         (b >> SEGMENT_SHIFT) & FIELD2_MASK
     }
 
-    /// The 2-bit opcode-specific field (bits 5-4): node class for Match,
-    /// ownership/contract flags for Call and Return.
     pub(crate) fn node_class_bits(b: u8) -> u8 {
         (b >> NODE_CLASS_SHIFT) & FIELD2_MASK
     }
 
-    /// Assemble a header byte from its fields.
     pub(crate) fn pack(segment: u8, node_class: u8, opcode: Opcode) -> u8 {
         (segment << SEGMENT_SHIFT) | (node_class << NODE_CLASS_SHIFT) | (opcode as u8)
     }
 }
 
-/// The 16-bit counts word of an extended Match:
-/// `effects(4) | neg(3) | succ(5) | missing(1) | predicate(3)`.
-/// Predicate zero means no operand. Values 1–7 select an operator and its table.
 #[derive(Clone, Copy)]
 pub(crate) struct MatchCounts {
     pub(crate) effects: u8,
@@ -121,8 +97,6 @@ impl MatchCounts {
         })
     }
 
-    /// Layout and encoding must choose the same width, including the counts word
-    /// required by a missing-node check even when it has no payload.
     pub(crate) fn opcode(self) -> Result<Opcode, EncodeError> {
         if self.effects == 0
             && self.neg == 0
@@ -164,9 +138,6 @@ impl MatchCounts {
 }
 
 /// Bytecode-word address in the instruction stream.
-///
-/// Used for layout addresses, entrypoint targets, bootstrap parameter, etc.
-/// For decoded instruction successors (where 0 = terminal), use [`SuccessorAddr`] instead.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct CodeAddr(u16);
@@ -218,10 +189,6 @@ impl std::fmt::Display for CodeAddr {
     }
 }
 
-/// Encoded non-terminal successor address in decoded instructions.
-///
-/// Uses NonZeroU16 because raw 0 means "terminal" (no successor).
-/// Use [`CodeAddr`] where zero is a valid address rather than a terminal marker.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct SuccessorAddr(NonZeroU16);
@@ -265,7 +232,6 @@ impl std::fmt::Display for SuccessorAddr {
     }
 }
 
-/// Instruction opcodes (4-bit).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Opcode {
@@ -281,8 +247,6 @@ pub enum Opcode {
 }
 
 impl Opcode {
-    /// Decode an opcode nibble, returning `None` for an unknown value so that
-    /// malformed bytecode is rejected with a clean error instead of panicking.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             0x0 => Some(Self::Match8),
@@ -298,8 +262,6 @@ impl Opcode {
         }
     }
 
-    /// Instruction size in bytes. The variant ladder is defined here; payload
-    /// capacity and word count derive from it.
     pub const fn size(self) -> usize {
         match self {
             Self::Match8 => 8,
@@ -313,7 +275,6 @@ impl Opcode {
         }
     }
 
-    /// Number of bytecode words this instruction occupies.
     pub const fn word_count(self) -> u16 {
         (self.size() / BYTECODE_WORD_SIZE) as u16
     }
@@ -330,8 +291,6 @@ impl Opcode {
         )
     }
 
-    /// Payload capacity in u16 slots — whatever follows the one-word header.
-    /// Zero for non-extended variants (Match8, Call, Return).
     pub const fn payload_slots(self) -> usize {
         if !self.is_match() || matches!(self, Self::Match8) {
             return 0;
@@ -340,34 +299,23 @@ impl Opcode {
     }
 }
 
-/// `MAX_MATCH_PAYLOAD_SLOTS` must track the largest variant's capacity.
 const _: () = assert!(MAX_MATCH_PAYLOAD_SLOTS == Opcode::Match64.payload_slots());
 
-/// Match instruction decoded from bytecode.
-///
-/// Provides iterator-based access to effects and successors without allocating.
 #[derive(Clone, Copy, Debug)]
 pub struct Match<'a> {
     bytes: &'a [u8],
-    /// Segment index (0-3, currently only 0 is used).
     pub segment: u8,
-    /// Navigation command. `Epsilon` means no cursor movement or node check.
     pub nav: Nav,
-    /// Node kind constraint (Any = wildcard, Named/Anonymous for specific checks).
     pub node_kind: NodeKindConstraint,
-    /// Field constraint (None = wildcard).
     pub node_field: Option<NodeFieldId>,
     layout: MatchLayout,
 }
 
-/// The two payload shapes of a [`Match`], discriminated by the opcode: the
-/// `Match8` fast path carries a single inline successor, while `Extended`
-/// (`Match16`-`Match64`) packs the counts addressing the effect slots,
-/// successors, and optional predicate.
 #[derive(Clone, Copy, Debug)]
 enum MatchLayout {
-    /// `next == 0` means terminal.
-    Match8 { next: u16 },
+    Match8 {
+        next: u16,
+    },
     Extended {
         effect_count: u8,
         neg_count: u8,
@@ -378,12 +326,6 @@ enum MatchLayout {
 }
 
 impl<'a> Match<'a> {
-    /// Parse a Match instruction from bytecode without allocating.
-    ///
-    /// The slice must start at the instruction and contain at least
-    /// the full instruction size (determined by opcode).
-    ///
-    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
         debug_assert!(
@@ -443,7 +385,6 @@ impl<'a> Match<'a> {
         matches!(self.layout, MatchLayout::Match8 { .. })
     }
 
-    /// Bytecode words this instruction occupies, read from its opcode.
     #[inline]
     pub fn word_count(&self) -> u16 {
         header_byte::opcode(self.bytes[0])
@@ -479,7 +420,6 @@ impl<'a> Match<'a> {
         }
     }
 
-    /// Iterate over effects executed after match acceptance, in bytecode order.
     #[inline]
     pub fn effects(&self) -> impl Iterator<Item = Effect> + '_ {
         let start = MATCH_PAYLOAD_START;
@@ -489,7 +429,6 @@ impl<'a> Match<'a> {
         })
     }
 
-    /// Iterate over negated fields (must NOT be present on matched node).
     #[inline]
     pub fn neg_fields(&self) -> impl Iterator<Item = NodeFieldId> + '_ {
         let start = MATCH_PAYLOAD_START + self.effect_count() * PAYLOAD_SLOT_SIZE;
@@ -516,9 +455,6 @@ impl<'a> Match<'a> {
         )
     }
 
-    /// Whether the matched node must be a tree-sitter MISSING node (a zero-byte
-    /// node the parser inserts during error recovery). Only extended Matches can
-    /// carry it — the `Match8` fast path has no counts word.
     #[inline]
     pub fn missing(&self) -> bool {
         matches!(self.layout, MatchLayout::Extended { missing: true, .. })
@@ -554,14 +490,11 @@ impl<'a> Match<'a> {
         }
     }
 
-    /// Byte offset where an optional predicate starts in the payload.
     #[inline]
     fn predicate_offset(&self) -> usize {
         (self.effect_count() + self.neg_count()) * PAYLOAD_SLOT_SIZE
     }
 
-    /// Byte offset where successors start in the payload.
-    /// Accounts for the predicate slots if present.
     #[inline]
     fn succ_offset(&self) -> usize {
         let predicate_size = if self.has_predicate() {
@@ -572,9 +505,6 @@ impl<'a> Match<'a> {
         MATCH_PAYLOAD_START + self.predicate_offset() + predicate_size
     }
 
-    /// Collect this borrowed view into an owned, encodable [`MatchInstr`].
-    ///
-    /// Lets the decoder be re-encoded for roundtrip testing.
     pub fn to_instr(self) -> MatchInstr {
         MatchInstr {
             nav: self.nav,
@@ -589,26 +519,17 @@ impl<'a> Match<'a> {
     }
 }
 
-/// Predicate filter carried by an extended Match (text comparison).
-///
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MatchPredicate {
     pub op: PredicateOp,
-    /// Index into the table selected by the operator.
     pub value_ref: u16,
 }
 
-/// Owned, encodable form of a Match instruction.
-///
-/// This is the encode-side mirror of the [`Match`] decoder: the emitter
-/// resolves symbolic references into one of these and calls [`encode`](Self::encode),
-/// keeping encode and decode in one crate so a roundtrip can be property-tested.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct MatchInstr {
     pub nav: Nav,
     pub node_kind: NodeKindConstraint,
     pub node_field: Option<NodeFieldId>,
-    /// Node must be a tree-sitter MISSING node — the `(MISSING …)` constraint.
     pub missing: bool,
     pub effects: Vec<Effect>,
     pub neg_fields: Vec<NodeFieldId>,
@@ -617,10 +538,6 @@ pub struct MatchInstr {
 }
 
 /// Error returned when an instruction cannot be encoded into bytecode.
-///
-/// Every variant is reachable from a `check`-clean query, so the emitter
-/// surfaces these as compile errors instead of letting an `as`-narrowing wrap
-/// or an `assert!` panic at encode time.
 #[derive(Clone, PartialEq, Eq, Debug, thiserror::Error)]
 pub enum EncodeError {
     #[error("too many effects on one match: {0} (max {MAX_EFFECTS})")]
@@ -636,10 +553,6 @@ pub enum EncodeError {
 }
 
 impl MatchInstr {
-    /// Encode to bytecode bytes, choosing the smallest fitting Match variant.
-    ///
-    /// Returns [`EncodeError`] rather than panicking when a count or payload
-    /// exceeds what the format can represent.
     pub fn encode(&self) -> Result<Vec<u8>, EncodeError> {
         for effect in &self.effects {
             if effect.payload > EFFECT_PAYLOAD_MAX {
@@ -704,7 +617,6 @@ const CALL_MAX_RETURNS: usize = PortId::COUNT as usize;
 const CALL_OWNERSHIP_BIT: u8 = 1;
 const CALL1_CONSUMED_BIT: u8 = 2;
 
-/// Which side of a call boundary owns navigation and field selection.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CallOwnership {
     Caller,
@@ -724,11 +636,6 @@ impl CallOwnership {
     }
 }
 
-/// Immutable entry protocol implemented by a callee body.
-///
-/// Caller-owned bodies are exact and therefore carry no body-side navigation
-/// or field. Callee-owned bodies embed the exact authored obligation that
-/// every call targeting them must declare.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CalleeContract {
     CallerOwned,
@@ -761,8 +668,6 @@ impl CalleeContract {
     }
 }
 
-/// Unified decoded call view. `Call1` and `CallN` differ only in physical
-/// density; execution and validation consume this semantic shape.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Call {
     pub segment: u8,
@@ -945,7 +850,6 @@ impl Call {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Return {
-    /// Segment index (0-3).
     pub segment: u8,
     pub port: PortId,
     pub contract: CalleeContract,
@@ -968,10 +872,6 @@ impl Return {
         }
     }
 
-    /// Decode from 8-byte bytecode.
-    ///
-    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    /// For Return, header flag bit 0 stores callee entry ownership.
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let header = bytes[0];
         let segment = header_byte::segment(header);
@@ -999,9 +899,6 @@ impl Return {
         }
     }
 
-    /// Encode to 8-byte bytecode.
-    ///
-    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     pub fn to_bytes(self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(
@@ -1018,7 +915,6 @@ impl Return {
                 .map_or(0, u16::from)
                 .to_le_bytes(),
         );
-        // bytes 3 and 6-7 are reserved/padding.
         bytes
     }
 }
@@ -1029,8 +925,6 @@ impl Default for Return {
     }
 }
 
-/// Select the smallest Match variant that fits the given payload. Returns
-/// `None` when no variant is large enough (the caller must split).
 pub fn select_match_opcode(slots_needed: usize) -> Option<Opcode> {
     if slots_needed == 0 {
         return Some(Opcode::Match8);

@@ -1,5 +1,3 @@
-//! Bytecode index newtypes.
-
 use std::num::NonZeroU16;
 
 use crate::core::ZeroIdError;

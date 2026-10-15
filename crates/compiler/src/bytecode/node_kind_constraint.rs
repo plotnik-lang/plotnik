@@ -1,40 +1,14 @@
-//! Node kind constraint for Match instructions.
-//!
-//! Extracted from ir.rs for use by runtime instruction decoding.
-
 use crate::core::NodeKindId;
 
-/// Node kind constraint for Match instructions.
-///
-/// Distinguishes between named nodes (`(identifier)`), anonymous nodes (`"text"`),
-/// and wildcards (`_`, `(_)`). Encoded in bytecode header byte bits 5-4.
-///
-/// | `node_class(2)` | Value | Meaning      | `node_val=0`        | `node_val>0`      |
-/// | --------------- | ----- | ------------ | ------------------- | ----------------- |
-/// | `00`            | Any   | `_` pattern  | No check            | (invalid)         |
-/// | `01`            | Named | `(_)`/`(t)`  | Check `is_named()`  | Check `is_named()` + `kind_id()` |
-/// | `10`            | Anon  | `"text"`     | Check `!is_named()` | Check `!is_named()` + `kind_id()` |
-/// | `11`            | -     | Reserved     | Error               | Error             |
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum NodeKindConstraint {
-    /// Any node (`_` pattern) - no kind check performed.
     #[default]
     Any,
-    /// Named node constraint (`(_)` or `(identifier)`).
-    /// - `None` = any named node (check `is_named()`)
-    /// - `Some(id)` = specific named kind (check `is_named()` and `kind_id()`)
     Named(Option<NodeKindId>),
-    /// Anonymous node constraint (`"text"` literals).
-    /// - `None` = any anonymous node (check `!is_named()`)
-    /// - `Some(id)` = specific anonymous kind (check `!is_named()` and `kind_id()`)
     Anonymous(Option<NodeKindId>),
 }
 
 impl NodeKindConstraint {
-    /// Encode to bytecode: returns (node_class bits, node_val).
-    ///
-    /// `node_class` is 2 bits for header byte bits 5-4.
-    /// `node_val` is u16 for bytes 2-3.
     pub fn to_bytes(self) -> (u8, u16) {
         match self {
             Self::Any => (0b00, 0),
@@ -43,17 +17,12 @@ impl NodeKindConstraint {
         }
     }
 
-    /// Decode from bytecode: node_class bits (2 bits) and node_val (u16).
     pub fn from_bytes(node_class: u8, node_val: u16) -> Self {
         Self::try_from_bytes(node_class, node_val).unwrap_or_else(|| {
             panic!("invalid node-kind constraint: class={node_class}, value={node_val}")
         })
     }
 
-    /// Non-panicking decode, for validating an untrusted instruction stream at
-    /// load time. Class `0b11` and Tree-sitter's internal `_ERROR` symbol have
-    /// no valid decoding. The built-in `ERROR` symbol remains valid for
-    /// `(ERROR)`.
     pub fn try_from_bytes(node_class: u8, node_val: u16) -> Option<Self> {
         match node_class {
             0b00 => (node_val == 0).then_some(Self::Any),

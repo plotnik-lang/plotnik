@@ -1,8 +1,3 @@
-//! Pre-decoded instruction stream, built once at module load.
-//!
-//! The VM indexes this cache instead of decoding bytes on every dispatch.
-//! Construction uses the bytecode decoders after load-time validation.
-
 use crate::bytecode::{
     BYTECODE_WORD_SIZE, CallOwnership, CodeAddr, Effect, Nav, NodeKindConstraint, PredicateOp,
     SuccessorAddr,
@@ -13,9 +8,6 @@ use plotnik_runtime::PortId;
 use super::super::instructions::header_byte;
 use super::Instruction;
 
-/// One pre-decoded bytecode word. Load-time validation proves every jump target
-/// and successor lands on an instruction start; `Interior` makes a violation
-/// fail loudly in release builds too.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum DecodedInstr {
     Match(DecodedMatch),
@@ -29,7 +21,6 @@ pub(crate) struct DecodedMatch {
     pub(crate) nav: Nav,
     pub(crate) node_kind: NodeKindConstraint,
     pub(crate) node_field: Option<NodeFieldId>,
-    /// Node must be a tree-sitter MISSING node — the `(MISSING …)` constraint.
     pub(crate) missing: bool,
     pub(crate) predicate: Option<DecodedPredicate>,
     effects_base: u32,
@@ -47,8 +38,6 @@ impl DecodedMatch {
     }
 }
 
-/// Predicate with the operator already decoded, so evaluation does no byte
-/// re-interpretation.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct DecodedPredicate {
     pub(crate) op: PredicateOp,
@@ -71,15 +60,11 @@ impl DecodedCall {
     }
 }
 
-/// The whole pre-decoded instruction stream plus the side pools its
-/// variable-length lists point into.
 #[derive(Debug, Default)]
 pub(crate) struct DecodedProgram {
     words: Vec<DecodedInstr>,
     effects: Vec<Effect>,
     neg_fields: Vec<NodeFieldId>,
-    /// Encoded successor addresses (validated instruction starts, never 0-as-terminal:
-    /// terminality is `successors(..).is_empty()`).
     successors: Vec<SuccessorAddr>,
 }
 
@@ -121,8 +106,6 @@ impl DecodedProgram {
     }
 }
 
-/// Walk the validated instruction stream and pre-decode every instruction.
-/// `instructions` is a whole number of bytecode words.
 pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
     let word_count = instructions.len() / BYTECODE_WORD_SIZE;
     let mut program = DecodedProgram::default();
@@ -159,7 +142,6 @@ pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
                     neg_len: (program.neg_fields.len() - neg_base as usize) as u8,
                     succ_len: (program.successors.len() - succ_base as usize) as u8,
                 }));
-                // Interior words of a multi-word Match are never addressed.
                 for _ in 1..opcode.word_count() {
                     program.words.push(DecodedInstr::Interior);
                 }

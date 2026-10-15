@@ -1,5 +1,3 @@
-//! Type metadata definitions for the bytecode format.
-
 use super::{StringId, TypeId};
 
 pub use crate::bytecode::type_system::TypeKind;
@@ -14,10 +12,7 @@ pub use crate::bytecode::type_system::TypeKind;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct TypeDef {
-    /// For wrappers/alias: inner/target TypeId.
-    /// For Record/Variant: index into TypeMembers section.
     payload: u16,
-    /// Member count (0 for wrappers/alias, field/case count for composites).
     count: u8,
     kind: u8,
 }
@@ -65,9 +60,6 @@ impl TypeDef {
         }
     }
 
-    /// Shared byte-writer for the two member-run kinds (Record, Variant). The
-    /// `kind as u8` write here is the on-wire discriminant — `for_record` and
-    /// `for_variant` are the only callers.
     fn composite(kind: TypeKind, member_start: u16, member_count: u8) -> Self {
         Self {
             payload: member_start,

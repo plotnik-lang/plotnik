@@ -1,9 +1,3 @@
-//! Bytecode module with unified storage.
-//!
-//! [`Module`] holds compiled bytecode plus a pre-decoded instruction stream.
-//! Construction remains crate-private so only compiler output can cross the
-//! checked loader boundary.
-
 use std::ops::Deref;
 
 use crate::core::{NodeFieldId, NodeKindId};
@@ -46,7 +40,6 @@ fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
     ])
 }
 
-/// Compiler-owned bytecode storage with guaranteed 64-byte alignment.
 pub(crate) struct ByteStorage(AlignedVec);
 
 impl Deref for ByteStorage {
@@ -64,7 +57,6 @@ impl std::fmt::Debug for ByteStorage {
 }
 
 impl ByteStorage {
-    /// Copy compiler-emitted bytes into the aligned runtime buffer.
     pub(crate) fn from_emitted_bytes(bytes: &[u8]) -> Self {
         Self(AlignedVec::copy_from_slice(bytes))
     }
@@ -102,20 +94,14 @@ impl<'a> Instruction<'a> {
 pub struct Module {
     storage: ByteStorage,
     header: Header,
-    /// Cached section offsets (computed from header counts).
     offsets: SectionOffsets,
-    /// Deserialized once at load time to avoid rebuilding DFAs during matching.
     regex_dfas: RegexDfas,
     decoded: DecodedProgram,
-    /// Instruction starts retained for the VM's debug IP assertion.
     #[cfg(debug_assertions)]
     instr_start_bitmap: Vec<bool>,
 }
 
 impl Module {
-    /// Validate raw bytecode and construct the module accepted by the VM.
-    ///
-    /// Crate-private visibility prevents bypassing the validation boundary.
     pub(crate) fn validate_and_load(bytes: &[u8]) -> Result<Self, ModuleError> {
         Self::load_storage(ByteStorage::from_emitted_bytes(bytes))
     }
@@ -261,14 +247,12 @@ impl Module {
         })
     }
 
-    /// `count + 1` entries: the extra sentinel offset gives the final string's end.
     fn string_table_slice(&self) -> &[u8] {
         let offset = self.offsets.str_table as usize;
         let count = self.header.str_table_count as usize;
         &self.storage[offset..offset + (count + 1) * STRING_TABLE_ENTRY_SIZE]
     }
 
-    /// `count + 1` entries: the extra sentinel offset gives the final DFA's end.
     fn regex_table_slice(&self) -> &[u8] {
         let offset = self.offsets.regex_table as usize;
         let count = self.header.regex_table_count as usize;
@@ -300,9 +284,6 @@ impl<'a> StringsView<'a> {
     }
 
     /// Get a string by raw index (for iteration/dumps, including easter egg at 0).
-    ///
-    /// The string table contains sequential u32 offsets. To get string i:
-    /// `start = table[i]`, `end = table[i+1]`, `length = end - start`.
     pub fn at(&self, idx: usize) -> &'a str {
         let start = read_u32_le(self.table, idx * STRING_TABLE_ENTRY_SIZE) as usize;
         let end = read_u32_le(self.table, (idx + 1) * STRING_TABLE_ENTRY_SIZE) as usize;
@@ -357,9 +338,6 @@ fn symbol_name_id(bytes: &[u8], offset: usize) -> StringId {
         .expect("validated symbol name id must be non-zero")
 }
 
-/// View into the regex table.
-///
-/// Entry layout: `string_id (u16) | reserved (u16) | offset (u32)` = 8 bytes.
 pub struct RegexView<'a> {
     blob: &'a [u8],
     table: &'a [u8],
@@ -368,7 +346,6 @@ pub struct RegexView<'a> {
 impl<'a> RegexView<'a> {
     const ENTRY_SIZE: usize = REGEX_TABLE_ENTRY_SIZE;
 
-    /// Raw serialized DFA bytes; use `regex-automata` to deserialize: `DFA::from_bytes(&bytes)`.
     pub fn at(&self, idx: usize) -> &'a [u8] {
         let entry_offset = idx * Self::ENTRY_SIZE;
         let next_entry_offset = (idx + 1) * Self::ENTRY_SIZE;
@@ -378,7 +355,6 @@ impl<'a> RegexView<'a> {
         &self.blob[start..end]
     }
 
-    /// Pattern `StringId` for display (e.g. `dump`/`trace`).
     pub fn pattern_string_id(&self, idx: usize) -> super::StringId {
         let entry_offset = idx * Self::ENTRY_SIZE;
         let string_id = read_u16_le(self.table, entry_offset);
@@ -435,9 +411,6 @@ impl<'a> TypesView<'a> {
         (0..self.members_count).map(|idx| self.get_member(idx))
     }
 
-    /// A member's `type_id` without building the (`NonZero`) name `StringId`.
-    /// Load-time validation uses this so a malformed zero name cannot panic the
-    /// validator before `validate_string_ids` rejects it.
     pub(crate) fn member_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.members_count, "type member index out of bounds");
         TypeId::from(read_u16_le(self.members_bytes, idx * TypeMember::SIZE + 2))
@@ -457,8 +430,6 @@ impl<'a> TypesView<'a> {
         (0..self.names_count).map(|idx| self.get_name(idx))
     }
 
-    /// A type name's target `type_id` without building the (`NonZero`) name
-    /// `StringId` — same boundary reason as [`member_type_id`](Self::member_type_id).
     pub(crate) fn name_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.names_count, "type name index out of bounds");
         TypeId::from(read_u16_le(self.names_bytes, idx * TypeNameEntry::SIZE + 2))

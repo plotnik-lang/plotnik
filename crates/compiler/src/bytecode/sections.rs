@@ -1,12 +1,9 @@
-//! Binary format section primitives.
-
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::ids::StringId;
 
 pub const SYMBOL_NAME_ENTRY_SIZE: usize = 4;
 
-/// Maps a Tree-sitter node kind ID to its string name.
 #[derive(Clone, Copy, Debug)]
 pub struct NodeKindEntry {
     symbol: NodeKindId,
@@ -35,7 +32,6 @@ impl NodeKindEntry {
     }
 }
 
-/// Maps a Tree-sitter field ID to its string name.
 #[derive(Clone, Copy, Debug)]
 pub struct FieldEntry {
     symbol: NodeFieldId,

@@ -1,38 +1,20 @@
-//! Shared formatting utilities for bytecode dump and execution trace.
-//!
-//! Both dump and trace use the same column layout:
-//! ```text
-//! | 2 | addr | 1 |   5   | 1 | content              | 1 | succ |
-//! |   | pad  |   | (sym) |   |                      |   |      |
-//! ```
-
 use std::borrow::Cow;
 
 use super::Effect;
 use super::effects::EffectKind;
 use plotnik_runtime::Nav;
 
-/// Column widths for instruction line formatting.
 pub mod cols {
     pub const INDENT: usize = 2;
     pub const GAP: usize = 1;
-    /// Symbol column width for fixed-width trace symbols.
     pub const SYMBOL: usize = 5;
-    /// Total width before successors are right-aligned.
     pub const TOTAL_WIDTH: usize = 44;
 }
 
-/// Symbols for the instruction and trace columns.
-///
-/// Format: `| left | center | right |`. Dump symbols keep the connector
-/// shape in these three parts; multi-digit up counts may extend `right`.
 #[derive(Clone, Debug)]
 pub struct Symbol {
-    /// Left connector or padding.
     pub left: &'static str,
-    /// Center connector, marker, or status.
     pub center: &'static str,
-    /// Right connector, suffix, or padding.
     pub right: Cow<'static, str>,
 }
 
@@ -59,13 +41,10 @@ impl Symbol {
         }
     }
 
-    /// Empty symbol (5 spaces).
     pub const EMPTY: Symbol = Symbol::new("  ", " ", "  ");
 
-    /// Epsilon symbol for unconditional instructions.
     pub const EPSILON: Symbol = Symbol::new(" ", "-ε-", " ");
 
-    /// Padding indicator (centered "..." in 5-char column).
     pub const PADDING: Symbol = Symbol::new(" ", "...", " ");
 
     pub fn format(&self) -> String {
@@ -73,29 +52,6 @@ impl Symbol {
     }
 }
 
-/// Format navigation command as a dump symbol.
-///
-/// | Nav             | Symbol examples | Notes                                   |
-/// | --------------- | --------------- | --------------------------------------- |
-/// | Epsilon         | -ε-             | Pure control flow, no cursor check      |
-/// | Stay            | (blank)         | No movement                             |
-/// | StayExact       | !               | Stay at position, exact match only      |
-/// | Down            | └‣─             | First child, skip any                   |
-/// | DownSkip        | └•─             | First child, skip trivia                |
-/// | DownSkipExtras  | └◦─             | First child, skip extras only           |
-/// | DownExact       | └─!             | First child, exact                      |
-/// | Next            | ─‣─             | Next sibling, skip any                  |
-/// | NextSkip        | ─•─             | Next sibling, skip trivia               |
-/// | NextSkipExtras  | ─◦─             | Next sibling, skip extras only          |
-/// | NextExact       | ──!             | Next sibling, exact                     |
-/// | Up(1)           | ─‣┘             | Ascend 1 level, skip any                |
-/// | Up(2), Up(10)   | ─‣┘², ─‣┘¹⁰     | Ascend n levels, skip any               |
-/// | UpSkipTrivia(n) | ─•┘², ─•┘¹⁰     | Ascend n, last non-trivia on each level |
-/// | UpSkipExtras(n) | ─◦┘², ─◦┘¹⁰     | Ascend n, last non-extra on each level  |
-/// | UpExact(n)      | !─┘², !─┘¹⁰     | Ascend n, last child on each level      |
-/// | ChildlessSkipTrivia | └•┘         | Assert no children beyond trivia        |
-/// | ChildlessSkipExtras | └◦┘         | Assert no children beyond extras        |
-/// | ChildlessExact  | └!┘             | Assert no children at all               |
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
         Nav::Epsilon => Symbol::EPSILON,
@@ -119,28 +75,23 @@ pub fn nav_symbol(nav: Nav) -> Symbol {
     }
 }
 
-/// Trace sub-line symbols.
 pub mod trace {
     use super::Symbol;
 
     pub const MATCH_SUCCESS: Symbol = Symbol::new("  ", "●", "  ");
     pub const MATCH_FAILURE: Symbol = Symbol::new("  ", "○", "  ");
 
-    /// Effect: data capture or structure.
     pub const EFFECT: Symbol = Symbol::new("  ", "⬥", "  ");
-    /// Effect: suppressed (inside @_ capture).
     pub const EFFECT_SUPPRESSED: Symbol = Symbol::new("  ", "⬦", "  ");
 
     pub const CALL: Symbol = Symbol::new("  ", "▶", "  ");
     pub const RETURN: Symbol = Symbol::new("  ", "◀", "  ");
 
-    /// Backtrack symbol (centered in 5 chars).
     pub const BACKTRACK: Symbol = Symbol::new(" ", "❮❮❮", " ");
 }
 
 const SUPERSCRIPT_DIGITS: &[char] = &['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
-/// Convert a number to superscript digits.
 pub fn superscript(n: u8) -> String {
     if n < 10 {
         SUPERSCRIPT_DIGITS[n as usize].to_string()
@@ -173,9 +124,6 @@ pub fn width_for_count(count: usize) -> usize {
     }
 }
 
-/// Truncate text to max length with ellipsis.
-///
-/// Used for displaying node text in traces.
 pub fn truncate_text(s: &str, max_len: usize) -> String {
     if s.chars().count() <= max_len {
         s.to_string()
@@ -185,10 +133,6 @@ pub fn truncate_text(s: &str, max_len: usize) -> String {
     }
 }
 
-/// Builder for formatted output lines.
-///
-/// Constructs lines following the column layout:
-/// `<indent><addr><gap><symbol><gap><content>...<successors>`
 pub struct LineBuilder {
     addr_width: usize,
 }
@@ -198,7 +142,6 @@ impl LineBuilder {
         Self { addr_width }
     }
 
-    /// Build an instruction line prefix: `  <addr> <symbol> `
     pub fn instruction_prefix(&self, addr: u16, symbol: Symbol) -> String {
         format!(
             "{:indent$}{:0aw$} {} ",
@@ -210,9 +153,6 @@ impl LineBuilder {
         )
     }
 
-    /// Pad content to total width and append successors.
-    ///
-    /// Ensures at least 2 spaces between content and successors.
     pub fn pad_successors(&self, base: String, successors: &str) -> String {
         let padding = cols::TOTAL_WIDTH
             .saturating_sub(display_width(&base))
@@ -221,9 +161,6 @@ impl LineBuilder {
     }
 }
 
-/// Calculate display width of a string, ignoring ANSI escape sequences.
-///
-/// ANSI sequences have the form `\x1b[...m` and render as zero-width.
 fn display_width(s: &str) -> usize {
     let mut width = 0;
     let mut in_escape = false;

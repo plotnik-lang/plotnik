@@ -1,33 +1,19 @@
-//! 64-byte aligned storage for bytecode.
-//!
-//! Bytecode sections are 64-byte aligned internally. For this alignment to be
-//! meaningful at runtime, the buffer itself must start at a 64-byte boundary.
-//! Standard `Vec<u8>` provides no alignment guarantees for `u8`.
-
 use std::ops::Deref;
 
 use super::SECTION_ALIGN;
 
-/// `repr(align(..))` only accepts a literal, so the alignment is spelled out
-/// here; this guards it against ever drifting from `SECTION_ALIGN`.
 const _: () = assert!(SECTION_ALIGN == 64);
 
-/// One section-aligned block of bytecode storage.
 #[repr(C, align(64))]
 #[derive(Clone, Copy)]
 struct Block([u8; SECTION_ALIGN]);
 
-/// Immutable 64-byte aligned byte storage.
-///
-/// Uses `Vec<Block>` internally — Vec guarantees element alignment,
-/// so the data starts at a 64-byte boundary. No custom allocator needed.
 pub struct AlignedVec {
     blocks: Vec<Block>,
     len: usize,
 }
 
 impl AlignedVec {
-    /// Copy bytes into aligned storage.
     pub fn copy_from_slice(bytes: &[u8]) -> Self {
         if bytes.is_empty() {
             return Self {
@@ -49,7 +35,6 @@ impl AlignedVec {
         }
     }
 
-    /// Number of bytes stored.
     pub fn len(&self) -> usize {
         self.len
     }

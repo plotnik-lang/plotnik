@@ -1,9 +1,3 @@
-//! Predicate operators for bytecode.
-//!
-//! Shared between compiler and runtime so the VM can decode operators
-//! from bytecode without depending on the parser.
-
-/// Predicate operator for node text filtering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PredicateOp {
     Eq,
@@ -16,8 +10,6 @@ pub enum PredicateOp {
 }
 
 impl PredicateOp {
-    /// Non-panicking decode, for validating an untrusted instruction stream at
-    /// load time before the VM or dump constructs a `PredicateOp` from the byte.
     pub fn try_from_byte(b: u8) -> Option<Self> {
         let op = match b {
             1 => Self::Eq,
@@ -32,7 +24,6 @@ impl PredicateOp {
         Some(op)
     }
 
-    /// Encode for bytecode.
     pub fn to_byte(self) -> u8 {
         match self {
             Self::Eq => 1,
@@ -45,7 +36,6 @@ impl PredicateOp {
         }
     }
 
-    /// Operator as display string.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Eq => "==",

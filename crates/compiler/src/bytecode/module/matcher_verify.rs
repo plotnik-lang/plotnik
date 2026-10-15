@@ -1,18 +1,3 @@
-//! Validation of decoded bytecode control flow and result effects.
-//!
-//! The bytecode loader projects structurally decoded instructions into this
-//! small program shape before the VM can observe the module. The abstract
-//! interpreter proves every control-flow path, not just every instruction:
-//! deduplicated alternative tails may legitimately reach one address with
-//! different builder stacks, so effect analysis keeps a set of abstract states
-//! per address.
-//!
-//! Recursive bodies cannot be inlined into that analysis. A monotone fixpoint
-//! instead summarizes which caller-top frames a body accepts, whether it writes
-//! through that frame, and what pending-value state it returns. Derived opener
-//! bounds reject net-growing cycles; a separate state budget bounds pathological
-//! finite combinations.
-
 use std::collections::hash_map::Entry as HashEntry;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;

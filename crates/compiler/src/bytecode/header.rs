@@ -1,10 +1,3 @@
-//! Bytecode header (64 bytes).
-//!
-//! Offsets are computed from counts + SECTION_ALIGN (64 bytes); no stored offsets.
-//! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
-//! NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
-//! Instructions → Spans
-
 use super::entrypoint::Entrypoint;
 use super::sections::SYMBOL_NAME_ENTRY_SIZE;
 use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
@@ -13,35 +6,18 @@ use super::{
     STRING_TABLE_ENTRY_SIZE, VERSION,
 };
 
-/// Number of sections after the header, in layout order. The single descriptor
-/// of that layout is [`Header::section_data_sizes`].
 pub(crate) const SECTION_COUNT: usize = 12;
 
-/// First 64 bytes of the bytecode buffer.
-///
-/// Layout (offsets computed from counts):
-/// - 0-23: identity and sizes (magic, version, checksum, total_size, str_blob_size, regex_blob_size)
-/// - 24-41: counts (9 × u16) — order matches section order
-/// - 42-43: spans_count
-/// - 44-63: reserved
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C, align(64))]
 pub struct Header {
-    // Bytes 0-23: Identity and sizes (6 × u32)
-    /// Magic bytes: b"PTKQ"
     pub magic: [u8; 4],
-    /// Bytecode format version.
     pub version: u32,
-    /// CRC32 checksum of everything after the header
     pub checksum: u32,
-    /// Total buffer size in bytes.
     pub total_size: u32,
-    /// Size of the string blob in bytes.
     pub str_blob_size: u32,
-    /// Size of the regex blob in bytes.
     pub regex_blob_size: u32,
 
-    // Bytes 24-41: Element counts (9 × u16) — order matches section order
     pub str_table_count: u16,
     pub regex_table_count: u16,
     pub node_kinds_count: u16,
@@ -52,10 +28,8 @@ pub struct Header {
     pub entrypoints_count: u16,
     pub instruction_word_count: u16,
 
-    // Bytes 42-43: Spans section count.
     pub spans_count: u16,
 
-    // Bytes 44-63: Reserved (public for cross-crate struct initialization)
     pub _reserved: [u8; 20],
 }
 
@@ -85,10 +59,6 @@ impl Default for Header {
     }
 }
 
-/// Computed section offsets derived from header counts.
-///
-/// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-/// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Instructions → Spans
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SectionOffsets {
     pub(crate) str_blob: u32,
@@ -106,7 +76,6 @@ pub struct SectionOffsets {
 }
 
 impl SectionOffsets {
-    /// Build from section start offsets in layout order.
     fn from_starts(o: [u32; SECTION_COUNT]) -> Self {
         Self {
             str_blob: o[0],
@@ -124,7 +93,6 @@ impl SectionOffsets {
         }
     }
 
-    /// Section start offsets in layout order.
     pub(crate) fn as_starts(&self) -> [u32; SECTION_COUNT] {
         [
             self.str_blob,
@@ -201,18 +169,7 @@ impl Header {
         self.version == VERSION
     }
 
-    /// Data size (bytes, before alignment padding) of each section, in layout
-    /// order. This is the single descriptor of the section layout — offset
-    /// computation ([`compute_offsets`](Self::compute_offsets)) and the load-time
-    /// bounds/padding checks all fold over it.
-    ///
-    /// Widened to `u64` so a corrupt header cannot overflow a running layout.
-    ///
-    /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-    /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
-    /// Instructions → Spans
     pub(crate) fn section_data_sizes(&self) -> [u64; SECTION_COUNT] {
-        // Tables carry a trailing sentinel entry, hence the `+ 1`.
         [
             self.str_blob_size as u64,
             self.regex_blob_size as u64,
@@ -229,15 +186,10 @@ impl Header {
         ]
     }
 
-    /// Compute section start offsets from counts and blob sizes.
-    ///
-    /// Each section is `SECTION_ALIGN`-aligned and begins right after the header.
-    /// Callers run `Module::validate_section_bounds` first, so the `u32`
-    /// arithmetic here cannot overflow.
     pub fn compute_offsets(&self) -> SectionOffsets {
         let align = SECTION_ALIGN as u32;
         let mut starts = [0u32; SECTION_COUNT];
-        let mut cursor = HEADER_SIZE as u32; // sections begin right after the header
+        let mut cursor = HEADER_SIZE as u32;
         for (index, (start, size)) in starts.iter_mut().zip(self.section_data_sizes()).enumerate() {
             *start = cursor;
             if index + 1 < SECTION_COUNT {
@@ -262,7 +214,6 @@ impl Header {
     }
 }
 
-/// Round up to the next multiple of `align`.
 fn align_up(value: u32, align: u32) -> u32 {
     (value + align - 1) & !(align - 1)
 }

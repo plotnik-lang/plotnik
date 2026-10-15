@@ -1,5 +1,3 @@
-//! Human-readable bytecode dump for debugging and documentation.
-
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
@@ -33,9 +31,7 @@ pub fn dump(module: &Module, colors: Colors) -> String {
 }
 
 struct DumpContext {
-    /// Maps instruction addresses to entrypoint names for labeling.
     addr_labels: BTreeMap<CodeAddr, String>,
-    /// Shared symbol/string decoding and match rendering.
     render: ModuleRenderContext,
     str_width: usize,
     type_width: usize,
@@ -64,7 +60,6 @@ impl DumpContext {
         let str_count = header.str_table_count as usize;
 
         let types = module.types();
-        // `defs_count` already includes every emitted builtin and custom type.
         let type_count = types.defs_count();
         let str_width = width_for_count(str_count);
         let type_width = width_for_count(type_count);
@@ -106,7 +101,6 @@ fn dump_strings(out: &mut String, module: &Module, ctx: &DumpContext) {
 
 fn dump_regexes(out: &mut String, module: &Module, ctx: &DumpContext) {
     let count = module.header().regex_table_count as usize;
-    // Index 0 is reserved, so only print if there are actual regexes
     if count <= 1 {
         return;
     }
@@ -134,7 +128,6 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
 
     writeln!(out, "{}[type_defs]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
-    // type_defs holds every type, builtins included.
     for (i, def) in types.iter().enumerate() {
         let (formatted, comment) = match def.decode() {
             TypeDefKind::Primitive(kind) => {
@@ -260,7 +253,6 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
     out.push('\n');
 }
 
-/// Format a type ID as a human-readable name.
 fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> String {
     let types = module.types();
     let strings = module.strings();
@@ -353,10 +345,6 @@ fn dump_spans(out: &mut String, module: &Module, ctx: &DumpContext) {
     out.push('\n');
 }
 
-/// Check if an instruction is padding (all-zeros Match8).
-///
-/// Padding slots contain zero bytes which decode as terminal epsilon Match8
-/// with Any node kind, no field constraint, and next=0.
 fn is_padding(instr: &Instruction) -> bool {
     match instr {
         Instruction::Match(m) => {
@@ -417,8 +405,6 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     }
 }
 
-/// Bundles the precomputed context and address width threaded through every
-/// per-instruction formatting routine.
 struct DumpFormatter<'a> {
     ctx: &'a DumpContext,
     addr_width: usize,
@@ -439,9 +425,6 @@ fn instruction_word_count(instr: &Instruction) -> u16 {
 }
 
 impl DumpFormatter<'_> {
-    /// Format a single padding word line.
-    ///
-    /// Output: `  07  ...` (word address and "..." in the symbol column)
     fn padding_word(&self, addr: CodeAddr) -> String {
         LineBuilder::new(self.addr_width)
             .instruction_prefix(addr.get(), Symbol::PADDING)
