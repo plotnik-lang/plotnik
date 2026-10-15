@@ -244,15 +244,12 @@ fn render_frontend(
         ));
     }
     match kind {
-        // Parser recovery snapshots pin diagnostics only; a half-built error CST is noise.
         FrontendMode::Parser(trivia) if !has_errors => {
             let cst = analyzed.dump_cst_with_trivia(matches!(trivia, TriviaPolicy::Include));
             out.push(GeneratedSection::new(SectionKind::Cst, cst));
             out.push(GeneratedSection::new(SectionKind::Ast, analyzed.dump_ast()));
         }
         FrontendMode::Parser(_) => {}
-        // The definition tree is meaningful even with unresolved refs, so it renders
-        // alongside any error diagnostics rather than being suppressed.
         FrontendMode::Analyze => {
             out.push(GeneratedSection::new(
                 SectionKind::Definitions,
@@ -553,8 +550,6 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
 
         let output = match result {
             Ok(journal) => {
-                // The verified variant (not plain `materialize`) so a type-unsound emission
-                // panics the snapshot in debug; the check compiles out under `--release`.
                 let value = materialize_verified(
                     scenario.source,
                     scenario.module,
@@ -566,8 +561,6 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                     .expect("materialized result must serialize to debug JSON")
             }
             Err(RuntimeError::NoMatch) => "<no match>".to_string(),
-            // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
-            // not — fail the trial rather than accept a resource limit as expected output.
             Err(err) => {
                 return Err(format!("VM run failed: {err}"));
             }
@@ -598,8 +591,6 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 rendered.push('\n');
                 rendered
             });
-            // The verified variant (not plain `materialize`) so a type-unsound emission
-            // panics the snapshot in debug; the check compiles out under `--release`.
             let value = materialize_verified(
                 scenario.source,
                 scenario.module,
@@ -614,8 +605,6 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
             )
         }
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
-        // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
-        // not — fail the trial rather than accept a resource limit as expected output.
         Err(err) => return Err(format!("VM run failed: {err}")),
     };
     Ok(VmArtifacts::TextTrace {
@@ -697,9 +686,6 @@ grammar_loader!(
     "typescript grammar"
 );
 
-/// The canonical file text every snapshot is compared against. Rebuilding the whole
-/// file each run, rather than editing sections in place, is what drops stale
-/// sections on accept.
 fn canonical(input: &Fixture, generated: &[GeneratedSection]) -> String {
     let mut out = String::new();
     out.push_str(&input.query);
@@ -734,9 +720,6 @@ fn push_section(out: &mut String, name: &str, body: &str) {
     }
 }
 
-/// A section boundary: the name centered in a 50-column dash rule. `input` and
-/// `input.<filename>` render as `INPUT` / `INPUT (<filename>)`; every other
-/// section is the uppercased name.
 fn section_rule(name: &str) -> String {
     const WIDTH: usize = 50;
     let label = if let Some(ext) = name.strip_prefix("input.") {
@@ -744,8 +727,6 @@ fn section_rule(name: &str) -> String {
     } else {
         name.to_ascii_uppercase()
     };
-    // At least one dash each side so an over-wide label still round-trips through
-    // the snapshot parser; width degrades gracefully past 50 columns.
     let fill = WIDTH.saturating_sub(label.len() + 2);
     let half = fill / 2;
     let left = half.max(1);

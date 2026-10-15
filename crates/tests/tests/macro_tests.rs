@@ -1,5 +1,3 @@
-//! Public generated-Rust contracts beyond the root-based snapshot corpus.
-
 use plotnik::LimitExceeded;
 use plotnik::tree_sitter::{Language, Parser, Tree};
 

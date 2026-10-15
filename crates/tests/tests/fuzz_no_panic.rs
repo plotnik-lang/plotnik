@@ -1,7 +1,3 @@
-//! Adversarial checks for the untrusted-text boundaries. Exact language and VM
-//! behavior belongs in snapshots; these properties only require totality and
-//! formatter idempotence across inputs too broad for a finite corpus.
-
 use std::sync::OnceLock;
 
 use proptest::prelude::*;

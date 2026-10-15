@@ -5,7 +5,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// A completed same-directory temporary file that removes itself unless renamed.
 struct TempSnapshotFile {
     path: PathBuf,
     file: Option<File>,
@@ -68,11 +67,6 @@ impl Drop for TempSnapshotFile {
     }
 }
 
-/// Replace `path` atomically after all bytes have been written and flushed.
-///
-/// This guarantees readers see either the old complete snapshot or the new one.
-/// It does not promise crash durability; the snapshot workflow does not require
-/// an `fsync` of the file and parent directory.
 pub fn replace(path: &Path, contents: &str) -> Result<(), String> {
     TempSnapshotFile::create(path)?
         .write(contents)?

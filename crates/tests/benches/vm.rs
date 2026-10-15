@@ -1,28 +1,3 @@
-//! VM hot-path benchmarks over a deterministic synthetic JavaScript corpus.
-//!
-//! Every iteration measures the user-visible query cost minus parsing: build a
-//! VM, execute the compiled module against a pre-parsed tree, and materialize
-//! the result. `parse` benches tree-sitter parsing of the same corpus for
-//! scale, and `scan_items_execute` skips materialization to split VM time from
-//! output building.
-//!
-//! Scenarios, each isolating a different runtime path:
-//! - `scan_items`: variants over every top-level statement — sibling
-//!   navigation, alternation checkpoints, and match-journal recording in bulk.
-//! - `fn_params`: nested field constraints plus an inner list per variant.
-//! - `deep_calls`: self-recursive definition descending nested call chains —
-//!   Call/Return frames and call-retry checkpoints.
-//! - `pred_eq` / `pred_regex`: string and regex predicates that mostly fail —
-//!   per-candidate navigation plus `utf8_text` extraction.
-//! - `backtrack_storm`: greedy any-star that never finds its tail, capped by
-//!   an explicit fuel budget — pure dispatch + backtracking, zero output.
-//!
-//! Run: `make bench` (or `make bench FILTER=scan_items`).
-//! Save/compare: `cargo bench -p plotnik-tests --bench vm -- --save-baseline
-//! <name>`, then `critcmp <a> <b>`.
-//! Profile: `samply record cargo bench -p plotnik-tests --bench vm --
-//! --profile-time 15 scan_items` (bench profile keeps line tables).
-
 use std::hint::black_box;
 use std::sync::LazyLock;
 
@@ -37,9 +12,6 @@ use plotnik_compiler::{Colors, Limit, QueryBuilder, RuntimeLimitSpec, VM, materi
 #[path = "../test_support/grammar_loader.rs"]
 mod grammar_loader;
 
-/// Deterministic synthetic JavaScript: five statement templates cycled by
-/// block index, so every run on every machine benches identical trees. No
-/// randomness — reproducibility beats realism drift.
 mod corpus {
     pub fn generate(target_bytes: usize) -> String {
         let mut out = String::with_capacity(target_bytes + 512);
@@ -88,8 +60,6 @@ mod corpus {
                 format!("const chain_{i} = (x) => {expr};\n")
             }
             3 => {
-                // A "needle" string every 43rd block index keeps predicate
-                // scenarios mostly-failing with a handful of real hits.
                 let s = if i.is_multiple_of(43) {
                     "needle".to_owned()
                 } else {
@@ -129,7 +99,6 @@ fn compile(query: &str) -> Module {
     let compiled = QueryBuilder::from_inline(query)
         .compile(&GRAMMAR)
         .expect("bench query parses");
-    // On failure, run the query through `plotnik check` to see diagnostics.
     assert!(compiled.is_valid(), "bench query compiles cleanly");
     compiled
         .emit(plotnik_compiler::BytecodeConfig::new())
@@ -251,8 +220,6 @@ fn bench_scenarios(c: &mut Criterion) {
     }
 }
 
-/// The scan without materialization: subtracting this from `scan_items/medium`
-/// attributes time between the VM proper and output building.
 fn bench_scan_execute(c: &mut Criterion) {
     let s = &SCENARIOS[0];
     let module = compile(s.query);
@@ -271,11 +238,6 @@ fn bench_scan_execute(c: &mut Criterion) {
     group.finish();
 }
 
-/// Raw dispatch + backtrack throughput. The anchorless star lets every `(_)`
-/// element re-bind to any later sibling on backtrack, so the search space is
-/// exponential and the run always exhausts its fuel budget; a fixed budget
-/// turns that storm into a stable dispatch-throughput measurement while fuel
-/// and matcher dispatches have their current one-to-one relationship.
 fn bench_backtrack_storm(c: &mut Criterion) {
     const FUEL_BUDGET: u64 = 50_000;
     let module = compile("Missing = (program {(_)* (debugger_statement)})");

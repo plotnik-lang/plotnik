@@ -44,8 +44,6 @@ pub(crate) fn source(case: &Case) -> Result<(String, bool), String> {
         return Err(format!("compilation failed for `{}`", case.relative));
     }
 
-    // The VM corpus renders match-only success as null. Project only that
-    // presentation difference, using the query's result type, not its expected output.
     let module = compiled
         .emit(BytecodeConfig::new())
         .map_err(|error| format!("emit corpus metadata for `{}`: {error}", case.relative))?
