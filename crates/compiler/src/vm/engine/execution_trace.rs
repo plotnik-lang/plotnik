@@ -341,6 +341,9 @@ impl Tracer for TraceRecorder {
     }
 
     fn trace_execution_started(&mut self, target_ip: CodeAddr) {
+        self.span_stack.clear();
+        self.shadow.clear();
+        self.journal_len = 0;
         self.current_ip = target_ip;
         self.add_record(
             TraceEvent::ExecutionStarted {

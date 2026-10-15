@@ -90,6 +90,78 @@ pub trait Tracer {
     fn trace_execution_started(&mut self, target_ip: CodeAddr);
 }
 
+impl<T: Tracer + ?Sized> Tracer for &mut T {
+    const ENABLED: bool = T::ENABLED;
+
+    fn trace_instruction(&mut self, ip: CodeAddr, instr: &Instruction<'_>) {
+        (**self).trace_instruction(ip, instr);
+    }
+
+    fn trace_nav(&mut self, nav: Nav, node: Node<'_>) {
+        (**self).trace_nav(nav, node);
+    }
+
+    fn trace_nav_failure(&mut self, nav: Nav) {
+        (**self).trace_nav_failure(nav);
+    }
+
+    fn trace_match_success(&mut self, node: Node<'_>) {
+        (**self).trace_match_success(node);
+    }
+
+    fn trace_match_failure(&mut self, node: Node<'_>) {
+        (**self).trace_match_failure(node);
+    }
+
+    fn trace_field_success(&mut self, field_id: NodeFieldId) {
+        (**self).trace_field_success(field_id);
+    }
+
+    fn trace_field_failure(&mut self, node: Node<'_>) {
+        (**self).trace_field_failure(node);
+    }
+
+    fn trace_predicate_failure(&mut self, node: Node<'_>) {
+        (**self).trace_predicate_failure(node);
+    }
+
+    fn trace_neg_field_failure(&mut self, node: Node<'_>, field: NodeFieldId) {
+        (**self).trace_neg_field_failure(node, field);
+    }
+
+    fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
+        (**self).trace_journal_event(event);
+    }
+
+    fn trace_effect_suppressed(&mut self, opcode: EffectKind, payload: usize) {
+        (**self).trace_effect_suppressed(opcode, payload);
+    }
+
+    fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool) {
+        (**self).trace_suppress_control(opcode, suppressed);
+    }
+
+    fn trace_call(&mut self, target_ip: CodeAddr) {
+        (**self).trace_call(target_ip);
+    }
+
+    fn trace_return(&mut self, port: PortId) {
+        (**self).trace_return(port);
+    }
+
+    fn trace_checkpoint_created(&mut self, ip: CodeAddr) {
+        (**self).trace_checkpoint_created(ip);
+    }
+
+    fn trace_backtrack(&mut self, depth: u32) {
+        (**self).trace_backtrack(depth);
+    }
+
+    fn trace_execution_started(&mut self, target_ip: CodeAddr) {
+        (**self).trace_execution_started(target_ip);
+    }
+}
+
 /// No-op tracer that gets optimized away completely.
 pub struct NoopTracer;
 
@@ -654,6 +726,12 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_execution_started(&mut self, target_ip: CodeAddr) {
+        // An accepted attempt can leave retry checkpoints and pending returns.
+        // Keep rendered lines, but never carry matcher state into a new candidate.
+        self.checkpoints.clear();
+        self.call_stack.clear();
+        self.deferred_return_ip = None;
+        self.prev_ip = None;
         let name = self.def_ref_name(target_ip);
         self.push_def_header(&name);
         self.call_stack.push(name);

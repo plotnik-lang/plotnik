@@ -94,8 +94,18 @@ impl<'s, 't> VM<'s, 't> {
         module: &'s Module,
         entrypoint: &Entrypoint,
     ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
+        self.apply_with(module, entrypoint, &mut NoopTracer)
+    }
+
+    /// Apply once with the same result and budget semantics, observing the attempt.
+    pub fn apply_with<T: Tracer>(
+        self,
+        module: &'s Module,
+        entrypoint: &Entrypoint,
+        tracer: &mut T,
+    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
         let mut budget = ExecutionBudget::new(self.limits);
-        self.apply_budgeted(module, entrypoint, &mut budget)
+        self.apply_budgeted(module, entrypoint, tracer, &mut budget)
     }
 
     /// Lazily apply one preferred result per candidate in inclusive preorder.
@@ -106,6 +116,17 @@ impl<'s, 't> VM<'s, 't> {
         module: &'s Module,
         entrypoint: Entrypoint,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
+        self.traverse_with(module, entrypoint, NoopTracer)
+    }
+
+    /// Observe every attempted candidate, including failures, only as consumed.
+    /// Pass an owned tracer or borrow one with `&mut` to inspect it after drop.
+    pub fn traverse_with<T: Tracer>(
+        self,
+        module: &'s Module,
+        entrypoint: Entrypoint,
+        mut tracer: T,
+    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
         Traversal::new(
             self.engine.node(),
             ExecutionBudget::new(self.limits),
@@ -113,21 +134,23 @@ impl<'s, 't> VM<'s, 't> {
                 Self::at_node(self.source, node, budget.limits()).apply_budgeted(
                     module,
                     &entrypoint,
+                    &mut tracer,
                     budget,
                 )
             },
         )
     }
 
-    fn apply_budgeted(
+    fn apply_budgeted<T: Tracer>(
         self,
         module: &'s Module,
         entrypoint: &Entrypoint,
+        tracer: &mut T,
         budget: &mut ExecutionBudget,
     ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
         let node = self.engine.node();
         let source = self.source;
-        let (result, _) = self.execute_budgeted(module, entrypoint, &mut NoopTracer, budget);
+        let (result, _) = self.execute_budgeted(module, entrypoint, tracer, budget);
         let journal = match result {
             Ok(journal) => journal,
             Err(RuntimeError::NoMatch) => return Ok(None),
