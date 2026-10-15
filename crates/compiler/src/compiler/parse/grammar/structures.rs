@@ -12,9 +12,7 @@ use crate::compiler::parse::token_set::{
 use super::utils::{starts_uppercase, to_pascal_case};
 
 enum ParenHead<'q> {
-    /// Concrete node kind: `(identifier ...)`.
     Concrete,
-    /// PascalCase reference to a named definition: `(Name)`.
     DefRef(&'q str),
 }
 
@@ -24,8 +22,6 @@ struct TreeSitterPredicateArguments<'q> {
     value: Option<&'q str>,
 }
 
-/// Native operator equivalent for the tree-sitter predicates that have one. The rest
-/// (`#any-of?`, `#set!`, `#is?`, …) have no equivalent and get no suggestion.
 fn predicate_operator(name: &str) -> Option<&'static str> {
     match name {
         "eq" => Some("=="),
@@ -37,9 +33,6 @@ fn predicate_operator(name: &str) -> Option<&'static str> {
 }
 
 impl<'q> Parser<'q, '_> {
-    /// `(type ...)` | `(_ ...)` | `(ERROR)` | `(MISSING ...)` | `(RefName)`
-    /// | `(pattern#subtype)` (native) | `(pattern/subtype)` (tree-sitter compat)
-    /// PascalCase without children → DefRef; with children → error but parses as Tree.
     pub(crate) fn parse_named_node(&mut self) {
         let checkpoint = self.checkpoint();
         self.push_delimiter();
@@ -49,7 +42,6 @@ impl<'q> Parser<'q, '_> {
 
         let head = match self.current() {
             SyntaxKind::ParenClose => {
-                // Empty tree `()` - validation phase will report EmptyTree error
                 self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 ParenHead::Concrete
             }
@@ -72,8 +64,6 @@ impl<'q> Parser<'q, '_> {
                     self.parse_node_predicate_error(checkpoint);
                     return;
                 }
-                // Tree-sitter style sequence: ((a) (b)) instead of {(a) (b)}
-                // Parse as Seq so it works correctly, but warn to encourage {} syntax
                 if self.at_ts(PATTERN_FIRST_TOKENS) {
                     self.start_node_at(checkpoint, SyntaxKind::Sequence);
                     tree_sitter_sequence = true;
@@ -102,8 +92,6 @@ impl<'q> Parser<'q, '_> {
             ParenHead::Concrete
         };
 
-        // A category separator binds only when tight against the node kind (tree-sitter
-        // strictness): `expression#sub` / `expression/sub`, never `expression # sub`.
         let head = if let Some(sep) = self.tokens.get(self.pos).copied()
             && matches!(sep.kind, SyntaxKind::Slash | SyntaxKind::Hash)
             && sep.span.start() == head_end
@@ -129,15 +117,6 @@ impl<'q> Parser<'q, '_> {
         head
     }
 
-    /// Parse a category separator and its optional subtype. The CST keeps the marker so later
-    /// stages can reject unsupported supertype matching cleanly. Two surface forms, both
-    /// tight-binding:
-    ///
-    /// - `#` — native category syntax. `(name#)` is a bare category; `(name#sub)` refines it.
-    /// - `/` — tree-sitter compatibility. Always needs a subtype; warns toward `#`.
-    ///
-    /// The separator is already known to be tight against the node kind; here we also require
-    /// the subtype to be tight against the separator, matching tree-sitter exactly.
     fn parse_concrete_category_refinement(&mut self, sep: SyntaxKind) {
         let sep_span = self.current_span();
         let has_subtype = self.consume_category_refinement_subtype(sep_span);
@@ -179,7 +158,7 @@ impl<'q> Parser<'q, '_> {
     }
 
     fn consume_category_refinement_subtype(&mut self, sep_span: TextRange) -> bool {
-        self.bump(); // consume `/` or `#`
+        self.bump();
         let subtype = self.tokens.get(self.pos).copied();
         let tight = subtype.is_some_and(|t| t.span.start() == sep_span.end());
         match subtype.map(|t| t.kind) {
@@ -195,11 +174,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// A tree-sitter predicate like `#eq?` or `#set!`: `#` tight against an identifier, itself
-    /// tight against a `?`/`!` suffix. Real predicates always carry that suffix, so requiring it
-    /// keeps a bare `#node_type` (a loose category-refinement typo) out of predicate recovery —
-    /// it falls through to the same "wrap in parens" diagnosis as the spaced form. A lone or
-    /// loosely-spaced `#` also falls through, so the caller keeps its "unexpected token" hint.
     pub(crate) fn at_ts_predicate(&mut self) -> bool {
         if self.current() != SyntaxKind::Hash {
             return false;
@@ -217,9 +191,6 @@ impl<'q> Parser<'q, '_> {
         })
     }
 
-    /// A misplaced tree-sitter predicate (`#eq?`, `#match?`, `#set!`) — unsupported. Consume its
-    /// name and recognizable arguments into one Error node so they do not cascade into bogus node
-    /// and quantifier diagnostics. Only call when [`at_ts_predicate`] holds.
     pub(crate) fn error_unsupported_predicate(&mut self) {
         self.start_node(SyntaxKind::Error);
         let (span, name) = self.consume_predicate_name();
@@ -230,13 +201,10 @@ impl<'q> Parser<'q, '_> {
         self.report_unsupported_predicate(span, name, arguments);
     }
 
-    /// Consume a tight predicate run `#name?` / `#name!`, returning its full span and the bare
-    /// predicate name (`eq`, `not-eq`, `match`, …). It lexes as `#` + identifier + `?`/`!`; the
-    /// suffix is guaranteed by the [`at_ts_predicate`] precondition. Only call when it holds.
     fn consume_predicate_name(&mut self) -> (TextRange, &'q str) {
         let start = self.current_span().start();
-        self.bump(); // `#`
-        let name = self.current_text(); // identifier, tight by precondition
+        self.bump();
+        let name = self.current_text();
         let mut end = self.current_span().end();
         self.bump();
         if let Some(suffix) = self.tokens.get(self.pos).copied()
@@ -249,10 +217,6 @@ impl<'q> Parser<'q, '_> {
         (TextRange::new(start, end), name)
     }
 
-    /// A parenthesized predicate written tree-sitter style, e.g. `(#eq? @x "foo")`. The `(` is
-    /// already consumed; swallow the predicate name and its arguments through the predicate's own
-    /// closing `)` into one Error node, so the arguments don't cascade into bogus child
-    /// diagnostics. Only call when [`at_ts_predicate`] holds.
     fn parse_node_predicate_error(&mut self, checkpoint: Checkpoint) {
         self.start_node_at(checkpoint, SyntaxKind::Error);
         let (span, name) = self.consume_predicate_name();
@@ -326,10 +290,6 @@ impl<'q> Parser<'q, '_> {
     }
 
     fn consume_until_matching_paren(&mut self) {
-        // Swallow arguments up to the predicate's own closing `)`, tracking delimiter depth: a
-        // nested argument like `(identifier)` ends at its own `)`, while an enclosing `]`/`}`
-        // left by a missing `)` stops the run *without* being consumed — so the outer
-        // alternation/sequence still closes and only the local missing `)` is reported.
         let mut depth = 0u32;
         while !self.eof() && !self.has_fatal_error() {
             match self.current() {
@@ -348,9 +308,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Report an unsupported tree-sitter predicate, suggesting the native node predicate only
-    /// for the ones with a real equivalent. `#set!`/`#is?`/`#any-of?` have none, so they get
-    /// the bare "not supported" message rather than a misleading suggestion.
     fn report_unsupported_predicate(
         &mut self,
         span: TextRange,
@@ -382,7 +339,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Parse a node predicate: `== "value"`, `=~ /pattern/`, etc.
     fn parse_node_predicate(&mut self, node_name: &str) {
         self.start_node(SyntaxKind::NodePredicate);
 
@@ -412,7 +368,6 @@ impl<'q> Parser<'q, '_> {
                 self.finish_node();
             }
             SyntaxKind::Slash => {
-                // Standalone slash - parse as regex (fallback, shouldn't happen normally)
                 self.parse_regex_literal();
             }
             _ => {
@@ -458,20 +413,15 @@ impl<'q> Parser<'q, '_> {
         &self.source[usize::from(range.start())..usize::from(range.end())]
     }
 
-    /// Parse a regex literal: `/pattern/`
-    ///
-    /// Regex literals consume all content verbatim (including whitespace and
-    /// comment-like sequences) until an unescaped closing `/` is found.
     fn parse_regex_literal(&mut self) {
         self.start_node(SyntaxKind::Regex);
-        self.bump(); // opening '/'
+        self.bump();
 
         let mut found_close = false;
 
         while !self.eof() && !self.has_fatal_error() {
             let kind = self.nth_raw(0);
 
-            // Inside regex, include ALL tokens (trivia too)
             if kind != SyntaxKind::Slash {
                 self.bump();
                 continue;
@@ -494,7 +444,7 @@ impl<'q> Parser<'q, '_> {
         }
 
         if found_close {
-            self.bump(); // closing '/'
+            self.bump();
         } else {
             if let Some(report) = self.report_current(DiagnosticKind::UnclosedRegex) {
                 report.emit();
@@ -527,8 +477,6 @@ impl<'q> Parser<'q, '_> {
             }
             _ => {}
         }
-        // A missing node is a zero-byte node, so children could never
-        // match anything; only the optional kind argument above is legal.
         if !self.at(SyntaxKind::ParenClose) && !self.eof() {
             self.parse_forbidden_children(DiagnosticKind::MissingTakesNoChildren);
         }
@@ -537,23 +485,13 @@ impl<'q> Parser<'q, '_> {
         self.finish_node();
     }
 
-    /// Parse children where none are allowed (`(ERROR ...)` / `(MISSING ...)`),
-    /// then report `kind` spanning everything consumed.
     fn parse_forbidden_children(&mut self, kind: DiagnosticKind) {
         let children_start = self.current_span().start();
         self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
-        // `parse_children` can bail without consuming (a fatal error, or
-        // trivia was all that remained), leaving the last non-trivia end
-        // before `children_start`; degrade to an empty span rather than an
-        // inverted one.
         let children_end = self
             .last_non_trivia_end()
             .map_or(children_start, |end| end.max(children_start));
         let children_span = TextRange::new(children_start, children_end);
-        // Reported past `report_at`: the parse above may already have
-        // reported at this exact offset (e.g. the `!field` deprecation
-        // warning), and the parser's one-diagnostic-per-offset dedup would
-        // swallow this error — the one that actually gates the pipeline.
         self.diagnostics
             .report(kind, Span::new(self.source_id, children_span))
             .fix("remove the children", "")
@@ -561,8 +499,6 @@ impl<'q> Parser<'q, '_> {
     }
 
     fn finish_named_node_parsing(&mut self, checkpoint: Checkpoint, head: ParenHead<'q>) {
-        // At EOF there are no children, only an unclosed tree; without this
-        // check the DefRef arm below would report phantom children there.
         let has_children = !self.at(SyntaxKind::ParenClose) && !self.eof();
 
         match head {
@@ -570,10 +506,6 @@ impl<'q> Parser<'q, '_> {
                 self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 let children_start = self.current_span().start();
                 self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
-                // `parse_children` can bail without consuming (a fatal error,
-                // or trivia was all that remained), leaving the last
-                // non-trivia end before `children_start`; degrade to an empty
-                // span rather than an inverted one.
                 let children_end = self
                     .last_non_trivia_end()
                     .map_or(children_start, |end| end.max(children_start));
@@ -625,9 +557,6 @@ impl<'q> Parser<'q, '_> {
                 self.error_skip_separator();
                 continue;
             }
-            // A sequence only groups siblings; a negated field constrains the
-            // enclosing node and is only consumed as a node's direct child —
-            // inside `{...}` it would be dropped on the floor.
             if until == SyntaxKind::BraceClose
                 && matches!(self.current(), SyntaxKind::Minus | SyntaxKind::Negation)
             {
@@ -668,7 +597,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Alternation/choice: `[expr1 expr2 ...]` or `[Label: pattern ...]`
     pub(crate) fn parse_alternation(&mut self) {
         self.start_node(SyntaxKind::Alternation);
         self.push_delimiter();
@@ -713,9 +641,6 @@ impl<'q> Parser<'q, '_> {
                 }
                 continue;
             }
-            // Anchors and negated fields cannot form alternatives — an alternative must
-            // be a pattern, and these constraints occupy no sibling position. Parse them
-            // anyway (with their suffix rejection) and report on the spot.
             if matches!(self.current(), SyntaxKind::Dot | SyntaxKind::DotBang) {
                 self.parse_rejected_positional(DiagnosticKind::AnchorInAlternation);
                 continue;
@@ -760,7 +685,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Consume adjacent garbage as one error node so recovery reports one diagnostic per run.
     fn consume_unexpected_run(
         &mut self,
         mut boundary: impl FnMut(&mut Self) -> bool,
@@ -772,7 +696,6 @@ impl<'q> Parser<'q, '_> {
         self.start_node(SyntaxKind::Error);
         self.bump();
         loop {
-            // Lookahead probes can drain trailing trivia; check EOF after them.
             let stop = self.has_fatal_error() || boundary(self) || self.eof();
             if stop {
                 break;
@@ -784,7 +707,6 @@ impl<'q> Parser<'q, '_> {
         Some(TextRange::new(start, end))
     }
 
-    /// Labeled alternative: `Label: pattern`.
     fn parse_alternative(&mut self) {
         self.start_node(SyntaxKind::Alternative);
 
@@ -798,7 +720,6 @@ impl<'q> Parser<'q, '_> {
         self.finish_node();
     }
 
-    /// Parse a lowercase label as an alternative, then emit an error.
     fn parse_alternative_lowercase_label(&mut self) {
         self.start_node(SyntaxKind::Alternative);
 
@@ -818,7 +739,6 @@ impl<'q> Parser<'q, '_> {
         self.finish_node();
     }
 
-    /// Sibling sequence: `{expr1 expr2 ...}`
     pub(crate) fn parse_sequence(&mut self) {
         self.start_node(SyntaxKind::Sequence);
         self.push_delimiter();
@@ -862,7 +782,6 @@ impl<'q> Parser<'q, '_> {
         true
     }
 
-    /// Consume a separator token (comma or pipe) into an Error node and emit a helpful error.
     fn error_skip_separator(&mut self) {
         let kind = self.current();
         let span = self.current_span();
@@ -881,14 +800,11 @@ impl<'q> Parser<'q, '_> {
     }
 }
 
-/// A `RegexLiteral` token is `/`-delimited; the lexer stops at the line end
-/// when the closing `/` is missing, so closedness must be re-checked here.
 fn regex_literal_is_closed(text: &str) -> bool {
     let Some(body) = text.strip_suffix('/') else {
         return false;
     };
     if body.is_empty() {
-        // A lone `/` is only an opener.
         return false;
     }
     body.chars().rev().take_while(|&c| c == '\\').count() % 2 == 0

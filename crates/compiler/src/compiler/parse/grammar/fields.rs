@@ -9,7 +9,6 @@ use super::utils::starts_uppercase;
 use super::validation::Ident;
 
 impl Parser<'_, '_> {
-    /// Capture type: `::Type`, `::text`, or `::bool`.
     pub(crate) fn parse_capture_type(&mut self) {
         self.start_node(SyntaxKind::CaptureType);
         self.expect(SyntaxKind::DoubleColon, "'::' for capture type");
@@ -28,7 +27,6 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// Handle a single-colon capture type (`@x : Type` instead of `@x :: Type`).
     pub(crate) fn parse_capture_type_single_colon(&mut self) {
         if !self.next_is(SyntaxKind::Id) {
             return;
@@ -43,7 +41,6 @@ impl Parser<'_, '_> {
 
         self.bump();
 
-        // `at` skips trivia, so this handles `@x : Type` with space
         if self.at(SyntaxKind::Id) {
             self.bump();
         }
@@ -51,9 +48,6 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// Negated field assertion: `-field` (field must be absent)
-    ///
-    /// Also accepts deprecated `!field` syntax with a warning.
     pub(crate) fn parse_negated_field(&mut self) {
         self.start_node(SyntaxKind::NegatedField);
 
@@ -80,8 +74,6 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// Disambiguate `field: pattern` from bare identifier via LL(2) lookahead.
-    /// Also handles `field = pattern` typo (should be `field: pattern`).
     pub(crate) fn parse_id_or_field(&mut self) {
         if self.next_is(SyntaxKind::Colon) {
             self.parse_field();
@@ -93,7 +85,6 @@ impl Parser<'_, '_> {
             return;
         }
 
-        // Bare identifiers are not valid patterns; patterns require parentheses
         let span = self.current_span();
         let text = self.current_text();
         let replacement = format!("({text})");
@@ -108,7 +99,6 @@ impl Parser<'_, '_> {
         self.bump_as_error();
     }
 
-    /// Field constraint: `field_name: pattern`
     pub(crate) fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
@@ -126,7 +116,6 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// Handle `field = pattern` typo - parse as Field but emit error.
     pub(crate) fn parse_field_equals_typo(&mut self) {
         self.start_node(SyntaxKind::Field);
 
@@ -171,10 +160,9 @@ impl Parser<'_, '_> {
 
         let end = self.consume_dotted_capture_tail(span.end());
         let full_span = TextRange::new(span.start(), end);
-        let name = &source[usize::from(span.start()) + 1..usize::from(end)]; // strip @ prefix
+        let name = &source[usize::from(span.start()) + 1..usize::from(end)];
         self.validate_capture_name(Ident::new(name, full_span));
 
-        // Capture types are only valid on regular captures.
         if is_capture {
             if self.at(SyntaxKind::DoubleColon) {
                 self.parse_capture_type();
@@ -191,10 +179,6 @@ impl Parser<'_, '_> {
         Some(TextRange::new(span.start(), capture_end))
     }
 
-    /// Tree-sitter style captures (`@foo.bar`, `@foo-bar`) lex as `@foo` `.`/`-` `bar`.
-    /// Consume directly adjacent `.ident`/`-ident` runs into an Error node so the
-    /// whole thing is diagnosed as one malformed capture name, not as an anchor or
-    /// negated field followed by a bare identifier. Returns the capture's end offset.
     fn consume_dotted_capture_tail(&mut self, mut end: TextSize) -> TextSize {
         let dotted_segment = |p: &Self, end: TextSize| {
             let sep = p
@@ -217,8 +201,8 @@ impl Parser<'_, '_> {
 
         self.start_node(SyntaxKind::Error);
         while let Some(segment_end) = dotted_segment(self, end) {
-            self.bump(); // separator
-            self.bump(); // identifier
+            self.bump();
+            self.bump();
             end = segment_end;
         }
         self.finish_node();

@@ -1,24 +1,3 @@
-//! Parser infrastructure for the query language.
-//!
-//! This parser produces a lossless concrete syntax tree (CST) via Rowan's green tree builder.
-//! Key design decisions borrowed from rust-analyzer, rnix-parser, and taplo:
-//!
-//! - Zero-copy parsing: tokens carry spans, text sliced only when building tree nodes
-//! - Trivia buffering: whitespace/comments collected, then attached as leading trivia
-//! - Checkpoint-based wrapping: retroactively wrap nodes for quantifiers `*+?`
-//! - Explicit recovery sets: per-production sets determine when to bail vs consume diagnostics
-//!
-//! # Recovery Strategy
-//!
-//! The parser is resilient — it always produces a tree. Recovery follows these rules:
-//!
-//! 1. Unknown tokens get wrapped in `SyntaxKind::Error` nodes and consumed
-//! 2. Missing expected tokens emit a diagnostic but don't consume (parent may handle)
-//! 3. Recovery sets define "synchronization points" per production
-//! 4. On recursion limit, remaining input goes into single Error node
-//!
-//! However, fuel exhaustion (parse_fuel, recursion_fuel) returns an actual error immediately.
-
 pub use crate::compiler::diagnostics::Error;
 
 pub(crate) mod ast;
@@ -78,11 +57,6 @@ pub fn parse_input_kind(source: crate::compiler::Source<'_>) -> Result<InputKind
     Ok(InputKind::Expression)
 }
 
-/// Parse one lossless query CST with caller-owned diagnostics and resource limits.
-///
-/// Syntax diagnostics remain in `diagnostics`; only fatal parser resource failures
-/// are returned. Callers decide whether recovery trees are acceptable at their
-/// boundary.
 pub(crate) fn parse_lossless(
     source: &str,
     source_id: crate::compiler::diagnostics::SourceId,

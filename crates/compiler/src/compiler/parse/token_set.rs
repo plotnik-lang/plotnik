@@ -1,10 +1,3 @@
-//! Parser recovery policy: FIRST and recovery sets over `SyntaxKind`.
-//!
-//! `TokenSet` is a 128-bit bitset of syntax kinds for O(1) membership testing;
-//! the consts below are the parser's per-production FIRST and recovery sets.
-//! This is parser policy, not shared CST data — only the parser reads it, so it
-//! lives next to the parser rather than in the CST module.
-
 use rowan::Language;
 
 use crate::compiler::parse::cst::SyntaxKind::*;
@@ -15,12 +8,10 @@ const _: () = assert!(
     "SyntaxKind count exceeds TokenSet capacity"
 );
 
-/// 128-bit bitset of `SyntaxKind`s for O(1) membership testing.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TokenSet(u128);
 
 impl TokenSet {
-    /// Panics at compile time if any kind's discriminant >= 128.
     #[inline]
     pub const fn new(kinds: &[SyntaxKind]) -> Self {
         let mut bits = 0u128;
@@ -56,9 +47,6 @@ impl std::fmt::Debug for TokenSet {
     }
 }
 
-/// FIRST set of pattern. `At` excluded (captures wrap, not start).
-/// `UnterminatedString` included so every pattern position reports
-/// it as an unclosed string instead of a generic unexpected token.
 pub const PATTERN_FIRST_TOKENS: TokenSet = TokenSet::new(&[
     ParenOpen,
     BracketOpen,
@@ -76,7 +64,6 @@ pub const PATTERN_FIRST_TOKENS: TokenSet = TokenSet::new(&[
     KwMissing,
 ]);
 
-/// FIRST set for root-level patterns. Excludes anchors/`Negation` (tree-internal).
 pub const ROOT_PATTERN_FIRST_TOKENS: TokenSet = TokenSet::new(&[
     ParenOpen,
     BracketOpen,

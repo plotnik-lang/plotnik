@@ -68,8 +68,6 @@ fn discover(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn parse_query<'a>(raw: &'a str, path: &Path) -> &'a str {
-    // The query is everything before the `TOKENS` rule; the dump after it is
-    // regenerated, so only the boundary matters.
     let mut offset = 0;
     for line in raw.split_inclusive('\n') {
         if is_tokens_rule(line) {
@@ -83,8 +81,6 @@ fn parse_query<'a>(raw: &'a str, path: &Path) -> &'a str {
     )
 }
 
-/// A column-zero, space-padded ` TOKENS ` rule — the shape `TOKENS_RULE` emits.
-/// The padding keeps authored query bytes like `-tokens-` out of the boundary.
 fn is_tokens_rule(line: &str) -> bool {
     let line = line.trim_end();
     line.starts_with('-')
@@ -96,8 +92,6 @@ fn is_tokens_rule(line: &str) -> bool {
             .is_some_and(|label| label.trim().eq_ignore_ascii_case("tokens"))
 }
 
-/// The rule that separates the authored query from the generated token dump —
-/// `tokens` centered in a 50-column dash rule.
 const TOKENS_RULE: &str = "--------------------- TOKENS ---------------------";
 
 fn canonical(query: &str, tokens: &str) -> String {

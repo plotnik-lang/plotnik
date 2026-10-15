@@ -1,14 +1,6 @@
-//! Syntax kinds for the query language.
-//!
-//! `SyntaxKind` serves dual roles: token kinds (from lexer) and node kinds (from parser).
-//! Logos derives token recognition; node kinds lack token/regex attributes.
-//! `QueryLang` implements Rowan's `Language` trait for tree construction.
-
 use logos::Logos;
 use rowan::Language;
 
-/// All token and node kinds. Tokens first, then nodes, then `__LAST` sentinel.
-/// `#[repr(u16)]` enables safe transmute in `kind_from_raw`.
 #[derive(Logos, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum SyntaxKind {
@@ -30,7 +22,6 @@ pub enum SyntaxKind {
     #[token("}")]
     BraceClose,
 
-    /// `::` for capture types. Longest match wins over `Colon`.
     #[token("::")]
     DoubleColon,
 
@@ -58,44 +49,32 @@ pub enum SyntaxKind {
     #[token("?")]
     Question,
 
-    /// Lazy `*?` quantifier.
     #[token("*?")]
     StarQuestion,
 
-    /// Lazy `+?` quantifier.
     #[token("+?")]
     PlusQuestion,
 
-    /// Lazy `??` quantifier.
     #[token("??")]
     QuestionQuestion,
 
-    /// Slash for tree-sitter supertype paths: `(expression/binary_expression)`
     #[token("/")]
     Slash,
 
-    /// Hash for native category syntax: `(expression#)` and `(expression#binary_expression)`.
-    /// Always a bare `#`; the subtype after it is a normal `Id`, so `#sub` and `/sub` share
-    /// one grammar. A misplaced `#` (e.g. a tree-sitter `#eq?` predicate) is diagnosed by the
-    /// parser, not the lexer.
     #[token("#")]
     Hash,
 
-    /// Comma (invalid separator, for error recovery)
     #[token(",")]
     Comma,
 
-    /// Pipe (invalid separator, for error recovery)
     #[token("|")]
     Pipe,
 
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
     #[regex(r"'(?:[^'\\]|\\.)*'")]
     #[doc(hidden)]
-    StringLiteral, // Lexer-internal only
+    StringLiteral,
 
-    /// String with no closing quote before end of line. Closed strings always
-    /// match longer, so this only wins when no closing quote exists.
     #[regex(r#""(?:[^"\\\n]|\\[^\n])*"#)]
     #[regex(r"'(?:[^'\\\n]|\\[^\n])*")]
     UnterminatedString,
@@ -110,8 +89,6 @@ pub enum SyntaxKind {
     #[token("MISSING")]
     KwMissing,
 
-    /// Identifier. Accepts dots/hyphens for tree-sitter compat; parser validates per context.
-    /// Keywords win over this regex via logos's higher literal-token priority.
     #[regex(r"[a-zA-Z][a-zA-Z0-9_.\-]*")]
     Id,
 
@@ -121,15 +98,12 @@ pub enum SyntaxKind {
     #[token(".")]
     Dot,
 
-    /// Regular capture: @name
     #[regex(r"@[a-zA-Z][a-zA-Z0-9_]*")]
     CaptureToken,
 
-    /// Discard: @_ or @_name
     #[regex(r"@_[a-zA-Z0-9_]*")]
     DiscardToken,
 
-    /// Bare @ (for error recovery: "capture without target")
     #[token("@")]
     At,
 
@@ -159,31 +133,23 @@ pub enum SyntaxKind {
     #[token("$=")]
     OpEndsWith,
 
-    /// Longest match wins over `Star`.
     #[token("*=")]
     OpContains,
 
-    /// `=~` for predicate regex match (when followed by string or error)
     #[token("=~")]
     OpRegexMatch,
 
-    /// `!~` for predicate regex no-match (when followed by string or error)
     #[token("!~")]
     OpRegexNoMatch,
 
-    /// `=~` followed by regex literal: `=~ /pattern/`
-    /// Compound token to avoid `//` being lexed as line comment.
     #[regex(r"=~[ \t\r\n]*/", lex_regex_predicate)]
     RegexPredicateMatch,
 
-    /// `!~` followed by regex literal: `!~ /pattern/`
     #[regex(r"!~[ \t\r\n]*/", lex_regex_predicate)]
     RegexPredicateNoMatch,
 
-    /// Regex literal token (after splitting compound predicate)
     RegexLiteral,
 
-    /// Coalesced unrecognized characters
     Garbage,
     Error,
 
@@ -204,19 +170,15 @@ pub enum SyntaxKind {
     Anchor,
     NegatedField,
     Def,
-    /// Predicate on a node: `(identifier == "foo")`
     NodePredicate,
     Regex,
 
-    // Must be last - used for bounds checking in `kind_from_raw`
     #[doc(hidden)]
     __LAST,
 }
 
 use SyntaxKind::*;
 
-/// Logos callback for regex predicate tokens.
-/// Called after matching `=~\s*/` or `!~\s*/`, consumes until closing unescaped `/`.
 fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
     let remaining = lexer.remainder();
     let mut backslash_count = 0;
@@ -234,9 +196,6 @@ fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
         backslash_count = if c == '\\' { backslash_count + 1 } else { 0 };
     }
 
-    // No closing slash on this line: stop at the line end so the rest of the
-    // file still lexes (an unclosed regex must not swallow every following
-    // definition); the parser reports the unclosed literal.
     lexer.bump(line_end);
     true
 }
@@ -260,7 +219,6 @@ impl From<SyntaxKind> for rowan::SyntaxKind {
     }
 }
 
-/// Language tag for Rowan's tree types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QueryLang {}
 

@@ -32,7 +32,6 @@ impl<'q> Parser<'q, '_> {
         ident
     }
 
-    /// Capture names are strictly snake_case: they become result fields.
     pub(crate) fn validate_capture_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if name.contains(['.', '-']) || name.chars().any(|c| c.is_ascii_uppercase()) {
@@ -45,7 +44,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Definition names are PascalCase because they name result types.
     pub(crate) fn validate_def_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if !starts_uppercase(name) || name.contains(['_', '-', '.']) {
@@ -56,8 +54,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Alternative labels are PascalCase (they become variant cases).
-    /// Lowercase labels take a separate parse path; this only checks separators.
     pub(crate) fn validate_alternative_label(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if name.contains(['_', '-', '.']) {
@@ -70,7 +66,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Field names are snake_case (tree-sitter grammar convention).
     pub(crate) fn validate_field_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if name.contains(['.', '-']) || starts_uppercase(name) {
@@ -83,8 +78,6 @@ impl<'q> Parser<'q, '_> {
         }
     }
 
-    /// Custom capture types are PascalCase. Lowercase identifiers are complete
-    /// syntax here so analysis can recognize built-ins and diagnose unknown ones.
     pub(crate) fn validate_capture_type_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         let malformed = name.contains(['.', '-']) || starts_uppercase(name) && name.contains('_');

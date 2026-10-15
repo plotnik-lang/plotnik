@@ -1,19 +1,9 @@
-//! Lexer for the query language.
-//!
-//! Produces span-based tokens without storing text - text is sliced from source only when needed.
-//!
-//! ## Error handling
-//!
-//! The lexer coalesces consecutive error characters into single `Garbage` tokens rather
-//! than producing one error per character. This keeps the token stream manageable for malformed input.
-
 use logos::Logos;
 use rowan::TextRange;
 use std::ops::Range;
 
 use super::cst::SyntaxKind;
 
-/// Zero-copy token: kind + span, text retrieved via [`token_text`] when needed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token {
     pub(crate) kind: SyntaxKind,
@@ -51,15 +41,7 @@ impl<'q> Lexeme<'q> {
     }
 }
 
-/// Tokenizes source into a vector of span-based tokens.
-///
-/// Post-processes the Logos output:
-/// - Coalesces consecutive lexer errors into single `Garbage` tokens
-/// - Splits `StringLiteral` tokens into quote + content + quote
-/// - Splits `RegexPredicateMatch`/`RegexPredicateNoMatch` into operator + whitespace + regex
 pub fn lex(source: &str) -> Vec<Token> {
-    // Every token spans at least one byte, so source.len() bounds the count;
-    // the divisor approximates the average bytes per token.
     let mut tokens = Vec::with_capacity(source.len() / 4 + 8);
     let mut lexer = SyntaxKind::lexer(source);
     let mut error_start: Option<usize> = None;
@@ -119,7 +101,6 @@ pub fn lex(source: &str) -> Vec<Token> {
     tokens
 }
 
-/// Splits a string literal token into: quote + content + quote
 fn split_string_literal(lexeme: Lexeme<'_>, tokens: &mut Vec<Token>) {
     let quote_char = lexeme
         .text
@@ -150,10 +131,6 @@ fn split_string_literal(lexeme: Lexeme<'_>, tokens: &mut Vec<Token>) {
     tokens.push(Token::new(quote_kind, range_to_text_range(end - 1..end)));
 }
 
-/// Splits a regex predicate token into: operator + whitespace (if any) + regex literal
-///
-/// Input: `=~ /pattern/` or `!~ /pattern/`
-/// Output: `OpRegexMatch`/`OpRegexNoMatch` + `Whitespace`? + `RegexLiteral`
 fn split_regex_predicate(lexeme: Lexeme<'_>, op_kind: SyntaxKind, tokens: &mut Vec<Token>) {
     let start = lexeme.start();
     let end = lexeme.end();
@@ -178,15 +155,11 @@ fn split_regex_predicate(lexeme: Lexeme<'_>, op_kind: SyntaxKind, tokens: &mut V
     ));
 }
 
-/// Retrieves the text slice for a token. O(1) slice into source.
 #[inline]
 pub fn token_text<'q>(source: &'q str, token: &Token) -> &'q str {
     &source[std::ops::Range::<usize>::from(token.span)]
 }
 
-/// Render the non-trivia token stream as one `Kind "text"` line per token.
-///
-/// `Token.kind` is `pub(crate)`, so a downstream test cannot format the stream itself.
 #[cfg(test)]
 pub(super) fn dump_tokens(source: &str) -> String {
     let mut out = String::new();

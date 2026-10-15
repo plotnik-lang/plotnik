@@ -59,7 +59,6 @@ impl Parser<'_, '_> {
         self.at_ts(ROOT_PATTERN_FIRST_TOKENS)
     }
 
-    /// Named pattern definition: `Name = pattern`
     fn parse_def(&mut self) {
         self.start_node(SyntaxKind::Def);
 

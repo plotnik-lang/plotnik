@@ -11,7 +11,6 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// `"if"` | `'+'`
     pub(crate) fn parse_string_pattern(&mut self) {
         let start = self.current_span().start();
         self.start_node(SyntaxKind::Str);
@@ -46,8 +45,6 @@ impl Parser<'_, '_> {
         }
     }
 
-    /// Consume string tokens (quote + optional content + quote) without creating a node.
-    /// Used for contexts where string appears as a raw value (supertype, MISSING arg).
     pub(crate) fn skip_string_tokens(&mut self) {
         let open_quote = self.current();
         self.bump();
@@ -66,7 +63,6 @@ impl Parser<'_, '_> {
         self.bump();
     }
 
-    /// `.` or `.!` anchor
     pub(crate) fn parse_anchor(&mut self) {
         self.start_node(SyntaxKind::Anchor);
         if self.at(SyntaxKind::DotBang) {
