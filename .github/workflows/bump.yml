@@ -56,8 +56,6 @@ jobs:
           tomato set workspace.package.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-compiler.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-runtime.version "$next" Cargo.toml
-          # explicit path+version dependencies (default-features / feature overrides
-          # that can't inherit from the workspace) need local version bumps too
           tomato set dependencies.plotnik-compiler.version "$next" crates/cli/Cargo.toml
           tomato set dependencies.plotnik-compiler.version "$next" crates/macros/Cargo.toml
           tomato set dependencies.plotnik-runtime.version "$next" crates/macros/Cargo.toml

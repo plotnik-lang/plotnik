@@ -89,9 +89,6 @@ test-codegen-rust:
 		--no-fail-fast
 
 shot:
-	@# See AGENTS.md for diagnostic guidelines
-	@# SHOT=1 updates custom inline snapshots; TRYBUILD=overwrite updates .stderr snapshots.
-	@# The first run also records pending Insta snapshots, which cargo insta then accepts.
 	@SHOT=1 TRYBUILD=overwrite cargo test \
 		--workspace \
 		--lib \

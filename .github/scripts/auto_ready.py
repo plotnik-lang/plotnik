@@ -5,13 +5,7 @@ Runs after an issue closes (GitHub `issues: closed`). For every issue the closed
 one was blocking, if all of that issue's blockers are now closed and its board
 Status is Backlog, set it to Ready. In progress / Done / Ready are never touched.
 
-The "issue closed -> Done" leg is handled by the project's built-in workflow; this
-fills the dependency-driven "blocker closed -> Ready" leg, which Projects has no
-built-in for.
-
-Everything goes through the GraphQL API directly (not the `gh` CLI), so it does
-not depend on the runner's bundled gh version. Set DRY_RUN=1 to log decisions
-without changing the board.
+Set DRY_RUN=1 to log decisions without changing the board.
 
 Required environment:
   GH_TOKEN          PAT with org Projects (read & write) + repo Issues (read)
@@ -47,7 +41,6 @@ def graphql(query, **variables):
 
 
 def blocked_by_closed(owner, name, number):
-    """Issue numbers that the just-closed issue was blocking."""
     data = graphql(
         """
         query($owner:String!, $name:String!, $n:Int!){
@@ -61,10 +54,6 @@ def blocked_by_closed(owner, name, number):
 
 
 def dependent_state(owner, name, number, project_id):
-    """(state, open_blocker_count, item_id, board_status) for one issue.
-
-    item_id / board_status describe its card on the given project (None if absent).
-    """
     data = graphql(
         """
         query($owner:String!, $name:String!, $n:Int!){

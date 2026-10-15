@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# Sourced by orb setup and repository-scoped login shells, not local development.
-# Keep debug assertions and overflow checks; omit only compiler debug information.
 export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-0}"
 export CARGO_PROFILE_TEST_DEBUG="${CARGO_PROFILE_TEST_DEBUG:-0}"
 
@@ -33,8 +31,6 @@ _plotnik_orb_jobs="$(
         done
     done
 
-    # Start conservatively: reserve 25% of the budget, then allow 2 GiB per job.
-    # One job is the minimum; this is a concurrency cap, not an OOM guarantee.
     jobs=$((memory * 3 / 4 / (2 * 1024 * 1024 * 1024)))
     ((jobs > 0)) || jobs=1
     ((jobs <= cpus)) || jobs="$cpus"

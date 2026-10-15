@@ -1,18 +1,8 @@
 name: Auto-ready unblocked issues
 
-# When an issue closes, any issue it was blocking whose blockers are now ALL
-# closed is promoted Backlog -> Ready on the Plotnik project board.
-#
-# Projects has no built-in automation for dependency-driven status changes, so
-# this "blocker -> Ready" leg lives here. The "issue closed -> Done" leg is
-# handled by the project's built-in "Item closed" workflow.
-#
-# Logic lives in .github/scripts/auto_ready.py (GraphQL-only, stdlib-only).
-
 on:
   issues:
     types: [closed]
-  # Manual hook for testing / re-running against an already-closed issue.
   workflow_dispatch:
     inputs:
       issue_number:
