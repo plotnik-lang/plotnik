@@ -1,19 +1,6 @@
 //! WebAssembly bindings for playground and editor integrations.
 //!
-//! A thin shim over `plotnik_compiler`, in three modules:
-//! - `lib.rs` — the `#[wasm_bindgen]` surface (`Session`, `tree`, `tokenize`)
-//!   and query execution
-//! - `langs` — the feature-gated language registry
-//! - `wire` — every JSON payload that crosses to JS, mirrored by the
-//!   playground's `protocol.ts`
-//!
-//! The API is session-based and fine-grained on purpose (compile per query
-//! edit, run per source edit, trace only when a debugger asks) — see
-//! `docs/wip/playground-design.md` §6.
-//!
-//! Boundary rule: query text, source text, and language names are user
-//! input — failures come back as `{error}` payloads or a rejected `compile`,
-//! never a panic. Past that validation the engine is trusted and asserts.
+//! Payload offsets are UTF-8 byte offsets into the supplied text.
 
 mod langs;
 mod wire;
@@ -100,6 +87,7 @@ impl Session {
         })
     }
 
+    /// Query diagnostics and metadata. Query spans are empty without bytecode.
     pub fn info(&self) -> JsValue {
         to_js(&self.info)
     }
@@ -131,6 +119,8 @@ impl Session {
     }
 
     /// Run the compiled query against source text.
+    /// Returns a result with provenance on success, or `{error}` on failure,
+    /// including when no match is found.
     pub fn run(&self, source: &str, entry: Option<String>) -> JsValue {
         let value = self.execute(source, entry.as_deref(), TraceMode::None);
         to_js(&value)

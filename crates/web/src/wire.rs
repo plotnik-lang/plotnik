@@ -1,14 +1,3 @@
-//! JSON payloads crossing the wasm boundary.
-//!
-//! Single source of truth for the wire shapes, mirrored by hand in the
-//! playground's `web/src/components/playground/protocol.ts` — change the two
-//! together. Payloads are assembled as `serde_json::Value` and handed to JS
-//! through [`to_js`] (plain objects, not the ES Maps serde-wasm-bindgen
-//! defaults to).
-//!
-//! Offsets in any payload are byte offsets into the exact text the caller
-//! passed in; the web side converts to UTF-16 at its edge (`byte-offsets.ts`).
-
 use plotnik_compiler::bytecode::{
     Entrypoint, Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind,
 };
@@ -18,8 +7,6 @@ use plotnik_compiler::{
 use serde_json::{Map, Value as JsonValue, json};
 use wasm_bindgen::JsValue;
 
-/// Serialize an engine-produced value, asserting success: everything past
-/// query validation is trusted, including its serializability.
 macro_rules! json_value {
     ($value:expr) => {
         serde_json::to_value($value).expect("wasm bundle value serializes")
@@ -27,9 +14,7 @@ macro_rules! json_value {
 }
 pub(crate) use json_value;
 
-/// Inputs for the `Session::info()` payload (`SessionInfo` in protocol.ts).
 pub struct InfoParts<'a> {
-    /// `None` when the query didn't produce bytecode (query spans come back empty).
     pub module: Option<&'a Module>,
     pub query_tokens: JsonValue,
     pub diagnostics: JsonValue,
@@ -41,7 +26,6 @@ pub struct InfoParts<'a> {
 
 pub fn info_json(parts: InfoParts) -> JsonValue {
     json!({
-        // Reserved for the first compatibility-bearing release.
         "version": 0,
         "query_spans": parts.module.map(query_spans_json).unwrap_or_else(|| json!([])),
         "query_tokens": parts.query_tokens,
@@ -53,9 +37,6 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
     })
 }
 
-/// A finished run (`RunResult` in protocol.ts): result plus provenance on
-/// success, `{error}` otherwise ("no match" included), with the execution
-/// trace attached when tracing.
 pub fn result_json(
     module: &Module,
     entrypoint: &Entrypoint,
@@ -90,9 +71,6 @@ pub fn error_json(error: impl Into<String>) -> JsonValue {
     json!({ "error": error.into() })
 }
 
-/// The static query-span table (`QuerySpan[]` in protocol.ts): the hub the
-/// playground joins every view through — see `docs/wip/playground-design.md`
-/// §2. The array index is the SpanId.
 fn query_spans_json(module: &Module) -> JsonValue {
     let spans = module
         .spans()

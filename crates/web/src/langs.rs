@@ -1,14 +1,9 @@
-//! Tree-sitter languages compiled into the WASM bundle.
-//!
-//! `grammars.rs` supplies both the build inputs and the runtime registry.
-
 use plotnik_compiler::GrammarIdentity;
 use plotnik_compiler::grammar::Grammar;
 use tree_sitter::{Language, Parser, Tree};
 
-/// A parser and the grammar metadata used to compile queries against it.
 pub struct Lang {
-    // WASM language handles are thread-bound. Cache metadata, then create a handle per parser.
+    // Language is not Send/Sync on Wasm targets, so cache a factory rather than a handle.
     language: fn() -> Language,
     grammar: Grammar,
 }
@@ -61,7 +56,6 @@ macro_rules! define_grammars {
                 }
 
                 static LANGUAGE: std::sync::LazyLock<Lang> = std::sync::LazyLock::new(|| Lang {
-                    // The build script compiles this entry point from the same package as the JSON.
                     language: || unsafe { tree_sitter_language::LanguageFn::from_raw($symbol) }.into(),
                     grammar: load_grammar(
                         include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", stringify!($name)))),
@@ -95,7 +89,6 @@ macro_rules! define_grammars {
 
 include!("../grammars.rs");
 
-/// Resolve an exact canonical language name.
 pub fn resolve(input: &str) -> Result<&'static Lang, String> {
     if let Some(lang) = from_name(input) {
         return Ok(lang);
