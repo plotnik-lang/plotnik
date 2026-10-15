@@ -1,10 +1,3 @@
-//! Result type definitions shared between analysis and bytecode.
-//!
-//! This module provides the canonical type model used across:
-//! - Type checking/inference (`query::type_check`)
-//! - Bytecode emission and runtime (`bytecode`)
-//! - TypeScript code generation
-
 mod kind;
 mod primitives;
 

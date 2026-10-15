@@ -1,6 +1,6 @@
 use std::fs;
 
-use plotnik_compiler::bytecode::type_system::TYPE_NO_VALUE;
+use plotnik_compiler::bytecode::{TypeDefKind, TypeKind};
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 use plotnik_compiler::{
     BytecodeConfig, CodegenProvenance, GrammarIdentity, QueryBuilder, RustCodegenConfig,
@@ -51,11 +51,15 @@ pub(crate) fn source(case: &Case) -> Result<(String, bool), String> {
         .map_err(|error| format!("emit corpus metadata for `{}`: {error}", case.relative))?
         .into_artifact()
         .expect("valid corpus query emits bytecode");
-    let match_only = module
-        .entrypoint("Q")
-        .expect("corpus entry Q exists")
-        .result_type()
-        == TYPE_NO_VALUE.into();
+    let entry = module.entrypoint("Q").expect("corpus entry Q exists");
+    let result_type = module
+        .types()
+        .get(entry.result_type())
+        .expect("entrypoint result type belongs to its module");
+    let match_only = matches!(
+        result_type.decode(),
+        TypeDefKind::Primitive(TypeKind::NoValue)
+    );
 
     let emission = compiled
         .emit(

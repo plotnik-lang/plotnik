@@ -1,24 +1,16 @@
-//! Primitive (builtin) type definitions.
-//!
-//! These are the fundamental types that exist in every query,
-//! with fixed indices 0 through 3 reserved across analysis and bytecode.
+//! These indices belong to type analysis, not emitted type tables.
+//! Determine an emitted type's kind from its `TypeDef`.
 
-/// Index for the no-value sentinel.
 pub const TYPE_NO_VALUE: u16 = 0;
 
-/// Index for the Node type (Tree-sitter node reference).
 pub const TYPE_NODE: u16 = 1;
 
-/// Index for borrowed source text.
 pub const TYPE_TEXT: u16 = 2;
 
-/// Index for boolean values.
 pub const TYPE_BOOL: u16 = 3;
 
-/// First index available for user-defined/composite types.
 pub const TYPE_CUSTOM_START: u16 = 4;
 
-/// Builtin primitive types; no additional metadata in the type table.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]
 pub enum PrimitiveType {
@@ -53,7 +45,6 @@ impl PrimitiveType {
         index < TYPE_CUSTOM_START
     }
 
-    /// Get the display name for this primitive (for bytecode dumps).
     pub const fn name(self) -> &'static str {
         match self {
             Self::NoValue => "NoValue",

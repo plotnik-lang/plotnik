@@ -1,0 +1,107 @@
+Q = (_ (A) @a)
+
+A = (_
+  (Q)? @b
+)
+--------------------- INPUT ----------------------
+1;
+------------------- TYPESCRIPT -------------------
+export interface A {
+  b: Q | null;
+}
+
+export interface Q {
+  a: A;
+}
+--------------------- OUTPUT ---------------------
+{
+  "a": {
+    "b": null
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "A"
+S4 "Q"
+
+[type_defs]
+T0 = Record  M0:1  ; { a }
+T1 = Option(T0)  ; Q?
+T2 = Record  M1:1  ; { b }
+
+[type_members]
+M0: S1 → T2  ; a: A
+M1: S2 → T1  ; b: T1
+
+[type_names]
+N0: S3 → T2  ; A
+N1: S4 → T0  ; Q
+
+[entrypoints]
+A = 00 :: T2
+Q = 02 :: T0
+
+[instructions]
+A:
+  00   !   (_)                              24, 16
+
+Q:
+  02   !   (_) [RecordOpen]                 04
+  04  └‣─  (A)                              00 : 05
+  05  -ε-  [RecordClose]                    08
+  07  ...
+  08  ─‣┘  _ [RecordSet(M0)]                10
+  10                                        ▶
+  11  -ε-  [RecordClose]                    13
+  13  ─‣┘  _ [RecordSet(M1)]                15
+  15                                        ▶
+  16  -ε-  [Absent RecordSet(M1)]           15
+  18   !   (Q)                              02 : 11
+  19  -ε-  [RecordOpen]                     18
+  21  ──!  _                                19, 21
+  23  ...
+  24  └─!  _                                19, 21
+--------------------- TRACE ----------------------
+Q:
+  02       (_) [RecordOpen]                 04
+       ●   program
+  04       (A)                              00 : 05
+       ▶   (A)
+
+A:
+  00       (_)                              24, 16
+       ●   expression_statement
+  24       _                                19, 21
+       ●   number
+  19  -ε-  [RecordOpen]                     18
+  18       (Q)                              02 : 11
+       ▶   (Q)
+
+Q:
+  02       (_) [RecordOpen]                 04
+       ●   number
+  04       (A)                              00 : 05
+  24  ❮❮❮ 
+  21       _                                19, 21
+       ●   ;
+  19  -ε-  [RecordOpen]                     18
+  18       (Q)                              02 : 11
+       ▶   (Q)
+
+Q:
+  02       (_) [RecordOpen]                 04
+       ○   ;
+  21  ❮❮❮ 
+  21       _                                19, 21
+  00  ❮❮❮ 
+  16  -ε-  [Absent RecordSet(M1)]           15
+  15   ◀   (A)                              
+
+Q:
+  05  -ε-  [RecordClose]                    08
+  08       _ [RecordSet(M0)]                10
+       ●   program
+  10   ◀   (Q)                              ◼

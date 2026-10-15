@@ -2,10 +2,9 @@
 
 use tree_sitter::{Node, Tree};
 
-use crate::bytecode::type_system::TYPE_NO_VALUE;
 use crate::bytecode::{
     CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind,
-    EntryBoundary, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp,
+    EntryBoundary, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp, TypeDefKind, TypeKind,
 };
 
 use crate::core::{Colors, NodeFieldId};
@@ -148,7 +147,14 @@ impl<'s, 't> VM<'s, 't> {
         };
 
         // NoValue is the emitted match-only capability, not an absent capture.
-        if u16::from(entrypoint.result_type()) == TYPE_NO_VALUE {
+        let result_type = module
+            .types()
+            .get(entrypoint.result_type())
+            .expect("entrypoint result type belongs to its module");
+        if matches!(
+            result_type.decode(),
+            TypeDefKind::Primitive(TypeKind::NoValue)
+        ) {
             return Ok(Some(Value::Node(NodeValue::from_node(node, source))));
         }
 

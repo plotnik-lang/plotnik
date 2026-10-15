@@ -762,6 +762,70 @@ fn unified_diff(actual: &str, expected: &str) -> String {
 }
 
 #[test]
+fn public_apply_and_traverse_classify_results_by_type_kind() {
+    use serde_json::json;
+
+    for (path, expected_apply, expected_search) in [
+        (
+            "06-vm/recursion/zero_id_record.txt",
+            Some(json!({"a": {"b": null}})),
+            vec![json!({"a": {"b": null}}), json!({"a": {"b": null}})],
+        ),
+        (
+            "06-vm/definitions/captureless_program_root_is_match_only.txt",
+            Some(json!({"kind": "program", "text": "x;", "span": [0, 2]})),
+            vec![json!({"kind": "program", "text": "x;", "span": [0, 2]})],
+        ),
+        (
+            "06-vm/anchors_trailing/up_anchor_rejects_trailing_named_node.txt",
+            None,
+            vec![],
+        ),
+    ] {
+        let raw = fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests")
+                .join(path),
+        )
+        .unwrap();
+        let fixture = Fixture::parse(&raw).unwrap();
+        let lang = Lang::resolve(fixture.language());
+        let compiled = QueryBuilder::from_sources(fixture.collection().0)
+            .compile(lang.grammar())
+            .unwrap();
+        assert!(compiled.is_valid());
+        let module = compiled
+            .emit(BytecodeConfig::new())
+            .unwrap()
+            .into_artifact()
+            .unwrap();
+        let entry = module.entrypoint("Q").unwrap();
+        if path == "06-vm/recursion/zero_id_record.txt" {
+            assert_eq!(u16::from(entry.result_type()), 0);
+        }
+
+        let source = &fixture.program().unwrap().body;
+        let tree = lang.parse(source).unwrap();
+        let applied = VM::builder(source, &tree)
+            .build()
+            .apply(&module, &entry)
+            .unwrap()
+            .map(|value| serde_json::to_value(value).unwrap());
+        let searched = VM::builder(source, &tree)
+            .build()
+            .traverse(&module, entry)
+            .map(|value| serde_json::to_value(value.unwrap()).unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            (applied, searched),
+            (expected_apply, expected_search),
+            "{path}"
+        );
+    }
+}
+
+#[test]
 fn one_module_runs_named_and_expression_entrypoints() {
     let lang = Lang::resolve(Language::JavaScript);
     let mut storage = SourceMap::new();

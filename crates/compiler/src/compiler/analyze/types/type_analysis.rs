@@ -577,7 +577,7 @@ impl TypeAnalysis {
                 self.types.get(RESERVED_NO_VALUE_TYPE_ID.0 as usize),
                 Some(TypeEntry::ReservedNoValue)
             ),
-            "the bytecode no-value slot must remain reserved",
+            "the analysis no-value slot must remain reserved",
         );
         assert!(
             matches!(self.type_shape(TYPE_NODE), Some(TypeShape::Node)),
@@ -858,31 +858,30 @@ impl TypeAnalysisBuilder {
             deferred_unifications: Vec::new(),
         };
 
-        // Preserve bytecode primitive numbering without treating no-value flow as a type.
         builder.analysis.types.push(TypeEntry::ReservedNoValue);
         assert_eq!(
             builder.analysis.types.len(),
             TYPE_NODE.0 as usize,
-            "reserved type layout changed before interning `Node`; the bytecode primitive IDs \
+            "reserved type layout changed before interning `Node`; the analysis primitive IDs \
              require `Node` at TYPE_NODE"
         );
 
         let node_id = builder.intern_type(TypeShape::Node);
         assert_eq!(
             node_id, TYPE_NODE,
-            "reserved type layout assigned `Node` the wrong bytecode primitive ID"
+            "reserved type layout assigned `Node` the wrong analysis primitive ID"
         );
 
         let text_id = builder.intern_type(TypeShape::Text);
         assert_eq!(
             text_id, TYPE_TEXT,
-            "reserved type layout assigned `text` the wrong bytecode primitive ID"
+            "reserved type layout assigned `text` the wrong analysis primitive ID"
         );
 
         let bool_id = builder.intern_type(TypeShape::Bool);
         assert_eq!(
             bool_id, TYPE_BOOL,
-            "reserved type layout assigned `bool` the wrong bytecode primitive ID"
+            "reserved type layout assigned `bool` the wrong analysis primitive ID"
         );
 
         builder
