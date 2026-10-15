@@ -12,14 +12,7 @@ pub fn compute_layout(ir: &NfaGraph) -> Result<LayoutMap, EmitError> {
         return Ok(LayoutMap::empty());
     }
 
-    let layout = CacheAligned::layout(ir.instructions(), &entry_labels);
-
-    if layout.total_words() > u16::MAX as u32 {
-        return Err(EmitError::TooManyInstructionWords(
-            layout.total_words() as usize
-        ));
-    }
-    Ok(layout)
+    CacheAligned::layout(ir.instructions(), &entry_labels)
 }
 
 #[cfg(test)]

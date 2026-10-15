@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use crate::bytecode::{BYTECODE_WORD_SIZE, CodeAddr, SECTION_ALIGN as CACHE_LINE};
 
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
+use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::lower::ir::{InstructionIR, Label};
 
 struct BlockArena {
@@ -103,22 +104,32 @@ impl BlockArena {
         self.label_to_offset.insert(label, offset);
     }
 
-    fn finalize(self) -> LayoutMap {
+    fn finalize(self) -> Result<LayoutMap, EmitError> {
         let mut mapping = BTreeMap::new();
-        let mut max_word_end: u32 = 0;
+        let mut max_word_end: usize = 0;
 
         for (block_idx, block) in self.blocks.iter().enumerate() {
-            let block_base_addr = (block_idx * CACHE_LINE / BYTECODE_WORD_SIZE) as u32;
+            let block_base_addr = block_idx * CACHE_LINE / BYTECODE_WORD_SIZE;
             for placement in &block.placements {
-                let word_addr =
-                    block_base_addr + (placement.offset / BYTECODE_WORD_SIZE as u8) as u32;
-                mapping.insert(placement.label, CodeAddr::from(word_addr as u16));
-                let word_end = word_addr + (placement.size / BYTECODE_WORD_SIZE as u8) as u32;
+                let word_addr = block_base_addr + placement.offset as usize / BYTECODE_WORD_SIZE;
+                mapping.insert(placement.label, word_addr);
+                let word_end = word_addr + placement.size as usize / BYTECODE_WORD_SIZE;
                 max_word_end = max_word_end.max(word_end);
             }
         }
 
-        LayoutMap::new(mapping, max_word_end)
+        if max_word_end > u16::MAX as usize {
+            return Err(EmitError::TooManyInstructionWords(max_word_end));
+        }
+
+        let mapping = mapping
+            .into_iter()
+            .map(|(label, word_addr)| {
+                let addr = u16::try_from(word_addr).expect("layout word count was validated");
+                (label, CodeAddr::from(addr))
+            })
+            .collect();
+        Ok(LayoutMap::new(mapping, max_word_end as u32))
     }
 }
 
@@ -225,9 +236,12 @@ impl Graph {
 pub struct CacheAligned;
 
 impl CacheAligned {
-    pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutMap {
+    pub fn layout(
+        instructions: &[InstructionIR],
+        entries: &[Label],
+    ) -> Result<LayoutMap, EmitError> {
         if instructions.is_empty() {
-            return LayoutMap::empty();
+            return Ok(LayoutMap::empty());
         }
 
         let graph = Graph::build(instructions);
@@ -395,7 +409,7 @@ impl<'a> LayoutBuilder<'a> {
         }
     }
 
-    fn finish(self) -> LayoutMap {
+    fn finish(self) -> Result<LayoutMap, EmitError> {
         self.arena.finalize()
     }
 }
