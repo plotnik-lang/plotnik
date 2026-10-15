@@ -74,8 +74,6 @@ fn format_query_impl(source: &str, config: ParseConfig) -> FormatResult<(String,
             Ok(None)
         )
     };
-    // Preserve declaration eligibility when moving comments or removing blank
-    // lines, including comments with malformed language names.
     if !has_declaration(source) && has_declaration(&output) {
         output.insert(0, '\n');
     }

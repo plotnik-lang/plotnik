@@ -2,23 +2,11 @@ use rowan::TextRange;
 
 use super::Span;
 
-/// Diagnostic kinds ordered by priority (highest priority first).
-///
-/// When two diagnostics have overlapping spans, the higher-priority one
-/// suppresses the lower-priority one. This prevents cascading error noise.
-///
-/// Priority rationale:
-/// - Unclosed delimiters cause massive cascading errors downstream
-/// - Expected token errors are root causes the user should fix first
-/// - Invalid syntax usage is a specific mistake at a location
-/// - Naming validation errors are convention violations
-/// - Semantic errors assume valid syntax
-/// - Structural observations are often consequences of earlier errors
+/// Diagnostic kinds ordered by suppression priority (highest priority first).
+/// Span eligibility is determined by `Diagnostics::live`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticKind {
-    // UnclosedString/UnclosedRegex rank first: an unterminated literal swallows
-    // subsequent closing delimiters, so it is the root cause to show.
     UnclosedString,
     UnclosedRegex,
     UnclosedTree,
@@ -123,8 +111,6 @@ pub enum DiagnosticKind {
 
     MissingDefName,
 
-    // Placed last (lowest priority): emission reports these only when no
-    // earlier-stage error exists.
     TargetLimitExceeded,
     NoEntrypoints,
     EmptyQuery,
@@ -145,10 +131,8 @@ impl DiagnosticKind {
         }
     }
 
-    /// Whether this kind suppresses `other` when spans overlap.
-    ///
-    /// Uses enum discriminant ordering: lower position = higher priority.
-    /// A higher-priority diagnostic suppresses lower-priority ones in the same span.
+    /// Whether this kind has higher suppression priority than `other`.
+    /// This comparison does not check span eligibility.
     pub fn suppresses(&self, other: &DiagnosticKind) -> bool {
         self < other
     }
@@ -439,7 +423,6 @@ impl DiagnosticKind {
     /// Template for custom messages; `{}` is replaced by the caller-provided detail.
     pub fn template(&self) -> String {
         match self {
-            // The detail IS the full message.
             Self::UnexpectedToken | Self::BareIdentifier => "{}".to_string(),
             Self::ExpectedSubtype | Self::TreeSitterSequenceSyntaxDeprecated => "{}".to_string(),
 
@@ -451,7 +434,6 @@ impl DiagnosticKind {
             }
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
-            // The detail leads with the specific conflict; the kind name is not prefixed.
             Self::IncompatibleTypes => "{}".to_string(),
             Self::UncollectedQuantifiedCaptures => "{}".to_string(),
             Self::CaptureWithoutSingleNode => "{}".to_string(),
@@ -487,7 +469,6 @@ impl DiagnosticKind {
             Self::BareSupertype => "`{}` is a supertype, not a node kind".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token and has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
-            // The detail, when present, is the crafted message; bare emits use the summary.
             Self::UnsatisfiablePattern | Self::QueryTooComplex => "{}".to_string(),
             Self::MixedAlternativeLabels => {
                 "an alternation cannot mix labeled and unlabeled alternatives: {}".to_string()
@@ -495,7 +476,6 @@ impl DiagnosticKind {
             Self::DuplicateAlternativeLabel => {
                 "alternative label `{}` is already used in this alternation".to_string()
             }
-            // The `EmitError` detail is already a complete message.
             Self::TargetLimitExceeded => "{}".to_string(),
             _ => format!("{}: {{}}", self.summary()),
         }
@@ -563,12 +543,7 @@ impl Related {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Diagnostic {
     pub(crate) kind: DiagnosticKind,
-    /// The range shown to the user (underlined in output).
     pub(crate) span: Span,
-    /// The range used for suppression logic. Errors within another error's
-    /// suppression_range may be suppressed. Defaults to `range` but can be
-    /// set to a parent context (e.g., enclosing tree span) for better cascading
-    /// error suppression.
     pub(crate) suppression_range: TextRange,
     pub(crate) message: String,
     pub(crate) fix: Option<Fix>,
@@ -577,7 +552,6 @@ pub(crate) struct Diagnostic {
 }
 
 impl Diagnostic {
-    /// New message with the kind's fallback text; `DiagnosticBuilder::detail` overrides it.
     pub(crate) fn new(kind: DiagnosticKind, span: Span) -> Self {
         Self {
             kind,

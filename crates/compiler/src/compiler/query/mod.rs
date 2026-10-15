@@ -1,5 +1,3 @@
-//! Query facade for Plotnik compilation.
-
 mod declaration;
 mod dump;
 mod input;

@@ -1,16 +1,7 @@
-//! Compiler-owned regex semantics.
-//!
-//! Analysis decides which syntax Plotnik accepts. This module then translates
-//! every accepted pattern once into a target-neutral HIR: Unicode-dependent
-//! constructs are expanded with the compiler's pinned tables, captures are
-//! erased, and word boundaries are fixed to ASCII semantics. Native and
-//! generated executors consume only that normalized form.
-
 use regex_automata::dfa::dense;
 use regex_automata::nfa::thompson;
 use regex_syntax::hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Look, Repetition};
 
-/// Resolve an analyzed pattern into the one semantic form every target uses.
 pub(crate) fn normalize(pattern: &str) -> Hir {
     let translated = regex_syntax::ParserBuilder::new()
         .utf8(true)
@@ -26,7 +17,6 @@ pub(crate) fn normalize(pattern: &str) -> Hir {
     normalized
 }
 
-/// Compile normalized HIR to native sparse-DFA bytes for Rust and bytecode.
 pub(in crate::compiler) fn compile_native_dfa(pattern: &Hir) -> Result<Vec<u8>, String> {
     let dense = build_dense(pattern)?;
     let sparse = dense.to_sparse().map_err(|error| error.to_string())?;

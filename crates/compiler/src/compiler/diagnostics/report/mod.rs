@@ -63,17 +63,6 @@ impl Diagnostics {
         self.messages.iter().filter(|d| d.is_error()).count()
     }
 
-    /// Returns diagnostics with cascading errors suppressed.
-    ///
-    /// All suppression is intra-file: offsets are per-source, so two diagnostics
-    /// are only ever compared when they share a `source`.
-    ///
-    /// Suppression rules:
-    /// 1. Containment: when error A's suppression_range contains error B's display range,
-    ///    and A has higher priority, suppress B (only for structural errors)
-    /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
-    /// 3. Consequence errors (MissingDefName) suppressed when any other error exists in the same source
-    /// 4. Adjacent: when error A ends exactly where error B starts, A suppresses B
     pub(crate) fn live(&self) -> Vec<&Diagnostic> {
         if self.messages.is_empty() {
             return Vec::new();
@@ -81,9 +70,6 @@ impl Diagnostics {
 
         let mut suppressed = vec![false; self.messages.len()];
 
-        // Rule 3: Suppress a consequence error only when a root diagnostic exists
-        // in its OWN source. A cascade is an intra-file phenomenon; a structural
-        // error in one file must not silence a real error in another.
         for (i, msg) in self.messages.iter().enumerate() {
             if !msg.kind.is_cascade_consequence() {
                 continue;
@@ -97,27 +83,20 @@ impl Diagnostics {
             }
         }
 
-        // O(n²) but n is typically small (< 100 diagnostics)
         for (i, a) in self.messages.iter().enumerate() {
             for (j, b) in self.messages.iter().enumerate() {
                 if i == j || suppressed[i] || suppressed[j] {
                     continue;
                 }
 
-                // Rules 1/2/4 below all compare raw offsets, which are only
-                // meaningful within one source. Never suppress across files.
                 if a.span.source != b.span.source {
                     continue;
                 }
 
-                // A warning never outranks an error
                 if a.is_warning() && b.is_error() {
                     continue;
                 }
 
-                // Rule 1: Structural error containment
-                // Only unclosed delimiters can suppress distant errors, because they cause
-                // cascading parse failures throughout the tree
                 let contains = a.suppression_range.start() <= b.span.range.start()
                     && b.span.range.end() <= a.suppression_range.end();
                 if contains && a.kind.is_structural_error() && a.kind.suppresses(&b.kind) {
@@ -126,9 +105,6 @@ impl Diagnostics {
                 }
 
                 if a.span.range.start() == b.span.range.start() {
-                    // Root cause errors (Expected*) suppress structural errors (Unclosed*)
-                    // even though structural errors have higher enum priority. This is because
-                    // ExpectedExpression is the actual mistake; UnclosedTree is a consequence.
                     if a.kind.is_root_cause_error() && b.kind.is_structural_error() {
                         suppressed[j] = true;
                         continue;
@@ -139,10 +115,6 @@ impl Diagnostics {
                     }
                 }
 
-                // Rule 4: Adjacent position - when A ends exactly where B starts,
-                // B is likely a consequence of A (e.g., `@x` where `@` is unexpected
-                // and `x` would be reported as bare identifier).
-                // Priority doesn't matter here - position determines causality.
                 if a.span.range.end() == b.span.range.start() {
                     suppressed[j] = true;
                 }

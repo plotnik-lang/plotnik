@@ -27,8 +27,6 @@ pub fn parse_grammar_declaration(
         Some((line, _)) => line.strip_suffix('\r').unwrap_or(line),
         None => source.content,
     };
-    // The comment lexer determines eligibility, including block-comment bounds.
-    // A declaration occupies the first physical line's sole comment.
     let mut lexer = SyntaxKind::lexer(line);
     let mut kind = lexer.next();
     if kind == Some(Ok(SyntaxKind::Whitespace)) {

@@ -1,5 +1,3 @@
-//! Builder-pattern printer for rendering diagnostics.
-
 use std::fmt::Write;
 
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};

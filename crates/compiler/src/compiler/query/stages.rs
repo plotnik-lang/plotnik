@@ -202,8 +202,6 @@ impl QueryParsed {
         let mut interner = Interner::new();
         let collected_definitions = resolve_names(&validated, &mut self.diag);
 
-        // A flat reference chain can recurse as deeply as a nested source tree, so it gets
-        // an explicit stack-depth ceiling and the same fatal recursion-limit outcome.
         let mut definitions = build_definition_graph(
             collected_definitions,
             &mut interner,
@@ -802,9 +800,6 @@ impl BindOutcome {
         }
     }
 
-    /// Emit failures without a precise location refer to participating syntax,
-    /// never an excluded source that happens to be first in original storage.
-    /// Prefer the execution expression, otherwise the first module syntax root.
     fn fallback_span(&self) -> Option<(SourceId, TextRange)> {
         let parsed = match self {
             Self::Bound(query) => &query.analyzed.parsed,

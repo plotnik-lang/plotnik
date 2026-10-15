@@ -1,5 +1,3 @@
-//! Test utilities.
-
 use std::sync::LazyLock;
 
 use crate::core::grammar::{Grammar, raw::RawGrammar};

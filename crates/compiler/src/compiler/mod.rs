@@ -1,9 +1,3 @@
-//! Plotnik compiler pipeline.
-//!
-//! Orchestrates parsing, analysis, lowering, and target emission
-//! into the `Query`/`QueryBuilder` pipeline. Pass internals stay under this
-//! module; the crate root re-exports only the facade-level API.
-
 mod analyze;
 pub(crate) mod diagnostics;
 mod fmt;

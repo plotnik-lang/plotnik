@@ -1,11 +1,3 @@
-//! Canonical serializable form of diagnostics.
-//!
-//! The WASM API returns diagnostics in this schema. Field semantics:
-//!
-//! - `code`: stable snake_case identifier derived from [`DiagnosticKind`]
-//! - `line`/`column`: 1-based; columns count Unicode scalar values
-//! - `offset`: byte offset into the source
-
 use serde::Serialize;
 
 use super::message::{DiagnosticKind, Severity};
@@ -13,6 +5,7 @@ use super::{SourceMap, message};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Diagnostic {
+    /// Stable snake_case diagnostic identifier.
     pub code: DiagnosticKind,
     pub severity: Severity,
     pub message: String,
@@ -35,8 +28,11 @@ pub struct Span {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Position {
+    /// One-based line number.
     pub line: u32,
+    /// One-based column measured in Unicode scalar values.
     pub column: u32,
+    /// Byte offset into the source.
     pub offset: u32,
 }
 

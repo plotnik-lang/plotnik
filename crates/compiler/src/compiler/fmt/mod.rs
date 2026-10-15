@@ -1,5 +1,3 @@
-//! Canonical formatting for Plotnik query source.
-
 mod comments;
 mod contract;
 mod format;

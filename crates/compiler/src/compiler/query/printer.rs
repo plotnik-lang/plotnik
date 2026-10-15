@@ -1,5 +1,3 @@
-//! AST/CST pretty-printer for debugging and test snapshots.
-
 use std::collections::BTreeMap;
 use std::fmt::Write;
 

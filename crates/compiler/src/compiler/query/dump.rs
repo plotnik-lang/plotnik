@@ -1,5 +1,3 @@
-//! String dump methods for query inspection.
-
 use crate::compiler::query::Query;
 
 impl Query {

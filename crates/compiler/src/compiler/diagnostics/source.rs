@@ -1,5 +1,3 @@
-//! Source storage for query compilation.
-
 /// Lightweight handle to a source in a compilation session.
 ///
 /// `Ord` follows insertion order (file index); diagnostics sort by it to group
