@@ -5,26 +5,19 @@ import {
 } from "shiki";
 import { plotnikGrammar } from "./plotnik-grammar";
 
-/* Syntax roles, colored from the jrnv Zed theme so the static panes match
-   the CodeMirror `tok-*`/`ptk-*` classes in global.css: one role, one color,
-   in both schemes. Keywords, operators, and field/property names stay ink
-   (the theme's signature), types are blue, strings green, constants/captures
-   purple, structure muted. Light string green is #3e8123 (theme's #448c27
-   misses AA on white). */
 interface SyntaxRoles {
-  /** Default code ink (node kinds, plain identifiers, keywords, operators). */
   fg: string;
-  /** Field names: a calmer ink, matching `tok-propertyName`. */
+
   field: string;
-  /** Punctuation and brackets. */
+
   punct: string;
-  /** Comments. */
+
   comment: string;
   capture: string;
   type: string;
-  /** String and regex literals. */
+
   value: string;
-  /** Numeric and boolean literals. */
+
   num: string;
   op: string;
 }
@@ -53,8 +46,6 @@ const rolesLight: SyntaxRoles = {
   op: "#000000",
 };
 
-/* One semantic role per color, the same in every pane, so the eye can follow
-   a capture from the query into the type and into the data. */
 function makeTheme(
   name: string,
   type: "dark" | "light",
@@ -96,7 +87,6 @@ function makeTheme(
         settings: { foreground: p.punct },
       },
 
-      /* plotnik */
       {
         scope: ["variable.capture.plotnik"],
         settings: { foreground: p.capture },
@@ -127,7 +117,6 @@ function makeTheme(
         settings: { foreground: p.op },
       },
 
-      /* TypeScript */
       {
         scope: [
           "entity.name.type",
@@ -145,7 +134,6 @@ function makeTheme(
         settings: { foreground: p.type },
       },
 
-      /* JSON: keys mirror the query's captures; span offsets stay quiet */
       {
         scope: ["support.type.property-name.json"],
         settings: { foreground: p.capture },
@@ -172,7 +160,6 @@ const highlighterPromise = createHighlighter({
   langs: [plotnikGrammar, "typescript", "json"],
 });
 
-/** A decorated range: an exact substring (nth occurrence) or a byte range. */
 export type MarkSpec = { class?: string } & (
   { find: string; occurrence?: number | "all" } | { start: number; end: number }
 );

@@ -7,60 +7,41 @@ import type {
   TreeResult,
 } from "./protocol";
 
-/* The playground's orchestration layer — and the only module that talks to
-   the worker client. It owns the worker lifetime and turns keystroke-level
-   inputs into settled engine results; components consume the returned state
-   and never call the client themselves.
-
-   Policy encoded here, in one place:
-   - one debounced latest-wins pipeline per engine call (compile / run / tree);
-   - run re-fires only after a successful compile actually swapped the worker
-     session (`compiled` object identity is the generation marker);
-   - stale-while-error: a query that stops producing bytecode keeps the last
-     good compile info and run output around, flagged `stale`
-     (docs/wip/playground-design.md §5). */
-
 export interface SessionInput {
   query: string;
   source: string;
   lang: string;
-  /** The user's entrypoint pick; null means "default" (last entrypoint).
-      A pick absent from the compiled query falls back, and comes back when
-      the entrypoint reappears. */
+
   entry: string | null;
-  /** Generated-code tab is visible and may request its lazy artifact. */
+
   generatedOpen: boolean;
 }
 
-/** A compile result paired with the exact text it describes: every offset in
-    `info` is relative to `query`, not to whatever the editor holds now. */
 export interface CompileOutcome {
   query: string;
   info: SessionInfo;
 }
 
-/** A dump paired with the exact source it describes (same pairing rule). */
 export interface TreeSnapshot {
   source: string;
   result: TreeResult;
 }
 
 export interface PlaygroundSession {
-  /** Engine worker is up; nothing fires before this. */
   ready: boolean;
-  /** A compile is scheduled or in flight. */
+
   compiling: boolean;
-  /** Pathological compiler failure; ordinary errors are `info.diagnostics`. */
+
   fatal: string | null;
-  /** Last good compile (kept through fatal ones). */
+
   compiled: CompileOutcome | null;
   generated: GeneratedCode | null;
   generating: boolean;
   entrypoints: string[];
-  /** Effective entrypoint after fallback; feed it back into the selector. */
+
   entry: string | null;
   runResult: RunResult | null;
-  /** `runResult` came from a query that no longer compiles to a module. */
+
   stale: boolean;
   tree: TreeSnapshot | null;
 }
@@ -171,16 +152,6 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
   };
 }
 
-/**
- * Debounced latest-wins pipeline: run `task` once `deps` have been quiet for
- * `delayMs`. A newer schedule invalidates every older one; the task must
- * gate its own state writes on `stillCurrent()` after each await. Returns
- * whether a run is scheduled or in flight.
- *
- * `deps` must list everything the task reads that should retrigger it — the
- * task closure itself is read through a ref (so it is never stale), but a
- * missing dep silently skips work.
- */
 function useDebouncedTask(
   enabled: boolean,
   delayMs: number,
@@ -193,10 +164,6 @@ function useDebouncedTask(
   taskRef.current = task;
   const seq = useRef(0);
 
-  /* Skip no-op writes: this effect re-runs on every dep change (every
-     keystroke), and an unconditional setState from a passive effect during
-     a burst of input counts toward React's nested-update limit — enough
-     consecutive keystrokes would trip "Maximum update depth exceeded". */
   const publishPending = useCallback((next: boolean) => {
     if (pendingRef.current === next) return;
     pendingRef.current = next;
@@ -218,11 +185,10 @@ function useDebouncedTask(
         });
     }, delayMs);
     return () => {
-      // Also covers unmount: bumping the sequence orphans in-flight results.
       seq.current += 1;
       clearTimeout(timer);
     };
-    // Scheduling is driven by the dep list alone; the task reads via ref.
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, delayMs, ...deps]);
 

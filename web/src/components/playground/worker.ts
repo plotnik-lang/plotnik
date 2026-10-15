@@ -8,14 +8,8 @@ import type {
   QueryToken,
 } from "./protocol";
 
-/* The engine side of the playground: owns the wasm instance and the one
-   compiled session. Deliberately a dumb pass-through — policy (debounce,
-   ordering, stale results) lives on the main thread in use-session.ts. */
-
 const wasmReady = init().then(() => undefined);
 
-/* The session survives failed recompiles: a query that stops compiling
-   must not take down the last good run target (stale-while-error). */
 let session: Session | null = null;
 
 const api: PlotnikApi = {

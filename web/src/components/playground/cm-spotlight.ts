@@ -21,14 +21,6 @@ import {
   type SpotlightSpec,
 } from "./spotlight";
 
-/* CodeMirror adapter for the spotlight: dispatch `setSpotlight` with UTF-16
-   document ranges (or null) and the editor dims everything outside them.
-   This is the editors' sink for the cross-view highlight fan-out — hover
-   sources dispatch here (via Playground), and plural ranges are first-class
-   because a single query construct can own many source images. The overlay
-   lives in scrollDOM, so it scrolls with the content; geometry and viewport
-   changes re-measure it. */
-
 export interface SpotlightRange {
   from: number;
   to: number;
@@ -57,16 +49,11 @@ const spotlightField = StateField.define<readonly SpotlightRange[] | null>({
   },
 });
 
-/** Clamp a spotlight range into the document (edits since the range was
-    computed can shrink it away entirely). */
 function clampToDoc(range: SpotlightRange, docLength: number): SpotlightRange {
   const from = Math.min(range.from, docLength);
   return { from, to: Math.min(Math.max(range.to, from), docLength) };
 }
 
-/* The region's line numbers stay under the veil (cutting them out would
-   read as part of the highlight) but render in stronger ink, so even
-   dimmed they stand apart from the other numbers. */
 const spotlightGutterMarker = new (class extends GutterMarker {
   elementClass = "cm-spotlightGutterLine";
 })();
@@ -109,8 +96,6 @@ const spotlightPlugin = ViewPlugin.fromClass(
     };
 
     constructor(view: EditorView) {
-      // scrollDOM is the positioning ancestor, so the layers scroll with the
-      // content (code-editor.tsx gives it position + isolation).
       this.spotlight = attachSpotlight(view.scrollDOM);
       this.measureReq = {
         read: (v) => this.read(v),
@@ -150,8 +135,7 @@ const spotlightPlugin = ViewPlugin.fromClass(
       const rects: RectLike[] = [];
       for (const region of regions) {
         const { from, to } = clampToDoc(region, doc.length);
-        // Positions outside the rendered viewport have no DOM to measure; the
-        // veil still covers them, and scrolling re-runs this read.
+
         const visFrom = Math.max(from, view.viewport.from);
         const visTo = Math.min(to, view.viewport.to);
         if (visFrom >= visTo) continue;

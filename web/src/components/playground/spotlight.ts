@@ -1,28 +1,3 @@
-/* Generic "spotlight" highlight, deliberately pane-agnostic: it knows
-   nothing about editors, dumps, or hover — callers translate their own
-   geometry into rects/specs. Consumers today: cm-spotlight.ts (CodeMirror
-   editors) and tree-dom.ts + tree-view.tsx (the source-tree pane); any future
-   pane that joins the cross-view highlight fan-out
-   (docs/wip/playground-design.md §3) should adapt itself to this module the
-   same way rather than invent another overlay.
-
-   Two layers share one hole path (the union of the focused text's per-line
-   rects — possibly from several disjoint ranges):
-
-   - lift: a filled copy of the hole, painted *below* the text, that raises
-     the focused region's background (light: to pure white, above the
-     off-white canvas). The pop comes from adding light to the region.
-   - veil: a full-pane rect masked by the hole, painted *above* the text, that
-     dims everything outside. Its color matches the canvas, so it washes out
-     the surrounding glyphs without dragging the background below the canvas.
-
-   Either layer can be a no-op per theme (transparent): dark keeps a darkening
-   veil and skips the lift; light leans on the lift and a canvas-colored veil.
-
-   The hole is outlined with circular fillets at every corner (convex and
-   concave), so the shape never shows a right angle even where lines of
-   different width meet. */
-
 export interface RectLike {
   left: number;
   top: number;
@@ -31,25 +6,20 @@ export interface RectLike {
 }
 
 export interface SpotlightGeometry {
-  /** Corner fillet radius; clamped per-corner to half the adjacent edges. */
   radius: number;
-  /** Horizontal breathing room around each line's glyphs. */
+
   padX: number;
-  /** Vertical breathing room above/below each blob. */
+
   padY: number;
-  /** Merge lines whose vertical gap is at most this; larger gaps split the
-      region into separate blobs (e.g. across a blank line). */
+
   bridge: number;
-  /** Left/right edges closer than this snap together to avoid micro-jogs. */
+
   snap: number;
 }
 
 export const SPOTLIGHT_GEOMETRY: SpotlightGeometry = {
-  /* Very subtle on purpose: enough that no corner is a right angle, not
-     enough to read as a pill. */
   radius: 3,
-  /* Kept tight: at monospace cell widths, more than ~1px starts swallowing
-     the neighboring glyph (worst on punctuation right at the edge). */
+
   padX: 1,
   padY: 2,
   bridge: 9,
@@ -63,8 +33,6 @@ interface Row {
   bottom: number;
 }
 
-/* Client rects come per text run (one per styled span); collapse them into
-   one rect per visual line before building the outline. */
 function mergeRows(rects: RectLike[]): Row[] {
   const sorted = rects
     .filter((r) => r.right - r.left > 0.01)
@@ -87,10 +55,6 @@ function mergeRows(rects: RectLike[]): Row[] {
 
 type Point = [number, number];
 
-/* Outline one blob of vertically contiguous rows, clockwise from the
-   top-left corner: across the top, down the right staircase, across the
-   bottom, up the left staircase. Jogs between rows are horizontal segments
-   at the shared row boundary, so the polygon is rectilinear. */
 function blobOutline(rows: Row[]): Point[] {
   const pts: Point[] = [];
   const first = rows[0];
@@ -109,7 +73,6 @@ function blobOutline(rows: Row[]): Point[] {
 }
 
 function simplify(pts: Point[]): Point[] {
-  // Drop zero-length edges (snapped jogs), then collinear middle points.
   const dedup: Point[] = [];
   for (const p of pts) {
     const prev = dedup[dedup.length - 1];
@@ -146,10 +109,6 @@ function simplify(pts: Point[]): Point[] {
 
 const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
 
-/* Replace every corner of the rectilinear outline with a circular fillet.
-   Cutting distance `d` back along both edges and joining with an arc of
-   radius `d` is tangent-continuous for convex and concave corners alike;
-   the sweep flag follows the turn direction (cross product, y-down). */
 function roundedPath(pts: Point[], radius: number): string {
   if (pts.length < 4) return "";
   const n = pts.length;
@@ -184,11 +143,6 @@ function roundedPath(pts: Point[], radius: number): string {
   return parts.join("");
 }
 
-/**
- * Build the spotlight hole path from raw client rects of the focused text
- * (already translated into overlay coordinates). Returns "" when nothing
- * remains to highlight.
- */
 export function spotlightPath(
   rects: RectLike[],
   geometry: SpotlightGeometry = SPOTLIGHT_GEOMETRY,
@@ -196,8 +150,6 @@ export function spotlightPath(
   const rows = mergeRows(rects);
   if (rows.length === 0) return "";
 
-  // Split into blobs of vertically contiguous rows that also overlap
-  // horizontally; disjoint pieces get their own rounded outline.
   const blobs: Row[][] = [];
   let blob: Row[] = [rows[0]];
   for (let i = 1; i < rows.length; i++) {
@@ -223,8 +175,7 @@ export function spotlightPath(
       top: r.top,
       bottom: r.bottom,
     }));
-    // Make rows contiguous (shared boundary at the midpoint of each gap),
-    // then pad the blob's outer edges.
+
     for (let i = 0; i < rows.length - 1; i++) {
       const boundary = (rows[i].bottom + rows[i + 1].top) / 2;
       rows[i].bottom = boundary;
@@ -232,7 +183,7 @@ export function spotlightPath(
     }
     rows[0].top -= geometry.padY;
     rows[rows.length - 1].bottom += geometry.padY;
-    // Nearly aligned edges snap together so the outline doesn't wiggle.
+
     for (let i = 0; i < rows.length - 1; i++) {
       if (Math.abs(rows[i].left - rows[i + 1].left) < geometry.snap) {
         const left = Math.min(rows[i].left, rows[i + 1].left);
@@ -254,12 +205,10 @@ export function spotlightPath(
 export interface SpotlightSpec {
   width: number;
   height: number;
-  /** Hole path in overlay coordinates; null hides the layers (with a fade). */
+
   path: string | null;
 }
 
-/** Spec that fades the spotlight out (the last hole shape is kept so the
-    exit transition doesn't jump). */
 export const HIDDEN_SPOTLIGHT: SpotlightSpec = {
   width: 0,
   height: 0,
@@ -271,12 +220,6 @@ export interface SpotlightHandle {
   destroy(): void;
 }
 
-/**
- * Attach a complete spotlight (lift + veil pair) inside `host`, which must
- * be the positioning ancestor of the highlighted content (both layers are
- * absolutely positioned at its origin; give the host its own stacking
- * context so the layers' z-indices stay scoped).
- */
 export function attachSpotlight(host: HTMLElement): SpotlightHandle {
   const lift = createLayer(host, "lift");
   const veil = createLayer(host, "veil");
@@ -296,18 +239,6 @@ let maskSeq = 0;
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-/**
- * Own one spotlight layer, appended to `parent`. `variant` picks which:
- *
- * - `"veil"` (`.spotlight-overlay`, layered above the text): a full-pane rect
- *   masked by the hole, plus a hairline `--spotlight-edge` along its boundary.
- * - `"lift"` (`.spotlight-lift`, layered below the text): a filled copy of the
- *   hole in `--spotlight-lift` that raises the region's background.
- *
- * `render` sizes the layer and swaps the hole. A null path fades the layer
- * out but keeps the last hole so the shape doesn't jump during the exit
- * transition.
- */
 function createLayer(
   parent: HTMLElement,
   variant: "veil" | "lift",
@@ -319,7 +250,7 @@ function createLayer(
   host.setAttribute("aria-hidden", "true");
 
   const svg = document.createElementNS(SVG_NS, "svg");
-  // Elements that track the pane size, and elements that track the hole path.
+
   const sizeEls: Element[] = [svg];
   const pathEls: Element[] = [];
 
@@ -340,8 +271,7 @@ function createLayer(
     const veil = document.createElementNS(SVG_NS, "rect");
     veil.setAttribute("fill", "var(--spotlight-veil)");
     veil.setAttribute("mask", `url(#${maskId})`);
-    /* Hairline along the hole boundary; --spotlight-edge decides per theme
-       how visible it is (transparent where the veil alone is enough). */
+
     const edge = document.createElementNS(SVG_NS, "path");
     edge.setAttribute("fill", "none");
     edge.setAttribute("stroke", "var(--spotlight-edge)");
@@ -369,7 +299,6 @@ function createLayer(
     }
     for (const el of pathEls) el.setAttribute("d", spec.path);
     if (host.style.opacity !== "1") {
-      // Let the hidden state paint once so the entry actually fades.
       raf = requestAnimationFrame(() => {
         host.style.opacity = "1";
       });
@@ -385,11 +314,6 @@ function createLayer(
   };
 }
 
-/**
- * Per-line sub-ranges of `[from, to)` with whitespace trimmed from both ends
- * of every line; all-whitespace lines drop out. This is what makes the
- * highlight hug glyphs instead of boxing indentation.
- */
 export function lineSegments(
   text: string,
   from: number,

@@ -5,12 +5,11 @@ export type PlotnikClient = Comlink.Remote<PlotnikApi>;
 
 export interface PlotnikClientHandle {
   api: PlotnikClient;
-  /** Tears the worker down; in-flight calls never settle after this. */
+
+  /** Comlink leaves calls without a handled worker response pending after disposal. */
   dispose(): void;
 }
 
-/** Spawn the engine worker and own its lifetime. One handle per mounted
-    playground; dispose on unmount or the worker (and its wasm heap) leaks. */
 export function createPlotnikClient(): PlotnikClientHandle {
   const worker = new Worker(new URL("./worker.ts", import.meta.url), {
     type: "module",

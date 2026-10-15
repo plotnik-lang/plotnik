@@ -1,13 +1,4 @@
-/* Wire types, mirrored by hand from the Rust side — every payload here is
-   assembled in `crates/web/src/wire.rs`; change the two together.
-
-   All offsets are BYTE offsets into the exact text that produced them;
-   convert with byte-offsets.ts at the point of use, never store UTF-16
-   offsets back into these shapes. (Diagnostics also carry line/column, where
-   column is a Unicode-scalar count — a third unit; the playground only ever
-   reads `offset`.) */
-
-/** `tokenize()` output — crates/compiler/src/compiler/parse/mod.rs `QueryToken`. */
+/** Wire offsets are UTF-8 bytes into the exact text that produced the payload. */
 export interface QueryToken {
   kind:
     | "whitespace"
@@ -23,8 +14,11 @@ export interface QueryToken {
 
 /** Diagnostics — crates/compiler/src/compiler/diagnostics/report/json.rs. */
 export interface WirePosition {
+  /** One-based line number. */
   line: number;
+  /** One-based column measured in Unicode scalar values. */
   column: number;
+  /** UTF-8 byte offset into the source. */
   offset: number;
 }
 
@@ -44,8 +38,7 @@ export interface WireDiagnostic {
   hints?: string[];
 }
 
-/** The static span table: the hub every future cross-view highlight joins
-    through (docs/wip/playground-design.md §2). The array index is the SpanId. */
+/** Static span table entry. The array index is the SpanId. */
 export interface QuerySpan {
   id: number;
   source_id: number;
@@ -135,9 +128,7 @@ export interface DumpNode {
 export type TreeResult =
   { error: string } | { chunks: DumpChunk[]; nodes: DumpNode[] };
 
-/** Worker API exposed via comlink: the full wasm surface, nothing more.
-    Orchestration (debounce, sequencing, caching) belongs in use-session.ts,
-    not here. */
+/** Worker API exposed via comlink. */
 export interface PlotnikApi {
   /** Resolves once the wasm module is instantiated. */
   ready(): Promise<void>;

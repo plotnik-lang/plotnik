@@ -1,13 +1,5 @@
 import type { LanguageRegistration } from "shiki";
 
-/**
- * Deliberately lexical TextMate grammar for plotnik query syntax.
- * Token-level only (no structural nesting): captures, node kinds,
- * PascalCase definitions/references, grammar fields, strings, predicates, quantifiers.
- * The tree-sitter grammar (separate repo) owns editor/playground
- * highlighting; this one feeds Shiki (site + docs) and, later,
- * GitHub linguist. Keep them in sync at the token level only.
- */
 export const plotnikGrammar: LanguageRegistration = {
   name: "plotnik",
   scopeName: "source.plotnik",
@@ -39,7 +31,6 @@ export const plotnikGrammar: LanguageRegistration = {
       ],
     },
     definition: {
-      // `Name =` at a definition site
       match: "\\b([A-Z][A-Za-z0-9_]*)\\s*(=)(?!=|~)",
       captures: {
         "1": { name: "entity.name.type.definition.plotnik" },
@@ -47,7 +38,6 @@ export const plotnikGrammar: LanguageRegistration = {
       },
     },
     "alternative-label": {
-      // `Tag:` labels an alternative inside `[...]`.
       match: "\\b([A-Z][A-Za-z0-9_]*)(:)",
       captures: {
         "1": { name: "entity.name.type.variant.plotnik" },
@@ -80,14 +70,12 @@ export const plotnikGrammar: LanguageRegistration = {
       },
     },
     "node-ref": {
-      // `(Name)` — reference to a named definition
       match: "(?<=\\()\\s*([A-Z][A-Za-z0-9_]*)\\b",
       captures: {
         "1": { name: "entity.name.type.reference.plotnik" },
       },
     },
     "node-kind": {
-      // `(node_kind` — tree-sitter named node
       match: "(?<=\\()\\s*([a-z_][a-z0-9_]*)\\b",
       captures: {
         "1": { name: "entity.name.tag.plotnik" },

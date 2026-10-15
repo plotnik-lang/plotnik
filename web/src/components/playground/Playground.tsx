@@ -42,19 +42,6 @@ import { decodePermalink, encodePermalink } from "./permalink";
 import { pushQueryFeedback } from "./query-feedback";
 import { usePlaygroundSession } from "./use-session";
 
-/* The playground shell: owns the user's inputs (query / source / lang /
-   entrypoint choice), feeds them to the session hook, and lays the panes
-   out. All engine orchestration lives in use-session.ts; all wire types in
-   protocol.ts.
-
-   Two mediator duties live here and nowhere else:
-   - editor feedback: pushing each compile's diagnostics/tokens into the
-     query editor;
-   - cross-pane highlighting: panes report hovers upward, Playground routes
-     them to their targets (today: tree hover → source spotlight). New hover
-     edges belong here, never wired pane-to-pane — this is the seed of the
-     N-way fan-out in docs/wip/playground-design.md §3. */
-
 const LANGS = [
   { value: "javascript", label: "JavaScript" },
   { value: "typescript", label: "TypeScript" },
@@ -82,7 +69,7 @@ const version = 1;
 export default function Playground() {
   const initial = useMemo(
     () => decodePermalink(window.location.hash),
-    // The hash is read once: later hash edits shouldn't clobber live editing.
+
     [],
   );
 
@@ -160,9 +147,6 @@ export default function Playground() {
     [lang],
   );
 
-  /* Hovering a tree node spotlights its document range in the editor. The
-     range is in the snapshot's coordinates; the spotlight field maps it
-     through any edits made since. */
   const handleTreeHover = useCallback((src: Range16 | null) => {
     sourceViewRef.current?.dispatch({
       effects: setSpotlight.of(src === null ? null : [src]),
@@ -381,8 +365,6 @@ function PaneLabel({ children }: { children: ReactNode }) {
   );
 }
 
-/* The same bar renders in two homes: as the tree panel's header when open,
-   and as the last row of the source column when collapsed. */
 function TreeToggle({
   open,
   onToggle,

@@ -21,8 +21,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeEditor } from "./code-editor";
 import type { GeneratedCode, RunResult, SessionInfo } from "./protocol";
 
-/* Stable identities: CodeEditor reconfigures whenever the extensions array
-   changes, so inline literals would re-init the language on every render. */
 const JSON_EXTENSIONS = [json()];
 const DTS_EXTENSIONS = [javascript({ typescript: true })];
 
@@ -31,7 +29,7 @@ interface OutputPanelProps {
   generated: GeneratedCode | null;
   generating: boolean;
   runResult: RunResult | null;
-  /** Query no longer compiles; the shown output is from the last good run. */
+
   stale: boolean;
   tab: OutputTab;
   onTabChange: (tab: OutputTab) => void;

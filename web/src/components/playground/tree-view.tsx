@@ -13,17 +13,6 @@ import {
 } from "./spotlight";
 import type { TreeSnapshot } from "./use-session";
 
-/* The source-tree pane. TreeView picks the state (skeleton / parse error / dump);
-   DumpView renders the dump and owns the hover machinery, so the spotlight
-   and index live exactly as long as there is a dump to point into.
-
-   Hover is one-way by design: the pane reports the hovered node's *source*
-   range upward via onHover and touches nothing else — Playground mediates
-   all cross-pane highlighting (see the fan-out plan in
-   docs/wip/playground-design.md §3). */
-
-/* Same palette roles as the query editor: the dump reads like the query that
-   would match it. Chunk kinds without an entry render plain. */
 const CHUNK_CLASS: Partial<Record<DumpChunk["kind"], string>> = {
   punct: "ptk-punct",
   string: "ptk-string",
@@ -33,8 +22,7 @@ const CHUNK_CLASS: Partial<Record<DumpChunk["kind"], string>> = {
 
 interface TreeViewProps {
   tree: TreeSnapshot | null;
-  /** Document range of the hovered node (UTF-16, in the snapshot's source
-      coordinates), or null; fires only on change. */
+
   onHover?: (src: Range16 | null) => void;
 }
 
@@ -116,20 +104,16 @@ function DumpView({ chunks, nodes, source, onHover }: DumpViewProps) {
     return () => {
       spotlight.destroy();
       spotRef.current = null;
-      // The dump is going away; don't leave the source editor lit.
+
       onHoverRef.current?.(null);
     };
   }, []);
 
-  // A new dump invalidates node indices; drop the hover rather than let it
-  // point at the wrong node until the pointer moves again.
   useLayoutEffect(() => {
     setHover(null);
   }, [index, setHover]);
 
   return (
-    /* `isolate` keeps the spotlight layers' z-index scoped to this wrapper;
-       `bg-editor` is the surface the lift rises above. */
     <div
       ref={wrapRef}
       className="relative isolate w-max min-w-full min-h-full bg-editor"
@@ -145,11 +129,6 @@ function DumpView({ chunks, nodes, source, onHover }: DumpViewProps) {
         }}
         onPointerLeave={() => setHover(null)}
       >
-        {/* One span per chunk, in order — the tree-dom.ts contract. Vertical
-            padding on the inline spans doesn't move any text (it never grows
-            the line box) but it does extend their hit area into the
-            half-leading gap between lines, so hover stays continuous when
-            the pointer crosses from one line to the next. */}
         {chunks.map((chunk, i) => (
           <span
             key={i}

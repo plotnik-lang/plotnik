@@ -6,17 +6,6 @@ import {
   type SpotlightSpec,
 } from "./spotlight";
 
-/* DOM-side geometry for the source-tree pane: pointer → dump offset → node
-   (hit-testing) and node → client rects → spotlight spec (measurement).
-
-   Rendering contract with tree-view.tsx: the dump renders inside a wrapper
-   (the spotlight's positioning ancestor) as a <pre> whose children are one
-   <span data-ci={i}> per chunk, in chunk order, so `pre.children[i]` is
-   chunk i and `index.chunkStarts` maps between chunk-local and global dump
-   offsets. Anything that walks that DOM belongs here, not in the view. */
-
-/* Resolve a pointer position to a text offset. Chrome/Safari and Firefox
-   expose different halves of the same API. */
 function caretAtPoint(
   x: number,
   y: number,
@@ -37,8 +26,6 @@ function caretAtPoint(
     : null;
 }
 
-/** The caret nearest the pointer as a global dump offset, or null when it
-    doesn't land inside one of `pre`'s chunk spans. */
 function caretDumpOffset(
   index: TreeIndex,
   pre: HTMLPreElement,
@@ -54,8 +41,6 @@ function caretDumpOffset(
   return index.chunkStarts[Number(span.getAttribute("data-ci"))] + caret.offset;
 }
 
-/* Dump offset → (text node, local offset); binary search over chunk starts,
-   then straight into that chunk's span. */
 function positionAt(index: TreeIndex, pre: HTMLPreElement, offset: number) {
   const starts = index.chunkStarts;
   let lo = 0;
@@ -69,19 +54,8 @@ function positionAt(index: TreeIndex, pre: HTMLPreElement, offset: number) {
   return { node: el.firstChild ?? el, offset: offset - starts[lo], chunk: lo };
 }
 
-/* Vertical slack when matching a pointer to a line's glyph box; mirrors the
-   spans' hit padding so edge hovering is continuous between lines too. */
 const LINE_HIT_SLACK = 4;
 
-/**
- * The node under the pointer, or null over dead space.
- *
- * Two hit paths. Direct: the pointer is on a glyph (chunk spans are the only
- * hover targets; empty space hits the <pre> itself). Edge: everything left
- * of a line — down to the pane's own edge, so a maximized window lets the
- * cursor rest at the screen edge — acts as that line's hover area, while
- * space right of a line and below the tree stays dead.
- */
 export function dumpNodeAtPoint(
   index: TreeIndex,
   pre: HTMLPreElement,
@@ -93,8 +67,7 @@ export function dumpNodeAtPoint(
     const chunk = Number(hit.getAttribute("data-ci"));
     const from = index.chunkStarts[chunk];
     const to = index.chunkStarts[chunk + 1];
-    // The caret API returns the nearest boundary, which can fall just past
-    // the hovered chunk; clamp back so edge pixels can't target a neighbor.
+
     const offset = caretDumpOffset(index, pre, x, y) ?? from;
     return resolveDumpHover(index, Math.min(Math.max(offset, from), to - 1));
   }
@@ -111,8 +84,7 @@ function edgeNode(
   if (offset === null) return null;
   const text = index.text;
   const firstGlyph = lineFirstGlyph(text, offset);
-  // The caret snapped past the line's first glyph: the pointer sits right
-  // of the text (or below the tree), not in the left margin.
+
   if (offset > firstGlyph) return null;
   if (firstGlyph >= text.length || text[firstGlyph] === "\n") return null;
   const glyph = positionAt(index, pre, firstGlyph);
@@ -127,10 +99,6 @@ function edgeNode(
   return resolveDumpHover(index, firstGlyph);
 }
 
-/**
- * Spotlight spec for `node`'s visible dump range, in `wrap`'s coordinate
- * space (`wrap` is the spotlight's positioning ancestor around the <pre>).
- */
 export function measureDumpSpotlight(
   index: TreeIndex,
   pre: HTMLPreElement,

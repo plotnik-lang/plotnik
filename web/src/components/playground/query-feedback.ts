@@ -4,10 +4,6 @@ import { byteToUtf16 } from "./byte-offsets";
 import { setTokenDecorations, type TokenRange } from "./code-editor";
 import type { QueryToken, WireDiagnostic } from "./protocol";
 
-/* Idents and whitespace keep the default ink; everything else gets a class
-   styled in global.css next to the lezer `tok-*` palette. Field names are
-   the exception: the lexer calls them plain idents, so they are recovered
-   below and get the calmer `tok-propertyName` ink, matching the tree pane. */
 const TOKEN_CLASS: Partial<Record<QueryToken["kind"], string>> = {
   comment: "ptk-comment",
   string: "ptk-string",
@@ -17,9 +13,6 @@ const TOKEN_CLASS: Partial<Record<QueryToken["kind"], string>> = {
   error: "ptk-error",
 };
 
-/* An ident is a field name when a bare `:` follows (variant tags are
-   PascalCase names and `::` capture types follow captures, so lowercase + single
-   colon is exact), or when it is glued to a leading `-` (negated field). */
 function isFieldName(
   tokens: QueryToken[],
   index: number,
@@ -44,12 +37,6 @@ function isFieldName(
   return false;
 }
 
-/**
- * Apply a compile round's feedback (squiggles + token colors) to the query
- * editor. `compiledText` is the exact text the worker compiled: if the
- * document moved on since, the byte offsets no longer apply and a newer
- * compile is already in flight, so the push is dropped.
- */
 export function pushQueryFeedback(
   view: EditorView,
   compiledText: string,

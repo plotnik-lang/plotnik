@@ -9,8 +9,6 @@ export interface PermalinkState {
   l: string;
 }
 
-/* `#code/` namespaces the hash so unrelated fragments (heading anchors)
-   never get mistaken for a snapshot; bump it if the payload shape changes. */
 const PREFIX = "#code/";
 
 export function decodePermalink(hash: string): PermalinkState | null {
