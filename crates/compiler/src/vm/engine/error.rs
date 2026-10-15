@@ -1,5 +1,3 @@
-//! Runtime errors and control-flow signals for VM execution.
-
 use plotnik_runtime::CallFrameError;
 
 #[derive(Debug, thiserror::Error)]
@@ -9,9 +7,8 @@ pub enum RuntimeError {
     #[error("exhausted the fuel limit of {0}")]
     OutOfFuel(u64),
 
-    /// `used` is the live-heap measurement at the trip point; because the arenas
-    /// grow geometrically it can overshoot `limit` by up to a doubling, so it is
-    /// reported alongside the ceiling to make the limit tunable.
+    /// `used` is the sampled estimate for occupied runtime entries, not allocated
+    /// heap capacity. Sampling can detect an overshoot after it occurs.
     #[error("exceeded the memory limit of {limit} bytes (used {used} bytes)")]
     MemoryLimitExceeded { used: u64, limit: u64 },
 
@@ -22,20 +19,12 @@ pub enum RuntimeError {
     NoMatch,
 }
 
-/// Non-error outcomes that unwind a dispatch back to the main execution loop.
-///
-/// These are propagated through the same `Err` channel as `RuntimeError` (so
-/// `?` can short-circuit a dispatch), but they are not failures: the main loop
-/// either continues (`Backtracked`) or completes the run (`Accept`).
 #[derive(Debug)]
 pub(crate) enum ControlFlow {
-    /// Successful completion: the run is done and the match journal is committed.
     Accept,
-    /// Backtracking occurred; control returns to the main loop to continue.
     Backtracked,
 }
 
-/// The `Err` channel of a VM dispatch: either a control-flow signal or a real error.
 #[derive(Debug)]
 pub(crate) enum Signal {
     Flow(ControlFlow),

@@ -1,5 +1,3 @@
-//! Materializes committed match journals into result values.
-
 use crate::bytecode::{Entrypoint, Module};
 use crate::core::Colors;
 
@@ -9,8 +7,6 @@ use plotnik_runtime::{JournalEvent, OutputEvents};
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
-    /// Member names resolved once, indexed by the `RecordSet`/`VariantOpen` payload.
-    /// Kills the two-table lookup and the string-table UTF-8 walk per event.
     member_names: Box<[&'a str]>,
 }
 
@@ -26,8 +22,6 @@ impl<'a> ValueMaterializer<'a> {
     }
 
     fn resolve_member_name(&self, idx: u16) -> &'a str {
-        // Journal event payloads are validated at module load; out of bounds here is
-        // a loader bug, and the slice-index panic is the assertion.
         self.member_names[idx as usize]
     }
 }
@@ -35,10 +29,7 @@ impl<'a> ValueMaterializer<'a> {
 /// Materialize the journal events into a [`Value`], then check it against the
 /// entrypoint's declared type.
 ///
-/// The type check is the trailing half of materialization, not an optional
-/// follow-up: it catches materializer/typegen drift and compiles to a no-op in
-/// release. Folding it in here keeps each call site from re-threading
-/// `result_type` and from materializing a value that silently skips the check.
+/// Type checking is debug-only and stops at 512 nested values.
 pub fn materialize_verified<'s, 't>(
     source: &'s str,
     module: &'s Module,
@@ -52,7 +43,6 @@ pub fn materialize_verified<'s, 't>(
     value
 }
 
-/// Value accumulator for stack-based materialization.
 enum ValueAccumulator<'s, 't> {
     List(Vec<Value<'s, 't>>),
     Record(Vec<(&'s str, Value<'s, 't>)>),
@@ -60,9 +50,6 @@ enum ValueAccumulator<'s, 't> {
         case: &'s str,
         fields: Vec<(&'s str, Value<'s, 't>)>,
     },
-    /// Marker into the scalar-only range stack. Keeping the marker here
-    /// preserves heterogeneous frame nesting checks without making ScalarMark
-    /// scan lists, records, and variants.
     Scalar(usize),
 }
 
@@ -82,7 +69,6 @@ impl<'a> ValueMaterializer<'a> {
         let mut stack: Vec<ValueAccumulator<'a, 't>> = vec![];
         let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
 
-        // Pending result value attached by `RecordSet` or `ArrayPush`.
         let mut pending: Option<Value<'a, 't>> = None;
 
         for (event_idx, event) in events.iter().enumerate() {

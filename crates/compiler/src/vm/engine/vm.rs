@@ -1,5 +1,3 @@
-//! Virtual machine for executing compiled Plotnik queries.
-
 use tree_sitter::{Node, Tree};
 
 use crate::bytecode::{
@@ -25,20 +23,14 @@ pub struct RunStats {
     /// Fuel consumed by execution. Each matcher dispatch currently
     /// consumes one unit; this is not a stable cross-version performance metric.
     pub fuel_used: u64,
-    /// Peak live runtime heap observed at memory-sampling points and run exit.
+    /// Peak estimated runtime memory for occupied entries, sampled during execution
+    /// and at run exit. Excludes spare allocation capacity.
     pub peak_live_heap_bytes: u64,
 }
 
 /// Virtual machine state for query execution.
-///
-/// The engine core — cursor, frames, checkpoints, match journal, suppression —
-/// lives in [`plotnik_runtime::Engine`], shared with generated matchers so the
-/// checkpoint contract stays single-sourced. The VM keeps only the
-/// interpretive layer: the instruction pointer into decoded bytecode and the
-/// fuel/memory budget.
 pub struct VM<'s, 't> {
     pub(crate) engine: Engine<'t>,
-    /// Current address in the decoded instruction stream.
     pub(crate) ip: CodeAddr,
 
     pub(crate) limits: ResolvedRuntimeLimits,
@@ -146,7 +138,6 @@ impl<'s, 't> VM<'s, 't> {
             Err(RuntimeError::CallFrame(error)) => return Err(error.into()),
         };
 
-        // NoValue is the emitted match-only capability, not an absent capture.
         let result_type = module
             .types()
             .get(entrypoint.result_type())
@@ -167,8 +158,6 @@ impl<'s, 't> VM<'s, 't> {
         )))
     }
 
-    /// Checkpoint that, on backtrack, advances the cursor and re-enters the
-    /// callee. `call_ip` is the Call's address (for trace rendering only).
     fn call_retry_checkpoint(&self, call_ip: CodeAddr, resume: CallResume) -> Checkpoint {
         Checkpoint::call_retry(self.engine.checkpoint_state(), u16::from(call_ip), resume)
     }
@@ -228,7 +217,6 @@ impl<'s, 't> VM<'s, 't> {
         let mut peak_live_heap_bytes = self.engine.heap_bytes();
 
         loop {
-            // One matcher dispatch currently consumes one fuel unit.
             if let Err(error) = budget.charge() {
                 let LimitExceeded::OutOfFuel(limit) = error else {
                     unreachable!("charging fuel only reports fuel exhaustion");
@@ -237,8 +225,6 @@ impl<'s, 't> VM<'s, 't> {
                 return (Err(RuntimeError::OutOfFuel(limit)), stats);
             }
 
-            // The shared budget schedules live matcher-heap samples across
-            // applications. Unbounded memory still samples for run statistics.
             if budget.memory_sample_due() {
                 let used = self.engine.heap_bytes();
                 peak_live_heap_bytes = peak_live_heap_bytes.max(used);
@@ -253,17 +239,12 @@ impl<'s, 't> VM<'s, 't> {
                 }
             }
 
-            // Fetch and dispatch. The IP must address a validated instruction
-            // start; a violation localizes a bad jump to the address that wrote
-            // `ip`, before decoding begins mid-instruction.
             #[cfg(debug_assertions)]
             debug_assert!(
                 module.is_validated_instruction_start(self.ip),
                 "ip {} is not a validated instruction start",
                 self.ip
             );
-            // Tracing renders from the byte-level decoder so trace output stays
-            // identical; the hot path reads the pre-decoded stream.
             if T::ENABLED {
                 tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));
             }
@@ -342,10 +323,6 @@ impl<'s, 't> VM<'s, 't> {
         self.finish_match(m, module, tracer)
     }
 
-    /// The post-acceptance half of a Match: run its effects, then follow its successors.
-    /// Shared by the dispatch path and the match-retry resume in
-    /// [`Self::backtrack`], so a resumed candidate emits exactly what the
-    /// original acceptance would have emitted.
     fn finish_match<T: Tracer>(
         &mut self,
         m: DecodedMatch,
@@ -397,14 +374,6 @@ impl<'s, 't> VM<'s, 't> {
         Ok(())
     }
 
-    /// Accepting a candidate in an engine-owned sibling search is a choice
-    /// point: leave a resume checkpoint so a later failure retries the search
-    /// past this candidate. Skipped when the search cannot legally advance past
-    /// the accepted node — either the nav owns no sibling search
-    /// ([`Nav::is_sibling_search`]; NFA-level retry loops are compiled with
-    /// exact navs precisely to opt out here), or the skip policy does not
-    /// admit the node into the pattern's gap (e.g. a named candidate under a
-    /// soft anchor is the only legal candidate).
     fn push_match_retry_if_resumable<T: Tracer>(
         &mut self,
         m: DecodedMatch,
@@ -422,17 +391,11 @@ impl<'s, 't> VM<'s, 't> {
         }
     }
 
-    /// The operator selects the table containing `p.value_ref`.
     fn evaluate_predicate(&self, p: DecodedPredicate, module: &Module) -> bool {
         let node = self.engine.node();
         let node_text = node_text(self.source, &node);
 
         if p.op.is_regex_op() {
-            // The DFAs are deserialized once at module load and reused here;
-            // `RegexDfas::is_match` upholds the populated-slot invariant that a
-            // module passing load guarantees. Deserializing per evaluation, as
-            // this once did, re-validated the whole automaton on every predicate
-            // test (issue #426).
             let matched = module
                 .regex_dfas()
                 .is_match(p.value_ref as usize, node_text);
@@ -475,8 +438,6 @@ impl<'s, 't> VM<'s, 't> {
                 }
             }
             NodeKindConstraint::Named(Some(expected)) => {
-                // kind_id first: it alone rejects most candidates, and each
-                // check is an FFI call.
                 if node.kind_id() != u16::from(expected) || !node.is_named() {
                     if T::ENABLED {
                         tracer.trace_match_failure(node);
@@ -502,9 +463,6 @@ impl<'s, 't> VM<'s, 't> {
             }
         }
 
-        // `(MISSING …)`: the node kind above is checked as usual, but the node
-        // must also be one the parser inserted during error recovery. Missing-ness
-        // is an orthogonal runtime flag, not a kind, so it gets its own gate.
         if m.missing && !node.is_missing() {
             if T::ENABLED {
                 tracer.trace_match_failure(node);
@@ -553,8 +511,6 @@ impl<'s, 't> VM<'s, 't> {
             return Err(ControlFlow::Accept.into());
         }
 
-        // Push checkpoints for non-preferred successors (in reverse order, so LIFO
-        // backtracking takes them in priority order).
         if succs.len() > 1 {
             self.engine.push_successors(&succs[1..]);
             if T::ENABLED {
@@ -583,9 +539,6 @@ impl<'s, 't> VM<'s, 't> {
         let skip_policy =
             self.navigate_to_field_with_policy(c.nav, c.node_field, module, tracer)?;
 
-        // A searchable nav leaves a retry checkpoint so the callee can be
-        // re-tried at later siblings if it fails. Exact/Stay navs have a fixed
-        // candidate and need no retry.
         if let Some(policy) = skip_policy
             && policy != SkipPolicy::Exact
         {
@@ -606,7 +559,6 @@ impl<'s, 't> VM<'s, 't> {
         Ok(())
     }
 
-    /// Push a frame for `target`, retaining the immutable call-site map token.
     fn enter_callee<T: Tracer>(
         &mut self,
         target: CodeAddr,
@@ -621,9 +573,6 @@ impl<'s, 't> VM<'s, 't> {
         Ok(())
     }
 
-    /// Navigate to a field and return the skip policy for retry support.
-    ///
-    /// Returns `Some(policy)` if navigation was performed, `None` if Stay nav was used.
     fn navigate_to_field_with_policy<T: Tracer>(
         &mut self,
         nav: Nav,
@@ -696,7 +645,6 @@ impl<'s, 't> VM<'s, 't> {
             tracer.trace_return(port);
         }
 
-        // If no frames, we're returning from the top-level entrypoint → Accept
         if self.engine.frames_empty() {
             assert_eq!(
                 port.to_byte(),
@@ -714,13 +662,6 @@ impl<'s, 't> VM<'s, 't> {
         Ok(())
     }
 
-    // Loops rather than self-recurses: a run of contiguous retry checkpoints
-    // with exhausted siblings (or failed field constraints) is unwound here in one
-    // call. The depth of that run is set by the source-tree shape and is decoupled
-    // from call depth, so tail-recursion would let untrusted source abort the
-    // process on the native stack (Rust does not guarantee TCO). The `continue`
-    // paths pop without re-pushing, so the checkpoint stack strictly shrinks until
-    // a resume succeeds or it empties — the loop always terminates.
     fn backtrack<T: Tracer>(&mut self, module: &Module, tracer: &mut T) -> Signal {
         'unwind: loop {
             let Some((cp, snapshot)) = self.engine.pop_checkpoint() else {
@@ -737,12 +678,6 @@ impl<'s, 't> VM<'s, 't> {
                     return ControlFlow::Backtracked.into();
                 }
 
-                // Call retry: advance to the next candidate satisfying the field
-                // constraint, then re-enter the callee. The scan mirrors the
-                // navigate-time field search: non-field siblings the policy admits
-                // are skipped, so a retry sees exactly the candidate set the
-                // original navigation saw. If siblings are exhausted, keep
-                // backtracking to an earlier checkpoint.
                 Resume::Call(resume) => {
                     if !self.engine.cursor_mut().continue_search(resume.policy) {
                         continue 'unwind;
@@ -789,12 +724,6 @@ impl<'s, 't> VM<'s, 't> {
                     return ControlFlow::Backtracked.into();
                 }
 
-                // Match retry: the checkpoint sits at the accepted-but-failed
-                // candidate of an engine-owned sibling search. Advance past it (the
-                // push gate proved the policy admits it into the gap) and re-run
-                // the same instruction's candidate search from there; acceptance
-                // repeats the match — fresh retry checkpoint, effects, successor
-                // dispatch — exactly as the dispatch path would.
                 Resume::Match => {
                     let DecodedInstr::Match(m) =
                         module.decoded().instruction_at(CodeAddr::from(cp.ip))

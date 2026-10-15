@@ -1,8 +1,3 @@
-//! Runtime engine for executing compiled Plotnik queries.
-//!
-//! The VM executes bytecode against tree-sitter syntax trees,
-//! producing a match journal that can be materialized into result values.
-
 mod error;
 mod execution_trace;
 mod materializer;
@@ -12,9 +7,6 @@ mod value;
 mod verify;
 mod vm;
 
-// Navigation, checkpoints, frames, the match journal, and limits live in
-// `plotnik-runtime`, shared with the generated-code backend; re-exported so the
-// crate-facing paths stay `vm::...`.
 pub use plotnik_runtime::{
     JournalEvent, Limit, MatchJournal, OutputEvents, ResolvedRuntimeLimits, RuntimeLimitSpec,
 };

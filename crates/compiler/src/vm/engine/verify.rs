@@ -1,8 +1,3 @@
-//! Debug-only type verification for materialized values.
-//!
-//! Verifies that materialized `Value` matches the declared `result_type` from bytecode.
-//! Zero-cost in release builds.
-
 use crate::bytecode::{Module, TypeId};
 #[cfg(debug_assertions)]
 use crate::bytecode::{StringsView, TypeDefKind, TypeKind, TypesView};
@@ -12,7 +7,7 @@ use super::Value;
 
 /// Panics with a pretty diagnostic if the value doesn't match the declared type.
 /// `declared_type` should be the `result_type` from the entrypoint that was executed.
-/// No-op in release builds.
+/// Checks at most 512 nested values. No-op in release builds.
 #[cfg(debug_assertions)]
 pub fn debug_verify_type(value: &Value, declared_type: TypeId, module: &Module, colors: Colors) {
     let mut verifier = TypeVerifier::new(module);
@@ -32,9 +27,6 @@ pub fn debug_verify_type(
 ) {
 }
 
-/// Walks a materialized `Value` against its declared type, accumulating
-/// mismatches. Bundles the always-paired `(TypesView, StringsView)` and owns the
-/// recursion's `path` cursor and `errors` sink so the walker needs no out-params.
 #[cfg(debug_assertions)]
 struct TypeVerifier<'a> {
     types: TypesView<'a>,
@@ -44,14 +36,6 @@ struct TypeVerifier<'a> {
     depth: u32,
 }
 
-/// Native-recursion bound for the verifier — the one remaining recursive walk over
-/// a materialized value. The cap keeps a pathologically deep value from overflowing
-/// the stack in debug builds, so it must sit well under the real limit (debug
-/// frames here are fat; the stack gives out around ~2500 of them). Past it,
-/// verification simply stops: a type-soundness bug deeper than the cap goes
-/// unchecked. That is an accepted trade, not a guarantee of completeness — the
-/// verifier is debug-only defense-in-depth (release builds skip it entirely) and
-/// such bugs almost always surface shallow.
 #[cfg(debug_assertions)]
 const MAX_VERIFY_DEPTH: u32 = 512;
 
@@ -67,7 +51,6 @@ impl<'a> TypeVerifier<'a> {
         }
     }
 
-    /// Depth-guarded entry; every recursive descent goes through here.
     fn verify(&mut self, value: &Value, declared: TypeId) {
         if self.depth >= MAX_VERIFY_DEPTH {
             return;
@@ -175,8 +158,6 @@ impl<'a> TypeVerifier<'a> {
 
             TypeDefKind::Record { .. } => match value {
                 Value::Record(fields) => {
-                    // Collect first: `members_of` borrows `self.types`, which would
-                    // clash with the `&mut self` recursion inside the loop.
                     let members: Vec<_> = self.types.members_of(&type_def).collect();
                     for member in members {
                         let field_name = self.strings.get(member.name_id);
@@ -196,9 +177,6 @@ impl<'a> TypeVerifier<'a> {
                                 self.path.truncate(prev_len);
                             }
                             None => {
-                                // Policy: every declared field is always present in
-                                // the output — option-typed fields materialize as null,
-                                // never as an absent key. A missing key is always a bug.
                                 self.errors.push(format!(
                                         "{}: field missing (declared fields are always present; option values use null)",
                                         append_path(&self.path, field_name)
@@ -289,7 +267,6 @@ fn value_kind_name(value: &Value) -> &'static str {
     }
 }
 
-/// Strips leading `.` so the root path prints as empty rather than `.`.
 #[cfg(debug_assertions)]
 fn format_path(path: &str) -> String {
     path.strip_prefix('.').unwrap_or(path).to_string()

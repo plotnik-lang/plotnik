@@ -1,5 +1,3 @@
-//! Structured VM execution trace for debugger-oriented output.
-
 use serde::Serialize;
 use tree_sitter::Node;
 
@@ -121,9 +119,6 @@ impl TraceRecorder {
         record_idx
     }
 
-    /// Whether the next record still lands in the buffer. Once saturated,
-    /// formatting effect strings would be wasted allocation — `add_record`
-    /// drops the event anyway.
     fn keeps_records(&self) -> bool {
         self.records.len() < self.max_records
     }
@@ -336,8 +331,6 @@ impl Tracer for TraceRecorder {
             .pop()
             .expect("trace_backtrack requires a matching checkpoint");
         self.span_stack.truncate(shadow.span_depth);
-        // The VM truncates its match journal to the checkpoint's watermark on
-        // restore; mirror that so `journal_len` keeps indexing the real journal.
         self.journal_len = shadow.journal_len;
         self.add_record(
             TraceEvent::Backtrack {

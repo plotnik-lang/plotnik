@@ -1,5 +1,3 @@
-//! Reconstruct result provenance from a winning match journal.
-
 use serde::Serialize;
 use tree_sitter::Node;
 

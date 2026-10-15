@@ -1,5 +1,3 @@
-//! Result value types for materialization.
-
 use std::fmt::Write as _;
 
 use serde::ser::{SerializeMap, SerializeSeq};
@@ -35,8 +33,6 @@ impl<'s, 't> NodeValue<'s, 't> {
     }
 }
 
-/// Slice `node`'s span out of the source. The runtime owns this so
-/// generated matchers slice predicate text identically to the VM.
 pub(crate) use plotnik_runtime::node_text;
 
 impl Serialize for NodeValue<'_, '_> {
@@ -77,11 +73,6 @@ pub enum Value<'s, 't> {
 
 impl Drop for Value<'_, '_> {
     fn drop(&mut self) {
-        // A captured-recursive query nests values as deep as the match, which can
-        // exceed any native-stack budget — so the derived recursive drop could
-        // overflow. Dismantle level by level instead: move each node's children
-        // onto a heap worklist, so every node drops only after it is childless and
-        // its own drop is a leaf.
         let mut worklist: Vec<Value<'_, '_>> = Vec::new();
         take_children(self, &mut worklist);
         while let Some(mut value) = worklist.pop() {
@@ -90,7 +81,6 @@ impl Drop for Value<'_, '_> {
     }
 }
 
-/// Move `value`'s direct child values onto `worklist`, leaving `value` childless.
 fn take_children<'s, 't>(value: &mut Value<'s, 't>, worklist: &mut Vec<Value<'s, 't>>) {
     match value {
         Value::List(items) => worklist.append(items),
@@ -104,10 +94,6 @@ fn take_children<'s, 't>(value: &mut Value<'s, 't>, worklist: &mut Vec<Value<'s,
     }
 }
 
-// This recursive impl is not on the deep-output path — output goes through the
-// iterative `Value::format`. If a serde-based output path is ever added, give it a
-// depth guard or an iterative serializer first; a captured-recursive query can nest
-// values past the native stack.
 impl Serialize for Value<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -166,32 +152,19 @@ impl Value<'_, '_> {
     }
 }
 
-/// `indent` varies by recursion depth; the rest is shared state threaded through every call.
 struct FormatCtx<'a> {
     out: &'a mut String,
     colors: &'a Colors,
     pretty: bool,
 }
 
-/// One emission for the iterative formatter's work stack.
 enum WorkItem<'a> {
-    /// Render a value: a leaf writes directly, a composite pushes its expansion.
     Value(&'a Value<'a, 'a>, usize),
-    /// Write a borrowed slice verbatim. Color codes are `'static`; record keys and
-    /// variant tags borrow the value.
     Str(&'a str),
-    /// Write a record field key `"key":` (colored, escaped, trailing space in pretty).
     Key(&'a str),
-    /// Pretty-mode line break followed by `n` indent spaces.
     Line(usize),
 }
 
-/// Format a value as colored JSON without native recursion.
-///
-/// Output depth tracks source depth for captured-recursive queries, and a high or
-/// `Unbounded` depth limit lets it exceed any native-stack budget — so the walk
-/// uses an explicit work stack. Emission is byte-identical to the equivalent
-/// recursive printer; the `06-vm` snapshots pin that.
 fn format_value<'a>(ctx: &mut FormatCtx<'_>, value: &'a Value<'a, 'a>, indent: usize) {
     let mut stack = vec![WorkItem::Value(value, indent)];
     while let Some(item) = stack.pop() {
@@ -296,9 +269,6 @@ fn format_node_value(ctx: &mut FormatCtx<'_>, node: &NodeValue<'_, '_>, indent: 
     out.push_str(c.reset);
 }
 
-/// Write a value's own tokens, deferring any nested values onto `stack`. A leaf
-/// writes fully; a composite writes its opener and queues children + closer so the
-/// nesting is driven by the stack rather than the native call stack.
 fn emit_value<'a>(
     ctx: &mut FormatCtx<'_>,
     value: &'a Value<'a, 'a>,
@@ -408,7 +378,6 @@ fn emit_value<'a>(
             ctx.out.push('"');
             ctx.out.push_str(c.reset);
 
-            // Only the `$data` payload nests; the case tag above is a leaf written in full.
             let mut deferred = Vec::new();
             if let Some(value) = payload.as_deref() {
                 ctx.out.push_str(c.dim);
@@ -440,7 +409,6 @@ fn emit_value<'a>(
     }
 }
 
-/// Write a record field key `"key":` (colored, escaped, trailing space in pretty).
 fn emit_key(ctx: &mut FormatCtx<'_>, key: &str) {
     let c = ctx.colors;
     ctx.out.push_str(c.blue);
@@ -456,7 +424,6 @@ fn emit_key(ctx: &mut FormatCtx<'_>, key: &str) {
     }
 }
 
-/// Escape `s` as a JSON string body, appending to `out`.
 fn push_indent(out: &mut String, n: usize) {
     for _ in 0..n {
         out.push(' ');

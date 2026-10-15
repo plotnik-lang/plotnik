@@ -1,24 +1,3 @@
-//! Tracing infrastructure for debugging VM execution.
-//!
-//! # Design: Zero-Cost Abstraction
-//!
-//! VM call sites are gated on `T::ENABLED`. `NoopTracer` sets that constant to
-//! `false`, so tracing work is removed before argument evaluation; this matters
-//! for arguments built from tree-sitter FFI calls such as `cursor.node()`.
-//! Tracing state still lives entirely outside core execution structures.
-//!
-//! # Design: Tracer-Owned State
-//!
-//! Tracing-only state (like checkpoint creation IPs for backtrack display) is
-//! maintained by the tracer itself, not in core structures like `Checkpoint`.
-//! This keeps execution structures minimal and avoids "spilling" tracing concerns
-//! into `exec`. For example:
-//! - `trace_checkpoint_created(ip)` - tracer pushes to its own stack
-//! - `trace_backtrack()` - tracer pops its stack to get the display IP
-//!
-//! `NoopTracer` ignores these calls (optimized away), while `PrintTracer`
-//! maintains parallel state for display purposes.
-
 use std::io::{self, Write as _};
 
 use tree_sitter::Node;
@@ -175,7 +154,6 @@ pub struct PrintTracer<'s> {
     pub(crate) lines: Vec<String>,
     pub(crate) builder: LineBuilder,
     pub(crate) render: ModuleRenderContext,
-    /// Parallel stack of checkpoint creation IPs (for backtrack display).
     pub(crate) checkpoints: Vec<TraceCheckpoint>,
     pub(crate) call_stack: Vec<String>,
     pub(crate) deferred_return_ip: Option<CodeAddr>,
@@ -330,10 +308,6 @@ impl<'s> PrintTracer<'s> {
         })
     }
 
-    /// The definition name for a call or entry target. Only entrypoints carry a
-    /// name; a call into an internal body (or an entry that isn't a named
-    /// definition) falls back to its address `@{ip}`, exactly as the bytecode
-    /// dump renders the same target.
     fn def_ref_name(&self, ip: CodeAddr) -> String {
         self.render
             .entrypoint_name(ip.get())
@@ -341,10 +315,6 @@ impl<'s> PrintTracer<'s> {
             .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.addr_width))
     }
 
-    /// Format kind without text content.
-    ///
-    /// - Named nodes: `kind` (e.g., `identifier`)
-    /// - Anonymous nodes: `kind` dim green (e.g., `let`)
     fn format_kind_simple(&self, kind: &str, is_named: bool) -> String {
         if is_named {
             kind.to_string()
@@ -354,17 +324,9 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
-    /// Format kind with source text, dynamically truncated to fit content width.
-    ///
-    /// - Named nodes: `kind text` (e.g., `identifier fetchData`)
-    /// - Anonymous nodes: just `text` in green (kind == text, no redundancy)
     fn format_kind_with_text(&self, kind: &str, text: &str, is_named: bool) -> String {
         let c = &self.colors;
 
-        // Available content width = TOTAL_WIDTH - prefix_width + addr_width.
-        // prefix_width = INDENT + addr_width + GAP + SYMBOL + GAP; the +addr_width
-        // cancels because the ellipsis can extend into the successors column
-        // (sub-lines have no successors, so we reuse that space).
         let available = cols::TOTAL_WIDTH - (cols::INDENT + cols::GAP + cols::SYMBOL + cols::GAP);
 
         if is_named {
@@ -372,7 +334,6 @@ impl<'s> PrintTracer<'s> {
             let truncated = truncate_text(text, text_budget);
             format!("{} {}{}{}{}", kind, c.dim, c.green, truncated, c.reset)
         } else {
-            // Anonymous: kind == text, so showing kind would duplicate.
             let truncated = truncate_text(text, available);
             format!("{}{}{}{}", c.dim, c.green, truncated, c.reset)
         }
@@ -416,9 +377,6 @@ impl<'s> PrintTracer<'s> {
         self.add_subline(symbol, &content);
     }
 
-    /// Format match content for instruction line (matches dump format exactly).
-    ///
-    /// Order: field/type/predicate content, one effects group, then successors.
     fn format_match_content(&self, m: &Match<'_>) -> String {
         self.render.trace_match_content(m)
     }
@@ -445,14 +403,12 @@ impl<'s> PrintTracer<'s> {
         self.lines.push(line);
     }
 
-    /// Add a sub-line (blank address area + symbol + content).
     fn add_subline(&mut self, symbol: Symbol, content: &str) {
         let addr_area = cols::INDENT + self.addr_width + cols::GAP;
         let prefix = format!("{:addr_area$}{} ", "", symbol.format());
         self.lines.push(format!("{prefix}{content}"));
     }
 
-    /// Format definition name (blue). User definitions get parentheses.
     fn format_def_ref(&self, name: &str) -> String {
         let c = self.colors;
         if name.starts_with('_') {
@@ -467,7 +423,6 @@ impl<'s> PrintTracer<'s> {
         format!("{}{}{}:", c.blue, name, c.reset)
     }
 
-    /// Push a definition header, with empty line separator (except for first header).
     fn push_def_header(&mut self, name: &str) {
         if !self.lines.is_empty() {
             self.lines.push(String::new());
@@ -476,7 +431,6 @@ impl<'s> PrintTracer<'s> {
     }
 
     fn format_cache_line_separator(&self) -> String {
-        // Content spans TOTAL_WIDTH (same as instruction lines before successors)
         let c = self.colors;
         format!(
             "{:indent$}{}{}{}",
@@ -488,10 +442,6 @@ impl<'s> PrintTracer<'s> {
         )
     }
 
-    /// Check if IPs cross a cache line boundary and insert separator if so.
-    ///
-    /// Cache line = 64 bytes = 8 bytecode words.
-    /// Only shows separator in verbose modes (-v, -vv).
     fn check_cache_line_boundary(&mut self, ip: CodeAddr) {
         if self.verbosity == Verbosity::Default {
             self.prev_ip = Some(ip);
@@ -514,7 +464,6 @@ impl Tracer for PrintTracer<'_> {
 
         match instr {
             Instruction::Match(m) => {
-                // Show ε for epsilon instructions, empty otherwise (nav shown in sublines)
                 let symbol = if m.is_epsilon() {
                     Symbol::EPSILON
                 } else {
@@ -589,9 +538,7 @@ impl Tracer for PrintTracer<'_> {
         self.add_subline(trace::MATCH_SUCCESS, &format!("{}:", name));
     }
 
-    fn trace_field_failure(&mut self, _node: Node<'_>) {
-        // Field failures are silent - we just backtrack
-    }
+    fn trace_field_failure(&mut self, _node: Node<'_>) {}
 
     fn trace_predicate_failure(&mut self, _node: Node<'_>) {
         if self.verbosity == Verbosity::Default {
@@ -663,7 +610,6 @@ impl Tracer for PrintTracer<'_> {
             .pop()
             .expect("trace_return requires balanced call stack");
         let content = self.format_def_ref(&name);
-        // Show ◼ when returning from top-level (stack now empty)
         let is_top_level = self.call_stack.is_empty();
         let successor = match (is_top_level, port.to_byte()) {
             (true, 0) => "◼".to_string(),
@@ -691,9 +637,6 @@ impl Tracer for PrintTracer<'_> {
             .checkpoints
             .pop()
             .expect("backtrack without checkpoint");
-        // Backtracking can restore a frame that already returned. Retain the
-        // checkpoint's actual call path rather than only its depth, which can
-        // shrink a trace stack but cannot reconstruct a popped callee name.
         self.call_stack = checkpoint.call_stack;
         assert_eq!(
             self.call_stack.len(),
