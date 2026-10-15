@@ -364,10 +364,9 @@ impl Query {
         self.parsed.definition_names()
     }
 
-    #[allow(clippy::result_large_err)]
-    fn into_analyzed(self) -> Result<AnalyzedQuery, Query> {
+    pub(crate) fn bind(self, grammar: &Grammar) -> BindOutcome {
         if self.parsed.diag.has_errors() {
-            return Err(self);
+            return BindOutcome::Invalid(Box::new(self));
         }
 
         let Query { parsed, analysis } = self;
@@ -377,14 +376,7 @@ impl Query {
                  analysis artifacts"
             )
         });
-        Ok(AnalyzedQuery { parsed, analysis })
-    }
-
-    pub(crate) fn bind(self, grammar: &Grammar) -> BindOutcome {
-        let mut analyzed = match self.into_analyzed() {
-            Ok(analyzed) => analyzed,
-            Err(query) => return BindOutcome::Invalid(Box::new(query)),
-        };
+        let mut analyzed = AnalyzedQuery { parsed, analysis };
 
         let mut output = GrammarBindingBuilder::new();
         output.identity(grammar.identity().cloned());
