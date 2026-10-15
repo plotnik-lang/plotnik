@@ -1,12 +1,9 @@
-//! Shared target-neutral compile and bytecode emission paths.
-
 use plotnik_compiler::bytecode::Module;
 use plotnik_compiler::grammar::Grammar;
 use plotnik_compiler::{BytecodeConfig, CompiledQuery, QueryBuilder, SourceMap};
 
 use crate::error::{CliError, write_stderr};
 
-/// Parse, analyze, bind, lower, and validate target-neutral compiler IR.
 pub fn compile_query(
     sources: SourceMap,
     grammar: &Grammar,

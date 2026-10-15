@@ -39,7 +39,6 @@ pub fn run(args: InferArgs) -> CliResult {
         Some("null") => TypeScriptMatchOnlyType::Null,
         _ => TypeScriptMatchOnlyType::Undefined,
     };
-    // Only use colors when outputting to stdout (not to file)
     let use_colors = args.color && args.output.is_none();
     let config = TypeScriptCodegenConfig::new()
         .export(args.export)

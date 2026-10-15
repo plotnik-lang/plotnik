@@ -1,5 +1,3 @@
-//! Extract compiler command options from clap matches.
-
 use std::path::PathBuf;
 
 use clap::ArgMatches;

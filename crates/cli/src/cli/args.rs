@@ -1,9 +1,3 @@
-//! Shared argument builders for CLI commands.
-//!
-//! Each function returns a `clap::Arg` that can be composed into commands.
-//! This allows the same arg definition to be reused across commands with
-//! different visibility settings (via `.hide(true)`).
-
 use std::path::PathBuf;
 
 use clap::{Arg, ArgAction, value_parser};

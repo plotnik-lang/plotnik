@@ -10,7 +10,6 @@ fn cache(root: &Path, entry: &str) {
     let dir = root.join(entry);
     fs::create_dir_all(&dir).expect("create cache fixture");
     fs::write(dir.join("grammar.json"), GRAMMAR).expect("write grammar fixture");
-    // Invalid WASM isolates metadata loading from source-parser initialization.
     fs::write(dir.join("parser.wasm"), b"not wasm").expect("write invalid parser fixture");
 }
 

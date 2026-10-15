@@ -1,7 +1,3 @@
-//! Command builders for the CLI.
-//!
-//! Each command is built using the shared arg builders from `args.rs`.
-
 use std::path::PathBuf;
 
 use clap::{Arg, ArgGroup, Command, value_parser};
@@ -19,7 +15,6 @@ fn with_hidden_trace_args(cmd: Command) -> Command {
         .arg(no_result_arg().hide(true))
 }
 
-// Hidden runtime-limit options for tree.
 fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
     cmd.arg(fuel_arg().hide(true))
         .arg(max_memory_arg().hide(true))

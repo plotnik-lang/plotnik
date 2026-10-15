@@ -207,7 +207,6 @@ impl LanguageOptions {
         };
         let json_url = format!("{url}/grammar.json{query}");
 
-        // Each GET can resolve a moving branch or a new toolchain build. Never mix them.
         for _ in 0..PAIR_ATTEMPTS {
             let json = fetch(&json_url)?;
             let wasm = fetch(&format!("{url}/parser.wasm{query}"))?;

@@ -44,9 +44,7 @@ pub fn writeln_stderr(args: fmt::Arguments<'_>) -> CliResult {
 
 #[derive(Debug)]
 pub enum CliError {
-    /// The domain answer is "no". Any explanation has already been printed.
     No,
-    /// Couldn't answer. The message is printed by `main` as `error: …`.
     Fatal(String),
 }
 

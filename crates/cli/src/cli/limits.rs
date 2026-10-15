@@ -1,5 +1,3 @@
-//! Runtime command limits.
-
 use clap::Arg;
 use plotnik_compiler::{Limit, RuntimeLimitSpec};
 
@@ -47,7 +45,6 @@ pub fn limits_preset_arg() -> Arg {
         .help("Runtime limit preset: 'auto' (default) or 'unbounded'")
 }
 
-/// `auto` | `unbounded` | a non-negative fuel amount.
 pub(crate) fn parse_fuel(raw: &str) -> Result<String, String> {
     if keyword(raw) {
         return Ok(raw.to_string());
@@ -60,7 +57,6 @@ pub(crate) fn parse_fuel(raw: &str) -> Result<String, String> {
         })
 }
 
-/// `auto` | `unbounded` | a binary size (`64MiB`, `512KiB`, `1GiB`, or bytes).
 pub(crate) fn parse_memory(raw: &str) -> Result<String, String> {
     if keyword(raw) {
         return Ok(raw.to_string());
@@ -75,9 +71,6 @@ fn keyword(raw: &str) -> bool {
     )
 }
 
-/// Parse a byte size with binary units only: a bare integer is bytes; `KiB`,
-/// `MiB`, `GiB` (case-insensitive) scale by 1024^n. SI units (`KB`/`MB`/`GB`)
-/// are rejected as ambiguous rather than silently reinterpreted.
 pub(crate) fn parse_size(raw: &str) -> Result<u64, String> {
     let s = raw.trim();
     if s.is_empty() {

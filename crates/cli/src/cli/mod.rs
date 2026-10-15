@@ -7,7 +7,6 @@ pub use limits::runtime_limits;
 pub use commands::build_cli;
 pub use dispatch::{CheckOpts, DumpOpts, GenerateOpts, InferOpts};
 
-/// Bare `.ptk` invocation still routes to the retained `run` command.
 pub fn route_default_subcommand(mut args: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
     if let Some(first) = args.get(1)
         && !first.as_encoded_bytes().starts_with(b"-")
@@ -66,9 +65,6 @@ impl ColorChoice {
                 if std::env::var_os("TERM").is_some_and(|t| t == "dumb") {
                     return false;
                 }
-                // Check both streams: if either is piped, disable colors.
-                // This handles `run query.ptk app.js | jq` where stdout is piped
-                // but stderr (diagnostics) is still a TTY.
                 std::io::IsTerminal::is_terminal(&std::io::stdout())
                     && std::io::IsTerminal::is_terminal(&std::io::stderr())
             }

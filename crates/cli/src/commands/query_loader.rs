@@ -63,7 +63,6 @@ fn load_file(path: &Path) -> Result<QuerySources, CliError> {
     })
 }
 
-/// Merge all `.ptk` files in a directory into one namespace.
 fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
     let entries = fs::read_dir(dir).map_err(|error| {
         CliError::fatal(format!(
