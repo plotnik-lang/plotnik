@@ -84,13 +84,6 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
         }
     }
 
-    if paths.is_empty() {
-        return Err(CliError::fatal(format!(
-            "no .ptk files found in workspace '{}'",
-            dir.display()
-        )));
-    }
-
     paths.sort();
 
     let mut sources = SourceMap::new();

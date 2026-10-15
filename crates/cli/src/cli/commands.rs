@@ -10,11 +10,6 @@ fn with_hidden_exec_args(cmd: Command) -> Command {
         .arg(compact_arg().hide(true))
 }
 
-fn with_hidden_trace_args(cmd: Command) -> Command {
-    cmd.arg(verbose_arg().hide(true))
-        .arg(no_result_arg().hide(true))
-}
-
 fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
     cmd.arg(fuel_arg().hide(true))
         .arg(max_memory_arg().hide(true))
@@ -36,13 +31,23 @@ pub fn build_cli() -> Command {
 
 Run 'plotnik <command> --help' for options."#,
         )
-        .subcommand(run_command())
+        .subcommand(execution_command(
+            "exec",
+            "Apply a query once at the source root",
+        ))
+        .subcommand(execution_command(
+            "find",
+            "Find the first match in the source tree",
+        ))
+        .subcommand(execution_command(
+            "find-all",
+            "Find all matches in the source tree",
+        ))
         .subcommand(check_command())
         .subcommand(tree_command())
         .subcommand(infer_command())
         .subcommand(generate_command())
         .subcommand(dump_command())
-        .subcommand(trace_command())
         .subcommand(lang_command())
         .subcommand(completions_command())
 }
@@ -114,7 +119,7 @@ pub fn tree_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_runtime_limit_args(with_hidden_trace_args(with_hidden_exec_args(cmd)))
+    with_hidden_runtime_limit_args(with_hidden_exec_args(cmd))
 }
 
 pub fn check_command() -> Command {
@@ -196,64 +201,51 @@ pub fn infer_command() -> Command {
         .arg(color_arg())
 }
 
-pub fn run_command() -> Command {
-    let cmd = Command::new("run")
-        .alias("exec")
-        .about("Execute a query")
-        .override_usage(
-            "\
-  plotnik run <PATH> <FILE>
-  plotnik run -q <QUERY> <FILE>
-  plotnik run -q <QUERY> -s <SOURCE> -l <LANG>",
+fn execution_command(name: &'static str, about: &'static str) -> Command {
+    Command::new(name)
+        .about(about)
+        .override_usage(format!(
+            "plotnik {name} <PATH> <FILE> --entry <NAME> [OPTIONS]\n  plotnik {name} - [PATH] <FILE> [OPTIONS]"
+        ))
+        .after_help(
+            "PATH is a saved PTK file or directory of .ptk files.\n\
+             A leading '-' reads a PTK expression from stdin. Saved definitions\n\
+             can support that expression. Without stdin, --entry is required.\n\
+             FILE is exactly one programming-language source file, always last.\n\
+             Its extension selects the grammar unless --lang overrides it.\n\
+             PTK language tags group directory members, not grammar selection.\n\n\
+             exec applies once at the root. find and find-all search inclusive,\n\
+             source-order depth-first, retaining nested matches. find returns\n\
+             the first result. find-all returns one JSON array, empty if unmatched.",
         )
-        .arg(query_path_arg())
-        .arg(source_path_arg())
+        .arg(
+            Arg::new("inputs")
+                .value_name("INPUT")
+                .value_parser(value_parser!(PathBuf))
+                .num_args(1..=3)
+                .action(clap::ArgAction::Append)
+                .required(true)
+                .help("PTK input first, one source FILE last"),
+        )
         .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(source_text_arg())
         .arg(lang_arg())
         .arg(cache_dir_arg())
         .arg(entry_arg())
         .next_help_heading("Output options")
         .arg(compact_arg())
-        .next_help_heading("Limit options")
-        .arg(fuel_arg())
-        .arg(max_memory_arg())
-        .arg(limits_preset_arg())
-        .next_help_heading("Global options")
-        .arg(color_arg());
-
-    with_hidden_trace_args(cmd)
-}
-
-pub fn trace_command() -> Command {
-    let cmd = Command::new("trace")
-        .about("Trace query execution")
-        .override_usage(
-            "\
-  plotnik trace <PATH> <FILE>
-  plotnik trace -q <QUERY> <FILE>
-  plotnik trace -q <QUERY> -s <SOURCE> -l <LANG>",
+        .arg(
+            Arg::new("trace")
+                .long("trace")
+                .action(clap::ArgAction::SetTrue)
+                .help("Trace attempted matches to stderr, keeping result JSON on stdout"),
         )
-        .arg(query_path_arg())
-        .arg(source_path_arg())
-        .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(source_text_arg())
-        .arg(lang_arg())
-        .arg(cache_dir_arg())
-        .arg(entry_arg())
-        .next_help_heading("Trace options")
-        .arg(verbose_arg())
-        .arg(no_result_arg())
+        .arg(verbose_arg().requires("trace"))
         .next_help_heading("Limit options")
         .arg(fuel_arg())
         .arg(max_memory_arg())
         .arg(limits_preset_arg())
         .next_help_heading("Global options")
-        .arg(color_arg());
-
-    cmd.arg(compact_arg().hide(true))
+        .arg(color_arg())
 }
 
 pub fn lang_command() -> Command {

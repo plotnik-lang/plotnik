@@ -56,18 +56,15 @@ fn individual_selection_uses_loaded_name_and_metadata_only() {
 
     let file = root.path().join("query.ptk");
     fs::write(&file, "// @Test_lang\nQ = (program)").unwrap();
-    for command in ["check", "run", "trace"] {
-        let mut args = vec![command, file.to_str().unwrap(), "--lang", "owner/repo@main"];
-        if command != "check" {
-            args.extend(["-s", "hello"]);
-        }
-        let conflict = run(root.path(), &args);
+    let conflict = run(
+        root.path(),
+        &["check", file.to_str().unwrap(), "--lang", "owner/repo@main"],
+    );
 
-        assert_eq!(conflict.status.code(), Some(1), "{conflict:?}");
-        let stderr = String::from_utf8(conflict.stderr).unwrap();
-        assert!(stderr.contains("query.ptk:1:5"), "{stderr}");
-        assert!(stderr.contains("declared language 'Test_lang' does not match loaded grammar 'test_lang' selected by --lang 'owner/repo@main'"), "{stderr}");
-    }
+    assert_eq!(conflict.status.code(), Some(1), "{conflict:?}");
+    let stderr = String::from_utf8(conflict.stderr).unwrap();
+    assert!(stderr.contains("query.ptk:1:5"), "{stderr}");
+    assert!(stderr.contains("declared language 'Test_lang' does not match loaded grammar 'test_lang' selected by --lang 'owner/repo@main'"), "{stderr}");
 
     let unknown_node = run(
         root.path(),

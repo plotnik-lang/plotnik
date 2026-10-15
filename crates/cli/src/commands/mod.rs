@@ -1,6 +1,7 @@
 pub mod check;
 pub mod compile;
 pub mod dump;
+pub mod exec;
 pub mod generate;
 pub mod grammar;
 pub mod infer;
@@ -8,5 +9,4 @@ pub mod inputs;
 pub mod lang;
 pub mod language;
 pub mod query_loader;
-pub mod run;
 pub mod tree;

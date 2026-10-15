@@ -22,7 +22,7 @@ pub fn run(args: DumpArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let artifacts = args.language.load_query(&loaded, None, args.color)?;
+    let artifacts = args.language.load_query(&loaded, args.color)?;
     let module = compile_module(loaded.sources, &artifacts.grammar, args.color)?;
     let colors = Colors::new(args.color);
     write_stdout(format_args!("{}", dump(&module, colors)))?;

@@ -7,18 +7,6 @@ pub use limits::runtime_limits;
 pub use commands::build_cli;
 pub use dispatch::{CheckOpts, DumpOpts, GenerateOpts, InferOpts};
 
-pub fn route_default_subcommand(mut args: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
-    if let Some(first) = args.get(1)
-        && !first.as_encoded_bytes().starts_with(b"-")
-        && std::path::Path::new(first)
-            .extension()
-            .is_some_and(|ext| ext == "ptk")
-    {
-        args.insert(1, "run".into());
-    }
-    args
-}
-
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ColorChoice {
     #[default]

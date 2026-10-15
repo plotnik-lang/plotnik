@@ -114,12 +114,7 @@ impl LanguageOptions {
         self.load_selected(input)
     }
 
-    pub fn load_query(
-        &self,
-        query: &QuerySources,
-        source: Option<&Path>,
-        color: bool,
-    ) -> Result<Artifacts, CliError> {
+    pub fn load_query(&self, query: &QuerySources, color: bool) -> Result<Artifacts, CliError> {
         if query.is_directory {
             if self.lang.is_none() {
                 return Err(CliError::fatal("query directories require --lang"));
@@ -150,8 +145,6 @@ impl LanguageOptions {
             .or_else(|| declaration.as_ref().map(|declaration| declaration.language))
         {
             self.load_selected(input)?
-        } else if source.is_some() {
-            self.load(source)?
         } else {
             return Err(CliError::fatal(
                 "query language required: use --lang or a first-line @language declaration",

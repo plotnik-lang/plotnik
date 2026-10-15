@@ -19,13 +19,6 @@ pub fn query_text_arg() -> Arg {
         .help("Inline query text")
 }
 
-pub fn source_path_arg() -> Arg {
-    Arg::new("source_path")
-        .value_name("FILE")
-        .value_parser(value_parser!(PathBuf))
-        .help("Source file or '-' for stdin")
-}
-
 pub fn source_text_arg() -> Arg {
     Arg::new("source_text")
         .short('s')
@@ -152,11 +145,4 @@ pub fn verbose_arg() -> Arg {
         .short('v')
         .action(ArgAction::Count)
         .help("Verbosity level (-v for verbose, -vv for very verbose)")
-}
-
-pub fn no_result_arg() -> Arg {
-    Arg::new("no_result")
-        .long("no-result")
-        .action(ArgAction::SetTrue)
-        .help("Skip materialization, show the execution trace only")
 }

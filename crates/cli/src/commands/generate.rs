@@ -44,7 +44,7 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let artifacts = args.language.load_query(&loaded, None, args.color)?;
+    let artifacts = args.language.load_query(&loaded, args.color)?;
     let compiled = compile_query(loaded.sources, &artifacts.grammar, args.color)?;
 
     match args.target {

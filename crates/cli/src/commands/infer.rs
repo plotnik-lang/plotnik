@@ -32,7 +32,7 @@ pub fn run(args: InferArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let artifacts = args.language.load_query(&loaded, None, args.color)?;
+    let artifacts = args.language.load_query(&loaded, args.color)?;
     let compiled = compile_query(loaded.sources, &artifacts.grammar, args.color)?;
 
     let match_only_type = match args.match_only_type.as_deref() {

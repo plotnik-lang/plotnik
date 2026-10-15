@@ -2,7 +2,7 @@ use plotnik_compiler::bytecode::Module;
 use plotnik_compiler::grammar::Grammar;
 use plotnik_compiler::{BytecodeConfig, CompiledQuery, QueryBuilder, SourceMap};
 
-use crate::error::{CliError, write_stderr};
+use crate::error::{CliError, CliResult, write_stderr};
 
 pub fn compile_query(
     sources: SourceMap,
@@ -13,16 +13,21 @@ pub fn compile_query(
         .compile(grammar)
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
+    report_errors(&compiled, color)?;
+    Ok(compiled)
+}
+
+pub fn report_errors(compiled: &CompiledQuery, color: bool) -> CliResult {
     let diagnostics = compiled.diagnostics();
-    if diagnostics.has_errors() {
-        write_stderr(format_args!(
-            "{}",
-            diagnostics.render_colored(compiled.source_map(), color)
-        ))?;
-        return Err(CliError::No);
+    if !diagnostics.has_errors() {
+        return Ok(());
     }
 
-    Ok(compiled)
+    write_stderr(format_args!(
+        "{}",
+        diagnostics.render_colored(compiled.source_map(), color)
+    ))?;
+    Err(CliError::No)
 }
 
 pub fn compile_module(
@@ -31,16 +36,12 @@ pub fn compile_module(
     color: bool,
 ) -> Result<Module, CliError> {
     let compiled = compile_query(sources, grammar, color)?;
-    emit_module(&compiled, BytecodeConfig::new(), color)
+    emit_module(&compiled, color)
 }
 
-pub fn emit_module(
-    compiled: &CompiledQuery,
-    config: BytecodeConfig,
-    color: bool,
-) -> Result<Module, CliError> {
+pub fn emit_module(compiled: &CompiledQuery, color: bool) -> Result<Module, CliError> {
     let emission = compiled
-        .emit(config)
+        .emit(BytecodeConfig::new())
         .map_err(|error| CliError::fatal(error.to_string()))?;
     let has_errors = emission.diagnostics().has_errors();
     if !emission.diagnostics().is_empty() {

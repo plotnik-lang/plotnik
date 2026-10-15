@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 use clap::ArgMatches;
 
-use cli::{CheckOpts, DumpOpts, GenerateOpts, InferOpts, build_cli, route_default_subcommand};
+use cli::{CheckOpts, DumpOpts, GenerateOpts, InferOpts, build_cli};
 use error::{CliError, CliResult};
 
 fn main() -> ExitCode {
@@ -18,8 +18,7 @@ fn main() -> ExitCode {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
     }
 
-    let args = route_default_subcommand(std::env::args_os().collect());
-    let matches = build_cli().get_matches_from(args);
+    let matches = build_cli().get_matches();
 
     match dispatch(&matches) {
         Ok(()) => ExitCode::SUCCESS,
@@ -46,8 +45,7 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
             let params = GenerateOpts::from_matches(m);
             commands::generate::run(params.into())
         }
-        Some(("run", m)) => commands::run::run(m, commands::run::Mode::Run),
-        Some(("trace", m)) => commands::run::run(m, commands::run::Mode::Trace),
+        Some((command @ ("exec" | "find" | "find-all"), m)) => commands::exec::run(m, command),
         Some(("lang", m)) => match m.subcommand() {
             Some(("dump", m)) => commands::lang::run_dump(m),
             _ => unreachable!("clap should have caught this"),

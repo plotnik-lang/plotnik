@@ -7,40 +7,52 @@ use crate::error::CliError;
 
 pub struct Inputs<'a> {
     pub query_path: Option<&'a Path>,
-    pub query_text: Option<&'a str>,
-    pub source_path: Option<&'a Path>,
-    pub source_text: Option<&'a str>,
+    /// No named entry means a leading '-' selected the stdin expression.
+    pub entry: Option<&'a str>,
+    pub source_path: &'a Path,
 }
 
 impl<'a> Inputs<'a> {
     pub fn from_matches(m: &'a ArgMatches) -> Result<Self, CliError> {
-        let mut query_path = m.get_one::<PathBuf>("query_path").map(PathBuf::as_path);
-        let query_text = m.get_one::<String>("query_text").map(String::as_str);
-        let mut source_path = m.get_one::<PathBuf>("source_path").map(PathBuf::as_path);
-        let source_text = m.get_one::<String>("source_text").map(String::as_str);
-        // With an inline query, clap puts a lone source file in the first optional
-        // positional slot. Interpret it before checking for conflicting inputs.
-        if query_text.is_some() && source_path.is_none() && source_text.is_none() {
-            source_path = query_path.take();
-        }
-        if query_text.is_some() && query_path.is_some() {
+        let paths: Vec<_> = m
+            .get_many::<PathBuf>("inputs")
+            .expect("clap requires positional input")
+            .map(PathBuf::as_path)
+            .collect();
+        let (source_path, query_paths) = paths.split_last().expect("clap requires inputs");
+        let expression = query_paths
+            .first()
+            .is_some_and(|path| *path == Path::new("-"));
+        let query_path = match (expression, query_paths) {
+            (true, [_]) => None,
+            (true, [_, path]) | (false, [path]) => Some(*path),
+            _ => {
+                return Err(CliError::fatal(
+                    "expected one saved PTK path, or leading '-' with an optional saved PTK path, then one source FILE",
+                ));
+            }
+        };
+        if *source_path == Path::new("-") || query_path == Some(Path::new("-")) {
             return Err(CliError::fatal(
-                "with --query, use either one source file or --source for inline text",
+                "only a leading '-' can read stdin; the source must be a file",
             ));
         }
-        if source_text.is_some() && source_path.is_some() {
+
+        let entry = m.get_one::<String>("entry").map(String::as_str);
+        if expression && entry.is_some() {
             return Err(CliError::fatal(
-                "use either a source file or --source for inline text",
+                "--entry conflicts with the stdin expression entrypoint",
             ));
         }
-        if query_path == Some(Path::new("-")) && source_path == Some(Path::new("-")) {
-            return Err(CliError::fatal("query and source cannot both read stdin"));
+
+        if !expression && entry.is_none() {
+            return Err(CliError::fatal("saved PTK input requires --entry NAME"));
         }
+
         Ok(Self {
             query_path,
-            query_text,
+            entry,
             source_path,
-            source_text,
         })
     }
 }

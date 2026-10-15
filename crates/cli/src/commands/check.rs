@@ -21,7 +21,7 @@ pub fn run(args: CheckArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let artifacts = args.language.load_query(&loaded, None, args.color)?;
+    let artifacts = args.language.load_query(&loaded, args.color)?;
     let checked = QueryBuilder::new(loaded.sources)
         .with_strict_lints(args.strict)
         .compile(&artifacts.grammar)
