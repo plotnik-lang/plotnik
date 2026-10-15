@@ -1,12 +1,3 @@
-//! Single source of truth for "what value shape does a capture hold".
-//!
-//! Inference and emission both have to decide what a `@capture` produces.
-//! Historically they re-derived this from overlapping but divergent syntactic
-//! predicates, which is exactly what let the declared type and the emitted
-//! effects disagree (issue #420). This classifier answers the question once,
-//! reading the inner expression's already-inferred type, so both sides stay in
-//! lockstep.
-
 use std::collections::HashMap;
 
 use crate::compiler::analyze::refs::DefinitionGraph;
@@ -16,28 +7,15 @@ use crate::compiler::analyze::types::type_shape::{
 };
 use crate::compiler::parse::ast::{Pattern, is_empty_group};
 
-/// How a captured value is produced — the bridge between the inferred type and
-/// the emitted effects.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CaptureKind {
-    /// The matched tree-sitter node itself (`Node` effect). If the inner has
-    /// bubbling child captures, they set into the enclosing scope as siblings.
     Node,
-    /// A fresh record built from the inner sequence/alternation's bubbling captures.
     Record,
-    /// A reference whose definition returns a structured type. The call site wraps
-    /// the `Call`/`Return` in a record scope when needed and observes the result —
-    /// the capture emits no `Node`.
     Ref,
-    /// The inner expression itself leaves the captured value pending — a
-    /// value-producing labeled alternation (lowered as `VariantOpen … VariantClose`). Emit
-    /// the inner, then a trailing `RecordSet`; the capture contributes no `Node` and no wrapper.
     PendingValue,
-    /// A list collected by `*` or `+` (`ListOpen … ArrayPush … ListClose`).
     List,
 }
 
-/// Capture value-mechanism classification while analysis is in progress.
 impl TypeAnalysis {
     fn classify<'a>(
         &'a self,
@@ -45,20 +23,12 @@ impl TypeAnalysis {
         definitions: &DefinitionGraph,
         mode: CaptureLookupMode<'a>,
     ) -> CaptureKind {
-        // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
-        // constraint, so the value mechanism is that of `x`.
         let pattern = unwrap_field(inner);
 
         if let Pattern::QuantifiedPattern(quant) = &pattern {
             let kind = mode.quantifier_kind(quant);
             return match kind {
-                // `*` / `+` collect into a list regardless of element shape.
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::List,
-                // `?` adds an option layer to the inner's value mechanism — except a
-                // fields-flow inner, whose captures the `?` collects as one
-                // option of a record (the `?` counterpart of `*`'s list). That holds
-                // for a named node too, even though its bare capture is a
-                // `Node`: quantified, its fields have nowhere to bubble.
                 QuantifierKind::Optional => {
                     let Some(inner) = quant.inner() else {
                         return mode.recover(
@@ -78,49 +48,33 @@ impl TypeAnalysis {
             };
         }
 
-        // A reference whose definition returns a structured type: the call site does
-        // its own Call/Return and record scoping. A reference to a node-valued or
-        // match-only definition falls through to `Node` — its matched node is captured
-        // directly.
         if self.ref_structured(&pattern, definitions, mode) {
             return CaptureKind::Ref;
         }
 
-        // An empty `{}` is an empty record scope.
         if is_empty_group(&pattern) {
             return CaptureKind::Record;
         }
 
-        // Everything else is decided by the inner's inferred data flow, so the type
-        // and the emitted effects can't disagree.
         let Some(flow) = mode.pattern_flow(self, &pattern) else {
             return CaptureKind::Node;
         };
 
         match flow {
-            // Bubbling captures: a sequence/alternation wraps them in a fresh record
-            // scope; a named node instead captures its matched node and lets the
-            // children bubble alongside as sibling fields.
             PatternFlow::Fields(_) => {
-                // A captured labeled alternation is a value context, so its variant type
-                // flows as `Value` (handled below); an unlabeled alternation flows `Fields`.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Alternation(_)) {
                     CaptureKind::Record
                 } else {
                     CaptureKind::Node
                 }
             }
-            // A structured value left pending by the inner itself — a value-producing
-            // variant type lowered through `VariantOpen`/`VariantClose`.
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue
             }
-            // Match-only, or a plain node value: the matched node is captured directly.
             _ => CaptureKind::Node,
         }
     }
 
-    /// Whether `pattern` is a reference to a definition that returns a structured type.
     pub fn ref_returns_structured(&self, pattern: &Pattern, definitions: &DefinitionGraph) -> bool {
         self.ref_structured(pattern, definitions, CaptureLookupMode::Admitted)
     }
@@ -138,8 +92,6 @@ impl TypeAnalysis {
             return mode.recover("admitted reference must resolve to a definition", false);
         };
 
-        // After inference the definition's registered result type is authoritative;
-        // this is the path emission always takes.
         if mode.is_admitted() {
             let Some(result_type) = self.expect_def_output(def_id).value() else {
                 return false;
@@ -165,9 +117,6 @@ impl TypeAnalysis {
             );
         }
 
-        // During inference a same-SCC target is not registered yet. Fall back to
-        // the reference's own inferred flow: a reference carries its target's
-        // result as a pending value (`Value`), structured or not.
         match mode.pattern_flow(self, pattern) {
             Some(PatternFlow::Value(t)) => self.is_structured_output(*t),
             _ => false,
@@ -176,11 +125,6 @@ impl TypeAnalysis {
 }
 
 impl TypeAnalysisView<'_> {
-    /// Classification used while inference is still constructing [`TypeAnalysis`].
-    ///
-    /// In-progress inference can legitimately ask before every definition output has
-    /// been memoized, so this view keeps the conservative fallbacks off the frozen
-    /// artifact's API.
     pub(crate) fn capture_kind(
         &self,
         inner: &Pattern,
@@ -242,7 +186,6 @@ impl<'a> CaptureLookupMode<'a> {
     }
 }
 
-/// Look through a `field: x` wrapper to the value it constrains.
 fn unwrap_field(pattern: &Pattern) -> Pattern {
     match pattern {
         Pattern::FieldPattern(f) => f.value().unwrap_or_else(|| pattern.clone()),

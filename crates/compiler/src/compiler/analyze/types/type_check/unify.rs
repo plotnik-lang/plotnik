@@ -1,5 +1,3 @@
-//! Unification logic for unlabeled alternation results.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::compiler::analyze::types::capture::{InferredField, InferredFieldFlow};

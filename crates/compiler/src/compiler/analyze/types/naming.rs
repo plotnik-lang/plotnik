@@ -1,22 +1,3 @@
-//! Type naming pass: every result type gets its name at compile time.
-//!
-//! Runs after inference, before the analysis freezes. Names come from exactly
-//! three places, mirroring where result-producing syntax is written:
-//!
-//! - A definition's result type carries the definition's name.
-//! - A composite reached through field `f` of a type named `T` is `T` +
-//!   PascalCase(`f`), landing on list/option *elements*. Variant-case
-//!   payload records stay anonymous (rendered inline); composites inside a
-//!   payload fields are named variant type name + verbatim label + PascalCase(field).
-//! - A custom `:: TypeName` capture type overrides the generated name and
-//!   restarts the chain below it.
-//!
-//! Names are nominal: the same name may recur only for structurally identical
-//! types (they collapse into one emission). Any other collision is a compile
-//! error carrying both sites. `Node` and definition names are reserved.
-//! Downstream (bytecode emission, typegen) renders names; it never invents
-//! them.
-
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 
@@ -31,8 +12,6 @@ use crate::core::utils::to_pascal_case;
 use crate::core::{Interner, Symbol};
 
 struct Claim {
-    /// The type this name stands for; `None` reserves the name without a type
-    /// (builtins, match-only definitions).
     type_id: Option<TypeId>,
     span: Option<Span>,
 }
@@ -80,8 +59,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         self.ctx.set_named_types(self.names);
     }
 
-    /// Transient expression shapes need no generated nominal name. Explicit
-    /// capture names still obey the module's ordinary type-name rules.
     fn claim_expression_types(&mut self, source: Option<crate::compiler::diagnostics::SourceId>) {
         let Some(source) = source else {
             return;
@@ -110,9 +87,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         );
     }
 
-    /// Pass 1: every definition claims its declaration name. Definition names
-    /// stay attached to their declarations rather than to an interned body
-    /// shape; match-only definitions still reserve the name.
     fn claim_definitions(&mut self, definitions: &DefinitionGraph) {
         for def_id in definitions.ids_in_def_id_order() {
             let definition = definitions.definition(def_id);
@@ -130,7 +104,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    /// Pass 2: descend each definition's result, naming nested composites.
     fn walk_definitions(&mut self, definitions: &DefinitionGraph) {
         for def_id in definitions.ids_in_def_id_order() {
             let output = self
@@ -149,8 +122,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    /// Descend a record/variant type that already carries `name`, naming its nested
-    /// composites.
     fn walk_named(&mut self, type_id: TypeId, name: &str) {
         let shape = self
             .ctx
@@ -167,9 +138,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 }
             }
             TypeShape::Variant(cases) => {
-                // Variant payload records are anonymous (rendered inline as the
-                // case's data); composites inside their fields are named
-                // through the variant type name + the verbatim label.
                 for (label_sym, payload) in &cases {
                     let Some(payload) = payload.type_id() else {
                         continue;
@@ -191,8 +159,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    /// Name the composite (if any) behind a field's type, unwrapping list and
-    /// option wrappers so the name lands on the element.
     fn visit_field_element(&mut self, field_type: TypeId, parent_name: &str, field: &str) {
         let element = self.unwrap_wrappers(field_type);
         let generated = format!("{parent_name}{}", to_pascal_case(field));
@@ -210,9 +176,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         match shape {
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 if let Some(&existing) = self.names.get(&element) {
-                    // The composite already has a generated or explicit name;
-                    // a second capture type is redundant noise or a futile
-                    // rename.
                     self.check_capture_type_on_named(element, existing);
                     return;
                 }
@@ -253,8 +216,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     .declaration_definition(declaration)
                     .is_some()
                 {
-                    // A definition reference already has its declaration's name;
-                    // a capture type cannot rename it.
                     let Some(capture_type) = self.custom_capture_types.get(&element).copied()
                     else {
                         return;
@@ -338,9 +299,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    /// Claim `name` for `type_id`. The same name may recur for structurally
-    /// identical types (nominal identity: one name, one shape); anything else
-    /// is a compile error at the claimant's site, pointing back at the first.
     fn claim(&mut self, name: Symbol, type_id: Option<TypeId>, span: Option<Span>) -> bool {
         match self.claims.entry(name) {
             Entry::Vacant(slot) => {
@@ -364,8 +322,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     self.ctx.record_invalid_type(type_id);
                 }
                 let Some(span) = span.or(existing_span) else {
-                    // No span on either side cannot happen for user-written
-                    // conflicts: builtins never conflict with each other.
                     unreachable!("a name conflict always involves a user-written site");
                 };
                 let Some(diag) = self.diag.as_deref_mut() else {
@@ -388,10 +344,6 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
     }
 }
 
-/// Raw naming validation records exactly which types participate in a naming
-/// conflict so capture-type normalization cannot erase that error. It does not
-/// emit diagnostics or install names; the final naming pass reports raw and
-/// normalized-only conflicts once against the final graph.
 pub(crate) struct RawTypeNameValidator<'a> {
     ctx: &'a mut TypeAnalysisBuilder,
     interner: &'a mut Interner,

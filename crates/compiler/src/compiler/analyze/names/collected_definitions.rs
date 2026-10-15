@@ -1,9 +1,3 @@
-//! Transient definitions collected during name resolution.
-//!
-//! Names remain strings until dependency analysis assigns stable `DefId`s and
-//! interns them in SCC order. The completed map is then consumed into the
-//! definition graph; later compiler phases never retain this representation.
-
 use indexmap::IndexMap;
 
 use crate::compiler::diagnostics::source::SourceId;

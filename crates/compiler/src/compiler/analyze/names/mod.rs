@@ -1,5 +1,3 @@
-//! Name resolution: collect definitions and validate references.
-
 mod collected_definitions;
 mod resolve;
 

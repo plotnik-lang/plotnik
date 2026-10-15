@@ -2,13 +2,8 @@ use crate::compiler::analyze::grammar::model::KindConstraint;
 use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
 
-/// Grammar-wide indexes reused by the primary solve and diagnostic probes. They
-/// are independent of anchor mode and query automata, so relaxed probes can share
-/// them instead of rebuilding the same maps for every reported culprit.
 pub(super) struct GrammarFacts {
-    /// Concrete named, non-supertype kinds a wildcard parent could be.
     parent_candidate_kinds: Vec<NodeKindId>,
-    /// Visible extra kinds (comments), and the named subset, for extra-consumption.
     extras: Vec<NodeKindId>,
     named_extras: Vec<NodeKindId>,
 }
@@ -59,8 +54,6 @@ fn build_parent_candidate_kinds(grammar: &Grammar) -> Vec<NodeKindId> {
 }
 
 fn extra_kinds(grammar: &Grammar) -> (Vec<NodeKindId>, Vec<NodeKindId>) {
-    // Extras are mostly lexical tokens (comments), so they live in the grammar's
-    // extra set, not the syntax-variable structure.
     let extras = grammar.extra_node_kinds().to_vec();
     let named = extras
         .iter()

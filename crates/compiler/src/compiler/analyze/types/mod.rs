@@ -1,5 +1,3 @@
-//! Result-type inference over the query AST.
-
 mod capture;
 mod entrypoints;
 mod naming;

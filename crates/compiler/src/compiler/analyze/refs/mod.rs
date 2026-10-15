@@ -1,5 +1,3 @@
-//! Reference analysis: dependency graph and recursion validation.
-
 mod definition_graph;
 mod dependencies;
 mod recursion;

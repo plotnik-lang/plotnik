@@ -36,8 +36,6 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         self.bind_named_kind(located.source(), &type_token);
     }
 
-    /// Recovery inserts terminals. Both named and anonymous aliases can name a
-    /// syntax node, so eligibility comes from realizations, not spelling or shape.
     fn resolve_missing_node(&mut self, located: &Located<NamedNodePattern>) {
         let source = located.source();
         let (token, id) = match located.node().missing_arg() {
@@ -67,10 +65,6 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .emit();
     }
 
-    /// Resolve and bind a named node kind named by `token`, recording the id for
-    /// lowering and reporting `UnknownNodeKind` (with a suggestion) when the grammar
-    /// has no such kind. Returns the resolved id, or `None` if unknown. Idempotent:
-    /// a repeated name hits the resolution cache and neither re-binds nor re-reports.
     fn bind_named_kind(&mut self, source: SourceId, token: &SyntaxToken) -> Option<NodeKindId> {
         let type_name = token.text();
         let key = NodeKind::Named(token_src(token, self.content(source)));
@@ -102,9 +96,6 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         None
     }
 
-    /// Resolve and bind an anonymous (literal-token) kind from `value_token`,
-    /// reporting `UnknownNodeKind` when the grammar has no such token. Returns the
-    /// resolved id, or `None` if unknown. Caches identically to [`Self::bind_named_kind`].
     fn bind_anonymous_kind(
         &mut self,
         source: SourceId,
@@ -135,7 +126,6 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         None
     }
 
-    /// Return the first occurrence of an unknown field for contextual reporting.
     fn resolve_field_by_token(
         &mut self,
         source: SourceId,
@@ -178,10 +168,6 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         builder.emit();
     }
 
-    /// Resolve a child/value named-node pattern to its grammar id, mirroring node-context resolution
-    /// but returning just the id. `None` for `(_)`, `ERROR`, `MISSING`, or an unresolved kind
-    /// (the latter already reported by the resolution pass) — all of which carry no
-    /// check signal and are conservatively accepted.
     pub(super) fn resolve_named_node_id(
         &self,
         located: &Located<NamedNodePattern>,

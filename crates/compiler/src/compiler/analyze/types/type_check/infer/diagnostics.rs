@@ -68,8 +68,6 @@ impl InferVisitor<'_, '_> {
         })
     }
 
-    /// Report a captured quantifier whose no-value inner doesn't match exactly one
-    /// node: there is no single node to bind (per element, for repeats).
     pub(super) fn report_quantified_capture_without_single_node(
         &mut self,
         quant: &QuantifiedPattern,
@@ -162,10 +160,6 @@ impl InferVisitor<'_, '_> {
         builder.emit();
     }
 
-    /// Report a capture whose no-value inner doesn't match exactly one node —
-    /// whether several or possibly none, there is no single node to bind.
-    /// Without this, the capture would silently bind an arbitrary node (or one
-    /// per repeat), or dangle on an empty match.
     pub(super) fn report_capture_without_single_node(
         &mut self,
         inner: &Pattern,
@@ -215,7 +209,6 @@ impl InferVisitor<'_, '_> {
         builder.emit();
     }
 
-    /// Report a captured reference whose definition has no value to capture.
     pub(super) fn report_capture_on_match_only_ref(
         &mut self,
         inner: &Pattern,
@@ -258,7 +251,6 @@ impl InferVisitor<'_, '_> {
         true
     }
 
-    /// Report a repeat whose element is a reference that can match zero nodes.
     pub(super) fn report_nullable_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
         let op = self.quantifier_operator(quant);
         let definition = self
@@ -282,9 +274,6 @@ impl InferVisitor<'_, '_> {
         builder.emit();
     }
 
-    /// Report a quantifier-rooted definition whose element shape has no name
-    /// source. The definition names the collection (the list/option type);
-    /// naming the element takes its own definition.
     pub(super) fn report_unnamed_quantified_element(
         &mut self,
         quant: &QuantifiedPattern,
@@ -314,8 +303,6 @@ impl InferVisitor<'_, '_> {
             .emit();
     }
 
-    /// Report bubbling captures that need a repetition or optional capture to
-    /// package one record value per quantifier occurrence.
     pub(super) fn report_uncollected_quantified_captures(
         &mut self,
         quant: &QuantifiedPattern,
@@ -352,7 +339,6 @@ impl InferVisitor<'_, '_> {
             )
         };
 
-        // The suggestion lands beside sibling captures, so avoid names bound there.
         let mut taken = raw_names;
         let scope_root = enclosing_scope_root(quant.syntax());
         let mut scope_tokens = Vec::new();
@@ -386,8 +372,6 @@ impl InferVisitor<'_, '_> {
         .emit();
     }
 
-    /// Warn when labels appear in a fields context: they have no output effect,
-    /// and captures from the alternatives merge into the enclosing result.
     pub(super) fn report_unused_alternative_labels(&mut self, alternation: &AlternationPattern) {
         self.report(
             DiagnosticKind::UnusedAlternativeLabels,
@@ -455,7 +439,6 @@ impl InferVisitor<'_, '_> {
     }
 }
 
-/// Collect captures that contribute result fields to one result scope.
 fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToken>) {
     for child in scope_root.children() {
         if let Some(captured_pattern) = CapturedPattern::cast(child.clone()) {
@@ -471,7 +454,6 @@ fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToke
     }
 }
 
-/// Find the result scope that would receive the suggested capture.
 fn enclosing_scope_root(node: &SyntaxNode) -> SyntaxNode {
     let mut root = node.clone();
     for ancestor in node.ancestors().skip(1) {
@@ -495,8 +477,6 @@ fn is_pattern_node(node: &SyntaxNode) -> bool {
     Pattern::cast(node.clone()).is_some()
 }
 
-/// Decide whether a capture exposes its inner result fields to the surrounding result scope.
-/// Plain node captures do; structured captures, repetition captures, and discards contain them.
 fn inner_captures_bubble_up(captured_pattern: &CapturedPattern) -> bool {
     if captured_pattern.capture().is_discard() {
         return false;
@@ -504,7 +484,6 @@ fn inner_captures_bubble_up(captured_pattern: &CapturedPattern) -> bool {
     let mut inner = captured_pattern.inner();
     loop {
         match inner {
-            // A field constraint navigates to a child; it does not create a scope.
             Some(Pattern::FieldPattern(f)) => inner = f.value(),
             Some(Pattern::QuantifiedPattern(q)) => {
                 if q.is_repeating() {
@@ -518,7 +497,6 @@ fn inner_captures_bubble_up(captured_pattern: &CapturedPattern) -> bool {
     }
 }
 
-/// Pick a suggestion that will not collide with captures already in scope.
 fn fresh_capture_name(taken: &[String]) -> String {
     let taken: HashSet<&str> = taken.iter().map(String::as_str).collect();
     for base in ["items", "matches", "entries", "elements", "records"] {

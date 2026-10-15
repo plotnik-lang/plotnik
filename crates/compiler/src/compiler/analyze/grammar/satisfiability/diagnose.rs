@@ -1,7 +1,3 @@
-//! Explain established failures using resolved constraints and solver probes.
-//! A specific message needs either a local contradiction or a probe that proves
-//! its claim. If refinement runs out of work, retain the original rejection.
-
 use std::collections::HashSet;
 
 use crate::compiler::analyze::Located;
@@ -37,7 +33,6 @@ impl ReportedCulprits {
     }
 }
 
-/// Emit the impossibility diagnostic for a failed root goal.
 pub(super) fn report_goal<'q>(
     ctx: Context<'q>,
     solver: &mut SatisfiabilitySolver<'q>,
@@ -127,9 +122,6 @@ impl ConcreteCulprit {
     }
 }
 
-/// Emit an impossible wildcard parent `(_ …)`: no kind the grammar builds takes the
-/// children it constrains. A wildcard fixes no kind of its own, so there is no single
-/// node to blame — the obstacle is that no production anywhere realizes this child list.
 fn emit_wildcard_failure(model: &Model, pattern: PatternId, diag: &mut Diagnostics) {
     diag.report(
         DiagnosticKind::UnsatisfiablePattern,
@@ -139,11 +131,6 @@ fn emit_wildcard_failure(model: &Model, pattern: PatternId, diag: &mut Diagnosti
     .emit();
 }
 
-/// Reject a query whose satisfiability analysis hit a resource ceiling — too many
-/// automaton states (an exponentially widening expansion) or a too-deep inlined
-/// reference. This is a resource limit, *not* an impossibility claim: the query may be
-/// perfectly valid, just larger than the compiler will spend on it. We point at the
-/// definition under analysis when the ceiling tripped.
 pub(super) fn report_too_complex(
     body: &Located<Pattern>,
     limit: AnalysisLimit,
@@ -170,9 +157,6 @@ pub(super) fn report_too_complex(
         .emit();
 }
 
-/// A single-valued field the culprit binds more than once, with the repeat count. Such a
-/// field can hold one child, so binding it twice is impossible whatever else matches —
-/// the first such field in source order, named for the message.
 fn repeated_single_field(
     ctx: Context<'_>,
     solver: &mut SatisfiabilitySolver,
@@ -247,7 +231,6 @@ fn report_negated_fields(
             .expect("resolved field has a name");
         let span = field.span;
         let kind = culprit.kind_name(ctx);
-        // The absence test covers every realization, including leaf aliases.
         let probe = ChildAutomaton::without_field(field.id, solver.budget())?;
         if !solver.probe(culprit.kind, probe)? {
             diag.report(DiagnosticKind::NegatedRequiredField, span)
@@ -277,9 +260,6 @@ fn report_negated_fields(
     Ok(reported)
 }
 
-/// Walk down from an unsatisfiable node to the deepest node whose children are each
-/// satisfiable on their own — the point where the arrangement, not any one child, is
-/// what the grammar rejects.
 fn locate(
     model: &Model,
     solver: &mut SatisfiabilitySolver,
@@ -312,8 +292,6 @@ fn locate(
     Ok(goal)
 }
 
-/// Anchor locations survive compilation, including inlined references. Test the
-/// proposed removal with all other constraints intact before offering that edit.
 fn report_anchors(
     ctx: Context<'_>,
     solver: &mut SatisfiabilitySolver,
@@ -417,7 +395,6 @@ fn report_anchors(
     Ok(true)
 }
 
-/// Child constraints still fail after this node's anchors have been relaxed.
 fn emit_arrangement_failure(
     ctx: Context<'_>,
     solver: &mut SatisfiabilitySolver,
@@ -584,9 +561,6 @@ fn constraints_span(model: &Model, pattern: PatternId) -> Span {
         .unwrap_or_else(|| kind_span(&model.node_origin(pattern)))
 }
 
-/// A nested pattern can work on some realization of its public kind and still
-/// fail at this position (notably when aliases share a kind). Keep its kind and
-/// field, and test whether removing only its child constraints permits a match.
 fn report_nested_constraints(
     ctx: Context<'_>,
     solver: &mut SatisfiabilitySolver,
@@ -782,9 +756,6 @@ fn query_child_demands(
     Ok(children)
 }
 
-// A field wrapped around a nullable pattern need not consume a field at all.
-// Sequences discard an inherited field in the child automaton, so they do not
-// establish a demand for that outer field either.
 fn guaranteed_child(
     model: &Model,
     mut pattern: PatternId,
@@ -873,9 +844,6 @@ pub(super) fn report_unexplained(ctx: Context<'_>, pattern: PatternId, diag: &mu
     }
 }
 
-/// The primary solve proved the node impossible, but diagnostic refinement ran out
-/// before it could distinguish anchors from child order. Keep the verdict precise
-/// without pretending to know the specific obstacle.
 fn emit_generic_failure(ctx: Context<'_>, culprit: &ConcreteCulprit, diag: &mut Diagnostics) {
     let kind_name = culprit.kind_name(ctx);
     let detail = format!("the grammar builds no {kind_name} matching this child structure");
@@ -897,13 +865,10 @@ fn kind_span(node: &Located<NamedNodePattern>) -> Span {
     node.span_of(range)
 }
 
-/// Render one kind: a named kind in backticks, an anonymous one as a quoted literal.
 fn render_kind(ctx: Context<'_>, kind: NodeKindId) -> String {
     format!("`{}`", format_kind(ctx.grammar, kind))
 }
 
-/// "a" or "an" for a rendered kind like `` `array` `` — chosen on the first letter
-/// inside the quoting, so a vowel-initial kind (`an array`) reads naturally.
 fn indefinite_article(rendered_kind: &str) -> &'static str {
     match rendered_kind
         .chars()

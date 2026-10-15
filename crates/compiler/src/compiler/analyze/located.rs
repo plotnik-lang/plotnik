@@ -1,9 +1,3 @@
-//! A node paired with the source it lives in.
-//!
-//! A `TextRange` is meaningless without the `SourceId` it indexes into. `Located`
-//! binds the two so a location carries its source by construction: passing a node
-//! across a workspace-file boundary cannot silently misattribute its diagnostics.
-
 use rowan::TextRange;
 
 use crate::compiler::diagnostics::source::SourceId;
@@ -28,9 +22,6 @@ impl<T> Located<T> {
         &self.node
     }
 
-    /// Re-tag a value reached from this node with the SAME source — a child of a
-    /// node always lives in the same file as the node. Crossing into another
-    /// file is done with a fresh `Located::new`, never `wrap`.
     pub fn wrap<U>(&self, child: U) -> Located<U> {
         Located {
             source: self.source,
@@ -38,7 +29,6 @@ impl<T> Located<T> {
         }
     }
 
-    /// Pair a range from this node's source with that source.
     pub fn span_of(&self, range: TextRange) -> Span {
         Span::new(self.source, range)
     }

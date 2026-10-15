@@ -1,7 +1,3 @@
-//! Semantic validation for empty constructs.
-//!
-//! Bans empty trees `()`, empty sequences `{}`, and empty alternations `[]`.
-
 use super::ValidationInput;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{
@@ -64,6 +60,5 @@ impl Visitor for EmptyConstructsValidator<'_> {
 }
 
 fn is_construct_empty(syntax: &SyntaxNode) -> bool {
-    // Invalid contents still produce error nodes, so only delimiter-only constructs count.
     syntax.children().next().is_none()
 }

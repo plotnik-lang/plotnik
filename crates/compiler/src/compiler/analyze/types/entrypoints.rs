@@ -1,5 +1,3 @@
-//! Entrypoint admission checks.
-
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::core::Interner;
 use indexmap::IndexMap;
@@ -9,11 +7,6 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::Root;
 
-/// Report every source definition whose body never became an admitted pattern.
-///
-/// Positional assertions (`.`, `-field`, `.!`) are not patterns by themselves,
-/// so definitions containing only one are absent from the definition graph. The
-/// AST remains the source of truth for the original definition list.
 pub fn check_entrypoints(
     ast_map: &IndexMap<SourceId, Root>,
     interner: &Interner,

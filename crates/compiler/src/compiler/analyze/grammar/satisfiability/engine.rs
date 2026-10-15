@@ -1,24 +1,3 @@
-//! The `SAT`/`THREAD` least-fixed-point.
-//!
-//! Two mutually-recursive judgments over finite, monotone domains:
-//!
-//! - `SAT(p, realizer)` — a grammar `realizer` (a token `Leaf`, or a non-terminal
-//!   `Var`) can realize the child structure query node `p` demands.
-//! - `THREAD(p, h, (q, boundary))` — the visible frontier of hidden variable `h`, spliced into
-//!   `p`'s child list, drives `A_p` from the input configuration to a set of outputs.
-//!
-//! They are computed as a least fixed point by a demand-driven worklist: every key
-//! starts at bottom (`SAT`→`false`, `THREAD`→∅); recomputing a key records which keys
-//! it read, and a key is re-queued only when one of its reads changes. Termination
-//! comes from the finite domains and monotonicity (Knaster–Tarski).
-//!
-//! The domains are finite but not small: a wide query child list yields an automaton
-//! with as many states, and threading the grammar through it is quadratic in that
-//! width. Construction and solving share a work budget, including collection
-//! copying, scans, and dependency storage. Exhaustion returns a resource error.
-//! No partial fixed-point value becomes a verdict. This is an analysis-work
-//! ceiling, not a wall-clock or byte-allocation limit for the whole compiler.
-
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
@@ -38,24 +17,13 @@ use super::facts::GrammarFacts;
 use crate::compiler::parse::ast::QuantifierKind;
 use crate::core::grammar::NodeRealizer;
 
-/// How a production step participates in threading.
 enum StepClass {
-    /// A real child surfacing under `kind`, realized by `realizer`, bound to `field`
-    /// when the grammar labels it. A label on this step overrides any pushed down
-    /// from a hidden ancestor (the innermost label is the one the runtime attaches).
     Visible(VisibleStep),
-    /// A child spliced in without an id of its own: thread through its frontier.
     HiddenSubtree(HiddenStep),
-    /// A hidden token: present in the production, absent from the tree.
     HiddenLeaf,
 }
 
 impl StepClass {
-    /// Classify a step for threading. A supertype is erased in the tree — tree-sitter
-    /// never emits a node of the supertype's kind, only one of its subtypes — so a
-    /// step surfacing a supertype is threaded through its body, not matched as a node.
-    /// Keying the descent off the step's own `body` is what keeps aliased nodes
-    /// structurally distinct from their namesakes.
     fn of(step: &SkeletonStep, grammar: &Grammar) -> Self {
         match step.projection(grammar) {
             StepProjection::Visible { kind, field, body } => StepClass::Visible(VisibleStep {
@@ -96,14 +64,10 @@ impl HiddenStep {
     }
 }
 
-/// Whether a matcher demanding field `want` accepts a child whose runtime label is
-/// `have`. A bare matcher (`want` is `None`) imposes no field constraint.
 fn field_ok(want: Option<NodeFieldId>, have: Option<NodeFieldId>) -> bool {
     want.is_none() || want == have
 }
 
-/// Primary automata occupy their pattern's slot. A diagnostic probe appends its
-/// own automaton, so recursive edges still target the unchanged primary slots.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct AutomatonId(usize);
 
@@ -120,8 +84,6 @@ struct ThreadKey {
     pattern: AutomatonId,
     hidden_var: VarId,
     input: Configuration,
-    /// Part of the key: the same frontier entered under different labels admits
-    /// different `field:` matchers, so the memo must keep them apart.
     inherited_field: Option<NodeFieldId>,
 }
 
@@ -169,9 +131,6 @@ enum Key {
     Thread(ThreadKey),
 }
 
-/// Data fixed once the automata are built; only `solve` mutates around it. Splitting
-/// it from the mutable solve state lets the worklist hold `&Frozen` and `&mut Solve`
-/// at once (disjoint borrows) while threading.
 struct Frozen<'a> {
     grammar: &'a Grammar,
     automata: Arc<Vec<Option<ChildAutomaton>>>,
@@ -232,9 +191,6 @@ impl<'a> Frozen<'a> {
         }
     }
 
-    /// Whether a child-position kind constraint admits visible grammar kind `k`.
-    /// Query supertypes are rejected before this pass runs, and grammar supertype
-    /// steps are classified as hidden frontiers before matching.
     fn kind_ok(&self, constraint: KindConstraint, k: NodeKindId) -> bool {
         let grammar = self.grammar;
         match constraint {
@@ -244,16 +200,10 @@ impl<'a> Frozen<'a> {
         }
     }
 
-    /// Whether the matcher's kind admits at least one extra kind. The childless fast
-    /// path of [`SatisfiabilitySolver::can_consume_extra`] — answered without materializing the
-    /// admitted-extra list, which matters on wide wildcard child lists.
     fn admits_any_extra(&self, constraint: KindConstraint) -> bool {
         self.facts.admits_any_extra(self.grammar, constraint)
     }
 
-    /// The concrete named kinds a wildcard parent could be: every named, non-supertype
-    /// kind the grammar can surface. A wildcard with children is satisfiable iff one of
-    /// these realizes its constraints, including a leaf realizing an empty child list.
     fn parent_candidate_kinds(&self) -> &[NodeKindId] {
         self.facts.parent_candidate_kinds()
     }
@@ -266,27 +216,16 @@ impl<'a> Frozen<'a> {
     }
 }
 
-/// Default ceiling on grammar-analysis work. Charge before expanding patterns,
-/// copying and scanning configurations, and storing or following dependencies.
-/// Diagnostic refinement has an independent budget of the same size, so its
-/// exhaustion cannot replace an established rejection with a resource error.
-/// Tunable per query via
-/// [`QueryBuilder::with_satisfiability_work_budget`](crate::QueryBuilder::with_satisfiability_work_budget)
-/// for the rare case that legitimately needs a wider one.
 pub const DEFAULT_SATISFIABILITY_WORK_BUDGET: u64 = 32_000_000;
 
-/// The mutable fixed-point state: memo tables, reverse dependencies, and the worklist.
 #[derive(Default)]
 struct Solve {
     sat: HashMap<SatKey, bool>,
     thread: HashMap<ThreadKey, Configurations>,
-    /// `dependents[k]` are the keys that read `k` — re-queued when `k` changes.
     dependents: HashMap<Key, IndexSet<Key>>,
-    /// The key currently being recomputed, so reads attribute to it.
     current: Option<Key>,
     queue: VecDeque<Key>,
     queued: HashSet<Key>,
-    /// Work is charged before use. Failure propagates without exposing partial memos.
     budget: Budget,
 }
 
@@ -313,8 +252,6 @@ impl<'a> SatisfiabilitySolver<'a> {
         }
     }
 
-    /// All primary verdicts are complete before diagnostic work starts. Retain
-    /// their caches, but charge refinement to a separate budget.
     pub(super) fn begin_diagnostics(&mut self, work_budget: u64) {
         self.solve.budget = Budget::new(work_budget);
     }
@@ -343,8 +280,6 @@ impl<'a> SatisfiabilitySolver<'a> {
         )
     }
 
-    /// Replace only this node's child automaton. Nested nodes keep their original
-    /// constraints, including when the same definition occurs in both positions.
     pub(super) fn probe(
         &mut self,
         kind: NodeKindId,
@@ -364,7 +299,6 @@ impl<'a> SatisfiabilitySolver<'a> {
         result
     }
 
-    /// A completed feasibility result, or a resource failure.
     pub(super) fn satisfiable(
         &mut self,
         pattern: PatternId,
@@ -399,16 +333,11 @@ impl<'a> SatisfiabilitySolver<'a> {
         Ok(false)
     }
 
-    /// Feasibility without a caller's parent. Sibling order and fields are checked
-    /// by the enclosing node's automaton. Here sequences require each item, choices
-    /// require one live branch, and nullable repeats need not enter their body.
     pub(super) fn possible(&mut self, pattern: PatternId) -> Result<bool, AnalysisLimit> {
         if let Some(&result) = self.patterns.get(&pattern) {
             return Ok(result);
         }
 
-        // A reference chain can multiply the nesting of individually shallow
-        // definitions. Keep this walk off the native stack and memoize shared bodies.
         let mut pending = vec![(pattern, 0)];
         let mut visiting = HashSet::from([pattern]);
         while let Some((current, next_child)) = pending.last_mut() {
@@ -452,8 +381,6 @@ impl<'a> SatisfiabilitySolver<'a> {
                         let child_result = if let Some(&result) = self.patterns.get(&child) {
                             result
                         } else if visiting.contains(&child) {
-                            // Sibling recursion stays conservative, as in child automata.
-                            // Concrete recursive nodes still use the least fixed point.
                             true
                         } else {
                             visiting.insert(child);
@@ -483,8 +410,6 @@ impl<'a> SatisfiabilitySolver<'a> {
         Ok(self.patterns[&pattern])
     }
 
-    /// Finish all transitively referenced child automata before solving. Inserting
-    /// each completed automaton before its dependencies also handles recursive nodes.
     fn build_pending(&mut self, pattern: PatternId) -> Result<(), AnalysisLimit> {
         if self.frozen.automata.is_empty() {
             self.solve.budget.spend(self.model.len() as u64)?;
@@ -578,9 +503,6 @@ impl Solve {
         Ok(())
     }
 
-    /// LIFO: a freshly demanded key is recomputed before the key that demanded it
-    /// resumes, so a dependency chain settles deepest-first and each fact is revisited
-    /// far fewer times than a breadth-first order would force.
     fn dequeue(&mut self) -> Option<Key> {
         let key = self.queue.pop_back()?;
         self.queued.remove(&key);
@@ -657,7 +579,6 @@ impl Solve {
         let automaton = frozen.automaton(pattern);
         let accept = automaton.accept();
         if realizer == NodeRealizer::Leaf {
-            // Leaves have no children, not even extras.
             return self.accepts_empty(automaton);
         }
 
@@ -693,9 +614,6 @@ impl Solve {
         Ok(reached)
     }
 
-    /// Thread one production's steps, left to right, through `A_p` from `start`,
-    /// returning the reachable state set. `thread.inherited_field` is the field a hidden ancestor
-    /// step pushed onto this frontier — `None` for a node's own children.
     fn thread_production(
         &mut self,
         thread: &ProductionThread<'_, '_>,
@@ -721,15 +639,8 @@ impl Solve {
         step: &SkeletonStep,
     ) -> Result<Configurations, AnalysisLimit> {
         match StepClass::of(step, thread.frozen.grammar) {
-            // A real child of kind `kind`. Each current state either skips it through a
-            // gap self-loop, or consumes it through an edge whose kind and field both
-            // admit the step. The step's own label wins over an inherited one.
             StepClass::Visible(visible) => self.thread_visible_step(thread, current, visible),
-            // Splice the hidden variable's visible frontier in, pushing down the label it
-            // inherits: this step's own field if it has one, otherwise the one already
-            // inherited (a plain supertype link never relabels what it carries).
             StepClass::HiddenSubtree(hidden) => self.thread_hidden_subtree(thread, current, hidden),
-            // A hidden token surfaces nothing and consumes nothing.
             StepClass::HiddenLeaf => current.copy(&mut self.budget),
         }
     }
@@ -758,9 +669,6 @@ impl Solve {
     ) -> Result<Configurations, AnalysisLimit> {
         let automaton = thread.automaton();
         let effective = visible.effective_field(thread.inherited_field);
-        // The query asserts this field absent (`-field`); a production binding it
-        // gives the node a forbidden child, so this whole path is dead — it can be
-        // neither consumed nor skipped past.
         if automaton.negates(effective) {
             return Ok(Configurations::default());
         }
@@ -768,8 +676,6 @@ impl Solve {
         let mut next = Configurations::default();
         for q in current.iter(&mut self.budget)? {
             self.charge()?;
-            // Control states do not own a search. Each consumer has its own
-            // position, so a broad alternative cannot lend its gap to another.
             if q.state == automaton.accept()
                 && q.boundary.gap_before(FirstClass::Named).admits(node_class)
             {
@@ -792,8 +698,6 @@ impl Solve {
         Ok(next)
     }
 
-    /// Whether the matched child's own structure is realized by `realizer` — trivially
-    /// true when the child is childless.
     fn child_sat(
         &mut self,
         matcher: &ChildMatcher,
@@ -805,10 +709,6 @@ impl Solve {
         }
     }
 
-    /// Epsilon closure plus optional extra consumption: a query child matching an
-    /// extra kind (a `(comment)`) may advance the automaton without a production step,
-    /// since the parser may insert an extra anywhere. Extras are optional, so the
-    /// closure only grows the reachable set.
     fn closure(
         &mut self,
         thread: &ProductionThread<'_, '_>,
@@ -833,8 +733,6 @@ impl Solve {
             for (matcher, to) in automaton.pattern_edges(input.state) {
                 self.charge()?;
                 if self.can_consume_extra(frozen, matcher)? {
-                    // Consuming an extra satisfies the incoming anchor just as
-                    // consuming any other visible child does.
                     let output = input.consume(*to, frozen.consumer_class(matcher.kind));
                     if result.insert(output, &mut self.budget)? {
                         stack.push(output);
@@ -845,8 +743,6 @@ impl Solve {
         Ok(result)
     }
 
-    /// A leaf realizes only the empty child sequence. Gaps cannot matter without
-    /// children, so this is reachability over epsilon edges alone.
     fn accepts_empty(&mut self, automaton: &ChildAutomaton) -> Result<bool, AnalysisLimit> {
         let start = Configuration::start(automaton.start());
         let mut visited = Configurations::singleton(start, &mut self.budget)?;
@@ -870,25 +766,15 @@ impl Solve {
         Ok(false)
     }
 
-    /// Whether a query child matching an extra kind may advance the automaton without a
-    /// production step. An extra is conservatively consumable in *any* gap, including
-    /// lexically sealed nodes (`(string (comment))`). Proving a gap sealed needs lexer-level
-    /// longest-match reasoning our model lacks (not the `IMMEDIATE_TOKEN` fact it looks
-    /// like), so we admit and stay sound — extra consumption only grows the reachable set.
     fn can_consume_extra(
         &mut self,
         frozen: &Frozen,
         matcher: &ChildMatcher,
     ) -> Result<bool, AnalysisLimit> {
-        // Extras are inserted unfielded, so a `field:` matcher can never be one — letting
-        // it "consume" an extra here would skip its field constraint.
         if matcher.field.is_some() {
             return Ok(false);
         }
         let Some(nested_pattern) = matcher.nested_pattern else {
-            // Childless matcher: it consumes an extra iff it admits any extra kind. No
-            // subtree to realize, so answer in O(1) without building the admitted list —
-            // the hot path on wide wildcard child lists.
             return Ok(frozen.admits_any_extra(matcher.kind));
         };
         for extra in frozen.extra_candidates(matcher.kind) {

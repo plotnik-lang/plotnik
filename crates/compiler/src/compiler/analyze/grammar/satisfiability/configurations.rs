@@ -1,5 +1,3 @@
-//! Reachable automaton positions and their path-specific sibling boundaries.
-
 use super::AnalysisLimit;
 use super::automaton::State;
 use super::budget::Budget;
@@ -36,8 +34,6 @@ impl Configuration {
     }
 }
 
-/// Only the occupied word interval is stored. A set containing a late exit does
-/// not allocate all the zero words between it and the automaton's start.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct Configurations {
     first_word: usize,
@@ -89,7 +85,6 @@ impl Configurations {
         Ok(self == other)
     }
 
-    /// Insert `state`, returning whether it was newly added.
     pub(super) fn insert(
         &mut self,
         state: Configuration,
@@ -112,7 +107,6 @@ impl Configurations {
         })
     }
 
-    /// Union `other` into `self`, returning whether `self` grew.
     pub(super) fn union_with(
         &mut self,
         other: &Configurations,
@@ -146,8 +140,6 @@ impl Configurations {
         budget.spend(self.word_count())?;
         let bits: u64 = self.words.iter().map(|word| word.count_ones() as u64).sum();
         budget.spend(self.word_count() + bits)?;
-        // Scan the occupied word interval, then walk each word's set bits. Late
-        // exit states do not force a scan of every preceding zero word.
         Ok(self.words.iter().enumerate().flat_map(|(word, &bits)| {
             let base = (self.first_word + word) as u32 * u64::BITS;
             let mut rest = bits;
@@ -203,8 +195,6 @@ impl Configurations {
         (initialized + reallocated + shifted) as u64
     }
 
-    /// Insertion and union are the only mutations. Each adds a nonzero boundary
-    /// word, so there are no empty prefixes or suffixes and equality is structural.
     fn extend_to(&mut self, first: usize, end: usize) {
         if self.is_empty() {
             self.first_word = first;

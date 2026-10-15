@@ -1,6 +1,3 @@
-//! Short, complete child-sequence descriptions for diagnostics. Stop rather than
-//! display a partial list when a frontier is recursive or too large to read.
-
 use std::collections::HashSet;
 
 use crate::core::grammar::{Grammar, StepProjection, VarId};

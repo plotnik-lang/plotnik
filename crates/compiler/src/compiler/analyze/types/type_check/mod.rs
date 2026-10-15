@@ -1,7 +1,3 @@
-//! Unified type checking pass.
-//!
-//! Computes result flow while checking it against retained structural facts.
-
 mod infer;
 mod unify;
 
@@ -14,10 +10,6 @@ use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::analyze::types::naming::{RawTypeNameValidator, TypeNamer};
 use crate::compiler::diagnostics::report::Diagnostics;
 
-/// Run type inference on all definitions.
-///
-/// Processes definitions in dependency order (leaves first) to handle
-/// recursive definitions correctly.
 pub fn infer_types(
     interner: &mut Interner,
     definitions: &DefinitionGraph,

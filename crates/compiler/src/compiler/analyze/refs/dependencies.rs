@@ -1,10 +1,3 @@
-//! Dependency analysis for definitions.
-//!
-//! Computes the dependency graph of definitions and identifies Strongly Connected
-//! Components (SCCs). The computed SCCs are exposed in reverse topological order
-//! (leaves first), which is useful for passes that need to process dependencies
-//! before dependents (like type inference).
-
 use std::collections::HashMap;
 
 use crate::core::Interner;
@@ -24,14 +17,10 @@ pub(in crate::compiler) fn build_definition_graph(
     limits: ReferenceLimits,
 ) -> Result<DefinitionGraph, Error> {
     let (sccs, ids_by_symbol, mut outgoing, target_by_reference) = {
-        // `strongconnect` recurses one frame per edge it follows. A chain like
-        // `A = (B)`, `B = (C)`, … is flat source, so the parser cannot bound it;
-        // graph construction owns the corresponding stack ceiling.
         let Some(topology) = TarjanScc::find(&collected, limits.max_depth) else {
             return Err(Error::RecursionLimitExceeded);
         };
 
-        // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs).
         let mut ids_by_symbol = HashMap::new();
         let mut definition_count = 0usize;
         let mut sccs = Vec::with_capacity(topology.sccs.len());
@@ -129,8 +118,6 @@ struct TarjanScc<'a> {
     lowlinks: IndexMap<&'a str, usize>,
     sccs: Vec<Vec<&'a str>>,
     outgoing: IndexMap<&'a str, ReferenceOccurrencesByTargetName<'a>>,
-    /// Recursion ceiling and current depth: an acyclic reference chain deeper than
-    /// this would overflow the native stack, so we stop and flag it instead.
     max_depth: u32,
     depth: u32,
     depth_exceeded: bool,
@@ -144,8 +131,6 @@ struct DependencyTopology<'a> {
 type ReferenceOccurrencesByTargetName<'a> = IndexMap<&'a str, Vec<DefRef>>;
 
 impl<'a> TarjanScc<'a> {
-    /// Returns the SCCs, or `None` if an acyclic reference chain ran past `max_depth`
-    /// (the caller rejects the query rather than risk a stack overflow).
     fn find(
         definitions: &'a CollectedDefinitions,
         max_depth: u32,
@@ -180,9 +165,6 @@ impl<'a> TarjanScc<'a> {
     }
 
     fn strongconnect(&mut self, name: &'a str) {
-        // One frame per edge followed; stop before the chain outruns the stack. The
-        // partial state left behind is discarded — `find` returns `None` and the query
-        // is rejected — so we need not unwind it cleanly, only avoid recursing further.
         if self.depth >= self.max_depth {
             self.depth_exceeded = true;
             return;
@@ -246,9 +228,6 @@ impl<'a> TarjanScc<'a> {
     }
 }
 
-/// Collect references that resolve within the transient definition map.
-///
-/// Returns only refs that point to defined names (filters out node kind references).
 fn collect_defined_reference_occurrences<'a>(
     pattern: &Pattern,
     definitions: &'a CollectedDefinitions,

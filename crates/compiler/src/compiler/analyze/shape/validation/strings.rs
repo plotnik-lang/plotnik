@@ -1,9 +1,3 @@
-//! String-literal escape validation.
-//!
-//! The lexer accepts any `\<char>` pair inside a string; only the escapes
-//! `unescape` understands are meaningful. This pass reports the rest, so every
-//! decode site past validation can trust the escapes it sees.
-
 use rowan::{TextRange, TextSize};
 
 use super::ValidationInput;

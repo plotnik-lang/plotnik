@@ -1,9 +1,3 @@
-//! Recursion validation for definitions.
-//!
-//! Validates that recursive definitions are well-formed:
-//! - Escapable: at least one non-recursive path exists
-//! - Progressing: every recursive cycle matches a node before recursing
-
 use std::collections::HashMap;
 
 use indexmap::{IndexMap, IndexSet};
@@ -83,7 +77,6 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             .any(|body| pattern_has_escape(body, &scc_set, self.definitions));
 
         if !has_escape {
-            // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
             let kind = RecursionFlaw::NoEscape;
             if let Some(cycle) = self.find_cycle(scc, &scc_set, kind) {
                 self.report_cycle(kind, cycle);
@@ -97,7 +90,6 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         }
     }
 
-    /// Finds a cycle within the given set of nodes (SCC).
     fn find_cycle(
         &self,
         nodes: &[DefId],
@@ -206,10 +198,6 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         cycle_definitions: &IndexSet<DefId>,
         primary: Span,
     ) -> Option<(Span, String)> {
-        // A range is only meaningfully contained by a body in the SAME source: two
-        // files' bodies can share numeric offsets, so a source-blind containment
-        // test would attribute the cycle to whichever file happens to be checked
-        // first. Match the source before comparing offsets.
         let def_id = cycle_definitions.iter().copied().find(|&def_id| {
             let definition = self.definitions.definition(def_id);
             definition.source() == primary.source
@@ -380,7 +368,6 @@ fn pattern_guarantees_progress(pattern: &Pattern) -> bool {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CycleSearchScope {
     All,
-    /// No preceding pattern on this path is guaranteed to match a node.
     BeforeProgress,
 }
 
@@ -420,7 +407,7 @@ impl Visitor for FirstRefNameRangeCollector<'_> {
 
     fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
         if self.scope == CycleSearchScope::BeforeProgress {
-            return; // Matching this node establishes progress before any nested reference.
+            return;
         }
         walk_named_node_pattern(self, node);
     }

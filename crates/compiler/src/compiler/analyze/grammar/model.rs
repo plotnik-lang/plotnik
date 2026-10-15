@@ -1,6 +1,3 @@
-//! Matching structure resolved once at the grammar boundary. Source nodes remain
-//! attached for diagnostics, but automata use resolved IDs and boundary operations.
-
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
@@ -32,7 +29,6 @@ pub(super) enum KindConstraint {
     Exact(NodeKindId),
     AnyNamed,
     AnyNode,
-    /// ERROR and MISSING are outside the retained grammar's tree model.
     Unconstrained,
 }
 
@@ -42,7 +38,6 @@ pub(super) struct Pattern {
 }
 
 impl Pattern {
-    /// Captures are absent from matching, but remain in provenance for full spans.
     pub(super) fn syntax(&self) -> Located<ast::Pattern> {
         self.origin.wrap(uncaptured(self.origin.node().clone()))
     }
@@ -154,8 +149,6 @@ impl Model {
         self.definitions.values().copied().chain(self.expression)
     }
 
-    /// Pending anchors can only come from authored sibling operations. Keep the
-    /// automaton's repeat-entry choices within that query-wide upper bound.
     pub(super) fn boundary_inputs(&self) -> impl Iterator<Item = BoundaryState> {
         let pending = self.pending_anchors;
         BoundaryState::all().filter(move |input| {
@@ -225,9 +218,6 @@ impl Builder<'_> {
                         }
                     })
                     .collect();
-                // Kind-wide restrictions cannot vary with a production or caller.
-                // Keep the reason so a dead branch can later be explained, without
-                // issuing an error when another branch can match.
                 let violation = match kind {
                     KindConstraint::Exact(kind) => {
                         if node.predicate().is_some()
@@ -326,8 +316,6 @@ impl Builder<'_> {
     }
 }
 
-// Captures neither add matching operations nor consume the automaton builder's
-// recursion budget. Strip them iteratively to avoid recursion here as well.
 fn uncaptured(mut pattern: ast::Pattern) -> ast::Pattern {
     while let ast::Pattern::CapturedPattern(capture) = pattern {
         pattern = capture.inner().expect("validated capture has a body");

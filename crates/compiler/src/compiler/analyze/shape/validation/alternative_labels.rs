@@ -1,5 +1,3 @@
-//! Mixed-labeling alternation diagnostic.
-
 use super::ValidationInput;
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::span::Span;

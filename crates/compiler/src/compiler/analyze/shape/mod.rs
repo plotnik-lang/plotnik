@@ -1,5 +1,3 @@
-//! Structural validation: anchors, predicates, alternative labeling, empty constructs.
-
 pub(crate) mod context;
 mod pattern_facts;
 mod root_extent;

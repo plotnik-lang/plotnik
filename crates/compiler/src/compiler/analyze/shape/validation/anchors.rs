@@ -1,10 +1,3 @@
-//! Semantic validation for anchor placement.
-//!
-//! Definition boundaries are call boundaries, not automatic errors. A group or
-//! definition may export a leading/trailing anchor for a caller to discharge
-//! with a sibling or named-node boundary. Only exported anchors that remain
-//! contextless across every definition composition are rejected here.
-
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};

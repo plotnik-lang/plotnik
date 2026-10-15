@@ -8,7 +8,6 @@ use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Interner;
 
-/// Shared artifacts produced by semantic analysis and consumed by later phases.
 #[derive(Clone, Copy)]
 pub(crate) struct AnalysisArtifacts<'a> {
     pub(crate) interner: &'a Interner,
@@ -29,7 +28,6 @@ impl<'a> AnalysisArtifacts<'a> {
         })
     }
 
-    /// Entrypoint-eligible outputs in the existing `DefId` order.
     pub(crate) fn iter_entrypoint_outputs(
         self,
     ) -> impl Iterator<Item = (DefId, DefinitionOutput)> + 'a {

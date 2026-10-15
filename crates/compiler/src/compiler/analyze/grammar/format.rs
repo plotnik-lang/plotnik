@@ -1,5 +1,3 @@
-//! Formatting shared by grammar diagnostics.
-
 use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
 

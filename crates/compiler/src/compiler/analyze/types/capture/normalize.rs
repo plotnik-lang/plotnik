@@ -1,5 +1,3 @@
-//! Focused capture-type and producer-flow normalization.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::planner::CaptureTypePlanner;
@@ -12,7 +10,6 @@ use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::ids::TypeDeclId;
 use crate::compiler::parse::ast::Pattern;
 
-// Past this point annotations crowd out the primary cause and the removal hint.
 const SUPPRESSED_CAPTURE_ANNOTATION_LIMIT: usize = 8;
 const SUPPRESSED_MEMBER_NAME_LIMIT: usize = 4;
 
@@ -178,8 +175,6 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
     fn run(mut self) -> HashMap<CaptureId, NormalizedField> {
         let mut normalized = HashMap::new();
         let mut deferred_diagnostics = Vec::new();
-        // Suppression warnings need every successful plan to recognize nested
-        // boundaries. Invalid-type errors join the queue to preserve capture order.
         for index in 0..self.session.input.captures.len() {
             let id = CaptureId::from_index(index);
             let (field, deferred_diagnostic) = self.normalize(id);
@@ -453,8 +448,6 @@ impl<'a> SuppressedCaptureCollector<'a> {
                     {
                         continue;
                     }
-                    // The boundary's normalized value is lost here, so annotate it. Its
-                    // children were already suppressed by its own type and belong to its warning.
                     if self.suppression_boundary_ids.contains(&capture_id) {
                         continue;
                     }
@@ -528,8 +521,6 @@ impl SuppressedValue {
         plan: &CaptureTypePlan,
         repeated: bool,
     ) -> Self {
-        // Follow the frozen plan alongside the inferred type: `text` maps list
-        // elements, while `bool` can replace an omitted list as one value.
         let type_id = inferred_types.resolve_reference_chain(type_id);
         match plan.kind() {
             CaptureTypePlanKind::Option { inner, .. } => {
@@ -605,8 +596,6 @@ impl SuppressedValue {
         } else {
             format!("`@{capture_name}`")
         };
-        // Capture annotations already account for record fields. Variant
-        // identity and list contents are separate losses and remain useful.
         match &self.kind {
             SuppressedValueKind::Record(fields) if include_record_field_annotation => {
                 Some(record_field_loss_annotation(&subject, fields, interner))
@@ -751,9 +740,6 @@ fn compute_invalid_containment(
     declarations: &BTreeMap<TypeDeclId, TypeId>,
     invalid: &HashSet<TypeId>,
 ) -> HashSet<TypeId> {
-    // Work backwards from invalid types. Unlike recursive DFS memoization,
-    // reverse reachability remains correct when references form a cycle: each
-    // containing type is visited once, after any invalid descendant reaches it.
     let mut containers = vec![Vec::new(); types.len()];
     for (index, shape) in types.iter().enumerate() {
         let Some(shape) = shape else {
@@ -858,7 +844,6 @@ struct FieldFlowNormalizer<'s, 'c, 'a, 'd> {
     session: &'s mut NormalizationSession<'a, 'd>,
     captures: &'c HashMap<CaptureId, NormalizedField>,
     normalized: HashMap<Pattern, BTreeMap<Symbol, NormalizedField>>,
-    // Downstream flows can revisit the same producer pair. Report each exact conflict once.
     reported_conflicts: HashSet<(Symbol, Span, Span)>,
 }
 
@@ -951,8 +936,6 @@ impl<'s, 'c, 'a, 'd> FieldFlowNormalizer<'s, 'c, 'a, 'd> {
                     previous_type = right_type;
                 }
                 Err(()) => {
-                    // Inference already reported the structural conflict that
-                    // blocked these producers; normalization must not cascade it.
                     if field.producers.iter().any(|capture_id| {
                         self.session.input.blocked_capture_ids.contains(capture_id)
                     }) {
@@ -964,9 +947,6 @@ impl<'s, 'c, 'a, 'd> FieldFlowNormalizer<'s, 'c, 'a, 'd> {
                     {
                         continue;
                     }
-                    // Inference already owns structural incompatibilities. A
-                    // mismatch here can only be introduced by written capture
-                    // types, so keep its field sources intact for later fields.
                     let types = self.session.types.in_progress();
                     let left_type = describe_type(&types, self.session.interner, previous_type);
                     let right_type = describe_type(&types, self.session.interner, right_type);

@@ -1,15 +1,3 @@
-//! `TypeAnalysis`: the frozen result of type inference.
-//!
-//! Holds the interned type registry, named type declarations, each definition's
-//! output, and each pattern's result flow. It is built
-//! incrementally by [`TypeAnalysisBuilder`] and frozen with
-//! [`TypeAnalysisBuilder::finish`]; past that boundary it is immutable and its
-//! accessors are trusted (a structural miss is a compiler bug, not a query
-//! condition).
-//!
-//! Definition matching identity remains owned by `DefinitionGraph`. This
-//! artifact records the separate type declaration owned by each definition.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
@@ -27,8 +15,6 @@ use crate::compiler::ids::{DefId, TypeDeclId};
 use crate::compiler::parse::ast::{CapturedPattern, Pattern};
 use crate::core::Symbol;
 
-/// One custom `:: TypeName` occurrence, recorded during inference for the
-/// naming pass to validate (nominal identity, collisions, redundancy).
 #[derive(Clone, Copy, Debug)]
 pub struct CustomCaptureTypeOccurrence {
     pub name: Symbol,
@@ -36,7 +22,6 @@ pub struct CustomCaptureTypeOccurrence {
     pub type_id: TypeId,
 }
 
-/// A named result type whose identity is independent of its structural body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TypeDeclaration {
     pub id: TypeDeclId,
@@ -147,10 +132,6 @@ impl TypeRelation {
     }
 }
 
-/// Frozen registry of inferred types, definition outputs, and pattern flows.
-///
-/// Constructed only via [`TypeAnalysisBuilder`]; the private fields and
-/// `#[non_exhaustive]` keep that the single entry point.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct TypeAnalysis {
@@ -160,17 +141,10 @@ pub struct TypeAnalysis {
 
     pattern_flows: HashMap<Pattern, PatternFlow>,
 
-    /// Raw capture mechanism plus the optional built-in capture-type plan for
-    /// every admitted regular capture occurrence.
     pub(super) capture_facts: HashMap<Pattern, CaptureFact>,
 
-    /// Final completion behavior for every merged field of each alternation.
     pub(super) field_completions: HashMap<Pattern, FieldCompletions>,
 
-    /// Structural bodies that are referenced by a generated or explicit type
-    /// name. Definition declarations are keyed by `DefId` instead: their names
-    /// must not attach to structurally interned bodies shared with unrelated
-    /// positions. `BTreeMap` preserves deterministic body order.
     named_types: BTreeMap<TypeId, Symbol>,
 }
 
@@ -178,8 +152,6 @@ pub struct TypeAnalysis {
 enum TypeEntry {
     ReservedNoValue,
     Shape(TypeShape),
-    /// Provisional IDs can already occur in parent shapes when an SCC seals.
-    /// Redirects preserve those issued IDs while canonicalizing their meaning.
     Redirect(TypeId),
 }
 
@@ -237,11 +209,6 @@ impl TypeAnalysis {
             .expect("admitted type id must reference a registered type")
     }
 
-    /// Coinductive structural comparison over the type graph.
-    ///
-    /// Transparent aliases compare through their bodies, while declarations
-    /// owning records or variants remain nominal. An open declaration yields
-    /// [`TypeRelation::Pending`] instead of being mistaken for a distinct type.
     fn type_relation(&self, a: TypeId, b: TypeId) -> TypeRelation {
         self.type_relation_inner(a, b, &mut HashSet::new())
     }
@@ -451,12 +418,6 @@ impl TypeAnalysis {
         }
     }
 
-    /// Fields of the record a `Fields` flow points to.
-    ///
-    /// Every `PatternFlow::Fields` is constructed by interning a `Record`, so a
-    /// non-`Record` id here is a broken type-system invariant, not a runtime
-    /// condition the query can trigger. We surface it loudly instead of fabricating
-    /// an empty record that would silently mistype the output.
     pub fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, RecordField> {
         match self.expect_type_shape(id) {
             TypeShape::Record(fields) => fields,
@@ -464,15 +425,6 @@ impl TypeAnalysis {
         }
     }
 
-    /// Whether a type is a meaningful structured output (variant/record, or a
-    /// list/option thereof). Plain `Node` is not — it is the matched node,
-    /// captured directly.
-    ///
-    /// A `Ref` resolves through its target: a reference to a match-only definition
-    /// leaves no pending value at runtime (the capture takes the matched node),
-    /// so it must not classify as structured. Mid-inference a same-SCC target
-    /// has no inferred output flow yet; assume structured — the admitted classification that
-    /// lowering reads always resolves.
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
             Some(TypeShape::Variant(_) | TypeShape::Record(_)) => true,
@@ -525,13 +477,6 @@ impl TypeAnalysis {
             .expect("admitted definition must have an inferred output")
     }
 
-    /// Follow a `Ref` chain to the underlying materialized type; non-ref types
-    /// resolve to themselves. The accessor type-table emission uses to map a
-    /// query type to the concrete shape it stands for.
-    ///
-    /// A `Ref` whose definition is match-only resolves to `Node`: the runtime
-    /// capture of such a reference takes the matched node (the callee leaves no
-    /// pending value), so `Node` is the shape the reference stands for.
     pub fn resolve_underlying_type_id(&self, type_id: TypeId) -> TypeId {
         let Some(TypeShape::Ref(declaration)) = self.type_shape(type_id) else {
             return type_id;
@@ -542,8 +487,6 @@ impl TypeAnalysis {
         self.resolve_underlying_type_id(target)
     }
 
-    /// Iterate over all definition result types as `(DefId, TypeId)` in `DefId`
-    /// order, which corresponds to SCC processing order (leaves first).
     pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, DefinitionOutput)> + '_ {
         self.definition_declarations
             .iter()
@@ -560,17 +503,10 @@ impl TypeAnalysis {
         self.named_types.get(&type_id).copied()
     }
 
-    /// Iterate generated and explicitly named structural bodies in `TypeId`
-    /// order. Definition declarations are exposed separately through their
-    /// `DefId` and output body.
     pub fn iter_named_types(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
         self.named_types.iter().map(|(&id, &sym)| (id, sym))
     }
 
-    /// Admission check for [`TypeAnalysisBuilder::finish`]: the frozen result must
-    /// be internally consistent before any trusting accessor reads it. Every
-    /// failure here is a type-inference bug, not a query condition, so we assert
-    /// loudly — the same discipline `DefinitionGraph::new` follows.
     fn assert_well_formed(&self) {
         assert!(
             matches!(
@@ -743,42 +679,22 @@ impl TypeAnalysis {
     }
 }
 
-/// Mutable accumulator that produces a [`TypeAnalysis`].
-///
-/// Owns the in-progress artifact plus the scratch state inference needs but the
-/// frozen result does not: interning indexes, the open SCC, and its deferred
-/// constraints. [`finish`](Self::finish) drops the scratch and hands back the
-/// frozen [`TypeAnalysis`].
 pub struct TypeAnalysisBuilder {
     pub(super) analysis: TypeAnalysis,
 
-    /// Full pattern inference state. Only the result flow survives freezing.
     pub(super) pattern_shapes: HashMap<Pattern, PatternShape>,
 
-    /// Reverse index for `intern_type` deduplication of leaf and wrapper shapes.
-    /// Records and variant types are deliberately NOT deduplicated: they are nominal —
-    /// two definitions with identical capture profiles are two distinct types,
-    /// each carrying its own name. Scratch: the frozen result looks types up by
-    /// `TypeId`, never by shape. SCC sealing redirects provisional IDs and
-    /// rebuilds this index from the canonical wrapper graph.
     intern_index: HashMap<TypeShape, TypeId>,
 
-    /// Creation site of every fresh record/variant type, for naming-pass diagnostics.
-    /// Scratch: only the naming pass consults it.
     type_provenance: HashMap<TypeId, Span>,
 
-    /// Custom `:: TypeName` capture-type occurrences in source order.
-    /// Scratch: only the naming pass consults it.
     custom_capture_types: Vec<CustomCaptureTypeOccurrence>,
 
-    /// Explicit capture-type declarations deduplicated by name and body.
     capture_type_declarations: HashMap<(Symbol, TypeId), TypeDeclId>,
 
     capture_provenance: CaptureProvenance,
     pattern_order: Vec<Pattern>,
 
-    /// Raw naming failures gate capture-type normalization but have no meaning
-    /// after the builder freezes the final public graph.
     pub(super) invalid_types: HashSet<TypeId>,
 
     open_scc: Option<HashSet<DefId>>,
@@ -887,8 +803,6 @@ impl TypeAnalysisBuilder {
         builder
     }
 
-    /// Freeze the accumulated state, dropping the inference-only scratch. Admits
-    /// the result only after asserting it is internally consistent.
     pub fn finish(mut self) -> TypeAnalysis {
         assert!(
             self.open_scc.is_none(),
@@ -921,8 +835,6 @@ impl TypeAnalysisBuilder {
         self.analysis
     }
 
-    /// Restricted read-only view of the in-progress artifact. It exposes only
-    /// accessors that are explicitly safe before [`finish`](Self::finish).
     pub(crate) fn in_progress(&self) -> TypeAnalysisView<'_> {
         TypeAnalysisView {
             analysis: &self.analysis,
@@ -930,7 +842,6 @@ impl TypeAnalysisBuilder {
         }
     }
 
-    /// Open the boundary within which inference may observe pending declarations.
     pub(super) fn begin_scc(&mut self, definitions: &[DefId]) {
         assert!(
             self.open_scc.is_none(),
@@ -951,7 +862,6 @@ impl TypeAnalysisBuilder {
         self.open_scc = Some(definitions);
     }
 
-    /// Resolve every order-dependent decision before later passes snapshot the graph.
     pub(super) fn seal_scc(&mut self) -> Vec<UnifyError> {
         let definitions = self
             .open_scc
@@ -1134,9 +1044,6 @@ impl TypeAnalysisBuilder {
         *entry = TypeEntry::Redirect(to);
     }
 
-    /// Intern a type shape. Leaf and wrapper shapes deduplicate structurally;
-    /// records and variant types always mint a fresh id (they are nominal — see the
-    /// `intern_index` field docs).
     pub fn intern_type(&mut self, mut shape: TypeShape) -> TypeId {
         self.canonicalize_shape(&mut shape);
         if let TypeShape::Option(inner) = &shape
@@ -1184,8 +1091,6 @@ impl TypeAnalysisBuilder {
         self.intern_type(TypeShape::Option(inner))
     }
 
-    /// Restore wrapper idempotence and interning uniqueness after redirects
-    /// reveal declaration bodies that were opaque while the SCC was open.
     fn normalize_sealed_type_graph(&mut self) {
         for _ in 0..=self.analysis.types.len() {
             let options_changed = self.redirect_redundant_options();
@@ -1199,9 +1104,6 @@ impl TypeAnalysisBuilder {
         panic!("sealed type canonicalization must converge")
     }
 
-    /// Type IDs follow creation order, so processing options forwards preserves
-    /// one wrapper in a recursive wrapper cycle instead of redirecting the
-    /// entire cycle into references.
     fn redirect_redundant_options(&mut self) -> bool {
         let mut changed = false;
         for index in 0..self.analysis.types.len() {
@@ -1391,7 +1293,6 @@ impl TypeAnalysisBuilder {
         self.intern_type(TypeShape::Ref(declaration))
     }
 
-    /// Record where a fresh record/variant type came from, for naming-pass diagnostics.
     pub fn record_type_provenance(&mut self, type_id: TypeId, span: Span) {
         self.type_provenance.entry(type_id).or_insert(span);
     }
@@ -1400,7 +1301,6 @@ impl TypeAnalysisBuilder {
         self.type_provenance.get(&type_id).copied()
     }
 
-    /// Record a custom `:: TypeName` occurrence for the naming pass.
     pub fn record_custom_capture_type(&mut self, occurrence: CustomCaptureTypeOccurrence) {
         self.custom_capture_types.push(occurrence);
     }
@@ -1471,8 +1371,6 @@ impl TypeAnalysisBuilder {
         provenance.normalize(pattern_order, self, interner, diagnostics);
     }
 
-    /// Install the naming pass's result. Names must be complete and validated
-    /// before the analysis is frozen.
     pub fn set_named_types(&mut self, names: BTreeMap<TypeId, Symbol>) {
         self.analysis.named_types = names;
     }

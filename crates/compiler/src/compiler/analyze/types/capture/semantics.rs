@@ -1,11 +1,3 @@
-//! Frozen semantics for capture types.
-//!
-//! Inference first validates the ordinary capture and records its
-//! [`CaptureKind`]. A built-in capture type then contributes one immutable plan
-//! describing how lowering maps that already-valid value. Lowering executes the
-//! plan; it never interprets the spelling after `::` or reclassifies the raw
-//! capture.
-
 use std::collections::BTreeMap;
 
 use crate::compiler::ids::TypeId;
@@ -208,17 +200,12 @@ impl CaptureFact {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FieldCompletion {
-    /// Every alternative produces the field, so lowering owes no value.
     AlwaysPresent,
-    /// A non-producing alternative materializes semantic absence (`null` in JSON).
     Absent,
-    /// A non-producing alternative materializes an empty list.
     EmptyList,
-    /// A non-producing alternative materializes a false presence value.
     False,
 }
 
-/// Total completion behavior for the fields merged by one alternation.
 #[derive(Clone, Debug, Default)]
 pub struct FieldCompletions {
     by_field: BTreeMap<Symbol, FieldCompletion>,

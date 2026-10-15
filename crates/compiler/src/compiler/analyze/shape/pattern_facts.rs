@@ -1,9 +1,3 @@
-//! Grammar-independent facts for definition bodies and authored patterns.
-//!
-//! Every fact in this module depends on the same definition graph and syntax
-//! tree. They are therefore solved together, retained once, and borrowed by
-//! validation, type inference, grammar checking, and lowering.
-
 use std::collections::HashMap;
 
 use rowan::TextRange;
@@ -115,7 +109,6 @@ struct AuthoredPatternFacts {
     may_match_anonymous_node: bool,
 }
 
-/// Frozen classification of every admitted definition and authored pattern.
 pub(crate) struct PatternFacts {
     definitions: Vec<DefinitionFacts>,
     expression: Option<DefinitionFacts>,
@@ -132,9 +125,6 @@ impl PatternFacts {
             .map(|_| PatternSummary::bottom())
             .collect::<Vec<_>>();
 
-        // Every component is a finite monotone lattice. Solving their product
-        // gives the same least fixed points as separate passes while resolving
-        // each reference and walking each definition body only once per round.
         for scc in definitions.sccs() {
             loop {
                 let mut changed = false;
@@ -153,9 +143,6 @@ impl PatternFacts {
             }
         }
 
-        // The fixed point answers references. Materialize each authored
-        // subpattern once so downstream phases borrow projections rather than
-        // recursively reinterpreting the same syntax.
         let mut pattern_summaries = HashMap::new();
         for def_id in definitions.ids_in_def_id_order() {
             retain_pattern_summaries(
@@ -348,8 +335,6 @@ fn summarize_pattern(
                 return PatternSummary::recovery_identity();
             };
             let mut summary = summarize_child(&value, definition_summaries, definitions, patterns);
-            // Field values are validated as exactly one node. Recovery keeps
-            // their definition-level extent and nullability conservative.
             summary.nullable = false;
             summary.root_extent = RootExtent::SingleNode;
             summary.context = summary.context.with_incoming_field();

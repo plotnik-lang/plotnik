@@ -1,31 +1,13 @@
-//! Sibling skip permissions and navigation for simple lowering routes.
-//!
-//! Path-specific anchor state lives in [`super::boundary`]. `GapClass` maps its
-//! permissions onto the same skip classes used by the runtime. `AnchorSemantics`
-//! supplies the direct navigation used by lowering's simple sequence routes.
-
 use crate::bytecode::Nav;
 use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::parse::ast::{Pattern, SeqItem};
 use crate::core::{NodeClass, SkipClass};
 
-/// What a gap between two query patterns may skip over, projected from the same
-/// [`Nav`] codegen emits so the checker and the VM cannot drift.
-///
-/// The axes mirror the VM exactly (`vm/engine/cursor.rs`): a node is *anonymous*
-/// when it is not named and *extra* when the parser marked it as an extra (a
-/// comment, say). The two are independent — a named comment is `(false, true)`, an
-/// anonymous brace `(true, false)`. A broad skip clears `anonymous || extra` (the
-/// VM's `is_trivia`); a narrow skip clears only `extra`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GapClass {
-    /// No anchor: any node may sit in the gap (the VM's `SkipPolicy::Any`).
     Any,
-    /// Soft `.` with both operands named: skip anonymous tokens and extras.
     AnonymousAndExtras,
-    /// Soft `.` with an anonymous operand: skip extras only.
     ExtrasOnly,
-    /// Exact `.!`: no syntax-tree node may intervene.
     Exact,
 }
 
@@ -39,12 +21,10 @@ impl GapClass {
         }
     }
 
-    /// Whether a node may be skipped across this gap.
     pub(crate) fn admits(self, node: NodeClass) -> bool {
         self.skip_class().admits(node)
     }
 
-    /// The skip classes nest, so their intersection is the more restrictive class.
     fn permissiveness(self) -> u8 {
         match self {
             Self::Exact => 0,
@@ -54,8 +34,6 @@ impl GapClass {
         }
     }
 
-    /// The more restrictive of two gaps — their intersection. The skip permission of one
-    /// path is bounded by the tightest gap on it.
     pub fn tighten(self, other: Self) -> Self {
         if self.permissiveness() <= other.permissiveness() {
             self
@@ -64,21 +42,12 @@ impl GapClass {
         }
     }
 
-    /// Project a codegen [`Nav`] onto the gap it opens, or `None` for navs that
-    /// drive no sibling gap (pure control flow, or a `Stay` that does not move).
-    ///
-    /// The skip suffix is what carries: a plain `Next`/`Down`/`Up` skips anything,
-    /// a `*Skip`/`UpSkipTrivia` is a broad skip, a `*SkipExtras`/`UpSkipExtras` a
-    /// narrow one, an `*Exact` skips nothing. `UpSkipTrivia` is the broad skip
-    /// despite its name — it mirrors `is_trivia`, not `is_extra` (see `cursor.rs`).
     pub fn from_nav(nav: Nav) -> Option<Self> {
         let class = match nav {
             Nav::Next | Nav::Down | Nav::Up(_) => Self::Any,
             Nav::NextSkip | Nav::DownSkip | Nav::UpSkipTrivia(_) => Self::AnonymousAndExtras,
             Nav::NextSkipExtras | Nav::DownSkipExtras | Nav::UpSkipExtras(_) => Self::ExtrasOnly,
             Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Exact,
-            // Childless asserts at the current position without moving; it
-            // opens no sibling gap, like the other stay-in-place navs.
             Nav::Epsilon
             | Nav::Stay
             | Nav::StayExact
@@ -90,15 +59,10 @@ impl GapClass {
     }
 }
 
-/// Computes anchor-derived navigation from retained pattern facts.
 pub struct AnchorSemantics<'a> {
     pattern_facts: &'a PatternFacts,
 }
 
-/// Whether this pattern's immediate alternatives compile alternative-local entry navs.
-///
-/// A soft anchor before such a pattern is decided by each alternative, not by the
-/// alternation's whole-pattern anonymous classification.
 pub(crate) fn has_direct_alternative_nav(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Alternation(_) => true,
@@ -118,7 +82,6 @@ impl<'a> AnchorSemantics<'a> {
         pattern.is_some_and(|pattern| self.pattern_facts.pattern_may_match_anonymous_node(pattern))
     }
 
-    /// Check for trailing anchor in items, descending into a sole-child sequence if needed.
     pub fn check_trailing_anchor(&self, items: &[SeqItem]) -> (bool, Option<Nav>) {
         if matches!(items.last(), Some(SeqItem::Anchor(_))) {
             let trailing_is_exact = items
@@ -156,11 +119,6 @@ impl<'a> AnchorSemantics<'a> {
         (false, None)
     }
 
-    /// The anchored entry nav a leading anchor imposes on the first pattern, or
-    /// `None` when the item list has no leading anchor. Descends into a sole-child
-    /// sequence like [`check_trailing_anchor`](Self::check_trailing_anchor), and
-    /// reads the nav off [`compute_nav_modes`](Self::compute_nav_modes) so the
-    /// empty-match arm of the anchor cannot drift from the arm that matches.
     pub fn check_leading_anchor(&self, items: &[SeqItem]) -> Option<Nav> {
         if items.len() == 1
             && let Some(SeqItem::Pattern(Pattern::SeqPattern(seq))) = items.first()
@@ -199,8 +157,6 @@ impl<'a> AnchorSemantics<'a> {
                 SeqItem::Pattern(pattern) => {
                     let current_is_anonymous =
                         self.pattern_facts.pattern_may_match_anonymous_node(pattern);
-                    // Alternation alternatives compile their own entry nav, so the alternative body—not
-                    // the whole alternation—decides whether soft anchors use extras-only nav.
                     let current_is_anonymous_for_anchor = if has_direct_alternative_nav(pattern) {
                         false
                     } else {

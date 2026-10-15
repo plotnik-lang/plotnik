@@ -1,9 +1,3 @@
-//! Name-resolution pass: collect definitions, then check references.
-//!
-//! Two passes over every source:
-//! 1. Collect all `Name = pattern` definitions.
-//! 2. Check that every `(UpperIdent)` reference resolves to a definition.
-
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::shape::validation::ValidatedAst;
 use crate::compiler::analyze::visitor::Visitor;
@@ -59,8 +53,6 @@ impl Visitor for DefCollector<'_, '_, '_> {
         let Some(body) = def.node().body() else {
             return;
         };
-        // A nameless def is a parser-level error (MissingDefName); there is no name
-        // to resolve, so it never enters the table.
         let Some(token) = def.node().name() else {
             return;
         };

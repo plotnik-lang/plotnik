@@ -1,11 +1,3 @@
-//! Path-sensitive sibling-boundary semantics.
-//!
-//! Lowering needs more than nullability. A structural pattern may consume a
-//! named node, consume a node that must be treated conservatively by a future
-//! soft anchor, or consume nothing while leaving an anchor pending. This module
-//! computes that finite relation independently of bytecode and runtime ABI
-//! choices.
-
 use std::collections::BTreeSet;
 
 use super::anchors::GapClass;
@@ -16,12 +8,6 @@ const FIRST_CLASS_COUNT: usize = 4;
 const PENDING_ANCHOR_COUNT: usize = 3;
 const STATE_COUNT: usize = FIRST_CLASS_COUNT * PENDING_ANCHOR_COUNT;
 
-/// How the most recent consumer must be classified for future soft anchors.
-///
-/// `Either` is intentionally distinct from a union of `Named` and `Anonymous`:
-/// one wildcard match has no control-flow branch that can select two different
-/// continuations. It therefore remains one descriptive outcome until the
-/// operational quotient conservatively merges it with `Anonymous`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum FirstClass {
     Empty,
@@ -44,7 +30,6 @@ impl FirstClass {
     }
 }
 
-/// Anchor constraint waiting for the next consumer or the enclosing boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum PendingAnchor {
     None,
@@ -63,14 +48,11 @@ impl PendingAnchor {
         }
     }
 
-    /// Consecutive anchors intersect their permissions. Exact is absorbing:
-    /// a later soft anchor can never loosen it.
     pub(crate) fn tighten(self, other: Self) -> Self {
         std::cmp::max(self, other)
     }
 }
 
-/// Descriptive sibling-boundary state at one point in a structural pattern.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct BoundaryState {
     pub(crate) previous: FirstClass,
@@ -140,14 +122,10 @@ impl BoundaryState {
     }
 }
 
-/// One path-sensitive result of applying a pattern to a boundary state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct BoundaryOutcome {
     pub(crate) state: BoundaryState,
-    /// Whether this pattern, rather than an earlier caller prefix, consumed a node.
     pub(crate) consumed: bool,
-    /// Class of this pattern's first consumer. Kept separately from the tail
-    /// because entry anchors observe the first while followers observe the last.
     pub(crate) first: FirstClass,
 }
 
@@ -161,7 +139,6 @@ impl BoundaryOutcome {
     }
 }
 
-/// `input boundary state -> possible semantic outcomes`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct BoundaryRelation {
     outcomes: [BTreeSet<BoundaryOutcome>; STATE_COUNT],
@@ -196,8 +173,6 @@ impl BoundaryRelation {
         relation
     }
 
-    /// The simple lowering route reuses its resolved entry navigation on every
-    /// iteration. Multiple boundary outcomes instead use path-specific entries.
     pub(crate) fn repeat_entry_gap(&self, input: BoundaryState) -> Option<GapClass> {
         let outcomes: Vec<_> = self.outcomes(input).iter().copied().collect();
         if !simple_boundary_outcomes(&outcomes) {
@@ -282,8 +257,6 @@ impl BoundaryRelation {
         consuming
     }
 
-    /// Quantifier closure with empty inner outcomes pruned. An iteration that
-    /// consumes nothing is never a loop edge.
     fn consuming_closure(&self, include_identity: bool) -> Self {
         let mut closure = Self::empty();
         for input in BoundaryState::all() {
@@ -320,8 +293,6 @@ impl BoundaryRelation {
     }
 }
 
-/// Maximum semantic continuation universe after operationally equivalent
-/// descriptive outcomes are merged.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum ExitPort {
     ConsumedNamedNone,
@@ -377,8 +348,6 @@ impl ExitPort {
     }
 }
 
-/// Whether a pattern has at most one consuming route and one empty route under
-/// the operational boundary quotient used by lowering.
 pub(crate) fn simple_boundary_outcomes(outcomes: &[BoundaryOutcome]) -> bool {
     let mut consuming = BTreeSet::new();
     let mut empty = BTreeSet::new();

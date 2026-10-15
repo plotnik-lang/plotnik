@@ -1,13 +1,3 @@
-//! Semantic validation passes.
-//!
-//! Validates semantic constraints that aren't captured by parsing or type checking:
-//! - Alternative-label consistency
-//! - Local shape rules; cross-definition anchor context is validated after
-//!   name and dependency analysis
-//! - Empty constructs (empty_constructs)
-//! - Predicate regex patterns (predicates)
-//! - String escape sequences (strings)
-
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::Located;
@@ -23,16 +13,12 @@ pub mod empty_constructs;
 pub mod predicates;
 pub mod strings;
 
-/// Inputs for the AST-only validation passes (alternative labeling, anchors, empty
-/// constructs).
 pub struct ValidationInput<'q, 'd> {
     pub source_id: SourceId,
     pub ast: &'q SyntaxNode,
     pub diag: &'d mut Diagnostics,
 }
 
-/// Inputs for predicate validation, which also needs the source text to slice
-/// out and check the regex patterns embedded in predicates.
 pub struct PredicateInput<'q, 'd> {
     pub source_id: SourceId,
     pub ast: &'q SyntaxNode,
@@ -40,7 +26,6 @@ pub struct PredicateInput<'q, 'd> {
     pub diag: &'d mut Diagnostics,
 }
 
-/// Inputs for the whole AST validation stage.
 pub struct ShapeValidationInput<'q, 'd> {
     pub source_map: &'q SourceMap,
     pub ast_map: &'q IndexMap<SourceId, Root>,
@@ -48,7 +33,6 @@ pub struct ShapeValidationInput<'q, 'd> {
     pub diag: &'d mut Diagnostics,
 }
 
-/// AST bundle admitted past this validation boundary.
 pub(crate) struct ValidatedAst<'q> {
     source_map: &'q SourceMap,
     ast_map: &'q IndexMap<SourceId, Root>,

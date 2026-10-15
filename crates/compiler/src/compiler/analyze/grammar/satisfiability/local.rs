@@ -29,8 +29,6 @@ enum Visit {
 }
 
 impl<'q> LocalDiagnostics<'_, 'q> {
-    /// Explain simple structural contradictions only after the solver has rejected
-    /// the enclosing pattern. These summaries choose wording, never admission.
     pub(super) fn report(
         grammar: &'q Grammar,
         model: &'q Model,
@@ -106,8 +104,6 @@ impl<'q> LocalDiagnostics<'_, 'q> {
                         None => {}
                     }
                     self.solver.budget().spend(node.children.len() as u64 + 1)?;
-                    // Finish after the children, so shared definitions retain both
-                    // caller-specific checks and the existing diagnostic deduplication.
                     pending.push(Visit::FinishNode(pattern, before));
                     pending.extend(node.children.iter().rev().filter_map(|item| {
                         item.pattern()
@@ -131,7 +127,6 @@ impl<'q> LocalDiagnostics<'_, 'q> {
                 }
                 PatternKind::Sequence(items) => {
                     self.solver.budget().spend(items.len() as u64)?;
-                    // A group does not carry its outer field into its siblings.
                     pending.extend(items.iter().rev().filter_map(|item| {
                         item.pattern()
                             .map(|pattern| Visit::Pattern(pattern, parent, None))
@@ -333,7 +328,6 @@ impl<'q> LocalDiagnostics<'_, 'q> {
             .emit();
     }
 
-    // An unlabelled query can also match a labelled child.
     fn child_kinds(&self, parent_id: NodeKindId) -> impl Iterator<Item = NodeKindId> + '_ {
         self.grammar
             .valid_child_types(parent_id)
@@ -425,8 +419,6 @@ impl<'q> LocalDiagnostics<'_, 'q> {
         Ok(())
     }
 
-    /// Hint for the invalid-field-value diagnostic: the named kinds a grammar field accepts, or — for
-    /// literal-only fields — a concrete `field: "token"` example.
     fn field_value_hint(
         &mut self,
         parent_id: NodeKindId,
@@ -499,9 +491,6 @@ struct FieldRef {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ParentNode {
     id: NodeKindId,
-    /// Source the parent node lives in. May differ from the source currently
-    /// being walked once validation crosses a reference into another workspace
-    /// file, so this span must be reported against its own source.
     span: Span,
 }
 

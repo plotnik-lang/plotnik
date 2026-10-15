@@ -1,9 +1,3 @@
-//! Canonical definition records and their reference graph.
-//!
-//! Dependency analysis consumes the transient string-keyed name-resolution map
-//! into this `DefId`-indexed representation. Every later compiler phase reads
-//! names, sources, bodies, SCCs, and graph relationships from this one owner.
-
 use std::collections::HashMap;
 
 use crate::compiler::analyze::Located;
@@ -61,21 +55,13 @@ impl Definition {
 }
 
 pub(crate) struct DefinitionGraph {
-    /// Strongly connected components in reverse topological order.
-    ///
-    /// `sccs[0]` has no dependencies, definitions within an SCC are mutually
-    /// recursive, and every admitted definition appears exactly once.
     sccs: Vec<Vec<DefId>>,
     ids_by_symbol: HashMap<Symbol, DefId>,
     definitions: Vec<Definition>,
-    /// Definition declaration order across source-map order.
     declaration_order: Vec<DefId>,
-    /// The one resolved target for each authored reference occurrence.
     target_by_reference: HashMap<DefRef, DefId>,
 }
 
-/// A stable definition subset. Membership is recorded densely; iteration is in
-/// `DefId` order regardless of graph traversal order.
 #[derive(Clone)]
 pub(crate) struct DefinitionReachability {
     reachable: Vec<bool>,
@@ -209,8 +195,6 @@ impl DefinitionGraph {
         self.id_for_symbol(interner.get(name)?)
     }
 
-    /// An execution expression can call authored definitions but cannot be a
-    /// reference target or participate in their recursive components.
     pub(crate) fn resolve_expression(&mut self, body: &Pattern, interner: &Interner) {
         for reference in body.syntax().descendants().filter_map(DefRef::cast) {
             let Some(name) = reference.name() else {
@@ -250,10 +234,6 @@ impl DefinitionGraph {
         self.definition(id).has_inbound
     }
 
-    /// Compute the transitive definition set demanded by `roots`.
-    ///
-    /// The closure includes the roots themselves and is safe for recursive
-    /// components. Its iterator is deterministic `DefId` order.
     pub(crate) fn reachable_from(
         &self,
         roots: impl IntoIterator<Item = DefId>,

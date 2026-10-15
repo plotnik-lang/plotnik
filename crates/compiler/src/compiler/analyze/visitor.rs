@@ -1,23 +1,3 @@
-//! AST Visitor pattern.
-//!
-//! # Usage
-//!
-//! Implement `Visitor` for your struct. Override `visit_*` methods to add logic.
-//! Call `walk_*` within your override to continue recursion (or omit it to stop).
-//!
-//! Every node is visited as a [`Located`] so a pass always knows which source the
-//! node lives in — diagnostics carry their source by construction.
-//!
-//! ```ignore
-//! impl Visitor for MyPass {
-//!     fn visit_named_node_pattern(&mut self, node: &Located<NamedNodePattern>) {
-//!         // Pre-order logic
-//!         walk_named_node_pattern(self, node);
-//!         // Post-order logic
-//!     }
-//! }
-//! ```
-
 use crate::compiler::analyze::Located;
 use crate::compiler::parse::SyntaxNode;
 use crate::compiler::parse::ast::{

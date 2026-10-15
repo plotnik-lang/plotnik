@@ -1,9 +1,3 @@
-//! Caller context required by definition bodies.
-//!
-//! Consuming neighbors satisfy exposed anchors, but incoming fields require
-//! a parent edge. An enclosing node supplies its children's context. Outcomes
-//! retain consumption and outstanding requirements through composition.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use rowan::{TextRange, TextSize};
@@ -14,12 +8,6 @@ use crate::compiler::parse::ast::{Pattern, QuantifierKind, SeqItem};
 
 use super::PatternFacts;
 
-/// One path-sensitive external-context outcome.
-///
-/// `needs_left` and `needs_right` describe anchors that remain exposed at this
-/// pattern's boundaries. A consuming neighbor supplied by sequence composition
-/// discharges the corresponding need. An incoming field remains required
-/// throughout same-level composition.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct ContextOutcome {
     consumed: bool,
@@ -140,8 +128,6 @@ impl ContextRelation {
         }
     }
 
-    /// Repetition admits only consuming inner outcomes. Empty iterations do
-    /// not execute, so their anchors cannot create an external obligation.
     fn consuming_closure(&self, include_identity: bool) -> Self {
         let iterations = self.consuming_only();
         let mut closure = if include_identity {
@@ -211,11 +197,6 @@ impl BoundaryAnchorRanges {
     }
 }
 
-/// Context outcomes annotated with authored anchors that remain exposed.
-///
-/// Ranges are grouped by anchor-only `ContextOutcome`: composition only consults that
-/// outcome's consumption flags, so merging ranges for equivalent outcomes
-/// preserves path sensitivity without retaining every syntactic path.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct AnchorRangeRelation {
     outcomes: BTreeMap<ContextOutcome, BoundaryAnchorRanges>,
@@ -340,8 +321,6 @@ impl AnchorRangeRelation {
     }
 }
 
-/// Anchor tokens authored in `def_id` whose boundary can remain exposed after
-/// transparent wrapper and nullable-path composition.
 pub(super) fn exported_anchor_ranges(
     pattern_facts: &PatternFacts,
     def_id: DefId,

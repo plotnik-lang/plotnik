@@ -1,6 +1,3 @@
-//! Child automata compiled from resolved matching structure. Each caller gets its
-//! own sequence exits, while nested node obligations share their pattern IDs.
-
 use std::collections::HashMap;
 
 use crate::compiler::analyze::anchors::GapClass;
@@ -154,8 +151,6 @@ impl ChildAutomaton {
         Ok(())
     }
 
-    /// An order probe asks about two resolved demands without carrying the rest
-    /// of the failed query's restrictions into the answer.
     pub(super) fn ordered_pair(
         first: ChildMatcher,
         second: ChildMatcher,
@@ -270,7 +265,6 @@ struct Builder<'q, 'a> {
     depth: u32,
 }
 
-// Reference diamonds and nested repeats can expand faster than their source.
 const STATE_CAP: usize = 20_000;
 
 impl Builder<'_, '_> {
@@ -297,7 +291,6 @@ impl Builder<'_, '_> {
             self.budget.charge()?;
             match item {
                 Item::Pattern(pattern) => {
-                    // A sibling list does not inherit a field from its surrounding group.
                     current = self.emit_pattern(*pattern, None, current)?;
                 }
                 Item::Anchor(anchor, span) => {
@@ -377,9 +370,6 @@ impl Builder<'_, '_> {
         if repeat.kind != QuantifierKind::OneOrMore {
             self.connect(from, to)?;
         }
-        // A simple repeat reuses its entry search permission. Keep that finite
-        // choice in loop control, while BoundaryState retains path-specific
-        // previous consumers and pending anchors throughout the body.
         let mut entries = Vec::new();
         for &input in &self.boundary_inputs {
             self.budget.spend(entries.len() as u64 + 1)?;
@@ -415,9 +405,6 @@ impl Builder<'_, '_> {
         Ok(to)
     }
 
-    /// An iteration must consume. Copy only its epsilon prefix, with no route
-    /// to its empty exit. The first consuming edge joins the original body.
-    /// Loop entries also retain the search permission resolved at repeat entry.
     fn consuming_entry(
         &mut self,
         entry: State,
@@ -462,8 +449,6 @@ impl Builder<'_, '_> {
         field: Option<NodeFieldId>,
         from: State,
     ) -> Result<State, AnalysisLimit> {
-        // Sibling recursion is not generally regular. Keep the existing conservative
-        // tail loop while retaining constraints imposed by the non-recursive prefix.
         self.budget.spend(self.ref_stack.len() as u64 + 1)?;
         if self.ref_stack.contains(&definition) {
             let exit = self.new_state()?;

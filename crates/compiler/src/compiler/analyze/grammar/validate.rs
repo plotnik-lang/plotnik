@@ -57,8 +57,6 @@ impl GrammarBinder<'_, '_> {
         builder.emit();
     }
 
-    /// Conservative entrypoint root admissibility: return `false` only when the
-    /// definition's outermost node-consuming pattern is known not to be the grammar root.
     pub(super) fn pattern_can_match_root(
         &self,
         located: &Located<Pattern>,
@@ -122,8 +120,6 @@ impl GrammarBinder<'_, '_> {
 
                 self.pattern_can_match_root(&located.wrap(first), grammar_root, seen_refs)
             }
-            // Incoming fields are supplied by enclosing nodes. Standalone
-            // eligibility handles this context requirement.
             Pattern::FieldPattern(_) => true,
         }
     }
@@ -148,10 +144,6 @@ impl GrammarBinder<'_, '_> {
         id == grammar_root
     }
 
-    /// Reject supertype patterns before lowering can emit a concrete-kind match that never fires.
-    /// Bare `(expression)` gets a syntax-oriented diagnostic; marked `(expression#...)` gets the
-    /// unsupported-feature diagnostic.
-    /// Returns whether the node was rejected.
     fn reject_supertype_match(&mut self, located: &Located<NamedNodePattern>) -> bool {
         let node = located.node();
         let kind_token = node.kind_token().expect("validated node has a kind");

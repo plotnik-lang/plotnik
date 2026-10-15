@@ -1,5 +1,3 @@
-//! Capture-type planning against the frozen inferred type graph.
-
 use std::collections::HashSet;
 
 use super::normalize::{AbsencePolicy, InferredTypeSnapshot, NormalizedField};

@@ -1,10 +1,3 @@
-//! Target-neutral result schema and capture-member layout.
-//!
-//! Analysis assigns types and names; this view turns them into the one ordered
-//! result model every downstream consumer shares. In particular, absolute
-//! composite member slots are assigned here, before bytecode or any
-//! source backend chooses a representation.
-
 use std::collections::{BTreeMap, HashSet};
 
 use indexmap::IndexMap;
@@ -32,8 +25,6 @@ pub(crate) enum ResultItemKind {
     Record,
     Variant,
     Alias,
-    /// A selectable match-only definition has a nominal marker and a `matches` API,
-    /// but no decoded value.
     MatchOnlyDef,
 }
 
@@ -91,9 +82,6 @@ pub(crate) enum CaptureScopeKind {
     Variant,
 }
 
-/// One public composite declaration and every compatible nominal scope that
-/// can produce its value. Source targets render `representative`; decoders
-/// accept member slots from every `occurrence`.
 #[derive(Clone, Debug)]
 pub(crate) struct PublicResultGroup {
     representative: TypeId,
@@ -155,9 +143,6 @@ pub(crate) struct CaptureLayout {
     members: Vec<CaptureMember>,
 }
 
-/// Stable analysis-type to emitted-type numbering shared by every output
-/// backend. Built-ins lead in canonical order, followed by value types in
-/// dependency order.
 #[derive(Clone, Debug)]
 pub(crate) struct ResultTypeLayout {
     no_value: bool,
@@ -359,11 +344,6 @@ impl PublicResultGroup {
     }
 }
 
-/// Owned, name-assigned result data derived once for a compiled query.
-///
-/// Semantic analyses remain owned by the bound query. This model retains only
-/// the target-neutral projection every downstream consumer shares, so a
-/// [`ResultSchema`] can cheaply combine it with those analyses when needed.
 #[derive(Clone)]
 pub(crate) struct ResultModel {
     reachable_defs: DefinitionReachability,
@@ -374,9 +354,6 @@ pub(crate) struct ResultModel {
     public_result_groups: BTreeMap<Symbol, PublicResultGroup>,
 }
 
-/// A borrowed view of a compiled query's semantic analyses and retained result
-/// model. Target representation choices such as Rust `Box` placement live
-/// downstream.
 #[derive(Clone, Copy)]
 pub(crate) struct ResultSchema<'a> {
     pub(crate) types: &'a TypeAnalysis,
@@ -522,12 +499,6 @@ impl<'a> ResultSchema<'a> {
         self.model.type_name_bindings.iter().copied()
     }
 
-    /// Public result items reachable from selectable definition outputs.
-    ///
-    /// Reachable fragment definitions still need capture slots and wire types
-    /// for matching. A source-code target, however, must not publish an
-    /// unspecialized fragment type merely because a capture-type-specialized call
-    /// uses the same matcher body.
     pub(crate) fn entrypoint_items(&self) -> &[ResultItem] {
         &self.model.entrypoint_items
     }

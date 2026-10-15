@@ -1,7 +1,3 @@
-//! Grammar productions threaded through resolved query child automata. The
-//! solver owns feasibility. Reporting follows failed constraints and retains source
-//! syntax only for diagnostic wording and highlights.
-
 mod automaton;
 mod budget;
 mod configurations;
@@ -101,7 +97,6 @@ impl Reporter<'_, '_> {
             PatternKind::Sequence(items) => {
                 self.walk_children(items.iter().filter_map(|item| item.pattern()))
             }
-            // Definitions are checked in their own right in declaration order.
             PatternKind::Reference(_) | PatternKind::Leaf(_) => Ok(()),
         }
     }

@@ -1,11 +1,3 @@
-//! Predicate validation.
-//!
-//! Validates regex patterns in predicates for unsupported features:
-//! - Backreferences (`\1`)
-//! - Lookahead/lookbehind (`(?=...)`, `(?!...)`, etc.)
-//! - Named captures (`(?P<name>...)`)
-//! - Target-dependent line modes and word-boundary variants
-
 use regex_syntax::ast::{self, Ast, GroupKind, Visitor as RegexVisitor, visit};
 use regex_syntax::hir;
 use rowan::TextRange;
@@ -47,7 +39,6 @@ struct RegexLiteral<'q> {
 
 impl RegexLiteral<'_> {
     fn map_span(self, regex_span: &ast::Span) -> TextRange {
-        // `range` includes the `/` delimiters, so content starts at +1.
         let content_start = u32::from(self.range.start()) + 1;
         let start = content_start + regex_span.start.offset as u32;
         let end = content_start + regex_span.end.offset as u32;
@@ -89,7 +80,6 @@ impl PredicateValidator<'_, '_> {
             return;
         }
 
-        // Parse with octal disabled so \1-\9 are backreferences, not octal
         let parser_result = ast::parse::ParserBuilder::new()
             .octal(false)
             .build()
@@ -105,7 +95,6 @@ impl PredicateValidator<'_, '_> {
                         Span::new(self.source_id, span),
                     ),
                     ast::ErrorKind::UnsupportedLookAround => {
-                        // Skip the opening `(` - point at `?=` / `?!` / `?<=` / `?<!`
                         use rowan::TextSize;
                         let adjusted =
                             TextRange::new(span.start() + TextSize::from(1u32), span.end());
@@ -136,8 +125,6 @@ impl PredicateValidator<'_, '_> {
 
         for capture_span in detector.named_captures {
             let span = regex.map_span(&capture_span);
-            // The span covers `?P<name>` / `?<name>` (the `(` is excluded), so deleting it
-            // turns `(?P<name>foo)` into a plain group `(foo)`.
             self.diag
                 .report(
                     DiagnosticKind::RegexNamedCapture,
@@ -212,7 +199,6 @@ impl RegexVisitor for RegexFeatureDetector {
         if let Ast::Group(group) = ast
             && let GroupKind::CaptureName { name, .. } = &group.kind
         {
-            // Span for `?P<name>` (skip opening paren, include closing `>`)
             let start = ast::Position::new(
                 group.span.start.offset + 1,
                 group.span.start.line,

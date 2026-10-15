@@ -1,5 +1,3 @@
-//! Core type definitions for the type checking pass.
-
 use std::collections::BTreeMap;
 
 pub use crate::compiler::ids::TypeId;
@@ -52,27 +50,18 @@ impl CasePayload {
     }
 }
 
-/// The shape of an inferred type, determining its structure.
-///
-/// This represents the inference-time type representation which carries
-/// actual data (fields, cases, inner types). Distinct from
-/// `type_system::TypeKind`, the bytecode discriminant.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeShape {
     Node,
-    /// Borrowed source text.
     Text,
     Bool,
     Record(BTreeMap<Symbol, RecordField>),
-    /// Variant type from a labeled alternation.
     Variant(BTreeMap<Symbol, CasePayload>),
-    /// Ordered list with its semantic minimum length.
     List {
         element: TypeId,
         minimum: ListMinimum,
     },
     Option(TypeId),
-    /// Reference to a named type declaration.
     Ref(TypeDeclId),
 }
 
@@ -136,7 +125,6 @@ fn field_type_id(field: &RecordField) -> TypeId {
     field.final_type
 }
 
-/// One finalized field in a record type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct RecordField {
     pub final_type: TypeId,
@@ -148,14 +136,10 @@ impl RecordField {
     }
 }
 
-/// Data flow through an expression.
 #[derive(Clone, Debug)]
 pub enum PatternFlow {
-    /// Transparent, produces no value.
     NoValue,
-    /// Opaque single value that doesn't bubble (scope boundary).
     Value(TypeId),
-    /// Record field set that bubbles to the parent scope.
     Fields(TypeId),
 }
 
@@ -176,7 +160,6 @@ impl PatternFlow {
     }
 }
 
-/// Inference-time result flow and field provenance for a pattern.
 #[derive(Clone, Debug)]
 pub struct PatternShape {
     pub flow: PatternFlow,

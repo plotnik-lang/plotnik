@@ -1,9 +1,3 @@
-//! Bind pass: resolve node kinds and fields against a tree-sitter grammar.
-//!
-//! Two-phase approach:
-//! 1. Resolve all symbols (node kinds and fields) against grammar
-//! 2. Validate syntax, then solve the resolved matching constraints
-
 use std::collections::{HashMap, HashSet};
 
 use crate::core::grammar::Grammar;
@@ -19,8 +13,6 @@ use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::ids::DefId;
 use crate::compiler::limits::SatisfiabilityLimits;
 
-/// The threaded dependencies of the bind pass. Decoupled from `Query` to allow
-/// testing without a full query context.
 pub struct GrammarBindInput<'a, 'q> {
     pub interner: &'a mut Interner,
     pub grammar: &'a Grammar,
@@ -66,7 +58,6 @@ impl<'q> GrammarBindInput<'_, 'q> {
                 output,
                 diag: diagnostics,
             };
-            // Preserve diagnostic phase order within each saved source.
             for definition_ids in definitions
                 .ids_in_declaration_order()
                 .chunk_by(|left, right| {
@@ -85,8 +76,6 @@ impl<'q> GrammarBindInput<'_, 'q> {
             }
         }
 
-        // Invalid names and unsupported syntax are unconditional errors. Matching
-        // constraints are evaluated only after every definition passes this boundary.
         if diagnostics.has_errors() {
             return;
         }
