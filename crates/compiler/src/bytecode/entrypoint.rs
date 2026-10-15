@@ -30,12 +30,26 @@ impl EntryBoundary {
     }
 }
 
-/// Named query definition entrypoint (8 bytes).
+/// Identity of a root in the module's entrypoint table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(C)]
+pub enum EntrypointIdentity {
+    Named(StringId),
+    Expression,
+}
+
+impl EntrypointIdentity {
+    pub(crate) fn to_u16(self) -> u16 {
+        match self {
+            Self::Named(name) => name.into(),
+            Self::Expression => 0,
+        }
+    }
+}
+
+/// A module-owned runnable root, whether named or supplied as an expression.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Entrypoint {
-    /// Definition name.
-    name: StringId,
+    identity: EntrypointIdentity,
     /// Starting instruction address.
     target: CodeAddr,
     /// Result type.
@@ -44,39 +58,49 @@ pub struct Entrypoint {
     boundary: u16,
 }
 
-const _: () = assert!(std::mem::size_of::<Entrypoint>() == Entrypoint::SIZE);
-
 impl Entrypoint {
-    /// Serialized size in bytes.
     pub const SIZE: usize = 8;
 
     pub(crate) fn new(
-        name: StringId,
+        identity: EntrypointIdentity,
         target: CodeAddr,
         result_type: TypeId,
         boundary: EntryBoundary,
     ) -> Self {
         Self {
-            name,
+            identity,
             target,
             result_type,
             boundary: boundary.to_u16(),
         }
     }
 
+    pub fn identity(&self) -> EntrypointIdentity {
+        self.identity
+    }
+
     pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
+        let identity = match StringId::try_from(u16::from_le_bytes([bytes[0], bytes[1]])) {
+            Ok(name) => EntrypointIdentity::Named(name),
+            Err(_) => EntrypointIdentity::Expression,
+        };
         Self {
-            name: StringId::try_from(u16::from_le_bytes([bytes[0], bytes[1]]))
-                .expect("entrypoint name id must be non-zero"),
+            identity,
             target: CodeAddr::from(u16::from_le_bytes([bytes[2], bytes[3]])),
             result_type: TypeId::from(u16::from_le_bytes([bytes[4], bytes[5]])),
             boundary: u16::from_le_bytes([bytes[6], bytes[7]]),
         }
     }
 
-    pub fn name(&self) -> StringId {
-        self.name
+    pub(crate) fn to_bytes(self) -> [u8; Self::SIZE] {
+        let mut bytes = [0; Self::SIZE];
+        bytes[0..2].copy_from_slice(&self.identity.to_u16().to_le_bytes());
+        bytes[2..4].copy_from_slice(&self.target.to_le_bytes());
+        bytes[4..6].copy_from_slice(&u16::from(self.result_type).to_le_bytes());
+        bytes[6..8].copy_from_slice(&self.boundary.to_le_bytes());
+        bytes
     }
+
     pub fn target(&self) -> CodeAddr {
         self.target
     }

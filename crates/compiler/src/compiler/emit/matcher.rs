@@ -272,7 +272,10 @@ impl MatcherPlan {
         let entrypoints = graph
             .entrypoints()
             .iter()
-            .map(|(&definition, entry)| {
+            .map(|(&key, entry)| {
+                let crate::compiler::lower::ir::EntrypointKey::Named(definition) = key else {
+                    unreachable!("source generation admits only named modules");
+                };
                 let symbol = artifacts.definitions.definition(definition).name();
                 EntryPlan {
                     definition,
@@ -374,6 +377,9 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             .origin(label)
             .expect("every pre-pack label carries an origin")
         {
+            LabelOrigin::Expression => {
+                unreachable!("execution expressions are not source-generated")
+            }
             LabelOrigin::Def(_) => StateOrigin::Definition,
             LabelOrigin::DefSpecialization { route, .. } => {
                 if route.requires_consumption() {

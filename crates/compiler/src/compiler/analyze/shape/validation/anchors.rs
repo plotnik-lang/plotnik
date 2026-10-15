@@ -14,6 +14,8 @@ pub(crate) struct AnchorValidationInput<'a, 'd> {
     pub pattern_facts: &'a PatternFacts,
     pub definitions: &'a DefinitionGraph,
     pub diag: &'d mut Diagnostics,
+    pub expression:
+        Option<&'a crate::compiler::analyze::Located<crate::compiler::parse::ast::Pattern>>,
 }
 
 pub(crate) fn validate_anchors(input: AnchorValidationInput<'_, '_>) -> bool {
@@ -22,7 +24,18 @@ pub(crate) fn validate_anchors(input: AnchorValidationInput<'_, '_>) -> bool {
             .pattern_facts
             .definition_requires_external_anchor_context(def_id)
     });
-    let discharged = input.definitions.reachable_from(self_contained_roots);
+    let expression_roots = input
+        .expression
+        .into_iter()
+        .filter(|_| {
+            !input
+                .pattern_facts
+                .expression_requires_external_anchor_context()
+        })
+        .flat_map(|expression| input.definitions.expression_dependencies(expression.node()));
+    let discharged = input
+        .definitions
+        .reachable_from(self_contained_roots.chain(expression_roots));
 
     let mut valid = true;
     for def_id in input.definitions.ids_in_def_id_order() {

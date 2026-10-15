@@ -31,7 +31,7 @@ mod type_meta;
 pub mod type_system;
 
 pub use dump::dump;
-pub use entrypoint::Entrypoint;
+pub use entrypoint::{Entrypoint, EntrypointIdentity};
 pub use ids::{StringId, TypeId};
 pub use instructions::{CodeAddr, EncodeError};
 pub use module::{EntrypointsView, Module, StringsView, TypesView};

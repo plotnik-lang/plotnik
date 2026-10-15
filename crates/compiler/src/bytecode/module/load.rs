@@ -192,9 +192,7 @@ impl Module {
         self.validate_type_defs()?;
         self.validate_type_names()?;
         self.validate_spans()?;
-        // Bound every embedded `StringId` before any later check constructs a
-        // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
-        // `Entrypoint`, which would otherwise panic on a malformed zero name.
+        // Bound embedded string references before trusting typed table views.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
         let is_start = self.validate_instructions()?;
@@ -461,9 +459,16 @@ impl Module {
         let entrypoints = self.entrypoints();
         let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
-        for i in 0..entrypoints.len() {
+        let mut has_expression = false;
+        for (i, ep) in entrypoints.iter().enumerate() {
             let invalid = || ModuleError::InvalidEntrypoint(i);
-            let ep = entrypoints.get(i);
+            if ep.identity() == EntrypointIdentity::Expression {
+                if has_expression {
+                    return Err(invalid());
+                }
+                has_expression = true;
+            }
+
             let target = ep.target();
 
             if target.get() >= word_count {
@@ -504,14 +509,17 @@ impl Module {
             Ok(())
         };
 
-        // Entrypoint name: u16 at entry+0
-        check(
-            self.offsets.entrypoints,
-            Entrypoint::SIZE,
-            0,
-            0,
-            self.header.entrypoints_count as usize,
-        )?;
+        // Identity zero denotes the expression, not a string reference.
+        for i in 0..self.header.entrypoints_count as usize {
+            let identity = read_u16_le(
+                storage,
+                self.offsets.entrypoints as usize + i * Entrypoint::SIZE,
+            );
+            if identity != 0 && identity >= n {
+                return Err(ModuleError::InvalidStringId(i));
+            }
+        }
+
         // node/field symbol name: u16 at entry+2
         check(
             self.offsets.node_kinds,

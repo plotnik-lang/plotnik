@@ -23,6 +23,9 @@ pub enum Error {
     #[error("query analysis failed with {} errors", .0.error_count())]
     QueryAnalyzeError(Diagnostics),
 
+    #[error("nothing to compile: no query sources selected")]
+    NoQuerySources,
+
     /// Emission configuration is outside-boundary input and has no honest
     /// query span.
     #[error("invalid emission configuration: {0}")]

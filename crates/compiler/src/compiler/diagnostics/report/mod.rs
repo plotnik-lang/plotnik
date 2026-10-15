@@ -193,6 +193,22 @@ impl Diagnostics {
     pub fn extend(&mut self, other: Diagnostics) {
         self.messages.extend(other.messages);
     }
+
+    pub(crate) fn add_grouping_hint(&mut self, source: SourceId) {
+        if let Some(diagnostic) = self.messages.iter_mut().find(|message| {
+            message.span.source == source
+                && matches!(
+                    message.kind,
+                    DiagnosticKind::UnknownNodeKind | DiagnosticKind::UnknownGrammarField
+                )
+                && message.fix.is_none()
+                && message.hints.is_empty()
+        }) {
+            diagnostic.hints.push(
+                "if this file is for another language, set its first-line language tag".to_owned(),
+            );
+        }
+    }
 }
 
 impl<'d> DiagnosticBuilder<'d> {

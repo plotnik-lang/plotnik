@@ -102,6 +102,12 @@ struct DefinitionFacts {
     boundary: BoundaryRelation,
 }
 
+impl DefinitionFacts {
+    fn is_entrypoint_eligible(&self) -> bool {
+        self.root_extent == RootExtent::SingleNode && !self.context.requires_external_context()
+    }
+}
+
 struct AuthoredPatternFacts {
     nullable: bool,
     root_extent: RootExtent,
@@ -112,11 +118,15 @@ struct AuthoredPatternFacts {
 /// Frozen classification of every admitted definition and authored pattern.
 pub(crate) struct PatternFacts {
     definitions: Vec<DefinitionFacts>,
+    expression: Option<DefinitionFacts>,
     patterns: HashMap<Pattern, AuthoredPatternFacts>,
 }
 
 impl PatternFacts {
-    pub(crate) fn analyze(definitions: &DefinitionGraph) -> Self {
+    pub(crate) fn analyze(
+        definitions: &DefinitionGraph,
+        expression: Option<&crate::compiler::analyze::Located<Pattern>>,
+    ) -> Self {
         let mut definition_summaries = definitions
             .ids_in_def_id_order()
             .map(|_| PatternSummary::bottom())
@@ -156,6 +166,23 @@ impl PatternFacts {
             );
         }
 
+        if let Some(expression) = expression {
+            retain_pattern_summaries(
+                expression.node(),
+                &definition_summaries,
+                definitions,
+                &mut pattern_summaries,
+            );
+        }
+
+        let expression = expression.map(|body| {
+            pattern_summaries
+                .get(body.node())
+                .expect("expression summary was retained")
+                .clone()
+                .into_definition_facts()
+        });
+
         let definitions = definition_summaries
             .into_iter()
             .map(PatternSummary::into_definition_facts)
@@ -167,6 +194,7 @@ impl PatternFacts {
 
         Self {
             definitions,
+            expression,
             patterns,
         }
     }
@@ -176,8 +204,22 @@ impl PatternFacts {
     }
 
     pub(crate) fn is_entrypoint_eligible(&self, def_id: DefId) -> bool {
-        let facts = self.definition(def_id);
-        facts.root_extent == RootExtent::SingleNode && !facts.context.requires_external_context()
+        self.definition(def_id).is_entrypoint_eligible()
+    }
+
+    pub(crate) fn expression_is_entrypoint_eligible(&self) -> bool {
+        self.expression
+            .as_ref()
+            .expect("expression was analyzed")
+            .is_entrypoint_eligible()
+    }
+
+    pub(crate) fn expression_requires_external_anchor_context(&self) -> bool {
+        self.expression
+            .as_ref()
+            .expect("expression was analyzed")
+            .context
+            .requires_external_anchor_context()
     }
 
     pub(crate) fn definition_requires_external_anchor_context(&self, def_id: DefId) -> bool {

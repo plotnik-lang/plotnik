@@ -966,6 +966,7 @@ impl From<ReturnIR> for InstructionIR {
 /// origin — they are wire-format artifacts with no source correspondence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LabelOrigin {
+    Expression,
     /// Allocated while compiling this definition's body.
     Def(DefId),
     /// Allocated while compiling a non-ordinary definition specialization.
@@ -977,7 +978,14 @@ pub(crate) enum LabelOrigin {
     },
 }
 
-/// One selectable definition and the result effects owned by its execution boundary.
+/// Identity of a root, separate from the named callable-body namespace.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum EntrypointKey {
+    Named(DefId),
+    Expression,
+}
+
+/// One runnable root and the result effects owned by its execution boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct EntrypointIR {
     pub(crate) target: Label,
@@ -990,8 +998,8 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for every emitted definition specialization.
     pub(in crate::compiler::lower) def_entries: IndexMap<DefSpecialization, Label>,
-    /// Selectable definitions in `DefId` order.
-    pub(in crate::compiler::lower) entrypoints: IndexMap<DefId, EntrypointIR>,
+    /// Named roots in `DefId` order, followed by the optional expression.
+    pub(in crate::compiler::lower) entrypoints: IndexMap<EntrypointKey, EntrypointIR>,
     /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
     /// Origin per label id (index = `Label.0`), recorded at allocation.
@@ -1003,8 +1011,12 @@ impl NfaGraph {
         &self.instructions
     }
 
-    pub(crate) fn entrypoints(&self) -> &IndexMap<DefId, EntrypointIR> {
+    pub(crate) fn entrypoints(&self) -> &IndexMap<EntrypointKey, EntrypointIR> {
         &self.entrypoints
+    }
+
+    pub(crate) fn executable_entries(&self) -> impl Iterator<Item = &EntrypointIR> {
+        self.entrypoints.values()
     }
 
     pub(crate) fn specialization_for_entry(&self, entry: Label) -> Option<&DefSpecialization> {

@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use crate::bytecode::{EntryBoundary, Labeling as SpanLabeling, Nav, SpanKind};
 use crate::compiler::analyze::boundary::BoundaryRelation;
 use crate::compiler::analyze::types::TypeShape;
-use crate::compiler::analyze::types::type_shape::PatternFlow;
+use crate::compiler::analyze::types::type_shape::{DefinitionOutput, PatternFlow};
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::boundary::ExitMap;
@@ -147,6 +147,18 @@ impl<'a> NfaBuilder<'a> {
         spans.bind(id, binding);
     }
 
+    fn entrypoint(&self, target: Label, output: DefinitionOutput) -> EntrypointIR {
+        let shape = output
+            .value()
+            .map(|ty| self.ctx.analysis.type_analysis.expect_type_shape(ty));
+        let boundary = match shape {
+            Some(TypeShape::Record(_)) => EntryBoundary::Record,
+            Some(TypeShape::Node) => EntryBoundary::Node,
+            _ => EntryBoundary::Passthrough,
+        };
+        EntrypointIR { target, boundary }
+    }
+
     pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> NfaGraph {
         let mut compiler = NfaBuilder::new(ctx);
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
@@ -154,15 +166,32 @@ impl<'a> NfaBuilder<'a> {
         let mut entrypoints = IndexMap::new();
         for (def_id, output) in ctx.analysis.iter_entrypoint_outputs() {
             let target = compiler.ensure_def_specialization(DefSpecialization::ordinary(def_id));
-            let output_shape = output
-                .value()
-                .map(|type_id| ctx.analysis.type_analysis.expect_type_shape(type_id));
-            let boundary = match output_shape {
-                Some(TypeShape::Record(_)) => EntryBoundary::Record,
-                Some(TypeShape::Node) => EntryBoundary::Node,
-                _ => EntryBoundary::Passthrough,
-            };
-            entrypoints.insert(def_id, EntrypointIR { target, boundary });
+            entrypoints.insert(
+                crate::compiler::lower::ir::EntrypointKey::Named(def_id),
+                compiler.entrypoint(target, output),
+            );
+        }
+
+        if let Some(body) = ctx.analysis.expression {
+            let output = ctx
+                .analysis
+                .expression_output()
+                .expect("analyzed expression has an output");
+            compiler.current_origin = Some(LabelOrigin::Expression);
+            let exit = compiler.fresh_label();
+            compiler.instructions.push(ReturnIR::matched(exit).into());
+            let target = compiler.with_scope_if_present(output.value(), |this| {
+                this.compile_def_body(
+                    body.node(),
+                    &DefBodyMode::ordinary(),
+                    CaptureExits::Single(exit),
+                    Some(Nav::StayExact),
+                )
+            });
+            entrypoints.insert(
+                crate::compiler::lower::ir::EntrypointKey::Expression,
+                compiler.entrypoint(target, output),
+            );
         }
 
         verify_fresh_build(&compiler.instructions);

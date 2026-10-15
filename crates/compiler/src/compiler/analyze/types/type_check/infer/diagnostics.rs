@@ -129,9 +129,13 @@ impl InferVisitor<'_, '_> {
                 hint,
             )
         } else {
-            let definition = enclosing_definition_name(quant);
-            let subject = format!("definition `{definition}`");
-            let suggested_capture = format!("{}_item", to_snake_case(&definition));
+            let (subject, suggested_capture) = match enclosing_definition_name(quant) {
+                Some(definition) => (
+                    format!("definition `{definition}`"),
+                    format!("{}_item", to_snake_case(&definition)),
+                ),
+                None => ("the expression".to_owned(), "item".to_owned()),
+            };
             let capture_target = first_result_capture_target(&inner);
             (
                 format!(
@@ -292,14 +296,17 @@ impl InferVisitor<'_, '_> {
         } else {
             "list"
         };
-        let definition = enclosing_definition_name(quant);
+        let subject = match enclosing_definition_name(quant) {
+            Some(name) => format!("definition `{name}` names"),
+            None => "the expression produces".to_owned(),
+        };
         let inner = quant
             .inner()
             .expect("validated quantified pattern has an inner pattern");
         let inner_text = inline_source(inner.syntax());
         self.report(DiagnosticKind::UnnamedQuantifiedElement, quant.text_range())
             .detail(format!(
-                "definition `{definition}` names the {collection}, but its element `{inner_text}` is {element_desc} without a type name"
+                "{subject} the {collection}, but its element `{inner_text}` is {element_desc} without a type name"
             ))
             .hint(format!(
                 "move `{inner_text}` into its own named definition, then apply `{op}` to a reference to that definition"
@@ -528,16 +535,13 @@ fn fresh_capture_name(taken: &[String]) -> String {
     unreachable!("an unbounded capture-name sequence always has a free name")
 }
 
-fn enclosing_definition_name(quant: &QuantifiedPattern) -> String {
+fn enclosing_definition_name(quant: &QuantifiedPattern) -> Option<String> {
     quant
         .syntax()
         .ancestors()
         .find_map(Def::cast)
-        .expect("inferred quantified pattern belongs to a definition")
-        .name()
-        .expect("validated definition has a name")
-        .text()
-        .to_string()
+        .and_then(|definition| definition.name())
+        .map(|name| name.text().to_owned())
 }
 
 fn first_result_capture_target(pattern: &Pattern) -> Option<String> {

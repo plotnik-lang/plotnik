@@ -53,7 +53,11 @@ impl ModuleRenderContext {
 
         let mut entrypoint_by_ip = BTreeMap::new();
         for e in entrypoints.iter() {
-            entrypoint_by_ip.insert(u16::from(e.target()), strings.get(e.name()).to_string());
+            let name = match e.identity() {
+                super::EntrypointIdentity::Named(name) => strings.get(name),
+                super::EntrypointIdentity::Expression => "<expression>",
+            };
+            entrypoint_by_ip.insert(u16::from(e.target()), name.to_string());
         }
 
         Self {

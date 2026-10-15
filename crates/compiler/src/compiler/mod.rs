@@ -34,5 +34,5 @@ pub use fmt::{FormatError, FormatResult, format_query};
 pub use parse::{QueryToken, tokenize};
 pub use query::{
     CompiledQuery, GrammarDeclaration, GrammarDeclarationError, Query, QueryBuilder,
-    parse_grammar_declaration,
+    SourceCollection, parse_grammar_declaration,
 };

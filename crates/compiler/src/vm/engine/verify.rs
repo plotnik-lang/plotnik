@@ -351,7 +351,10 @@ fn panic_with_mismatch(
         .iter()
         .find_map(|e| {
             if e.result_type() == declared_type {
-                Some(strings.get(e.name()))
+                Some(match e.identity() {
+                    crate::bytecode::EntrypointIdentity::Named(name) => strings.get(name),
+                    crate::bytecode::EntrypointIdentity::Expression => "<expression>",
+                })
             } else {
                 None
             }

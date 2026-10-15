@@ -57,6 +57,57 @@ const SPLIT_CALL_QUERY: &str = indoc! {r#"
     Q = (program (B) @x :: text)
 "#};
 
+#[test]
+fn serialized_expression_root_is_verified_before_execution() {
+    let mut sources = SourceMap::new();
+    let saved = sources.add_file(SourcePath::new("query.ptk"), "Named = (program)");
+    let expression = sources.add_stdin("(program) @root");
+    let mut collection = crate::compiler::SourceCollection::new(sources);
+    collection.include(saved);
+    let prepared = QueryBuilder::from_sources(collection)
+        .with_expression(expression)
+        .compile_dynamic(grammar())
+        .unwrap();
+    let module = prepared
+        .emit(BytecodeConfig::new())
+        .unwrap()
+        .into_artifact()
+        .unwrap();
+    assert_eq!(module.entrypoint_count(), 2);
+    let expression = module.expression_entrypoint().unwrap();
+    let named = module.entrypoint("Named").unwrap();
+    let offset = module.offsets().entrypoints as usize;
+
+    // Root identity, not table position, controls lookup after a byte roundtrip.
+    let mut reordered = module.bytes().to_vec();
+    reordered[offset..offset + 16].rotate_left(8);
+    reseal(&mut reordered);
+    let reloaded = Module::validate_and_load(&reordered).unwrap();
+    assert_eq!(reloaded.entrypoint_at(0), Some(expression));
+    assert_eq!(reloaded.expression_entrypoint(), Some(expression));
+    assert_eq!(reloaded.entrypoint("Named"), Some(named));
+    assert_eq!(reloaded.entrypoint_names().collect::<Vec<_>>(), ["Named"]);
+
+    let mut duplicate = reordered.clone();
+    duplicate[offset + 8..offset + 10].copy_from_slice(&0u16.to_le_bytes());
+    reseal(&mut duplicate);
+    assert!(matches!(
+        Module::validate_and_load(&duplicate),
+        Err(ModuleError::InvalidEntrypoint(1))
+    ));
+
+    // The body writes a record field. Removing its entry-owned record frame
+    // must fail through the same admission path as any named entrypoint.
+    let mut broken = reordered;
+    let boundary_offset = offset + 6;
+    broken[boundary_offset..boundary_offset + 2].copy_from_slice(&0u16.to_le_bytes());
+    reseal(&mut broken);
+    assert!(matches!(
+        Module::validate_and_load(&broken),
+        Err(ModuleError::EffectStackImbalance(_))
+    ));
+}
+
 const ROUTED_CALL_QUERY: &str = indoc! {r#"
     B = (expression_statement)
     A = (statement_block (A)+ (identifier))?
@@ -163,25 +214,18 @@ fn find_predicate_off(bytes: &[u8]) -> usize {
 
 #[test]
 fn forged_invalid_entrypoint_name_is_rejected() {
-    // `0` is the reserved easter-egg index (never a real reference) and `u16::MAX`
-    // is past the table; both must yield a clean error, not panic during StringId decoding.
-    for forged in [0u16, u16::MAX] {
-        let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
-        let ep_off = Module::validate_and_load(&bytes)
-            .expect("module validates before tampering")
-            .offsets()
-            .entrypoints as usize;
+    let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
+    let ep_off = Module::validate_and_load(&bytes)
+        .expect("module validates before tampering")
+        .offsets()
+        .entrypoints as usize;
 
-        bytes[ep_off..ep_off + 2].copy_from_slice(&forged.to_le_bytes());
-        reseal(&mut bytes);
+    bytes[ep_off..ep_off + 2].copy_from_slice(&u16::MAX.to_le_bytes());
+    reseal(&mut bytes);
 
-        let err =
-            Module::validate_and_load(&bytes).expect_err("forged entrypoint name must be rejected");
-        assert!(
-            matches!(err, ModuleError::InvalidStringId(_)),
-            "forged name {forged}: expected InvalidStringId, got {err:?}"
-        );
-    }
+    let err = Module::validate_and_load(&bytes)
+        .expect_err("out-of-range named identity must be rejected");
+    assert!(matches!(err, ModuleError::InvalidStringId(_)));
 }
 
 #[test]

@@ -33,7 +33,7 @@ pub(super) use diagnose::Context as ReportContext;
 pub(super) fn check(ctx: ReportContext<'_>, limits: SatisfiabilityLimits, diag: &mut Diagnostics) {
     let mut solver = SatisfiabilitySolver::checking(ctx.grammar, ctx.model, limits);
     let mut failed = Vec::new();
-    for pattern in ctx.model.definitions() {
+    for pattern in ctx.model.bodies() {
         match solver.possible(pattern) {
             Ok(true) => {}
             Ok(false) => failed.push(pattern),

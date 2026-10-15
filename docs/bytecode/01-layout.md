@@ -10,7 +10,7 @@
 
 ## Design
 
-The bytecode stores a compiled query as a program and the data that program uses. An entrypoint lets the caller choose a named query to run, such as `Q` in the introduction. It stores the starting instruction and result type. Several entrypoints can share the same bytecode. The VM runs the chosen entry against a document and its syntax tree.
+The bytecode stores a compiled query as a program and the data that program uses. An entrypoint lets the caller choose a named query to run, such as `Q` in the introduction, or an expression supplied without a name. It stores the starting instruction and result type. Several entrypoints can share the same bytecode. The VM runs the chosen entry against a document and its syntax tree.
 
 ```text
 Bytecode + entrypoint ---+

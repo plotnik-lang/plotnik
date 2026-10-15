@@ -4,7 +4,7 @@
 //! 1. Resolve all symbols (node kinds and fields) against grammar
 //! 2. Validate syntax, then solve the resolved matching constraints
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::core::grammar::Grammar;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId};
@@ -29,6 +29,8 @@ pub struct GrammarBindInput<'a, 'q> {
     pub pattern_facts: &'a PatternFacts,
     pub strict_lints: bool,
     pub satisfiability_limits: SatisfiabilityLimits,
+    pub expression:
+        Option<&'a crate::compiler::analyze::Located<crate::compiler::parse::ast::Pattern>>,
 }
 
 impl<'q> GrammarBindInput<'_, 'q> {
@@ -41,31 +43,46 @@ impl<'q> GrammarBindInput<'_, 'q> {
             pattern_facts,
             strict_lints,
             satisfiability_limits,
+            expression,
         } = self;
 
         let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
         let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+        let expression_calls = expression
+            .into_iter()
+            .flat_map(|body| definitions.expression_dependencies(body.node()))
+            .collect();
 
-        // Resolve, lint, and check all definitions from one source before moving
-        // to the next, preserving the bind pass's diagnostic phase order.
-        for definition_ids in definitions
-            .ids_in_declaration_order()
-            .chunk_by(|left, right| {
-                definitions.definition(*left).source() == definitions.definition(*right).source()
-            })
         {
             let mut binder = GrammarBinder {
                 interner: &mut *interner,
                 grammar,
                 source_map,
                 definitions,
+                expression_calls,
                 strict_lints,
                 node_kind_ids: &mut node_kind_ids,
                 node_field_ids: &mut node_field_ids,
                 output,
                 diag: diagnostics,
             };
-            binder.bind(definition_ids);
+            // Preserve diagnostic phase order within each saved source.
+            for definition_ids in definitions
+                .ids_in_declaration_order()
+                .chunk_by(|left, right| {
+                    definitions.definition(*left).source()
+                        == definitions.definition(*right).source()
+                })
+            {
+                binder.bind(definition_ids);
+            }
+            if let Some(expression) = expression {
+                binder.resolve_symbols(expression);
+                if strict_lints {
+                    binder.check_root_pattern(expression, "this expression");
+                }
+                binder.validate_syntax(expression);
+            }
         }
 
         // Invalid names and unsupported syntax are unconditional errors. Matching
@@ -80,6 +97,7 @@ impl<'q> GrammarBindInput<'_, 'q> {
             source_map,
             &node_kind_ids,
             &node_field_ids,
+            expression,
         );
         super::satisfiability::check(
             super::satisfiability::ReportContext {
@@ -97,6 +115,7 @@ pub(super) struct GrammarBinder<'a, 'q> {
     pub(super) grammar: &'a Grammar,
     pub(super) source_map: &'q SourceMap,
     pub(super) definitions: &'a DefinitionGraph,
+    expression_calls: HashSet<DefId>,
     pub(super) strict_lints: bool,
     pub(super) node_kind_ids: &'a mut HashMap<NodeKind<&'q str>, Option<NodeKindId>>,
     pub(super) node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
@@ -125,6 +144,23 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
     }
 
     fn check_entrypoint_root(&mut self, def_id: DefId) {
+        if self.definitions.has_inbound_references(def_id)
+            || self.expression_calls.contains(&def_id)
+        {
+            return;
+        }
+
+        let definition = self.definitions.definition(def_id);
+        let located = definition.located_body();
+        let name = self.interner.resolve(definition.name()).to_owned();
+        self.check_root_pattern(&located, &format!("entrypoint `{name}`"));
+    }
+
+    fn check_root_pattern(
+        &mut self,
+        located: &crate::compiler::analyze::Located<crate::compiler::parse::ast::Pattern>,
+        subject: &str,
+    ) {
         let Some(grammar_root) = self.grammar.root() else {
             return;
         };
@@ -133,16 +169,10 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .node_kind(grammar_root)
             .expect("grammar root must have a node-kind name");
 
-        if self.definitions.has_inbound_references(def_id) {
-            return;
-        }
-        let definition = self.definitions.definition(def_id);
-        let located = definition.located_body();
         let mut seen_refs = std::collections::HashSet::new();
-        if self.pattern_can_match_root(&located, grammar_root, &mut seen_refs) {
+        if self.pattern_can_match_root(located, grammar_root, &mut seen_refs) {
             return;
         }
-        let name = self.interner.resolve(definition.name());
 
         self.diag
             .report(
@@ -150,7 +180,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
                 Span::new(located.source(), located.node().text_range()),
             )
             .detail(format!(
-                "entrypoint `{name}` cannot match the `{grammar_root_name}` syntax-tree root"
+                "{subject} cannot match the `{grammar_root_name}` syntax-tree root"
             ))
             .hint(format!("start with a `{grammar_root_name}` node pattern"))
             .emit();

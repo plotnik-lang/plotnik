@@ -18,7 +18,7 @@ pub fn validate_empty_constructs(input: ValidationInput) {
         diag,
     } = input;
     let mut visitor = EmptyConstructsValidator { diag };
-    visitor.visit(&Located::new(source_id, ast.clone()));
+    visitor.visit_syntax(&Located::new(source_id, ast.clone()));
 }
 
 struct EmptyConstructsValidator<'d> {

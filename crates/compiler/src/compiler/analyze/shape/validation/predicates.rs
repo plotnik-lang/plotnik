@@ -30,7 +30,7 @@ pub fn validate_predicates(input: PredicateInput) {
         source_id,
         source: source_content,
     };
-    validator.visit(&Located::new(source_id, ast.clone()));
+    validator.visit_syntax(&Located::new(source_id, ast.clone()));
 }
 
 struct PredicateValidator<'q, 'd> {

@@ -5,8 +5,8 @@
 use crate::core::NodeKind;
 
 use crate::bytecode::{
-    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SPAN_NO_BINDING,
-    SYMBOL_NAME_ENTRY_SIZE, SpanEntry,
+    Entrypoint, EntrypointIdentity, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN,
+    SPAN_NO_BINDING, SYMBOL_NAME_ENTRY_SIZE, SpanEntry,
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
@@ -15,7 +15,7 @@ use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
 };
-use crate::compiler::lower::ir::NfaGraph;
+use crate::compiler::lower::ir::{EntrypointKey, NfaGraph};
 use crate::compiler::lower::spans::{SpanBindingIR, SpanTable};
 
 use super::layout::compute_layout;
@@ -97,27 +97,25 @@ impl<'a> EmitPipeline<'a> {
             fields.push(FieldEntry::new(field_id, name));
         }
 
-        let mut entrypoints: Vec<Entrypoint> = Vec::new();
-        for (def_id, output) in self.input.iter_entrypoint_outputs() {
-            let name_sym = self.input.definitions.definition(def_id).name();
-            let name = self.strings.intern(name_sym, self.input.interner)?;
-            let result_type =
-                self.types
-                    .resolve_output(output, self.input.type_analysis, self.type_layout)?;
-
-            let entry = self
-                .ir
-                .entrypoints()
-                .get(&def_id)
-                .expect("entrypoint must have compiled target");
-            let target = self
-                .layout
-                .code_addrs()
-                .get(&entry.target)
-                .copied()
-                .expect("entrypoint target must have a code address");
-
-            entrypoints.push(Entrypoint::new(name, target, result_type, entry.boundary));
+        let mut entrypoints = Vec::new();
+        for (&key, entry) in self.ir.entrypoints() {
+            let (identity, output) = match key {
+                EntrypointKey::Named(def_id) => {
+                    let name_sym = self.input.definitions.definition(def_id).name();
+                    let name = self.strings.intern(name_sym, self.input.interner)?;
+                    (
+                        EntrypointIdentity::Named(name),
+                        self.input.type_analysis.expect_def_output(def_id),
+                    )
+                }
+                EntrypointKey::Expression => (
+                    EntrypointIdentity::Expression,
+                    self.input
+                        .expression_output()
+                        .expect("lowered expression has an output"),
+                ),
+            };
+            entrypoints.push(self.entry_handle(identity, entry, output)?);
         }
 
         if node_kinds.len() > EmitError::MAX_NODE_KINDS {
@@ -135,6 +133,28 @@ impl<'a> EmitPipeline<'a> {
             fields,
             entrypoints,
         })
+    }
+
+    fn entry_handle(
+        &self,
+        identity: EntrypointIdentity,
+        entry: &crate::compiler::lower::ir::EntrypointIR,
+        output: crate::compiler::analyze::types::type_shape::DefinitionOutput,
+    ) -> Result<Entrypoint, EmitError> {
+        let result_type =
+            self.types
+                .resolve_output(output, self.input.type_analysis, self.type_layout)?;
+        let target = *self
+            .layout
+            .code_addrs()
+            .get(&entry.target)
+            .expect("entry target has a code address");
+        Ok(Entrypoint::new(
+            identity,
+            target,
+            result_type,
+            entry.boundary,
+        ))
     }
 
     /// Serialize every table into its section, then write the header and checksum.
@@ -380,10 +400,7 @@ fn emit_symbol_name_table<T: Copy>(
 fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(entrypoints.len() * Entrypoint::SIZE);
     for ep in entrypoints {
-        bytes.extend_from_slice(&u16::from(ep.name()).to_le_bytes());
-        bytes.extend_from_slice(&ep.target().to_le_bytes());
-        bytes.extend_from_slice(&u16::from(ep.result_type()).to_le_bytes());
-        bytes.extend_from_slice(&ep.boundary().to_u16().to_le_bytes());
+        bytes.extend_from_slice(&ep.to_bytes());
     }
     bytes
 }

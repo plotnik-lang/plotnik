@@ -209,6 +209,30 @@ impl DefinitionGraph {
         self.id_for_symbol(interner.get(name)?)
     }
 
+    /// An execution expression can call authored definitions but cannot be a
+    /// reference target or participate in their recursive components.
+    pub(crate) fn resolve_expression(&mut self, body: &Pattern, interner: &Interner) {
+        for reference in body.syntax().descendants().filter_map(DefRef::cast) {
+            let Some(name) = reference.name() else {
+                continue;
+            };
+            let Some(target) = self.id_for_name(interner, name.text()) else {
+                continue;
+            };
+            self.target_by_reference.insert(reference, target);
+        }
+    }
+
+    pub(crate) fn expression_dependencies(
+        &self,
+        body: &Pattern,
+    ) -> impl Iterator<Item = DefId> + '_ {
+        body.syntax()
+            .descendants()
+            .filter_map(DefRef::cast)
+            .filter_map(|reference| self.reference_target(&reference))
+    }
+
     pub(crate) fn reference_target(&self, reference: &DefRef) -> Option<DefId> {
         self.target_by_reference.get(reference).copied()
     }

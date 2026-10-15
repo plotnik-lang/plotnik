@@ -110,6 +110,16 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
         );
     }
 
+    if let Some(body) = input.analysis.expression {
+        collect_pattern(
+            input,
+            body.source(),
+            body.node(),
+            OutputBindingVisibility::Visible,
+            &mut candidates,
+        );
+    }
+
     let mut counts = [0usize; 6];
     for candidate in &candidates {
         counts[tier(candidate.kind) as usize] += 1;

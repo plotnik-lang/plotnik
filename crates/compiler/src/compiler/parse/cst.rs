@@ -188,6 +188,7 @@ pub enum SyntaxKind {
     Error,
 
     Root,
+    ExpressionRoot,
     NamedNode,
     DefRef,
     Str,

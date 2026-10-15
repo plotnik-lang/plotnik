@@ -209,11 +209,6 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
         for def in root.defs() {
             self.format_def(&def, 1)?;
         }
-        // Parser wraps all top-level patterns in Def nodes, so this should be empty
-        assert!(
-            root.patterns().next().is_none(),
-            "printer: unexpected bare Pattern in Root (parser should wrap in Def)"
-        );
         Ok(())
     }
 

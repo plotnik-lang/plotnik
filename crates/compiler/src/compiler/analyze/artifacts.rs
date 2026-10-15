@@ -1,9 +1,11 @@
+use super::Located;
 use crate::compiler::analyze::grammar::GrammarBinding;
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::DefinitionOutput;
 use crate::compiler::ids::DefId;
+use crate::compiler::parse::ast::Pattern;
 use crate::core::Interner;
 
 /// Shared artifacts produced by semantic analysis and consumed by later phases.
@@ -14,9 +16,19 @@ pub(crate) struct AnalysisArtifacts<'a> {
     pub(crate) pattern_facts: &'a PatternFacts,
     pub(crate) definitions: &'a DefinitionGraph,
     pub(crate) grammar: &'a GrammarBinding,
+    pub(crate) expression: Option<&'a Located<Pattern>>,
 }
 
 impl<'a> AnalysisArtifacts<'a> {
+    pub(crate) fn expression_output(self) -> Option<DefinitionOutput> {
+        self.expression.map(|body| {
+            super::types::type_check::body_output(
+                body.node(),
+                self.type_analysis.expect_pattern_flow(body.node()),
+            )
+        })
+    }
+
     /// Entrypoint-eligible outputs in the existing `DefId` order.
     pub(crate) fn iter_entrypoint_outputs(
         self,

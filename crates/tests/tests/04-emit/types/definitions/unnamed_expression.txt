@@ -1,0 +1,10 @@
+(program) @root
+--------------------- INPUT ----------------------
+------------------ DIAGNOSTICS -------------------
+error: expected a definition
+ --> query.ptk:1:1
+  |
+1 | (program) @root
+  | ^^^^^^^^^^^^^^^
+  |
+help: add a name and `=` before this pattern

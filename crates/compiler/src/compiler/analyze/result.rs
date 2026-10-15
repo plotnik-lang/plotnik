@@ -397,12 +397,20 @@ impl ResultModel {
     ) -> Result<Self, ResultSchemaError> {
         let types = artifacts.type_analysis;
         let definitions = artifacts.definitions;
-        let reachable_defs = definitions.reachable_from(
+        let roots = artifacts.iter_entrypoint_outputs().map(|(id, _)| id).chain(
             artifacts
-                .iter_entrypoint_outputs()
-                .map(|(def_id, _)| def_id),
+                .expression
+                .into_iter()
+                .flat_map(|body| definitions.expression_dependencies(body.node())),
         );
-        let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
+        let reachable_defs = definitions.reachable_from(roots);
+        let collected_types = CollectedTypes::collect(
+            types,
+            reachable_defs
+                .iter()
+                .map(|id| types.expect_def_output(id))
+                .chain(artifacts.expression_output()),
+        );
         let capture_layout = CaptureLayout::build(types, &collected_types.value_types)?;
         let type_layout = ResultTypeLayout::build(
             collected_types.no_value,
@@ -647,11 +655,11 @@ struct CollectedTypes {
 }
 
 impl CollectedTypes {
-    fn collect(types: &TypeAnalysis, definitions: impl IntoIterator<Item = DefId>) -> Self {
+    fn collect(types: &TypeAnalysis, outputs: impl IntoIterator<Item = DefinitionOutput>) -> Self {
         let mut collector = TypeCollector::new();
         let mut no_value = false;
-        for def_id in definitions {
-            let Some(type_id) = types.expect_def_output(def_id).value() else {
+        for output in outputs {
+            let Some(type_id) = output.value() else {
                 no_value = true;
                 continue;
             };

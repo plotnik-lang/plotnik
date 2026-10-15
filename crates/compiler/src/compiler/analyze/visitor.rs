@@ -19,6 +19,7 @@
 //! ```
 
 use crate::compiler::analyze::Located;
+use crate::compiler::parse::SyntaxNode;
 use crate::compiler::parse::ast::{
     AlternationPattern, AnonymousNodePattern, CapturedPattern, Def, DefRef, FieldPattern,
     NamedNodePattern, NodeWildcard, Pattern, QuantifiedPattern, Root, SeqPattern,
@@ -27,6 +28,16 @@ use crate::compiler::parse::ast::{
 pub trait Visitor: Sized {
     fn visit(&mut self, ast: &Located<Root>) {
         walk(self, ast);
+    }
+
+    fn visit_syntax(&mut self, syntax: &Located<SyntaxNode>) {
+        for node in syntax.node().children() {
+            if let Some(def) = Def::cast(node.clone()) {
+                self.visit_def(&syntax.wrap(def));
+            } else if let Some(pattern) = Pattern::cast(node) {
+                self.visit_pattern(&syntax.wrap(pattern));
+            }
+        }
     }
 
     fn visit_def(&mut self, def: &Located<Def>) {

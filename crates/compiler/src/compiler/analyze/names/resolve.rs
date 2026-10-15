@@ -37,6 +37,14 @@ pub(in crate::compiler) fn resolve_names(
         validator.visit(&Located::new(source_id, ast.clone()));
     }
 
+    if let Some(expression) = validated.expression() {
+        ReferenceValidator {
+            diag,
+            definitions: &definitions,
+        }
+        .visit_pattern(expression);
+    }
+
     definitions
 }
 

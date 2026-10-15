@@ -53,7 +53,11 @@ impl DumpContext {
 
         let mut addr_labels = BTreeMap::new();
         for ep in entrypoints.iter() {
-            let name = strings.get(ep.name()).to_string();
+            let name = match ep.identity() {
+                super::EntrypointIdentity::Named(name) => strings.get(name),
+                super::EntrypointIdentity::Expression => "<expression>",
+            }
+            .to_string();
             addr_labels.insert(ep.target(), name);
         }
 
@@ -290,7 +294,10 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let mut entries: Vec<_> = entrypoints
         .iter()
         .map(|ep| {
-            let name = strings.get(ep.name());
+            let name = match ep.identity() {
+                super::EntrypointIdentity::Named(name) => strings.get(name),
+                super::EntrypointIdentity::Expression => "<expression>",
+            };
             (name, ep.target(), u16::from(ep.result_type()))
         })
         .collect();

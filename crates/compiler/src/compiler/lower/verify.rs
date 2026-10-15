@@ -147,7 +147,7 @@ mod debug_impl {
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum WalkRoot {
-        Entrypoint(DefId, EntryBoundary),
+        Entrypoint(crate::compiler::lower::ir::EntrypointKey, EntryBoundary),
         Def(DefSpecialization),
     }
 

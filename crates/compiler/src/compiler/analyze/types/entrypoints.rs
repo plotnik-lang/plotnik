@@ -20,11 +20,11 @@ pub fn check_entrypoints(
     definitions: &DefinitionGraph,
     diag: &mut Diagnostics,
 ) {
-    let mut any_defs = false;
     for (source_id, root) in ast_map {
         for def in root.defs() {
-            any_defs = true;
-            let Some(name) = def.name() else { continue };
+            let Some(name) = def.name() else {
+                continue;
+            };
             if definitions.id_for_name(interner, name.text()).is_none() {
                 diag.report(
                     DiagnosticKind::NoEntrypoints,
@@ -41,15 +41,5 @@ pub fn check_entrypoints(
                 .emit();
             }
         }
-    }
-
-    // A defless query (empty file, comments only) has nothing for the loops
-    // above to flag; without this it would validate silently.
-    if !any_defs && let Some((source_id, root)) = ast_map.first() {
-        diag.report(
-            DiagnosticKind::EmptyQuery,
-            Span::new(*source_id, root.syntax().text_range()),
-        )
-        .emit();
     }
 }

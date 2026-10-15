@@ -108,6 +108,7 @@ impl Item {
 pub(super) struct Model {
     patterns: Vec<Pattern>,
     definitions: IndexMap<DefId, PatternId>,
+    expression: Option<PatternId>,
     pending_anchors: [bool; PendingAnchor::ALL.len()],
 }
 
@@ -119,6 +120,7 @@ impl Model {
         sources: &SourceMap,
         kinds: &HashMap<NodeKind<&str>, Option<NodeKindId>>,
         fields: &HashMap<&str, Option<NodeFieldId>>,
+        expression: Option<&Located<ast::Pattern>>,
     ) -> Self {
         let mut builder = Builder {
             model: Self::default(),
@@ -134,6 +136,9 @@ impl Model {
             let pattern = builder.pattern(body);
             builder.model.definitions.insert(definition, pattern);
         }
+        if let Some(expression) = expression {
+            builder.model.expression = Some(builder.pattern(expression.clone()));
+        }
         builder.model
     }
 
@@ -145,8 +150,8 @@ impl Model {
         self.definitions[&id]
     }
 
-    pub(super) fn definitions(&self) -> impl Iterator<Item = PatternId> + '_ {
-        self.definitions.values().copied()
+    pub(super) fn bodies(&self) -> impl Iterator<Item = PatternId> + '_ {
+        self.definitions.values().copied().chain(self.expression)
     }
 
     /// Pending anchors can only come from authored sibling operations. Keep the

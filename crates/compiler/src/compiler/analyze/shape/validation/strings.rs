@@ -23,7 +23,7 @@ pub fn validate_strings(input: ValidationInput) {
         diag,
     } = input;
     let mut validator = StringValidator { diag, source_id };
-    validator.visit(&Located::new(source_id, ast.clone()));
+    validator.visit_syntax(&Located::new(source_id, ast.clone()));
 }
 
 struct StringValidator<'d> {

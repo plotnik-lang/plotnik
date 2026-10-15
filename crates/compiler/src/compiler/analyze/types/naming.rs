@@ -67,12 +67,36 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    pub(crate) fn assign(mut self, definitions: &DefinitionGraph) {
+    pub(crate) fn assign(
+        mut self,
+        definitions: &DefinitionGraph,
+        expression: Option<crate::compiler::diagnostics::SourceId>,
+    ) {
         self.reserve_builtins();
         self.claim_definitions(definitions);
         self.walk_definitions(definitions);
+        self.claim_expression_types(expression);
 
         self.ctx.set_named_types(self.names);
+    }
+
+    /// Transient expression shapes need no generated nominal name. Explicit
+    /// capture names still obey the module's ordinary type-name rules.
+    fn claim_expression_types(&mut self, source: Option<crate::compiler::diagnostics::SourceId>) {
+        let Some(source) = source else {
+            return;
+        };
+
+        let mut types: Vec<_> = self
+            .custom_capture_types
+            .iter()
+            .filter(|(_, occurrence)| occurrence.span.source == source)
+            .map(|(&ty, _)| ty)
+            .collect();
+        types.sort();
+        for ty in types {
+            self.name_element(self.unwrap_wrappers(ty), None);
+        }
     }
 
     fn reserve_builtins(&mut self) {
@@ -171,6 +195,11 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
     /// option wrappers so the name lands on the element.
     fn visit_field_element(&mut self, field_type: TypeId, parent_name: &str, field: &str) {
         let element = self.unwrap_wrappers(field_type);
+        let generated = format!("{parent_name}{}", to_pascal_case(field));
+        self.name_element(element, Some(generated));
+    }
+
+    fn name_element(&mut self, element: TypeId, generated: Option<String>) {
         let shape = self
             .ctx
             .in_progress()
@@ -188,20 +217,23 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     return;
                 }
 
-                let generated = format!("{parent_name}{}", to_pascal_case(field));
                 let (name_sym, span) = match self.custom_capture_types.get(&element).copied() {
                     Some(capture_type) => {
-                        if self.interner.resolve(capture_type.name) == generated {
+                        if generated.as_deref() == Some(self.interner.resolve(capture_type.name)) {
                             self.warn_redundant_capture_type(
                                 capture_type.span,
                                 &format!(
-                                    "this capture already has type `{generated}`. Naming it `{generated}` has no effect"
+                                    "this capture already has type `{name}`. Naming it `{name}` has no effect", name = self.interner.resolve(capture_type.name)
                                 ),
                             );
                         }
                         (capture_type.name, Some(capture_type.span))
                     }
                     None => {
+                        let Some(generated) = generated else {
+                            return;
+                        };
+
                         let sym = self.interner.intern(&generated);
                         (sym, self.ctx.type_provenance(element))
                     }
@@ -370,7 +402,11 @@ impl<'a> RawTypeNameValidator<'a> {
         Self { ctx, interner }
     }
 
-    pub(crate) fn validate(self, definitions: &DefinitionGraph) {
+    pub(crate) fn validate(
+        self,
+        definitions: &DefinitionGraph,
+        expression: Option<crate::compiler::diagnostics::SourceId>,
+    ) {
         let custom_capture_types = self
             .ctx
             .custom_capture_types()
@@ -388,5 +424,6 @@ impl<'a> RawTypeNameValidator<'a> {
         validator.reserve_builtins();
         validator.claim_definitions(definitions);
         validator.walk_definitions(definitions);
+        validator.claim_expression_types(expression);
     }
 }

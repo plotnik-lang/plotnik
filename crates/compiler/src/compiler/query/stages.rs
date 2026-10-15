@@ -1,29 +1,28 @@
 use indexmap::IndexMap;
 use rowan::TextRange;
 
-use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::bind;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::resolve_names;
 use crate::compiler::analyze::refs::{DefinitionGraph, build_definition_graph, validate_recursion};
 use crate::compiler::analyze::result::{ResultModel, ResultSchema};
-use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::analyze::shape::validation::{
     AnchorValidationInput, ShapeValidationInput, validate_anchors, validate_ast,
 };
+use crate::compiler::analyze::shape::{PatternFacts, RootExtent};
 use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::analyze::types::type_check::{self, TypeAnalysis};
+use crate::compiler::analyze::{AnalysisArtifacts, Located};
 #[cfg(test)]
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::emit::{
     BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
     RustTypesOutput, TypeScriptCodegenConfig, TypeScriptTypesOutput,
 };
-use crate::compiler::limits::CompilerLimits;
 use crate::compiler::lower::ir::SemanticNfa;
 use crate::compiler::lower::spans::assign_spans;
 use crate::compiler::lower::{LowerInput, lower_semantic, pack_lowered};
-use crate::compiler::parse::{Root, parse_lossless};
+use crate::compiler::parse::{Parser, Root, lex, parse_lossless};
 use crate::core::grammar::Grammar;
 use crate::core::{Colors, Interner};
 
@@ -32,20 +31,24 @@ use crate::compiler::Diagnostics;
 use crate::compiler::diagnostics::{DiagnosticKind, Span};
 use crate::compiler::source::{SourceId, SourceMap};
 
+use super::input::{CompilationInput, CompilationUnit, SourceCollection};
+
 pub(crate) type AstMap = IndexMap<SourceId, Root>;
 
 pub struct QueryBuilder {
-    source_map: SourceMap,
-    limits: CompilerLimits,
-    strict_lints: bool,
+    input: CompilationInput,
 }
 
 impl QueryBuilder {
     pub fn new(source_map: SourceMap) -> Self {
+        Self::from_sources(SourceCollection::explicit(source_map))
+    }
+
+    /// Compile registered module sources, grouping directory members only after
+    /// the caller supplies a grammar. Stored non-module sources do not participate.
+    pub fn from_sources(collection: SourceCollection) -> Self {
         Self {
-            source_map,
-            limits: CompilerLimits::default(),
-            strict_lints: false,
+            input: CompilationInput::new(collection),
         }
     }
 
@@ -54,26 +57,38 @@ impl QueryBuilder {
         Self::new(source_map)
     }
 
+    /// Attach a separately stored expression. It can refer to named definitions,
+    /// but is not itself part of their namespace.
+    /// This source is parsed as an expression, not as a named module source.
+    /// Source generation rejects a compiled query that contains an expression.
+    pub fn with_expression(mut self, source: SourceId) -> Self {
+        self.input.expression = Some(source);
+        self
+    }
+
     pub fn with_parse_fuel(mut self, fuel: u32) -> Self {
-        self.limits = self.limits.with_parse_fuel(fuel);
+        self.input.limits = self.input.limits.with_parse_fuel(fuel);
         self
     }
 
     /// Override the parser's source-nesting ceiling.
     pub fn with_parse_max_depth(mut self, limit: u32) -> Self {
-        self.limits = self.limits.with_parse_max_depth(limit);
+        self.input.limits = self.input.limits.with_parse_max_depth(limit);
         self
     }
 
     /// Override the reference graph's recursion ceiling.
     pub fn with_reference_max_depth(mut self, limit: u32) -> Self {
-        self.limits = self.limits.with_reference_max_depth(limit);
+        self.input.limits = self.input.limits.with_reference_max_depth(limit);
         self
     }
 
     /// Override the satisfiability automaton's inlined-pattern nesting ceiling.
     pub fn with_satisfiability_automaton_max_depth(mut self, limit: u32) -> Self {
-        self.limits = self.limits.with_satisfiability_automaton_max_depth(limit);
+        self.input.limits = self
+            .input
+            .limits
+            .with_satisfiability_automaton_max_depth(limit);
         self
     }
 
@@ -82,33 +97,56 @@ impl QueryBuilder {
     /// default protects against an adversarial one driving the quadratic solve for an
     /// unbounded stretch.
     pub fn with_satisfiability_work_budget(mut self, budget: u64) -> Self {
-        self.limits = self.limits.with_satisfiability_work_budget(budget);
+        self.input.limits = self.input.limits.with_satisfiability_work_budget(budget);
         self
     }
 
     /// Enable stricter advisory lints that are too noisy for normal compilation.
     pub fn with_strict_lints(mut self, enabled: bool) -> Self {
-        self.strict_lints = enabled;
+        self.input.strict_lints = enabled;
         self
     }
 
+    /// Analyze query sources and the optional expression, validating tag metadata.
     pub fn analyze(self) -> crate::compiler::QueryResult<Query> {
         self.parse()?.analyze()
     }
 
+    pub(crate) fn parse(self) -> crate::compiler::QueryResult<QueryParsed> {
+        let (unit, diagnostics) = self.input.admit_static(None)?;
+        unit.parse(diagnostics)
+    }
+
+    /// Compile against the caller's selected grammar, validating language tags.
+    /// Tags group directory sources. They do not select or resolve a grammar.
     pub fn compile(self, grammar: &Grammar) -> crate::compiler::QueryResult<CompiledQuery> {
         self.bind(grammar)?.compile()
     }
 
-    pub(crate) fn bind(self, grammar: &Grammar) -> crate::compiler::QueryResult<BindOutcome> {
-        Ok(self.analyze()?.bind(grammar))
+    /// Compile dynamic query input using the caller's selected grammar.
+    /// Invalid grouping tags are ignored, not query syntax or semantic errors.
+    /// All eligible named entrypoints and the optional expression are retained.
+    pub fn compile_dynamic(self, grammar: &Grammar) -> crate::compiler::QueryResult<CompiledQuery> {
+        self.input
+            .admit_execution(grammar.name())?
+            .parse(Diagnostics::new())?
+            .analyze()?
+            .bind(grammar)
+            .compile()
     }
 
-    pub(crate) fn parse(self) -> crate::compiler::QueryResult<QueryParsed> {
-        let mut ast = IndexMap::new();
-        let mut diag = Diagnostics::new();
+    pub(crate) fn bind(self, grammar: &Grammar) -> crate::compiler::QueryResult<BindOutcome> {
+        let (unit, diagnostics) = self.input.admit_static(Some(grammar.name()))?;
+        Ok(unit.parse(diagnostics)?.analyze()?.bind(grammar))
+    }
+}
 
-        for source in self.source_map.iter() {
+impl CompilationUnit {
+    fn parse(self, mut diag: Diagnostics) -> crate::compiler::QueryResult<QueryParsed> {
+        let mut ast = IndexMap::new();
+
+        for &id in self.modules.keys() {
+            let source = self.source_map.source(id);
             let root = parse_lossless(
                 source.content,
                 source.id,
@@ -118,39 +156,44 @@ impl QueryBuilder {
             ast.insert(source.id, root);
         }
 
+        let expression = if let Some(id) = self.expression {
+            let source = self.source_map.source(id);
+            let root = Parser::new(
+                source.content,
+                id,
+                lex(source.content),
+                &mut diag,
+                self.limits.parse().config(),
+            )
+            .parse_expression()?;
+            Some(Located::new(id, root))
+        } else {
+            None
+        };
+
         Ok(QueryParsed {
-            source_map: self.source_map,
+            input: self,
             diag,
             ast_map: ast,
-            limits: self.limits,
-            strict_lints: self.strict_lints,
+            expression,
         })
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct QueryParsed {
-    source_map: SourceMap,
+    input: CompilationUnit,
     ast_map: AstMap,
     diag: Diagnostics,
-    limits: CompilerLimits,
-    strict_lints: bool,
+    expression: Option<Located<crate::compiler::parse::ast::Expression>>,
 }
 
 impl QueryParsed {
     pub(crate) fn analyze(mut self) -> crate::compiler::QueryResult<Query> {
-        for source in self.source_map.iter() {
-            if let Err(error) = super::parse_grammar_declaration(source) {
-                self.diag
-                    .report(DiagnosticKind::InvalidGrammarDeclaration, error.span)
-                    .hint(error.message)
-                    .emit();
-            }
-        }
-
         let Some(validated) = validate_ast(ShapeValidationInput {
-            source_map: &self.source_map,
+            source_map: &self.input.source_map,
             ast_map: &self.ast_map,
+            expression: self.expression.as_ref(),
             diag: &mut self.diag,
         }) else {
             return Ok(Query::parsed_only(self));
@@ -161,26 +204,72 @@ impl QueryParsed {
 
         // A flat reference chain can recurse as deeply as a nested source tree, so it gets
         // an explicit stack-depth ceiling and the same fatal recursion-limit outcome.
-        let definitions = build_definition_graph(
+        let mut definitions = build_definition_graph(
             collected_definitions,
             &mut interner,
-            self.limits.references(),
+            self.input.limits.references(),
         )?;
-        let pattern_facts = PatternFacts::analyze(&definitions);
+        let expression = validated.expression().cloned();
+        if let Some(expression) = &expression {
+            definitions.resolve_expression(expression.node(), &interner);
+        }
+        let pattern_facts = PatternFacts::analyze(&definitions, expression.as_ref());
         let anchors_valid = validate_anchors(AnchorValidationInput {
             pattern_facts: &pattern_facts,
             definitions: &definitions,
             diag: &mut self.diag,
+            expression: expression.as_ref(),
         });
         if !anchors_valid {
             return Ok(Query::parsed_only(self));
         }
         validate_recursion(&definitions, &interner, &mut self.diag);
 
-        let type_analysis =
-            type_check::infer_types(&mut interner, &definitions, &pattern_facts, &mut self.diag);
+        if !self.diag.has_errors()
+            && let Some(expression) = &expression
+            && !pattern_facts.expression_is_entrypoint_eligible()
+        {
+            let message =
+                if pattern_facts.pattern_root_extent(expression.node()) != RootExtent::SingleNode {
+                    "the expression must match exactly one node"
+                } else if pattern_facts.expression_requires_external_anchor_context() {
+                    "anchor needs an enclosing node"
+                } else {
+                    "a field constraint needs an enclosing node"
+                };
+            self.diag
+                .report(
+                    DiagnosticKind::NoEntrypoints,
+                    expression.span_of(expression.node().text_range()),
+                )
+                .detail(message)
+                .emit();
+            return Ok(Query::parsed_only(self));
+        }
+
+        let type_analysis = type_check::infer_types(
+            &mut interner,
+            &definitions,
+            &pattern_facts,
+            expression.as_ref(),
+            &mut self.diag,
+        );
         if !self.diag.has_errors() {
             check_entrypoints(validated.ast_map(), &interner, &definitions, &mut self.diag);
+            if expression.is_none()
+                && validated
+                    .ast_map()
+                    .values()
+                    .all(|root| root.defs().next().is_none())
+                && let Some((&id, root)) = validated.ast_map().first()
+            {
+                self.diag
+                    .report(
+                        DiagnosticKind::EmptyQuery,
+                        Span::new(id, root.syntax().text_range()),
+                    )
+                    .emit();
+            }
         }
 
         let analysis = Analysis {
@@ -188,13 +277,14 @@ impl QueryParsed {
             definitions,
             pattern_facts,
             type_analysis,
+            expression,
         };
 
         Ok(Query::analyzed(self, analysis))
     }
 
     pub(crate) fn source_map(&self) -> &SourceMap {
-        &self.source_map
+        &self.input.source_map
     }
 
     pub(crate) fn diagnostics(&self) -> &Diagnostics {
@@ -229,6 +319,7 @@ pub(super) struct Analysis {
     pub(super) definitions: DefinitionGraph,
     pub(super) pattern_facts: PatternFacts,
     pub(super) type_analysis: TypeAnalysis,
+    pub(super) expression: Option<Located<crate::compiler::parse::ast::Pattern>>,
 }
 
 impl Query {
@@ -302,13 +393,20 @@ impl Query {
         bind::GrammarBindInput {
             interner: &mut analyzed.analysis.interner,
             grammar,
-            source_map: &analyzed.parsed.source_map,
+            source_map: &analyzed.parsed.input.source_map,
             definitions: &analyzed.analysis.definitions,
             pattern_facts: &analyzed.analysis.pattern_facts,
-            strict_lints: analyzed.parsed.strict_lints,
-            satisfiability_limits: analyzed.parsed.limits.satisfiability(),
+            strict_lints: analyzed.parsed.input.strict_lints,
+            satisfiability_limits: analyzed.parsed.input.limits.satisfiability(),
+            expression: analyzed.analysis.expression.as_ref(),
         }
         .bind(&mut output, &mut analyzed.parsed.diag);
+
+        for (&id, source) in &analyzed.parsed.input.modules {
+            if source.needs_grouping_hint() {
+                analyzed.parsed.diag.add_grouping_hint(id);
+            }
+        }
 
         if analyzed.parsed.diag.has_errors() {
             return BindOutcome::Invalid(Box::new(analyzed.into_query()));
@@ -417,21 +515,17 @@ impl CompiledQuery {
             inspection: config.inspection_enabled(),
         };
         let mut diagnostics = Diagnostics::new();
-        if config.inspection_enabled() {
+        let semantic = if input.inspection {
             self.bound
                 .report_inspection_span_degradation_for(&input, &mut diagnostics);
-        }
-        let lowered = if config.inspection_enabled() {
-            pack_lowered(lower_semantic(&input), &input)
+            lower_semantic(&input)
         } else {
-            pack_lowered(
-                self.semantic_nfa
-                    .as_ref()
-                    .expect("valid query retains semantic NFA")
-                    .clone(),
-                &input,
-            )
+            self.semantic_nfa
+                .as_ref()
+                .expect("valid query retains semantic NFA")
+                .clone()
         };
+        let lowered = pack_lowered(semantic, &input);
         let bytes = match crate::compiler::emit::targets::bytecode::emit(
             bound.analysis_input(),
             &schema,
@@ -456,6 +550,7 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
+        self.require_static_module()?;
         let schema = self.result_schema();
         let source =
             crate::compiler::emit::targets::rust::emit_types(schema, &config.rust_types_config());
@@ -472,6 +567,7 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
+        self.require_static_module()?;
         let bound = self
             .bound
             .bound()
@@ -520,6 +616,7 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
+        self.require_static_module()?;
         let schema = self.result_schema();
         let emitter = config.emitter_config();
         let (source, bindings) = if config.colored_output() {
@@ -534,6 +631,23 @@ impl CompiledQuery {
             TypeScriptTypesOutput::new(source, bindings),
             Diagnostics::new(),
         ))
+    }
+
+    fn require_static_module(&self) -> crate::compiler::QueryResult<()> {
+        let bound = self.bound.bound().expect("valid query is grammar-bound");
+        let diagnostics = bound.analyzed.parsed.input.metadata_diagnostics();
+        if diagnostics.has_errors() {
+            return Err(crate::compiler::Error::QueryAnalyzeError(diagnostics));
+        }
+
+        if bound.analysis_input().expression.is_some() {
+            return Err(crate::compiler::emit::EmitConfigError::new(
+                "source generation does not accept an execution expression",
+            )
+            .into());
+        }
+
+        Ok(())
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -578,7 +692,7 @@ impl CompiledQuery {
 
     /// Render the optimized pre-pack NFA — the IR every backend consumes — in
     /// the bytecode dump format (label space, with definition provenance).
-    /// `None` when the query didn't compile, mirroring [`Self::module`].
+    /// `None` when the program did not compile.
     pub fn dump_nfa(&self, colors: Colors) -> Option<String> {
         let semantic = self.semantic_nfa.as_ref()?;
         let bound = self.bound.bound()?;
@@ -688,14 +802,20 @@ impl BindOutcome {
         }
     }
 
-    /// A coarse fallback span for emit/load failures, none of which carry a
-    /// source mapping. Points at the whole first source; the diagnostic's detail
-    /// carries the specifics. `None` when the query has no sources at all, so the
-    /// operation remains total even on an empty source map.
+    /// Emit failures without a precise location refer to participating syntax,
+    /// never an excluded source that happens to be first in original storage.
+    /// Prefer the execution expression, otherwise the first module syntax root.
     fn fallback_span(&self) -> Option<(SourceId, TextRange)> {
-        let source = self.source_map().iter().next()?;
-        let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
-        Some((source.id, TextRange::up_to(len.into())))
+        let parsed = match self {
+            Self::Bound(query) => &query.analyzed.parsed,
+            Self::Invalid(query) => &query.parsed,
+        };
+        if let Some(expression) = &parsed.expression {
+            return Some((expression.source(), expression.node().text_range()));
+        }
+
+        let (&id, root) = parsed.ast_map.first()?;
+        Some((id, root.syntax().text_range()))
     }
 
     fn report_inspection_span_degradation_for(
@@ -807,6 +927,7 @@ impl BoundQuery {
             pattern_facts: self.pattern_facts(),
             definitions: self.definitions(),
             grammar: self.grammar(),
+            expression: self.analyzed.analysis.expression.as_ref(),
         }
     }
 }

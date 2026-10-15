@@ -1548,7 +1548,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
         }
     }
 
-    pub fn run(mut self) -> TypeAnalysisBuilder {
+    pub fn run(mut self, expression: Option<&Located<Pattern>>) -> TypeAnalysisBuilder {
         self.ctx.declare_definitions(
             self.analysis
                 .definitions
@@ -1558,6 +1558,9 @@ impl<'a, 'd> InferPass<'a, 'd> {
 
         self.process_sccs();
         self.assert_all_definitions_processed();
+        if let Some(expression) = expression {
+            self.infer_body(expression);
+        }
         assert!(
             self.deferred_checks.is_empty(),
             "every SCC must resolve its deferred semantic checks",
@@ -1687,28 +1690,30 @@ impl<'a, 'd> InferPass<'a, 'd> {
     fn infer_and_register(&mut self, def_id: DefId) {
         let definition = self.analysis.definitions.definition(def_id);
         let located_body = definition.located_body();
-
-        // Infer this definition's body only; references into other definitions
-        // resolve to their precomputed results.
-        let info = self.visit(located_body.source(), |visitor| {
-            visitor.infer_pattern_value(&located_body)
-        });
-
-        let output = match &info.flow {
-            PatternFlow::NoValue => DefinitionOutput::MatchOnly,
-            PatternFlow::Fields(type_id) => DefinitionOutput::Value(*type_id),
-            // A root value is the definition's result only when a labeled
-            // alternation or quantifier supplies it directly. A bare reference
-            // is structural: no capture, no result value — the definition still
-            // matches, like a capture-less regex.
-            PatternFlow::Value(t) => {
-                if definition_value_root(located_body.node()) {
-                    DefinitionOutput::Value(*t)
-                } else {
-                    DefinitionOutput::MatchOnly
-                }
-            }
-        };
+        let info = self.infer_body(&located_body);
+        let output = body_output(located_body.node(), &info.flow);
         self.ctx.record_def_output(def_id, output);
+    }
+
+    fn infer_body(&mut self, body: &Located<Pattern>) -> PatternShape {
+        self.visit(body.source(), |visitor| visitor.infer_pattern_value(body))
+    }
+}
+
+pub(crate) fn body_output(body: &Pattern, flow: &PatternFlow) -> DefinitionOutput {
+    match flow {
+        PatternFlow::NoValue => DefinitionOutput::MatchOnly,
+        PatternFlow::Fields(type_id) => DefinitionOutput::Value(*type_id),
+        // A root value is the definition's result only when a labeled
+        // alternation or quantifier supplies it directly. A bare reference
+        // is structural: no capture, no result value — the definition still
+        // matches, like a capture-less regex.
+        PatternFlow::Value(t) => {
+            if definition_value_root(body) {
+                DefinitionOutput::Value(*t)
+            } else {
+                DefinitionOutput::MatchOnly
+            }
+        }
     }
 }

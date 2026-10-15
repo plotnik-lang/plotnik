@@ -72,8 +72,9 @@ use plotnik_compiler::bytecode::{Module, dump as dump_bytecode};
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 use plotnik_compiler::{
     BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, PrintTracer, QueryBuilder,
-    RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TraceRecorder, TypeScriptBinding,
-    TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
+    RuntimeError, RustCodegenConfig, SourceCollection, SourceMap, SourcePath, TraceRecorder,
+    TypeScriptBinding, TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance,
+    materialize_verified,
 };
 use plotnik_tests::snapshot::{Section, parse_document};
 use support::snapshots::{
@@ -837,6 +838,218 @@ fn unified_diff(actual: &str, expected: &str) -> String {
         .context_radius(3)
         .header("on disk", "expected")
         .to_string()
+}
+
+#[test]
+fn one_module_runs_named_and_expression_entrypoints() {
+    let lang = Lang::resolve(None).unwrap();
+    let mut storage = SourceMap::new();
+    storage.add_file(
+        SourcePath::new("entries.ptk"),
+        indoc::indoc! {"
+        Part = { . (identifier) @text :: text . }
+        A = (program (expression_statement (Part) @a))
+        B = (program) @b :: text
+        Expression = (number)
+    "},
+    );
+    let expression = storage.add_stdin("(program (comment)? (expression_statement (Part) @expr))");
+    let compiled = QueryBuilder::new(storage)
+        .with_expression(expression)
+        .compile_dynamic(lang.grammar())
+        .unwrap();
+    assert!(
+        compiled.is_valid(),
+        "{}",
+        compiled.diagnostics().render(compiled.source_map())
+    );
+    assert_eq!(
+        compiled.definition_names().collect::<Vec<_>>(),
+        ["Part", "A", "B", "Expression"]
+    );
+    let module = compiled
+        .emit(BytecodeConfig::new())
+        .unwrap()
+        .into_artifact()
+        .unwrap();
+    assert_eq!(
+        module.entrypoint_names().collect::<Vec<_>>(),
+        ["A", "B", "Expression"]
+    );
+    assert_eq!(module.entrypoint_count(), 4);
+    assert!(module.entrypoint("Part").is_none());
+    let a = module.entrypoint("A").unwrap();
+    let b = module.entrypoint("B").unwrap();
+    let expression = module.expression_entrypoint().unwrap();
+    let source = "chosen;";
+    let tree = lang.parse(source).unwrap();
+
+    for (entry, expected) in [
+        (a, serde_json::json!({"a": {"text": "chosen"}})),
+        (b, serde_json::json!({"b": "chosen;"})),
+        (expression, serde_json::json!({"expr": {"text": "chosen"}})),
+        (a, serde_json::json!({"a": {"text": "chosen"}})),
+    ] {
+        let journal = VM::builder(source, &tree)
+            .build()
+            .execute(&module, &entry)
+            .unwrap();
+        let value = materialize_verified(
+            source,
+            &module,
+            &entry,
+            journal.output_events(),
+            Colors::new(false),
+        );
+        let json = plotnik_runtime::debug::to_json(&value).unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&json).unwrap(),
+            expected
+        );
+    }
+
+    assert!(matches!(
+        compiled.emit(RustCodegenConfig::new()),
+        Err(plotnik_compiler::Error::EmitConfig(_))
+    ));
+    assert!(matches!(
+        compiled.emit_types(TypeScriptCodegenConfig::new()),
+        Err(plotnik_compiler::Error::EmitConfig(_))
+    ));
+}
+
+#[test]
+fn filtered_workspace_requires_query_input() {
+    let mut storage = SourceMap::new();
+    let foreign = storage.add_file(SourcePath::new("foreign.ptk"), "// @html\nInvalid = (");
+    let expression = storage.add_stdin("(program)");
+    let mut sources = SourceCollection::new(storage);
+    sources.include_directory(foreign);
+
+    for result in [
+        QueryBuilder::from_sources(sources.clone()).compile(javascript_grammar()),
+        QueryBuilder::from_sources(sources.clone()).compile_dynamic(javascript_grammar()),
+    ] {
+        let Err(error) = result else {
+            panic!("a workspace with no selected query sources must fail compilation");
+        };
+        assert_eq!(
+            error.to_string(),
+            "nothing to compile: no query sources selected"
+        );
+    }
+
+    let compiled = QueryBuilder::from_sources(sources)
+        .with_expression(expression)
+        .compile_dynamic(javascript_grammar())
+        .unwrap();
+    assert!(compiled.is_valid());
+    let module = compiled
+        .emit(BytecodeConfig::new())
+        .unwrap()
+        .into_artifact()
+        .unwrap();
+    assert_eq!(module.entrypoint_count(), 1);
+    assert!(module.expression_entrypoint().is_some());
+}
+
+#[test]
+fn static_generation_rechecks_dynamic_grouping_metadata() {
+    let mut storage = SourceMap::new();
+    let foreign = storage.add_file(SourcePath::new("foreign.ptk"), "// @html\nInvalid = (");
+    let saved = storage.add_file(
+        SourcePath::new("entries.ptk"),
+        "// @bad/name\nRoot = (program)",
+    );
+    let mut sources = SourceCollection::new(storage);
+    sources.include_directory(foreign);
+    sources.include_directory(saved);
+    let compiled = QueryBuilder::from_sources(sources)
+        .compile_dynamic(javascript_grammar())
+        .unwrap();
+    assert!(compiled.is_valid());
+    assert_eq!(compiled.definition_names().collect::<Vec<_>>(), ["Root"]);
+    assert!(compiled.emit(BytecodeConfig::new()).unwrap().is_valid());
+
+    let Err(plotnik_compiler::Error::QueryAnalyzeError(diagnostics)) =
+        compiled.emit(RustCodegenConfig::new())
+    else {
+        panic!("static generation must reject malformed metadata admitted for dynamic execution");
+    };
+    let wire = diagnostics.to_wire(compiled.source_map());
+    assert_eq!(wire.len(), 1);
+    assert_eq!(
+        wire[0].code,
+        plotnik_compiler::DiagnosticKind::InvalidGrammarDeclaration
+    );
+    assert_eq!(wire[0].span.file, "entries.ptk");
+    assert_eq!(
+        (
+            wire[0].span.start.line,
+            wire[0].span.start.column,
+            wire[0].span.start.offset
+        ),
+        (1, 5, 4)
+    );
+}
+
+#[test]
+fn expression_parse_errors_do_not_gain_semantic_errors() {
+    let mut storage = SourceMap::new();
+    let expression = storage.add_stdin("// no pattern");
+
+    let compiled = QueryBuilder::new(storage)
+        .with_expression(expression)
+        .compile_dynamic(javascript_grammar())
+        .unwrap();
+
+    assert!(!compiled.is_valid());
+    assert_eq!(compiled.diagnostics().error_count(), 1);
+    let diagnostics = compiled.diagnostics().to_wire(compiled.source_map());
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        plotnik_compiler::DiagnosticKind::ExpectedExpression
+    );
+    assert_eq!(diagnostics[0].span.file, "<stdin>");
+    assert_eq!(diagnostics[0].span.start.offset, 13);
+    assert_eq!(diagnostics[0].span.end.offset, 13);
+}
+
+#[test]
+fn entrypoint_advisories_include_the_execution_expression() {
+    let mut storage = SourceMap::new();
+    let saved = storage.add_file(SourcePath::new("entries.ptk"), "Named = (identifier)");
+    let expression = storage.add_stdin("(identifier)");
+    let mut sources = SourceCollection::new(storage);
+    sources.include(saved);
+    let compiled = QueryBuilder::from_sources(sources)
+        .with_expression(expression)
+        .with_strict_lints(true)
+        .compile_dynamic(javascript_grammar())
+        .unwrap();
+
+    assert!(compiled.is_valid());
+    let diagnostics = compiled.diagnostics().to_wire(compiled.source_map());
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(
+        diagnostics[0].message,
+        "entrypoint `Named` cannot match the `program` syntax-tree root"
+    );
+    assert_eq!(
+        diagnostics[1].message,
+        "this expression cannot match the `program` syntax-tree root"
+    );
+    for (diagnostic, (file, offset)) in diagnostics.iter().zip([("entries.ptk", 8), ("<stdin>", 0)])
+    {
+        assert_eq!(
+            diagnostic.code,
+            plotnik_compiler::DiagnosticKind::EntrypointNeverMatchesRoot
+        );
+        assert_eq!(diagnostic.span.file, file);
+        assert_eq!(diagnostic.span.start.offset, offset);
+        assert_eq!(diagnostic.hints, ["start with a `program` node pattern"]);
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/snapshot_tests.rs"));

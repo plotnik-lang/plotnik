@@ -16,8 +16,8 @@ use super::sections::{FieldEntry, NodeKindEntry, SYMBOL_NAME_ENTRY_SIZE};
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    BYTECODE_WORD_SIZE, CodeAddr, Entrypoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE,
-    STRING_TABLE_ENTRY_SIZE,
+    BYTECODE_WORD_SIZE, CodeAddr, Entrypoint, EntrypointIdentity, REGEX_TABLE_ENTRY_SIZE,
+    SPAN_ENTRY_SIZE, STRING_TABLE_ENTRY_SIZE,
 };
 use plotnik_runtime::RegexDfas;
 
@@ -245,11 +245,20 @@ impl Module {
         self.entrypoints().find_by_name(name, &self.strings())
     }
 
-    /// Names of all entrypoints, in table order.
+    pub fn expression_entrypoint(&self) -> Option<Entrypoint> {
+        self.entrypoints()
+            .iter()
+            .find(|entry| entry.identity() == EntrypointIdentity::Expression)
+    }
+
+    /// Names of authored entrypoints, in table order. The expression has no name.
     pub fn entrypoint_names(&self) -> impl Iterator<Item = &str> {
         let strings = self.strings();
         let entrypoints = self.entrypoints();
-        (0..self.entrypoint_count()).map(move |i| strings.get(entrypoints.get(i).name()))
+        (0..self.entrypoint_count()).filter_map(move |i| match entrypoints.get(i).identity() {
+            EntrypointIdentity::Named(name) => Some(strings.get(name)),
+            EntrypointIdentity::Expression => None,
+        })
     }
 
     /// `count + 1` entries: the extra sentinel offset gives the final string's end.
@@ -521,7 +530,9 @@ impl<'a> EntrypointsView<'a> {
     }
 
     pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<Entrypoint> {
-        self.iter().find(|e| strings.get(e.name()) == name)
+        self.iter().find(
+            |e| matches!(e.identity(), EntrypointIdentity::Named(id) if strings.get(id) == name),
+        )
     }
 }
 

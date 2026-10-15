@@ -85,6 +85,7 @@ impl<'a> NfaDumper<'a> {
 
     pub(crate) fn def_name_of(&self, label: Label) -> &str {
         match self.origin_of(label) {
+            LabelOrigin::Expression => "<expression>",
             LabelOrigin::Def(id) => self.def_name(id),
             LabelOrigin::DefSpecialization { def_id, .. } => self.def_name(def_id),
         }
@@ -101,7 +102,17 @@ impl NfaDumper<'_> {
             .graph
             .entrypoints()
             .iter()
-            .map(|(&def_id, entry)| (self.def_name(def_id), entry.target))
+            .map(|(&key, entry)| {
+                (
+                    match key {
+                        crate::compiler::lower::ir::EntrypointKey::Named(def_id) => {
+                            self.def_name(def_id)
+                        }
+                        crate::compiler::lower::ir::EntrypointKey::Expression => "<expression>",
+                    },
+                    entry.target,
+                )
+            })
             .collect();
         entries.sort_by_key(|(name, _)| *name);
 
@@ -158,6 +169,7 @@ impl NfaDumper<'_> {
 
     fn origin_header(&self, origin: LabelOrigin) -> String {
         match origin {
+            LabelOrigin::Expression => "<expression>:".to_owned(),
             LabelOrigin::Def(id) => format!("{}:", self.def_name(id)),
             origin @ LabelOrigin::DefSpecialization { .. } => {
                 format!("{}:", self.specialization_name(origin))
@@ -395,6 +407,7 @@ impl NfaDumper<'_> {
     /// allocated the target label names the callee.
     fn callee_name(&self, target: Label) -> String {
         match self.origin_of(target) {
+            LabelOrigin::Expression => unreachable!("expressions are not call targets"),
             LabelOrigin::Def(id) => self.def_name(id).to_string(),
             origin @ LabelOrigin::DefSpecialization { .. } => self.specialization_name(origin),
         }

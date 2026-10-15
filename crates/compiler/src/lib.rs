@@ -57,8 +57,8 @@ pub use crate::compiler::{
 };
 pub use crate::compiler::{
     CompiledQuery, GrammarDeclaration, GrammarDeclarationError, Query, QueryBuilder, QueryToken,
-    Source, SourceId, SourceKind, SourceMap, SourcePath, format_query, parse_grammar_declaration,
-    tokenize,
+    Source, SourceCollection, SourceId, SourceKind, SourceMap, SourcePath, format_query,
+    parse_grammar_declaration, tokenize,
 };
 
 #[cfg(feature = "vm")]

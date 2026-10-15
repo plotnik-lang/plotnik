@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
-use super::ast::Root;
+use super::ast::{Expression, Root};
 use super::cst::{SyntaxKind, SyntaxNode};
 use super::lexer::{Token, token_text};
 use super::token_set::TokenSet;
@@ -126,6 +126,28 @@ impl<'q, 'd> Parser<'q, 'd> {
         let cst = self.finish()?;
         let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
         Ok(ParsedRoot { ast: root })
+    }
+
+    pub(crate) fn parse_expression(mut self) -> Result<Expression, Error> {
+        self.start_node(SyntaxKind::ExpressionRoot);
+        self.parse_required_pattern();
+
+        if !self.is_done() {
+            if let Some(report) = self.report_current(DiagnosticKind::UnexpectedToken) {
+                report.detail("expected a single expression").emit();
+            }
+            self.start_node(SyntaxKind::Error);
+            while !self.is_done() {
+                self.bump();
+            }
+            self.finish_node();
+        }
+
+        self.eat_trivia();
+        self.finish_node();
+        let cst = self.finish()?;
+        Ok(Expression::cast(SyntaxNode::new_root(cst))
+            .expect("expression parser produces Expression"))
     }
 
     fn finish(mut self) -> Result<GreenNode, Error> {

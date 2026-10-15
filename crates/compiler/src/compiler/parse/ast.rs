@@ -155,6 +155,7 @@ fn alternative_body(alternative: Alternative) -> Option<Pattern> {
 }
 
 ast_node!(Root, Root);
+ast_node!(Expression, ExpressionRoot);
 ast_node!(Def, Def);
 ast_node!(NamedNodePattern, NamedNode);
 ast_node!(DefRef, DefRef);
@@ -366,9 +367,11 @@ impl Root {
     pub fn defs(&self) -> impl Iterator<Item = Def> + '_ {
         self.0.children().filter_map(Def::cast)
     }
+}
 
-    pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
-        self.0.children().filter_map(Pattern::cast)
+impl Expression {
+    pub fn body(&self) -> Option<Pattern> {
+        self.0.children().find_map(Pattern::cast)
     }
 }
 

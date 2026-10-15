@@ -13,7 +13,7 @@ pub fn validate_alternative_labels(input: ValidationInput) {
         diag,
     } = input;
 
-    for node in ast.syntax().descendants() {
+    for node in ast.descendants() {
         if node.kind() != SyntaxKind::Alternation {
             continue;
         }

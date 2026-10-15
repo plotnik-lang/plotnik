@@ -358,7 +358,9 @@ byte    0..1       2..3       4..5          6..7
        +----------+----------+-------------+----------+
 ```
 
-The name is a nonzero string index below `str_table_count`. The target is an instruction address, and the result type ID is less than `type_defs_count`.
+For a named query, the name is a nonzero string index below `str_table_count`. Zero means the entrypoint runs an unnamed expression instead. A module can contain at most one such expression, anywhere in this table.
+
+The target is an instruction address, and the result type ID is less than `type_defs_count`.
 
 | Boundary | Name          | Before body  | After acceptance |
 | -------- | ------------- | ------------ | ---------------- |
@@ -370,9 +372,13 @@ The name is a nonzero string index below `str_table_count`. The target is an ins
 
 Other boundary values are invalid. Boundary effects obey the same [effect rules](04-effects.md) as encoded effects. They belong only to entry execution. Ordinary and recursive calls to the same target do not apply them.
 
-The compiler emits selectable definitions in definition order. A selectable definition's root matches exactly one node. Sequence- and quantifier-rooted fragments are not entries. The emitted boundary is `Record` for a direct `Record` result, `Node` for a direct `Node` result, and `Passthrough` for other results or match-only definitions. The completed value has to match the declared [type](03-types.md).
+The compiler emits selectable definitions in definition order, followed by the unnamed expression if one was supplied. Both must match exactly one node when run on their own. Sequence- and quantifier-rooted fragments are not entrypoints.
 
-Readers validate the name and type references, target, boundary value, and effect discipline. They do not infer a boundary mode from the declared type or establish result-type soundness. The compiler supplies unique entry names in definition order. The reader does not check either property.
+For example, `left: (identifier)` needs a parent whose `left` child it can test. A trailing anchor in `{(identifier) .}` needs a following sibling pattern or the end of a parent's child list. These fragments can be used inside larger patterns, but cannot run as entrypoints. Fields and anchors inside a node pattern, such as `(binary_expression left: (identifier))`, do not prevent that pattern from being an entrypoint.
+
+The compiler chooses the boundary mode so the completed result matches the declared [type](03-types.md).
+
+Readers validate the name and type references, target, boundary value, and effect discipline for every entrypoint. They also reject a second unnamed expression. They do not infer a boundary mode from the declared type or establish result-type soundness. The compiler supplies unique entry names in definition order. The reader does not check either property.
 
 ### Valid control flow
 
