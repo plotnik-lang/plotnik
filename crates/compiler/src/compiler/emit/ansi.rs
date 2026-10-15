@@ -1,5 +1,3 @@
-//! ANSI presentation for deterministic styled text.
-
 use crate::core::Colors;
 
 use super::sink::Style;

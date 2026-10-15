@@ -1,5 +1,3 @@
-//! Bytecode instruction emission.
-
 use std::collections::BTreeMap;
 
 use crate::bytecode::{

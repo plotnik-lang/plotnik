@@ -1,5 +1,3 @@
-//! Error types for bytecode emission.
-
 use crate::bytecode::{EncodeError, MAX_SPANS};
 use crate::compiler::analyze::result::ResultSchemaError;
 

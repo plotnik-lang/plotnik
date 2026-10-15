@@ -1,5 +1,3 @@
-//! VM bytecode target.
-
 mod instructions;
 mod layout;
 mod layout_map;

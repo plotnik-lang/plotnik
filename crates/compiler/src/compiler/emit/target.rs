@@ -1,5 +1,3 @@
-//! Public target-dispatched emission API.
-
 use std::borrow::Cow;
 
 use plotnik_runtime::{Limit, RuntimeLimitSpec};

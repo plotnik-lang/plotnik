@@ -1,12 +1,7 @@
-//! Configuration for Rust type emission.
-
 use std::borrow::Cow;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Absolute path of the runtime crate as generated code should spell it.
-    /// The default matches a direct `plotnik-runtime` dependency; the proc-macro
-    /// backend re-points it at its own re-export.
     pub(crate) rt_crate: Cow<'static, str>,
     pub(crate) serde: bool,
 }
@@ -30,7 +25,6 @@ impl Config {
         self
     }
 
-    /// Also emit `SerializeWithSource` impls for the generated types.
     pub fn serde(mut self, enabled: bool) -> Self {
         self.serde = enabled;
         self

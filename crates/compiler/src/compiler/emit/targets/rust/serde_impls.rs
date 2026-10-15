@@ -1,17 +1,3 @@
-//! Generated `SerializeWithSource` impls.
-//!
-//! Mirrors the VM's materialized-value JSON exactly — record fields in
-//! declaration order, `None` as one flat null, nodes as
-//! `{kind, text, span}`, variants as `{"$tag": ...}` / `{"$tag", "$data"}` —
-//! so serialized generated output can be diffed against VM output verbatim.
-//! Serialized keys and tags always use the original query-side names, even
-//! when the Rust identifier had to be keyword-renamed.
-//!
-//! Rust enum variant payloads are anonymous records, so each payload arm defines a
-//! local `Data` adapter borrowing the matched fields; bindings are positional
-//! (`v0`, `v1`, ...) to keep a capture literally named `source` from
-//! shadowing the source parameter.
-
 use std::fmt::Write as _;
 
 use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
@@ -52,8 +38,6 @@ impl Emitter<'_, '_> {
             _ => unreachable!("serde impls are generated for structs and enums only"),
         };
 
-        // Only payload fields thread the source through; a no-payload enum
-        // never touches it and must not bind it, or the impl warns.
         let source = body.source_param();
         let body = body.code;
 
@@ -161,8 +145,6 @@ impl Emitter<'_, '_> {
         for (index, ((&name_sym, info), field_ident)) in
             fields.iter().zip(&field_idents).enumerate()
         {
-            // The helper borrows the enum's actual field, so its type must be
-            // spelled with the declaration's own cut context.
             let field_ty = self.field_type(TypeContext::item(item.value_type()), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");

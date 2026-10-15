@@ -1,9 +1,3 @@
-//! Conservative native-stack estimate for generated typed result decoders.
-//!
-//! Rust does not expose final stack maps during source generation. This model
-//! counts the locals emitted for each decode shape; `plotnik-runtime` adds runtime
-//! padding when it converts the largest frame into an automatic depth limit.
-
 use std::collections::{BTreeMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;

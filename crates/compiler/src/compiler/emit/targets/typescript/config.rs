@@ -1,5 +1,3 @@
-//! Configuration types for TypeScript emission.
-
 use crate::core::Colors;
 
 /// How to represent match-only output in TypeScript.

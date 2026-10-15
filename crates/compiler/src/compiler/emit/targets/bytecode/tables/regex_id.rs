@@ -1,5 +1,3 @@
-//! Regex table wire ID.
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub(in crate::compiler) struct RegexId(u16);

@@ -1,8 +1,3 @@
-//! Type-table emission phase: walk the inferred types (TypeAnalysis) and lower
-//! them into the bytecode type table, interning their names into the shared
-//! string table. The table storage and its read accessors live in
-//! `emit::tables`; this module owns the walk.
-
 use crate::bytecode::{TypeDef, TypeKind, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::result::{
@@ -18,8 +13,6 @@ use crate::compiler::emit::targets::bytecode::tables::{
 use crate::compiler::ids::TypeId;
 use crate::core::Interner;
 
-/// Build the type table, interning type, member, and name strings into the
-/// shared string table. Threads the string table by value because it extends it.
 pub fn build_type_table(
     schema: &ResultSchema<'_>,
     mut strings: StringTableBuilder,
@@ -29,14 +22,6 @@ pub fn build_type_table(
     Ok((types, strings))
 }
 
-/// Build the bytecode table in canonical result-type order.
-///
-/// Types reachable from selectable definition outputs are emitted. This keeps
-/// demanded fragment capture scopes available to matcher bodies without
-/// shipping unused fragments. Dead inference intermediates — an unlabeled
-/// alternation's per-alternative merged records, for instance — are also pruned.
-/// Used built-ins lead, then value types follow in definition order,
-/// depth-first.
 fn build(
     types: &mut TypeTableBuilder,
     schema: &ResultSchema<'_>,

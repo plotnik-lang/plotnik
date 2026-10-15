@@ -1,7 +1,3 @@
-//! Module-assembly emission phase: build the node-kind, grammar-field, and entrypoint wire
-//! tables, serialize every section, and frame the module with its header and
-//! checksum.
-
 use crate::core::NodeKind;
 
 use crate::bytecode::{
@@ -22,8 +18,6 @@ use super::layout::compute_layout;
 use super::string_table::seed_string_table;
 use super::type_table::build_type_table;
 
-/// The node-kind, grammar-field, and entrypoint wire tables. Built together because all
-/// three intern their names into the one string table.
 pub struct ModuleTables {
     node_kinds: Vec<NodeKindEntry>,
     fields: Vec<FieldEntry>,
@@ -41,12 +35,6 @@ pub(in crate::compiler::emit) struct EmitPipeline<'a> {
 }
 
 impl<'a> EmitPipeline<'a> {
-    /// Prepare every shared encoding table before module assembly begins.
-    ///
-    /// String seeding, type projection, and instruction layout are one ordered
-    /// preparation phase: the resulting builders must agree before later table
-    /// assembly interns the final symbol names. Keeping that sequence here
-    /// avoids exposing six independently correlated constructor arguments.
     pub(in crate::compiler::emit) fn prepare(
         input: AnalysisArtifacts<'a>,
         ir: &'a NfaGraph,
@@ -78,9 +66,6 @@ impl<'a> EmitPipeline<'a> {
         &self.layout
     }
 
-    /// Assemble the node-kind, grammar-field, and entrypoint tables, interning the last
-    /// names into the string table. As the final string-table writer, this is where
-    /// the string, type, and table capacities are sealed.
     pub(in crate::compiler::emit) fn build_tables(&mut self) -> Result<ModuleTables, EmitError> {
         let mut node_kinds: Vec<NodeKindEntry> = Vec::new();
         for (node_kind, node_id) in self.input.grammar.kind_entries() {
@@ -157,7 +142,6 @@ impl<'a> EmitPipeline<'a> {
         ))
     }
 
-    /// Serialize every table into its section, then write the header and checksum.
     pub(in crate::compiler::emit) fn write_module(
         &self,
         pool: ConstantPool<'_>,
@@ -173,10 +157,6 @@ impl<'a> EmitPipeline<'a> {
         let entrypoints_bytes = emit_entrypoints(&tables.entrypoints);
         let spans_bytes = self.emit_spans()?;
 
-        // Section order matches the bytecode layout:
-        // Header → StringBlob → RegexBlob → StringTable → RegexTable →
-        // NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames →
-        // Entrypoints → Instructions → Spans
         let mut writer = SectionWriter::new();
 
         writer.emit_section(&str_blob);
@@ -374,7 +354,6 @@ impl SectionWriter {
         self.output
     }
 
-    /// Pad a buffer to the section alignment boundary.
     fn pad_to_section(&mut self) {
         let rem = self.output.len() % SECTION_ALIGN;
         if rem == 0 {

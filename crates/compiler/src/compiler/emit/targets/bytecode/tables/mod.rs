@@ -1,13 +1,3 @@
-//! Shared bytecode-emission data types.
-//!
-//! The emit phases each live in a sibling `compiler::emit` module; this one owns
-//! the data they produce and thread across phase boundaries: the emit error plus
-//! the string, type, and regex tables. The tables carry their
-//! construction *state* and serialization, but no algorithm that walks the IR
-//! and no regex engine — those belong to the phase modules. Each table is a
-//! cross-phase accumulator (no single phase owns its full lifecycle), so it
-//! lives here at the emit root rather than inside one phase.
-
 mod constant_pool;
 mod error;
 mod regex_id;

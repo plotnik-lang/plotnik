@@ -1,28 +1,3 @@
-//! Typed result-decoder emission and supplied-node execution.
-//!
-//! The committed match journal is a tiny event format whose schema *is* the
-//! query's result type, so decoding is generated deserialization (serde-derive
-//! mental model), not interpretation: one decoder fn per named type, shared
-//! across every position that holds it, matching only the entries the type
-//! admits. It runs once, on the winning path; failed execution paths never reach it.
-//!
-//! Two journal facts shape the decoders (see the VM materializer, the reference
-//! consumer):
-//!
-//! - **Values are value-first.** A field's entries arrive *before* the
-//!   `RecordSet` that names the field, and `RecordSet` order inside one record varies
-//!   between instances of the same type. Record scopes therefore peek ahead
-//!   to the balancing `RecordSet` (`ResultDecoder::peek_record_set`) to pick the
-//!   field's typed decoder, then consume linearly.
-//! - **`RecordSet`/`VariantOpen` payloads are absolute member-table indices**, baked
-//!   from the same emit tables the matcher folded into its states. Nominal
-//!   twins (one name, several structurally-identical analysis types) own
-//!   distinct member runs, so an arm matches the union of its twins' indices.
-//!
-//! Naming is never re-derived: item and field spellings come from the
-//! typegen emitter's own model, so a keyword-renamed field decodes exactly as
-//! it was declared.
-
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
@@ -51,8 +26,6 @@ pub(super) struct DecoderGen<'m, 'a> {
 }
 
 struct DecoderTables {
-    /// Item name → decoder fn ident, uniqued in item order (nominally distinct
-    /// names can share a snake form, e.g. `HTTPServer` / `HttpServer`).
     decoder_fns: HashMap<Symbol, String>,
 }
 
@@ -153,7 +126,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             .any(|item| item.has_decoder() && item.fallible)
     }
 
-    /// Independent execution methods are emitted only for eligible entries.
     pub(super) fn execution_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entrypoints {
@@ -343,7 +315,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "        Ok(Some(value))");
     }
 
-    /// Every decoder fn, in item order.
     pub(super) fn decoders(&self) -> String {
         let mut out = String::new();
         for item in self.decode.items() {
@@ -458,11 +429,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         out.push_str("}\n");
     }
 
-    /// The field-collection loop of one struct-like scope: positional locals,
-    /// the peek-dispatch loop over member indices, one `RecordSet` consumed per
-    /// field value. Variant payloads reuse it with `VariantClose` as the terminator
-    /// (payload `RecordSet`s attach directly to the variant frame — the materializer's
-    /// contract).
     fn field_scope(&self, out: &mut String, scope: &Scope<'_>, plan: &DecodeScope) {
         let p = indentation(scope.level());
         for (index, field) in plan.fields.iter().enumerate() {
@@ -501,9 +467,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "{p}}}");
     }
 
-    /// The construction expression closing a scope: every field was set
-    /// exactly once (field completion guarantees a `RecordSet` per
-    /// field on every accepting path), so the positional locals unwrap.
     fn construct(&self, out: &mut String, scope: &Scope<'_>, plan: &DecodeScope, fallible: bool) {
         let p = indentation(scope.level());
         let head = scope.construction_head();
@@ -540,12 +503,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         }
     }
 
-    /// Decode one planned value. The returned expression's first line splices
-    /// inline; continuation lines are indented for `level`. `depth` suffixes
-    /// list accumulators so nested lists don't shadow. `cut` is the item
-    /// declaration this position renders inside — the box-placement context,
-    /// threaded exactly as the type renderer threads it so `Box::new` sits
-    /// precisely where the declared type says `Box`.
     fn value_expr(&self, plan: &DecodeValue, context: DecodeContext) -> String {
         match plan {
             DecodeValue::Node => "decoder.expect_node()".to_string(),
@@ -564,9 +521,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         }
     }
 
-    /// `Absent` is the whole absent value — one flat absence, however many
-    /// `Option` layers the type carries; a present value wraps `Some` at
-    /// every layer (the VM never nests nulls).
     fn option_expr(&self, inner: &DecodeValue, context: DecodeContext) -> String {
         let p = indentation(context.level);
         let inner_expr = self.value_expr(inner, context.in_some_branch());
@@ -598,9 +552,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     }
 }
 
-/// Where a value expression is emitted. `type_context` decides recursive
-/// `Box` placement, `level` is the emitted indentation, and `list_depth`
-/// keeps nested list accumulator names distinct.
 #[derive(Clone, Copy)]
 struct DecodeContext {
     type_context: TypeContext,
@@ -647,8 +598,6 @@ impl DecodeContext {
     }
 }
 
-/// One struct-like scope from field collection through value construction.
-/// The kind fixes the close probe, indentation, and construction head together.
 struct Scope<'a> {
     context: DecodeContext,
     kind: ScopeKind<'a>,
@@ -705,7 +654,6 @@ impl<'a> Scope<'a> {
     }
 }
 
-/// `12` or `12 | 27` — the Rust match pattern for planned twin indices.
 fn arm_pattern(indices: &[ResultMemberId]) -> String {
     indices
         .iter()

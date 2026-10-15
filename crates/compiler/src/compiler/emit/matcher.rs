@@ -1,11 +1,3 @@
-//! Target-neutral matcher plan.
-//!
-//! This is the semantic half of generated matcher emission. It assigns dense
-//! runtime state ids, preserves dump provenance, orders candidate checks,
-//! records exact search and retry policies, resolves capture-member effects,
-//! and resolves symbolic successor labels. Backends render this data without
-//! inspecting the NFA again.
-
 use std::collections::BTreeMap;
 
 use plotnik_runtime::{Nav, SkipPolicy};
@@ -23,7 +15,6 @@ use crate::compiler::lower::ir::{
 use crate::compiler::regex::normalize;
 use crate::core::{NodeFieldId, NodeKindId};
 
-/// Dense runtime state id carried by frames and checkpoints.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct StateId(u16);
 
@@ -33,7 +24,6 @@ impl StateId {
     }
 }
 
-/// Regex table id, assigned in first-appearance order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RegexId(usize);
 
@@ -55,7 +45,6 @@ pub(crate) struct StatePlan {
     pub(crate) label: Label,
     pub(crate) definition: String,
     pub(crate) origin: StateOrigin,
-    /// The instruction in the canonical NFA dump format.
     pub(crate) provenance: String,
     pub(crate) kind: StatePlanKind,
 }
@@ -74,9 +63,7 @@ pub(crate) enum StatePlanKind {
 #[derive(Clone, Debug)]
 pub(crate) struct MatchPlan {
     pub(crate) nav: Nav,
-    /// Policy used while scanning for the first acceptable candidate.
     pub(crate) search: SkipPolicy,
-    /// Policy stored in a match-retry checkpoint, when this state owns one.
     pub(crate) retry: Option<SkipPolicy>,
     pub(crate) checks: Vec<CheckPlan>,
     pub(crate) effects: Vec<EffectPlan>,
@@ -103,7 +90,6 @@ impl MatchPlan {
         self.checks.iter().any(CheckPlan::reads_node)
     }
 
-    /// Whether candidate setup can fail before this state's terminal flow.
     pub(crate) fn can_fail_before_flow(&self) -> bool {
         self.navigates() || self.has_candidate_checks()
     }
@@ -135,7 +121,6 @@ impl CallPlan {
         matches!(self.nav, Nav::Stay | Nav::StayExact)
     }
 
-    /// Whether navigation or field selection can fail before entering the call.
     pub(crate) fn can_fail_before_flow(&self) -> bool {
         self.caller_owned() && (!self.stays_on_current_node() || self.field.is_some())
     }
@@ -147,8 +132,6 @@ pub(crate) enum FlowPlan {
     Jump(StateId),
     Fork {
         next: StateId,
-        /// Checkpoints in the NFA's declared order. The runtime pushes this
-        /// slice with its established reverse/LIFO discipline.
         successors: Vec<StateId>,
     },
 }
@@ -156,8 +139,6 @@ pub(crate) enum FlowPlan {
 #[derive(Clone, Debug)]
 pub(crate) struct EffectPlan {
     pub(crate) kind: EffectKind,
-    /// Absolute capture-member slot for `RecordSet`/`VariantOpen`; literal payload for
-    /// the other effect kinds.
     pub(crate) payload: u16,
     pub(crate) display: String,
 }
@@ -235,8 +216,6 @@ pub(crate) struct MatcherPlan {
     states: Vec<StatePlan>,
     entrypoints: Vec<EntryPlan>,
     expected_kinds: Vec<ExpectedKind>,
-    /// Fields in first-appearance order. Target representation passes use
-    /// this order when resolving identifier collisions.
     fields: Vec<FieldPlan>,
     regexes: Vec<RegexPlan>,
     label_width: usize,
@@ -471,8 +450,6 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         }
     }
 
-    /// Candidate checks in the VM's normative order: kind, missing, field,
-    /// negated fields, then text predicate.
     fn checks(&mut self, instruction: &MatchIR, retryable: bool) -> Vec<CheckPlan> {
         let mut checks = Vec::new();
         if let Some(kind) = self.kind_check(instruction.node_kind) {

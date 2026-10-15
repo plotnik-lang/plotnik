@@ -1,11 +1,5 @@
-//! Static template substitution for backend-owned source skeletons.
-
 use crate::compiler::emit::sink::Sink;
 
-/// Splice a column-zero template into `out`, substituting `@KEY@` values and
-/// indenting every non-empty line. A template placeholder without a supplied
-/// value is always an emitter bug, so it fails here instead of shipping
-/// malformed generated code.
 pub(crate) fn splice(out: &mut String, indent: &str, template: &str, subs: &[(&str, &str)]) {
     let text = substitute(template.trim_matches('\n'), subs);
 

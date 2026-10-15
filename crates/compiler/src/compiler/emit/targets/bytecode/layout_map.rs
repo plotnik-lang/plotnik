@@ -3,14 +3,9 @@ use std::collections::BTreeMap;
 use crate::bytecode::CodeAddr;
 use crate::compiler::lower::ir::Label;
 
-/// Result of layout: maps labels to bytecode-word addresses.
 #[derive(Clone, Debug)]
 pub(in crate::compiler::emit) struct LayoutMap {
-    /// Mapping from symbolic labels to concrete bytecode-word addresses.
     label_to_addr: BTreeMap<Label, CodeAddr>,
-    /// Total number of bytecode words. Held as `u32` so a query whose layout overflows
-    /// the `u16` address space is detectable at emit time instead of
-    /// wrapping silently; `emit` rejects it before any address is used.
     total_words: u32,
 }
 

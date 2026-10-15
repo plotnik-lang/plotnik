@@ -1,25 +1,3 @@
-//! The query-module emitter: fork-point NFA → Rust source.
-//!
-//! The output is one self-contained module: typed output structs/enums (the
-//! Rust type renderer's text, verbatim), supplied-node execution and
-//! per-type result decoders (`decode.rs`), and the compiled matcher itself —
-//! shielded inside a nested `mod matcher` so its machinery names (`Flow`,
-//! state consts) can never collide with a query's own type names.
-//!
-//! Emission is deterministic — instructions render in label order, names and
-//! tables come from `BTreeMap`s — so the same query always produces the same
-//! code (snapshot-friendly, cache-friendly).
-//!
-//! Control skeletons (`run`, `backtrack`, `match_retry`) transcribe the VM's
-//! `execute_with_stats` / `backtrack` handler-for-handler over the shared
-//! `plotnik_runtime::Engine`; per-state arms render the target-neutral matcher plan
-//! with operands folded to constants. When the VM engine changes shape, the
-//! sibling text here must follow — the 06-vm conformance corpus is the tripwire.
-//!
-//! All emitted shapes live as column-0 raw-string templates at the bottom of
-//! this file; the shared template splicer substitutes `@KEY@` placeholders
-//! and re-indents.
-
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
@@ -41,22 +19,14 @@ use plotnik_runtime::{Limit, Nav, SkipPolicy};
 
 use super::entry_names::{apply_fn_name, journal_fn_name};
 
-/// Generate the Rust query module for a compiled query's fork-point NFA.
-///
-/// The caller guarantees the query compiled successfully and was built
-/// *without* inspection — spans are a VM/playground concern and never reach
-/// generated code.
 pub(crate) fn generate(plan: &CodegenPlan<'_>, config: &Config) -> Result<String, String> {
     let generator = Generator::new(plan, config)?;
     Ok(generator.render())
 }
 
 struct StateInfo {
-    /// Dense runtime id (the value checkpoints and frames carry).
     id: u16,
-    /// `S{label}_{DEF}` const name; the label matches the NFA dump.
     const_name: String,
-    /// `s{label}_{def}` stem for per-state helper fns.
     fn_stem: String,
 }
 
@@ -106,14 +76,9 @@ impl RegexStatic {
     }
 }
 
-/// Rust-only representation decisions over the neutral matcher plan.
 struct RustRepresentation {
     states: Vec<StateInfo>,
-    /// Field-id consts: id → `F_{NAME}` const name. Keyed by id and
-    /// collision-suffixed at insert, so the const namespace stays injective.
     fields: BTreeMap<NodeFieldId, String>,
-    /// Rust uses regex-automata's native serialized sparse-DFA format compiled
-    /// from the same normalized semantics dynamic backends print.
     regexes: Vec<RegexStatic>,
 }
 
@@ -166,9 +131,6 @@ impl RustRepresentation {
         if self.fields.contains_key(&id) {
             return;
         }
-        // Distinct grammar field names can collapse to one SHOUTY form
-        // (`fooBar` / `foo_bar`); suffix until free so a collision can never
-        // silently alias two ids under one const.
         let mut name = format!("F_{}", shouty_ident(display));
         while self.fields.values().any(|taken| *taken == name) {
             let _ = write!(name, "_{id}");
@@ -308,9 +270,6 @@ impl<'a> Generator<'a> {
         );
     }
 
-    /// `pub use` every journal entrypoint at module root, so the public
-    /// surface (`{def}_journal`, per [`journal_fn_name`]) doesn't move when the
-    /// machinery does.
     fn entry_reexports(&self, out: &mut String) {
         let mut names: Vec<String> = self
             .plan
@@ -350,9 +309,6 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// The language-skew tables and their assert: every kind and field id in
-    /// this module is a numeric bake of the generation-time grammar, so the
-    /// first run checks each one against the tree's live language.
     fn language_check(&self, out: &mut String) {
         out.push('\n');
         if let Some(identity) = &self.config.grammar_identity {
@@ -483,8 +439,6 @@ impl<'a> Generator<'a> {
     }
 
     fn entry_fns(&self, out: &mut String) {
-        // An unbounded resource emits `false` for its metering const, folding
-        // the check out of candidate application.
         let limits = self.limits;
         let fuel_metered = limits.fuel != Limit::Unbounded;
         let memory_metered = limits.memory != Limit::Unbounded;
@@ -624,10 +578,6 @@ impl<'a> Generator<'a> {
         out.push_str("        }\n");
     }
 
-    /// The dispatch arm for a Match instruction. Epsilon runs effects and
-    /// follows successors; everything else navigates, searches candidates, leaves a
-    /// retry checkpoint when the engine owns the sibling search, then runs
-    /// the shared finish (effects plus successor dispatch).
     fn match_arm(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
         let info = self.state(state.id);
 
@@ -652,9 +602,6 @@ impl<'a> Generator<'a> {
         out.push_str("        }\n");
     }
 
-    /// The candidate loop: try the current node, advance past rejected ones per
-    /// the nav's skip policy. An `Exact` policy has exactly one candidate, so
-    /// the loop degenerates to a single check.
     fn candidate_search(
         &self,
         out: &mut String,
@@ -689,9 +636,6 @@ impl<'a> Generator<'a> {
         );
     }
 
-    /// Accepting a candidate in an engine-owned sibling search leaves a
-    /// match-retry checkpoint, gated on the policy admitting the node into
-    /// the pattern's gap — the VM's `push_match_retry_if_resumable`.
     fn retry_checkpoint(
         &self,
         out: &mut String,
@@ -704,8 +648,6 @@ impl<'a> Generator<'a> {
         };
         let policy = policy_expr(policy);
         let state = &self.state(state.id).const_name;
-        // Machinery is rendered before the enclosing `mod matcher` adds its
-        // four-space indent, so include that final width in the layout choice.
         let compact_len = format!(
             "{indent}    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), {state}));"
         )
@@ -744,8 +686,6 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// Post-acceptance effects, then successor dispatch — inline for states
-    /// with no retry, `finish_*` fns where the backtrack path re-emits them.
     fn effects_and_flow(
         &self,
         out: &mut String,
@@ -843,9 +783,6 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// The dispatch arm for a Call. Caller-owned entry work navigates, checks
-    /// the field, and may retain a sibling retry. Callee-owned entry work is
-    /// already embedded in the specialized target.
     fn call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
         if plan.caller_owned() {
             self.caller_owned_call_arm(out, state_plan, plan);
@@ -944,8 +881,6 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// The candidate check, mirroring the VM's `candidate_matches` order:
-    /// kind, missing, field, negated fields, predicate.
     fn cand_fn(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
         let info = self.state(state.id);
         out.push('\n');
@@ -979,7 +914,6 @@ impl<'a> Generator<'a> {
         out.push_str("    true\n}\n");
     }
 
-    /// Every check in the VM's `candidate_matches` order.
     fn candidate_checks(&self, plans: &[CheckPlan]) -> Vec<CandidateCheck> {
         plans
             .iter()
@@ -1068,8 +1002,6 @@ impl<'a> Generator<'a> {
                 continue;
             }
             let info = self.state(state.id);
-            // `eng` feeds effect emission and successor pushes; a finish that
-            // only jumps must not bind it, or every such fn warns.
             let eng = if plan.effects.is_empty() && !matches!(plan.flow, FlowPlan::Fork { .. }) {
                 "_eng"
             } else {
@@ -1091,8 +1023,6 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// The backtrack unwind — the VM's `backtrack` with the Match arm
-    /// dispatched to generated per-state retries.
     fn backtrack_fn(&self, out: &mut String) {
         let source_arg = if self.plan.matcher().any_retry_predicate() {
             "source"
@@ -1117,9 +1047,6 @@ impl<'a> Generator<'a> {
         );
     }
 
-    /// Per-state match-retry: advance past the accepted-but-failed candidate,
-    /// re-run the same state's candidate search and re-emit the finish. Only
-    /// sibling-search states can carry a match-retry checkpoint.
     fn match_retry_fn(&self, out: &mut String) {
         let retryable: Vec<(&StatePlan, &MatchPlan)> = self
             .plan
@@ -1169,8 +1096,6 @@ impl<'a> Generator<'a> {
     }
 }
 
-/// `Nav` as a generated-code expression; the `Debug` form matches the variant
-/// syntax (`Up(2)`), pinned by `nav_expr_matches_debug` in the tests.
 pub(super) fn nav_expr(nav: Nav) -> String {
     format!("rt::Nav::{nav:?}")
 }
@@ -1210,15 +1135,10 @@ fn render_const_slice(
     out.push_str("];\n");
 }
 
-/// `Limit` as a generated-code expression; the `Debug` form matches the
-/// variant syntax (`Of(3)`), pinned by `limit_expr_matches_debug` in the tests.
 pub(super) fn limit_expr(limit: Limit) -> String {
     format!("rt::Limit::{limit:?}")
 }
 
-/// The decode-depth policy as the generated `MAX_DECODE_DEPTH` initializer.
-/// Resolved at generation time — the ceiling guards the native stack, which
-/// does not scale with the input, so there is nothing to resolve per run.
 pub(super) fn depth_expr(limit: Limit, max_decoder_frame_bytes: u64) -> String {
     match limit {
         Limit::Auto => format!("Some(rt::decode_depth_auto({max_decoder_frame_bytes}))"),

@@ -1,5 +1,3 @@
-//! Read-only view over sealed bytecode constant tables.
-
 use crate::bytecode::StringId;
 
 use super::{EmitError, RegexId, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};

@@ -1,5 +1,3 @@
-//! TypeScript declarations rendered directly from target-neutral output facts.
-
 use std::collections::HashSet;
 
 use crate::compiler::analyze::result::{

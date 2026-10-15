@@ -1,5 +1,3 @@
-//! TypeScript type target.
-
 mod config;
 mod types;
 

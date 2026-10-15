@@ -1,9 +1,3 @@
-//! Capacity limits and load-time validation for the bytecode boundary (#422).
-//!
-//! These assert that a query which would overflow a fixed-width field fails
-//! emission with a clear [`EmitError`] instead of silently wrapping or panicking,
-//! and that a truncated or corrupted module is rejected by `Module::validate_and_load`.
-
 use std::fmt::Write as _;
 
 use crate::bytecode::{EncodeError, Module};
@@ -14,8 +8,6 @@ use crate::compiler::test_utils::synthetic_grammar as grammar;
 use crate::compiler::{BytecodeConfig, DiagnosticKind, RustCodegenConfig, TypeScriptCodegenConfig};
 use crate::compiler::{SourceMap, SourcePath};
 
-/// Bind `src` to the test grammar (capacity limits live at emission, not binding) and
-/// return the emission result.
 #[track_caller]
 fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
     let mut source_map = SourceMap::new();
@@ -111,15 +103,10 @@ fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
 
 #[test]
 fn effect_member_payload_overflow_is_emit_error() {
-    // Members are indexed into a 10-bit effect payload (max 1023). Spread > 1024
-    // globally-distinct captures across several definitions (each record staying
-    // under the 255-field limit) so a RecordSet effect references an index past 1023.
     let mut query = String::new();
     for def in 0..5 {
         write!(query, "D{def} = (program").unwrap();
         for field in 0..250 {
-            // Concrete child kind: keeps each definition's satisfiability solve linear
-            // (the wide member count is the point, not wildcard matching).
             write!(query, " (expression_statement) @d{def}_f{field}").unwrap();
         }
         writeln!(query, ")").unwrap();
@@ -148,9 +135,6 @@ fn truncated_or_corrupted_module_is_rejected() {
         );
     }
 
-    // Flipping any single byte is caught: the CRC covers everything after the
-    // 64-byte header, and structural checks (bounds, sentinels, reserved bytes,
-    // type defs, entrypoints) cover the header itself.
     for i in 0..bytes.len() {
         let mut corrupt = bytes.clone();
         corrupt[i] ^= 0xFF;
@@ -163,10 +147,6 @@ fn truncated_or_corrupted_module_is_rejected() {
 
 #[test]
 fn crafted_header_blob_size_does_not_overflow_offsets() {
-    // `str_blob_size` lives in the header (bytes 16..20), which the CRC does not
-    // cover, so a corrupt near-`u32::MAX` value reaches offset computation. It
-    // must be rejected by the section-bounds check, not overflow the u32
-    // arithmetic in `compute_offsets` (a debug panic — load failing open).
     let mut bytes = try_emit("Q = (program (_) @name)").expect("valid query emits");
     bytes[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
 

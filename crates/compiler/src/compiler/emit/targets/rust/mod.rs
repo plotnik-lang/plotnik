@@ -1,5 +1,3 @@
-//! Rust source target.
-
 mod config;
 mod decode;
 mod decoder_frame;

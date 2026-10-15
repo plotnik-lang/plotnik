@@ -1,11 +1,3 @@
-//! Target-neutral typed result-decoding plan.
-//!
-//! Match-journal events name record fields and variant cases with absolute layout
-//! slots. This plan resolves every nominal twin to the complete set of slots
-//! it may produce and turns result types into a small value-decoding algebra.
-//! Backends choose identifiers, error syntax, recursion representation, and
-//! construction syntax without walking analysis types or rebuilding tables.
-
 use std::collections::HashSet;
 
 use indexmap::IndexMap;
@@ -52,9 +44,7 @@ pub(crate) struct DecodeItem {
     pub(crate) name: Symbol,
     pub(crate) output: DefinitionOutput,
     pub(crate) kind: DecodeItemKind,
-    /// This decoder is a recursive definition's dynamic depth boundary.
     pub(crate) enters_depth: bool,
-    /// This decoder or one it calls can trip the decode-depth limit.
     pub(crate) fallible: bool,
 }
 
@@ -86,7 +76,6 @@ pub(crate) struct DecodeScope {
 #[derive(Clone, Debug)]
 pub(crate) struct DecodeField {
     pub(crate) name: Symbol,
-    /// Every absolute `RecordSet` slot this field may use across nominal twins.
     pub(crate) indices: Vec<ResultMemberId>,
     pub(crate) value: DecodeValue,
 }
@@ -94,7 +83,6 @@ pub(crate) struct DecodeField {
 #[derive(Clone, Debug)]
 pub(crate) struct DecodeCase {
     pub(crate) name: Symbol,
-    /// Every absolute `VariantOpen` slot this case may use across twins.
     pub(crate) indices: Vec<ResultMemberId>,
     pub(crate) payload: Option<DecodeScope>,
 }
@@ -106,13 +94,7 @@ pub(crate) enum DecodeValue {
     Bool,
     Option(Box<DecodeValue>),
     List(Box<DecodeValue>),
-    Nested {
-        item: Symbol,
-        /// Analysis type at this read position. It preserves whether the
-        /// position is a direct nominal value or a definition-reference
-        /// occurrence without prescribing a target's representation.
-        source_type: TypeId,
-    },
+    Nested { item: Symbol, source_type: TypeId },
 }
 
 struct DecodePlanBuilder<'p, 'a> {
@@ -260,7 +242,6 @@ impl DecodePlanBuilder<'_, '_> {
     }
 }
 
-/// Case `index`'s payload record across every nominal variant occurrence.
 fn payload_occurrences(
     layout: &CaptureLayout,
     occurrences: &[TypeId],
@@ -284,7 +265,6 @@ fn payload_occurrences(
         .collect()
 }
 
-/// Absolute member indices for one field/case position across all occurrences.
 fn member_indices(
     layout: &CaptureLayout,
     occurrences: &[TypeId],

@@ -1,10 +1,3 @@
-//! A deterministic text sink with indentation, styles, and semantic ranges.
-//!
-//! Emitters write their text once. ANSI styling is retained as zero-width
-//! events, while semantic tags retain ranges in the unstyled text. Callers can
-//! then render plain text, colored text, or a source map without duplicating
-//! the language renderer.
-
 use super::ansi::{StyleChange, StyleEvent, render};
 
 const INDENT: &str = "    ";
@@ -53,8 +46,6 @@ impl<T> Sink<T> {
         self.text.push('\n');
     }
 
-    /// Write every line at the current indentation, leaving blank lines empty.
-    /// A trailing newline in `text` remains one trailing newline in the sink.
     pub(crate) fn lines(&mut self, text: &str) {
         for line in text.lines() {
             self.line(line);

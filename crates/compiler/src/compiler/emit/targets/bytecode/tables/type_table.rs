@@ -1,12 +1,3 @@
-//! Type table accumulator for bytecode emission.
-//!
-//! Owns the bytecode-level type tables (defs, members, names) plus the primitive
-//! push/resolve operations the type-emit phase drives. The target-neutral result
-//! layout is the sole source of type IDs; this builder only validates and writes
-//! their compact wire representation. The walk that decides reachability,
-//! ordering, and how each inferred shape lowers lives in
-//! `compiler::emit::type_table`.
-
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::result::ResultTypeLayout;
@@ -16,14 +7,10 @@ use crate::compiler::ids::{ResultTypeId, TypeId};
 
 use super::error::EmitError;
 
-/// Holds bytecode type metadata in canonical result-type order.
 #[derive(Debug)]
 pub struct TypeTableBuilder {
-    /// Type definitions (4 bytes each).
     type_defs: Vec<TypeDef>,
-    /// Type members for records/variants (4 bytes each).
     type_members: Vec<TypeMember>,
-    /// Type names for named types (4 bytes each).
     type_names: Vec<TypeNameEntry>,
 }
 
@@ -36,7 +23,6 @@ impl TypeTableBuilder {
         }
     }
 
-    /// Push `def` at its canonical result-type slot and return the wire ID.
     pub fn push_result(
         &mut self,
         result_id: ResultTypeId,
@@ -68,12 +54,10 @@ impl TypeTableBuilder {
         }
     }
 
-    /// Overwrite a previously reserved slot with its final definition.
     pub fn fill_slot(&mut self, slot_index: usize, def: TypeDef) {
         self.type_defs[slot_index] = def;
     }
 
-    /// Member-table length: the base index for the next record or variant type's members.
     pub fn members_len(&self) -> u16 {
         u16::try_from(self.type_members.len())
             .expect("capture layout validates the type-member index space")
@@ -92,9 +76,6 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    /// Resolve a semantic type to the wire type used at a value position.
-    /// Definition references use their underlying body; an explicit capture-type
-    /// declaration preserves its alias identity.
     pub fn resolve_type(
         &self,
         type_id: TypeId,
@@ -130,7 +111,6 @@ impl TypeTableBuilder {
         Ok(WireTypeId::from(raw))
     }
 
-    /// Returns `(type_defs_bytes, type_members_bytes, type_names_bytes)`.
     pub fn emit(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         let mut defs_bytes = Vec::with_capacity(self.type_defs.len() * TypeDef::SIZE);
         for def in &self.type_defs {

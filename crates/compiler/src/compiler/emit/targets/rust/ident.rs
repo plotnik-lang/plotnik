@@ -1,9 +1,5 @@
-//! Identifier casing and Rust keyword hygiene shared by type and code emitters.
-
 use std::collections::HashSet;
 
-/// PascalCase → SHOUTY_SNAKE (`FooBar` → `FOO_BAR`, `HTTPServer` →
-/// `HTTP_SERVER`).
 pub(crate) fn shouty_ident(name: &str) -> String {
     case_segments(name)
         .map(|segment| segment.to_uppercase())
@@ -11,7 +7,6 @@ pub(crate) fn shouty_ident(name: &str) -> String {
         .join("_")
 }
 
-/// PascalCase → snake_case (`FooBar` → `foo_bar`).
 pub(crate) fn snake_ident(name: &str) -> String {
     case_segments(name)
         .map(|segment| segment.to_lowercase())
@@ -19,10 +14,8 @@ pub(crate) fn snake_ident(name: &str) -> String {
         .join("_")
 }
 
-/// Keywords with no `r#` form.
 const RUST_UNRAW: &[&str] = &["crate", "self", "super", "Self"];
 
-/// Reserved words through Rust 2024 that are valid as raw identifiers.
 const RUST_RAW: &[&str] = &[
     "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "do", "dyn",
     "else", "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl", "in", "let",
@@ -31,9 +24,6 @@ const RUST_RAW: &[&str] = &[
     "where", "while", "yield",
 ];
 
-/// Hygienic Rust identifiers for one scope, in input order. Underscore-renamed
-/// keywords keep growing underscores until unique, so `self` and `self_` can
-/// coexist without changing their query-side serialized names.
 pub(crate) fn rust_scope_idents<'a>(names: impl Iterator<Item = &'a str>) -> Vec<String> {
     let mut taken = HashSet::new();
     names
@@ -57,8 +47,6 @@ fn rust_ident(name: &str) -> String {
     }
 }
 
-/// Split camel/Pascal humps: a boundary opens before an uppercase following a
-/// non-uppercase, and before the last uppercase of an acronym run.
 fn case_segments(name: &str) -> impl Iterator<Item = String> {
     let chars: Vec<char> = name.chars().collect();
     let mut segments = Vec::new();

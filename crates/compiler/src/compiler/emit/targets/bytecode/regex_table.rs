@@ -1,8 +1,3 @@
-//! Regex-table emission phase: compile predicate regexes to sparse DFAs.
-//!
-//! Compilation lives here so the regex engine stays out of `core`; the table
-//! that accumulates the compiled bytes is a core type.
-
 use crate::bytecode::StringId;
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, RegexId, RegexTableBuilder, StringTableBuilder,
@@ -10,9 +5,6 @@ use crate::compiler::emit::targets::bytecode::tables::{
 use crate::compiler::lower::ir::{InstructionIR, NfaGraph, PredicateValueIR};
 use crate::compiler::regex::{compile_native_dfa, normalize};
 
-/// Compile every regex predicate into the regex table, resolving each pattern's
-/// StringId from the finished string table. Reads the string table; interns
-/// nothing into it.
 pub fn build_regex_table(
     nfa: &NfaGraph,
     strings: &StringTableBuilder,
@@ -41,8 +33,6 @@ fn intern_regex_predicates(
     Ok(())
 }
 
-/// Compile `pattern` to a sparse DFA and store it under `string_id`, returning
-/// its regex ID. Deduplicates by StringId, so a repeated pattern compiles once.
 pub(super) fn intern(
     regexes: &mut RegexTableBuilder,
     pattern: &str,

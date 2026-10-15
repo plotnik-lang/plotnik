@@ -1,16 +1,3 @@
-//! Item collection and rendering.
-//!
-//! One item per named type: every value-producing definition (struct, enum, or a
-//! `pub type` alias for leaf/wrapper result types), plus every named composite
-//! its output reaches, emitted parent-first right after their owner. Names
-//! come verbatim from the naming pass; the only unnamed composites are enum
-//! variant payload structs, which render inline as struct variants.
-//!
-//! `Option`/`Vec`/`Box` are spelled absolutely (`::core::option::Option`)
-//! because a definition may legitimately be named `Option` and item
-//! declarations shadow the prelude inside the generated module. `Node` alone
-//! can stay bare: the naming pass reserves it.
-
 use crate::compiler::analyze::result::ResultSchema;
 pub(crate) use crate::compiler::analyze::result::{ResultItem as Item, ResultItemKind as ItemKind};
 use crate::compiler::analyze::types::type_shape::{CasePayload, RecordField, TypeId, TypeShape};
@@ -198,13 +185,6 @@ impl<'m, 'a> Emitter<'m, 'a> {
         format!("pub type {ident}{lt} = {body};")
     }
 
-    /// An alias item's body: one shape level rendered structurally (the
-    /// item's own name must not win), positions below it render as usual.
-    ///
-    /// Throughout the rendering recursion, `cut` is the item declaration a
-    /// by-value path from this position is still inside — the context
-    /// the shared type model keys on. Descending into a list element
-    /// clears it: `Vec` indirects, so no cycle below is by-value.
     fn alias_body(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
@@ -234,7 +214,6 @@ impl<'m, 'a> Emitter<'m, 'a> {
         self.position_type(context, info.final_type)
     }
 
-    /// Render a type at a use site: named types by name, wrappers inline.
     pub(super) fn position_type(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
@@ -276,10 +255,6 @@ impl<'m, 'a> Emitter<'m, 'a> {
         format!("{ident}{lt}")
     }
 
-    /// A reference renders as its target declaration's type name, boxed when
-    /// this occurrence closes a by-value cycle through the enclosing item's
-    /// declaration. A match-only target contributes no value, so the capture holds
-    /// the matched node itself.
     fn ref_type(
         &mut self,
         context: TypeContext,

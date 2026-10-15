@@ -1,5 +1,3 @@
-//! Target-neutral emission planning and target implementations.
-
 mod ansi;
 mod decode;
 mod matcher;

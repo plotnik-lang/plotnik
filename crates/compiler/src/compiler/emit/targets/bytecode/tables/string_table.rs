@@ -1,7 +1,3 @@
-//! String table builder for bytecode emission.
-//!
-//! Builds the string table section, remapping query Symbols to bytecode StringIds.
-
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -11,24 +7,12 @@ use crate::bytecode::StringId;
 
 use super::error::EmitError;
 
-/// Easter egg string at index 0 (Dostoevsky, The Idiot).
-/// StringId(0) is reserved and never referenced by instructions.
 pub const EASTER_EGG: &str = "Beauty will save the world";
 
-/// Builds a subset of the query interner's strings into bytecode StringIds.
-/// This builder collects only the strings that are actually used and assigns
-/// compact StringId indices.
-///
-/// StringId(0) is reserved for an easter egg and is never referenced by
-/// instructions. Actual strings start at index 1.
 #[derive(Debug)]
 pub struct StringTableBuilder {
-    /// Map from query Symbol to bytecode StringId.
     mapping: HashMap<Symbol, StringId>,
-    /// Reverse lookup from string content to StringId (for intern_str). Shares
-    /// each string's allocation with `strings` via `Rc`.
     str_lookup: HashMap<Rc<str>, StringId>,
-    /// Ordered strings for the binary.
     strings: Vec<Rc<str>>,
 }
 
@@ -39,7 +23,6 @@ impl StringTableBuilder {
             str_lookup: HashMap::new(),
             strings: Vec::new(),
         };
-        // Reserve index 0 for easter egg (never looked up via str_lookup)
         builder.strings.push(Rc::from(EASTER_EGG));
         builder
     }
@@ -61,7 +44,6 @@ impl StringTableBuilder {
         Ok(id)
     }
 
-    /// Intern a string directly (for generated strings not in the query interner).
     pub fn intern_str(&mut self, s: &str) -> Result<StringId, EmitError> {
         if let Some(&id) = self.str_lookup.get(s) {
             return Ok(id);
@@ -86,7 +68,6 @@ impl StringTableBuilder {
         self.str_lookup.get(s).copied()
     }
 
-    /// Returns `(blob_bytes, table_bytes)`.
     pub fn emit(&self) -> Result<(Vec<u8>, Vec<u8>), EmitError> {
         let mut blob = Vec::new();
         let mut offsets: Vec<u32> = Vec::with_capacity(self.strings.len() + 1);
@@ -95,7 +76,7 @@ impl StringTableBuilder {
             offsets.push(blob_offset(blob.len())?);
             blob.extend_from_slice(s.as_bytes());
         }
-        offsets.push(blob_offset(blob.len())?); // sentinel
+        offsets.push(blob_offset(blob.len())?);
 
         let table_bytes: Vec<u8> = offsets.iter().flat_map(|o| o.to_le_bytes()).collect();
 

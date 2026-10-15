@@ -1,9 +1,3 @@
-//! Cache-aligned instruction layout.
-//!
-//! Extracts linear chains from the control flow graph and places them
-//! contiguously. Packs successor instructions into free space of predecessor
-//! blocks for improved d-cache locality.
-
 use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{BYTECODE_WORD_SIZE, CodeAddr, SECTION_ALIGN as CACHE_LINE};
@@ -11,21 +5,18 @@ use crate::bytecode::{BYTECODE_WORD_SIZE, CodeAddr, SECTION_ALIGN as CACHE_LINE}
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::lower::ir::{InstructionIR, Label};
 
-/// Intermediate representation for layout optimization.
 struct BlockArena {
     blocks: Vec<Block>,
     label_to_block: BTreeMap<Label, usize>,
     label_to_offset: BTreeMap<Label, u8>,
 }
 
-/// A 64-byte cache-line block.
 struct Block {
     placements: Vec<Placement>,
     reserved: u8,
     used: u8,
 }
 
-/// An instruction placed within a block.
 struct Placement {
     label: Label,
     offset: u8,
@@ -114,9 +105,6 @@ impl BlockArena {
 
     fn finalize(self) -> LayoutMap {
         let mut mapping = BTreeMap::new();
-        // Accumulate in u32 so the word count never wraps; the emitter rejects a
-        // layout exceeding the u16 address space before any `word_addr as u16` (which
-        // may wrap here) is read.
         let mut max_word_end: u32 = 0;
 
         for (block_idx, block) in self.blocks.iter().enumerate() {
@@ -134,11 +122,8 @@ impl BlockArena {
     }
 }
 
-/// Block-to-block reference counts for scoring.
 struct BlockEdges {
-    /// (from_block, to_block) -> reference count
     direct: BTreeMap<(usize, usize), usize>,
-    /// block -> list of predecessor blocks
     predecessors: BTreeMap<usize, Vec<usize>>,
 }
 
@@ -173,8 +158,6 @@ impl BlockEdges {
     }
 }
 
-/// Score a candidate block for packing based on reference distance.
-/// Direct refs count 1.0, 1-hop = 0.5, 2-hop = 0.25, capped at 3 hops.
 fn block_score(target_block: usize, candidate_block: usize, refs: &BlockEdges) -> f32 {
     let mut score = 0.0f32;
     let mut frontier = vec![(candidate_block, 0u8)];
@@ -196,11 +179,8 @@ fn block_score(target_block: usize, candidate_block: usize, refs: &BlockEdges) -
     score
 }
 
-/// Successor graph for layout analysis.
 struct Graph {
-    /// label -> list of successor labels
     successors: BTreeMap<Label, Vec<Label>>,
-    /// label -> list of predecessor labels
     predecessors: BTreeMap<Label, Vec<Label>>,
 }
 
@@ -242,13 +222,9 @@ impl Graph {
     }
 }
 
-/// Cache-aligned layout strategy.
 pub struct CacheAligned;
 
 impl CacheAligned {
-    /// Compute layout for instructions with given entrypoints.
-    ///
-    /// Returns the label-to-address mapping and total bytecode-word count.
     pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutMap {
         if instructions.is_empty() {
             return LayoutMap::empty();
@@ -276,9 +252,6 @@ impl CacheAligned {
     }
 }
 
-/// Cache-aligned placement of instructions into blocks. Owns the `BlockArena`
-/// under construction so the passes hand it off through `self` rather than
-/// threading `ir`/`refs` between free functions.
 struct LayoutBuilder<'a> {
     label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>,
     arena: BlockArena,
@@ -288,10 +261,6 @@ impl<'a> LayoutBuilder<'a> {
     fn new(label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>, reserve_zero: bool) -> Self {
         let mut arena = BlockArena::new();
         if reserve_zero {
-            // Entry and call targets may use address zero, but Match successors
-            // and call continuations encode zero as terminal. Keep the first
-            // entry nonzero only when it is also reached through one of those
-            // successor operands.
             arena
                 .blocks
                 .push(Block::with_reserved_prefix(BYTECODE_WORD_SIZE as u8));
@@ -356,10 +325,6 @@ impl<'a> LayoutBuilder<'a> {
         refs
     }
 
-    /// Pack successor instructions into free space of predecessor blocks.
-    ///
-    /// When X → Y and X is in block B, try to move Y to an earlier block
-    /// that has free space and high reference score to B.
     fn pack_successors(&mut self) {
         let refs = self.block_refs();
 
@@ -408,7 +373,6 @@ impl<'a> LayoutBuilder<'a> {
             });
             let size = instr.size() as u8;
 
-            // Prefer blocks that reference the predecessor block (cache locality)
             let scores: Vec<_> = (0..current_block)
                 .map(|c| block_score(pred_block, c, &refs))
                 .collect();
@@ -444,7 +408,6 @@ fn extract_chains(
     let mut visited = HashSet::new();
     let mut chains = Vec::new();
 
-    // Start with entrypoints (hot paths)
     for &entry in entries {
         if visited.contains(&entry) {
             continue;
@@ -463,9 +426,6 @@ fn extract_chains(
     chains
 }
 
-/// Build a single chain starting from a label.
-///
-/// Extends the chain while there's a single unvisited successor with a single predecessor.
 fn build_chain(start: Label, graph: &Graph, visited: &mut HashSet<Label>) -> Vec<Label> {
     let mut chain = vec![start];
     visited.insert(start);
@@ -483,7 +443,6 @@ fn build_chain(start: Label, graph: &Graph, visited: &mut HashSet<Label>) -> Vec
     chain
 }
 
-/// Order chains: entries first, then by size (larger = hotter assumption).
 fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label>> {
     let entry_set: HashSet<Label> = entries.iter().copied().collect();
 
