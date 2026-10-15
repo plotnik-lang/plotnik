@@ -70,6 +70,7 @@ mod debug_impl {
         MatchNamed(Option<String>),
         MatchAnon(Option<String>),
         MatchAny,
+        Missing,
         Field(String),
         NegField(String),
         Predicate(u8, String),
@@ -141,6 +142,10 @@ mod debug_impl {
                     ops.push(SemanticOp::MatchAnon(name));
                 }
             }
+        }
+
+        if m.missing {
+            ops.push(SemanticOp::Missing);
         }
 
         if let Some(f) = m.node_field {

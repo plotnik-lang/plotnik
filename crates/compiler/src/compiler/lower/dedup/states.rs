@@ -5,7 +5,7 @@ use crate::bytecode::{Nav, NodeKindConstraint};
 use crate::core::NodeFieldId;
 
 use crate::compiler::lower::ir::{
-    CallEntry, EffectIR, InstructionIR, Label, NfaGraph, PredicateIR,
+    CallEntry, EffectIR, InstructionIR, Label, MatchIR, NfaGraph, PredicateIR,
 };
 
 pub fn dedup_states(nfa: &mut NfaGraph) {
@@ -44,6 +44,7 @@ enum StateKey {
         nav: Nav,
         node_kind: NodeKindConstraint,
         node_field: Option<NodeFieldId>,
+        missing: bool,
         effects: Vec<EffectIR>,
         neg_fields: Vec<NodeFieldId>,
         predicate: Option<PredicateIR>,
@@ -59,18 +60,28 @@ enum StateKey {
 impl StateKey {
     fn of(instr: &InstructionIR, norm: SuccNorm) -> Option<Self> {
         match instr {
-            InstructionIR::Match(m) => Some(Self::Match {
-                nav: m.nav,
-                node_kind: m.node_kind,
-                node_field: m.node_field,
-                effects: m.effects.clone(),
-                neg_fields: m.neg_fields.clone(),
-                predicate: m.predicate.clone(),
-                successors: m
-                    .successors
+            InstructionIR::Match(MatchIR {
+                label,
+                nav,
+                node_kind,
+                node_field,
+                missing,
+                effects,
+                neg_fields,
+                predicate,
+                successors,
+            }) => Some(Self::Match {
+                nav: *nav,
+                node_kind: *node_kind,
+                node_field: *node_field,
+                missing: *missing,
+                effects: effects.clone(),
+                neg_fields: neg_fields.clone(),
+                predicate: predicate.clone(),
+                successors: successors
                     .iter()
                     .map(|&s| match norm {
-                        SuccNorm::SelfLoop if s == m.label => SuccKey::SelfLoop,
+                        SuccNorm::SelfLoop if s == *label => SuccKey::SelfLoop,
                         _ => SuccKey::Other(s),
                     })
                     .collect(),

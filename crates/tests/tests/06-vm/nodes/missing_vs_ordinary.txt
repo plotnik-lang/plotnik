@@ -1,0 +1,95 @@
+Q = (program
+  (if_statement
+    consequence: (statement_block
+      [
+        (MISSING "}")
+        "}"
+      ] @m
+    )
+  )
+)
+--------------------- INPUT ----------------------
+if (x) { y }
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  m: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "m": {
+    "kind": "}",
+    "span": [11, 12],
+    "text": "}"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "m"
+S2 "Q"
+S3 "program"
+S4 "if_statement"
+S5 "statement_block"
+S6 "}"
+S7 "consequence"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { m }
+
+[type_members]
+M0: S1 → T0  ; m: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (if_statement)                   02
+  02  └‣─  consequence: (statement_block)   03
+  03  └─!  _                                06, 08, 10
+  05                                        ▶
+  06   !   (MISSING "}") [Node RecordSet(M0)]  12
+  08   !   "}" [Node RecordSet(M0)]         12
+  10  ──!  _                                06, 08, 10
+  12  ─‣┘³ _                                05
+--------------------- TRACE ----------------------
+Q:
+  00       (program)                        01
+       ●   program
+  01       (if_statement)                   02
+       ●   if_statement
+  02       consequence: (statement_block)   03
+       ○   if
+       ○   parenthesized_expression
+       ●   statement_block
+  03       _                                06, 08, 10
+       ●   {
+  06       (MISSING "}") [Node RecordSet(M0)]  12
+       ○   {
+  03  ❮❮❮ 
+  08       "}" [Node RecordSet(M0)]         12
+       ○   {
+  03  ❮❮❮ 
+  10       _                                06, 08, 10
+       ●   expression_statement
+  06       (MISSING "}") [Node RecordSet(M0)]  12
+       ○   expression_statement
+  10  ❮❮❮ 
+  08       "}" [Node RecordSet(M0)]         12
+       ○   expression_statement
+  10  ❮❮❮ 
+  10       _                                06, 08, 10
+       ●   }
+  06       (MISSING "}") [Node RecordSet(M0)]  12
+       ○   }
+  10  ❮❮❮ 
+  08       "}" [Node RecordSet(M0)]         12
+       ●   }
+  12       _                                05
+       ●   program
+  05   ◀   (Q)                              ◼
