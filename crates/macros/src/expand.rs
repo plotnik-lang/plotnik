@@ -1,20 +1,3 @@
-//! `query!` expansion: resolve the grammar, run the compiler pipeline, and
-//! splice the generated module into the caller.
-//!
-//! The expansion is wrapped in a fingerprint-named module and glob
-//! re-exported, so several `query!` invocations can share one enclosing
-//! module without their internals (the `rt` alias, `mod matcher`) colliding:
-//!
-//! ```text
-//! mod __plotnik_1a2b3c4d {
-//!     const _: &str = ::core::include_str!("queries/q.ptk"); // rebuild anchors
-//!     const _: &[u8] = ::core::include_bytes!("/…/grammar.json");
-//!     /* the generated query module */
-//! }
-//! #[allow(unused_imports)]
-//! pub use self::__plotnik_1a2b3c4d::*;
-//! ```
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -67,14 +50,10 @@ impl RebuildAnchors {
 }
 
 pub fn expand(input: TokenStream) -> TokenStream {
-    // The wrapper-module name comes from the raw input: same invocation, same
-    // name (deterministic output); different queries in one module never
-    // collide. Two identical invocations in one module collide here — and on
-    // every generated type — which is the right error.
     let fingerprint = crc32fast::hash(input.to_string().as_bytes());
 
-    // Rebuild anchors for everything read from disk, emitted on success *and*
-    // failure: a broken query file must retrigger expansion when edited.
+    // Rust tracks these generated includes as dependencies, including on failure,
+    // so editing a query file with compilation errors retriggers expansion.
     let mut anchors = RebuildAnchors::new();
 
     match try_expand(input, &mut anchors) {
@@ -97,8 +76,6 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
         .map_err(|message| ExpandError::new(args.grammar.span, message))?;
     anchors.grammar(&spec, &args.grammar.value, &loaded_grammar.path);
 
-    // Generated entries can run at supplied nonroot nodes, so the CLI's strict
-    // root-only lint does not apply. Proc macros have no warning channel.
     let query_span = query.span;
     let compiled = compile_query(query, &loaded_grammar.grammar)?;
     reject_colliding_entry_names(&compiled, query_span)?;
@@ -135,8 +112,6 @@ fn compile_query(
     let diagnostics = compiled.diagnostics();
     if diagnostics.has_errors() || diagnostics.has_warnings() {
         let rendered = diagnostics.render_colored(compiled.source_map(), false);
-        // The message lands under rustc's own `error:` heading; the first
-        // rendered severity tag would double it, so it hands that role over.
         let message = rendered.strip_prefix("error: ").unwrap_or(&rendered);
         return Err(ExpandError::new(span, message));
     }
@@ -144,11 +119,6 @@ fn compile_query(
     Ok(compiled)
 }
 
-/// Every definition becomes snake_case items (`{def}_trace`, the
-/// execution surface). Distinct PascalCase names can collapse to one
-/// snake form (`HTTPServer` / `HttpServer`); generated code would then fail
-/// with a bare rustc duplicate-definition error, so refuse the query with the
-/// real diagnosis instead.
 fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<(), ExpandError> {
     let mut entry_names: HashMap<String, String> = HashMap::new();
     for def in compiled.entrypoint_names() {
@@ -167,8 +137,6 @@ fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<
     Ok(())
 }
 
-/// The query text and diagnostic span, with file sources anchored so edits
-/// retrigger expansion even when the query is currently invalid.
 fn load_query_input(
     source: &QuerySource,
     base_dir: Option<&Path>,
@@ -214,8 +182,6 @@ fn anchor_path(
     }
 }
 
-/// The directory of the file containing the invocation — the base every
-/// relative path resolves against, exactly like `include_str!`.
 fn invoking_dir() -> Option<PathBuf> {
     let file = Span::call_site().local_file()?;
     Some(file.parent()?.to_path_buf())
@@ -261,8 +227,6 @@ fn parse_generated(text: &str) -> TokenStream {
         .expect("generated module lexes as a token stream")
 }
 
-/// `compile_error! { "…" }` with every token spanned onto the offending
-/// argument, so the caller sees the right thing underlined.
 fn compile_error(error: &ExpandError) -> TokenStream {
     let mut literal = Literal::string(&error.message);
     literal.set_span(error.span);

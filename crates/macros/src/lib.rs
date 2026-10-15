@@ -2,10 +2,8 @@
 //! build time and expands to the generated query module (typed result types,
 //! supplied-node execution methods, and the compiled matcher).
 //!
-//! All compilation logic lives in `plotnik-compiler` (built compiler-only, no C);
-//! this crate only parses macro arguments, locates the grammar, and splices
-//! the generated module into the caller. Use it through the `plotnik` facade
-//! crate — generated code spells its runtime paths as `::plotnik::rt::...`.
+//! Use it through the `plotnik` facade crate. Generated code uses
+//! `::plotnik::rt::...` runtime paths.
 
 use proc_macro::TokenStream;
 

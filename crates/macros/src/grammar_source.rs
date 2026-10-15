@@ -1,16 +1,3 @@
-//! Where a query's grammar comes from — the pluggable half of `query!`.
-//!
-//! There is deliberately no built-in language registry and no per-language
-//! feature flags here: the caller's own dependency graph is the registry.
-//! Any package that ships a `grammar.json` works, including `tree-sitter-*`
-//! crates and local grammar crates, and the grammar version
-//! is exactly the package version the caller's lockfile resolved, i.e. the
-//! same package whose parser they link at runtime. A filesystem path is the
-//! escape hatch for grammars that live outside the graph.
-//!
-//! New source kinds (an env override, a workspace-level grammar map, ...)
-//! are one more [`GrammarSpec`] variant plus a [`resolve`] arm.
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -21,19 +8,13 @@ use plotnik_compiler::grammar::raw::RawGrammar;
 
 #[derive(Debug, PartialEq)]
 pub enum GrammarSpec<'a> {
-    /// A `grammar.json` path, resolved like `include_str!` (relative to the
-    /// invoking file).
     Path(&'a str),
-    /// A package in the caller's dependency graph, optionally narrowed to
-    /// one of several grammars it ships (`"tree-sitter-typescript/tsx"`).
     Package {
         name: &'a str,
         subgrammar: Option<&'a str>,
     },
 }
 
-/// Classify the `grammar = "..."` argument. Only a `.json` suffix means a
-/// filesystem path — `/` alone is the package/subgrammar separator.
 pub fn parse_spec(raw: &str) -> GrammarSpec<'_> {
     if raw.ends_with(".json") {
         return GrammarSpec::Path(raw);
@@ -53,9 +34,6 @@ pub fn parse_spec(raw: &str) -> GrammarSpec<'_> {
 #[derive(Debug)]
 pub struct ResolvedGrammar {
     pub json: String,
-    /// Absolute path of the `grammar.json` actually read; the expansion
-    /// anchors an `include_bytes!` on it so in-place edits (path
-    /// dependencies, local grammars) retrigger the macro.
     pub path: PathBuf,
 }
 
@@ -99,12 +77,6 @@ pub fn resolve(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<Resolv
     }
 }
 
-/// Resolve and parse the grammar, cached by resolved path for the life of
-/// the rustc process. Expansion is not incremental — every check of the
-/// using crate re-runs every `query!` in it — and a grammar.json can be
-/// megabytes (tree-sitter-typescript), so re-parsing it once per invocation
-/// is real build time. Files are stable within one compiler process; edits
-/// between processes are what the `include_bytes!` rebuild anchors track.
 pub fn load(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<LoadedGrammar, String> {
     static CACHE: OnceLock<Mutex<HashMap<PathBuf, Arc<Grammar>>>> = OnceLock::new();
 
@@ -142,8 +114,6 @@ pub fn load(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<LoadedGra
     })
 }
 
-/// Resolve a user-written path the way `include_str!` would: absolute paths
-/// as-is, relative ones against the invoking file's directory.
 pub fn resolve_relative(raw: &str, base_dir: Option<&Path>) -> Result<PathBuf, String> {
     let path = Path::new(raw);
     if path.is_absolute() {
@@ -168,9 +138,6 @@ fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGramm
     let package = select_dependency_package(metadata, name)?;
     let candidates = package_grammar_jsons(package, name)?;
 
-    // One grammar and no selector: done. Everything else goes through the
-    // `name` field inside each grammar.json, the only spelling that is
-    // stable across crate layouts.
     if candidates.len() == 1 && subgrammar.is_none() {
         let path = candidates.into_iter().next().expect("checked non-empty");
         return ResolvedGrammar::read(path);
@@ -265,12 +232,6 @@ fn resolve_named_grammar(
     }
 }
 
-/// Package ids reachable from the invoking crate in the resolved dependency
-/// graph — the set `grammar = "package"` may name; the whole workspace graph
-/// would also admit packages only some *other* workspace member depends on.
-/// `None` when the walk isn't possible (no resolve section, invoking package
-/// not identifiable): the caller then falls back to the whole graph, and the
-/// generated module's language-skew check still backstops a wrong pick.
 fn dependency_closure(
     metadata: &cargo_metadata::Metadata,
 ) -> Option<std::collections::HashSet<&cargo_metadata::PackageId>> {
@@ -299,9 +260,6 @@ fn dependency_closure(
     Some(reachable)
 }
 
-/// The caller's resolved dependency graph, computed once per rustc process.
-/// `cargo metadata` re-reads the workspace's own lockfile, so during a build
-/// it neither resolves anew nor touches the network.
 fn metadata() -> Result<&'static cargo_metadata::Metadata, String> {
     static METADATA: OnceLock<Result<cargo_metadata::Metadata, String>> = OnceLock::new();
     METADATA
@@ -320,9 +278,6 @@ fn metadata() -> Result<&'static cargo_metadata::Metadata, String> {
         .map_err(Clone::clone)
 }
 
-/// Every `grammar.json` inside a package checkout. Grammar files sit shallow
-/// (`src/`, `grammar/src/`, `<subgrammar>/src/`), so the walk is depth-capped
-/// and skips directories that can only contain noise.
 fn find_grammar_jsons(root: &Path) -> Vec<PathBuf> {
     fn walk(dir: &Path, depth: usize, found: &mut Vec<PathBuf>) {
         if depth > 4 {
@@ -361,7 +316,6 @@ fn is_ignored_package_dir(name: &str) -> bool {
     name.starts_with('.') || name == "node_modules" || name == "target"
 }
 
-/// The `name` field of a grammar.json — how subgrammars are told apart.
 fn grammar_name(json: &str) -> Option<String> {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
         return None;

@@ -1,14 +1,5 @@
-//! Token-level argument parsing for `query!`.
-//!
-//! No syntax crate: the argument grammar is a flat `key = value` list plus
-//! one bare string literal (the query), which a hand-rolled walk over
-//! [`TokenTree`]s covers. Everything that can go wrong reports through
-//! [`ExpandError`] with a span, so the caller sees the offending argument
-//! underlined.
-
 use proc_macro::{Span, TokenStream, TokenTree};
 
-/// A macro-expansion failure: rendered as `compile_error!` at `span`.
 pub struct ExpandError {
     pub span: Span,
     pub message: String,
@@ -23,8 +14,6 @@ impl ExpandError {
     }
 }
 
-/// A parsed string literal argument and the token span diagnostics should
-/// underline when that argument is responsible for an error.
 pub struct StringArg {
     pub value: String,
     pub span: Span,
@@ -44,8 +33,6 @@ impl QuerySource {
     }
 }
 
-/// A limit argument as written; mirrors `plotnik_runtime::Limit` without naming it
-/// (this module stays token-only).
 pub enum LimitArg {
     Auto,
     Unbounded,
@@ -96,9 +83,6 @@ impl LimitKey {
         }
     }
 
-    /// Whether `unbounded` is a legal value. A recursive native value has no
-    /// safe unbounded decode depth (`drop` alone overflows), so `depth` refuses
-    /// it — reflected in the value-error wording.
     fn allows_unbounded(self) -> bool {
         !matches!(self, Self::Depth)
     }
@@ -249,7 +233,6 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
 
     while let Some(token) = cursor.current().cloned() {
         match &token {
-            // The one positional argument: the query string.
             TokenTree::Literal(_) => {
                 let literal = string_value(&token)?;
                 args.put_query(QuerySource::Inline { literal })?;
@@ -291,7 +274,6 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
             }
         }
 
-        // Between arguments: a comma, or the end. A trailing comma is fine.
         cursor.consume_separator()?;
     }
     args.finish(call_span)
@@ -333,8 +315,6 @@ fn take_integer_limit(token: &TokenTree, key: LimitKey) -> Result<LimitArg, Expa
     Ok(LimitArg::Of(value))
 }
 
-/// The value forms a limit accepts, as an error-message fragment. `depth` omits
-/// `unbounded` because it refuses that value (see [`LimitKey::allows_unbounded`]).
 fn accepted_limit_values(key: LimitKey) -> &'static str {
     if key.allows_unbounded() {
         "an unsigned integer, `auto`, or `unbounded`"
