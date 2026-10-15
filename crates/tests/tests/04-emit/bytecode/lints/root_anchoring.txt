@@ -14,7 +14,7 @@ warning: entrypoint `Bad` cannot match the `program` syntax-tree root
 7 | Bad = (identifier) @bad
   |       ^^^^^^^^^^^^^^^^^
   |
-help: make `Bad` start with a `program` node pattern because matching begins at the syntax-tree root
+help: start with a `program` node pattern
 ---------------------- NFA -----------------------
 [entrypoints]
 Bad  = 15

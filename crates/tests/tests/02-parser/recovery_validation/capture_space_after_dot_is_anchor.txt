@@ -1,25 +1,25 @@
 (identifier) @foo . (other)
 ------------------ DIAGNOSTICS -------------------
-error: definition must be named
+error: expected a definition
  --> query.ptk:1:1
   |
 1 | (identifier) @foo . (other)
   | ^^^^^^^^^^^^^^^^^
   |
-help: add a PascalCase definition name and `=` before `(identifier) @foo`
+help: add a name and `=` before this pattern
 
-error: definition must be named
+error: expected a definition
  --> query.ptk:1:19
   |
 1 | (identifier) @foo . (other)
   |                   ^
   |
-help: add a PascalCase definition name and `=` before `.`
+help: add a name and `=` before this pattern
 
-error: definition must be named
+error: expected a definition
  --> query.ptk:1:21
   |
 1 | (identifier) @foo . (other)
   |                     ^^^^^^^
   |
-help: add a PascalCase definition name and `=` before `(other)`
+help: add a name and `=` before this pattern

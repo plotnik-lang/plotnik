@@ -429,7 +429,7 @@ impl DiagnosticKind {
             Self::UnsatisfiablePattern => "pattern can never match",
             Self::QueryTooComplex => "query too complex to compile",
             Self::InvalidGrammarDeclaration => "invalid grammar declaration",
-            Self::MissingDefName => "definition must be named",
+            Self::MissingDefName => "expected a definition",
             Self::TargetLimitExceeded => "emission target limit exceeded",
             Self::NoEntrypoints => "query defines no selectable entrypoint",
             Self::EmptyQuery => "query defines nothing",

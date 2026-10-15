@@ -152,9 +152,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             .detail(format!(
                 "entrypoint `{name}` cannot match the `{grammar_root_name}` syntax-tree root"
             ))
-            .hint(format!(
-                "make `{name}` start with a `{grammar_root_name}` node pattern because matching begins at the syntax-tree root"
-            ))
+            .hint(format!("start with a `{grammar_root_name}` node pattern"))
             .emit();
     }
 }

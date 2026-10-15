@@ -1,9 +1,9 @@
 (program (identifier) @id)
 ------------------ DIAGNOSTICS -------------------
-error: definition must be named
+error: expected a definition
  --> query.ptk:1:1
   |
 1 | (program (identifier) @id)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-help: add a PascalCase definition name and `=` before `(program (identifier) @id)`
+help: add a name and `=` before this pattern
