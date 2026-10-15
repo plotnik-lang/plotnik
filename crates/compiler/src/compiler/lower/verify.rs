@@ -1,32 +1,3 @@
-//! Debug-only structural verification of compiled IR.
-//!
-//! Two complementary, zero-cost-in-release checks guard the IR pipeline:
-//!
-//! 1. An **order-sensitive semantic fingerprint** of the graph reachable from an
-//!    entry: the ordered list (DFS pre-order) of per-path hashes. For a
-//!    backtracking VM transition *order* is semantics, so the fingerprint is
-//!    sensitive to successor priority and to dropped/duplicated successors. Every
-//!    optimization pass must preserve it — see [`run_verified`].
-//! 2. **Structural invariants** on the instruction list: no duplicate labels and
-//!    no dangling references (successors and `Call` targets/returns all resolve).
-//!
-//! The fingerprint normalizes away the two representation changes our passes make
-//! legitimately:
-//! - it sees through effect-free epsilons (pure control flow), so epsilon
-//!   elimination is a no-op;
-//! - it coalesces runs of same-mode `Up` navigation, summing their levels and
-//!   ignoring interspersed effects (effects commute with pure navigation), so
-//!   `collapse_up` — and epsilon elimination parking effects onto Up nodes — is a
-//!   no-op.
-//!
-//! Anything else a pass does to navigation, matching, effects, or successor order
-//! changes the fingerprint and trips the check.
-//!
-//! Cost is bounded: traversal stops after [`MAX_PATHS`] completed paths (a
-//! semantic count, stable across passes) and cuts any single path past
-//! [`MAX_DEPTH`] nodes (a backstop against pathological epsilon cycles, far above
-//! any real path), so debug builds stay usable on large queries.
-
 #[cfg(debug_assertions)]
 pub use debug_impl::{
     run_root_pruning_verified, run_verified, verify_constructed, verify_fresh_build,
@@ -42,7 +13,6 @@ mod release_impl {
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{InstructionIR, NfaGraph};
 
-    /// Run a pass. Verification is compiled out in release builds.
     #[inline(always)]
     pub fn run_verified(
         _name: &str,
@@ -53,8 +23,6 @@ mod release_impl {
         pass(nfa);
     }
 
-    /// Run a pass that may intentionally prune internal definition roots.
-    /// Verification is compiled out in release builds.
     #[inline(always)]
     pub fn run_root_pruning_verified(
         _name: &str,
@@ -65,11 +33,9 @@ mod release_impl {
         pass(nfa);
     }
 
-    /// No-op in release builds.
     #[inline(always)]
     pub fn verify_constructed(_nfa: &NfaGraph, _ctx: &LowerInput) {}
 
-    /// No-op in release builds.
     #[inline(always)]
     pub fn verify_fresh_build(_instructions: &[InstructionIR]) {}
 }
@@ -91,27 +57,15 @@ mod debug_impl {
         NodeKindConstraint, PortId, PredicateValueIR,
     };
 
-    /// Max completed paths recorded per fingerprint. This counts root-to-leaf
-    /// walks, a *semantic* quantity (laser-vision makes it invariant to epsilon
-    /// insertion), so truncating here stays consistent across passes.
     const MAX_PATHS: usize = 50_000;
 
-    /// Max nodes along a single path before it is cut. A backstop against a
-    /// pathological pure-epsilon cycle (which adds nodes without hitting cycle
-    /// detection); far above any real path length.
     const MAX_DEPTH: u32 = 200_000;
 
-    /// Number of paths materialized for the human-readable mismatch diagnostic.
     const DIAG_PATHS: usize = 400;
 
-    /// One observable semantic effect along a path.
-    ///
-    /// Up navigation is recorded as [`SemanticOp::UpNav`] (mode tag, level) so that
-    /// [`coalesce_ups`] can sum adjacent runs; all other navs are recorded verbatim.
     #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     enum SemanticOp {
         Nav(Nav),
-        /// Up navigation: (mode tag, level). See [`Nav::up_mode_tag`].
         UpNav(u8, u32),
         MatchNamed(Option<String>),
         MatchAnon(Option<String>),
@@ -122,17 +76,13 @@ mod debug_impl {
         Effect(EffectKind, Option<String>),
         Call(String),
         Return(PortId),
-        /// Cycle back-reference detected during traversal.
         CycleRef,
-        /// Label referenced but not present in the instruction list.
         DanglingLabel,
-        /// Path cut at the depth limit.
         DepthCut,
     }
 
     type Path = Vec<SemanticOp>;
 
-    /// Order-sensitive fingerprint: per-path hashes in DFS pre-order.
     #[derive(Clone)]
     pub struct Fingerprint {
         hashes: Vec<u64>,
@@ -156,17 +106,12 @@ mod debug_impl {
         fingerprints: Vec<(WalkRoot, Label, Fingerprint)>,
     }
 
-    /// What one node contributes to the walk.
     struct NodeContribution {
-        /// Effect-free epsilon: contributes no ops and is not marked visited
-        /// (laser vision through pure control flow).
         see_through: bool,
         ops: Vec<SemanticOp>,
-        /// Continuation labels in priority order; empty means the path ends here.
         succs: Vec<Label>,
     }
 
-    /// Collect the ordered ops a single match contributes.
     fn collect_match_ops(m: &MatchIR, ctx: &LowerInput) -> Vec<SemanticOp> {
         let mut ops = Vec::new();
 
@@ -283,23 +228,12 @@ mod debug_impl {
         coalesce_ups(normalize_commuting_effects(ops))
     }
 
-    /// Coalesce runs of same-mode Up navigation into a single summed `UpNav`.
-    ///
-    /// `Up(a)` then `Up(b)` of the same mode is `Up(a+b)`, and capture effects
-    /// commute with pure navigation — so a later `UpNav,MatchAny` pair is folded
-    /// into an earlier same-mode one even across interspersed `Effect`s, but not
-    /// across a real navigation/match/call (which closes the run). This makes both
-    /// `collapse_up` and epsilon-elimination's effect migration invisible to the
-    /// fingerprint, while still catching a level that changes by any other means.
     fn coalesce_ups(ops: Vec<SemanticOp>) -> Vec<SemanticOp> {
         let mut out: Vec<SemanticOp> = Vec::with_capacity(ops.len());
-        // (mode, index in `out`) of the most recent Up run still open for merging.
         let mut pending: Option<(u8, usize)> = None;
         let mut iter = ops.into_iter().peekable();
 
         while let Some(op) = iter.next() {
-            // An Up node is always `UpNav` immediately followed by `MatchAny`
-            // (pure navigation checks no node kind). Only such pairs coalesce.
             let up_pair = match op {
                 SemanticOp::UpNav(mode, level)
                     if matches!(iter.peek(), Some(SemanticOp::MatchAny)) =>
@@ -339,8 +273,6 @@ mod debug_impl {
         h.finish()
     }
 
-    /// Compute one node's contribution. Cycle detection is the walker's job (it
-    /// depends on traversal state), so this is a pure function of the graph.
     struct GraphWalk<'a> {
         instr_map: HashMap<Label, &'a InstructionIR>,
         label_to_def: HashMap<Label, DefId>,
@@ -363,8 +295,6 @@ mod debug_impl {
             }
         }
 
-        /// Compute one node's contribution. Cycle detection is the walker's job (it
-        /// depends on traversal state), so this is a pure function of the graph.
         fn node_contribution(&self, label: Label) -> NodeContribution {
             let Some(&instr) = self.instr_map.get(&label) else {
                 return NodeContribution {
@@ -390,8 +320,6 @@ mod debug_impl {
                     }
                 }
                 InstructionIR::Call(c) => {
-                    // Record the callee by stable DefId (label-rename invariant); follow
-                    // the return continuation rather than descending into the callee.
                     let def_id = self.label_to_def.get(&c.target).unwrap_or_else(|| {
                         panic!(
                             "semantic NFA verification found call target {:?}, but that label is \
@@ -414,15 +342,10 @@ mod debug_impl {
             }
         }
 
-        /// Iterative DFS over the graph reachable from `entry`, invoking `on_path` with
-        /// each completed path (coalesced) in pre-order. An explicit stack (no
-        /// recursion, so deep IRs can't overflow) carries per-successor op prefixes and
-        /// visited snapshots. Returns whether traversal was truncated by a budget.
         fn walk(&self, entry: Label, max_paths: usize, mut on_path: impl FnMut(Path)) -> bool {
             let mut count = 0usize;
             let mut truncated = false;
 
-            // (label, ops-so-far, visited set, node depth)
             let mut stack: Vec<(Label, Vec<SemanticOp>, HashSet<Label>, u32)> =
                 vec![(entry, Vec::new(), HashSet::new(), 0)];
 
@@ -448,7 +371,6 @@ mod debug_impl {
                 let contribution = self.node_contribution(label);
 
                 if contribution.see_through {
-                    // Reversed pushes so successors pop in priority order (pre-order).
                     for &succ in contribution.succs.iter().rev() {
                         stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                     }
@@ -504,10 +426,6 @@ mod debug_impl {
         }
     }
 
-    /// The role an effect plays in value-scope nesting: it opens a scope, closes
-    /// the scope a specific kind opened, or is scope-neutral. The match is
-    /// exhaustive on purpose — a new `EffectKind` cannot compile until it
-    /// declares its scope behaviour here.
     enum ScopeRole {
         Open(EffectKind),
         Close(EffectKind),
@@ -530,10 +448,6 @@ mod debug_impl {
         Some(role)
     }
 
-    /// A single path's scope effects must nest like brackets: every close matches
-    /// the innermost open, none underflows, and a *completed* path leaves nothing
-    /// open. Paths cut by a cycle/depth marker are partial, so their leftover opens
-    /// are expected and not flagged.
     fn check_path_scopes(path: &Path) -> Result<(), String> {
         let mut stack: Vec<EffectKind> = Vec::new();
         let mut spans: Vec<Option<String>> = Vec::new();
@@ -588,8 +502,6 @@ mod debug_impl {
         Ok(())
     }
 
-    /// Structural invariants independent of any entrypoint: every label is unique
-    /// and every reference resolves to a real instruction.
     fn check_labels(instructions: &[InstructionIR]) -> Result<(), String> {
         let mut index = std::collections::HashMap::with_capacity(instructions.len());
         for (i, instr) in instructions.iter().enumerate() {
@@ -611,7 +523,6 @@ mod debug_impl {
                     ));
                 }
             }
-            // `successors()` omits a Call's target — check it explicitly.
             if let InstructionIR::Call(c) = instr
                 && !index.contains_key(&c.target)
             {
@@ -625,10 +536,6 @@ mod debug_impl {
         Ok(())
     }
 
-    /// Every body must return or accept at the same cursor depth it entered with.
-    ///
-    /// Calls apply their own navigation at the call site, but the callee is a
-    /// separately checked body.
     fn check_depth_neutrality(nfa: &NfaGraph) -> Result<(), String> {
         let instr_map: HashMap<Label, &InstructionIR> =
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
@@ -646,10 +553,6 @@ mod debug_impl {
         Ok(())
     }
 
-    /// Every compiled `Node` effect must run after some real match has
-    /// consumed a candidate. This is only a compiler IR check: once the VM's
-    /// `Node` effect reads the cursor directly, malformed bytecode can still
-    /// produce wrong values, but it cannot reach undefined state.
     fn check_no_node_on_empty_paths(nfa: &NfaGraph) -> Result<(), String> {
         let instr_map: HashMap<Label, &InstructionIR> =
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
@@ -936,8 +839,6 @@ mod debug_impl {
         }
     }
 
-    /// Run `pass`, then assert it preserved every entry's fingerprint and left the
-    /// instruction list structurally sound.
     pub fn run_verified(
         name: &str,
         nfa: &mut NfaGraph,
@@ -949,9 +850,6 @@ mod debug_impl {
         verify_after_pass(name, &before, nfa, ctx);
     }
 
-    /// Run a pass that may intentionally remove internal definition roots.
-    /// Entrypoint behavior and every surviving definition body must remain
-    /// unchanged; fingerprints for roots the pass deleted are discarded.
     pub fn run_root_pruning_verified(
         name: &str,
         nfa: &mut NfaGraph,
@@ -967,10 +865,6 @@ mod debug_impl {
         verify_after_pass(name, &before, nfa, ctx);
     }
 
-    /// Check the freshly-constructed IR before any pass runs: structural soundness
-    /// plus balanced scope effects on every path. Passes preserve the fingerprint
-    /// (which carries the full effect sequence), so a construction that balances
-    /// here stays balanced through the pipeline.
     pub fn verify_constructed(nfa: &NfaGraph, ctx: &LowerInput) {
         if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
@@ -987,9 +881,6 @@ mod debug_impl {
         }
     }
 
-    /// Check invariants that are only true for brand-new Thompson IR. Later
-    /// passes may legitimately move effects across epsilon chains while
-    /// preserving the semantic fingerprint.
     pub fn verify_fresh_build(instructions: &[InstructionIR]) {
         if let Err(e) = check_span_start_at_placement(instructions) {
             panic!("[verify] fresh Thompson build misplaced cursor-reading span marker: {e}");

@@ -1,15 +1,3 @@
-//! Epsilon elimination pass.
-//!
-//! Eliminates epsilon transitions (pure control flow) from IR while preserving semantics.
-//! Uses a three-phase iterative approach:
-//!
-//! 1. **Forward migration**: Effectful epsilons push effects to exclusive successors
-//! 2. **Expand forks**: Effectless epsilon forks expanded into predecessors
-//! 3. **Laser vision**: Every instruction (epsilons included) looks through epsilon
-//!    chains, absorbing or bypassing
-//!
-//! Phases iterate until no changes occur.
-
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph};
@@ -33,10 +21,6 @@ fn build_predecessor_map(instructions: &[InstructionIR]) -> HashMap<Label, Vec<L
     preds
 }
 
-/// An immutable view over the instruction list paired with its label→index map.
-///
-/// Bundles the `(instructions, idx)` clump every lookup threads, so a label is
-/// always resolved against the index built for that exact list.
 struct InstrIndex<'a> {
     instructions: &'a [InstructionIR],
     idx: &'a HashMap<Label, usize>,
@@ -54,11 +38,6 @@ impl<'a> InstrIndex<'a> {
         }
     }
 
-    /// See through single-successor epsilon chains.
-    ///
-    /// Returns `(target, accumulated_effects)` or `None` if blocked by:
-    /// - Epsilon fork (multiple successors)
-    /// - Cycle
     fn see_through(&self, start: Label) -> Option<(Label, Vec<EffectIR>)> {
         let mut current = start;
         let mut effects = Vec::new();
@@ -70,7 +49,7 @@ impl<'a> InstrIndex<'a> {
             }
 
             let Some(m) = self.match_at(current) else {
-                return Some((current, effects)); // Non-Match target (Call/Return)
+                return Some((current, effects));
             };
 
             if !m.is_epsilon() {
@@ -78,7 +57,7 @@ impl<'a> InstrIndex<'a> {
             }
 
             if m.successors.len() != 1 {
-                return Some((current, effects)); // Epsilon fork: visible but can't see through
+                return Some((current, effects));
             }
 
             if m.effects
@@ -136,17 +115,10 @@ impl MatchEdit {
     }
 }
 
-/// Whether any effect reads the VM cursor. Such effects are
-/// position-sensitive: their meaning depends on the current cursor node, so
-/// they cannot be reordered across a navigation.
 fn reads_cursor(effects: &[EffectIR]) -> bool {
     effects.iter().any(|effect| effect.kind().reads_cursor())
 }
 
-/// Phase A: Forward migration.
-///
-/// Effectful epsilons with exclusive edge to a non-epsilon successor
-/// push their effects forward, becoming effectless.
 fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
     let mut changed = false;
     let preds = build_predecessor_map(instructions);
@@ -183,14 +155,10 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             continue;
         }
 
-        // Effects that read the cursor (Node) must not migrate forward across
-        // the non-epsilon successor's navigation: they would capture the
-        // successor's node instead of the inbound one.
         if reads_cursor(&eps.effects) {
             continue;
         }
 
-        // This epsilon must be successor's ONLY predecessor (exclusive edge)
         let is_exclusive = preds
             .get(&succ_label)
             .is_some_and(|p| p.len() == 1 && p[0] == eps.label);
@@ -198,7 +166,6 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             continue;
         }
 
-        // Migrate: epsilon effects run before the successor's own effects.
         let eps_label = eps.label;
         let eps_effects = eps.effects.clone();
 
@@ -222,24 +189,10 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
     changed
 }
 
-/// Phase B: Laser vision rewrites.
-///
-/// Each instruction looks through epsilon chains to find reachable targets:
-/// - Single-successor instructions can absorb effects
-/// - Multi-successor instructions follow effectless chains only
-///
-/// Epsilons participate as sources too: a single-successor epsilon absorbs the
-/// whole downstream chain into itself (coalescing the effect chains that scope
-/// brackets around a `Call` produce, since `CallIR` can't carry effects), and a
-/// epsilon fork bypasses pure jumps per successor. Effects bubble *up*
-/// toward fork points this way, while forward migration pushes them *down*
-/// into non-epsilon instructions; both strictly shorten chains, so the
-/// fixpoint terminates.
 fn laser_vision(result: &mut NfaGraph) -> bool {
     let mut changed = false;
     let idx = build_label_to_index(&result.instructions);
 
-    // Track old→new entry remaps to fix up Call targets referencing them.
     let mut entry_remaps: HashMap<Label, Label> = HashMap::new();
     for entry in result.def_entries.values_mut() {
         if let Some((target, effects)) =
@@ -278,7 +231,6 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
         };
 
         let single = m.successors.len() == 1;
-        // Cloned lazily on the first rewrite; the common no-op case allocates nothing.
         let mut edited: Option<MatchEdit> = None;
 
         for (j, &succ) in m.successors.iter().enumerate() {
@@ -292,16 +244,10 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
                 continue;
             }
 
-            // Effects require single successor (can't execute for all paths)
             if !effects.is_empty() && !single {
                 continue;
             }
 
-            // No `reads_cursor` guard is needed here (unlike forward_migrate):
-            // the seen-through chain is all epsilons, which preserve the cursor,
-            // so appending still reads the node these effects saw at their
-            // original position. forward_migrate is unsafe only because it
-            // pushes effects past a navigation.
             edited
                 .get_or_insert_with(|| MatchEdit::from_match(m))
                 .rewrite_successor(j, target, effects);
@@ -352,15 +298,6 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
     changed
 }
 
-/// Phase C: Expand epsilon forks.
-///
-/// Effectless epsilon forks are expanded by replacing the epsilon
-/// reference in each predecessor with the epsilon's successors.
-///
-/// Before:  a → [ε, x], ε → [d, e, f]
-/// After:   a → [d, e, f, x]
-///
-/// The epsilon becomes unreachable and is eliminated during layout.
 fn expand_epsilon_forks(result: &mut NfaGraph) -> bool {
     let idx = build_label_to_index(&result.instructions);
     let preds = build_predecessor_map(&result.instructions);
@@ -379,7 +316,7 @@ fn expand_epsilon_forks(result: &mut NfaGraph) -> bool {
             continue;
         }
         if m.successors.len() <= 1 {
-            continue; // Single-succ handled by laser_vision
+            continue;
         }
 
         let eps_label = m.label;
@@ -395,7 +332,6 @@ fn expand_epsilon_forks(result: &mut NfaGraph) -> bool {
                         .splice(pos..pos + 1, eps_succs.iter().cloned());
                     changed = true;
                 }
-                // Call has a single `next` - can't expand a fork into it
             }
         }
     }
@@ -403,10 +339,6 @@ fn expand_epsilon_forks(result: &mut NfaGraph) -> bool {
     changed
 }
 
-/// Eliminate epsilon transitions from compiled IR.
-///
-/// Runs the migrate/expand/laser-vision phases to a fixed point. Semantic
-/// preservation is asserted by the caller via `verify::run_verified` (debug only).
 pub fn eliminate_epsilons(result: &mut NfaGraph) {
     loop {
         let a = forward_migrate(&mut result.instructions);

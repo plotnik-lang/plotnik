@@ -1,44 +1,3 @@
-//! State deduplication: hash-cons structurally identical instructions.
-//!
-//! Thompson construction freely duplicates small states — a search-nav
-//! quantifier's first and repeat iterations each emit a position search whose
-//! `navigate` and `retry` states are byte-identical wildcard `Next` transitions into
-//! the same `try` state (#475). Two instructions that perform the same
-//! operation and continue to the same successors are bisimilar: no execution
-//! can tell which one it is in, so every reference to the duplicate is
-//! redirected to the first occurrence and the duplicate is dropped.
-//!
-//! Merging runs to a fixed point because collapsing one pair can make its
-//! predecessors identical in turn. Each round tries two successor keyings:
-//!
-//! - **Self-normalized**: a state's edge to itself is a sentinel, so twin
-//!   retry loops (`A → [.., A]` vs `B → [.., B]`) merge. This is the only
-//!   graph-shape normalization; mutually-recursive twins (`A → B`, `B → A`)
-//!   are left alone — hash-consing under-approximates bisimilarity, which is
-//!   enough for construction-made duplicates.
-//! - **Raw**: catches the copy that jumps *into* a twin's loop
-//!   (`B → [.., A]` merging into the self-looping `A → [.., A]`), which
-//!   self-normalization renders differently.
-//!
-//! Duplicate entries within one successor list also collapse (keep first):
-//! successor attempts restart from the same origin state, so a repeated label
-//! is a provably identical retry. Merges create these (`→ [a, b]` where `b`
-//! merged into `a`), and removing them re-enables further merges.
-//!
-//! `Return` is deliberately never merged: every `Return` is behaviorally
-//! identical, so keying them would fold all defs' accept states into one
-//! instruction across definition boundaries — an 8-byte saving per def that
-//! would cost each def its own accept state in dumps and layout locality.
-//!
-//! This pass cannot run under `verify::run_verified`: the debug fingerprint
-//! walks every path and cuts cycles by per-path visited *labels*, so merging
-//! twin states on a loop shifts the cut one hop earlier (the path revisits the
-//! representative where it previously reached the distinct twin first). The
-//! recorded paths differ even though each is an op-for-op prefix of the same
-//! infinite unrolling — a bisimulation quotient preserves path semantics but
-//! not label-cut path *sets*. Structural soundness and scope balance are
-//! re-checked by `verify_constructed` after the pass instead.
-
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
@@ -67,22 +26,18 @@ pub fn dedup_states(nfa: &mut NfaGraph) {
     }
 }
 
-/// How successor labels enter the dedup key. See the module docs for why both
-/// are needed.
 #[derive(Clone, Copy)]
 enum SuccNorm {
     SelfLoop,
     Raw,
 }
 
-/// A successor slot in a dedup key.
 #[derive(PartialEq, Eq, Hash)]
 enum SuccKey {
     SelfLoop,
     Other(Label),
 }
 
-/// Everything observable about an instruction except its own label.
 #[derive(PartialEq, Eq, Hash)]
 enum StateKey {
     Match {
@@ -137,10 +92,6 @@ impl StateKey {
     }
 }
 
-/// One merge round: group instructions by structural key. Within a group the
-/// first occurrence (instruction order, which layout follows) survives; the
-/// rest map to it. Representatives are never themselves remapped in a round,
-/// so the map is single-level.
 fn plan_merges(instructions: &[InstructionIR], norm: SuccNorm) -> HashMap<Label, Label> {
     let mut representatives: HashMap<StateKey, Label> = HashMap::new();
     let mut remap: HashMap<Label, Label> = HashMap::new();
@@ -162,8 +113,6 @@ fn plan_merges(instructions: &[InstructionIR], norm: SuccNorm) -> HashMap<Label,
     remap
 }
 
-/// Rewrite every reference in the graph through `remap`: successor lists, call
-/// continuations and targets, and entrypoints themselves.
 fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     if let Some((&label, &representative)) = remap
         .iter()
@@ -200,8 +149,6 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     }
 }
 
-/// Drop repeated labels within each successor list, keeping the first
-/// (highest-priority) occurrence.
 fn dedup_successors(instructions: &mut [InstructionIR]) {
     for instr in instructions {
         let InstructionIR::Match(m) = instr else {

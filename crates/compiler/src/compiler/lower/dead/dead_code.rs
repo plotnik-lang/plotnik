@@ -1,9 +1,3 @@
-//! Dead code elimination pass.
-//!
-//! Removes unreachable instructions and definition specializations after epsilon
-//! elimination. Reachability starts at exported definition entries; a call
-//! reaches both its return continuations and its callee body.
-
 use std::collections::HashSet;
 
 use crate::compiler::lower::ir::{InstructionIR, Label, NfaGraph};

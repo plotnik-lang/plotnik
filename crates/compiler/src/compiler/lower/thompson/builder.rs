@@ -1,5 +1,3 @@
-//! Core compiler state and entrypoints.
-
 use std::collections::HashSet;
 
 use indexmap::IndexMap;
@@ -31,29 +29,15 @@ pub struct NfaBuilder<'a> {
     pub(super) anchor_semantics: AnchorSemantics<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
-    /// Compilation window every fresh label is attributed to (see [`LabelOrigin`]).
     current_origin: Option<LabelOrigin>,
-    /// Origin per allocated label id (index = `Label.0`), moved into the graph.
     label_origins: Vec<Option<LabelOrigin>>,
     pub(super) def_entries: IndexMap<DefSpecialization, Label>,
     compiled_def_specializations: HashSet<DefSpecialization>,
     active_def_specializations: HashSet<DefSpecialization>,
-    /// Stack of active record scopes for capture lookup.
-    /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<RecordScope>,
-    /// Non-zero while compiling under a discard (`@_`). The whole
-    /// region compiles structurally: captures are inert, alternations emit no
-    /// variant tags or null defaults. Only definition calls still produce
-    /// output — shared code emits unconditionally — and the call site brackets
-    /// them with SuppressBegin/SuppressEnd (`RefLowering::SuppressedCall`).
     pub(super) suppress_depth: u32,
-    /// Non-zero while explicit node-pattern matches contribute scalar provenance.
     source_mark_depth: u32,
-    /// Definitions whose body is currently being compiled (standalone or
-    /// inlined). A nullable reference back into this set cannot inline again —
-    /// it falls back to a guarded call (`compile_ref_guarded_call`).
     pub(super) inline_stack: Vec<DefId>,
-    /// Inspection span table, built before lowering so construct ids are stable.
     pub(super) spans: Option<SpanTable>,
 }
 
@@ -131,8 +115,6 @@ impl<'a> NfaBuilder<'a> {
         self.ctx.inspection
     }
 
-    /// The pre-assigned span id for a construct, or `None` when inspection is off
-    /// or that construct's tier was dropped by the budget ladder.
     pub(super) fn span_id(&self, node: &SyntaxNode, kind: SpanKind) -> Option<SpanId> {
         self.spans
             .as_ref()
@@ -211,7 +193,6 @@ impl<'a> NfaBuilder<'a> {
         }
     }
 
-    /// Generate a fresh label, attributing it to the active compilation window.
     pub(super) fn fresh_label(&mut self) -> Label {
         let l = Label(self.next_label_id);
         self.next_label_id += 1;
@@ -219,9 +200,6 @@ impl<'a> NfaBuilder<'a> {
         l
     }
 
-    /// Return the entry for one semantic definition specialization, compiling it
-    /// once when first requested. The entry is registered before the body so a
-    /// recursive component can call back into an active specialization safely.
     pub(super) fn ensure_def_specialization(&mut self, specialization: DefSpecialization) -> Label {
         let entry = self.reserve_def_specialization(&specialization);
         if self.compiled_def_specializations.contains(&specialization)
@@ -319,16 +297,8 @@ impl<'a> NfaBuilder<'a> {
             CaptureExits::Single(matched_return)
         };
 
-        // Ordinary specializations are exact because their caller owns navigation.
-        // Routed recursive specializations own the original call-site navigation so
-        // their authored nullable alternative order stays above candidate retries.
         let body_nav = Some(specialization.route().body_nav());
 
-        // Definitions are compiled in normalized form: body -> Return
-        // No record wrapper - that's the caller's responsibility (call-site scoping).
-        // We still use with_scope for member index lookup during compilation.
-        // The inline-stack entry keeps a nullable self-reference inside this
-        // body (`A = (x (A) (y))?`) from inlining itself endlessly.
         let type_id = self
             .ctx
             .analysis
@@ -550,13 +520,6 @@ impl<'a> NfaBuilder<'a> {
         self.dispatch_pattern(pattern, PatternCtx::with_nav(exit, nav_override))
     }
 
-    /// Compile a pattern with navigation override and capture effects.
-    ///
-    /// Capture effects are propagated to the innermost match instruction:
-    /// - Named/Anonymous nodes: effects go on the match
-    /// - Sequences: effects go on last item
-    /// - Alternations: effects go on each alternative
-    /// - Other wrappers: effects propagate through
     pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
         let ctx = self.bracket_pattern_ctx(pattern, ctx);
         match pattern {
@@ -565,10 +528,6 @@ impl<'a> NfaBuilder<'a> {
             Pattern::NodeWildcard(n) => self.compile_node_wildcard(n, ctx),
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
             Pattern::Alternation(alternation) => {
-                // Inference decides tagging from output context. A labeled
-                // alternation has `Value(variant)` flow where its value is
-                // materialized; in a fields context, its captures merge. A
-                // discarded region compiles structurally without variant scopes.
                 let flow = &self.ctx.analysis.type_analysis.expect_pattern_flow(pattern);
                 if ctx.needs_value()
                     && matches!(flow, PatternFlow::Value(_))
@@ -594,11 +553,6 @@ impl<'a> NfaBuilder<'a> {
         }
     }
 
-    /// Wrap this pattern's capture channel in inspection span brackets.
-    ///
-    /// Node-matching patterns use `SpanStartAt` because their `pre` effects land
-    /// on the consuming match instruction; epsilon-entered constructs use pure
-    /// marker starts.
     pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
         let (kind, start_at) = match pattern {
             Pattern::NamedNodePattern(_)

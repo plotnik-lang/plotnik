@@ -1,11 +1,3 @@
-//! Lowering pass: transforms unconstrained IR into bytecode-compatible form.
-//!
-//! This pass handles bytecode encoding constraints by splitting oversized
-//! instructions into cascading epsilon chains:
-//! - effects > 15 → epsilon chain after match
-//! - neg_fields > 7 → epsilon chain for overflow checks
-//! - successors > 28 → cascading epsilon forks
-
 use crate::bytecode::{MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS};
 use crate::core::NodeFieldId;
 
@@ -26,10 +18,6 @@ pub fn pack_instructions(result: &mut NfaGraph) {
         .unwrap_or(0)
         + 1;
 
-    // Earlier passes may have deleted the highest-numbered labels, so ids from
-    // `next_label` up get *reused* for cascade states. Drop the dead labels'
-    // origins so a reused id reads as a wire artifact (no origin), not as the
-    // dead label's definition.
     result.label_origins.truncate(next_label as usize);
 
     let mut emitter = Emitter::new(result.instructions.len(), next_label);
@@ -91,9 +79,6 @@ impl Emitter {
                     self.emit_effects_chain_to_succs(chain_entry, current_succs, effects);
                 }
                 PostChain::Successors(succs) => {
-                    // The cascade holds the *overflow* (lowest-priority) successors. It is an
-                    // additional successor, so append its entry after the kept successors rather
-                    // than replacing them — replacing silently drops the kept successors.
                     self.emit_successors_cascade(chain_entry, succs);
                     current_succs.push(chain_entry);
                     continue;
@@ -191,11 +176,6 @@ fn drain_post_chains(m: &mut MatchIR) -> Vec<PostChain> {
 }
 
 fn successor_budget(m: &MatchIR) -> usize {
-    // Successors share the 28-slot Match64 payload with the match's retained
-    // effects, neg fields, and predicate (`MatchIR::resolve` panics on a combined
-    // overflow). Budget the successor split against those other slots — not the bare
-    // 28 — so the kept successors plus the cascade entry appended below land exactly at
-    // the limit, never one over. (`other_slots` ≤ 15+7+1, so the budget stays ≥ 5.)
     let predicate_slots = if m.predicate.is_some() {
         crate::bytecode::PREDICATE_SLOTS
     } else {

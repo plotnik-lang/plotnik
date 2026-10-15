@@ -7,9 +7,6 @@ use crate::compiler::{BytecodeConfig, BytecodeInspection, CompiledQuery, Emissio
 
 #[test]
 fn ladder_drops_whole_lower_priority_tiers() {
-    // Each definition contributes one definition, capture, and pattern span.
-    // One more than a third of the budget admits the first two complete tiers
-    // but forces the pattern tier over the module-wide limit.
     let definition_count = MAX_SPANS / 3 + 1;
     let mut src = String::new();
     for i in 0..definition_count {

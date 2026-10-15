@@ -1,10 +1,3 @@
-//! Instruction IR with symbolic labels.
-//!
-//! Pre-layout instructions use `Label` for symbolic references.
-//! After layout, labels are resolved to bytecode-word addresses (u16) for serialization.
-//! Result-producing effects carry canonical member IDs assigned before
-//! lowering, so every later consumer observes the same identity.
-
 use std::collections::BTreeMap;
 
 use crate::bytecode::{CodeAddr, EffectKind, EntryBoundary, MatchCounts, Nav, PredicateOp};
@@ -21,13 +14,8 @@ use crate::core::NodeFieldId;
 
 pub use plotnik_runtime::PortId;
 
-/// Node kind constraint for Match instructions.
-///
-/// The bytecode crate owns this type; re-exported here so IR producers and
-/// consumers can name it as `ir::NodeKindConstraint`.
 pub(crate) use crate::bytecode::NodeKindConstraint;
 
-/// Symbolic reference, resolved to a bytecode-word address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Label(pub u32);
 
@@ -38,15 +26,12 @@ impl Label {
     }
 }
 
-/// Label to continue at after a callee returns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReturnAddr(pub Label);
 
-/// Label where a callee definition starts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CalleeEntry(pub Label);
 
-/// How a compiled definition body produces its pending value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DefOutputMode {
     Ordinary,
@@ -54,7 +39,6 @@ pub(crate) enum DefOutputMode {
     CaptureType(CaptureTypePlan),
 }
 
-/// Copyable output provenance retained after a definition specialization is lowered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DefOutputOrigin {
     Ordinary,
@@ -72,26 +56,18 @@ impl DefOutputMode {
     }
 }
 
-/// Whether explicit node-pattern matches contribute source provenance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SourceMode {
     Ordinary,
     Mark,
 }
 
-/// Return outcomes provided by a definition whose entry navigation is routed
-/// through its body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum RoutedReturns {
     MatchOnly,
     Split,
 }
 
-/// Independent lowering choices for one definition body.
-///
-/// Keeping the axes in one semantic key prevents each new behavior from
-/// growing its own parallel entry map. Equal call sites reuse the same body,
-/// including through recursive components.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct DefBodyMode {
     output: DefOutputMode,
@@ -146,11 +122,6 @@ impl DefBodyMode {
     }
 }
 
-/// Navigation and return routing for one definition body.
-///
-/// Ordinary calls navigate before entering an exact body. Recursive nullable
-/// calls route navigation into the body instead, so the body's authored alternative
-/// order remains above any candidate-search checkpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DefRoute {
     Caller,
@@ -224,7 +195,6 @@ impl DefRoute {
     }
 }
 
-/// One memoized definition body and its lowering mode.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct DefSpecialization {
     def_id: DefId,
@@ -234,21 +204,12 @@ pub(crate) struct DefSpecialization {
     ports: ExitSignature,
 }
 
-/// Entry-side semantic contract owned by a boundary-aware specialization.
-///
-/// The exact reachable port signature remains on [`DefSpecialization`] because
-/// ordinary and boundary-aware bodies share the same generalized return ABI.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct DefBoundaryContract {
     input: BoundaryState,
     entry: EntryObligation,
 }
 
-/// Immutable entry protocol implemented by one specialized definition body.
-///
-/// Caller-owned bodies are exact: navigation and field selection happen at
-/// each call site. Callee-owned bodies embed one exact obligation into their
-/// nullable structure, so every call targeting that body must agree with it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum CalleeEntryContract {
     CallerOwned,
@@ -355,14 +316,12 @@ impl DefSpecialization {
     }
 }
 
-/// Effect operation whose structured-result arguments use canonical member IDs.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EffectIR {
     kind: EffectKind,
     payload: EffectArg,
 }
 
-/// An effect's argument: a literal value, or a canonical field/case identity.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EffectArg {
     Literal(usize),
@@ -379,7 +338,6 @@ impl EffectIR {
         &self.payload
     }
 
-    /// Create a literal effect without member reference.
     pub fn literal(kind: EffectKind, payload: usize) -> Self {
         Self {
             kind,
@@ -402,7 +360,6 @@ impl EffectIR {
         Self::literal(EffectKind::Absent, 0)
     }
 
-    /// Append the pending value to the open list.
     pub fn array_push() -> Self {
         Self::literal(EffectKind::ArrayPush, 0)
     }
@@ -463,12 +420,10 @@ impl EffectIR {
         Self::literal(EffectKind::BoolValue, usize::from(value))
     }
 
-    /// Open an inspection span and snapshot the current cursor node.
     pub fn span_start_at(id: u16) -> Self {
         Self::literal(EffectKind::SpanStartAt, id as usize)
     }
 
-    /// Open an inspection span without reading the cursor.
     pub fn span_start(id: u16) -> Self {
         Self::literal(EffectKind::SpanStart, id as usize)
     }
@@ -477,7 +432,6 @@ impl EffectIR {
         Self::literal(EffectKind::SpanEnd, id as usize)
     }
 
-    /// Whether this effect is an inspection span bracket.
     pub fn is_span_marker(&self) -> bool {
         matches!(
             self.kind(),
@@ -491,15 +445,9 @@ impl EffectIR {
     }
 }
 
-/// Predicate value: string or regex pattern.
-///
-/// Both variants store predicate text. Emit interns that text into the bytecode
-/// string table after the IR is complete.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PredicateValueIR {
-    /// String comparison value.
     String(Box<str>),
-    /// Regex pattern, compiled to a DFA during emit.
     Regex(Box<str>),
 }
 
@@ -515,10 +463,6 @@ impl PredicateValueIR {
     }
 }
 
-/// Predicate IR for node text filtering.
-///
-/// Applied after node kind/field matching. Compares node text against
-/// a string literal or regex pattern.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PredicateIR {
     pub op: PredicateOp,
@@ -541,7 +485,6 @@ impl PredicateIR {
     }
 }
 
-/// Pre-layout instruction with symbolic references.
 #[derive(Clone, Debug)]
 pub enum InstructionIR {
     Match(MatchIR),
@@ -559,7 +502,6 @@ impl InstructionIR {
         }
     }
 
-    /// Compute instruction size in bytes (8, 16, 24, 32, 48, or 64).
     pub fn size(&self) -> usize {
         match self {
             Self::Match(m) => m.size(),
@@ -574,7 +516,6 @@ impl InstructionIR {
         }
     }
 
-    /// Get all successor labels (for graph building).
     pub fn successors(&self) -> &[Label] {
         match self {
             Self::Match(m) => &m.successors,
@@ -584,30 +525,20 @@ impl InstructionIR {
     }
 }
 
-/// Match instruction IR with symbolic successors.
 #[derive(Clone, Debug)]
 pub struct MatchIR {
     pub label: Label,
-    /// Navigation command. `Epsilon` means pure control flow (no node check).
     pub nav: Nav,
-    /// Node kind constraint (Any = wildcard, Named/Anonymous for specific checks).
     pub node_kind: NodeKindConstraint,
-    /// Field constraint (None = wildcard).
     pub node_field: Option<NodeFieldId>,
-    /// Node must be a tree-sitter MISSING node — the `(MISSING …)` constraint.
     pub missing: bool,
-    /// Effects to execute after a successful match, in bytecode order.
     pub effects: Vec<EffectIR>,
-    /// Fields that must NOT be present on the node.
     pub neg_fields: Vec<NodeFieldId>,
-    /// Predicate for node text filtering (None = no text check).
     pub predicate: Option<PredicateIR>,
-    /// Successor labels (empty = accept, 1 = linear, 2+ = fork).
     pub successors: Vec<Label>,
 }
 
 impl MatchIR {
-    /// Create a terminal/accept state (empty successors).
     pub fn terminal(label: Label) -> Self {
         Self {
             label,
@@ -622,7 +553,6 @@ impl MatchIR {
         }
     }
 
-    /// Create an epsilon transition (no node interaction) to a single successor.
     pub fn epsilon(label: Label, next: Label) -> Self {
         Self::terminal(label).next(next)
     }
@@ -702,7 +632,6 @@ impl MatchIR {
         .size()
     }
 
-    /// Check if this is an epsilon transition (no node interaction).
     #[inline]
     pub fn is_epsilon(&self) -> bool {
         self.nav == Nav::Epsilon
@@ -715,31 +644,23 @@ impl From<MatchIR> for InstructionIR {
     }
 }
 
-/// Call instruction IR with symbolic target.
 #[derive(Clone, Debug)]
 pub struct CallIR {
     pub label: Label,
-    /// Which side of the call boundary discharges entry navigation and field
-    /// selection.
     pub entry: CallEntry,
-    /// Callee entry point.
     pub target: Label,
-    /// Continuations indexed by the callee-local dense [`PortId`].
     pub returns: Vec<Label>,
 }
 
-/// Entry ownership for a definition call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CallEntry {
-    /// The call instruction navigates and checks the field before entering an
-    /// exact callee body.
     CallerOwned {
         nav: Nav,
         field: Option<NodeFieldId>,
     },
-    /// The specialized callee carries the entry obligation through nullable
-    /// structure and discharges it at each eventual first consumer.
-    CalleeOwned { obligation: EntryObligation },
+    CalleeOwned {
+        obligation: EntryObligation,
+    },
 }
 
 impl CallEntry {
@@ -774,7 +695,6 @@ impl CallEntry {
 }
 
 impl CallIR {
-    /// Create a call instruction with default nav (Stay) and no field constraint.
     pub fn new(label: Label, return_addr: ReturnAddr, callee: CalleeEntry) -> Self {
         Self {
             label,
@@ -787,7 +707,6 @@ impl CallIR {
         }
     }
 
-    /// Create a matched-only call whose callee owns entry navigation.
     pub fn routed(
         label: Label,
         entry_nav: Nav,
@@ -804,8 +723,6 @@ impl CallIR {
         }
     }
 
-    /// Create a call whose nullable callee reports node-consuming and empty
-    /// outcomes separately. Navigation belongs to the routed callee variant.
     pub fn split(
         label: Label,
         entry_nav: Nav,
@@ -886,10 +803,6 @@ impl CallIR {
     }
 }
 
-/// The two semantic continuations of a nullable recursive call.
-///
-/// Bundling the same-typed labels prevents callers from silently transposing
-/// the node-consuming and empty routes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SplitReturnAddrs {
     pub matched: ReturnAddr,
@@ -905,9 +818,7 @@ impl From<CallIR> for InstructionIR {
 #[derive(Clone, Debug)]
 pub struct ReturnIR {
     pub label: Label,
-    /// Callee-local dense exit port.
     pub port: PortId,
-    /// Entry protocol implemented by the body containing this return.
     pub(crate) entry: CalleeEntryContract,
 }
 
@@ -955,21 +866,10 @@ impl From<ReturnIR> for InstructionIR {
     }
 }
 
-/// Which compilation window a label was allocated in — per-instruction
-/// provenance for dumps and generated-code comments.
-///
-/// Attribution is by *physical* location: labels created while a nullable ref
-/// is inlined into a host definition belong to the host (the instruction lives
-/// in the host's body). Post-build passes only delete and rewire instructions,
-/// never renumber labels, so an origin recorded at allocation stays valid for
-/// every surviving label. Labels minted later by `pack_instructions` have no
-/// origin — they are wire-format artifacts with no source correspondence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LabelOrigin {
     Expression,
-    /// Allocated while compiling this definition's body.
     Def(DefId),
-    /// Allocated while compiling a non-ordinary definition specialization.
     DefSpecialization {
         def_id: DefId,
         output: DefOutputOrigin,
@@ -978,31 +878,24 @@ pub(crate) enum LabelOrigin {
     },
 }
 
-/// Identity of a root, separate from the named callable-body namespace.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum EntrypointKey {
     Named(DefId),
     Expression,
 }
 
-/// One runnable root and the result effects owned by its execution boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct EntrypointIR {
     pub(crate) target: Label,
     pub(crate) boundary: EntryBoundary,
 }
 
-/// Compiled query IR plus entry labels produced by the compile stage.
 #[derive(Clone, Debug)]
 pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
-    /// Entry labels for every emitted definition specialization.
     pub(in crate::compiler::lower) def_entries: IndexMap<DefSpecialization, Label>,
-    /// Named roots in `DefId` order, followed by the optional expression.
     pub(in crate::compiler::lower) entrypoints: IndexMap<EntrypointKey, EntrypointIR>,
-    /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
-    /// Origin per label id (index = `Label.0`), recorded at allocation.
     pub(in crate::compiler::lower) label_origins: Vec<Option<LabelOrigin>>,
 }
 
@@ -1029,22 +922,11 @@ impl NfaGraph {
         self.spans.as_ref()
     }
 
-    /// The compilation window `label` was allocated in, or `None` for labels
-    /// minted by post-build passes (pack cascades).
     pub(crate) fn origin(&self, label: Label) -> Option<LabelOrigin> {
         self.label_origins.get(label.0 as usize).copied().flatten()
     }
 }
 
-/// The optimized NFA before wire packing — the last pipeline artifact every
-/// backend shares.
-///
-/// This is the fork point between executors: the bytecode path packs it for
-/// the wire (`pack_instructions` splits instructions that exceed wire slot
-/// limits into epsilon cascades); code generation consumes it directly, with
-/// symbolic labels and provenance intact. Everything semantic — anchors,
-/// nullable inlining, null-defaulting, greediness, dedup — has already
-/// happened by this point.
 #[derive(Clone, Debug)]
 pub struct SemanticNfa {
     raw: NfaGraph,
@@ -1064,11 +946,6 @@ impl SemanticNfa {
     }
 }
 
-/// Lowered IR admitted by the query pipeline for emission.
-///
-/// Raw [`NfaGraph`] stays mutable inside `compiler::lower`; emission only
-/// receives this wrapper, so callers cannot hand an arbitrary pass-local IR bag to
-/// the bytecode writer.
 #[derive(Clone, Debug)]
 pub struct LoweredNfa {
     raw: NfaGraph,

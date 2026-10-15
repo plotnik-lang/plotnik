@@ -1,13 +1,3 @@
-//! Human-readable dump of the fork-point NFA (the optimized, pre-pack IR).
-//!
-//! Mirrors the bytecode dump's visual grammar
-//! in label space, keeping the resolution the wire format erases: symbolic labels
-//! instead of packed code addresses, definition-name section headers from label
-//! provenance (`Name (consuming):` for the guarded-recursion body variant,
-//! real member names on `RecordSet`/`VariantOpen`,
-//! callee names on calls (`(Name+)` marks a consuming-body callee), and inline
-//! predicate text — the IR has no string table to index into.
-
 use std::fmt::Write as _;
 
 use crate::bytecode::{EffectKind, LineBuilder, Nav, Symbol, nav_symbol, width_for_count};
@@ -20,7 +10,6 @@ use crate::compiler::lower::ir::{
 };
 use crate::core::{Colors, NodeFieldId, NodeKindId};
 
-/// Render the optimized NFA in the bytecode dump format, label space.
 pub(crate) fn dump_nfa(
     nfa: &SemanticNfa,
     artifacts: AnalysisArtifacts<'_>,
@@ -37,10 +26,6 @@ pub(crate) fn dump_nfa(
     out
 }
 
-/// Renders instructions in the dump format. Besides the full [`dump_nfa`]
-/// output, codegen borrows this per-instruction: each generated state arm
-/// carries its instruction as a comment in this exact format, so generated
-/// code lines up with the NFA dump 1:1.
 pub(crate) struct NfaDumper<'a> {
     graph: &'a NfaGraph,
     artifacts: AnalysisArtifacts<'a>,
@@ -70,7 +55,6 @@ impl<'a> NfaDumper<'a> {
         }
     }
 
-    /// One instruction in dump format (label, nav glyph, content, successors).
     pub(crate) fn render_instruction(&self, instr: &InstructionIR) -> String {
         match instr {
             InstructionIR::Match(m) => self.format_match(m),
@@ -340,8 +324,6 @@ impl NfaDumper<'_> {
         self.artifacts.interner.resolve(descriptor.name).to_string()
     }
 
-    /// Render a `(MISSING …)` constraint. `Any` is bare `(MISSING)`; a named or
-    /// anonymous kind names the specific missing token.
     fn missing_pattern(&self, kind: NodeKindConstraint) -> String {
         match kind {
             NodeKindConstraint::Any => "(MISSING)".to_string(),
@@ -356,7 +338,6 @@ impl NfaDumper<'_> {
     }
 
     fn kind_name(&self, id: NodeKindId) -> String {
-        // The builtin error symbol has no grammar entry; render `(ERROR)` as written.
         if id == NodeKindId::ERROR {
             return "ERROR".to_string();
         }
@@ -402,9 +383,6 @@ impl NfaDumper<'_> {
         LineBuilder::new(self.label_width).pad_successors(format!("{prefix}{content}"), &successors)
     }
 
-    /// Callee display name, resolved through the target label's origin: calls
-    /// enter at a definition body (or its consuming specialization), so the window that
-    /// allocated the target label names the callee.
     fn callee_name(&self, target: Label) -> String {
         match self.origin_of(target) {
             LabelOrigin::Expression => unreachable!("expressions are not call targets"),

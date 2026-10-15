@@ -1,19 +1,8 @@
-//! Operational quotient of descriptive boundary outcomes.
-//!
-//! Lowering routes only distinctions that future matching can observe. In
-//! particular, an anonymous consumer and an any-node consumer share one
-//! conservative class, and exact pending anchors make previous namedness
-//! irrelevant.
-
 use std::collections::BTreeMap;
 
 use crate::compiler::analyze::boundary::ExitPort;
 use plotnik_runtime::PortId;
 
-/// Exact ordered port set exposed by one lowered specialization.
-///
-/// Ordering is semantic `ExitPort` order, so equal contracts share one dense
-/// local numbering independent of construction order.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct ExitSignature {
     ports: Box<[ExitPort]>,
@@ -56,8 +45,6 @@ impl ExitSignature {
     }
 }
 
-/// Dense-by-signature continuation map. Missing ports mean failure; callers
-/// must never substitute a canonical continuation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ExitMap<T> {
     targets: BTreeMap<ExitPort, T>,

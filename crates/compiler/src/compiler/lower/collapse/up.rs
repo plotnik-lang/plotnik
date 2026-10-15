@@ -1,20 +1,3 @@
-//! Up-collapse optimization: merge consecutive Up instructions of the same mode.
-//!
-//! Transforms: Up(1) → Up(1) → Up(2) into Up(4)
-//!
-//! Merging the constraint-carrying modes (`UpSkipTrivia`/`UpSkipExtras`/`UpExact`)
-//! is sound because `Up*` composes: the VM re-validates the exit constraint at
-//! every level it ascends (see `the VM`'s `go_up`), so `Up*(a)` then `Up*(b)`
-//! is exactly `Up*(a+b)`. A merge that would overflow the level field is refused,
-//! leaving a contiguous chain whose per-level checks partition the levels with no
-//! gap — never a capped instruction that silently drops upward movement.
-//!
-//! Constraints:
-//! - Same mode only (Up, UpSkipTrivia, UpSkipExtras, UpExact can't mix)
-//! - Effectless only (no effects or neg_fields)
-//! - Capped at `Nav::MAX_UP_LEVEL` per instruction (the 5-bit level field)
-//! - Single successor (can't merge fork instructions)
-
 use std::collections::{HashMap, HashSet};
 
 use crate::bytecode::Nav;
@@ -29,7 +12,6 @@ pub fn collapse_up(result: &mut NfaGraph) {
         .map(|(i, instr)| (instr.label(), i))
         .collect();
 
-    // Only collapse into a successor with exactly one predecessor; others still point to it.
     let mut predecessor_count: HashMap<Label, usize> = HashMap::new();
     for instr in &result.instructions {
         for &succ in instr.successors() {
@@ -40,9 +22,6 @@ pub fn collapse_up(result: &mut NfaGraph) {
     let mut removed: HashSet<Label> = HashSet::new();
 
     for i in 0..result.instructions.len() {
-        // An already-absorbed instruction must not seed a new merge: its original
-        // successor edge is stale, and reusing it lets a removed node re-absorb the
-        // live boundary node a capped chain stopped at, dangling the head's edge.
         if removed.contains(&result.instructions[i].label()) {
             continue;
         }
@@ -96,9 +75,6 @@ pub fn collapse_up(result: &mut NfaGraph) {
                 break;
             }
 
-            // Merge: add levels, but only when the sum is still encodable. If it would
-            // overflow the level field, refuse the merge — capping to the max would
-            // silently drop upward movement while still absorbing the successor.
             let new_level = current_level.saturating_add(succ_level);
             if new_level > Nav::MAX_UP_LEVEL {
                 break;
@@ -123,7 +99,6 @@ pub fn collapse_up(result: &mut NfaGraph) {
         .retain(|instr| !removed.contains(&instr.label()));
 }
 
-/// Check if a MatchIR has no effects or constraints (pure navigation).
 fn is_effectless(m: &MatchIR) -> bool {
     m.node_kind == NodeKindConstraint::Any
         && m.node_field.is_none()

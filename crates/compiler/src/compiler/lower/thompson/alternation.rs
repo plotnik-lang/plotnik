@@ -14,11 +14,6 @@ use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{AnchorSemantics, pattern_owns_iteration, resumable_search_nav};
 use super::scope::SkipExit;
 
-/// The alternation's resumable search nav (from [`resumable_search_nav`]), kept
-/// distinct from an alternative's `first_nav` so the adjacent `Option<Nav>` inputs
-/// to [`nav_for_alternative`] cannot be transposed. `Some` means the alternation
-/// owns the retry wrapper and each alternative matches exactly at the candidate
-/// (`StayExact`).
 #[derive(Clone, Copy)]
 struct AltSearchNav(Option<Nav>);
 
@@ -76,38 +71,6 @@ fn nav_for_alternative(
 }
 
 impl NfaBuilder<'_> {
-    /// Clone a soft-anchor follower into a named-node-only retry entry.
-    ///
-    /// Sequence lowering has already compiled the follower after the alternation's
-    /// `exit`. Soft anchors normally conservatively skip extras only
-    /// (`NextSkipExtras`) because an anonymous-token left side must not skip
-    /// anonymous tokens before the follower. When an alternative definitely matched a
-    /// named node, the soft-anchor rule allows anonymous-token skipping too, so a
-    /// `NextSkip` clone of that follower preserves the intended soft-anchor
-    /// semantics for named alternatives without weakening anonymous alternatives.
-    ///
-    /// The clone is intentionally narrow: it reuses the already-compiled follower's
-    /// successor, effects, predicate, field constraints, etc., so only navigation
-    /// changes. That keeps the alternative-specific tweak local and avoids recompiling a
-    /// sibling suffix with duplicated effects. The clone is appended after its
-    /// successor has already been emitted; label references are symbolic IR, so
-    /// the order is irrelevant until packing.
-    ///
-    /// A captured/tagged alternation does not exit straight into the follower:
-    /// capture lowering interposes effect epsilons (`RecordSet`, scope closes) between
-    /// alternation exit and follower (#472). The walk below sees through that
-    /// chain and clones it along with the follower, so each alternative runs the
-    /// chain's effects exactly once — via the named twin or the conservative
-    /// original, never both.
-    ///
-    /// Returns `None` — caller stays conservative — unless the chain is
-    /// single-successor epsilons ending at a `Match` carrying `NextSkipExtras` on
-    /// a `Named` node, the one shape where the upgrade is both safe and needed.
-    /// The `Named` check matters because `NextSkipExtras` is ambiguous: it also
-    /// appears when the *follower* may match anonymous nodes, and then extras-only
-    /// skipping is correct even after a named alternative. Anonymous/`_` followers fail
-    /// that check; a ref follower (`Call`) is skipped because the IR alone cannot
-    /// prove the callee never matches an anonymous node.
     fn clone_named_follower_skip_entry(&mut self, exit: Label) -> Option<Label> {
         let mut chain: Vec<MatchIR> = Vec::new();
         let mut seen = HashSet::new();
@@ -149,14 +112,6 @@ impl NfaBuilder<'_> {
         Some(entry)
     }
 
-    /// Per-alternative "named" flags plus the soft-skip follower twin. An alternative
-    /// is "named" (eligible for the twin) when it cannot
-    /// match an anonymous node and does not own its own iteration. A quantified
-    /// alternative's empty path leaves no named node on the anchor's left, so the
-    /// soft-skip upgrade is unsound there. The anonymity test covers the whole alternative,
-    /// matching `nav_for_alternative`'s before-anchor classification. The twin is a
-    /// `NextSkip` clone of a conservative (`NextSkipExtras`) soft follower, worth
-    /// cloning only when at least one alternative is itself named.
     fn alternative_routing(
         &mut self,
         alternatives: &[ast::Alternative],
@@ -187,15 +142,6 @@ impl NfaBuilder<'_> {
         }
     }
 
-    /// A resumable search nav (`Down`/`Next`/`Stay`) gets one position-search retry
-    /// wrapper around the fanned-in alternatives; otherwise each alternative performed
-    /// its own exact navigation.
-    ///
-    /// `empty` holds the lifted empty-match continuations of nullable
-    /// alternatives (see [`compile_unlabeled_alternatives`](Self::compile_unlabeled_alternatives)).
-    /// They sit outside the position search — an empty outcome needs no
-    /// candidate node — and after it: consuming matches, at any candidate and
-    /// in any alternative, are preferred over an empty one.
     fn assemble_alternatives(
         &mut self,
         successors: Vec<Label>,
@@ -232,7 +178,6 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// An unlabeled alternation merges each alternative's fields into one record.
     pub(super) fn compile_unlabeled_alternation(
         &mut self,
         alternation: &ast::AlternationPattern,
@@ -242,8 +187,6 @@ impl NfaBuilder<'_> {
         self.compile_unlabeled_alternation_with_exits(alternation, ctx, skip_exit)
     }
 
-    /// [`compile_unlabeled_alternation`](Self::compile_unlabeled_alternation) with a distinct empty
-    /// continuation (a skippable sequence item, or a pruned iteration element).
     pub(super) fn compile_unlabeled_alternation_with_exits(
         &mut self,
         alternation: &ast::AlternationPattern,
@@ -259,15 +202,6 @@ impl NfaBuilder<'_> {
         )
     }
 
-    /// Lower an alternation without variant tagging. `alternation` is the pattern whose inferred result carries
-    /// the merged output record.
-    ///
-    /// A nullable alternative compiles pruned ([`SkipExit::Fail`]) so its body only
-    /// matches by consuming; its empty outcome is lifted to one shared
-    /// alternative after the candidate search — a pure-effect epsilon that
-    /// defaults every merged field and exits to `skip_exit` with the cursor
-    /// untouched. That gives the empty path a life outside the search
-    /// (it needs no candidate node) and an honest cursor for any follower.
     fn compile_unlabeled_alternatives(
         &mut self,
         alternation: &Pattern,
@@ -285,8 +219,6 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        // In a suppressed region there is no result shape to keep stable (and a
-        // value-producing labeled alternation routed here still flows `Value(variant)`, not a record).
         let alternation_type_id = if self.is_suppressed() {
             None
         } else {
@@ -318,15 +250,7 @@ impl NfaBuilder<'_> {
 
             let alternative_exit = alternative_routing.alternative_exit(alternative_idx, exit);
 
-            // Complete every merged field this alternative does not itself
-            // produce, so the result shape stays stable. "Produces" means a top-level
-            // (bubbling) field — a capture nested in a child scope (`{...} @item`)
-            // belongs to that scope, not here. The alternative's inferred bubble is the
-            // single source of truth; a syntactic capture walk would miscount nested
-            // names and drop a needed completion.
             let completion_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
-                // Only bubbling fields count as provided; a `Value` alternative (a
-                // bare reference, suppressed) contributes nothing here.
                 let provided: HashSet<Symbol> =
                     match &self.ctx.analysis.type_analysis.expect_pattern_flow(&body) {
                         PatternFlow::Fields(id) => self
@@ -360,8 +284,6 @@ impl NfaBuilder<'_> {
                 } else {
                     capture.clone()
                 };
-                // Pruned body: merged effects stay on dominating epsilons —
-                // the body's partial-skip paths must not drop them.
                 let exit = if alternative_capture.post.is_empty() {
                     alternative_exit
                 } else {
@@ -400,12 +322,6 @@ impl NfaBuilder<'_> {
             };
             successors.push(alternative_entry);
 
-            // Lower the alternative's own empty outcome instead of guessing a
-            // value from its final field types. The distinction is semantic:
-            // an absent field takes its declared completion, while a field that is
-            // present through an empty match can produce a record, `""`, or
-            // `true`. Reusing the ordinary skippable lowering also preserves
-            // capture and alternative spans around that exact outcome.
             if alternative_nullable && let SkipExit::To(skip) = skip_exit {
                 let alternative_capture = if let Some(id) = alternative_span {
                     capture
@@ -434,8 +350,6 @@ impl NfaBuilder<'_> {
         self.assemble_alternatives(successors, empty, search_nav, exit)
     }
 
-    /// Effects that complete every merged field absent from `provided`, resolved
-    /// against the enclosing scope.
     pub(super) fn merged_field_completion_effects(
         &self,
         completions: &FieldCompletions,
@@ -467,8 +381,6 @@ impl NfaBuilder<'_> {
             .collect()
     }
 
-    /// A labeled alternation opens each alternative's variant scope
-    /// (`VariantOpen`...`VariantClose`) and compiles its payload inside it.
     pub(super) fn compile_labeled_alternation(
         &mut self,
         alternation: &ast::AlternationPattern,
@@ -478,11 +390,6 @@ impl NfaBuilder<'_> {
         self.compile_labeled_alternation_with_exits(alternation, ctx, skip_exit)
     }
 
-    /// [`compile_labeled_alternation`](Self::compile_labeled_alternation) with a distinct empty
-    /// continuation. A nullable alternative compiles pruned; its empty outcome
-    /// is lifted past the candidate search — the
-    /// variant tags with every payload field at its default (see
-    /// [`compile_unlabeled_alternatives`](Self::compile_unlabeled_alternatives)).
     pub(super) fn compile_labeled_alternation_with_exits(
         &mut self,
         alternation: &ast::AlternationPattern,

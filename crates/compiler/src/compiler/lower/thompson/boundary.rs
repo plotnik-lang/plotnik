@@ -1,21 +1,9 @@
-//! Boundary semantics translated into concrete Thompson navigation.
-//!
-//! Analysis describes what a pattern leaves at a sibling boundary. This module
-//! is the lowering-side adapter: it intersects that state with an authored
-//! entry navigation, selects the concrete VM navigation, and reconstructs the
-//! state represented by an operational exit port.
-
 use crate::bytecode::Nav;
 use crate::compiler::analyze::anchors::GapClass;
 use crate::compiler::analyze::boundary::ExitPort;
 use crate::compiler::analyze::boundary::{BoundaryState, FirstClass, PendingAnchor};
 use crate::core::NodeFieldId;
 
-/// Navigation an atom must perform when it receives control.
-///
-/// The wrapped navigation may already be constrained by an enclosing search.
-/// Resolving the contract only tightens that constraint; a pending soft anchor
-/// cannot loosen an exact or extras-only entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct NavigationContract {
     authored: Nav,
@@ -47,7 +35,6 @@ impl NavigationContract {
         self.authored
     }
 
-    /// Resolve this entry for the next node-consuming pattern.
     pub(crate) fn resolve(self, state: BoundaryState, next: FirstClass) -> Nav {
         assert!(
             next != FirstClass::Empty,
@@ -75,7 +62,6 @@ impl NavigationContract {
     }
 }
 
-/// Everything that must reach the first actual consumer of a structural form.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct EntryObligation {
     pub(crate) navigation: NavigationContract,
@@ -112,10 +98,6 @@ impl EntryObligation {
     }
 }
 
-/// Navigation for leaving a consumed child list.
-///
-/// The enclosing boundary is operationally named. A soft trailing anchor is
-/// therefore broad only after a named (or absent) previous consumer.
 pub(crate) fn trailing_up_nav(state: BoundaryState, levels: u8) -> Nav {
     assert!(
         (1..=Nav::MAX_UP_LEVEL).contains(&levels),
@@ -130,10 +112,6 @@ pub(crate) fn trailing_up_nav(state: BoundaryState, levels: u8) -> Nav {
     }
 }
 
-/// Empty-list counterpart of [`trailing_up_nav`].
-///
-/// No check is necessary without a pending anchor. Otherwise the childless
-/// instruction enforces the same gap class without descending or ascending.
 pub(crate) fn trailing_childless_nav(state: BoundaryState) -> Option<Nav> {
     let nav = match state.gap_before(FirstClass::Named) {
         GapClass::Any => return None,
@@ -144,11 +122,6 @@ pub(crate) fn trailing_childless_nav(state: BoundaryState) -> Option<Nav> {
     Some(nav)
 }
 
-/// Reconstruct the canonical boundary state represented by an exit port.
-///
-/// Empty outcomes retain the caller's previous consumer. The port already
-/// names the relation's final pending-anchor state; it must not be recomposed
-/// with the input a second time.
 pub(crate) fn next_boundary_state(input: BoundaryState, port: ExitPort) -> BoundaryState {
     match port {
         ExitPort::ConsumedNamedNone => BoundaryState::new(FirstClass::Named, PendingAnchor::None),

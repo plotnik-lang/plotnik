@@ -1,10 +1,3 @@
-//! Unified quantifier compilation (`?`, `*`, `+` and lazy variants).
-//!
-//! Cursor-local paths — plain, list-context, and split-exit — share
-//! `compile_quantified`. Boundary-aware paths share
-//! `compile_boundary_iteration`, so boundary route discovery and search
-//! navigation stay independent of result handling.
-
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
@@ -27,17 +20,6 @@ use super::nfa_emit::{ForkTargets, Greediness};
 use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
 use super::sequences::SeqItemsCtx;
 
-/// The nav under which a quantifier iteration runs a resumable position search,
-/// or `None` for a bounded anchor that matches a single candidate directly.
-///
-/// Identical to [`resumable_search_nav`] except `StayExact` is also a search.
-/// The difference is the consumer, not the nav: a *match-once* item at
-/// `StayExact` is positioned by an outer search and matches exactly there, but a
-/// quantifier is a *loop* — even from a fixed `StayExact` start (a called def
-/// body, an alternation candidate, the entrypoint) it must scan its siblings
-/// forward, so it owns a resumable search. A bounded anchor (`*Skip*`/`*Exact`)
-/// stays put in both. Folding this case back into `resumable_search_nav` makes
-/// alternations double-wrap and regresses; the two must stay distinct.
 pub(super) fn quantifier_search_nav(nav: Nav) -> Option<Nav> {
     match nav {
         Nav::StayExact => Some(Nav::StayExact),
@@ -45,13 +27,9 @@ pub(super) fn quantifier_search_nav(nav: Nav) -> Option<Nav> {
     }
 }
 
-/// Result of parsing a quantified pattern.
 pub(super) enum QuantifierForm {
-    /// No inner pattern found.
     Empty,
-    /// Inner pattern exists but no valid quantifier operator.
     Plain(Pattern),
-    /// Valid quantified pattern with inner and operator.
     Quantified {
         inner: Pattern,
         operator: QuantifierOperator,
@@ -184,10 +162,6 @@ struct QuantifierRoute {
     exits: CaptureExits,
 }
 
-/// Result handling for one admitted consuming boundary iteration.
-///
-/// Route discovery and loop topology are independent of whether the matched
-/// pattern produces no value, an ordinary value, or a transformed value.
 #[derive(Clone)]
 pub(super) enum BoundaryIterationOutputMode {
     NoValue,
@@ -200,7 +174,6 @@ pub(super) enum BoundaryIterationOutputMode {
     },
 }
 
-/// Output handling for the consuming and empty branches of `?`.
 pub(super) struct BoundaryOptionalOutput {
     pub(super) iteration_mode: BoundaryIterationOutputMode,
     pub(super) empty_effects: Vec<EffectIR>,
@@ -220,14 +193,6 @@ impl QuantifierRoute {
 }
 
 impl NfaBuilder<'_> {
-    /// Split the incoming capture into loop-invariant brackets and per-iteration
-    /// effects. `pre` (enclosing opens, null defaults) runs once before the
-    /// first iteration; everything from the first unmatched close in `post`
-    /// (closes of scopes this quantifier did not open) runs once after the
-    /// last. Only the remaining `post` prefix — this level's own value effects —
-    /// stays on each iteration. Without this split, a labeled alternative like
-    /// `[A: (x)+ ...]` would re-open its variant scope on every loop pass and
-    /// close it over the previous pass's pending value.
     fn bracket_quantifier(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -268,9 +233,6 @@ impl NfaBuilder<'_> {
         self.emit_effects_if_nonempty(exit, effects)
     }
 
-    /// Whether this quantifier's value is observed by its continuation. The
-    /// inferred `Value` flow is necessary but not enough: nested bare values are
-    /// structural unless a root/capture/ref context observes the pending value.
     fn is_value_collecting(&self, quant: &ast::QuantifiedPattern, needs_value: bool) -> bool {
         if self.is_suppressed() || !needs_value {
             return false;
@@ -285,7 +247,6 @@ impl NfaBuilder<'_> {
         )
     }
 
-    /// Compile a quantified pattern with capture effects (passed to body).
     pub(super) fn compile_quantified_pattern(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -322,9 +283,6 @@ impl NfaBuilder<'_> {
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile a quantified pattern for list capture with element-level effects.
-    ///
-    /// The element-capture effects (typically `[ArrayPush]`) are placed on each iteration.
     pub(super) fn compile_quantified_for_list(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -971,15 +929,6 @@ impl NfaBuilder<'_> {
         }
     }
 
-    /// Compile only the admitted empty outcomes of a nullable pattern.
-    ///
-    /// Ordinary skippable lowering already owns the exact value, scope, span,
-    /// and recursive-reference semantics for every empty outcome. Compile
-    /// that graph with both continuations joined, then project it onto control
-    /// paths that never perform a node match. This retains both kinds of
-    /// empty result — an absent option and a present structured value —
-    /// without letting a lifted alternation fallback re-run its consuming body
-    /// against the parent cursor.
     pub(super) fn compile_empty_outcome(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
         let exit = ctx.exit;
         let first_new_instruction = self.instructions.len();
@@ -987,10 +936,6 @@ impl NfaBuilder<'_> {
         self.project_empty_paths(first_new_instruction, entry, exit)
     }
 
-    /// Keep the newly emitted subgraph's paths that reach `exit` using only
-    /// epsilon control flow or a childless anchor assertion. `Stay*` still
-    /// counts as a node match: accepting it here is the bug that turns a
-    /// wildcard under `?`'s absent value into its parent node.
     fn project_empty_paths(
         &mut self,
         first_new_instruction: usize,
@@ -1056,9 +1001,6 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Compile a nullable pattern with independent node-consuming and empty
-    /// continuations. The consuming continuation travels as a complete pattern
-    /// context; the sibling argument is only the empty route.
     pub(super) fn compile_nullable_pattern(
         &mut self,
         pattern: &Pattern,
@@ -1071,11 +1013,6 @@ impl NfaBuilder<'_> {
             capture,
             observe_value,
         } = self.bracket_pattern_ctx(pattern, matched);
-        // A captured `?`/`*` at this navigating position shares the single
-        // mechanism dispatch with the ordinary capture path (`compile_captured`),
-        // split exits and all, so the two can never drift — the gap behind both
-        // #470 and the `@_` discard panic. It emits the scope that matches the
-        // declared scope (`Record`/`List`/`Suppress`), closing it on both exits.
         if let Pattern::CapturedPattern(cap) = pattern
             && cap.inner().is_some()
         {
@@ -1090,10 +1027,6 @@ impl NfaBuilder<'_> {
             );
         }
 
-        // A reference to a nullable definition skips like an inline `?`: its
-        // body is inlined so the empty path takes `skip_exit` with the
-        // checkpoint-restored cursor (a call's empty return cannot — the
-        // return address carries the consumed-candidate navigation).
         if let Pattern::DefRef(r) = pattern {
             let def_id = self.expect_reference_target(r);
             if self.definition_is_nullable(def_id) {
@@ -1107,9 +1040,6 @@ impl NfaBuilder<'_> {
             }
         }
 
-        // An alternation with a nullable alternative: the lifted empty
-        // alternative exits to `skip_exit` (or is pruned) instead of
-        // dead-ending inside the candidate search.
         if let Pattern::Alternation(alternation) = pattern {
             let pattern_ctx = PatternCtx {
                 exit: match_exit,
@@ -1117,8 +1047,6 @@ impl NfaBuilder<'_> {
                 capture,
                 observe_value,
             };
-            // Mirrors dispatch_pattern: only a labeled alternation whose value is
-            // observed outside suppression emits variant events.
             let flow = &self.ctx.analysis.type_analysis.expect_pattern_flow(pattern);
             return if pattern_ctx.needs_value()
                 && matches!(flow, PatternFlow::Value(_))
@@ -1130,10 +1058,6 @@ impl NfaBuilder<'_> {
             };
         }
 
-        // A group whose items can all skip: compile the items with the skip
-        // exit threaded through, so the all-skip path exits with the
-        // checkpoint-restored cursor exactly like a single skippable item
-        // (partial matches exit through `match_exit` as usual).
         if let Pattern::SeqPattern(seq) = pattern {
             let items: Vec<_> = seq.items().collect();
             let is_inside_node = matches!(
@@ -1151,10 +1075,6 @@ impl NfaBuilder<'_> {
             });
         }
 
-        // Must be a QuantifiedPattern at this point: every caller passes a
-        // nullable pattern, and every other nullable form early-returned above.
-        // Falling through to `dispatch_pattern` here would bracket the pattern's
-        // inspection span a second time (it was already bracketed on entry).
         let Pattern::QuantifiedPattern(quant) = pattern else {
             unreachable!("skippable dispatch fell through for non-nullable pattern kind");
         };
@@ -1209,15 +1129,6 @@ impl NfaBuilder<'_> {
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile a record capture whose inner has a `?` quantifier
-    /// (`{...}? @x`, `[...]? @x`) — the only quantifier that reaches the record
-    /// mechanism, since `*`/`+` classify as `List`.
-    ///
-    /// The record value has option type. Mirroring how lists scope each element
-    /// record, the `RecordOpen → body → RecordClose+RecordSet` wrapper lives inside the
-    /// iteration; the skip path emits a bare `Absent` for the capture instead of
-    /// a hollow `{ field: null }` record, matching the declared
-    /// `{ … } | null` type.
     pub(super) fn compile_option_record_capture(
         &mut self,
         req: CaptureRequest,
@@ -1249,8 +1160,6 @@ impl NfaBuilder<'_> {
         };
         let brackets = self.bracket_quantifier(&quant, outer_capture, match_exit);
 
-        // Skip: the record is absent — null the capture; the enclosing scope's
-        // trailing effects still run, as they do on the match path.
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
                 let quant_end = self.quant_end_for(&brackets, skip);
@@ -1265,7 +1174,6 @@ impl NfaBuilder<'_> {
             SkipExit::Fail => None,
         };
 
-        // The record's type drives the inner captures' `RecordSet` member resolution.
         let record_type_id = self
             .ctx
             .analysis
@@ -1302,19 +1210,11 @@ impl NfaBuilder<'_> {
                 },
                 Greediness::from(operator),
             ),
-            // Pruned: the element must match — an empty outcome backtracks.
             None => iterate,
         };
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile a list capture (`(x)* @cap`) — `ListOpen → quantifier (with ArrayPush)
-    /// → ListClose+capture → exit(s)`. With `Single` exits the loop falls straight
-    /// through; with `Split` exits an empty match takes `skip_exit` and a loop-exit
-    /// takes `match_exit`, each closing the list. `capture_effects` is built once
-    /// by the caller; the matched element's `Node` is pushed only when the
-    /// element is not already a structured value
-    /// ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
     pub(super) fn compile_list_capture(
         &mut self,
         req: CaptureRequest,
@@ -1377,7 +1277,6 @@ impl NfaBuilder<'_> {
             }
         };
 
-        // Emit the list-open state at entry with outer pre-effects such as VariantOpen.
         self.emit_list_open(inner_entry, outer_capture.pre, quant_start)
     }
 
@@ -1427,16 +1326,6 @@ impl NfaBuilder<'_> {
         self.compile_quantified(quant, scope, route)
     }
 
-    /// Emit a single quantifier iteration (`?`, or the leading match of `*`/`+`):
-    /// reach one element via `nav`, match `compile_body` there, exit to `exit`.
-    ///
-    /// A search nav (see [`quantifier_search_nav`]) wraps a `StayExact` body in
-    /// [`emit_position_search`](Self::emit_position_search), which owns a
-    /// checkpoint so the search can resume at a later sibling when a following
-    /// pattern fails. A bounded (anchored/exact) nav is applied to the body
-    /// directly: it has a single candidate, so the VM's own `continue_search`
-    /// enforces the skip policy and the iteration never advances past a named
-    /// sibling.
     pub(super) fn emit_iteration(
         &mut self,
         nav: Nav,
@@ -1452,15 +1341,6 @@ impl NfaBuilder<'_> {
         }
     }
 
-    /// Emit the first and repeat iterations of a looping quantifier (`*`/`+`),
-    /// both looping back to `loop_entry`.
-    ///
-    /// A resumable search nav shares one `StayExact` body behind two position
-    /// searches, so the repeat reuses the body and resumes via the same
-    /// mechanism as the first. A bounded nav instead compiles the body twice —
-    /// the first iteration applies `first_nav`, the repeat applies its
-    /// [`sibling_continuation`](Nav::sibling_continuation) — so repeated matches
-    /// are adjacent sibling matches rather than a forward search.
     fn emit_loop_iterations(
         &mut self,
         first_nav: Nav,
@@ -1470,7 +1350,6 @@ impl NfaBuilder<'_> {
         let repeat_nav = first_nav.sibling_continuation();
         if let Some(first_search) = quantifier_search_nav(first_nav) {
             let body = compile_body(self, ExitNav::new(loop_entry, Nav::StayExact));
-            // Invariant guarded by `quantifier_tests::search_nav_repeats_as_search`.
             let repeat_search =
                 quantifier_search_nav(repeat_nav).expect("a search nav repeats as a search");
             (
@@ -1485,9 +1364,6 @@ impl NfaBuilder<'_> {
         }
     }
 
-    /// Single dispatch point for every quantified shape. Callers choose the
-    /// semantic iteration scope and route; the quantifier itself remains the
-    /// authority for its element and greediness.
     fn compile_quantified(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -1510,8 +1386,6 @@ impl NfaBuilder<'_> {
 
         match operator.kind() {
             QuantifierKind::OneOrMore => {
-                // Plus: must match at least once. The first iteration has no exit
-                // fallback, so a total failure backtracks to the caller.
                 let loop_entry = self.fresh_label();
                 let (first_iterate, repeat_iterate) =
                     self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
@@ -1529,8 +1403,6 @@ impl NfaBuilder<'_> {
             }
 
             QuantifierKind::ZeroOrMore => match exits {
-                // Pruned empty match: the star must consume, so it compiles
-                // exactly like a plus — total failure backtracks to the caller.
                 CaptureExits::Split {
                     match_exit,
                     skip_exit: SkipExit::Fail,
@@ -1572,8 +1444,6 @@ impl NfaBuilder<'_> {
                         greediness,
                     );
 
-                    // An empty match backtracks to the entry epsilon's checkpoint, restoring
-                    // the pre-nav cursor and taking skip_exit.
                     self.emit_fork_epsilon(
                         ForkTargets {
                             prefer: first_iterate,
@@ -1611,7 +1481,6 @@ impl NfaBuilder<'_> {
                         skip_exit: SkipExit::To(skip_exit),
                         ..
                     } => skip_exit,
-                    // Pruned: the element must match — no skip alternative.
                     CaptureExits::Split {
                         skip_exit: SkipExit::Fail,
                         ..
@@ -1625,8 +1494,6 @@ impl NfaBuilder<'_> {
                     }
                 };
 
-                // Any failure backtracks to the entry epsilon's checkpoint, restoring
-                // the pre-navigation cursor and taking `skip_with_absence`.
                 let iterate = self.emit_iteration(first_nav_mode, match_exit, compile_body);
                 self.emit_fork_epsilon(
                     ForkTargets {
@@ -1639,11 +1506,6 @@ impl NfaBuilder<'_> {
         }
     }
 
-    /// Compile a quantifier that IS a definition's output: the collected
-    /// value is left pending as the call's return value — a captured
-    /// quantifier with no consumer of its own. `*`/`+` collect a list
-    /// (`ListOpen → iterations with ArrayPush → ListClose`); `?` leaves the element's
-    /// value pending on the match path and a bare `Absent` on the skip path.
     fn compile_valued_quantifier(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -1667,13 +1529,6 @@ impl NfaBuilder<'_> {
         }
     }
 
-    /// The `?` half of [`compile_valued_quantifier`](Self::compile_valued_quantifier).
-    ///
-    /// The element's value must survive as the pending call value, so a
-    /// reference element compiles with the keep-value ref lowering (a plain
-    /// `RecordSet` attachment doesn't exist at a definition's root); a node
-    /// element pends its match via a `Node` effect, while structured
-    /// elements leave their own value pending.
     fn compile_valued_optional(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -1694,7 +1549,6 @@ impl NfaBuilder<'_> {
         };
         let brackets = self.bracket_quantifier(quant, outer, match_exit);
 
-        // Skip: the value is a bare null; enclosing-scope effects still run.
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
                 let quant_end = self.quant_end_for(&brackets, skip);
@@ -1707,7 +1561,6 @@ impl NfaBuilder<'_> {
         let match_target =
             self.emit_effects_if_nonempty(brackets.exit, brackets.inner_capture.post.clone());
 
-        // A field constraint is navigation on the element, not structure.
         let (element, field_override) = match &inner {
             Pattern::FieldPattern(f) => {
                 let field_id = self.resolve_field(f);
@@ -1723,9 +1576,6 @@ impl NfaBuilder<'_> {
         let iterate = if let Pattern::DefRef(r) = &element {
             let def_id = self.expect_reference_target(r);
             if self.definition_is_nullable(def_id) {
-                // An empty element match and a skip of the `?` both leave
-                // a null pending; funneling the inline skip into the match
-                // continuation keeps the two paths one value.
                 self.emit_iteration(first_nav, match_target, |this, target| {
                     let ExitNav { exit, nav } = target;
                     this.compile_ref_inline_keep_value(
@@ -1772,16 +1622,11 @@ impl NfaBuilder<'_> {
                 },
                 Greediness::from(operator),
             ),
-            // Pruned: the value must match — an empty outcome backtracks.
             None => iterate,
         };
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile one quantifier-iteration element. A nullable element compiles
-    /// with its empty path pruned ([`SkipExit::Fail`]): an iteration that
-    /// consumes nothing is a failed attempt — the search advances or the loop
-    /// exits — never a spurious empty element.
     pub(super) fn compile_iteration_element(&mut self, inner: &Pattern, ctx: PatternCtx) -> Label {
         if self.pattern_is_nullable(inner) {
             return self.compile_nullable_pattern(inner, ctx, SkipExit::Fail);

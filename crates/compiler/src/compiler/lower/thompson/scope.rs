@@ -1,7 +1,3 @@
-//! Scope management for structured captures.
-//!
-//! Handles `RecordOpen`/`RecordClose` and `ListOpen`/`ListClose` wrappers for captures.
-
 use crate::bytecode::Nav;
 use crate::compiler::ids::{ResultMemberId, TypeId};
 use crate::compiler::lower::ir::{EffectIR, Label, MatchIR};
@@ -14,22 +10,9 @@ use super::capture::{CaptureEffects, PatternCtx};
 #[derive(Clone, Copy, Debug)]
 pub struct RecordScope(pub TypeId);
 
-/// Where a captured pattern's compiled scope continues.
-///
-/// Most captures have one continuation (`Single`). A capture wrapping an
-/// `?`/`*` at a navigating first-child position needs two: the parent must
-/// restore the cursor and take a different path when the inner matches empty
-/// times, so the match and skip paths exit separately (`Split`). A scope emitter
-/// closes its scope on *every* continuation, so the only difference between the
-/// two modes is how many close states it emits. Threading this through one
-/// mechanism dispatch (`compile_captured`) keeps the single- and split-exit paths
-/// from drifting — the gap behind both #470 and the `@_` discard panic.
 #[derive(Clone, Copy)]
 pub(super) enum CaptureExits {
-    /// One continuation for the matched path (a non-skippable capture, or the
-    /// single-exit caller where match and skip coincide).
     Single(Label),
-    /// Distinct continuations for the node-consuming path and the empty skip path.
     Split {
         match_exit: Label,
         skip_exit: SkipExit,
@@ -37,8 +20,6 @@ pub(super) enum CaptureExits {
 }
 
 impl CaptureExits {
-    /// The continuation taken when the capture matches. For `Single` this is the
-    /// only continuation; a bare capture (which never skips) uses it too.
     pub(super) fn match_exit(self) -> Label {
         match self {
             CaptureExits::Single(exit) => exit,
@@ -63,35 +44,18 @@ impl CaptureExits {
     }
 }
 
-/// Continuation for an empty (skip) outcome.
-///
-/// `Fail` prunes the path: no continuation is emitted, so an empty outcome
-/// backtracks like a plain match failure (the effect journal unwinds with it).
-/// Quantifier iterations and alternation alternatives compile nullable elements
-/// this way — there, consuming nothing is a failed attempt, never an empty
-/// element or an empty win.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum SkipExit {
     To(Label),
     Fail,
 }
 
-/// The two distinct continuations a skippable pattern (`?`/`*`) routes to:
-/// the node-consuming path and the empty skip path. Bundling them keeps the two
-/// from being transposed at a call site.
 #[derive(Clone, Copy)]
 pub(super) struct SplitExits {
     pub match_exit: Label,
     pub skip_exit: SkipExit,
 }
 
-/// The per-capture inputs shared by every capture lowering. The continuation is
-/// not among them: it is a sibling argument whose type encodes the capability —
-/// the scope-emitting helpers ([`NfaBuilder::compile_record_capture`] /
-/// [`NfaBuilder::compile_list_capture`]) take a [`CaptureExits`], so an empty
-/// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
-/// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
-/// unrepresentable for them rather than silently collapsed via `match_exit`.
 pub(super) struct CaptureRequest {
     pub inner: Pattern,
     pub nav: Option<Nav>,
@@ -100,8 +64,6 @@ pub(super) struct CaptureRequest {
 }
 
 impl CaptureRequest {
-    /// A definition-root list produces a pending value rather than assigning
-    /// a named capture at this site.
     pub(super) fn pending_list(
         inner: Pattern,
         nav: Option<Nav>,
@@ -116,9 +78,6 @@ impl CaptureRequest {
     }
 }
 
-/// Emitted in order after a scope-closing epsilon (`ListClose`/`RecordClose`): the
-/// capture's own value effects first, then the enclosing scope's. Bundled so the
-/// two same-type slices can't be transposed at a call site.
 #[derive(Clone, Copy)]
 pub(super) struct ScopeCloseEffects<'a> {
     pub leading: &'a [EffectIR],
@@ -183,26 +142,11 @@ impl NfaBuilder<'_> {
         self.lookup_member_symbol(name, type_id)
     }
 
-    /// Compile a record-scope capture: `RecordOpen → inner → RecordClose+capture → exit(s)`.
-    ///
-    /// A quantified inner (`{...}? @cap`) routes to
-    /// [`compile_option_record_capture`](Self::compile_option_record_capture): the
-    /// record value has option type, so the record scope must not open on the skip
-    /// path. For the remaining (non-quantified) inners the record opens once and
-    /// closes on every continuation.
-    ///
-    /// `outer_capture.pre` runs in the enclosing scope before the record opens
-    /// (e.g. an alternative's default-value effects, or a variant's
-    /// `VariantOpen`); dropping it would lose those and close a scope that never opened.
-    /// `@cap` is resolved by the caller, against the enclosing scope.
     pub(super) fn compile_record_capture(
         &mut self,
         req: CaptureRequest,
         exits: CaptureExits,
     ) -> Label {
-        // `{...}? @x`: the record value has option type. The record scope moves
-        // inside the quantifier iteration so a skip emits a bare `Absent` for the
-        // capture — never a hollow `{ field: null }` record.
         if matches!(&req.inner, Pattern::QuantifiedPattern(_)) {
             return self.compile_option_record_capture(req, exits);
         }
@@ -214,7 +158,6 @@ impl NfaBuilder<'_> {
             outer_capture,
         } = req;
 
-        // The record scope's type drives the inner captures' `RecordSet` member resolution.
         let scope_type_id = self
             .ctx
             .analysis
@@ -261,11 +204,6 @@ impl NfaBuilder<'_> {
         self.emit_record_open_with_pre(inner_entry, outer_capture.pre)
     }
 
-    /// Compile a node capture that also contains bubbling inner captures.
-    ///
-    /// `capture_effects` land on the inner match instruction, not a `RecordClose` state.
-    /// The inner captures use the already-open outer scope, so no RecordOpen/RecordClose
-    /// wrapper is emitted.
     pub(super) fn compile_bubble_with_node_capture(
         &mut self,
         req: CaptureRequest,
@@ -300,10 +238,6 @@ impl NfaBuilder<'_> {
         self.dispatch_pattern(&inner, pattern_ctx)
     }
 
-    /// Compile a pattern with RecordOpen/RecordClose wrapping for list iteration.
-    ///
-    /// Used when inner is a scope-creating pattern (sequence/alternation) with
-    /// internal captures. Each iteration produces `RecordOpen → inner → RecordClose ArrayPush`.
     pub(super) fn compile_record_for_list(
         &mut self,
         inner: &Pattern,
@@ -319,7 +253,6 @@ impl NfaBuilder<'_> {
                 .into(),
         );
 
-        // `element_type_id` drives `RecordSet` effects inside the record scope.
         let inner_entry = self.with_scope_if_present(element_type_id, |this| {
             this.compile_iteration_element(inner, PatternCtx::with_nav(record_close, nav_override))
         });
@@ -347,21 +280,14 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a record-open epsilon state with no enclosing pre-effects.
     pub(super) fn emit_record_open(&mut self, successor: Label) -> Label {
         self.emit_record_open_with_pre(successor, vec![])
     }
 
-    /// Emit a record-close epsilon state with no capture or outer effects.
     pub(super) fn emit_record_close(&mut self, successor: Label) -> Label {
         self.emit_record_close_with_effects(ScopeCloseEffects::none(), successor)
     }
 
-    /// Emit a record-close epsilon state carrying capture and outer effects.
-    ///
-    /// The record-scope counterpart of [`emit_list_close`](Self::emit_list_close),
-    /// used by split-exit record captures to close the record and apply `RecordSet`
-    /// on each exit.
     pub(super) fn emit_record_close_with_effects(
         &mut self,
         effects: ScopeCloseEffects<'_>,
@@ -379,7 +305,6 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a list-open epsilon state with optional leading and trailing effects.
     pub(super) fn emit_list_open(
         &mut self,
         successor: Label,
@@ -397,11 +322,6 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a record-open epsilon state with optional leading effects.
-    ///
-    /// The record-scope counterpart of [`emit_list_open`](Self::emit_list_open),
-    /// used by split-exit record captures to open the record after the enclosing
-    /// scope's pre-effects (e.g. a variant case's `VariantOpen`).
     pub(super) fn emit_record_open_with_pre(
         &mut self,
         successor: Label,

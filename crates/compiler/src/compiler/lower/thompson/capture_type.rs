@@ -1,5 +1,3 @@
-//! Lowering for built-in text and boolean capture types.
-
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::boundary::BoundaryState;
 use crate::compiler::analyze::types::{
@@ -87,12 +85,6 @@ impl CaptureTerminal {
     }
 }
 
-/// Owns one capture-type transformation and its continuation protocol.
-///
-/// The plan, navigation, and match/skip exits travel together because every
-/// recursive call changes them as one semantic route. Keeping that behavior on
-/// a lowering role prevents helper calls from accepting incoherent combinations
-/// such as a string close with presence-boolean source semantics.
 pub(super) struct CaptureTypeLowerer<'b, 'a> {
     compiler: &'b mut NfaBuilder<'a>,
     plan: CaptureTypePlan,
@@ -115,10 +107,6 @@ impl<'a> NfaBuilder<'a> {
         }
     }
 
-    /// A transformed quantifier element still obeys the ordinary iteration
-    /// contract: matching zero nodes is a failed attempt, never a present
-    /// option value or a list item. Apply the conversion only to the
-    /// consuming continuation.
     fn capture_type_iteration_exits(&self, pattern: &Pattern, exit: Label) -> CaptureExits {
         if !self.pattern_is_nullable(pattern) {
             return CaptureExits::Single(exit);

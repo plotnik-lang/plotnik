@@ -10,9 +10,6 @@ use crate::core::NodeFieldId;
 use super::NfaBuilder;
 use super::capture::CaptureEffects;
 
-/// `prefer` is tried first when greedy, `other` first when lazy. Bundled
-/// so the two same-type `Label`s can't be transposed — a swap would silently
-/// flip greediness.
 #[derive(Clone, Copy)]
 pub(super) struct ForkTargets {
     pub prefer: Label,
@@ -99,11 +96,6 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit an epsilon with combined effects.
-    ///
-    /// Note: this consumes only `outer.post`. Callers whose capture owns no
-    /// scope-opening state (`PendingValue`, suppressed region) must route `outer.pre`
-    /// separately via [`wrap_entry_pre`](Self::wrap_entry_pre).
     pub(super) fn emit_effects_epsilon(
         &mut self,
         exit: Label,
@@ -120,16 +112,6 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Emit `pre` effects on an epsilon that runs immediately before `entry`, in
-    /// the enclosing scope. Returns the new entry, or `entry` unchanged when
-    /// `pre` is empty.
-    ///
-    /// Scope-opening captures (`compile_record_capture`, `compile_list_capture`)
-    /// fold `outer_capture.pre` onto their own `RecordOpen`/`ListOpen` state. Captures that
-    /// own no such state — `PendingValue` and suppressed regions — have nowhere to fold it,
-    /// so they call this. Dropping it loses a case's `VariantOpen` (or an
-    /// an alternative's injected defaults), and the path then closes a
-    /// scope it never opened.
     pub(super) fn wrap_entry_pre(&mut self, entry: Label, pre: Vec<EffectIR>) -> Label {
         if pre.is_empty() {
             return entry;
@@ -143,9 +125,6 @@ impl NfaBuilder<'_> {
         pre_state
     }
 
-    /// Produce absent captures on the skip path of a `?`/`*` quantifier,
-    /// mirroring what alternations do for asymmetric alternatives.
-    /// Returns `exit` unchanged when no `RecordSet` effects are present.
     pub(super) fn emit_absence_for_skip_path(
         &mut self,
         exit: Label,
@@ -180,18 +159,11 @@ impl NfaBuilder<'_> {
         self.emit_effects_if_nonempty(exit, absence_effects)
     }
 
-    /// Emit absence events for internal captures when skipping a `?`/`*` pattern.
-    ///
-    /// Unlike `emit_absence_for_skip_path` which handles captures passed as effects,
-    /// this function handles captures defined INSIDE the pattern (e.g., `{(x) @cap}?`).
-    /// It collects all capture names from the pattern and emits `Absent RecordSet` for each.
     pub(super) fn emit_absence_for_internal_captures(
         &mut self,
         exit: Label,
         inner: &Pattern,
     ) -> Label {
-        // Suppressed captures declare no fields; the name lookup below would
-        // silently bind a same-named field of the enclosing scope.
         if self.is_suppressed() {
             return exit;
         }
@@ -236,33 +208,17 @@ impl NfaBuilder<'_> {
         self.emit_effects_epsilon(exit, effects, CaptureEffects::default())
     }
 
-    /// Cascading for bytecode limits is handled by the lowering pass.
     pub(super) fn emit_epsilon(&mut self, label: Label, successors: Vec<Label>) {
         self.instructions
             .push(MatchIR::terminal(label).successors(successors).into());
     }
 
-    /// Cascading for bytecode limits is handled by the lowering pass.
-    /// Returns the entry label (same as `instr.label`).
     pub(super) fn emit_match(&mut self, instr: MatchIR) -> Label {
         let entry = instr.label;
         self.instructions.push(instr.into());
         entry
     }
 
-    /// Emit a wildcard navigation state that accepts any node.
-    ///
-    /// Used for skip-retry logic in quantifiers: navigates to the next position
-    /// and matches any node there. If navigation fails (no more siblings/children),
-    /// the VM backtracks automatically.
-    ///
-    /// The nav is emitted exact: a wildcard state is always internal to an
-    /// NFA-level retry loop (position search), and that loop owns the sibling
-    /// search. The engine treats a non-exact `Down*`/`Next*` match acceptance
-    /// as a choice point and leaves a resume checkpoint
-    /// (`Nav::is_sibling_search`); an exact nav opts these states out, keeping
-    /// every search under exactly one retry owner. Behavior is otherwise
-    /// identical — with an `Any` constraint the skip policy is never consulted.
     pub(super) fn emit_wildcard_nav(&mut self, label: Label, nav: Nav, successor: Label) {
         self.instructions.push(
             MatchIR::epsilon(label, successor)
@@ -271,8 +227,6 @@ impl NfaBuilder<'_> {
         );
     }
 
-    /// Emit an epsilon fork preferring `targets.prefer` when greedy,
-    /// `targets.other` when lazy.
     pub(super) fn emit_fork_epsilon(
         &mut self,
         targets: ForkTargets,
@@ -292,29 +246,6 @@ impl NfaBuilder<'_> {
         self.emit_epsilon(label, greediness.successors(targets));
     }
 
-    /// Emit a resumable sibling search around a `body` that matches exactly at
-    /// the current position. This is the single primitive for every kind of
-    /// position search: navigate to a candidate, try the body there, and on
-    /// failure advance to the next sibling and retry.
-    ///
-    /// ```text
-    ///   navigate: Match(nav, wildcard) -> try
-    ///   try:      epsilon -> [body, retry]
-    ///   retry:    Match(Next, wildcard) -> try
-    /// ```
-    ///
-    /// When the body fails (even deep inside, on a descendant), the VM
-    /// backtracks to `try`, which falls through to `retry`, advances to the
-    /// next sibling, and retries. When siblings are exhausted, backtracking
-    /// propagates past `try` to the caller's checkpoint.
-    ///
-    /// The body is always preferred over advancing: the iteration has no exit
-    /// edge of its own, so a following pattern can never bind at a
-    /// failed-candidate cursor position (see #414). Greediness and empty-match
-    /// escape, where applicable, live on the caller's loop-boundary epsilons,
-    /// not here.
-    ///
-    /// Returns the `navigate` label (the entry point for the search).
     pub(super) fn emit_position_search(&mut self, nav: Nav, body: Label) -> Label {
         let try_label = self.fresh_label();
 
@@ -336,10 +267,6 @@ impl NfaBuilder<'_> {
         navigate
     }
 
-    /// Position search whose candidate selection also discharges a grammar
-    /// field obligation. The exact body sees the selected node but never the
-    /// field again; retries reapply the field only while selecting a new
-    /// candidate.
     pub(super) fn emit_position_search_with_field(
         &mut self,
         nav: Nav,

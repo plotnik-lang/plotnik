@@ -1,5 +1,3 @@
-//! Compile-time inspection span table.
-
 use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
