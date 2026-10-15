@@ -89,7 +89,7 @@ pub fn run(m: &ArgMatches, command: &str) -> CliResult {
         writeln_stderr(format_args!("{}", tracer.render()))?;
         result
     } else {
-        execute(vm, &module, entrypoint, command, NoopTracer)
+        execute(vm, &module, entrypoint, command, &mut NoopTracer)
     };
     let Some(value) = result? else {
         writeln_stderr(format_args!("no match"))?;
@@ -105,10 +105,10 @@ fn execute<'s, 't, T: Tracer>(
     module: &'s Module,
     entrypoint: Entrypoint,
     command: &str,
-    mut tracer: T,
+    tracer: &mut T,
 ) -> Result<Option<Value<'s, 't>>, CliError> {
     match command {
-        "exec" => vm.apply_with(module, &entrypoint, &mut tracer),
+        "exec" => vm.apply_with(module, &entrypoint, tracer),
         "find" => vm
             .traverse_with(module, entrypoint, tracer)
             .next()
@@ -117,7 +117,7 @@ fn execute<'s, 't, T: Tracer>(
             .traverse_with(module, entrypoint, tracer)
             .collect::<Result<Vec<_>, _>>()
             .map(|values| Some(Value::List(values))),
-        _ => unreachable!("dispatch selects an execution command"),
+        _ => unreachable!("unexpected execution command: {command:?}"),
     }
     .map_err(|error| CliError::fatal(error.to_string()))
 }

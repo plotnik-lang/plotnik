@@ -97,7 +97,7 @@ impl<'s, 't> VM<'s, 't> {
         self.apply_with(module, entrypoint, &mut NoopTracer)
     }
 
-    /// Apply once with the same result and budget semantics, observing the attempt.
+    /// Apply as in [`Self::apply`], tracing the attempt.
     pub fn apply_with<T: Tracer>(
         self,
         module: &'s Module,
@@ -116,27 +116,36 @@ impl<'s, 't> VM<'s, 't> {
         module: &'s Module,
         entrypoint: Entrypoint,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
-        self.traverse_with(module, entrypoint, NoopTracer)
+        let mut tracer = NoopTracer;
+        self.traverse_impl(move |vm, budget| {
+            vm.apply_budgeted(module, &entrypoint, &mut tracer, budget)
+        })
     }
 
-    /// Observe every attempted candidate, including failures, only as consumed.
-    /// Pass an owned tracer or borrow one with `&mut` to inspect it after drop.
+    /// Traverse as in [`Self::traverse`], tracing each attempted candidate, including failures,
+    /// only as the iterator is consumed.
+    /// Drop the iterator before inspecting the borrowed tracer.
     pub fn traverse_with<T: Tracer>(
         self,
         module: &'s Module,
         entrypoint: Entrypoint,
-        mut tracer: T,
+        tracer: &mut T,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
+        self.traverse_impl(move |vm, budget| vm.apply_budgeted(module, &entrypoint, tracer, budget))
+    }
+
+    fn traverse_impl<F>(
+        self,
+        mut apply: F,
+    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>>
+    where
+        F: FnMut(Self, &mut ExecutionBudget) -> Result<Option<Value<'s, 't>>, LimitExceeded>,
+    {
         Traversal::new(
             self.engine.node(),
             ExecutionBudget::new(self.limits),
             move |node, budget: &mut ExecutionBudget| {
-                Self::at_node(self.source, node, budget.limits()).apply_budgeted(
-                    module,
-                    &entrypoint,
-                    &mut tracer,
-                    budget,
-                )
+                apply(Self::at_node(self.source, node, budget.limits()), budget)
             },
         )
     }

@@ -33,7 +33,7 @@ Run 'plotnik <command> --help' for options."#,
         )
         .subcommand(execution_command(
             "exec",
-            "Apply a query once at the source root",
+            "Apply a query at the source-tree root",
         ))
         .subcommand(execution_command(
             "find",
@@ -41,7 +41,7 @@ Run 'plotnik <command> --help' for options."#,
         ))
         .subcommand(execution_command(
             "find-all",
-            "Find all matches in the source tree",
+            "Collect one result per matching node",
         ))
         .subcommand(check_command())
         .subcommand(tree_command())
@@ -202,22 +202,25 @@ pub fn infer_command() -> Command {
 }
 
 fn execution_command(name: &'static str, about: &'static str) -> Command {
+    let search_help = match name {
+        "find" => "\n\nSearch from the root, depth-first in source order.",
+        "find-all" => {
+            "\n\nSearch from the root, depth-first in source order, including nested matches.\n\
+             Return a JSON array, or [] if nothing matches."
+        }
+        _ => "",
+    };
+
     Command::new(name)
         .about(about)
         .override_usage(format!(
-            "plotnik {name} <PATH> <FILE> --entry <NAME> [OPTIONS]\n  plotnik {name} - [PATH] <FILE> [OPTIONS]"
+            "plotnik {name} [OPTIONS] --entry <NAME> <PATH> <FILE>\n  plotnik {name} [OPTIONS] - [PATH] <FILE>"
         ))
-        .after_help(
-            "PATH is a saved PTK file or directory of .ptk files.\n\
-             A leading '-' reads a PTK expression from stdin. Saved definitions\n\
-             can support that expression. Without stdin, --entry is required.\n\
-             FILE is exactly one programming-language source file, always last.\n\
-             Its extension selects the grammar unless --lang overrides it.\n\
-             PTK language tags group directory members, not grammar selection.\n\n\
-             exec applies once at the root. find and find-all search inclusive,\n\
-             source-order depth-first, retaining nested matches. find returns\n\
-             the first result. find-all returns one JSON array, empty if unmatched.",
-        )
+        .after_help(format!(
+            "PATH is a PTK file or directory of .ptk files.\n\
+             Use '-' to read a PTK expression from stdin. [PATH] supplies definitions it can use.\n\
+             FILE is the source file. Its extension selects the grammar unless --lang is set.{search_help}",
+        ))
         .arg(
             Arg::new("inputs")
                 .value_name("INPUT")
@@ -225,7 +228,7 @@ fn execution_command(name: &'static str, about: &'static str) -> Command {
                 .num_args(1..=3)
                 .action(clap::ArgAction::Append)
                 .required(true)
-                .help("PTK input first, one source FILE last"),
+                .help("PTK input followed by the source file"),
         )
         .next_help_heading("Input options")
         .arg(lang_arg())
@@ -237,7 +240,7 @@ fn execution_command(name: &'static str, about: &'static str) -> Command {
             Arg::new("trace")
                 .long("trace")
                 .action(clap::ArgAction::SetTrue)
-                .help("Trace attempted matches to stderr, keeping result JSON on stdout"),
+                .help("Write the execution trace to stderr"),
         )
         .arg(verbose_arg().requires("trace"))
         .next_help_heading("Limit options")

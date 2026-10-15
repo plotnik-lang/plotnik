@@ -7,7 +7,6 @@ use crate::error::CliError;
 
 pub struct Inputs<'a> {
     pub query_path: Option<&'a Path>,
-    /// No named entry means a leading '-' selected the stdin expression.
     pub entry: Option<&'a str>,
     pub source_path: &'a Path,
 }
@@ -16,10 +15,12 @@ impl<'a> Inputs<'a> {
     pub fn from_matches(m: &'a ArgMatches) -> Result<Self, CliError> {
         let paths: Vec<_> = m
             .get_many::<PathBuf>("inputs")
-            .expect("clap requires positional input")
+            .expect("clap requires the inputs argument")
             .map(PathBuf::as_path)
             .collect();
-        let (source_path, query_paths) = paths.split_last().expect("clap requires inputs");
+        let (source_path, query_paths) = paths
+            .split_last()
+            .expect("clap requires at least one input");
         let expression = query_paths
             .first()
             .is_some_and(|path| *path == Path::new("-"));
@@ -27,26 +28,24 @@ impl<'a> Inputs<'a> {
             (true, [_]) => None,
             (true, [_, path]) | (false, [path]) => Some(*path),
             _ => {
-                return Err(CliError::fatal(
-                    "expected one saved PTK path, or leading '-' with an optional saved PTK path, then one source FILE",
-                ));
+                return Err(CliError::fatal("expected <PATH> <FILE> or - [PATH] <FILE>"));
             }
         };
         if *source_path == Path::new("-") || query_path == Some(Path::new("-")) {
-            return Err(CliError::fatal(
-                "only a leading '-' can read stdin; the source must be a file",
-            ));
+            return Err(CliError::fatal("'-' must be the first positional input"));
         }
 
         let entry = m.get_one::<String>("entry").map(String::as_str);
         if expression && entry.is_some() {
             return Err(CliError::fatal(
-                "--entry conflicts with the stdin expression entrypoint",
+                "cannot use --entry with a stdin expression",
             ));
         }
 
         if !expression && entry.is_none() {
-            return Err(CliError::fatal("saved PTK input requires --entry NAME"));
+            return Err(CliError::fatal(
+                "--entry <NAME> is required without a stdin expression",
+            ));
         }
 
         Ok(Self {

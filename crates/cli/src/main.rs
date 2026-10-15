@@ -11,8 +11,7 @@ use cli::{CheckOpts, DumpOpts, GenerateOpts, InferOpts, build_cli};
 use error::{CliError, CliResult};
 
 fn main() -> ExitCode {
-    // Die silently on closed pipes (`plotnik dump … | head`) like standard Unix
-    // tools, instead of panicking with exit 101 when println! hits EPIPE.
+    // Rust ignores SIGPIPE by default. Restore silent Unix closed-pipe termination.
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
