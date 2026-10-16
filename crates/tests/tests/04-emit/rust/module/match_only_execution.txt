@@ -23,7 +23,8 @@ impl Probe {
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<rt::Node<'t>>, rt::LimitExceeded> {
         let mut budget = matcher::execution_budget(node);
-        Self::apply(node, source, &mut budget)
+        let mut eng = rt::Engine::new_match_only(node.walk());
+        Self::apply(&mut eng, source, &mut budget)
     }
 
     /// Search inclusively in source-order DFS preorder, retaining nested matches.
@@ -34,11 +35,13 @@ impl Probe {
     ) -> impl ::core::iter::FusedIterator<
         Item = ::core::result::Result<rt::Node<'t>, rt::LimitExceeded>,
     > + use<'t, 's> {
+        let mut eng = rt::Engine::new_match_only(scope.walk());
         rt::Traversal::new(
             scope,
             matcher::execution_budget(scope),
             move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {
-                Self::apply(node, source, budget)
+                eng.reset(node);
+                Self::apply(&mut eng, source, budget)
             },
         )
     }
@@ -60,11 +63,12 @@ impl Probe {
     }
 
     fn apply<'t>(
-        node: rt::Node<'t>,
+        eng: &mut rt::Engine<'t>,
         source: &str,
         budget: &mut rt::ExecutionBudget,
     ) -> ::core::result::Result<::core::option::Option<rt::Node<'t>>, rt::LimitExceeded> {
-        Ok(matcher::probe_apply(node, source, budget)?.map(|_| node))
+        let node = eng.node();
+        Ok(matcher::probe_apply(eng, source, budget)?.map(|_| node))
     }
 }
 
@@ -171,13 +175,13 @@ mod matcher {
     }
 
     /// Apply one candidate using the operation's cumulative budget.
-    pub(super) fn probe_apply<'t>(
-        node: rt::Node<'t>,
+    pub(super) fn probe_apply<'a, 't>(
+        eng: &'a mut rt::Engine<'t>,
         source: &str,
         budget: &mut rt::ExecutionBudget,
-    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        run_at_node::<true, true, false>(
-            node,
+    ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        run_at_node::<true, true>(
+            eng,
             source,
             S2_PROBE,
             EntryBoundary::new(false, false),
@@ -249,36 +253,31 @@ mod matcher {
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         let mut budget = rt::ExecutionBudget::new(limits);
-        run_at_node::<METERED_FUEL, METERED_MEMORY, RECORD_OUTPUT_EVENTS>(
-            tree.root_node(),
+        let mut eng = if RECORD_OUTPUT_EVENTS {
+            rt::Engine::new(tree.root_node().walk())
+        } else {
+            rt::Engine::new_match_only(tree.root_node().walk())
+        };
+        let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
+            &mut eng,
             source,
             entry,
             boundary,
             &mut budget,
-        )
+        )?
+        .is_some();
+        Ok(accepted.then(|| eng.into_journal()))
     }
 
-    /// Internal application boundary. The caller owns the operation budget, so
-    /// applying at another candidate never resets fuel or memory sampling.
-    fn run_at_node<
-        't,
-        const METERED_FUEL: bool,
-        const METERED_MEMORY: bool,
-        const RECORD_OUTPUT_EVENTS: bool,
-    >(
-        node: rt::Node<'t>,
+    fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+        eng: &'a mut rt::Engine<'t>,
         source: &str,
         entry: u16,
         boundary: EntryBoundary,
         budget: &mut rt::ExecutionBudget,
-    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        verify_language(node);
-        let mut eng = if RECORD_OUTPUT_EVENTS {
-            rt::Engine::new(node.walk())
-        } else {
-            rt::Engine::new_match_only(node.walk())
-        };
-        boundary.begin(&mut eng);
+    ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        verify_language(eng.node());
+        boundary.begin(eng);
         let mut ip = entry;
         loop {
             if METERED_FUEL || METERED_MEMORY {
@@ -297,17 +296,17 @@ mod matcher {
                     }
                 }
             }
-            match dispatch(&mut eng, source, ip) {
+            match dispatch(eng, source, ip) {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => {
-                    boundary.finish(&mut eng);
-                    return Ok(Some(eng.into_journal()));
+                    boundary.finish(eng);
+                    return Ok(Some(eng.accepted_journal()));
                 }
-                Flow::Backtrack => match backtrack(&mut eng, source) {
+                Flow::Backtrack => match backtrack(eng, source) {
                     Unwound::Resumed(next) => ip = next,
                     Unwound::Accepted => {
-                        boundary.finish(&mut eng);
-                        return Ok(Some(eng.into_journal()));
+                        boundary.finish(eng);
+                        return Ok(Some(eng.accepted_journal()));
                     }
                     Unwound::NoMatch => return Ok(None),
                 },

@@ -5,24 +5,37 @@ use super::value::{NodeValue, Value};
 use super::verify::debug_verify_type;
 use plotnik_runtime::{JournalEvent, OutputEvents};
 
-pub struct ValueMaterializer<'a> {
-    source: &'a str,
-    member_names: Box<[&'a str]>,
+pub struct ValueMaterializer<'s, 't> {
+    source: &'s str,
+    module: &'s Module,
+    member_names: Box<[&'s str]>,
+    stack: Vec<ValueAccumulator<'s, 't>>,
+    scalar_ranges: Vec<Option<std::ops::Range<usize>>>,
 }
 
-impl<'a> ValueMaterializer<'a> {
-    pub fn new(source: &'a str, module: &'a Module) -> Self {
+impl<'s, 't> ValueMaterializer<'s, 't> {
+    pub fn new(source: &'s str, module: &'s Module) -> Self {
         let types = module.types();
         let strings = module.strings();
         let member_names = types.members().map(|m| strings.get(m.name_id)).collect();
         Self {
             source,
+            module,
             member_names,
+            stack: Vec::new(),
+            scalar_ranges: Vec::new(),
         }
     }
 
-    fn resolve_member_name(&self, idx: u16) -> &'a str {
-        self.member_names[idx as usize]
+    pub fn materialize_verified(
+        &mut self,
+        entrypoint: &Entrypoint,
+        events: OutputEvents<'_, 't>,
+        colors: Colors,
+    ) -> Value<'s, 't> {
+        let value = self.materialize(events);
+        debug_verify_type(&value, entrypoint.result_type(), self.module, colors);
+        value
     }
 }
 
@@ -37,10 +50,7 @@ pub fn materialize_verified<'s, 't>(
     events: OutputEvents<'_, 't>,
     colors: Colors,
 ) -> Value<'s, 't> {
-    let materializer = ValueMaterializer::new(source, module);
-    let value = materializer.materialize(events);
-    debug_verify_type(&value, entrypoint.result_type(), module, colors);
-    value
+    ValueMaterializer::new(source, module).materialize_verified(entrypoint, events, colors)
 }
 
 enum ValueAccumulator<'s, 't> {
@@ -64,23 +74,33 @@ impl ValueAccumulator<'_, '_> {
     }
 }
 
-impl<'a> ValueMaterializer<'a> {
-    pub fn materialize<'t>(&self, events: OutputEvents<'_, 't>) -> Value<'a, 't> {
-        let mut stack: Vec<ValueAccumulator<'a, 't>> = vec![];
-        let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
+impl<'s, 't> ValueMaterializer<'s, 't> {
+    pub fn materialize(&mut self, events: OutputEvents<'_, 't>) -> Value<'s, 't> {
+        let Self {
+            source,
+            module: _,
+            member_names,
+            stack,
+            scalar_ranges,
+        } = self;
+        assert!(stack.is_empty(), "previous builder frames must be closed");
+        assert!(
+            scalar_ranges.is_empty(),
+            "previous scalar frames must be closed"
+        );
 
-        let mut pending: Option<Value<'a, 't>> = None;
+        let mut pending: Option<Value<'s, 't>> = None;
 
         for (event_idx, event) in events.iter().enumerate() {
             match event {
                 JournalEvent::Node(n) => {
-                    pending = Some(Value::Node(NodeValue::from_node(*n, self.source)));
+                    pending = Some(Value::Node(NodeValue::from_node(*n, source)));
                 }
                 JournalEvent::Absent => {
                     pending = Some(Value::Absent);
                 }
                 JournalEvent::NodeText(node) => {
-                    pending = Some(Value::Text(plotnik_runtime::node_text(self.source, node)));
+                    pending = Some(Value::Text(plotnik_runtime::node_text(source, node)));
                 }
                 JournalEvent::NodeBool(_) => {
                     pending = Some(Value::Bool(true));
@@ -95,7 +115,7 @@ impl<'a> ValueMaterializer<'a> {
                 }
                 JournalEvent::ScalarMark(node) => {
                     let mark = node.start_byte()..node.end_byte();
-                    for range in &mut scalar_ranges {
+                    for range in scalar_ranges.iter_mut() {
                         *range = Some(match range.take() {
                             Some(current) => {
                                 current.start.min(mark.start)..current.end.max(mark.end)
@@ -121,9 +141,7 @@ impl<'a> ValueMaterializer<'a> {
                         .pop()
                         .expect("Scalar marker owns a range frame");
                     pending = Some(match range {
-                        Some(range) => {
-                            Value::Text(plotnik_runtime::source_text(self.source, range))
-                        }
+                        Some(range) => Value::Text(plotnik_runtime::source_text(source, range)),
                         None => Value::Absent,
                     });
                 }
@@ -175,7 +193,7 @@ impl<'a> ValueMaterializer<'a> {
                     stack.push(ValueAccumulator::Record(vec![]));
                 }
                 JournalEvent::RecordSet(idx) => {
-                    let field_name = self.resolve_member_name(*idx);
+                    let field_name = member_names[*idx as usize];
                     let val = pending
                         .take()
                         .expect("RecordSet requires a produced value (verified at load)");
@@ -201,7 +219,7 @@ impl<'a> ValueMaterializer<'a> {
                     pending = Some(Value::Record(fields));
                 }
                 JournalEvent::VariantOpen(idx) => {
-                    let case = self.resolve_member_name(*idx);
+                    let case = member_names[*idx as usize];
                     stack.push(ValueAccumulator::Variant {
                         case,
                         fields: vec![],

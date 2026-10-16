@@ -139,6 +139,12 @@ impl FrameArena {
         }
     }
 
+    #[cfg(feature = "execution")]
+    pub(crate) fn clear(&mut self) {
+        self.frames.clear();
+        self.current = None;
+    }
+
     /// Push a new frame, returns its index.
     pub fn push(&mut self, call_site: u16) -> Result<u32, CallFrameError> {
         let idx = u32::try_from(self.frames.len()).map_err(|_| CallFrameError::ArenaCapacity {

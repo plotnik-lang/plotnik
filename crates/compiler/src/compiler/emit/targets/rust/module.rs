@@ -446,29 +446,21 @@ impl<'a> Generator<'a> {
         let memory_metered = if memory_metered { "true" } else { "false" };
         for entry in self.plan.matcher().entrypoints() {
             let def = entry.name.as_str();
-            let name = self
-                .plan
-                .result()
-                .definitions
-                .definition(entry.definition)
-                .name();
-            let has_decoder = self.plan.decode().item(name).has_decoder();
             let info = self.state(entry.entry);
             let boundary = match entry.boundary {
                 EntryBoundary::Passthrough => "EntryBoundary::new(false, false)",
                 EntryBoundary::Node => "EntryBoundary::new(false, true)",
                 EntryBoundary::Record => "EntryBoundary::new(true, false)",
             };
-            let record_output = if has_decoder { "true" } else { "false" };
-            let driver =
-                format!("run_at_node::<{fuel_metered}, {memory_metered}, {record_output}>");
+            let driver = format!("run_at_node::<{fuel_metered}, {memory_metered}>");
             let state = &info.const_name;
-            let compact = format!("    {driver}(node, source, {state}, {boundary}, budget)");
-            let apply_call = if compact.len() + 4 <= 100 {
+            let args = format!("eng, source, {state}, {boundary}, budget");
+            let compact = format!("    {driver}({args})");
+            let apply_call = if compact.len() + 4 <= 100 && args.len() <= 60 {
                 compact
             } else {
                 format!(
-                    "    {driver}(\n        node,\n        source,\n        {state},\n        {boundary},\n        budget,\n    )"
+                    "    {driver}(\n        eng,\n        source,\n        {state},\n        {boundary},\n        budget,\n    )"
                 )
             };
             let subs = [
@@ -1281,11 +1273,11 @@ pub fn @JOURNAL_FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJou
 
 const APPLY_ENTRY_FN: &str = r#"
 /// Apply one candidate using the operation's cumulative budget.
-pub(super) fn @APPLY_FN@<'t>(
-    node: rt::Node<'t>,
+pub(super) fn @APPLY_FN@<'a, 't>(
+    eng: &'a mut rt::Engine<'t>,
     source: &str,
     budget: &mut rt::ExecutionBudget,
-) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
+) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
 @APPLY_CALL@
 }
 "#;
@@ -1356,36 +1348,31 @@ fn run<
     limits: rt::ResolvedRuntimeLimits,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
     let mut budget = rt::ExecutionBudget::new(limits);
-    run_at_node::<METERED_FUEL, METERED_MEMORY, RECORD_OUTPUT_EVENTS>(
-        tree.root_node(),
+    let mut eng = if RECORD_OUTPUT_EVENTS {
+        rt::Engine::new(tree.root_node().walk())
+    } else {
+        rt::Engine::new_match_only(tree.root_node().walk())
+    };
+    let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
+        &mut eng,
         source,
         entry,
         boundary,
         &mut budget,
-    )
+    )?
+    .is_some();
+    Ok(accepted.then(|| eng.into_journal()))
 }
 
-/// Internal application boundary. The caller owns the operation budget, so
-/// applying at another candidate never resets fuel or memory sampling.
-fn run_at_node<
-    't,
-    const METERED_FUEL: bool,
-    const METERED_MEMORY: bool,
-    const RECORD_OUTPUT_EVENTS: bool,
->(
-    node: rt::Node<'t>,
+fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+    eng: &'a mut rt::Engine<'t>,
     source: &str,
     entry: u16,
     boundary: EntryBoundary,
     budget: &mut rt::ExecutionBudget,
-) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    verify_language(node);
-    let mut eng = if RECORD_OUTPUT_EVENTS {
-        rt::Engine::new(node.walk())
-    } else {
-        rt::Engine::new_match_only(node.walk())
-    };
-    boundary.begin(&mut eng);
+) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
+    verify_language(eng.node());
+    boundary.begin(eng);
     let mut ip = entry;
     loop {
         if METERED_FUEL || METERED_MEMORY {
@@ -1404,17 +1391,17 @@ fn run_at_node<
                 }
             }
         }
-        match dispatch(&mut eng, source, ip) {
+        match dispatch(eng, source, ip) {
             Flow::Jump(next) => ip = next,
             Flow::Accept => {
-                boundary.finish(&mut eng);
-                return Ok(Some(eng.into_journal()));
+                boundary.finish(eng);
+                return Ok(Some(eng.accepted_journal()));
             }@FLOW_CALL_ERROR_ARM@
-            Flow::Backtrack => match backtrack(&mut eng, source) {
+            Flow::Backtrack => match backtrack(eng, source) {
                 Unwound::Resumed(next) => ip = next,
                 Unwound::Accepted => {
-                    boundary.finish(&mut eng);
-                    return Ok(Some(eng.into_journal()));
+                    boundary.finish(eng);
+                    return Ok(Some(eng.accepted_journal()));
                 }
                 Unwound::NoMatch => return Ok(None),@UNWOUND_CALL_ERROR_ARM@
             },

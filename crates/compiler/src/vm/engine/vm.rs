@@ -13,7 +13,7 @@ use plotnik_runtime::{
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
-use super::materializer::materialize_verified;
+use super::materializer::ValueMaterializer;
 use super::trace::{NoopTracer, Tracer};
 use super::value::{NodeValue, Value, node_text};
 
@@ -72,6 +72,83 @@ impl<'s, 't> VMBuilder<'s, 't> {
     }
 }
 
+struct Application<'s, 't> {
+    vm: VM<'s, 't>,
+    module: &'s Module,
+    entrypoint: Entrypoint,
+    materializer: Option<ValueMaterializer<'s, 't>>,
+}
+
+impl<'s, 't> Application<'s, 't> {
+    fn new(vm: VM<'s, 't>, module: &'s Module, entrypoint: Entrypoint) -> Self {
+        Self {
+            vm,
+            module,
+            entrypoint,
+            materializer: None,
+        }
+    }
+
+    fn apply_budgeted<T: Tracer>(
+        &mut self,
+        tracer: &mut T,
+        budget: &mut ExecutionBudget,
+    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
+        let node = self.vm.engine.node();
+        let source = self.vm.source;
+        let (result, _) = self
+            .vm
+            .run_budgeted(self.module, &self.entrypoint, tracer, budget);
+        match result {
+            Ok(()) => {}
+            Err(RuntimeError::NoMatch) => return Ok(None),
+            Err(RuntimeError::OutOfFuel(limit)) => return Err(LimitExceeded::OutOfFuel(limit)),
+            Err(RuntimeError::MemoryLimitExceeded { used, limit }) => {
+                return Err(LimitExceeded::Memory { used, limit });
+            }
+            Err(RuntimeError::CallFrame(error)) => return Err(error.into()),
+        }
+
+        let result_type = self
+            .module
+            .types()
+            .get(self.entrypoint.result_type())
+            .expect("entrypoint result type belongs to its module");
+        if matches!(
+            result_type.decode(),
+            TypeDefKind::Primitive(TypeKind::NoValue)
+        ) {
+            return Ok(Some(Value::Node(NodeValue::from_node(node, source))));
+        }
+
+        let materializer = self
+            .materializer
+            .get_or_insert_with(|| ValueMaterializer::new(source, self.module));
+        Ok(Some(materializer.materialize_verified(
+            &self.entrypoint,
+            self.vm.engine.journal().output_events(),
+            Colors::new(false),
+        )))
+    }
+
+    fn traverse_impl<F>(
+        mut self,
+        mut apply: F,
+    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>>
+    where
+        F: FnMut(&mut Self, &mut ExecutionBudget) -> Result<Option<Value<'s, 't>>, LimitExceeded>,
+    {
+        Traversal::new(
+            self.vm.engine.node(),
+            ExecutionBudget::new(self.vm.limits),
+            move |node, budget: &mut ExecutionBudget| {
+                self.vm.engine.reset(node);
+                apply(&mut self, budget)
+            },
+        )
+    }
+}
+
 impl<'s, 't> VM<'s, 't> {
     fn at_node(source: &'s str, node: Node<'t>, limits: ResolvedRuntimeLimits) -> Self {
         VM {
@@ -105,7 +182,7 @@ impl<'s, 't> VM<'s, 't> {
         tracer: &mut T,
     ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
         let mut budget = ExecutionBudget::new(self.limits);
-        self.apply_budgeted(module, entrypoint, tracer, &mut budget)
+        Application::new(self, module, *entrypoint).apply_budgeted(tracer, &mut budget)
     }
 
     /// Lazily apply one preferred result per candidate in inclusive preorder.
@@ -117,9 +194,8 @@ impl<'s, 't> VM<'s, 't> {
         entrypoint: Entrypoint,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
         let mut tracer = NoopTracer;
-        self.traverse_impl(move |vm, budget| {
-            vm.apply_budgeted(module, &entrypoint, &mut tracer, budget)
-        })
+        Application::new(self, module, entrypoint)
+            .traverse_impl(move |app, budget| app.apply_budgeted(&mut tracer, budget))
     }
 
     /// Traverse as in [`Self::traverse`], tracing each attempted candidate, including failures,
@@ -131,63 +207,8 @@ impl<'s, 't> VM<'s, 't> {
         entrypoint: Entrypoint,
         tracer: &mut T,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
-        self.traverse_impl(move |vm, budget| vm.apply_budgeted(module, &entrypoint, tracer, budget))
-    }
-
-    fn traverse_impl<F>(
-        self,
-        mut apply: F,
-    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>>
-    where
-        F: FnMut(Self, &mut ExecutionBudget) -> Result<Option<Value<'s, 't>>, LimitExceeded>,
-    {
-        Traversal::new(
-            self.engine.node(),
-            ExecutionBudget::new(self.limits),
-            move |node, budget: &mut ExecutionBudget| {
-                apply(Self::at_node(self.source, node, budget.limits()), budget)
-            },
-        )
-    }
-
-    fn apply_budgeted<T: Tracer>(
-        self,
-        module: &'s Module,
-        entrypoint: &Entrypoint,
-        tracer: &mut T,
-        budget: &mut ExecutionBudget,
-    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
-        let node = self.engine.node();
-        let source = self.source;
-        let (result, _) = self.execute_budgeted(module, entrypoint, tracer, budget);
-        let journal = match result {
-            Ok(journal) => journal,
-            Err(RuntimeError::NoMatch) => return Ok(None),
-            Err(RuntimeError::OutOfFuel(limit)) => return Err(LimitExceeded::OutOfFuel(limit)),
-            Err(RuntimeError::MemoryLimitExceeded { used, limit }) => {
-                return Err(LimitExceeded::Memory { used, limit });
-            }
-            Err(RuntimeError::CallFrame(error)) => return Err(error.into()),
-        };
-
-        let result_type = module
-            .types()
-            .get(entrypoint.result_type())
-            .expect("entrypoint result type belongs to its module");
-        if matches!(
-            result_type.decode(),
-            TypeDefKind::Primitive(TypeKind::NoValue)
-        ) {
-            return Ok(Some(Value::Node(NodeValue::from_node(node, source))));
-        }
-
-        Ok(Some(materialize_verified(
-            source,
-            module,
-            entrypoint,
-            journal.output_events(),
-            Colors::new(false),
-        )))
+        Application::new(self, module, entrypoint)
+            .traverse_impl(move |app, budget| app.apply_budgeted(tracer, budget))
     }
 
     fn call_retry_checkpoint(&self, call_ip: CodeAddr, resume: CallResume) -> Checkpoint {
@@ -223,22 +244,23 @@ impl<'s, 't> VM<'s, 't> {
 
     /// Execute query with a tracer and report run statistics.
     pub fn execute_with_stats<T: Tracer>(
-        self,
+        mut self,
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
         let mut budget = ExecutionBudget::new(self.limits);
-        self.execute_budgeted(module, entrypoint, tracer, &mut budget)
+        let (result, stats) = self.run_budgeted(module, entrypoint, tracer, &mut budget);
+        (result.map(|()| self.engine.into_journal()), stats)
     }
 
-    fn execute_budgeted<T: Tracer>(
-        mut self,
+    fn run_budgeted<T: Tracer>(
+        &mut self,
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
         budget: &mut ExecutionBudget,
-    ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
+    ) -> (Result<(), RuntimeError>, RunStats) {
         self.ip = entrypoint.target();
         if T::ENABLED {
             tracer.trace_execution_started(self.ip);
@@ -299,7 +321,8 @@ impl<'s, 't> VM<'s, 't> {
                 Err(Signal::Flow(ControlFlow::Accept)) => {
                     self.finish_entry(boundary, tracer);
                     let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);
-                    return (Ok(self.engine.into_journal()), stats);
+                    self.engine.accepted_journal();
+                    return (Ok(()), stats);
                 }
                 Err(Signal::Error(e)) => {
                     let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);

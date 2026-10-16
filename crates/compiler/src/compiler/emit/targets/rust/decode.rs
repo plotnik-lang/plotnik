@@ -147,10 +147,15 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             "rt::Node<'t>"
         };
         let application_generics = if item.has_decoder() { "" } else { "<'t>" };
-        let node_type = if sig.usage.tree || !item.has_decoder() {
-            "rt::Node<'t>"
+        let (node_type, engine_type) = if sig.usage.tree || !item.has_decoder() {
+            ("rt::Node<'t>", "rt::Engine<'t>")
         } else {
-            "rt::Node<'_>"
+            ("rt::Node<'_>", "rt::Engine<'_>")
+        };
+        let engine_constructor = if item.has_decoder() {
+            "rt::Engine::new"
+        } else {
+            "rt::Engine::new_match_only"
         };
         let source_ref = if sig.usage.source { "&'s str" } else { "&str" };
         let _ = writeln!(
@@ -174,7 +179,11 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        let mut budget = matcher::execution_budget(node);"
         );
-        let _ = writeln!(out, "        Self::apply(node, source, &mut budget)");
+        let _ = writeln!(
+            out,
+            "        let mut eng = {engine_constructor}(node.walk());"
+        );
+        let _ = writeln!(out, "        Self::apply(&mut eng, source, &mut budget)");
         let _ = writeln!(out, "    }}\n");
         let _ = writeln!(
             out,
@@ -201,6 +210,10 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             );
             let _ = writeln!(out, "    > + use<'t, 's> {{");
         }
+        let _ = writeln!(
+            out,
+            "        let mut eng = {engine_constructor}(scope.walk());"
+        );
         let _ = writeln!(out, "        rt::Traversal::new(");
         let _ = writeln!(out, "            scope,");
         let _ = writeln!(out, "            matcher::execution_budget(scope),");
@@ -208,7 +221,8 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {{"
         );
-        let _ = writeln!(out, "                Self::apply(node, source, budget)");
+        let _ = writeln!(out, "                eng.reset(node);");
+        let _ = writeln!(out, "                Self::apply(&mut eng, source, budget)");
         let _ = writeln!(out, "            }},");
         let _ = writeln!(out, "        )");
         let _ = writeln!(out, "    }}\n");
@@ -242,7 +256,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         );
         let _ = writeln!(out, "    }}\n");
         let _ = writeln!(out, "    fn apply{application_generics}(");
-        let _ = writeln!(out, "        node: {node_type},");
+        let _ = writeln!(out, "        eng: &mut {engine_type},");
         let _ = writeln!(out, "        source: {source_ref},");
         let _ = writeln!(out, "        budget: &mut rt::ExecutionBudget,");
         let _ = writeln!(
@@ -250,9 +264,10 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             "    ) -> ::core::result::Result<::core::option::Option<{result_type}>, rt::LimitExceeded> {{"
         );
         if !item.has_decoder() {
+            let _ = writeln!(out, "        let node = eng.node();");
             let _ = writeln!(
                 out,
-                "        Ok(matcher::{apply_fn}(node, source, budget)?.map(|_| node))"
+                "        Ok(matcher::{apply_fn}(eng, source, budget)?.map(|_| node))"
             );
         } else {
             self.decode_application(out, item, &apply_fn);
@@ -291,7 +306,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let decoder_fn = self.decoder_fn(item.name);
         let _ = writeln!(
             out,
-            "        let Some(journal) = matcher::{apply_fn}(node, source, budget)? else {{"
+            "        let Some(journal) = matcher::{apply_fn}(eng, source, budget)? else {{"
         );
         let _ = writeln!(out, "            return Ok(None);");
         let _ = writeln!(out, "        }};");

@@ -77,6 +77,37 @@ impl<'t> Engine<'t> {
     /// Surrender the committed match journal after acceptance.
     #[inline]
     pub fn into_journal(self) -> MatchJournal<'t> {
+        self.accepted_journal();
+        self.journal
+    }
+
+    /// Abandon the previous candidate, retaining scratch capacity for this operation.
+    pub fn reset(&mut self, node: Node<'t>) {
+        let Self {
+            cursor,
+            frames,
+            checkpoints,
+            journal,
+            recursion_depth,
+            suppress_depth,
+            base_suppress_depth,
+            scalar_depth,
+            snapshot_cursor_active,
+        } = self;
+
+        checkpoints.clear();
+        frames.clear();
+        journal.truncate(0);
+        *recursion_depth = 0;
+        *suppress_depth = *base_suppress_depth;
+        *scalar_depth = 0;
+        *snapshot_cursor_active = false;
+        cursor.reset(node);
+    }
+
+    /// Borrow accepted output only until the next candidate resets scratch.
+    /// Decoders must return values independent of this journal.
+    pub fn accepted_journal(&self) -> &MatchJournal<'t> {
         assert!(
             self.frames.is_empty(),
             "runtime accepted a match with a live call frame: current_frame={:?}",
@@ -94,7 +125,7 @@ impl<'t> Engine<'t> {
             self.scalar_depth, 0,
             "runtime accepted a match with unclosed scalar output effects"
         );
-        self.journal
+        &self.journal
     }
 
     /// Snapshot the engine state a checkpoint restores on backtrack.
@@ -374,8 +405,9 @@ impl<'t> Engine<'t> {
         Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
-    /// Occupied arena bytes plus estimated cursor-snapshot storage.
-    /// Excludes spare arena capacity and does not allocate.
+    /// Sampled matcher-heap estimate, not a total-memory ceiling. Arena elements
+    /// use length, excluding spare capacity retained across candidate resets.
+    /// Pooled cursor estimates stay charged even when recycled. Never allocates.
     pub fn heap_bytes(&self) -> u64 {
         self.frames.byte_footprint()
             + self.checkpoints.byte_footprint()

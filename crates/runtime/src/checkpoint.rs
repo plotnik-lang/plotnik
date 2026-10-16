@@ -152,6 +152,13 @@ impl CheckpointStack {
         }
     }
 
+    #[cfg(feature = "execution")]
+    pub(crate) fn clear(&mut self) {
+        self.stack.clear();
+        self.snapshots.clear();
+        self.max_frame_idx = None;
+    }
+
     pub fn push(&mut self, mut checkpoint: Checkpoint) {
         self.push_inner(&mut checkpoint);
         self.stack.push(checkpoint);

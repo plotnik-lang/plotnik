@@ -1,6 +1,8 @@
 use plotnik::LimitExceeded;
 use plotnik::tree_sitter::{Language, Parser, Tree};
 
+mod support;
+
 fn parse(language: &Language, source: &str) -> Tree {
     let mut parser = Parser::new();
     parser.set_language(language).expect("language loads");
@@ -77,6 +79,16 @@ mod nodes {
           Second: (binary_expression right: (_) @right)
         ]
         Args = (arguments (identifier)* @ids :: text)
+        Calls = [
+          (call_expression
+            function: (identifier) @bad :: text
+            arguments: (arguments (number == "0"))
+          )
+          (call_expression
+            function: (identifier != "skip") @name :: text
+            arguments: (Args) @args
+          )
+        ]
         Left = left: (identifier) @node
         Pair = (binary_expression (Left) @left right: (identifier) @text :: text)
         "#,
@@ -198,6 +210,20 @@ fn compiled_limits_reject_work_at_their_distinct_boundaries() {
         depth_limited::Q::find_all(tree.root_node(), source),
         Err(LimitExceeded::DecodeDepth(1))
     );
+
+    let source = "x; ((y));";
+    let tree = parse(&js(), source);
+    let mut each = depth_limited::Expr::each(tree.root_node(), source);
+    let first = each.next().unwrap().unwrap();
+    assert_eq!(each.next(), Some(Err(LimitExceeded::DecodeDepth(1))));
+    assert_eq!(each.next(), None);
+    drop(each);
+
+    let depth_limited::Expr::Id { id } = first else {
+        panic!("the first candidate is an identifier");
+    };
+    assert_eq!(id.byte_range(), 0..1);
+    assert_eq!(id.utf8_text(source.as_bytes()), Ok("x"));
 }
 
 #[test]
@@ -288,6 +314,83 @@ fn quantifier_lists_stay_inside_independent_results() {
     assert_eq!(
         nodes::Args::find_all(tree.root_node(), source),
         Ok(vec![first, second])
+    );
+}
+
+#[test]
+fn failed_captures_do_not_leak_into_later_nested_results() {
+    let source = "f(alpha, beta); skip(1); g(gamma);";
+    let tree = parse(&js(), source);
+
+    let mut each = nodes::Calls::each(tree.root_node(), source);
+    let first = each.next().unwrap().unwrap();
+    let second = each.next().unwrap().unwrap();
+    assert_eq!(each.next(), None);
+    drop(each);
+
+    let json = serde_json::to_value(plotnik::rt::WithSource::new(&vec![first, second], source))
+        .expect("retained values serialize after iterator drop");
+    assert_eq!(
+        json,
+        serde_json::json!([
+            {"bad": null, "name": "f", "args": {"ids": ["alpha", "beta"]}},
+            {"bad": null, "name": "g", "args": {"ids": ["gamma"]}}
+        ])
+    );
+}
+
+#[test]
+fn vm_nested_results_survive_resume_terminal_error_and_drop() {
+    use plotnik_compiler::{BytecodeConfig, Limit, QueryBuilder, RuntimeLimitSpec, VM};
+
+    let query = indoc::indoc! {r#"
+        Q = [
+          (call_expression
+            function: (identifier) @bad :: text
+            arguments: (arguments (number == "0"))
+          )
+          (call_expression
+            function: (identifier != "skip") @name
+            arguments: (arguments (identifier)* @args :: text)
+          )
+        ]
+    "#};
+    let compiled = QueryBuilder::from_inline(query)
+        .compile(support::javascript_grammar())
+        .expect("query compiles");
+    let module = compiled
+        .emit(BytecodeConfig::new())
+        .expect("query emits")
+        .into_artifact()
+        .expect("query is valid");
+    let source = format!(
+        "f(alpha, beta); skip(1); g(gamma); {}",
+        "later;".repeat(100)
+    );
+    let tree = parse(&js(), &source);
+
+    let mut each = VM::builder(&source, &tree)
+        .limits(RuntimeLimitSpec {
+            fuel_limit: Limit::Of(250),
+            ..Default::default()
+        })
+        .build()
+        .traverse(&module, module.entrypoint("Q").unwrap());
+    let first = each.next().unwrap().unwrap();
+    let second = each.next().unwrap().unwrap();
+    assert_eq!(each.next(), Some(Err(LimitExceeded::OutOfFuel(250))));
+    assert_eq!(each.next(), None);
+    assert_eq!(each.next(), None);
+    drop(each);
+
+    assert_eq!(
+        serde_json::to_value(vec![first, second]).unwrap(),
+        serde_json::json!([
+            {"bad": null, "name": {"kind": "identifier", "text": "f", "span": [0, 1]},
+             "args": ["alpha", "beta"]},
+            {"bad": null, "name": {"kind": "identifier", "text": "g", "span": [25, 26]},
+             "args": ["gamma"]}
+        ])
     );
 }
 

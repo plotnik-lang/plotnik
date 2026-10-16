@@ -787,22 +787,57 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
 
         let source = &fixture.program().unwrap().body;
         let tree = lang.parse(source).unwrap();
-        let applied = VM::builder(source, &tree)
-            .build()
-            .apply(&module, &entry)
+        for traced in [false, true] {
+            let mut tracer = TraceRecorder::new(&module, 65_536);
+            let vm = VM::builder(source, &tree).build();
+            let applied = if traced {
+                vm.apply_with(&module, &entry, &mut tracer)
+            } else {
+                vm.apply(&module, &entry)
+            }
             .unwrap()
             .map(|value| serde_json::to_value(value).unwrap());
-        let searched = VM::builder(source, &tree)
-            .build()
-            .traverse(&module, entry)
-            .map(|value| serde_json::to_value(value.unwrap()).unwrap())
+
+            if traced {
+                assert!(tracer.finish().records.iter().any(|record| matches!(
+                    record.event,
+                    plotnik_compiler::TraceEvent::Instruction
+                )));
+            }
+
+            let mut tracer = TraceRecorder::new(&module, 65_536);
+            let vm = VM::builder(source, &tree).build();
+            let searched = if traced {
+                vm.traverse_with(&module, entry, &mut tracer)
+                    .collect::<Result<Vec<_>, _>>()
+            } else {
+                vm.traverse(&module, entry).collect::<Result<Vec<_>, _>>()
+            }
+            .unwrap()
+            .into_iter()
+            .map(|value| serde_json::to_value(value).unwrap())
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            (applied, searched),
-            (expected_apply, expected_search),
-            "{path}"
-        );
+            assert_eq!(
+                (&applied, &searched),
+                (&expected_apply, &expected_search),
+                "{path}, traced={traced}"
+            );
+            if traced {
+                let attempts = tracer
+                    .finish()
+                    .records
+                    .iter()
+                    .filter(|record| {
+                        matches!(
+                            record.event,
+                            plotnik_compiler::TraceEvent::ExecutionStarted { .. }
+                        )
+                    })
+                    .count();
+                assert_eq!(attempts, tree.root_node().descendant_count());
+            }
+        }
     }
 }
 

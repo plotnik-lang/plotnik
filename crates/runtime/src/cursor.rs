@@ -79,6 +79,21 @@ impl<'t> CursorWrapper<'t> {
         }
     }
 
+    pub(crate) fn reset(&mut self, node: Node<'t>) {
+        while let Some(entry) = self.snapshots.live.pop_front() {
+            self.snapshots.free.push(entry.cursor);
+        }
+
+        self.snapshots.next_seq = 0;
+        self.snapshots.wide_restore_misses = 0;
+        self.cursor.reset(node);
+        assert_eq!(
+            self.descendant_index(),
+            0,
+            "candidate cursor must be rooted"
+        );
+    }
+
     #[inline]
     pub fn node(&self) -> Node<'t> {
         self.cursor.node()
