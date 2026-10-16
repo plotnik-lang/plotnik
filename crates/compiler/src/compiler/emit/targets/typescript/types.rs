@@ -6,12 +6,12 @@ use crate::compiler::analyze::result::{
 use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, ListMinimum, RecordField, TypeId, TypeShape,
 };
-use crate::compiler::emit::sink::{Sink, Style};
+use crate::compiler::emit::sink::Sink;
 use crate::compiler::ids::{ResultMemberId, ResultTypeId};
 use crate::core::Symbol;
 
 use super::TypeScriptBinding;
-use super::config::{Config, MatchOnlyType};
+use super::config::Config;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct SemanticTag {
@@ -19,22 +19,11 @@ struct SemanticTag {
     member: Option<ResultMemberId>,
 }
 
-pub(crate) fn emit_schema(schema: &ResultSchema<'_>, config: Config) -> String {
-    SchemaEmitter::new(schema, config).emit().0
-}
-
-pub(crate) fn emit_schema_mapped(
+pub(crate) fn emit_schema(
     schema: &ResultSchema<'_>,
     config: Config,
 ) -> (String, Vec<TypeScriptBinding>) {
-    assert!(
-        config.colors.blue.is_empty()
-            && config.colors.green.is_empty()
-            && config.colors.dim.is_empty()
-            && config.colors.reset.is_empty(),
-        "mapped TypeScript emission requires colors off"
-    );
-    SchemaEmitter::new(schema, config).mapped().emit()
+    SchemaEmitter::new(schema, config).emit()
 }
 
 struct SchemaEmitter<'a> {
@@ -44,7 +33,6 @@ struct SchemaEmitter<'a> {
     declared_names: HashSet<String>,
     needs_node_type: bool,
     sink: Sink<SemanticTag>,
-    map_enabled: bool,
 }
 
 impl<'a> SchemaEmitter<'a> {
@@ -61,13 +49,7 @@ impl<'a> SchemaEmitter<'a> {
             declared_names: HashSet::new(),
             needs_node_type: false,
             sink: Sink::new(),
-            map_enabled: false,
         }
-    }
-
-    fn mapped(mut self) -> Self {
-        self.map_enabled = true;
-        self
     }
 
     fn emit(mut self) -> (String, Vec<TypeScriptBinding>) {
@@ -83,11 +65,7 @@ impl<'a> SchemaEmitter<'a> {
             self.emit_item(item);
         }
 
-        let mut output = if self.map_enabled {
-            self.sink.plain().to_string()
-        } else {
-            self.sink.render(self.config.colors)
-        };
+        let mut output = self.sink.plain().to_string();
         output.truncate(output.trim_end().len());
         output.push('\n');
         let ranges = self
@@ -110,6 +88,7 @@ impl<'a> SchemaEmitter<'a> {
         if !seen.insert(ty) {
             return false;
         }
+
         match self.schema.types.expect_type_shape(ty) {
             TypeShape::Node => true,
             TypeShape::Ref(declaration) => self
@@ -128,6 +107,7 @@ impl<'a> SchemaEmitter<'a> {
         if !self.declared_names.insert(name.clone()) {
             return;
         }
+
         match item.kind {
             ResultItemKind::Record => self.emit_interface(&name, item.value_type()),
             ResultItemKind::Variant => self.emit_variant(&name, item.value_type()),
@@ -136,71 +116,39 @@ impl<'a> SchemaEmitter<'a> {
                 self.emit_type_decl(&name, item.output, body);
             }
             ResultItemKind::MatchOnlyDef => {
-                let body = match self.config.match_only_type {
-                    MatchOnlyType::Undefined => text("undefined"),
-                    MatchOnlyType::Null => text("null"),
-                };
-                self.emit_type_decl(&name, item.output, body);
+                self.emit_type_decl(&name, item.output, text("undefined"));
             }
         }
     }
 
     fn emit_type_decl(&mut self, name: &str, output: DefinitionOutput, body: Sink<SemanticTag>) {
-        emit_export(&mut self.sink, self.config.export);
-        self.sink.styled(Style::Dim, "type");
-        self.sink.push(" ");
-        self.sink.set_style(Style::Blue);
+        self.sink.push("export type ");
         self.push_mapped_output(name, output);
-        self.sink.reset_style();
-        self.sink.push(" ");
-        self.sink.styled(Style::Dim, "=");
-        self.sink.push(" ");
+        self.sink.push(" = ");
         self.sink.append(body);
-        self.sink.set_style(Style::Dim);
         self.sink.push(";\n\n");
-        self.sink.reset_style();
     }
 
     fn emit_interface(&mut self, name: &str, ty: TypeId) {
-        emit_export(&mut self.sink, self.config.export);
-        self.sink.styled(Style::Dim, "interface");
-        self.sink.push(" ");
-        self.sink.set_style(Style::Blue);
+        self.sink.push("export interface ");
         self.push_mapped(name, ty, None);
-        self.sink.reset_style();
-        self.sink.push(" ");
-        self.sink.set_style(Style::Dim);
-        self.sink.push("{\n");
+        self.sink.push(" {\n");
 
         for (field, info, member) in self.record_members(ty) {
             let value = self.render_ty(info.final_type);
-            self.sink.reset_style();
             self.sink.push("  ");
             self.push_mapped(&field, ty, Some(member));
-            self.sink.set_style(Style::Dim);
-            self.sink.push(":");
-            self.sink.reset_style();
-            self.sink.push(" ");
+            self.sink.push(": ");
             self.sink.append(value);
-            self.sink.set_style(Style::Dim);
             self.sink.push(";\n");
         }
-        self.sink.set_style(Style::Dim);
-        self.sink.push("}");
-        self.sink.reset_style();
-        self.sink.push("\n\n");
+        self.sink.push("}\n\n");
     }
 
     fn emit_variant(&mut self, name: &str, ty: TypeId) {
-        emit_export(&mut self.sink, self.config.export);
-        self.sink.styled(Style::Dim, "type");
-        self.sink.push(" ");
-        self.sink.set_style(Style::Blue);
+        self.sink.push("export type ");
         self.push_mapped(name, ty, None);
-        self.sink.reset_style();
-        self.sink.push(" ");
-        self.sink.styled(Style::Dim, "=");
-        self.sink.push("\n");
+        self.sink.push(" =\n");
 
         let cases = self.variant_members(ty);
         let last = cases.len().saturating_sub(1);
@@ -208,21 +156,17 @@ impl<'a> SchemaEmitter<'a> {
             let rendered = self.render_variant(
                 &case,
                 payload,
-                self.map_enabled.then_some(SemanticTag {
+                Some(SemanticTag {
                     type_id: self.wire_id(ty),
                     member: Some(member),
                 }),
-                self.map_enabled,
+                true,
             );
-            self.sink.push("  ");
-            self.sink.styled(Style::Dim, "|");
-            self.sink.push(" ");
+            self.sink.push("  | ");
             self.sink.append(rendered);
-            self.sink.set_style(Style::Dim);
             if position == last {
                 self.sink.push(";");
             }
-            self.sink.reset_style();
             self.sink.push("\n");
         }
         self.sink.push("\n");
@@ -233,10 +177,9 @@ impl<'a> SchemaEmitter<'a> {
             && let Some(symbol) = self.schema.types.type_name_of(ty)
             && self.item_names.contains(&symbol)
         {
-            let mut out = Sink::new();
-            out.styled(Style::Blue, &self.name(symbol));
-            return out;
+            return text(&self.name(symbol));
         }
+
         self.render_shape(ty)
     }
 
@@ -251,10 +194,9 @@ impl<'a> SchemaEmitter<'a> {
                 if self.schema.types.declaration_body(*declaration).is_none() {
                     return text("Node");
                 }
+
                 let name = self.schema.types.declaration_name(*declaration);
-                let mut out = Sink::new();
-                out.styled(Style::Blue, &self.name(name));
-                out
+                text(&self.name(name))
             }
             TypeShape::Record(_) => self.inline_record(ty, false),
             TypeShape::Variant(_) => self.inline_variant(ty),
@@ -263,24 +205,23 @@ impl<'a> SchemaEmitter<'a> {
 
     fn render_nullable(&self, inner: TypeId) -> Sink<SemanticTag> {
         let mut out = self.render_ty(inner);
-        out.push(" ");
-        out.styled(Style::Dim, "|");
-        out.push(" null");
+        out.push(" | null");
         out
     }
 
     fn render_array(&self, element: TypeId, minimum: ListMinimum) -> Sink<SemanticTag> {
         if minimum == ListMinimum::Zero {
             let mut out = self.render_ty(element);
-            out.styled(Style::Dim, "[]");
+            out.push("[]");
             return out;
         }
+
         let mut out = Sink::new();
-        out.styled(Style::Dim, "[");
+        out.push("[");
         out.append(self.render_ty(element));
-        out.styled(Style::Dim, ", ...");
+        out.push(", ...");
         out.append(self.render_ty(element));
-        out.styled(Style::Dim, "[]]");
+        out.push("[]]");
         out
     }
 
@@ -288,18 +229,18 @@ impl<'a> SchemaEmitter<'a> {
         let Some(scope) = self.schema.layout().scope(ty) else {
             return self.render_ty(ty);
         };
+
         if scope.kind() != CaptureScopeKind::Record {
             return self.render_ty(ty);
         }
+
         let fields = self.record_members(ty);
         if fields.is_empty() {
-            let mut out = Sink::new();
-            out.styled(Style::Dim, "{}");
-            return out;
+            return text("{}");
         }
+
         let mut out = Sink::new();
-        out.styled(Style::Dim, "{");
-        out.push(" ");
+        out.push("{ ");
         let last = fields.len() - 1;
         for (position, (name, info, member)) in fields.into_iter().enumerate() {
             if tags {
@@ -313,18 +254,13 @@ impl<'a> SchemaEmitter<'a> {
             } else {
                 out.push(&name);
             }
-            out.set_style(Style::Dim);
-            out.push(":");
-            out.reset_style();
-            out.push(" ");
+            out.push(": ");
             out.append(self.render_ty(info.final_type));
             if position != last {
-                out.set_style(Style::Dim);
                 out.push("; ");
             }
         }
-        out.push(" ");
-        out.styled(Style::Dim, "}");
+        out.push(" }");
         out
     }
 
@@ -332,9 +268,7 @@ impl<'a> SchemaEmitter<'a> {
         let mut out = Sink::new();
         for (position, (name, payload, _)) in self.variant_members(ty).into_iter().enumerate() {
             if position > 0 {
-                out.push(" ");
-                out.styled(Style::Dim, "|");
-                out.push(" ");
+                out.push(" | ");
             }
             out.append(self.render_variant(&name, payload, None, false));
         }
@@ -397,58 +331,33 @@ impl<'a> SchemaEmitter<'a> {
         payload_tags: bool,
     ) -> Sink<SemanticTag> {
         let mut out = Sink::new();
-        out.styled(Style::Dim, "{");
-        out.push(" $tag");
-        out.styled(Style::Dim, ":");
-        out.push(" ");
-        out.set_style(Style::Green);
-        out.push("\"");
+        out.push("{ $tag: \"");
         if let Some(tag) = tag {
             out.tagged(tag, |out| out.push(name));
         } else {
             out.push(name);
         }
         out.push("\"");
-        out.reset_style();
         let Some(payload) = payload.type_id() else {
-            out.push(" ");
-            out.styled(Style::Dim, "}");
+            out.push(" }");
             return out;
         };
-        out.set_style(Style::Dim);
-        out.push("; $data");
-        out.set_style(Style::Dim);
-        out.push(":");
-        out.reset_style();
-        out.push(" ");
+
+        out.push("; $data: ");
         out.append(self.inline_record(payload, payload_tags));
-        out.push(" ");
-        out.styled(Style::Dim, "}");
+        out.push(" }");
         out
     }
 
     fn emit_node_interface(&mut self) {
-        emit_export(&mut self.sink, self.config.export);
-        self.sink.styled(Style::Dim, "interface");
-        self.sink.push(" ");
-        self.sink.styled(Style::Blue, "Node");
-        self.sink.push(" ");
-        self.sink.set_style(Style::Dim);
-        self.sink.push("{\n");
+        self.sink.push("export interface Node {\n");
         emit_node_field(&mut self.sink, "kind", text("string"));
         emit_node_field(&mut self.sink, "text", text("string"));
-        emit_node_field(&mut self.sink, "span", span_type());
-        self.sink.set_style(Style::Dim);
-        self.sink.push("}");
-        self.sink.reset_style();
-        self.sink.push("\n\n");
+        emit_node_field(&mut self.sink, "span", text("[number, number]"));
+        self.sink.push("}\n\n");
     }
 
     fn push_mapped(&mut self, value: &str, ty: TypeId, member: Option<ResultMemberId>) {
-        if !self.map_enabled {
-            self.sink.push(value);
-            return;
-        }
         let tag = SemanticTag {
             type_id: self.wire_id(ty),
             member,
@@ -457,10 +366,6 @@ impl<'a> SchemaEmitter<'a> {
     }
 
     fn push_mapped_output(&mut self, value: &str, output: DefinitionOutput) {
-        if !self.map_enabled {
-            self.sink.push(value);
-            return;
-        }
         let type_id = match output {
             DefinitionOutput::MatchOnly => self.schema.type_layout().no_value_output_id(),
             DefinitionOutput::Value(type_id) => self.wire_id(type_id),
@@ -476,10 +381,6 @@ impl<'a> SchemaEmitter<'a> {
 
     fn render_builtin(&self, value: &str, ty: TypeId) -> Sink<SemanticTag> {
         let mut out = Sink::new();
-        if !self.map_enabled {
-            out.push(value);
-            return out;
-        }
         out.tagged(
             SemanticTag {
                 type_id: self.wire_id(ty),
@@ -499,32 +400,12 @@ impl<'a> SchemaEmitter<'a> {
     }
 }
 
-fn emit_export(sink: &mut Sink<SemanticTag>, enabled: bool) {
-    if enabled {
-        sink.styled(Style::Dim, "export");
-        sink.push(" ");
-    }
-}
-
 fn emit_node_field(sink: &mut Sink<SemanticTag>, name: &str, ty: Sink<SemanticTag>) {
-    sink.reset_style();
     sink.push("  ");
     sink.push(name);
-    sink.styled(Style::Dim, ":");
-    sink.push(" ");
+    sink.push(": ");
     sink.append(ty);
-    sink.set_style(Style::Dim);
     sink.push(";\n");
-}
-
-fn span_type() -> Sink<SemanticTag> {
-    let mut out = Sink::new();
-    out.styled(Style::Dim, "[");
-    out.push("number");
-    out.styled(Style::Dim, ", ");
-    out.push("number");
-    out.styled(Style::Dim, "]");
-    out
 }
 
 fn text(value: &str) -> Sink<SemanticTag> {

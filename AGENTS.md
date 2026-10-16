@@ -190,13 +190,12 @@ Expr = [
 
 # CLI compiler commands
 
-`cargo run -p plotnik-cli -- <command>`.
+`cargo run -- <command>`.
 
 ```sh
-cargo run -p plotnik-cli -- check query.ptk --lang javascript
-cargo run -p plotnik-cli -- infer query.ptk --lang javascript
-cargo run -p plotnik-cli -- gen query.ptk --lang javascript --target rust
-cargo run -p plotnik-cli -- dump query.ptk --lang javascript
+cargo run -- check query.ptk --lang javascript
+cargo run -- gen query.ptk --lang javascript --target rust
+cargo run -- dump query.ptk --lang javascript
 ```
 
 - Exit codes:

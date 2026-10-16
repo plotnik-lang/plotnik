@@ -5,7 +5,7 @@ mod limits;
 pub use limits::runtime_limits;
 
 pub use commands::build_cli;
-pub use dispatch::{CheckOpts, DumpOpts, GenerateOpts, InferOpts};
+pub use dispatch::{CheckOpts, DumpOpts, GenerateOpts};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ColorChoice {

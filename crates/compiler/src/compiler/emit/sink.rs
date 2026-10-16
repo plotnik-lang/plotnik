@@ -1,13 +1,4 @@
-use super::ansi::{StyleChange, StyleEvent, render};
-
 const INDENT: &str = "    ";
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Style {
-    Blue,
-    Green,
-    Dim,
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TaggedRange<T> {
@@ -20,7 +11,6 @@ pub(crate) struct TaggedRange<T> {
 pub(crate) struct Sink<T> {
     text: String,
     tags: Vec<TaggedRange<T>>,
-    styles: Vec<StyleEvent>,
     indent: usize,
 }
 
@@ -29,7 +19,6 @@ impl<T> Sink<T> {
         Self {
             text: String::new(),
             tags: Vec::new(),
-            styles: Vec::new(),
             indent: 0,
         }
     }
@@ -59,26 +48,6 @@ impl<T> Sink<T> {
         result
     }
 
-    pub(crate) fn set_style(&mut self, style: Style) {
-        self.styles.push(StyleEvent {
-            offset: self.text.len(),
-            change: StyleChange::Set(style),
-        });
-    }
-
-    pub(crate) fn reset_style(&mut self) {
-        self.styles.push(StyleEvent {
-            offset: self.text.len(),
-            change: StyleChange::Reset,
-        });
-    }
-
-    pub(crate) fn styled(&mut self, style: Style, text: &str) {
-        self.set_style(style);
-        self.push(text);
-        self.reset_style();
-    }
-
     pub(crate) fn tagged<R>(&mut self, tag: T, f: impl FnOnce(&mut Self) -> R) -> R {
         let start = self.text.len();
         let index = self.tags.len();
@@ -100,10 +69,6 @@ impl<T> Sink<T> {
             range.end += offset;
             range
         }));
-        self.styles.extend(other.styles.drain(..).map(|mut event| {
-            event.offset += offset;
-            event
-        }));
     }
 
     pub(crate) fn plain(&self) -> &str {
@@ -112,10 +77,6 @@ impl<T> Sink<T> {
 
     pub(crate) fn tags(&self) -> &[TaggedRange<T>] {
         &self.tags
-    }
-
-    pub(crate) fn render(&self, colors: crate::core::Colors) -> String {
-        render(&self.text, &self.styles, colors)
     }
 }
 

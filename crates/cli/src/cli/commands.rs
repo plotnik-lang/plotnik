@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Arg, ArgGroup, Command, value_parser};
+use clap::{Arg, Command, value_parser};
 
 use super::args::*;
 use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
@@ -45,7 +45,6 @@ Run 'plotnik <command> --help' for options."#,
         ))
         .subcommand(check_command())
         .subcommand(tree_command())
-        .subcommand(infer_command())
         .subcommand(generate_command())
         .subcommand(dump_command())
         .subcommand(lang_command())
@@ -58,22 +57,23 @@ pub fn generate_command() -> Command {
         .about("Generate a compiled matcher module")
         .override_usage(
             "\
-  plotnik gen <PATH> [--lang <LANG>] --target rust
-  plotnik gen -q <QUERY> [--lang <LANG>] --target rust",
+  plotnik gen <PATH> --lang <LANG> --target rust [-o <FILE>]
+  plotnik gen - --lang <LANG> --target rust [-o <FILE>]",
         )
         .after_help(
             r#"EXAMPLES:
   plotnik gen query.ptk --lang javascript --target rust
   plotnik gen query.ptk --lang javascript --target rust -o query.rs
 
+PATH is a PTK file or directory. '-' reads a named PTK module from stdin.
+--lang selects the grammar. Tags group directory members by language.
 The generated module imports `plotnik_runtime`. Depend on `plotnik-runtime` to use it.
 The module records the exact grammar name, SHA-256, and source used during
 binding."#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(lang_arg())
+        .arg(lang_arg().required(true))
         .arg(cache_dir_arg())
         .next_help_heading("Generation options")
         .arg(target_arg())
@@ -84,37 +84,27 @@ binding."#,
 
 pub fn tree_command() -> Command {
     let cmd = Command::new("tree")
-        .about("Display the syntax tree")
+        .about("Display a source-language syntax tree")
         .override_usage(
             "\
-  plotnik tree <FILE>                 # .ptk query or source file path
-  plotnik tree - --lang <LANG>        # stdin, plotnik for query syntax
-  plotnik tree -q <QUERY>
-  plotnik tree -s <SOURCE> -l <LANG>",
+  plotnik tree <FILE> [--lang <LANG>] [--include-anonymous]
+  plotnik tree - --lang <LANG> [--include-anonymous]",
         )
         .after_help(
-            "Plotnik syntax is displayed locally.\n\
-             Source syntax uses --lang or the source file extension.\n\
-             Stdin and extensionless files require --lang; use plotnik for query syntax.",
+            "The source file extension selects the grammar unless --lang is set.\n\
+             Stdin and extensionless files require --lang.",
         )
         .arg(
             Arg::new("input_path")
                 .value_name("FILE")
                 .value_parser(value_parser!(PathBuf))
-                .help("File path (.ptk query or source), or '-' for stdin"),
-        )
-        .group(
-            ArgGroup::new("input")
-                .args(["input_path", "query_text", "source_text"])
-                .required(true),
+                .required(true)
+                .help("Source file path, or '-' for stdin"),
         )
         .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(source_text_arg())
         .arg(lang_arg())
         .arg(cache_dir_arg())
         .next_help_heading("Output options")
-        .arg(query_view_arg())
         .arg(include_anonymous_arg())
         .next_help_heading("Global options")
         .arg(color_arg());
@@ -127,22 +117,22 @@ pub fn check_command() -> Command {
         .about("Validate a query")
         .override_usage(
             "\
-  plotnik check <PATH> [--lang <LANG>]
-  plotnik check -q <QUERY> [--lang <LANG>]",
+  plotnik check <PATH> --lang <LANG> [--strict]
+  plotnik check - --lang <LANG> [--strict]",
         )
         .after_help(
             r#"EXAMPLES:
   plotnik check query.ptk --lang javascript
   plotnik check queries/ --lang javascript
-  plotnik check -q 'Q = ...' --lang javascript
+  plotnik check - --lang javascript
 
-Individual queries can select a language with a first-line @language comment.
-Directories require --lang."#,
+PATH is a PTK file or directory. '-' reads a named PTK module from stdin.
+--lang selects the grammar. Tags group directory members by language.
+Successful validation writes no stdout. Diagnostics go to stderr."#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(lang_arg())
+        .arg(lang_arg().required(true))
         .arg(cache_dir_arg())
         .next_help_heading("Check options")
         .arg(strict_arg())
@@ -155,48 +145,22 @@ pub fn dump_command() -> Command {
         .about("Show compiled bytecode for debugging")
         .override_usage(
             "\
-  plotnik dump <PATH> [--lang <LANG>]
-  plotnik dump -q <QUERY> [--lang <LANG>]",
+  plotnik dump <PATH> --lang <LANG>
+  plotnik dump - --lang <LANG>",
         )
         .after_help(
             r#"EXAMPLES:
   plotnik dump query.ptk --lang javascript
-  plotnik dump -q 'Q = ...' --lang javascript"#,
-        )
-        .arg(query_path_arg())
-        .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(lang_arg())
-        .arg(cache_dir_arg())
-        .next_help_heading("Global options")
-        .arg(color_arg())
-}
+  plotnik dump - --lang javascript
 
-pub fn infer_command() -> Command {
-    Command::new("infer")
-        .about("Generate type definitions from a query")
-        .override_usage(
-            "\
-  plotnik infer <PATH> [--lang <LANG>]
-  plotnik infer -q <QUERY> [--lang <LANG>]",
-        )
-        .after_help(
-            r#"EXAMPLES:
-  plotnik infer query.ptk --lang javascript
-  plotnik infer -q 'Q = ...' --lang javascript
-  plotnik infer query.ptk --lang javascript -o types.d.ts"#,
+PATH is a PTK file or directory. '-' reads a named PTK module from stdin.
+--lang selects the grammar. Tags group directory members by language.
+Prints the complete bytecode dump, including types, entrypoints, spans, and instructions."#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")
-        .arg(query_text_arg())
-        .arg(lang_arg())
+        .arg(lang_arg().required(true))
         .arg(cache_dir_arg())
-        .next_help_heading("Output options")
-        .arg(format_arg())
-        .arg(no_node_type_arg())
-        .arg(no_export_arg())
-        .arg(match_only_type_arg())
-        .arg(output_file_arg())
         .next_help_heading("Global options")
         .arg(color_arg())
 }

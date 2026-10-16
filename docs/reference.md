@@ -912,15 +912,16 @@ Unicode escape digits are hexadecimal, as in `\u{1F600}`. Other string escapes a
 
 `//` and `;` begin line comments. `/* ... */` encloses a block comment.
 
-A first-line comment can declare a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. The declaration must match the loaded grammar's name exactly, including case.
+A first-line comment can tag a file with a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. When compiling a directory, Plotnik includes files tagged for the selected grammar and files without a tag.
 
 ### Check a query
 
-Use `check` to validate a query against a grammar and `infer` to show its result types:
+Use `check` to validate a query against a grammar, `dump` to inspect its bytecode, and `gen` to generate a Rust matcher:
 
 ```sh
 plotnik check query.ptk --lang javascript
-plotnik infer query.ptk --lang javascript
+plotnik dump query.ptk --lang javascript
+plotnik gen query.ptk --lang javascript --target rust
 ```
 
 ## A complete example

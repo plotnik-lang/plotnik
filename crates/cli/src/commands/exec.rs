@@ -3,52 +3,44 @@ use std::io::{IsTerminal, Read as _};
 use clap::ArgMatches;
 use plotnik_compiler::bytecode::{Entrypoint, Module};
 use plotnik_compiler::{
-    Colors, NoopTracer, PrintTracer, QueryBuilder, SourceCollection, SourceMap, Tracer, VM, Value,
-    Verbosity,
+    Colors, NoopTracer, PrintTracer, QueryBuilder, SourceMap, Tracer, VM, Value, Verbosity,
 };
 
 use super::{
     compile,
     inputs::{Inputs, load_source},
     language::LanguageOptions,
-    query_loader::load_query,
+    query_loader::{QuerySources, load_query},
 };
 use crate::cli::{ColorChoice, runtime_limits};
 use crate::error::{CliError, CliResult, writeln_stderr, writeln_stdout};
 
 pub fn run(m: &ArgMatches, command: &str) -> CliResult {
     let inputs = Inputs::from_matches(m)?;
-    let (mut storage, directory) = match inputs.query_path {
-        Some(path) => {
-            let loaded = load_query(Some(path), None)?;
-            (loaded.sources, loaded.is_directory)
-        }
-        None => (SourceMap::new(), false),
+    let mut loaded = match inputs.query_path {
+        Some(path) => load_query(path)?,
+        None => QuerySources {
+            sources: SourceMap::new(),
+            is_directory: false,
+        },
     };
-    let modules: Vec<_> = storage.iter().map(|source| source.id).collect();
+
     let expression = if inputs.entry.is_none() {
         let mut text = String::new();
         std::io::stdin()
             .read_to_string(&mut text)
             .map_err(|error| CliError::fatal(format!("failed to read stdin: {error}")))?;
-        Some(storage.add_stdin(&text))
+        Some(loaded.sources.add_stdin(&text))
     } else {
         None
     };
-    let mut collection = SourceCollection::new(storage);
-    for id in modules {
-        if directory {
-            collection.include_directory(id);
-        } else {
-            collection.include(id);
-        }
-    }
-    let mut builder = QueryBuilder::from_sources(collection);
+
+    let mut builder = QueryBuilder::from_sources(loaded.into_collection());
     if let Some(expression) = expression {
         builder = builder.with_expression(expression);
     }
 
-    let source = load_source(Some(inputs.source_path), None)?;
+    let source = load_source(inputs.source_path)?;
     let color = ColorChoice::from_matches(m).should_colorize();
     let artifacts = LanguageOptions::from_matches(m).load(Some(inputs.source_path))?;
     let compiled = builder

@@ -609,14 +609,8 @@ impl CompiledQuery {
         self.require_static_module()?;
         let schema = self.result_schema();
         let emitter = config.emitter_config();
-        let (source, bindings) = if config.colored_output() {
-            (
-                crate::compiler::emit::targets::typescript::emit_schema(&schema, emitter),
-                Vec::new(),
-            )
-        } else {
-            crate::compiler::emit::targets::typescript::emit_schema_mapped(&schema, emitter)
-        };
+        let (source, bindings) =
+            crate::compiler::emit::targets::typescript::emit_schema(&schema, emitter);
         Ok(Emission::success(
             TypeScriptTypesOutput::new(source, bindings),
             Diagnostics::new(),

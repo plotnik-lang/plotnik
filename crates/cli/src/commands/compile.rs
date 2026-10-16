@@ -1,15 +1,15 @@
 use plotnik_compiler::bytecode::Module;
 use plotnik_compiler::grammar::Grammar;
-use plotnik_compiler::{BytecodeConfig, CompiledQuery, QueryBuilder, SourceMap};
+use plotnik_compiler::{BytecodeConfig, CompiledQuery, QueryBuilder, SourceCollection};
 
 use crate::error::{CliError, CliResult, write_stderr};
 
 pub fn compile_query(
-    sources: SourceMap,
+    sources: SourceCollection,
     grammar: &Grammar,
     color: bool,
 ) -> Result<CompiledQuery, CliError> {
-    let compiled = QueryBuilder::new(sources)
+    let compiled = QueryBuilder::from_sources(sources)
         .compile(grammar)
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
@@ -31,7 +31,7 @@ pub fn report_errors(compiled: &CompiledQuery, color: bool) -> CliResult {
 }
 
 pub fn compile_module(
-    sources: SourceMap,
+    sources: SourceCollection,
     grammar: &Grammar,
     color: bool,
 ) -> Result<Module, CliError> {

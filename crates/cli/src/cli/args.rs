@@ -8,23 +8,8 @@ pub fn query_path_arg() -> Arg {
     Arg::new("query_path")
         .value_name("PATH")
         .value_parser(value_parser!(PathBuf))
+        .required(true)
         .help("Query file, directory of .ptk files, or '-' for stdin")
-}
-
-pub fn query_text_arg() -> Arg {
-    Arg::new("query_text")
-        .short('q')
-        .long("query")
-        .value_name("QUERY")
-        .help("Inline query text")
-}
-
-pub fn source_text_arg() -> Arg {
-    Arg::new("source_text")
-        .short('s')
-        .long("source")
-        .value_name("SOURCE")
-        .help("Inline source text")
 }
 
 pub const LANGUAGE_HELP: &str =
@@ -55,15 +40,6 @@ pub fn color_arg() -> Arg {
         .help("Colorize output")
 }
 
-pub fn query_view_arg() -> Arg {
-    Arg::new("query_view")
-        .long("query-view")
-        .value_name("VIEW")
-        .default_value("ast")
-        .value_parser(["ast", "cst"])
-        .help("Choose the query tree view")
-}
-
 pub fn include_anonymous_arg() -> Arg {
     Arg::new("include_anonymous")
         .long("include-anonymous")
@@ -76,36 +52,6 @@ pub fn strict_arg() -> Arg {
         .long("strict")
         .action(ArgAction::SetTrue)
         .help("Treat warnings as errors")
-}
-
-pub fn format_arg() -> Arg {
-    Arg::new("format")
-        .long("format")
-        .value_name("FORMAT")
-        .default_value("typescript")
-        .help("Output format (typescript, ts)")
-}
-
-pub fn no_node_type_arg() -> Arg {
-    Arg::new("no_node_type")
-        .long("no-node-type")
-        .action(ArgAction::SetTrue)
-        .help("Don't emit the Node type definition")
-}
-
-pub fn no_export_arg() -> Arg {
-    Arg::new("no_export")
-        .long("no-export")
-        .action(ArgAction::SetTrue)
-        .help("Don't export types")
-}
-
-pub fn match_only_type_arg() -> Arg {
-    Arg::new("match_only_type")
-        .long("match-only-type")
-        .value_name("TYPE")
-        .value_parser(["undefined", "null"])
-        .help("Type for match-only results: undefined (default) or null")
 }
 
 pub fn output_file_arg() -> Arg {

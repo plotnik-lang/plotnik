@@ -7,22 +7,16 @@ use super::query_loader::load_query;
 use crate::error::{CliError, CliResult, write_stderr};
 
 pub struct CheckArgs {
-    pub query_path: Option<PathBuf>,
-    pub query_text: Option<String>,
+    pub query_path: PathBuf,
     pub language: LanguageOptions,
     pub strict: bool,
     pub color: bool,
 }
 
 pub fn run(args: CheckArgs) -> CliResult {
-    let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
-
-    if loaded.sources.is_empty() {
-        return Err(CliError::fatal("query cannot be empty"));
-    }
-
-    let artifacts = args.language.load_query(&loaded, args.color)?;
-    let checked = QueryBuilder::new(loaded.sources)
+    let sources = load_query(&args.query_path)?.into_collection();
+    let artifacts = args.language.load(None)?;
+    let checked = QueryBuilder::from_sources(sources)
         .with_strict_lints(args.strict)
         .compile(&artifacts.grammar)
         .map_err(|e| CliError::fatal(e.to_string()))?;

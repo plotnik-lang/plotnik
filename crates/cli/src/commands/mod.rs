@@ -4,7 +4,6 @@ pub mod dump;
 pub mod exec;
 pub mod generate;
 pub mod grammar;
-pub mod infer;
 pub mod inputs;
 pub mod lang;
 pub mod language;

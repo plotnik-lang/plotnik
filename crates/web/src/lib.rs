@@ -57,7 +57,7 @@ impl Session {
         let module = bytecode.into_artifact();
         let bytecode_size_bytes = module.as_ref().map(Module::bytecode_size);
         let types = compiled
-            .emit_types(TypeScriptCodegenConfig::new().colored(false))
+            .emit_types(TypeScriptCodegenConfig::new())
             .map_err(|error| JsValue::from_str(&error.to_string()))?;
         diagnostics.extend(types.diagnostics().clone());
         diagnostics.extend(bytecode_diagnostics);

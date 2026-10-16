@@ -1,8 +1,8 @@
 mod config;
 mod types;
 
-pub use config::{Config, MatchOnlyType};
-pub(crate) use types::{emit_schema, emit_schema_mapped};
+pub use config::Config;
+pub(crate) use types::emit_schema;
 
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct TypeScriptBinding {

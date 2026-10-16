@@ -1,4 +1,3 @@
-mod ansi;
 mod decode;
 mod matcher;
 mod plan;
@@ -14,4 +13,4 @@ pub use target::{
 
 pub(crate) use plan::CodegenPlan;
 pub use targets::rust::journal_fn_name;
-pub use targets::typescript::{MatchOnlyType as TypeScriptMatchOnlyType, TypeScriptBinding};
+pub use targets::typescript::TypeScriptBinding;

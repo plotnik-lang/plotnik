@@ -56,14 +56,7 @@ impl<'a> Inputs<'a> {
     }
 }
 
-pub fn load_source(path: Option<&Path>, text: Option<&str>) -> Result<String, CliError> {
-    if let Some(text) = text {
-        return Ok(text.to_owned());
-    }
-
-    let path = path.ok_or_else(|| {
-        CliError::fatal("source required: supply a file path or --source for inline text")
-    })?;
+pub fn load_source(path: &Path) -> Result<String, CliError> {
     if path == Path::new("-") {
         let mut source = String::new();
         std::io::stdin()

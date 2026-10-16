@@ -43,8 +43,8 @@ pub mod diagnostics {
     };
 }
 
+pub use crate::compiler::TypeScriptBinding;
 pub use crate::compiler::journal_fn_name as matcher_journal_fn_name;
-pub use crate::compiler::{TypeScriptBinding, TypeScriptMatchOnlyType};
 
 pub use crate::core::Colors;
 pub use crate::core::grammar::GrammarIdentity;

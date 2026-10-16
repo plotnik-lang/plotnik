@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 use clap::ArgMatches;
 
-use cli::{CheckOpts, DumpOpts, GenerateOpts, InferOpts, build_cli};
+use cli::{CheckOpts, DumpOpts, GenerateOpts, build_cli};
 use error::{CliError, CliResult};
 
 fn main() -> ExitCode {
@@ -35,10 +35,6 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
         Some(("dump", m)) => {
             let params = DumpOpts::from_matches(m);
             commands::dump::run(params.into())
-        }
-        Some(("infer", m)) => {
-            let params = InferOpts::from_matches(m);
-            commands::infer::run(params.into())
         }
         Some(("gen", m)) => {
             let params = GenerateOpts::from_matches(m);

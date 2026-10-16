@@ -3,11 +3,10 @@ use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use plotnik_compiler::{DiagnosticKind, Diagnostics, WasmParser, parse_grammar_declaration};
+use plotnik_compiler::WasmParser;
 
 use super::grammar;
-use super::query_loader::QuerySources;
-use crate::error::{CliError, write_stderr};
+use crate::error::CliError;
 
 const ENDPOINT: &str = "https://plotnik.dev/lang";
 const MAX_DOWNLOAD: u64 = 64 * 1024 * 1024;
@@ -112,72 +111,6 @@ impl LanguageOptions {
             })
             .ok_or_else(|| CliError::fatal("source language required: use --lang"))?;
         self.load_selected(input)
-    }
-
-    pub fn load_query(&self, query: &QuerySources, color: bool) -> Result<Artifacts, CliError> {
-        if query.is_directory {
-            if self.lang.is_none() {
-                return Err(CliError::fatal("query directories require --lang"));
-            }
-
-            return self.load(None);
-        }
-
-        let query_source = query.sources.iter().next().expect("query has one source");
-        let declaration = match parse_grammar_declaration(query_source) {
-            Ok(declaration) => declaration,
-            Err(error) => {
-                let mut diagnostics = Diagnostics::new();
-                diagnostics
-                    .report(DiagnosticKind::InvalidGrammarDeclaration, error.span)
-                    .hint(error.message)
-                    .emit();
-                write_stderr(format_args!(
-                    "{}",
-                    diagnostics.render_colored(&query.sources, color)
-                ))?;
-                return Err(CliError::No);
-            }
-        };
-        let artifacts = if let Some(input) = self
-            .lang
-            .as_deref()
-            .or_else(|| declaration.as_ref().map(|declaration| declaration.language))
-        {
-            self.load_selected(input)?
-        } else {
-            return Err(CliError::fatal(
-                "query language required: use --lang or a first-line @language declaration",
-            ));
-        };
-        if let Some(declaration) = declaration
-            && declaration.language != artifacts.grammar.name()
-        {
-            let mut diagnostics = Diagnostics::new();
-            let selection = match &self.lang {
-                Some(lang) => format!(" selected by --lang '{lang}'"),
-                None => String::new(),
-            };
-            diagnostics
-                .report(
-                    DiagnosticKind::InvalidGrammarDeclaration,
-                    declaration.language_span,
-                )
-                .detail(format!(
-                    "declared language '{}' does not match loaded grammar '{}'{}",
-                    declaration.language,
-                    artifacts.grammar.name(),
-                    selection,
-                ))
-                .emit();
-            write_stderr(format_args!(
-                "{}",
-                diagnostics.render_colored(&query.sources, color)
-            ))?;
-            return Err(CliError::No);
-        }
-
-        Ok(artifacts)
     }
 
     fn load_selected(&self, input: &str) -> Result<Artifacts, CliError> {

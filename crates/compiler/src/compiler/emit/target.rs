@@ -4,9 +4,8 @@ use plotnik_runtime::{Limit, RuntimeLimitSpec};
 
 use crate::bytecode::Module;
 use crate::compiler::diagnostics::{Diagnostics, QueryResult};
-use crate::compiler::emit::targets::typescript::{MatchOnlyType, TypeScriptBinding};
+use crate::compiler::emit::targets::typescript::TypeScriptBinding;
 use crate::compiler::query::CompiledQuery;
-use crate::core::Colors;
 
 /// The artifact and emission-local diagnostics produced by one target.
 pub struct Emission<T> {
@@ -251,20 +250,14 @@ pub enum TypeScriptNodeRepresentation {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeScriptCodegenConfig {
-    export: bool,
     emit_node_interface: bool,
-    match_only_type: MatchOnlyType,
-    colors: Colors,
     node_representation: TypeScriptNodeRepresentation,
 }
 
 impl Default for TypeScriptCodegenConfig {
     fn default() -> Self {
         Self {
-            export: true,
             emit_node_interface: true,
-            match_only_type: MatchOnlyType::Undefined,
-            colors: Colors::OFF,
             node_representation: TypeScriptNodeRepresentation::SerializedValue,
         }
     }
@@ -275,23 +268,8 @@ impl TypeScriptCodegenConfig {
         Self::default()
     }
 
-    pub fn export(mut self, enabled: bool) -> Self {
-        self.export = enabled;
-        self
-    }
-
     pub fn emit_node_interface(mut self, enabled: bool) -> Self {
         self.emit_node_interface = enabled;
-        self
-    }
-
-    pub fn match_only_type(mut self, match_only_type: MatchOnlyType) -> Self {
-        self.match_only_type = match_only_type;
-        self
-    }
-
-    pub fn colored(mut self, enabled: bool) -> Self {
-        self.colors = Colors::new(enabled);
         self
     }
 
@@ -302,14 +280,7 @@ impl TypeScriptCodegenConfig {
 
     pub(crate) fn emitter_config(&self) -> crate::compiler::emit::targets::typescript::Config {
         crate::compiler::emit::targets::typescript::Config::new()
-            .export(self.export)
             .emit_node_interface(self.emit_node_interface)
-            .match_only_type(self.match_only_type)
-            .colored(!self.colors.blue.is_empty())
-    }
-
-    pub(crate) fn colored_output(&self) -> bool {
-        !self.colors.blue.is_empty()
     }
 
     fn validate(&self) -> Result<(), EmitConfigError> {

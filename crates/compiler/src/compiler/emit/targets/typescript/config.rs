@@ -1,30 +1,12 @@
-use crate::core::Colors;
-
-/// How to represent match-only output in TypeScript.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum MatchOnlyType {
-    /// `undefined` - the absence of a value
-    #[default]
-    Undefined,
-    /// `null` - explicit null value
-    Null,
-}
-
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub(crate) export: bool,
     pub(crate) emit_node_interface: bool,
-    pub(crate) match_only_type: MatchOnlyType,
-    pub(crate) colors: Colors,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            export: true,
             emit_node_interface: true,
-            match_only_type: MatchOnlyType::default(),
-            colors: Colors::OFF,
         }
     }
 }
@@ -34,23 +16,8 @@ impl Config {
         Self::default()
     }
 
-    pub fn export(mut self, value: bool) -> Self {
-        self.export = value;
-        self
-    }
-
     pub fn emit_node_interface(mut self, value: bool) -> Self {
         self.emit_node_interface = value;
-        self
-    }
-
-    pub fn match_only_type(mut self, value: MatchOnlyType) -> Self {
-        self.match_only_type = value;
-        self
-    }
-
-    pub fn colored(mut self, enabled: bool) -> Self {
-        self.colors = Colors::new(enabled);
         self
     }
 }

@@ -16,8 +16,7 @@ pub enum GenerateTarget {
 }
 
 pub struct GenerateArgs {
-    pub query_path: Option<PathBuf>,
-    pub query_text: Option<String>,
+    pub query_path: PathBuf,
     pub language: LanguageOptions,
     pub target: GenerateTarget,
     pub output: Option<PathBuf>,
@@ -39,13 +38,9 @@ pub fn run(args: GenerateArgs) -> CliResult {
 }
 
 pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
-    let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
-    if loaded.sources.is_empty() {
-        return Err(CliError::fatal("query cannot be empty"));
-    }
-
-    let artifacts = args.language.load_query(&loaded, args.color)?;
-    let compiled = compile_query(loaded.sources, &artifacts.grammar, args.color)?;
+    let sources = load_query(&args.query_path)?.into_collection();
+    let artifacts = args.language.load(None)?;
+    let compiled = compile_query(sources, &artifacts.grammar, args.color)?;
 
     match args.target {
         GenerateTarget::Rust => {

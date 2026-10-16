@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
-use plotnik_compiler::{SourceMap, SourcePath};
+use plotnik_compiler::{SourceCollection, SourceMap, SourcePath};
 
 use crate::error::CliError;
 
@@ -11,32 +11,32 @@ pub struct QuerySources {
     pub is_directory: bool,
 }
 
-pub fn load_query(
-    query_path: Option<&Path>,
-    query_text: Option<&str>,
-) -> Result<QuerySources, CliError> {
-    if let Some(text) = query_text {
-        let mut sources = SourceMap::new();
-        sources.add_inline(text);
-        return Ok(QuerySources {
-            sources,
-            is_directory: false,
-        });
+impl QuerySources {
+    pub fn into_collection(self) -> SourceCollection {
+        let ids: Vec<_> = self.sources.iter().map(|source| source.id).collect();
+        let mut collection = SourceCollection::new(self.sources);
+        for id in ids {
+            if self.is_directory {
+                collection.include_directory(id);
+            } else {
+                collection.include(id);
+            }
+        }
+
+        collection
+    }
+}
+
+pub fn load_query(path: &Path) -> Result<QuerySources, CliError> {
+    if path.as_os_str() == "-" {
+        return load_stdin();
     }
 
-    if let Some(path) = query_path {
-        if path.as_os_str() == "-" {
-            return load_stdin();
-        }
-        if path.is_dir() {
-            return load_workspace(path);
-        }
-        return load_file(path);
+    if path.is_dir() {
+        return load_workspace(path);
     }
 
-    Err(CliError::fatal(
-        "query required: supply a file, directory, '-' for stdin, or --query for inline text",
-    ))
+    load_file(path)
 }
 
 fn load_stdin() -> Result<QuerySources, CliError> {
