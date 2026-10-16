@@ -14,7 +14,7 @@ pub struct ResultDecoder<'a, 't, 's> {
 impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
     pub fn new(events: OutputEvents<'a, 't>, source: &'s str) -> Self {
         Self {
-            record_set_index: build_record_set_index(&events),
+            record_set_index: Vec::new(),
             events,
             source,
             pos: 0,
@@ -48,7 +48,15 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
     /// The member index of the field value starting at the cursor.
     /// Values precede their `RecordSet`, so the decoder needs this lookahead
     /// to choose the field's type before consuming its value.
-    pub fn peek_record_set(&self) -> u16 {
+    pub fn peek_record_set(&mut self) -> u16 {
+        if let Some(JournalEvent::RecordSet(index)) = self.events.get(self.pos + 1) {
+            return *index;
+        }
+
+        if self.record_set_index.is_empty() {
+            self.record_set_index = build_record_set_index(&self.events);
+        }
+
         let record_set_pos = *self
             .record_set_index
             .get(self.pos)
