@@ -245,11 +245,17 @@ pub fn completions_command() -> Command {
 fn lang_dump_command() -> Command {
     Command::new("dump")
         .about("Dump grammar tree shapes")
+        .after_help(
+            r#"EXAMPLES:
+  plotnik lang dump javascript
+  plotnik lang dump owner/repo/grammar-directory@revision --no-legend --width 60"#,
+        )
         .arg(cache_dir_arg())
         .arg(
             clap::Arg::new("lang")
                 .value_name("LANG[@REVISION]")
                 .help(LANGUAGE_HELP)
+                .required(true)
                 .index(1),
         )
         .arg(
