@@ -1325,6 +1325,17 @@ impl TypeAnalysisBuilder {
             .record_capture(captured_pattern, observation)
     }
 
+    pub(super) fn capture_is_admitted(&self, id: CaptureId) -> bool {
+        self.capture_provenance
+            .captures
+            .get(id.index())
+            .expect("capture id references an inferred capture")
+            .observation
+            .contract
+            .fact
+            .is_valid()
+    }
+
     pub fn record_capture_fact(&mut self, pattern: Pattern, fact: CaptureFact) {
         self.analysis.capture_facts.insert(pattern, fact);
     }

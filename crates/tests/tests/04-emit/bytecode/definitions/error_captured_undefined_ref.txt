@@ -1,0 +1,9 @@
+Q = (Part) @x
+------------------ DIAGNOSTICS -------------------
+error: `Part` is not defined
+ --> query.ptk:1:6
+  |
+1 | Q = (Part) @x
+  |      ^^^^
+  |
+help: define `Part` before using `(Part)`, or change the reference to an existing definition

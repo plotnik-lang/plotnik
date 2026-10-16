@@ -1,0 +1,8 @@
+(Part) @x
+------------------ DIAGNOSTICS -------------------
+error: `Part` is not defined
+  |
+1 | (Part) @x
+  |  ^^^^
+  |
+help: define `Part` before using `(Part)`, or change the reference to an existing definition

@@ -1,0 +1,27 @@
+Known = (identifier) @name
+
+Part = [
+  (Missing) @x
+  (identifier) @x
+  (Known) @x
+]
+
+Q = (Part)
+------------------ DIAGNOSTICS -------------------
+error: `Missing` is not defined
+ --> query.ptk:4:4
+  |
+4 |   (Missing) @x
+  |    ^^^^^^^
+  |
+help: define `Missing` before using `(Missing)`, or change the reference to an existing definition
+
+error: `@x` has incompatible types `Node` and `Known` across alternatives
+ --> query.ptk:5:16
+  |
+5 |   (identifier) @x
+  |                ^^
+6 |   (Known) @x
+  |           -- `@x` has type `Known` here
+  |
+help: make every alternative produce the same type, or label the alternatives for a variant type

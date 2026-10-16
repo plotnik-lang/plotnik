@@ -219,9 +219,10 @@ impl InferVisitor<'_, '_> {
             return false;
         }
 
-        let definition = self
-            .referenced_definition(inner)
-            .expect("resolved definition reference has definition provenance");
+        let Some(definition) = self.referenced_definition(inner) else {
+            return false;
+        };
+
         let capture_name = self.ctx.interner.resolve(capture_name).to_string();
         let suggested_capture = format!("{capture_name}_value");
         let hint = result_capture_hint(

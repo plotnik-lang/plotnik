@@ -1,0 +1,26 @@
+Part = (identifier)
+
+Q = (program
+  (Missing) @x
+  (Part) @y
+)
+------------------ DIAGNOSTICS -------------------
+error: `Missing` is not defined
+ --> query.ptk:4:4
+  |
+4 |   (Missing) @x
+  |    ^^^^^^^
+  |
+help: define `Missing` before using `(Missing)`, or change the reference to an existing definition
+
+error: `@y` cannot capture `(Part)` because `Part` produces no result value
+ --> query.ptk:5:3
+  |
+1 | Part = (identifier)
+  | ------------------- `Part` is defined here
+...
+5 |   (Part) @y
+  |   ^^^^^^
+  |
+help: make `Part` produce a result by changing `(identifier)` to `(identifier) @y_value` in definition `Part`
+help: or remove `@y` and capture a node pattern directly

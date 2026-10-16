@@ -1,0 +1,16 @@
+Known = (identifier) @name
+
+Part = [
+  (Missing) @x
+  (Known) @x
+]
+
+Q = (Part) @out
+------------------ DIAGNOSTICS -------------------
+error: `Missing` is not defined
+ --> query.ptk:4:4
+  |
+4 |   (Missing) @x
+  |    ^^^^^^^
+  |
+help: define `Missing` before using `(Missing)`, or change the reference to an existing definition

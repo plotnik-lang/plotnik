@@ -106,6 +106,18 @@ fn merge_field(
     right: InferredField,
     fallback_span: Span,
 ) -> Result<InferredField, UnifyError> {
+    if !left.producers.iter().any(|&id| ctx.capture_is_admitted(id)) {
+        return Ok(right);
+    }
+
+    if !right
+        .producers
+        .iter()
+        .any(|&id| ctx.capture_is_admitted(id))
+    {
+        return Ok(left);
+    }
+
     let final_type = match ctx.unify_types(left.info.final_type, right.info.final_type) {
         TypeUnification::Unified(final_type) => final_type,
         outcome @ (TypeUnification::Distinct | TypeUnification::Pending) => {
