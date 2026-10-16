@@ -62,7 +62,7 @@ impl ExecutionBudget {
 /// The executor applies an eligible entry once per candidate, using a separate
 /// cursor rooted at that candidate and this operation's budget. Its result must
 /// own its state, not borrow reusable matcher scratch. A successful candidate
-/// does not prune descendants. No work on the next candidate happens until the
+/// prunes its descendants. No work on the next candidate happens until the
 /// consumer asks for another item.
 ///
 /// The first failure is yielded once, then the iterator is permanently exhausted.
@@ -73,6 +73,7 @@ pub struct Traversal<'t, F> {
     budget: ExecutionBudget,
     apply: F,
     started: bool,
+    matched: bool,
     done: bool,
 }
 
@@ -83,14 +84,17 @@ impl<'t, F> Traversal<'t, F> {
             budget,
             apply,
             started: false,
+            matched: false,
             done: false,
         }
     }
 
     fn advance(&mut self) -> Result<bool, LimitExceeded> {
-        self.budget.charge()?;
-        if self.cursor.goto_first_child() {
-            return Ok(true);
+        if !self.matched {
+            self.budget.charge()?;
+            if self.cursor.goto_first_child() {
+                return Ok(true);
+            }
         }
 
         loop {
@@ -135,8 +139,14 @@ where
             };
 
             match result {
-                Ok(Some(value)) => return Some(Ok(value)),
-                Ok(None) => continue,
+                Ok(Some(value)) => {
+                    self.matched = true;
+                    return Some(Ok(value));
+                }
+                Ok(None) => {
+                    self.matched = false;
+                    continue;
+                }
                 Err(error) => {
                     self.done = true;
                     return Some(Err(error));

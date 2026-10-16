@@ -40,7 +40,7 @@ impl<'t> Q<'t> {
         Self::apply(&mut eng, source, &mut budget, &mut scratch)
     }
 
-    /// Search inclusively in source-order DFS preorder, retaining nested matches.
+    /// Search inclusively in source-order DFS preorder, skipping descendants of matches.
     /// Matching and traversal share compiled-in limits. An error ends iteration.
     pub fn each<'s>(
         scope: rt::Node<'t>,

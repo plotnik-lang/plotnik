@@ -226,9 +226,10 @@ impl<'s, 't> VM<'s, 't> {
         Application::new(self, module, *entrypoint).apply_budgeted(tracer, &mut budget)
     }
 
-    /// Lazily apply one preferred result per candidate in inclusive preorder.
+    /// Lazily return outermost matches in inclusive, source-order DFS preorder.
+    /// A successful candidate prunes its descendants from further search.
     /// All traversal and matching work shares the limits already resolved for
-    /// this VM's scope. Quantifier collections remain inside each result.
+    /// this VM's scope. Recursive captures and collections remain inside each result.
     pub fn traverse(
         self,
         module: &'s Module,

@@ -746,11 +746,24 @@ fn unified_diff(actual: &str, expected: &str) -> String {
 fn public_apply_and_traverse_classify_results_by_type_kind() {
     use serde_json::json;
 
+    let chain = json!({"top": {"$tag": "Step", "$data": {"inner": {
+        "$tag": "Step", "$data": {"inner": {
+            "$tag": "Base", "$data": {"name": {
+                "kind": "identifier", "text": "a", "span": [0, 1]
+            }}
+        }}
+    }}}});
+
     for (path, expected_apply, expected_search) in [
         (
             "06-vm/recursion/zero_id_record.txt",
             Some(json!({"a": {"b": null}})),
-            vec![json!({"a": {"b": null}}), json!({"a": {"b": null}})],
+            vec![json!({"a": {"b": null}})],
+        ),
+        (
+            "06-vm/recursion/variant_chain_nests_variants.txt",
+            Some(chain.clone()),
+            vec![chain],
         ),
         (
             "06-vm/definitions/captureless_program_root_is_match_only.txt",
@@ -824,8 +837,8 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
                 "{path}, traced={traced}"
             );
             if traced {
-                let attempts = tracer
-                    .finish()
+                let trace = tracer.finish();
+                let attempts = trace
                     .records
                     .iter()
                     .filter(|record| {
@@ -835,7 +848,12 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
                         )
                     })
                     .count();
-                assert_eq!(attempts, tree.root_node().descendant_count());
+                let expected_attempts = if expected_apply.is_some() {
+                    1
+                } else {
+                    tree.root_node().descendant_count()
+                };
+                assert_eq!(attempts, expected_attempts, "{path}");
             }
         }
     }

@@ -98,9 +98,9 @@ mod nodes {
 
 mod walk_limited {
     plotnik::query! {
-        "Probe = (_)",
+        "Probe = (expression_statement) Root = (_)",
         grammar = "tree-sitter-javascript",
-        fuel = 8,
+        fuel = 5,
     }
 }
 
@@ -265,7 +265,7 @@ fn suitable_nonroot_application_and_context_composition() {
 }
 
 #[test]
-fn search_retains_nested_matches_in_preorder_with_one_preferred_result() {
+fn search_returns_outermost_matches_in_preorder_with_one_preferred_result() {
     let source = "alpha + (beta * gamma); delta - epsilon;";
     let tree = parse(&js(), source);
     let scope = tree.root_node();
@@ -281,7 +281,7 @@ fn search_retains_nested_matches_in_preorder_with_one_preferred_result() {
         })
         .collect::<Vec<_>>();
 
-    assert_eq!(lefts, vec!["alpha", "beta", "delta"]);
+    assert_eq!(lefts, vec!["alpha", "delta"]);
     assert_eq!(
         nodes::Binary::find(scope, source),
         Ok(Some(values[0].clone()))
@@ -294,7 +294,7 @@ fn search_retains_nested_matches_in_preorder_with_one_preferred_result() {
     );
     assert_eq!(
         nodes::Binary::find_all(outer, source),
-        Ok(values[..2].to_vec())
+        Ok(values[..1].to_vec())
     );
 }
 
@@ -319,22 +319,27 @@ fn quantifier_lists_stay_inside_independent_results() {
 
 #[test]
 fn failed_captures_do_not_leak_into_later_nested_results() {
-    let source = "f(alpha, beta); skip(1); g(gamma);";
+    let source = "f(alpha, beta); skip(1); skip(g(gamma)); h(delta);";
     let tree = parse(&js(), source);
 
     let mut each = nodes::Calls::each(tree.root_node(), source);
     let first = each.next().unwrap().unwrap();
     let second = each.next().unwrap().unwrap();
+    let third = each.next().unwrap().unwrap();
     assert_eq!(each.next(), None);
     drop(each);
 
-    let json = serde_json::to_value(plotnik::rt::WithSource::new(&vec![first, second], source))
-        .expect("retained values serialize after iterator drop");
+    let json = serde_json::to_value(plotnik::rt::WithSource::new(
+        &vec![first, second, third],
+        source,
+    ))
+    .expect("retained values serialize after iterator drop");
     assert_eq!(
         json,
         serde_json::json!([
             {"bad": null, "name": "f", "args": {"ids": ["alpha", "beta"]}},
-            {"bad": null, "name": "g", "args": {"ids": ["gamma"]}}
+            {"bad": null, "name": "g", "args": {"ids": ["gamma"]}},
+            {"bad": null, "name": "h", "args": {"ids": ["delta"]}}
         ])
     );
 }
@@ -434,28 +439,20 @@ fn lazy_search_shares_fuel_and_fuses_after_a_terminal_error() {
         application_limited::Probe::each(scope, source).next(),
         Some(Err(LimitExceeded::OutOfFuel(2)))
     );
+    assert_eq!(walk_limited::Root::find_all(scope, source), Ok(vec![scope]));
+
     let mut each = walk_limited::Probe::each(scope, source);
     let first = each.next().unwrap().unwrap();
-    assert_eq!(first, scope);
-    assert_eq!(walk_limited::Probe::find(scope, source), Ok(Some(scope)));
-    let mut successes = vec![first];
-    loop {
-        match each.next() {
-            Some(Ok(node)) => successes.push(node),
-            Some(Err(error)) => {
-                assert_eq!(error, LimitExceeded::OutOfFuel(8));
-                break;
-            }
-            None => panic!("the complete traversal exceeds the compiled fuel limit"),
-        }
-    }
+    assert_eq!(first, scope.named_child(0).unwrap());
+    assert_eq!(walk_limited::Probe::find(scope, source), Ok(Some(first)));
+    assert_eq!(each.next(), Some(Err(LimitExceeded::OutOfFuel(5))));
     assert_eq!(each.next(), None);
     assert_eq!(each.next(), None);
     drop(each);
-    assert_eq!(successes[0].utf8_text(source.as_bytes()), Ok(source));
+    assert_eq!(first.utf8_text(source.as_bytes()), Ok("alpha;"));
     assert_eq!(
         walk_limited::Probe::find_all(scope, source),
-        Err(LimitExceeded::OutOfFuel(8))
+        Err(LimitExceeded::OutOfFuel(5))
     );
 }
 

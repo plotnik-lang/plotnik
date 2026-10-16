@@ -203,9 +203,11 @@ pub fn infer_command() -> Command {
 
 fn execution_command(name: &'static str, about: &'static str) -> Command {
     let search_help = match name {
-        "find" => "\n\nSearch from the root, depth-first in source order.",
+        "find" => {
+            "\n\nSearch inclusively from the root, depth-first in source order. Return the first match."
+        }
         "find-all" => {
-            "\n\nSearch from the root, depth-first in source order, including nested matches.\n\
+            "\n\nSearch inclusively from the root, depth-first in source order. Skip descendants of matches.\n\
              Return a JSON array, or [] if nothing matches."
         }
         _ => "",

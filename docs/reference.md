@@ -1016,4 +1016,4 @@ Each call contributes one record. The `*` fills that record's `arguments` list; 
 
 `Call::exec(tree.root_node(), source)` would not find these calls. It checks only the supplied node and its specified children, and the root is a `program`.
 
-Search visits the scope node first, then each child's subtree from left to right, including nested matches. On `f(g(a)); h(b);`, `Call` finds `f`, then `g`, then `h`. Each node contributes at most one match, using the query's usual backtracking rules.
+Search visits the scope node first, then each child's subtree from left to right, skipping descendants of matching nodes. On `f(g(a)); h(b);`, `Call` finds `f`, then `h`. Each node contributes at most one match, using the query's usual backtracking rules. [Recursive captures](#recursion) can still retain nested structure within each result.

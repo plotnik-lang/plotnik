@@ -202,7 +202,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "    }}\n");
         let _ = writeln!(
             out,
-            "    /// Search inclusively in source-order DFS preorder, retaining nested matches."
+            "    /// Search inclusively in source-order DFS preorder, skipping descendants of matches."
         );
         let _ = writeln!(
             out,
