@@ -5,10 +5,10 @@ use plotnik_compiler::{CodegenProvenance, RustCodegenConfig};
 
 use clap::ValueEnum;
 
-use super::compile::compile_query;
+use super::compile::{compile_query, report_diagnostics};
 use super::language::LanguageOptions;
 use super::query_loader::load_query;
-use crate::error::{CliError, CliResult, write_stderr, write_stdout, writeln_stderr};
+use crate::error::{CliError, CliResult, write_stdout, writeln_stderr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum GenerateTarget {
@@ -47,18 +47,7 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
             let emission = compiled
                 .emit(RustCodegenConfig::new().provenance(CodegenProvenance::Full))
                 .map_err(|error| CliError::fatal(error.to_string()))?;
-            let has_errors = emission.diagnostics().has_errors();
-            if !emission.diagnostics().is_empty() {
-                write_stderr(format_args!(
-                    "{}",
-                    emission
-                        .diagnostics()
-                        .render_colored(compiled.source_map(), args.color)
-                ))?;
-            }
-            if has_errors {
-                return Err(CliError::No);
-            }
+            report_diagnostics(emission.diagnostics(), compiled.source_map(), args.color)?;
             Ok(emission
                 .into_artifact()
                 .expect("valid query emits a Rust module")

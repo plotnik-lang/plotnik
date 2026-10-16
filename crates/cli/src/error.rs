@@ -27,13 +27,6 @@ pub fn writeln_stdout(args: fmt::Arguments<'_>) -> CliResult {
         .map_err(|error| CliError::fatal(format!("failed to write stdout: {error}")))
 }
 
-pub fn write_stderr(args: fmt::Arguments<'_>) -> CliResult {
-    io::stderr()
-        .lock()
-        .write_fmt(args)
-        .map_err(|error| CliError::fatal(format!("failed to write stderr: {error}")))
-}
-
 pub fn writeln_stderr(args: fmt::Arguments<'_>) -> CliResult {
     let mut stderr = io::stderr().lock();
     stderr

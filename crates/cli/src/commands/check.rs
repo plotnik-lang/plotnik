@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use plotnik_compiler::QueryBuilder;
 
+use super::compile::report_diagnostics;
 use super::language::LanguageOptions;
 use super::query_loader::load_query;
-use crate::error::{CliError, CliResult, write_stderr};
+use crate::error::{CliError, CliResult};
 
 pub struct CheckArgs {
     pub query_path: PathBuf,
@@ -22,21 +23,9 @@ pub fn run(args: CheckArgs) -> CliResult {
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
     let diagnostics = checked.diagnostics();
-    let source_map = checked.source_map();
-    let valid = if args.strict {
-        !diagnostics.has_errors() && !diagnostics.has_warnings()
-    } else {
-        !diagnostics.has_errors()
-    };
+    report_diagnostics(diagnostics, checked.source_map(), args.color)?;
 
-    if !valid || diagnostics.has_warnings() {
-        write_stderr(format_args!(
-            "{}",
-            diagnostics.render_colored(source_map, args.color)
-        ))?;
-    }
-
-    if !valid {
+    if args.strict && diagnostics.has_warnings() {
         return Err(CliError::No);
     }
 

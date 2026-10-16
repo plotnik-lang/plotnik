@@ -198,27 +198,95 @@ fn static_stdin_is_a_named_module() {
 }
 
 #[test]
-fn strict_check_treats_warnings_as_failure_without_stdout() {
+fn compiler_warnings_preserve_success_and_output_unless_check_is_strict() {
     let root = tempfile::tempdir().unwrap();
     cache(root.path(), "test_lang");
     let query = "Q = (program [A: (identifier) B: (identifier)])";
+    let expected = concat!(
+        "warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result\n",
+        "  |\n",
+        "1 | Q = (program [A: (identifier) B: (identifier)])\n",
+        "  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+        "  |\n",
+        "help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them\n",
+    );
 
-    let normal = stdin(root.path(), &["check", "-", "--lang", "test_lang"], query);
+    for command in ["check", "dump", "gen"] {
+        let mut args = vec![command, "-", "--lang", "test_lang"];
+        if command == "gen" {
+            args.extend(["--target", "rust"]);
+        }
+        let normal = stdin(root.path(), &args, query);
+        let unlabeled = stdin(
+            root.path(),
+            &args,
+            "Q = (program [(identifier) (identifier)])",
+        );
+
+        assert_eq!(normal.status.code(), Some(0), "{normal:?}");
+        assert_eq!(String::from_utf8(normal.stderr).unwrap(), expected);
+        assert_eq!(unlabeled.status.code(), Some(0), "{unlabeled:?}");
+        assert!(unlabeled.stderr.is_empty(), "{unlabeled:?}");
+        assert_eq!(normal.stdout, unlabeled.stdout);
+        assert_eq!(normal.stdout.is_empty(), command == "check");
+
+        if command == "gen" {
+            let output = root.path().join("matcher.rs");
+            args.extend(["--output", output.to_str().unwrap()]);
+            let saved = stdin(root.path(), &args, query);
+
+            assert_eq!(saved.status.code(), Some(0), "{saved:?}");
+            assert!(saved.stdout.is_empty(), "{saved:?}");
+            assert_eq!(fs::read(&output).unwrap(), normal.stdout);
+            assert_eq!(
+                String::from_utf8(saved.stderr).unwrap(),
+                format!("{expected}Wrote Rust matcher to {}\n", output.display())
+            );
+        }
+    }
+
     let strict = stdin(
         root.path(),
         &["check", "-", "--lang", "test_lang", "--strict"],
         query,
     );
 
-    assert_eq!(normal.status.code(), Some(0), "{normal:?}");
     assert_eq!(strict.status.code(), Some(1), "{strict:?}");
-    assert!(normal.stdout.is_empty(), "{normal:?}");
     assert!(strict.stdout.is_empty(), "{strict:?}");
-    for output in [normal, strict] {
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(
-            stderr.contains("warning: alternative labels have no output effect"),
-            "{stderr}"
-        );
-    }
+    assert_eq!(String::from_utf8(strict.stderr).unwrap(), expected);
+}
+
+#[test]
+fn generation_errors_leave_existing_output_unchanged() {
+    let root = tempfile::tempdir().unwrap();
+    cache(root.path(), "test_lang");
+    let query = root.path().join("invalid.ptk");
+    fs::write(&query, "Q = (unknown)").unwrap();
+    let output = root.path().join("matcher.rs");
+    fs::write(&output, "existing matcher").unwrap();
+
+    let invalid = run(
+        root.path(),
+        &[
+            "gen",
+            query.to_str().unwrap(),
+            "--lang",
+            "test_lang",
+            "--target",
+            "rust",
+            "--output",
+            output.to_str().unwrap(),
+        ],
+    );
+
+    assert_eq!(invalid.status.code(), Some(1), "{invalid:?}");
+    assert!(invalid.stdout.is_empty(), "{invalid:?}");
+    assert_eq!(fs::read_to_string(output).unwrap(), "existing matcher");
+    assert_eq!(
+        String::from_utf8(invalid.stderr).unwrap(),
+        format!(
+            "error: `unknown` is not a valid node kind\n --> {}:1:6\n  |\n1 | Q = (unknown)\n  |      ^^^^^^^\n",
+            query.display()
+        )
+    );
 }

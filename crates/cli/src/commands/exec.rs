@@ -46,7 +46,7 @@ pub fn run(m: &ArgMatches, command: &str) -> CliResult {
     let compiled = builder
         .compile_dynamic(&artifacts.grammar)
         .map_err(|error| CliError::fatal(error.to_string()))?;
-    compile::report_errors(&compiled, color)?;
+    compile::report_diagnostics(compiled.diagnostics(), compiled.source_map(), color)?;
 
     let module = compile::emit_module(&compiled, color)?;
     let entrypoint = match inputs.entry {
