@@ -1,4 +1,4 @@
-use crate::bytecode::{Entrypoint, Module};
+use crate::bytecode::{Entrypoint, Module, TypeDefKind};
 use crate::core::Colors;
 
 use super::value::{NodeValue, Value};
@@ -9,6 +9,7 @@ pub struct ValueMaterializer<'s, 't> {
     source: &'s str,
     module: &'s Module,
     member_names: Box<[&'s str]>,
+    record_widths: Box<[u8]>,
     stack: Vec<ValueAccumulator<'s, 't>>,
     scalar_ranges: Vec<Option<std::ops::Range<usize>>>,
 }
@@ -18,10 +19,22 @@ impl<'s, 't> ValueMaterializer<'s, 't> {
         let types = module.types();
         let strings = module.strings();
         let member_names = types.members().map(|m| strings.get(m.name_id)).collect();
+        let mut record_widths = vec![0; types.members_count()];
+        for def in types.iter() {
+            if let TypeDefKind::Record {
+                member_start,
+                member_count,
+            } = def.decode()
+            {
+                let start = usize::from(member_start);
+                record_widths[start..start + usize::from(member_count)].fill(member_count);
+            }
+        }
         Self {
             source,
             module,
             member_names,
+            record_widths: record_widths.into_boxed_slice(),
             stack: Vec::new(),
             scalar_ranges: Vec::new(),
         }
@@ -80,6 +93,7 @@ impl<'s, 't> ValueMaterializer<'s, 't> {
             source,
             module: _,
             member_names,
+            record_widths,
             stack,
             scalar_ranges,
         } = self;
@@ -198,9 +212,14 @@ impl<'s, 't> ValueMaterializer<'s, 't> {
                         .take()
                         .expect("RecordSet requires a produced value (verified at load)");
                     match stack.last_mut() {
-                        Some(ValueAccumulator::Record(fields)) => fields.push((field_name, val)),
-                        Some(ValueAccumulator::Variant { fields, .. }) => {
-                            fields.push((field_name, val))
+                        Some(
+                            ValueAccumulator::Record(fields)
+                            | ValueAccumulator::Variant { fields, .. },
+                        ) => {
+                            if fields.is_empty() {
+                                fields.reserve_exact(usize::from(record_widths[*idx as usize]));
+                            }
+                            fields.push((field_name, val));
                         }
                         other => panic!(
                             "event {event_idx}: RecordSet expects Record/Variant on stack, found {:?}",
