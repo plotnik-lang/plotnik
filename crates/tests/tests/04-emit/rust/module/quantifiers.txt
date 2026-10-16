@@ -37,7 +37,8 @@ impl<'t> Q<'t> {
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         let mut budget = matcher::execution_budget(node);
         let mut eng = rt::Engine::new(node.walk());
-        Self::apply(&mut eng, source, &mut budget)
+        let mut scratch = rt::DecoderScratch::default();
+        Self::apply(&mut eng, source, &mut budget, &mut scratch)
     }
 
     /// Search inclusively in source-order DFS preorder, retaining nested matches.
@@ -48,12 +49,13 @@ impl<'t> Q<'t> {
     ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
     + use<'t, 's> {
         let mut eng = rt::Engine::new(scope.walk());
+        let mut scratch = rt::DecoderScratch::default();
         rt::Traversal::new(
             scope,
             matcher::execution_budget(scope),
             move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {
                 eng.reset(node);
-                Self::apply(&mut eng, source, budget)
+                Self::apply(&mut eng, source, budget, &mut scratch)
             },
         )
     }
@@ -78,11 +80,13 @@ impl<'t> Q<'t> {
         eng: &mut rt::Engine<'t>,
         source: &str,
         budget: &mut rt::ExecutionBudget,
+        scratch: &mut rt::DecoderScratch,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         let Some(journal) = matcher::q_apply(eng, source, budget)? else {
             return Ok(None);
         };
-        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);
+
+        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source, scratch);
         let value = decode_q(&mut decoder);
         decoder.finish();
         Ok(Some(value))

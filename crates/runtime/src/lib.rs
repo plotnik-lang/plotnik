@@ -57,7 +57,7 @@ pub use execution::{ExecutionBudget, Traversal};
 #[cfg(feature = "execution")]
 pub use journal::{JournalEvent, MatchJournal, OutputEvents, node_text, source_text};
 #[cfg(feature = "execution")]
-pub use result_decoder::ResultDecoder;
+pub use result_decoder::{DecoderScratch, ResultDecoder};
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
 #[cfg(feature = "execution")]

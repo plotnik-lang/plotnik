@@ -4,17 +4,30 @@ use crate::{JournalEvent, OutputEvents, node_text, source_text};
 
 const NO_RECORD_SET: u32 = u32::MAX;
 
+/// Retains offsets, never journal references or output values.
+#[derive(Default)]
+pub struct DecoderScratch {
+    record_set_index: Vec<u32>,
+    outer: Vec<u32>,
+}
+
 pub struct ResultDecoder<'a, 't, 's> {
     events: OutputEvents<'a, 't>,
     source: &'s str,
     pos: usize,
-    record_set_index: Vec<u32>,
+    scratch: &'a mut DecoderScratch,
 }
 
 impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
-    pub fn new(events: OutputEvents<'a, 't>, source: &'s str) -> Self {
+    pub fn new(
+        events: OutputEvents<'a, 't>,
+        source: &'s str,
+        scratch: &'a mut DecoderScratch,
+    ) -> Self {
+        scratch.record_set_index.clear();
+
         Self {
-            record_set_index: Vec::new(),
+            scratch,
             events,
             source,
             pos: 0,
@@ -53,11 +66,12 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
             return *index;
         }
 
-        if self.record_set_index.is_empty() {
-            self.record_set_index = build_record_set_index(&self.events);
+        if self.scratch.record_set_index.is_empty() {
+            build_record_set_index(&self.events, self.scratch);
         }
 
         let record_set_pos = *self
+            .scratch
             .record_set_index
             .get(self.pos)
             .expect("result decoder: peeked past the end of the output-event stream");
@@ -261,14 +275,22 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
     }
 }
 
-fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
+fn build_record_set_index(events: &OutputEvents<'_, '_>, scratch: &mut DecoderScratch) {
     assert!(
         u32::try_from(events.len()).is_ok_and(|len| len < NO_RECORD_SET),
         "output-event count fits the u32 index space"
     );
-    let mut index = vec![NO_RECORD_SET; events.len()];
+
+    let DecoderScratch {
+        record_set_index: index,
+        outer,
+    } = scratch;
+
+    index.clear();
+    index.resize(events.len(), NO_RECORD_SET);
+    outer.clear();
+
     let mut cur = NO_RECORD_SET;
-    let mut outer: Vec<u32> = Vec::new();
     for (i, entry) in events.iter().enumerate().rev() {
         match entry {
             JournalEvent::RecordSet(_) => {
@@ -305,5 +327,4 @@ fn build_record_set_index(events: &OutputEvents<'_, '_>) -> Vec<u32> {
          matcher verification admitted an imbalanced journal",
         outer.len()
     );
-    index
 }

@@ -158,6 +158,11 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             "rt::Engine::new_match_only"
         };
         let source_ref = if sig.usage.source { "&'s str" } else { "&str" };
+        let scratch_arg = if item.has_decoder() {
+            ", &mut scratch"
+        } else {
+            ""
+        };
         let _ = writeln!(
             out,
             "impl{} {}{} {{",
@@ -183,7 +188,16 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        let mut eng = {engine_constructor}(node.walk());"
         );
-        let _ = writeln!(out, "        Self::apply(&mut eng, source, &mut budget)");
+        if item.has_decoder() {
+            let _ = writeln!(
+                out,
+                "        let mut scratch = rt::DecoderScratch::default();"
+            );
+        }
+        let _ = writeln!(
+            out,
+            "        Self::apply(&mut eng, source, &mut budget{scratch_arg})"
+        );
         let _ = writeln!(out, "    }}\n");
         let _ = writeln!(
             out,
@@ -214,6 +228,12 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        let mut eng = {engine_constructor}(scope.walk());"
         );
+        if item.has_decoder() {
+            let _ = writeln!(
+                out,
+                "        let mut scratch = rt::DecoderScratch::default();"
+            );
+        }
         let _ = writeln!(out, "        rt::Traversal::new(");
         let _ = writeln!(out, "            scope,");
         let _ = writeln!(out, "            matcher::execution_budget(scope),");
@@ -222,7 +242,10 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             "            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {{"
         );
         let _ = writeln!(out, "                eng.reset(node);");
-        let _ = writeln!(out, "                Self::apply(&mut eng, source, budget)");
+        let _ = writeln!(
+            out,
+            "                Self::apply(&mut eng, source, budget{scratch_arg})"
+        );
         let _ = writeln!(out, "            }},");
         let _ = writeln!(out, "        )");
         let _ = writeln!(out, "    }}\n");
@@ -259,6 +282,9 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "        eng: &mut {engine_type},");
         let _ = writeln!(out, "        source: {source_ref},");
         let _ = writeln!(out, "        budget: &mut rt::ExecutionBudget,");
+        if item.has_decoder() {
+            let _ = writeln!(out, "        scratch: &mut rt::DecoderScratch,");
+        }
         let _ = writeln!(
             out,
             "    ) -> ::core::result::Result<::core::option::Option<{result_type}>, rt::LimitExceeded> {{"
@@ -310,9 +336,10 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         );
         let _ = writeln!(out, "            return Ok(None);");
         let _ = writeln!(out, "        }};");
+        let _ = writeln!(out);
         let _ = writeln!(
             out,
-            "        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source);"
+            "        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source, scratch);"
         );
         if item.fallible {
             let _ = writeln!(
