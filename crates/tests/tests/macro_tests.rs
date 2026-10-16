@@ -461,16 +461,29 @@ fn lazy_search_shares_fuel_and_fuses_after_a_terminal_error() {
 
 #[test]
 fn wrong_language_tree_panics_with_version_skew() {
+    let valid = parse(&js(), "good;");
+    let value = skew::Q::find(valid.root_node(), "good;").unwrap().unwrap();
+    assert_eq!(value.id.byte_range(), 0..4);
+
     let source = "void main() {}";
     let tree = parse(&tree_sitter_dart::LANGUAGE.into(), source);
 
-    let panic = std::panic::catch_unwind(|| skew::Q::exec(tree.root_node(), source))
-        .expect_err("the language check must reject a Dart tree");
-    let message = panic
-        .downcast_ref::<String>()
-        .map(String::as_str)
-        .or_else(|| panic.downcast_ref::<&str>().copied())
-        .expect("panic carries a message");
+    drop(skew::Q::each(tree.root_node(), source));
+    for search in [false, true] {
+        let panic = std::panic::catch_unwind(|| {
+            if search {
+                skew::Q::find(tree.root_node(), source)
+            } else {
+                skew::Q::exec(tree.root_node(), source)
+            }
+        })
+        .expect_err("each operation must check its own tree's language");
+        let message = panic
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| panic.downcast_ref::<&str>().copied())
+            .expect("panic carries a message");
 
-    assert!(message.contains("grammar version skew"), "got: {message}");
+        assert!(message.contains("grammar version skew"), "got: {message}");
+    }
 }

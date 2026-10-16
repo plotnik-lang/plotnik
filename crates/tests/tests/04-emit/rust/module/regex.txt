@@ -32,6 +32,7 @@ impl<'t> Q<'t> {
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         let mut budget = matcher::execution_budget(node);
         let mut eng = rt::Engine::new(node.walk());
+        matcher::verify_language(node);
         let mut scratch = rt::DecoderScratch::default();
         Self::apply(&mut eng, source, &mut budget, &mut scratch)
     }
@@ -44,11 +45,17 @@ impl<'t> Q<'t> {
     ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
     + use<'t, 's> {
         let mut eng = rt::Engine::new(scope.walk());
+        let mut verified = false;
         let mut scratch = rt::DecoderScratch::default();
         rt::Traversal::new(
             scope,
             matcher::execution_budget(scope),
             move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {
+                if !verified {
+                    matcher::verify_language(node);
+                    verified = true;
+                }
+
                 eng.reset(node);
                 Self::apply(&mut eng, source, budget, &mut scratch)
             },
@@ -167,12 +174,7 @@ mod matcher {
     /// kind/field ids and silently mis-match, so mismatches panic: version skew
     /// between the generation-time grammar and the runtime parser is a build
     /// mistake, not a runtime condition to recover from.
-    ///
-    /// Every `run` checks its own tree — the walk is a handful of id lookups,
-    /// noise next to a match — so the guarantee holds per call, not per process:
-    /// a process that mixes languages (or grammar versions of one language) must
-    /// fail on the wrong tree, not only on the first one it ever saw.
-    fn verify_language(node: rt::Node<'_>) {
+    pub(super) fn verify_language(node: rt::Node<'_>) {
         let language = node.language();
         for &(id, name, named) in EXPECTED_KINDS {
             let found = language.node_kind_for_id(id);
@@ -349,6 +351,7 @@ mod matcher {
         } else {
             rt::Engine::new_match_only(tree.root_node().walk())
         };
+        verify_language(eng.node());
         let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
             &mut eng,
             source,
@@ -367,7 +370,6 @@ mod matcher {
         boundary: EntryBoundary,
         budget: &mut rt::ExecutionBudget,
     ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        verify_language(eng.node());
         boundary.begin(eng);
         let mut ip = entry;
         loop {

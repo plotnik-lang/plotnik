@@ -188,6 +188,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        let mut eng = {engine_constructor}(node.walk());"
         );
+        let _ = writeln!(out, "        matcher::verify_language(node);");
         if item.has_decoder() {
             let _ = writeln!(
                 out,
@@ -228,6 +229,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        let mut eng = {engine_constructor}(scope.walk());"
         );
+        let _ = writeln!(out, "        let mut verified = false;");
         if item.has_decoder() {
             let _ = writeln!(
                 out,
@@ -241,6 +243,11 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {{"
         );
+        let _ = writeln!(out, "                if !verified {{");
+        let _ = writeln!(out, "                    matcher::verify_language(node);");
+        let _ = writeln!(out, "                    verified = true;");
+        let _ = writeln!(out, "                }}");
+        let _ = writeln!(out);
         let _ = writeln!(out, "                eng.reset(node);");
         let _ = writeln!(
             out,

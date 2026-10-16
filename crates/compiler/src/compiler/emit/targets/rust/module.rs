@@ -1189,12 +1189,7 @@ const VERIFY_LANGUAGE: &str = r#"
 /// kind/field ids and silently mis-match, so mismatches panic: version skew
 /// between the generation-time grammar and the runtime parser is a build
 /// mistake, not a runtime condition to recover from.
-///
-/// Every `run` checks its own tree — the walk is a handful of id lookups,
-/// noise next to a match — so the guarantee holds per call, not per process:
-/// a process that mixes languages (or grammar versions of one language) must
-/// fail on the wrong tree, not only on the first one it ever saw.
-fn verify_language(node: rt::Node<'_>) {
+pub(super) fn verify_language(node: rt::Node<'_>) {
     let language = node.language();
     for &(id, name, named) in EXPECTED_KINDS {
         let found = language.node_kind_for_id(id);
@@ -1226,12 +1221,7 @@ const VERIFY_LANGUAGE_WITH_IDENTITY: &str = r#"
 /// kind/field ids and silently mis-match, so mismatches panic: version skew
 /// between the generation-time grammar and the runtime parser is a build
 /// mistake, not a runtime condition to recover from.
-///
-/// Every `run` checks its own tree — the walk is a handful of id lookups,
-/// noise next to a match — so the guarantee holds per call, not per process:
-/// a process that mixes languages (or grammar versions of one language) must
-/// fail on the wrong tree, not only on the first one it ever saw.
-fn verify_language(node: rt::Node<'_>) {
+pub(super) fn verify_language(node: rt::Node<'_>) {
     let language = node.language();
     for &(id, name, named) in EXPECTED_KINDS {
         let found = language.node_kind_for_id(id);
@@ -1353,6 +1343,7 @@ fn run<
     } else {
         rt::Engine::new_match_only(tree.root_node().walk())
     };
+    verify_language(eng.node());
     let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
         &mut eng,
         source,
@@ -1371,7 +1362,6 @@ fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
     boundary: EntryBoundary,
     budget: &mut rt::ExecutionBudget,
 ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    verify_language(eng.node());
     boundary.begin(eng);
     let mut ip = entry;
     loop {
