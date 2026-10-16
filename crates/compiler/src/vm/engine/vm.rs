@@ -28,6 +28,47 @@ pub struct RunStats {
     pub peak_live_heap_bytes: u64,
 }
 
+trait StatsObserver: Default {
+    const ENABLED: bool;
+    type Report;
+
+    fn observe_heap(&mut self, used: u64);
+    fn finish(self, budget: &ExecutionBudget) -> Self::Report;
+}
+
+#[derive(Default)]
+struct NoStats;
+
+impl StatsObserver for NoStats {
+    const ENABLED: bool = false;
+    type Report = ();
+
+    fn observe_heap(&mut self, _used: u64) {}
+
+    fn finish(self, _budget: &ExecutionBudget) {}
+}
+
+#[derive(Default)]
+struct CollectStats {
+    peak_live_heap_bytes: u64,
+}
+
+impl StatsObserver for CollectStats {
+    const ENABLED: bool = true;
+    type Report = RunStats;
+
+    fn observe_heap(&mut self, used: u64) {
+        self.peak_live_heap_bytes = self.peak_live_heap_bytes.max(used);
+    }
+
+    fn finish(self, budget: &ExecutionBudget) -> RunStats {
+        RunStats {
+            fuel_used: budget.fuel_used(),
+            peak_live_heap_bytes: self.peak_live_heap_bytes,
+        }
+    }
+}
+
 /// Virtual machine state for query execution.
 pub struct VM<'s, 't> {
     pub(crate) engine: Engine<'t>,
@@ -96,9 +137,9 @@ impl<'s, 't> Application<'s, 't> {
     ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
         let node = self.vm.engine.node();
         let source = self.vm.source;
-        let (result, _) = self
-            .vm
-            .run_budgeted(self.module, &self.entrypoint, tracer, budget);
+        let (result, _) =
+            self.vm
+                .run_budgeted::<T, NoStats>(self.module, &self.entrypoint, tracer, budget);
         match result {
             Ok(()) => {}
             Err(RuntimeError::NoMatch) => return Ok(None),
@@ -238,29 +279,38 @@ impl<'s, 't> VM<'s, 't> {
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<MatchJournal<'t>, RuntimeError> {
-        let (result, _) = self.execute_with_stats(module, entrypoint, tracer);
-        result
+        self.execute_impl::<T, NoStats>(module, entrypoint, tracer)
+            .0
     }
 
     /// Execute query with a tracer and report run statistics.
     pub fn execute_with_stats<T: Tracer>(
-        mut self,
+        self,
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
-        let mut budget = ExecutionBudget::new(self.limits);
-        let (result, stats) = self.run_budgeted(module, entrypoint, tracer, &mut budget);
-        (result.map(|()| self.engine.into_journal()), stats)
+        self.execute_impl::<T, CollectStats>(module, entrypoint, tracer)
     }
 
-    fn run_budgeted<T: Tracer>(
+    fn execute_impl<T: Tracer, S: StatsObserver>(
+        mut self,
+        module: &Module,
+        entrypoint: &Entrypoint,
+        tracer: &mut T,
+    ) -> (Result<MatchJournal<'t>, RuntimeError>, S::Report) {
+        let mut budget = ExecutionBudget::new(self.limits);
+        let (result, report) = self.run_budgeted::<T, S>(module, entrypoint, tracer, &mut budget);
+        (result.map(|()| self.engine.into_journal()), report)
+    }
+
+    fn run_budgeted<T: Tracer, S: StatsObserver>(
         &mut self,
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
         budget: &mut ExecutionBudget,
-    ) -> (Result<(), RuntimeError>, RunStats) {
+    ) -> (Result<(), RuntimeError>, S::Report) {
         self.ip = entrypoint.target();
         if T::ENABLED {
             tracer.trace_execution_started(self.ip);
@@ -268,28 +318,29 @@ impl<'s, 't> VM<'s, 't> {
         let boundary = entrypoint.boundary();
         self.begin_entry(boundary, tracer);
 
-        let mut peak_live_heap_bytes = self.engine.heap_bytes();
+        let mut stats = S::default();
+        if S::ENABLED {
+            stats.observe_heap(self.engine.heap_bytes());
+        }
 
-        loop {
+        let result = loop {
             if let Err(error) = budget.charge() {
                 let LimitExceeded::OutOfFuel(limit) = error else {
                     unreachable!("charging fuel only reports fuel exhaustion");
                 };
-                let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);
-                return (Err(RuntimeError::OutOfFuel(limit)), stats);
+                break Err(RuntimeError::OutOfFuel(limit));
             }
 
-            if budget.memory_sample_due() {
+            if budget.memory_sample_due() && (S::ENABLED || self.limits.max_memory.is_some()) {
                 let used = self.engine.heap_bytes();
-                peak_live_heap_bytes = peak_live_heap_bytes.max(used);
+                if S::ENABLED {
+                    stats.observe_heap(used);
+                }
+
                 if let Some(max) = self.limits.max_memory
                     && used > max
                 {
-                    let stats = self.finish_stats_with(&mut peak_live_heap_bytes, used, budget);
-                    return (
-                        Err(RuntimeError::MemoryLimitExceeded { used, limit: max }),
-                        stats,
-                    );
+                    break Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
                 }
             }
 
@@ -320,16 +371,20 @@ impl<'s, 't> VM<'s, 't> {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
                 Err(Signal::Flow(ControlFlow::Accept)) => {
                     self.finish_entry(boundary, tracer);
-                    let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);
                     self.engine.accepted_journal();
-                    return (Ok(()), stats);
+                    break Ok(());
                 }
                 Err(Signal::Error(e)) => {
-                    let stats = self.finish_stats(&mut peak_live_heap_bytes, budget);
-                    return (Err(e), stats);
+                    break Err(e);
                 }
             }
+        };
+
+        if S::ENABLED {
+            stats.observe_heap(self.engine.heap_bytes());
         }
+
+        (result, stats.finish(budget))
     }
 
     fn begin_entry<T: Tracer>(&mut self, boundary: EntryBoundary, tracer: &mut T) {
@@ -345,24 +400,6 @@ impl<'s, 't> VM<'s, 't> {
             EntryBoundary::Record => EffectKind::RecordClose,
         };
         self.emit_effect(Effect::new(kind, 0), tracer);
-    }
-
-    fn finish_stats(&self, peak_live_heap_bytes: &mut u64, budget: &ExecutionBudget) -> RunStats {
-        let used = self.engine.heap_bytes();
-        self.finish_stats_with(peak_live_heap_bytes, used, budget)
-    }
-
-    fn finish_stats_with(
-        &self,
-        peak_live_heap_bytes: &mut u64,
-        used: u64,
-        budget: &ExecutionBudget,
-    ) -> RunStats {
-        *peak_live_heap_bytes = (*peak_live_heap_bytes).max(used);
-        RunStats {
-            fuel_used: budget.fuel_used(),
-            peak_live_heap_bytes: *peak_live_heap_bytes,
-        }
     }
 
     fn exec_match<T: Tracer>(
