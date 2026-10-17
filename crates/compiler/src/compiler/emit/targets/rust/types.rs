@@ -30,7 +30,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
 
     pub(super) fn emit(mut self) -> String {
         let sections = self.render_sections();
-        let mut out = Sink::<()>::new();
+        let mut out = Sink::new();
         if self.uses_node {
             let rt = &self.config.rt_crate;
             out.push(&format!("use {rt}::Node;\n\n"));
@@ -92,7 +92,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
         let ident = self.item_ident(item.name).to_string();
         let lt = self.lifetime_args(item_ty);
 
-        let mut out = Sink::<()>::new();
+        let mut out = Sink::new();
         out.line(DERIVES);
         out.line(&format!("pub struct {ident}{lt} {{"));
         out.indented(|out| {
@@ -124,7 +124,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
             .flatten()
             .any(|fields| fields.join(", ").len() > 35);
 
-        let mut out = Sink::<()>::new();
+        let mut out = Sink::new();
         out.line(DERIVES);
         out.line(&format!("pub enum {ident}{lt} {{"));
         out.indented(|out| {

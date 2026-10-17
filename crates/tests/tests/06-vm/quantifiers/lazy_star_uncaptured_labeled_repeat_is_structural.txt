@@ -9,11 +9,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a; b; debugger;
-------------------- TYPESCRIPT -------------------
-export type A =
-  | { $tag: "X" };
-
-export type Q = undefined;
 --------------------- OUTPUT ---------------------
 null
 -------------------- BYTECODE --------------------

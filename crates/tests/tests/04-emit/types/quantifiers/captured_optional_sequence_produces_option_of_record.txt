@@ -4,15 +4,6 @@ Q = (program
     (debugger_statement) @dbg
   }? @attrs
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  attrs: QAttrs | null;
-}
-
-export interface QAttrs {
-  dbg: Node;
-  decl: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

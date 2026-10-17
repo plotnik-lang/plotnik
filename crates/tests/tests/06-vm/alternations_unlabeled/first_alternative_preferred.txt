@@ -8,11 +8,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  any: Node | null;
-  id: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "any": {

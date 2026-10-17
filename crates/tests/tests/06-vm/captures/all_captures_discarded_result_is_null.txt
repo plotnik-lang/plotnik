@@ -1,8 +1,6 @@
 Q = (program (expression_statement) @_)
 --------------------- INPUT ----------------------
 foo;
-------------------- TYPESCRIPT -------------------
-export type Q = undefined;
 --------------------- OUTPUT ---------------------
 null
 -------------------- BYTECODE --------------------

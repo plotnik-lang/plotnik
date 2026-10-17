@@ -6,15 +6,6 @@ Q = (program
     (expression_statement) @stmt
   } @b :: Info
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: Info;
-  b: Info;
-}
-
-export interface Info {
-  stmt: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

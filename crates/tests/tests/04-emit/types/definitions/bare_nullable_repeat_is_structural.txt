@@ -5,8 +5,6 @@ Q = (program
     (array (MaybeId)*)
   )
 )
-------------------- TYPESCRIPT -------------------
-export type Q = undefined;
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q;

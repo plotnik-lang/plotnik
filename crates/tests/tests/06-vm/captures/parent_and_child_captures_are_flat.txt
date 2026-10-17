@@ -5,11 +5,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 function foo() {}
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  fn: Node;
-  name: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "fn": {

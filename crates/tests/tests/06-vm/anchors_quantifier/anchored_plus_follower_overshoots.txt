@@ -11,12 +11,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 bar; debugger; foo;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: Node | null;
-  b: [Node, ...Node[]];
-  c: Node;
-}
 --------------------- OUTPUT ---------------------
 <no match>
 -------------------- BYTECODE --------------------

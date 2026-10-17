@@ -1,7 +1,7 @@
 use serde_json::json;
 
+use plotnik_compiler::QueryToken;
 use plotnik_compiler::bytecode::{Labeling, SpanEntry, SpanKind};
-use plotnik_compiler::{QueryToken, TypeScriptBinding};
 
 use super::wire::{InfoParts, info_json, query_span_json};
 
@@ -14,12 +14,6 @@ fn session_info_uses_domain_names_at_the_protocol_boundary() {
             span: (0, 1),
         }]),
         diagnostics: json!([]),
-        typescript_declarations: String::new(),
-        typescript_bindings: json!([TypeScriptBinding {
-            span: (7, 11),
-            type_id: 2,
-            member_id: Some(3),
-        }]),
         entrypoints: &[],
         bytecode_size_bytes: None,
     });
@@ -31,12 +25,6 @@ fn session_info_uses_domain_names_at_the_protocol_boundary() {
             "query_spans": [],
             "query_tokens": [{ "kind": "ident", "span": [0, 1] }],
             "diagnostics": [],
-            "typescript_declarations": "",
-            "typescript_bindings": [{
-                "span": [7, 11],
-                "type_id": 2,
-                "member_id": 3,
-            }],
             "entrypoints": [],
             "bytecode_size_bytes": null,
         })

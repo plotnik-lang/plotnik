@@ -12,17 +12,6 @@ Q = (program
     )
   )
 )
-------------------- TYPESCRIPT -------------------
-export interface Row {
-  key: Node;
-  val: Node;
-}
-
-export interface Q {
-  rows: Rows;
-}
-
-export type Rows = Row[];
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

@@ -9,19 +9,6 @@ Q = (program
   ]
 )
 --------------------- INPUT ----------------------
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  left: QLeft | null;
-  right: QRight | null;
-}
-
-export interface QLeft {
-  comment: Node | null;
-}
-
-export interface QRight {
-  identifier: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "left": {

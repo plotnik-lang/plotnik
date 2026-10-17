@@ -2,12 +2,6 @@ Name = (identifier) @name
 Q = (program (expression_statement (Name)))
 ---------------- INPUT (index.ts) ----------------
 x
-------------------- TYPESCRIPT -------------------
-export interface Name {
-  name: Node;
-}
-
-export type Q = undefined;
 --------------------- OUTPUT ---------------------
 null
 ------------------- INSPECTION -------------------

@@ -9,15 +9,6 @@ Q = (program
 ---------------- INPUT (index.ts) ----------------
 a
 b
-------------------- TYPESCRIPT -------------------
-export interface Name {
-  name: Node;
-}
-
-export interface Q {
-  first: Name;
-  second: Name;
-}
 --------------------- OUTPUT ---------------------
 {
   "first": {

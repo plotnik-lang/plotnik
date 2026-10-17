@@ -72,12 +72,6 @@ pub(crate) enum SerdePolicy {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum MappingPolicy {
-    Include,
-    Omit,
-}
-
-#[derive(Debug, Clone, Copy)]
 pub(crate) enum VmMode {
     StructuredTrace,
     TextTrace { inspection: InspectionPolicy },
@@ -95,7 +89,6 @@ pub(crate) enum SnapshotKind {
     },
     Types {
         serde: SerdePolicy,
-        mapping: MappingPolicy,
         lints: LintPolicy,
     },
     Matcher {
@@ -136,11 +129,6 @@ impl SnapshotKind {
                     SerdePolicy::Include
                 } else {
                     SerdePolicy::Omit
-                },
-                mapping: if name.contains("mapped") {
-                    MappingPolicy::Include
-                } else {
-                    MappingPolicy::Omit
                 },
                 lints,
             }),
@@ -197,15 +185,9 @@ impl SnapshotKind {
                 SectionKind::Nfa,
                 SectionKind::Bytecode,
             ],
-            Self::Types { .. } => &[
-                SectionKind::Diagnostics,
-                SectionKind::TypeScript,
-                SectionKind::Rust,
-                SectionKind::Mapped,
-            ],
+            Self::Types { .. } => &[SectionKind::Diagnostics, SectionKind::Rust],
             Self::Matcher { .. } => &[SectionKind::Diagnostics, SectionKind::Matcher],
             Self::Vm { .. } => &[
-                SectionKind::TypeScript,
                 SectionKind::Diagnostics,
                 SectionKind::Output,
                 SectionKind::Inspection,
@@ -241,9 +223,7 @@ pub(crate) enum SectionKind {
     Definitions,
     Nfa,
     Bytecode,
-    TypeScript,
     Rust,
-    Mapped,
     Matcher,
     Output,
     Inspection,
@@ -260,9 +240,7 @@ impl SectionKind {
             Self::Definitions => "definitions",
             Self::Nfa => "nfa",
             Self::Bytecode => "bytecode",
-            Self::TypeScript => "typescript",
             Self::Rust => "rust",
-            Self::Mapped => "mapped",
             Self::Matcher => "matcher",
             Self::Output => "output",
             Self::Inspection => "inspection",
@@ -286,9 +264,7 @@ const ALL_SECTION_KINDS: &[SectionKind] = &[
     SectionKind::Definitions,
     SectionKind::Nfa,
     SectionKind::Bytecode,
-    SectionKind::TypeScript,
     SectionKind::Rust,
-    SectionKind::Mapped,
     SectionKind::Matcher,
     SectionKind::Output,
     SectionKind::Inspection,

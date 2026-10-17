@@ -5,10 +5,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 x;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  expression: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "expression": {

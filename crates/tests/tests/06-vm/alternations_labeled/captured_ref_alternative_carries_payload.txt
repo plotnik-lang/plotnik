@@ -9,17 +9,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x;
-------------------- TYPESCRIPT -------------------
-export interface Inner {
-  name: Node;
-}
-
-export interface Q {
-  v: QV;
-}
-
-export type QV =
-  | { $tag: "Call"; $data: { data: Inner } };
 --------------------- OUTPUT ---------------------
 {
   "v": {

@@ -5,7 +5,7 @@ use crate::bytecode::{EncodeError, Module};
 use super::EmitError;
 use crate::compiler::query::QueryBuilder;
 use crate::compiler::test_utils::synthetic_grammar as grammar;
-use crate::compiler::{BytecodeConfig, DiagnosticKind, RustCodegenConfig, TypeScriptCodegenConfig};
+use crate::compiler::{BytecodeConfig, DiagnosticKind, RustCodegenConfig};
 use crate::compiler::{SourceMap, SourcePath};
 
 #[track_caller]
@@ -43,12 +43,6 @@ fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
             .expect("Rust module emission answers")
             .is_valid()
     );
-    assert!(
-        compiled
-            .emit_types(TypeScriptCodegenConfig::new())
-            .expect("TypeScript type emission answers")
-            .is_valid()
-    );
 
     let bytecode = compiled
         .emit(BytecodeConfig::new())
@@ -82,12 +76,6 @@ fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
         compiled
             .emit(RustCodegenConfig::new())
             .expect("Rust module emission answers")
-            .is_valid()
-    );
-    assert!(
-        compiled
-            .emit_types(TypeScriptCodegenConfig::new())
-            .expect("TypeScript type emission answers")
             .is_valid()
     );
 

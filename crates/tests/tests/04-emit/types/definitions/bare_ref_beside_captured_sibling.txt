@@ -6,13 +6,6 @@ Q = (program
   (A)
   (debugger_statement) @name
 )
-------------------- TYPESCRIPT -------------------
-export type A =
-  | { $tag: "X"; $data: { s: Node } };
-
-export interface Q {
-  name: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

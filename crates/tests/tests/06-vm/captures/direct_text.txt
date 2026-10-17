@@ -9,11 +9,6 @@ Q = (program
 
 // second
 café;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  comments: string[];
-  name: string;
-}
 --------------------- OUTPUT ---------------------
 {
   "comments": [

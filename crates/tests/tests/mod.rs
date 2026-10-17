@@ -28,15 +28,15 @@
 //! | `02-parser`  | cst, ast                                                                     |
 //! | `03-analyze` | definitions                                                                  |
 //! | `04-emit/bytecode` | nfa, bytecode                                                         |
-//! | `04-emit/types` | typescript, rust types (serde impls under a `serde/` folder)             |
+//! | `04-emit/types` | rust types (serde impls under a `serde/` folder)                        |
 //! | `04-emit/rust/module` | generated Rust matcher module                                      |
-//! | `06-vm`      | typescript, output, inspection if enabled, bytecode, trace (requires input) |
+//! | `06-vm`      | output, inspection if enabled, bytecode, trace (requires input)             |
 //!
 //! Compile-stage snapshots under an `inspection/` folder compile with
 //! `BytecodeConfig::inspection(BytecodeInspection::Spans)`.
 //!
 //! The `DIAGNOSTICS` section renders whenever the query produces warnings or errors.
-//! Errors are terminal for the compile stages (bytecode/typescript/rust/trace/output
+//! Errors are terminal for the compile stages (bytecode/rust/trace/output
 //! are suppressed); for `02-parser` they suppress cst/ast too, matching the recovery
 //! tests. Warnings coexist with the normal sections.
 //!
@@ -76,13 +76,12 @@ use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 use plotnik_compiler::{
     BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, InputKind, PrintTracer,
     QueryBuilder, RuntimeError, RustCodegenConfig, SourceCollection, SourceMap, SourcePath,
-    TraceRecorder, TypeScriptBinding, TypeScriptCodegenConfig, VM, Verbosity,
-    extract_result_provenance, materialize_verified,
+    TraceRecorder, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
 use plotnik_tests::snapshot::{Fixture, Language, Section};
 use support::snapshots::{
-    GeneratedOutput, GeneratedSection, InspectionPolicy, MappingPolicy, SectionKind, SerdePolicy,
-    Snapshot, SnapshotKind, SnapshotMode, TriviaPolicy, VmMode, snapshot,
+    GeneratedOutput, GeneratedSection, InspectionPolicy, SectionKind, SerdePolicy, Snapshot,
+    SnapshotKind, SnapshotMode, TriviaPolicy, VmMode, snapshot,
 };
 
 mod support;
@@ -327,13 +326,8 @@ fn render_compiled(
                 dump_bytecode(module, Colors::new(false)),
             ));
         }
-        SnapshotKind::Types { serde, mapping, .. } => {
+        SnapshotKind::Types { serde, .. } => {
             out.extend(diag);
-            let typescript = render_typescript(compiled);
-            out.push(GeneratedSection::new(
-                SectionKind::TypeScript,
-                typescript.clone(),
-            ));
             let rust_config = RustCodegenConfig::new().serde(matches!(serde, SerdePolicy::Include));
             let rust = compiled
                 .emit_types(rust_config)
@@ -342,22 +336,6 @@ fn render_compiled(
                 .expect("valid query emits Rust types")
                 .into_source();
             out.push(GeneratedSection::new(SectionKind::Rust, rust));
-            if matches!(mapping, MappingPolicy::Include) {
-                let (mapped_types, ranges) = compiled
-                    .emit_types(typescript_config())
-                    .expect("TypeScript emission answers")
-                    .into_artifact()
-                    .expect("valid query emits TypeScript types")
-                    .into_parts();
-                assert_eq!(
-                    typescript, mapped_types,
-                    "mapped d.ts must match normal d.ts"
-                );
-                out.push(GeneratedSection::new(
-                    SectionKind::Mapped,
-                    render_mapped(&mapped_types, &ranges),
-                ));
-            }
         }
         SnapshotKind::Matcher { .. } => {
             out.extend(diag);
@@ -395,12 +373,6 @@ fn render_compiled(
                 source: &input.body,
                 mode,
             };
-            if module.expression_entrypoint().is_none() {
-                out.push(GeneratedSection::new(
-                    SectionKind::TypeScript,
-                    render_typescript(compiled),
-                ));
-            }
             out.extend(diag);
             if emission.diagnostics().has_warnings() {
                 out.push(GeneratedSection::new(
@@ -455,20 +427,6 @@ fn render_vm(scenario: VmScenario<'_>) -> Result<Vec<GeneratedSection>, String> 
     Ok(out)
 }
 
-fn render_typescript(compiled: &CompiledQuery) -> String {
-    compiled
-        .emit_types(typescript_config())
-        .expect("TypeScript emission answers")
-        .into_artifact()
-        .expect("valid query emits TypeScript types")
-        .into_parts()
-        .0
-}
-
-fn typescript_config() -> TypeScriptCodegenConfig {
-    TypeScriptCodegenConfig::new().emit_node_interface(false)
-}
-
 fn emit_bytecode(
     compiled: &CompiledQuery,
     inspection: InspectionPolicy,
@@ -491,27 +449,6 @@ fn emit_bytecode(
         );
     }
     emission
-}
-
-fn render_mapped(dts: &str, bindings: &[TypeScriptBinding]) -> String {
-    let mut out = String::new();
-    for binding in bindings {
-        let start = binding.span.0 as usize;
-        let end = binding.span.1 as usize;
-        let member = binding
-            .member_id
-            .map(|idx| format!(".M{idx}"))
-            .unwrap_or_default();
-        out.push_str(&format!(
-            "{}..{} T{}{} {:?}\n",
-            binding.span.0,
-            binding.span.1,
-            binding.type_id,
-            member,
-            &dts[start..end]
-        ));
-    }
-    out
 }
 
 struct VmScenario<'a> {
@@ -929,10 +866,6 @@ fn one_module_runs_named_and_expression_entrypoints() {
 
     assert!(matches!(
         compiled.emit(RustCodegenConfig::new()),
-        Err(plotnik_compiler::Error::EmitConfig(_))
-    ));
-    assert!(matches!(
-        compiled.emit_types(TypeScriptCodegenConfig::new()),
         Err(plotnik_compiler::Error::EmitConfig(_))
     ));
 }

@@ -17,18 +17,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, c, b]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  b: Node;
-  items: Items;
-}
-
-export type Items = [Elem, ...Elem[]];
-
-export interface Elem {
-  a: Node | null;
-  x: Node | null;
-}
 --------------------- OUTPUT ---------------------
 <no match>
 -------------------- BYTECODE --------------------

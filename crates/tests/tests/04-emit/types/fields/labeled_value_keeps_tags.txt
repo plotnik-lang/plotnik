@@ -4,14 +4,6 @@ Q = (call_expression
     Member: (member_expression)
   ] @fn
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  fn: QFn;
-}
-
-export type QFn =
-  | { $tag: "Id" }
-  | { $tag: "Member" };
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {

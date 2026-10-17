@@ -5,12 +5,6 @@ Q = (program
     (array (Ids) @ids)
   )
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  ids: Ids;
-}
-
-export type Ids = Node[];
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

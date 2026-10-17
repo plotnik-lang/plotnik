@@ -8,11 +8,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let x; /* c */ debugger;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: Node | null;
-  b: Node;
-}
 --------------------- OUTPUT ---------------------
 <no match>
 -------------------- BYTECODE --------------------

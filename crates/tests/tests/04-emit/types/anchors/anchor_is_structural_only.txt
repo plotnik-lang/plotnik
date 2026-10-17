@@ -6,10 +6,6 @@ Q = (program
     )
   )
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  first: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

@@ -13,16 +13,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, b]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  b: Node;
-  prefixes: [QPrefixes, ...QPrefixes[]];
-}
-
-export interface QPrefixes {
-  a: Node | null;
-  x: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "b": {

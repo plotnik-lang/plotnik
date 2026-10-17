@@ -9,14 +9,6 @@ warning: this capture already has type `QInfo`. Naming it `QInfo` has no effect
   |
 4 |   } @info :: QInfo
   |              ^^^^^
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  info: QInfo;
-}
-
-export interface QInfo {
-  stmt: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

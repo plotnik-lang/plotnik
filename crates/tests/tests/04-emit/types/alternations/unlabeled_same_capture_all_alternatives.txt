@@ -2,10 +2,6 @@ Q = [
   (identifier) @x
   (number) @x
 ]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

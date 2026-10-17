@@ -6,13 +6,6 @@ Q = (program
 --------------------- INPUT ----------------------
 // c
 x;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  items: QItems[];
-}
-
-export type QItems =
-  | { $tag: "A"; $data: { c: Node | null } };
 --------------------- OUTPUT ---------------------
 {
   "items": [

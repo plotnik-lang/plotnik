@@ -10,11 +10,6 @@ Q = (program
 )
 ---------------- INPUT (index.ts) ----------------
 interface I { a: string }
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: Node;
-  prop: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "name": {

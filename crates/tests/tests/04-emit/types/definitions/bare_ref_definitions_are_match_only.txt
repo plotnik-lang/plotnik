@@ -1,14 +1,6 @@
 Id = (identifier) @id
 Foo = (function_declaration name: (Id))
 Bar = (class_declaration name: (Id))
-------------------- TYPESCRIPT -------------------
-export interface Id {
-  id: Node;
-}
-
-export type Foo = undefined;
-
-export type Bar = undefined;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

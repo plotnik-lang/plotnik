@@ -4,12 +4,6 @@ A = [
 ]
 
 Q = (expression_statement (A))
-------------------- TYPESCRIPT -------------------
-export type A =
-  | { $tag: "X"; $data: { x: Node } }
-  | { $tag: "Y"; $data: { y: Node } };
-
-export type Q = undefined;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

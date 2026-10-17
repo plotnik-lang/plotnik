@@ -5,10 +5,6 @@ Q = (program
   } @span :: text
 )
 --------------------- INPUT ----------------------
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  span: string | null;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: capture type `text` replaces the record value captured by `@span` with source text
  --> query.ptk:5:5

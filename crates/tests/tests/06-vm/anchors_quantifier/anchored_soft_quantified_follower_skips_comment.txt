@@ -11,12 +11,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 /* c */ debugger; foo;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: Node | null;
-  b: Node[];
-  c: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "a": null,

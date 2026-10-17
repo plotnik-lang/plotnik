@@ -3,7 +3,7 @@ use crate::compiler::emit::sink::Sink;
 pub(crate) fn splice(out: &mut String, indent: &str, template: &str, subs: &[(&str, &str)]) {
     let text = substitute(template.trim_matches('\n'), subs);
 
-    let mut sink = Sink::<()>::new();
+    let mut sink = Sink::new();
     for line in text.lines() {
         if line.is_empty() {
             sink.push("\n");

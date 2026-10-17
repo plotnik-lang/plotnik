@@ -17,15 +17,6 @@ warning: capture type `text` replaces the record value captured by `@suppressed`
   |           ^^^^^^^^^^^^^^^^^^^
   |
 help: remove `:: text` to return the record value instead
-------------------- TYPESCRIPT -------------------
-export interface Foo {
-  x: Node;
-}
-
-export interface Q {
-  kept: Foo;
-  suppressed: string;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

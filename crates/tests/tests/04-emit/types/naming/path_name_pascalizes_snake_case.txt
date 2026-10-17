@@ -3,14 +3,6 @@ Q = (program
     (expression_statement) @s
   } @my_items
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  my_items: QMyItems;
-}
-
-export interface QMyItems {
-  s: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

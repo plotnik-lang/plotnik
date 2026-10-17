@@ -9,14 +9,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 [x, y];
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  ids: [QIds, ...QIds[]];
-}
-
-export interface QIds {
-  id: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "ids": [

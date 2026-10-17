@@ -1,10 +1,6 @@
 Item = (array
   (Item)* @children
 )
-------------------- TYPESCRIPT -------------------
-export interface Item {
-  children: Item[];
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Item {

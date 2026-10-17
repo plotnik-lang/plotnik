@@ -6,15 +6,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x; y;
-------------------- TYPESCRIPT -------------------
-export interface Id {
-  name: Node;
-}
-
-export interface Q {
-  a: Id;
-  b: Id;
-}
 --------------------- OUTPUT ---------------------
 {
   "a": {

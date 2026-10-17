@@ -2,14 +2,6 @@ E = (expression_statement (number) @n)
 Q = (program (E) @e)
 --------------------- INPUT ----------------------
 a; 1;
-------------------- TYPESCRIPT -------------------
-export interface E {
-  n: Node;
-}
-
-export interface Q {
-  e: E;
-}
 --------------------- OUTPUT ---------------------
 {
   "e": {

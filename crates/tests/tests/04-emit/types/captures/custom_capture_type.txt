@@ -1,10 +1,4 @@
 Q = (identifier) @name :: Identifier
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: Identifier;
-}
-
-export type Identifier = Node;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

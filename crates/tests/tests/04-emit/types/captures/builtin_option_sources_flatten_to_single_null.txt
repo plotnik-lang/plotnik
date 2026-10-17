@@ -6,10 +6,6 @@ Q = (program
     (debugger_statement)
   ]
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: string | null;
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'s> {

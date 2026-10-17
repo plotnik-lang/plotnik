@@ -15,16 +15,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [b]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  b: Node;
-  prefix: Prefix;
-}
-
-export interface Prefix {
-  a: Node | null;
-  x: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "b": {

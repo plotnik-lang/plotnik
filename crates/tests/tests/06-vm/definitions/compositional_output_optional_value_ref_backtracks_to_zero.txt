@@ -20,17 +20,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, c, b]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  b: Node;
-  choice: Maybe;
-}
-
-export type Maybe = Elem | null;
-
-export type Elem =
-  | { $tag: "Left"; $data: { a: Node | null; z: Node | null } }
-  | { $tag: "X"; $data: { x: Node } };
 --------------------- OUTPUT ---------------------
 {
   "b": {

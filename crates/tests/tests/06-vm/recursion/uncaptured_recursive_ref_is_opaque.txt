@@ -10,14 +10,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a()()
-------------------- TYPESCRIPT -------------------
-export interface Nested {
-  name: Node | null;
-}
-
-export interface Q {
-  c: Nested;
-}
 --------------------- OUTPUT ---------------------
 {
   "c": {

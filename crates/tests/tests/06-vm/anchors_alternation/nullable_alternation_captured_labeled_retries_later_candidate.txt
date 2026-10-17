@@ -15,15 +15,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, x, b]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  b: Node;
-  choice: QChoice;
-}
-
-export type QChoice =
-  | { $tag: "Left"; $data: { a: Node | null } }
-  | { $tag: "X"; $data: { x: Node } };
 --------------------- OUTPUT ---------------------
 {
   "b": {

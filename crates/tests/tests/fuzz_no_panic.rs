@@ -7,8 +7,7 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_compiler::bytecode::Module;
 use plotnik_compiler::{
-    BytecodeConfig, Colors, QueryBuilder, TypeScriptCodegenConfig, VM, Value, format_query,
-    materialize_verified,
+    BytecodeConfig, Colors, QueryBuilder, VM, Value, format_query, materialize_verified,
 };
 
 mod support;
@@ -38,7 +37,6 @@ fn try_compile_smoke(query: &str) {
     if !compiled.is_valid() {
         return;
     }
-    let _ = compiled.emit_types(TypeScriptCodegenConfig::new());
     let _ = compiled.emit(BytecodeConfig::new());
 }
 

@@ -4,11 +4,6 @@ NestedCall = (call_expression
     (NestedCall) @inner
   ]
 )
-------------------- TYPESCRIPT -------------------
-export interface NestedCall {
-  inner: NestedCall | null;
-  name: Node | null;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

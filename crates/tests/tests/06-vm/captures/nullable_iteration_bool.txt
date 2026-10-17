@@ -5,10 +5,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 value;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  present: boolean;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: capture type `bool` replaces the record value captured by `@present` with a presence boolean
  --> query.ptk:4:6

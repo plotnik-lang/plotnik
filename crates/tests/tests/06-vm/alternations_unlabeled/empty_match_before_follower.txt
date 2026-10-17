@@ -9,12 +9,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  d: Node;
-  e: Node | null;
-  ids: Node[];
-}
 --------------------- OUTPUT ---------------------
 {
   "d": {

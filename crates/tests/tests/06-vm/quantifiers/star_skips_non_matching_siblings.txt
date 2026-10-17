@@ -3,10 +3,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let a; foo; let b;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  decls: Node[];
-}
 --------------------- OUTPUT ---------------------
 {
   "decls": [

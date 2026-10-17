@@ -9,18 +9,6 @@ Foo = (function_declaration
     } @outer :: Bar
   )
 )
-------------------- TYPESCRIPT -------------------
-export interface Foo {
-  outer: Bar;
-}
-
-export interface Bar {
-  inner: BarInner;
-}
-
-export interface BarInner {
-  v: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

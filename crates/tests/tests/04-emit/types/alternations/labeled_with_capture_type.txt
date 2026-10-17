@@ -2,12 +2,6 @@ Q = [
   Str: (string) @s :: Foo
   Num: (number) @n
 ]
-------------------- TYPESCRIPT -------------------
-export type Q =
-  | { $tag: "Str"; $data: { s: Foo } }
-  | { $tag: "Num"; $data: { n: Node } };
-
-export type Foo = Node;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

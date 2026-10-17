@@ -6,14 +6,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a; b;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: QX;
-}
-
-export type QX =
-  | { $tag: "A"; $data: { stmts: Node[] } }
-  | { $tag: "B" };
 --------------------- OUTPUT ---------------------
 {
   "x": {

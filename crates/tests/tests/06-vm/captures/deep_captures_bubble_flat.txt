@@ -8,11 +8,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 function f() { return 1 }
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: Node;
-  retval: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "name": {

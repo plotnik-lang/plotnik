@@ -19,10 +19,6 @@ warning: capture type `text` replaces the record value captured by `@text` with 
   |           ^^^^^^^^^^^^^
   |
 help: remove `:: text` to return the record value instead
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  text: string;
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'s> {

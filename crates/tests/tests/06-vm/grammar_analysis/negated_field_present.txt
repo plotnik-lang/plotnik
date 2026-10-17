@@ -8,10 +8,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 let a=b;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  declaration: Node;
-}
 --------------------- OUTPUT ---------------------
 <no match>
 -------------------- BYTECODE --------------------

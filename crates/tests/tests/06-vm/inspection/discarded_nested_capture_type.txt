@@ -4,10 +4,6 @@ Q = (program
   } @outer :: text
 )
 --------------------- INPUT ----------------------
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  outer: string | null;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: capture type `text` replaces the record value captured by `@outer` with source text
  --> query.ptk:4:5

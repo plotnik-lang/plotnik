@@ -16,8 +16,7 @@ use langs::Lang;
 use plotnik_compiler::bytecode::{Entrypoint, Module};
 use plotnik_compiler::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
-    RuntimeLimitSpec, RustCodegenConfig, TraceRecorder, TypeScriptCodegenConfig, VM, dump_tree,
-    tokenize as query_tokenize,
+    RuntimeLimitSpec, RustCodegenConfig, TraceRecorder, VM, dump_tree, tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
 use wasm_bindgen::prelude::*;
@@ -56,23 +55,13 @@ impl Session {
         let mut diagnostics = compiled.diagnostics().clone();
         let module = bytecode.into_artifact();
         let bytecode_size_bytes = module.as_ref().map(Module::bytecode_size);
-        let types = compiled
-            .emit_types(TypeScriptCodegenConfig::new())
-            .map_err(|error| JsValue::from_str(&error.to_string()))?;
-        diagnostics.extend(types.diagnostics().clone());
         diagnostics.extend(bytecode_diagnostics);
         let diagnostics = json_value!(diagnostics.to_wire(compiled.source_map()));
-        let (typescript_declarations, typescript_bindings) = types
-            .into_artifact()
-            .map(|output| output.into_parts())
-            .unwrap_or_else(|| (String::new(), Vec::new()));
         let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
         let info = info_json(InfoParts {
             module: module.as_ref(),
             query_tokens: json_value!(tokens),
             diagnostics,
-            typescript_declarations,
-            typescript_bindings: json_value!(typescript_bindings),
             entrypoints: &entrypoints,
             bytecode_size_bytes,
         });

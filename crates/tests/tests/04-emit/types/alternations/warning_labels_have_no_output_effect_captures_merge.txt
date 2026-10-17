@@ -15,11 +15,6 @@ warning: alternative labels have no output effect here: captures from the altern
   | |___^
   |
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  d: Node | null;
-  e: Node | null;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

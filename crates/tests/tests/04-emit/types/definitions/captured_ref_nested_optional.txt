@@ -7,12 +7,6 @@ Q = (program
     )
   )
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: MaybeId;
-}
-
-export type MaybeId = Node | null;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

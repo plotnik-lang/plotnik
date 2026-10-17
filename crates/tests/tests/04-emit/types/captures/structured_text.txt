@@ -19,12 +19,6 @@ warning: capture type `text` replaces the record value captured by `@chunk` with
   |     ^^^^^^^^^^^^^^
   |
 help: remove `:: text` to return the record value instead
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  chunk: string;
-  name: Node;
-  statement: string;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

@@ -10,14 +10,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a; b;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  items: QItems[];
-}
-
-export interface QItems {
-  a: Node;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
  --> query.ptk:3:5

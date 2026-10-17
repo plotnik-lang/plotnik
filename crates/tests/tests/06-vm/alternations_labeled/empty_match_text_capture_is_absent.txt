@@ -7,10 +7,6 @@ Q = (program
   ] @value :: text
 )
 --------------------- INPUT ----------------------
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  value: string | null;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: capture type `text` replaces the variant value captured by `@value` with source text
  --> query.ptk:7:5

@@ -6,14 +6,6 @@ A = [
 Q = (program
   (expression_statement (A) @a)
 )
-------------------- TYPESCRIPT -------------------
-export type A =
-  | { $tag: "X" }
-  | { $tag: "Y" };
-
-export interface Q {
-  a: A;
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum A {

@@ -17,7 +17,7 @@ use crate::compiler::analyze::{AnalysisArtifacts, Located};
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::emit::{
     BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
-    RustTypesOutput, TypeScriptCodegenConfig, TypeScriptTypesOutput,
+    RustTypesOutput,
 };
 use crate::compiler::lower::ir::SemanticNfa;
 use crate::compiler::lower::spans::assign_spans;
@@ -595,24 +595,6 @@ impl CompiledQuery {
         };
         Ok(Emission::success(
             RustModuleOutput::new(source),
-            Diagnostics::new(),
-        ))
-    }
-
-    pub(crate) fn emit_typescript_types(
-        &self,
-        config: &TypeScriptCodegenConfig,
-    ) -> crate::compiler::QueryResult<Emission<TypeScriptTypesOutput>> {
-        if !self.is_valid() {
-            return Ok(Emission::invalid_query());
-        }
-        self.require_static_module()?;
-        let schema = self.result_schema();
-        let emitter = config.emitter_config();
-        let (source, bindings) =
-            crate::compiler::emit::targets::typescript::emit_schema(&schema, emitter);
-        Ok(Emission::success(
-            TypeScriptTypesOutput::new(source, bindings),
             Diagnostics::new(),
         ))
     }

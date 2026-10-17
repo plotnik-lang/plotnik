@@ -16,14 +16,6 @@ warning: capture type `text` replaces the record value captured by `@foo` with s
   |   ^^^^^^^^^^^^
   |
 help: remove `:: text` to return the record value instead
-------------------- TYPESCRIPT -------------------
-export interface Foo {
-  foo: string;
-}
-
-export interface Q {
-  root: Foo;
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Foo<'s> {

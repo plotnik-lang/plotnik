@@ -10,14 +10,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a()();
-------------------- TYPESCRIPT -------------------
-export type Chain =
-  | { $tag: "Base"; $data: { name: Node } }
-  | { $tag: "Step"; $data: { inner: Chain } };
-
-export interface Q {
-  top: Chain;
-}
 --------------------- OUTPUT ---------------------
 {
   "top": {

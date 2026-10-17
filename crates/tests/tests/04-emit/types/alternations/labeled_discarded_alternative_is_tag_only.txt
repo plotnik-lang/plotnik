@@ -6,18 +6,6 @@ Q = (program
     Decl: (lexical_declaration) @d
   ] @item
 )
-------------------- TYPESCRIPT -------------------
-export interface Inner {
-  call: Node;
-}
-
-export interface Q {
-  item: QItem;
-}
-
-export type QItem =
-  | { $tag: "Call" }
-  | { $tag: "Decl"; $data: { d: Node } };
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

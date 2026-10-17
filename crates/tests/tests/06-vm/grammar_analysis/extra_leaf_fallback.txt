@@ -6,10 +6,6 @@ Q = [
 ]
 ---------------- INPUT (index.js) ----------------
 /* c */ x;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  comment: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "comment": {

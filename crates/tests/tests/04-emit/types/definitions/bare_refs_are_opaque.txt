@@ -10,14 +10,6 @@ Q = (program
   (A)
   (B)
 )
-------------------- TYPESCRIPT -------------------
-export type A =
-  | { $tag: "X"; $data: { s: Node } };
-
-export type B =
-  | { $tag: "Y"; $data: { d: Node } };
-
-export type Q = undefined;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

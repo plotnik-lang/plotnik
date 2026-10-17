@@ -11,14 +11,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 class C { a(){}; b(){} }
-------------------- TYPESCRIPT -------------------
-export interface Member {
-  name: Node;
-}
-
-export interface Q {
-  m: Member;
-}
 --------------------- OUTPUT ---------------------
 {
   "m": {

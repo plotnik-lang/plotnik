@@ -4,7 +4,6 @@ use plotnik_runtime::{Limit, RuntimeLimitSpec};
 
 use crate::bytecode::Module;
 use crate::compiler::diagnostics::{Diagnostics, QueryResult};
-use crate::compiler::emit::targets::typescript::TypeScriptBinding;
 use crate::compiler::query::CompiledQuery;
 
 /// The artifact and emission-local diagnostics produced by one target.
@@ -241,69 +240,6 @@ impl CodegenTarget for RustCodegenConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum TypeScriptNodeRepresentation {
-    #[default]
-    SerializedValue,
-    LiveTreeSitterNode,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TypeScriptCodegenConfig {
-    emit_node_interface: bool,
-    node_representation: TypeScriptNodeRepresentation,
-}
-
-impl Default for TypeScriptCodegenConfig {
-    fn default() -> Self {
-        Self {
-            emit_node_interface: true,
-            node_representation: TypeScriptNodeRepresentation::SerializedValue,
-        }
-    }
-}
-
-impl TypeScriptCodegenConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn emit_node_interface(mut self, enabled: bool) -> Self {
-        self.emit_node_interface = enabled;
-        self
-    }
-
-    pub fn node_representation(mut self, representation: TypeScriptNodeRepresentation) -> Self {
-        self.node_representation = representation;
-        self
-    }
-
-    pub(crate) fn emitter_config(&self) -> crate::compiler::emit::targets::typescript::Config {
-        crate::compiler::emit::targets::typescript::Config::new()
-            .emit_node_interface(self.emit_node_interface)
-    }
-
-    fn validate(&self) -> Result<(), EmitConfigError> {
-        if self.node_representation == TypeScriptNodeRepresentation::LiveTreeSitterNode {
-            return Err(EmitConfigError::new(
-                "live tree-sitter nodes require the future TypeScript module target",
-            ));
-        }
-        Ok(())
-    }
-}
-
-impl private::Sealed for TypeScriptCodegenConfig {}
-
-impl CodegenTarget for TypeScriptCodegenConfig {
-    type TypesOutput = TypeScriptTypesOutput;
-
-    fn emit_types(self, query: &CompiledQuery) -> QueryResult<Emission<Self::TypesOutput>> {
-        self.validate()?;
-        query.emit_typescript_types(&self)
-    }
-}
-
 macro_rules! source_output {
     ($name:ident) => {
         pub struct $name {
@@ -334,26 +270,3 @@ macro_rules! source_output {
 
 source_output!(RustModuleOutput);
 source_output!(RustTypesOutput);
-
-pub struct TypeScriptTypesOutput {
-    source: String,
-    bindings: Vec<TypeScriptBinding>,
-}
-
-impl TypeScriptTypesOutput {
-    pub(crate) fn new(source: String, bindings: Vec<TypeScriptBinding>) -> Self {
-        Self { source, bindings }
-    }
-
-    pub fn source(&self) -> &str {
-        &self.source
-    }
-
-    pub fn bindings(&self) -> &[TypeScriptBinding] {
-        &self.bindings
-    }
-
-    pub fn into_parts(self) -> (String, Vec<TypeScriptBinding>) {
-        (self.source, self.bindings)
-    }
-}

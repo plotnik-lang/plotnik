@@ -15,16 +15,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [b]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  b: Node;
-  choice: QChoice;
-}
-
-export interface QChoice {
-  a: Node | null;
-  x: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "b": {

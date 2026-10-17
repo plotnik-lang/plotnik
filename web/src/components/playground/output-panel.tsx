@@ -1,5 +1,4 @@
 import { json } from "@codemirror/lang-json";
-import { javascript } from "@codemirror/lang-javascript";
 import {
   CheckIcon,
   CircleAlertIcon,
@@ -19,13 +18,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeEditor } from "./code-editor";
-import type { GeneratedCode, RunResult, SessionInfo } from "./protocol";
+import type { GeneratedCode, RunResult } from "./protocol";
 
 const JSON_EXTENSIONS = [json()];
-const DTS_EXTENSIONS = [javascript({ typescript: true })];
 
 interface OutputPanelProps {
-  info: SessionInfo | null;
   generated: GeneratedCode | null;
   generating: boolean;
   runResult: RunResult | null;
@@ -37,7 +34,7 @@ interface OutputPanelProps {
   onGeneratedCopy: () => void;
 }
 
-export type OutputTab = "output" | "types" | "generated";
+export type OutputTab = "output" | "generated";
 
 function GeneratedBody({
   generated,
@@ -176,31 +173,7 @@ function OutputBody({
   );
 }
 
-function TypesBody({ info }: { info: SessionInfo | null }) {
-  if (!info || info.typescript_declarations.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>No types yet</EmptyTitle>
-          <EmptyDescription>
-            Types appear once the query compiles.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
-  return (
-    <CodeEditor
-      value={info.typescript_declarations}
-      readOnly
-      extensions={DTS_EXTENSIONS}
-      aria-label="inferred TypeScript types"
-    />
-  );
-}
-
 export function OutputPanel({
-  info,
   generated,
   generating,
   runResult,
@@ -219,15 +192,11 @@ export function OutputPanel({
       <div className="flex items-center border-b bg-sidebar px-2 py-1.5">
         <TabsList>
           <TabsTrigger value="output">Output</TabsTrigger>
-          <TabsTrigger value="types">Types</TabsTrigger>
           <TabsTrigger value="generated">Generated</TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="output" className="min-h-0 flex-1">
         <OutputBody runResult={runResult} stale={stale} />
-      </TabsContent>
-      <TabsContent value="types" className="min-h-0 flex-1">
-        <TypesBody info={info} />
       </TabsContent>
       <TabsContent value="generated" className="min-h-0 flex-1">
         <GeneratedBody

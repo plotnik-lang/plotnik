@@ -5,10 +5,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let x
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  id: Node | null;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
  --> query.ptk:2:3

@@ -8,11 +8,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger; debugger;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: Node | null;
-  b: Node[];
-}
 --------------------- OUTPUT ---------------------
 {
   "a": null,

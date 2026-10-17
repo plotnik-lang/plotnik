@@ -13,18 +13,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [{a: [1]}];
-------------------- TYPESCRIPT -------------------
-export interface Obj {
-  arr: Arr | null;
-}
-
-export interface Arr {
-  obj: Obj | null;
-}
-
-export interface Q {
-  top: Arr;
-}
 --------------------- OUTPUT ---------------------
 {
   "top": {

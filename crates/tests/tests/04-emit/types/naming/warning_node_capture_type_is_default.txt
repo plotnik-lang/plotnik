@@ -5,10 +5,6 @@ warning: this capture already has type `Node`. Naming it `Node` has no effect
   |
 1 | Q = (identifier) @x :: Node
   |                        ^^^^
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

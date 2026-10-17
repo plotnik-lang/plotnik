@@ -4,11 +4,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 foo;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  decl: Node | null;
-  stmt: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "decl": null,

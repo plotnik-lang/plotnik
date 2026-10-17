@@ -7,14 +7,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  outer: QOuter | null;
-}
-
-export interface QOuter {
-  id: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "outer": {

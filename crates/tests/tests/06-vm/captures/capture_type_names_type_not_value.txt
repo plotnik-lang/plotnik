@@ -5,12 +5,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 foo;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  id: Ident;
-}
-
-export type Ident = Node;
 --------------------- OUTPUT ---------------------
 {
   "id": {

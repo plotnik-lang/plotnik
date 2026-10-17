@@ -15,8 +15,6 @@ warning: alternative labels have no output effect here: captures from the altern
   | |___^
   |
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
-------------------- TYPESCRIPT -------------------
-export type Q = undefined;
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q;

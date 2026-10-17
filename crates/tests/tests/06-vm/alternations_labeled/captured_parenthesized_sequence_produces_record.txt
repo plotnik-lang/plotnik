@@ -7,14 +7,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: QX;
-}
-
-export interface QX {
-  a: Node;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
  --> query.ptk:2:3

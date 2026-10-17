@@ -6,11 +6,6 @@ Q = (program
     (debugger_statement) @d
   ]
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  d: Node | null;
-  stmts: Node[];
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

@@ -76,10 +76,8 @@ crates/
       parse/                   # lexer, grammar, AST
       analyze/                 # semantic analysis passes
       lower/                   # Thompson NFA build + optimization passes
-      emit/                    # IR → bytecode module
+      emit/                    # IR → bytecode module, Rust types and matcher module
       query/                   # facade: Query, QueryBuilder, CheckedQuery, CompiledQuery
-      typegen/                 # bytecode → TypeScript .d.ts / Rust types
-      codegen/                 # fork-point NFA → generated Rust matcher
       diagnostics/             # user-facing error reporting
     src/core/                  # grammar metadata, node-kind database, interner
     src/vm/                    # runtime engine, backtracking, materialization
@@ -93,9 +91,7 @@ crates/
       02-parser/
       03-analyze/
       04-emit/
-      05-typegen/
       06-vm/
-      07-codegen/
 docs/                          # query language reference and bytecode specification
 ```
 

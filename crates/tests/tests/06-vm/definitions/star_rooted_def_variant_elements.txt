@@ -12,16 +12,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, 1, b];
-------------------- TYPESCRIPT -------------------
-export type Entry =
-  | { $tag: "Id"; $data: { id: Node } }
-  | { $tag: "Num"; $data: { num: Node } };
-
-export interface Q {
-  items: Items;
-}
-
-export type Items = Entry[];
 --------------------- OUTPUT ---------------------
 {
   "items": [

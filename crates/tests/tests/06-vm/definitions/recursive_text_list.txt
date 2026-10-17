@@ -12,14 +12,6 @@ Q = (A) @result
 // first
 
 // second
-------------------- TYPESCRIPT -------------------
-export interface A {
-  comments: string[];
-}
-
-export interface Q {
-  result: A;
-}
 --------------------- OUTPUT ---------------------
 {
   "result": {

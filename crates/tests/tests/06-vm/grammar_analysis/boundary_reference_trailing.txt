@@ -10,14 +10,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 [x, y];
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  tail: Tail;
-}
-
-export interface Tail {
-  last: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "tail": {

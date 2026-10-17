@@ -10,10 +10,6 @@ warning: this capture already has type `Expr`. Naming it `Foo` has no effect
   |
 4 |     (Expr) @inner :: Foo
   |                      ^^^
-------------------- TYPESCRIPT -------------------
-export type Expr =
-  | { $tag: "Lit"; $data: { n: Node } }
-  | { $tag: "Rec"; $data: { inner: Expr } };
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

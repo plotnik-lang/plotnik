@@ -3,14 +3,6 @@ Q = (program
     (expression_statement) @s
   }* @rows :: Row
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  rows: Row[];
-}
-
-export interface Row {
-  s: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

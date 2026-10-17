@@ -246,7 +246,7 @@ impl<'a> Generator<'a> {
         out.push_str("/// The compiled matcher: engine machinery shielded from the query's\n");
         out.push_str("/// type namespace.\n");
         out.push_str("mod matcher {\n");
-        let mut nested = Sink::<()>::new();
+        let mut nested = Sink::new();
         nested.indented(|nested| nested.lines(&machinery));
         out.push_str(nested.plain());
         out.push_str("}\n");

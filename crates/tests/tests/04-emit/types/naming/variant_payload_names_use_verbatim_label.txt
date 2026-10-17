@@ -8,18 +8,6 @@ Q = (program
     DECL: (lexical_declaration) @node
   ] @item
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  item: QItem;
-}
-
-export type QItem =
-  | { $tag: "Stmt"; $data: { info: QItemStmtInfo } }
-  | { $tag: "DECL"; $data: { node: Node } };
-
-export interface QItemStmtInfo {
-  name: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

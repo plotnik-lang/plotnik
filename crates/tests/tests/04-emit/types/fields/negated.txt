@@ -2,10 +2,6 @@ Q = (variable_declarator
   -value
   name: (identifier) @name
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

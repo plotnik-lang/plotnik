@@ -8,10 +8,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 x;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  value: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "value": {

@@ -43,7 +43,6 @@ pub mod diagnostics {
     };
 }
 
-pub use crate::compiler::TypeScriptBinding;
 pub use crate::compiler::journal_fn_name as matcher_journal_fn_name;
 
 pub use crate::core::Colors;
@@ -53,7 +52,7 @@ pub use crate::compiler::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, DiagnosticBuilder,
     DiagnosticKind, Diagnostics, Emission, EmitConfigError, EmitTarget, Error, FormatError,
     FormatResult, QueryResult, RustCodegenConfig, RustModuleOutput, RustTypesOutput, Severity,
-    Span, TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
+    Span,
 };
 pub use crate::compiler::{
     CompiledQuery, GrammarDeclaration, GrammarDeclarationError, InputKind, Query, QueryBuilder,

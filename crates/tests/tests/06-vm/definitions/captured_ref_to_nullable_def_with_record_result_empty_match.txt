@@ -8,19 +8,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: A;
-  d: Node;
-}
-
-export interface A {
-  x: AX | null;
-}
-
-export interface AX {
-  id: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "a": {

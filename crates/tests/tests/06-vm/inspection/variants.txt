@@ -8,14 +8,6 @@ Q = (program
 )
 ---------------- INPUT (index.ts) ----------------
 42
-------------------- TYPESCRIPT -------------------
-export type Expr =
-  | { $tag: "Id"; $data: { id: Node } }
-  | { $tag: "Num"; $data: { num: Node } };
-
-export interface Q {
-  expr: Expr;
-}
 --------------------- OUTPUT ---------------------
 {
   "expr": {

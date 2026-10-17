@@ -5,10 +5,6 @@ Q = (program
 a
 b
 c
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  stmts: Node[];
-}
 --------------------- OUTPUT ---------------------
 {
   "stmts": [

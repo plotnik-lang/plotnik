@@ -5,19 +5,6 @@ Both = (pair
   (property_identifier) @key
   (number) @val
 )
-------------------- TYPESCRIPT -------------------
-export interface Name {
-  name: Node;
-}
-
-export interface Value {
-  value: Node;
-}
-
-export interface Both {
-  key: Node;
-  val: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

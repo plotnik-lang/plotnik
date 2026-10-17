@@ -5,12 +5,6 @@ Q = (program
     (array (MaybeId) @first)
   )
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  first: MaybeId;
-}
-
-export type MaybeId = Node | null;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

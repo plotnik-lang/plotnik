@@ -16,14 +16,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 f(a, c, b)
-------------------- TYPESCRIPT -------------------
-export interface B {
-  self: Node;
-}
-
-export interface Q {
-  b: B;
-}
 --------------------- OUTPUT ---------------------
 <no match>
 -------------------- BYTECODE --------------------

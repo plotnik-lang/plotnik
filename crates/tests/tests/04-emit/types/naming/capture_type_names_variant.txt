@@ -4,14 +4,6 @@ Q = (program
     B: (debugger_statement)
   ] @kind :: Kind
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  kind: Kind;
-}
-
-export type Kind =
-  | { $tag: "A" }
-  | { $tag: "B" };
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {

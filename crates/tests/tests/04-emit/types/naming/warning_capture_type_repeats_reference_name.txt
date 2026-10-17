@@ -9,14 +9,6 @@ warning: this capture already has type `Foo`. Naming it `Foo` has no effect
   |
 4 |   (Foo) @val :: Foo
   |                 ^^^
-------------------- TYPESCRIPT -------------------
-export interface Foo {
-  call: Node;
-}
-
-export interface Q {
-  val: Foo;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

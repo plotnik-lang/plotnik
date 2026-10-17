@@ -7,12 +7,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, b, c];
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  ids: Ids;
-}
-
-export type Ids = Node[];
 --------------------- OUTPUT ---------------------
 {
   "ids": [

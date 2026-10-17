@@ -8,14 +8,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 foo
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  e: QE;
-}
-
-export type QE =
-  | { $tag: "A"; $data: { a: Node } }
-  | { $tag: "B"; $data: { b: Node } };
 --------------------- OUTPUT ---------------------
 {
   "e": {

@@ -26,27 +26,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x + 42;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  left: Wrapped;
-  right: Choice;
-}
-
-export interface Wrapped {
-  value: Alias;
-}
-
-export interface Alias {
-  value: Left;
-}
-
-export interface Left {
-  node: Node;
-}
-
-export interface Choice {
-  node: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "left": {

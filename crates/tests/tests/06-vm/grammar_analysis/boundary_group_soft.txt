@@ -12,10 +12,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 [x, y];
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  last: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "last": {

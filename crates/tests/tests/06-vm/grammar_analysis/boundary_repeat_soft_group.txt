@@ -14,15 +14,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 [x,,y,,z];
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  last: Node;
-  pairs: [QPairs, ...QPairs[]];
-}
-
-export interface QPairs {
-  id: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "last": {

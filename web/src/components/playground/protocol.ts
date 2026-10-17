@@ -51,21 +51,12 @@ export interface QuerySpan {
   };
 }
 
-/** TypeScript declaration binding — typegen `TypeScriptBinding`. */
-export interface TypeScriptBinding {
-  span: [number, number];
-  type_id: number;
-  member_id: number | null;
-}
-
 /** `Session::info()`. */
 export interface SessionInfo {
   version: number;
   query_spans: QuerySpan[];
   query_tokens: QueryToken[];
   diagnostics: WireDiagnostic[];
-  typescript_declarations: string;
-  typescript_bindings: TypeScriptBinding[];
   entrypoints: string[];
   bytecode_size_bytes: number | null;
 }

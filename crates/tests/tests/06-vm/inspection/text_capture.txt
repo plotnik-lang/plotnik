@@ -5,10 +5,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 value;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: string;
-}
 --------------------- OUTPUT ---------------------
 {
   "name": "value"

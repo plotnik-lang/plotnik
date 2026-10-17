@@ -5,13 +5,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let x
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  e: QE | null;
-}
-
-export type QE =
-  | { $tag: "A"; $data: { a: Node } };
 --------------------- OUTPUT ---------------------
 {
   "e": null

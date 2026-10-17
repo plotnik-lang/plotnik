@@ -2,11 +2,6 @@ Q = (array
   (identifier)+? @many
   (number)?? @one
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  many: [Node, ...Node[]];
-  one: Node | null;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

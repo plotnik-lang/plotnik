@@ -8,11 +8,6 @@ Q = (program
 --------------------- INPUT ----------------------
 // doc
 function f() {}
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  doc: Node;
-  fn: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "doc": {

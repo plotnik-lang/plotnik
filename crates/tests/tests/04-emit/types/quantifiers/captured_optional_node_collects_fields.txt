@@ -3,14 +3,6 @@ Q = (program
     (identifier) @id
   )? @x
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: QX | null;
-}
-
-export interface QX {
-  id: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

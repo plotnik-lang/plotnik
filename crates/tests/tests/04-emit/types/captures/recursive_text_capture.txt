@@ -8,12 +8,6 @@ B = [
 ]*
 
 Q = (A)
-------------------- TYPESCRIPT -------------------
-export interface A {
-  comments: string[];
-}
-
-export type Q = undefined;
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct A<'s> {

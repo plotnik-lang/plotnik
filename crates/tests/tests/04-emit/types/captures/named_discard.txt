@@ -1,6 +1,4 @@
 Q = (program (expression_statement) @_stmt)
-------------------- TYPESCRIPT -------------------
-export type Q = undefined;
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q;

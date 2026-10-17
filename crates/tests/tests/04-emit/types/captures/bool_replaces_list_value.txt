@@ -19,10 +19,6 @@ warning: capture type `bool` replaces the list value captured by `@items` with a
   |        `@items` no longer contains the collected items
   |
 help: remove `:: bool` to return the list value instead
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  items: boolean;
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {

@@ -13,15 +13,6 @@ Q = (program
 --------------------- INPUT ----------------------
 x;
 y;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: Pair;
-  b: Pair;
-}
-
-export interface Pair {
-  v: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "a": {

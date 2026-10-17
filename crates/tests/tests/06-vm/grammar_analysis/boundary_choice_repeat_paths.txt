@@ -13,10 +13,6 @@ Q = (program
 )
 ---------------- INPUT (index.js) ----------------
 [x, 1, y];
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  parts: [Node, ...Node[]];
-}
 --------------------- OUTPUT ---------------------
 {
   "parts": [

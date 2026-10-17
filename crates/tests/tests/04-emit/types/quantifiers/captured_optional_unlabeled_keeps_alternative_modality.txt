@@ -4,15 +4,6 @@ Q = (program
     (debugger_statement) @b
   ]? @x
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: QX | null;
-}
-
-export interface QX {
-  a: Node | null;
-  b: Node | null;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

@@ -5,10 +5,6 @@ Q = (program
 )
 ---------------- INPUT (index.ts) ----------------
 x
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  id: Node;
-}
 --------------------- OUTPUT ---------------------
 <no match>
 ---------------- EXECUTION_TRACE -----------------

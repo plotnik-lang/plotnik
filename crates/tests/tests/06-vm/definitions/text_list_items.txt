@@ -7,10 +7,6 @@ Q = (program
 // first
 
 // second
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  comments: string[];
-}
 --------------------- OUTPUT ---------------------
 {
   "comments": [

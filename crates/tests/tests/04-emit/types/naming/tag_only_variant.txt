@@ -4,14 +4,6 @@ Q = (program
     Decl: (lexical_declaration)
   ] @kind
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  kind: QKind;
-}
-
-export type QKind =
-  | { $tag: "Stmt" }
-  | { $tag: "Decl" };
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {

@@ -1,9 +1,5 @@
 Q = (program (expression_statement) @e)
 --------------------- INPUT ----------------------
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  e: Node;
-}
 --------------------- OUTPUT ---------------------
 <no match>
 -------------------- BYTECODE --------------------

@@ -1,10 +1,6 @@
 Q = (variable_declarator
   value: (number)? @init
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  init: Node | null;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

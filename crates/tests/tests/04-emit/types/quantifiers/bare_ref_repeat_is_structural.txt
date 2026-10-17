@@ -3,11 +3,6 @@ Item = [
 ]
 
 Q = (program (Item)+)
-------------------- TYPESCRIPT -------------------
-export type Item =
-  | { $tag: "A"; $data: { s: Node } };
-
-export type Q = undefined;
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

@@ -7,10 +7,6 @@ Q = (source_file
 )
 --------------- INPUT (index.dart) ---------------
 void f() {}
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "name": {

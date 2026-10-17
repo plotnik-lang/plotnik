@@ -10,13 +10,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [1];
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  first: MaybeId;
-  n: Node;
-}
-
-export type MaybeId = Node | null;
 --------------------- OUTPUT ---------------------
 {
   "first": null,

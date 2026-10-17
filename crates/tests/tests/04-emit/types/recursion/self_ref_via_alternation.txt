@@ -5,10 +5,6 @@ Expr = [
     right: (Expr) @right
   )
 ]
-------------------- TYPESCRIPT -------------------
-export type Expr =
-  | { $tag: "Lit"; $data: { value: Node } }
-  | { $tag: "Binary"; $data: { left: Expr; right: Expr } };
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

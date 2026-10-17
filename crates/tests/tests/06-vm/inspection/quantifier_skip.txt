@@ -6,11 +6,6 @@ Q = (program
 )
 ---------------- INPUT (index.ts) ----------------
 function f() {}
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: Node;
-  stmt: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "name": {

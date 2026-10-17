@@ -3,10 +3,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 // only a comment
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  has_statement: boolean;
-}
 --------------------- OUTPUT ---------------------
 {
   "has_statement": false

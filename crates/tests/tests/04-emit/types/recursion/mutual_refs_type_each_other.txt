@@ -15,18 +15,6 @@ B = [
 Q = (program
   (expression_statement (A) @root)
 )
-------------------- TYPESCRIPT -------------------
-export type B =
-  | { $tag: "Leaf"; $data: { n: Node } }
-  | { $tag: "Wrap"; $data: { a: A } };
-
-export type A =
-  | { $tag: "Base"; $data: { id: Node } }
-  | { $tag: "Nest"; $data: { b: B } };
-
-export interface Q {
-  root: A;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

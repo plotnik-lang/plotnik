@@ -2,11 +2,6 @@ Q = (program
   (expression_statement (identifier) @deep)
   (debugger_statement) @shallow
 )
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  deep: Node;
-  shallow: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 

@@ -17,10 +17,6 @@ warning: capture type `text` replaces the variant value captured by `@value` wit
   |     `@value` no longer identifies the matched case: `Comment` or `Statement`
   |
 help: remove `:: text` to return the variant value instead
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  value: string;
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'s> {

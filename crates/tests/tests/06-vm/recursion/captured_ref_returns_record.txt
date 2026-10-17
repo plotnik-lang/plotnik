@@ -10,15 +10,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a()();
-------------------- TYPESCRIPT -------------------
-export interface Nested {
-  inner: Nested | null;
-  name: Node | null;
-}
-
-export interface Q {
-  top: Nested;
-}
 --------------------- OUTPUT ---------------------
 {
   "top": {

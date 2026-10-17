@@ -8,16 +8,6 @@ Alias = (Left)
 Other = (program)
 --------------------- INPUT ----------------------
 chosen;
-------------------- TYPESCRIPT -------------------
-export interface Name {
-  text: string;
-}
-
-export interface Q {
-  name: Name;
-}
-
-export type Other = undefined;
 --------------------- OUTPUT ---------------------
 {
   "name": {

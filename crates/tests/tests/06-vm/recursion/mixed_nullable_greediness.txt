@@ -25,11 +25,6 @@ Q = (program
 //a
 //b
 //stop
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  rest: string;
-  x: string | null;
-}
 ------------------ DIAGNOSTICS -------------------
 warning: capture type `text` replaces the record value captured by `@x` with source text
   --> query.ptk:16:9

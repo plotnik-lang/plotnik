@@ -8,19 +8,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a;
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  w: QW;
-}
-
-export interface QW {
-  b: Node | null;
-  grp: QWGrp | null;
-}
-
-export interface QWGrp {
-  a: Node;
-}
 --------------------- OUTPUT ---------------------
 {
   "w": {

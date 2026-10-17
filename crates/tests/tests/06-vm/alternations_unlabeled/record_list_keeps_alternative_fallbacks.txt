@@ -10,15 +10,6 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [x, y]
-------------------- TYPESCRIPT -------------------
-export interface Q {
-  items: QItems[];
-}
-
-export interface QItems {
-  a: Node | null;
-  b: Node | null;
-}
 --------------------- OUTPUT ---------------------
 {
   "items": [

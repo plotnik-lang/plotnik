@@ -18,8 +18,6 @@ pub struct InfoParts<'a> {
     pub module: Option<&'a Module>,
     pub query_tokens: JsonValue,
     pub diagnostics: JsonValue,
-    pub typescript_declarations: String,
-    pub typescript_bindings: JsonValue,
     pub entrypoints: &'a [String],
     pub bytecode_size_bytes: Option<usize>,
 }
@@ -30,8 +28,6 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
         "query_spans": parts.module.map(query_spans_json).unwrap_or_else(|| json!([])),
         "query_tokens": parts.query_tokens,
         "diagnostics": parts.diagnostics,
-        "typescript_declarations": parts.typescript_declarations,
-        "typescript_bindings": parts.typescript_bindings,
         "entrypoints": parts.entrypoints,
         "bytecode_size_bytes": parts.bytecode_size_bytes,
     })

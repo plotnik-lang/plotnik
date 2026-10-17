@@ -8,14 +8,6 @@ Shared = (identifier) @text :: text
 Root = (program
   (expression_statement (Shared) @value)
 )
-------------------- TYPESCRIPT -------------------
-export interface Shared {
-  text: string;
-}
-
-export interface Root {
-  value: Shared;
-}
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Shared<'s> {
