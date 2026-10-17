@@ -8,7 +8,7 @@ use crate::alloc::{Account, Meter, Shared};
 use crate::json::{JsonError, Style, Writer};
 use crate::tape::{JournalEvent, Tape};
 
-/// One VM match result as flat, indexed rows.
+/// One VM match's result graph, stored as flat, indexed rows.
 ///
 /// The VM interprets bytecode, so it keeps results in this logical form
 /// instead of generated native types. It shares normalization, validation

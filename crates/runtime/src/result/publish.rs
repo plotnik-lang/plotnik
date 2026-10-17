@@ -1,8 +1,8 @@
 use std::alloc::Layout;
 
 use super::family::{Publish, ResultFamily};
-use super::lease::Lease;
 use super::owner::Match;
+use super::region::Region;
 use super::rows::{Normalizer, Rows};
 use super::schema::{Schema, Ty};
 use super::scope::{Plan, Scope};
@@ -11,10 +11,10 @@ use crate::LimitExceeded;
 use crate::alloc::Meter;
 use crate::tape::Tape;
 
-/// Reusable scratch that turns accepted tapes into owned matches.
+/// Reusable scratch that publishes accepted tapes as region-owned result graphs.
 ///
 /// Publication is two linear passes over the normalized rows: the first
-/// sizes the result block, the second builds the native values into it in
+/// sizes the region, the second builds the native values into it in
 /// postorder, children before parents. Nothing is relocated after a
 /// reference to it exists.
 pub struct Publisher<'t> {
@@ -44,7 +44,7 @@ impl<'t> Publisher<'t> {
             .run(meter, &schema, tape.events(), &mut self.rows)?;
 
         let layout = self.plan(meter, schema, E::LAYOUTS, source, root, E::ROOT)?;
-        let lease = Lease::allocate(meter, layout)?;
+        let region = Region::allocate(meter, layout)?;
         let mut walk = Walk::new(
             meter,
             schema,
@@ -55,10 +55,10 @@ impl<'t> Publisher<'t> {
             E::ROOT,
         )?;
         let root = {
-            let scope = match lease.base() {
-                // SAFETY: the lease owns `layout.size()` writable bytes at
+            let scope = match region.base() {
+                // SAFETY: the region owns `layout.size()` writable bytes at
                 // `base`, and `scope` is dropped in this block, before the
-                // lease can move or release them.
+                // region can move or release them.
                 Some(base) => unsafe { Scope::new(base, layout.size()) },
                 None => Scope::empty(),
             };
@@ -69,13 +69,13 @@ impl<'t> Publisher<'t> {
                 layout.size(),
                 "the publisher placed a different amount than planned"
             );
-            // SAFETY: `value` references only the lease's block and data
+            // SAFETY: `value` references only the region's block and data
             // that outlives `E`; `Match` keeps the block alive and hands the
             // value out only through `view`, which rebinds the storage
             // lifetime to a borrow of the match.
             unsafe { rebind::<E>(value) }
         };
-        Ok(Match::new(root, lease))
+        Ok(Match::new(root, region))
     }
 
     /// Size the block with the same placement order the build uses: list

@@ -176,7 +176,7 @@ impl<'t, 's> rt::Publish<'t, 's> for Q<'t> {
     }
 }
 
-/// Typed construction of result values from walk steps.
+/// Typed publication of a region-owned result graph from walk steps.
 mod publish {
     use super::*;
 

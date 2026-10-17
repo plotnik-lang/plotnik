@@ -1,11 +1,11 @@
-//! Result construction: normalization of accepted tapes, typed walks, and
-//! publication into owned matches.
+//! Result graphs: normalization of accepted construction tapes, typed walks,
+//! and publication into region-owned native matches or indexed VM documents.
 
 mod document;
 mod family;
-mod lease;
 mod owner;
 mod publish;
+mod region;
 mod rows;
 mod schema;
 mod scope;

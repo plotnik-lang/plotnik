@@ -93,11 +93,11 @@ mod code {
     pub const SPAN_END: u32 = 19;
 }
 
-/// Append-only, reversible record of one candidate's output.
+/// The append-only, reversible construction tape for one candidate's output.
 ///
 /// Appends are amortized O(1); a checkpoint is two lengths and rollback
-/// restores them. Matching only appends and rolls back: it never builds result
-/// values or reads earlier events.
+/// restores them. Matching only appends and rolls back: it never builds the
+/// published result graph or reads earlier events.
 pub struct Tape<'t> {
     ops: Buffer<Op>,
     nodes: Buffer<Node<'t>>,

@@ -6,7 +6,7 @@ use super::template::splice;
 
 /// The result-side code of a generated module: type checks, result-family
 /// bindings, JSON shapes, execution points, the logical schema, and the
-/// typed publisher that builds native values from walk steps.
+/// typed publisher that builds region-owned result graphs from walk steps.
 pub(super) struct PublishGen<'m> {
     model: &'m ResultModel,
 }
@@ -246,7 +246,7 @@ impl<'m> PublishGen<'m> {
         }
 
         let mut out = String::new();
-        out.push_str("\n/// Typed construction of result values from walk steps.\n");
+        out.push_str("\n/// Typed publication of a region-owned result graph from walk steps.\n");
         out.push_str("mod publish {\n");
         out.push_str("    use super::*;\n");
         let mut body = String::new();

@@ -2,7 +2,7 @@ use std::alloc::Layout;
 
 use super::{Match, Matches};
 use crate::alloc::{Account, Meter};
-use crate::result::lease::Lease;
+use crate::result::region::Region;
 use crate::{ResolvedRuntimeLimits, Scope};
 
 #[derive(Clone, Copy)]
@@ -16,9 +16,9 @@ crate::result_family!(Row<'r>);
 
 fn make<'r>(meter: &mut Meter<'_>, seed: u64) -> Match<Row<'r>> {
     let layout = Layout::array::<u64>(5).unwrap();
-    let lease = Lease::allocate(meter, layout).unwrap();
-    // SAFETY: the returned match owns the lease and bounds all exposed borrows.
-    let scope = unsafe { Scope::new(lease.base().unwrap(), layout.size()) };
+    let region = Region::allocate(meter, layout).unwrap();
+    // SAFETY: the returned match owns the region and bounds all exposed borrows.
+    let scope = unsafe { Scope::new(region.base().unwrap(), layout.size()) };
     let first = scope.push(meter, seed).unwrap();
     let mut items = scope.slice(3);
     items.write(meter, seed + 11).unwrap();
@@ -31,11 +31,11 @@ fn make<'r>(meter: &mut Meter<'_>, seed: u64) -> Match<Row<'r>> {
     assert_eq!(items, [seed + 11, seed + 17, seed + 23]);
     assert_eq!(*last, seed + 29);
 
-    Match::new(Row { first, items, last }, lease)
+    Match::new(Row { first, items, last }, region)
 }
 
 #[test]
-fn borrowed_rows_survive_moves_growth_and_cross_thread_release() {
+fn result_graphs_survive_moves_growth_and_cross_thread_release() {
     let account = Account::new(ResolvedRuntimeLimits {
         fuel_limit: None,
         max_memory: None,

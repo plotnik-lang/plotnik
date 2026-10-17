@@ -7,28 +7,28 @@ use std::ops::Range;
 use std::ptr::NonNull;
 
 use super::family::{Publish, ResultFamily};
-use super::lease::Lease;
+use super::region::Region;
 use crate::LimitExceeded;
 use crate::alloc::{Account, Meter, raw};
 use crate::json::{self, JsonError, Style};
 
-/// The owned result of one match.
+/// One match's region-owned result graph.
 ///
-/// The root value is stored inline; values it references live in the
-/// match's own block, so a `Match` can move freely and outlives the
+/// The root value is stored inline; its descendant rows and list elements
+/// live in the match's region, so a `Match` can move freely and outlives the
 /// operation that produced it. Read it through [`Match::view`].
 pub struct Match<E: ResultFamily> {
     // Moving an owner into a function must not protect its internal references
-    // against the deallocation performed by its lease's destructor.
+    // against the deallocation performed by its region's destructor.
     root: MaybeUninit<E>,
-    lease: Lease,
+    region: Region,
 }
 
 impl<E: ResultFamily> Match<E> {
-    pub(crate) fn new(root: E, lease: Lease) -> Self {
+    pub(crate) fn new(root: E, region: Region) -> Self {
         Self {
             root: MaybeUninit::new(root),
-            lease,
+            region,
         }
     }
 
@@ -51,11 +51,11 @@ impl<E: ResultFamily> Match<E> {
         E: Publish<'t, 's>,
     {
         let value = E::json(self.view());
-        json::write_value(self.lease.account(), value, source, style, sink)
+        json::write_value(self.region.account(), value, source, style, sink)
     }
 }
 
-/// The owned results of `find_all`, in match order.
+/// The region-owned result graphs of `find_all`, in match order.
 ///
 /// Iterate a borrow to read them: `for q in &matches { ... }`.
 pub struct Matches<E: ResultFamily> {
@@ -85,9 +85,9 @@ impl<E: ResultFamily> Matches<E> {
             let slot = self.table.slot(self.table.len);
             slot.cast::<E>()
                 .copy_from_nonoverlapping(item.root.as_ptr(), 1);
-            slot.add(self.table.lease_offset)
-                .cast::<Lease>()
-                .write(item.lease);
+            slot.add(self.table.region_offset)
+                .cast::<Region>()
+                .write(item.region);
         }
         self.table.len += 1;
         Ok(())
@@ -96,7 +96,7 @@ impl<E: ResultFamily> Matches<E> {
     fn get<'a>(&'a self, index: usize) -> &'a E::Borrowed<'a> {
         assert!(index < self.table.len, "match index is initialized");
         // SAFETY: the table stores initialized `E` roots, and owns all their
-        // leases. Rebinding only shortens the internal storage lifetime.
+        // regions. Rebinding only shortens the internal storage lifetime.
         unsafe { &*self.table.slot(index).cast::<E::Borrowed<'a>>() }
     }
 }
@@ -140,20 +140,20 @@ impl<'a, E: ResultFamily> DoubleEndedIterator for Iter<'a, E> {
     }
 }
 
-/// The table owns bytes and lease descriptors, never a generic result value.
+/// The table owns bytes and region descriptors, never a generic result value.
 /// Its destructor must not require the result's external borrows to be live.
 struct Table {
     ptr: NonNull<u8>,
     root: Layout,
     stride: usize,
     align: usize,
-    lease_offset: usize,
+    region_offset: usize,
     len: usize,
     cap: usize,
     account: Option<Account>,
 }
 
-// SAFETY: mutation requires exclusive access, and lease release is thread-safe.
+// SAFETY: mutation requires exclusive access, and region release is thread-safe.
 unsafe impl Send for Table {}
 // SAFETY: shared access only reads immutable roots through `Matches<E>`.
 unsafe impl Sync for Table {}
@@ -165,7 +165,7 @@ impl Table {
             root,
             stride: 0,
             align: 1,
-            lease_offset: 0,
+            region_offset: 0,
             len: 0,
             cap: 0,
             account: None,
@@ -178,9 +178,9 @@ impl Table {
         }
 
         let overflow = LimitExceeded::Allocation { bytes: u64::MAX };
-        let (slot, lease_offset) = self
+        let (slot, region_offset) = self
             .root
-            .extend(Layout::new::<Lease>())
+            .extend(Layout::new::<Region>())
             .map_err(|_| overflow)?;
         let slot = slot.pad_to_align();
         let cap = self.cap.checked_mul(2).ok_or(overflow)?.max(8);
@@ -202,7 +202,7 @@ impl Table {
             });
         };
         // SAFETY: the new block has room for every initialized slot. Copying
-        // transfers leases, so the old block is freed without dropping them.
+        // transfers regions, so the old block is freed without dropping them.
         unsafe {
             ptr.as_ptr()
                 .copy_from_nonoverlapping(self.ptr.as_ptr(), copied)
@@ -216,7 +216,7 @@ impl Table {
         self.ptr = ptr;
         self.stride = slot.size();
         self.align = slot.align();
-        self.lease_offset = lease_offset;
+        self.region_offset = region_offset;
         self.cap = cap;
         if self.account.is_none() {
             self.account = Some(account.clone());
@@ -242,17 +242,17 @@ impl Drop for Table {
         }
 
         for index in 0..self.len {
-            // SAFETY: every committed slot contains one initialized lease.
+            // SAFETY: every committed slot contains one initialized region.
             // Roots are non-dropping and are never read during destruction.
             unsafe {
                 self.slot(index)
-                    .add(self.lease_offset)
-                    .cast::<Lease>()
+                    .add(self.region_offset)
+                    .cast::<Region>()
                     .drop_in_place()
             };
         }
         let layout = self.layout();
-        // SAFETY: all leases are released and no root borrows remain.
+        // SAFETY: all regions are released and no root borrows remain.
         unsafe { raw::deallocate(self.ptr, layout) };
         self.account
             .as_ref()

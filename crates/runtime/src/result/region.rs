@@ -4,22 +4,22 @@ use std::ptr::NonNull;
 use crate::LimitExceeded;
 use crate::alloc::{Account, Meter, raw};
 
-/// Ownership of one match's result block and of its memory charge.
+/// The region holding a native result graph's descendants and list elements.
 ///
-/// The block holds only `Copy` rows, so releasing it never visits them.
-/// A flat result has no block but still keeps the operation account, which
-/// later rendering charges.
-pub(crate) struct Lease {
+/// The root stays inline in `Match`. The region holds only `Copy` rows, so
+/// releasing it never visits them. A graph without descendants or list elements
+/// needs no block but still keeps the operation account for later rendering.
+pub(crate) struct Region {
     block: Option<(NonNull<u8>, Layout)>,
     account: Account,
 }
 
-// SAFETY: the lease exclusively owns its block; the account is thread-safe.
-unsafe impl Send for Lease {}
-// SAFETY: shared access never touches the block through the lease.
-unsafe impl Sync for Lease {}
+// SAFETY: the region exclusively owns its block; the account is thread-safe.
+unsafe impl Send for Region {}
+// SAFETY: shared access never touches the block through the region.
+unsafe impl Sync for Region {}
 
-impl Lease {
+impl Region {
     /// Admit and allocate a block of `layout`; a zero-size layout allocates nothing.
     pub(crate) fn allocate(meter: &mut Meter<'_>, layout: Layout) -> Result<Self, LimitExceeded> {
         let account = meter.account().clone();
@@ -52,13 +52,13 @@ impl Lease {
     }
 }
 
-impl Drop for Lease {
+impl Drop for Region {
     fn drop(&mut self) {
         let Some((ptr, layout)) = self.block.take() else {
             return;
         };
         // SAFETY: the block came from `allocate` with this layout, and every
-        // reference into it is bounded by the owner of this lease.
+        // reference into it is bounded by the owner of this region.
         unsafe { raw::deallocate(ptr, layout) };
         self.account.release(layout.size() as u64);
     }

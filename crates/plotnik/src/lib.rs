@@ -26,15 +26,18 @@
 //! }
 //! ```
 //!
-//! Value-producing queries return an owning `rt::Match`. Read the generated
-//! row through `view()`. Rows are shallow `Copy` values: lists are borrowed
-//! slices and recursive values are references into the match's storage.
+//! Value-producing queries return a region-owned result graph in `rt::Match`.
+//! Read its root through `view()`. The root stays inline in the match, while
+//! descendant rows and list elements live in its region. Rows are shallow
+//! `Copy` values: lists are borrowed slices and recursive values are references.
 //! Each item from `each` owns its storage independently. `find_all` returns
 //! `rt::Matches`, which supports borrowing iteration with `for row in &matches`.
 //! Node fields borrow the parse tree, text fields borrow the source, and
 //! slices and recursive references cannot outlive their result owner.
-//! Use `Match::write_json` to render a result without recursive serialization.
+//! Use `Match::write_json` to render a result graph iteratively.
 //! Match-only queries return the matched node instead of a result owner.
+//! The reversible construction tape records matching effects and rolls back
+//! with backtracking. Publication turns an accepted tape into the result graph.
 //!
 //! There is no built-in language list: `grammar = "..."` names any package in
 //! your own dependency graph that ships a `grammar.json` (`tree-sitter-*` or
