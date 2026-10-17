@@ -436,7 +436,7 @@ Square brackets choose one pattern:
 
 This captures one `Node`. The alternatives are not a list of results.
 
-At a candidate sibling, alternatives are tried in source order. If none can complete the rest of the query, matching can try a later sibling. A later alternative at an earlier sibling wins over an earlier alternative found farther ahead. An alternative that initially matches can still be abandoned if a later requirement fails.
+Alternatives are tried in source order. If a later part of the query fails, Plotnik can backtrack and try another alternative.
 
 ### Merge result fields
 
