@@ -1,0 +1,154 @@
+Nonempty = (identifier)+
+Nullable = (identifier)*
+
+Q = (program
+  (expression_statement
+    [
+      (array
+        (Nonempty) @nonempty :: text
+      )
+      (number)
+    ]
+  )
+  (expression_statement
+    [
+      (array
+        (Nullable) @nullable :: text
+      )
+      (number)
+    ]
+  )
+  (expression_statement
+    [
+      (array
+        (identifier)+ @direct :: text
+      )
+      (number)
+    ]
+  )
+)
+--------------------- INPUT ----------------------
+3; 4; 5;
+--------------------- OUTPUT ---------------------
+{
+  "direct": [],
+  "nonempty": null,
+  "nullable": null
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "nonempty"
+S02 "nullable"
+S03 "direct"
+S04 "Nonempty"
+S05 "Nullable"
+S06 "Q"
+S07 "identifier"
+S08 "program"
+S09 "expression_statement"
+S10 "array"
+S11 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = <Text>
+T2 = ListOneOrMore(T0)  ; <Node>+
+T3 = ListZeroOrMore(T0)  ; <Node>*
+T4 = ListOneOrMore(T1)  ; <Text>+
+T5 = Option(T4)  ; T4?
+T6 = ListZeroOrMore(T1)  ; <Text>*
+T7 = Option(T6)  ; T6?
+T8 = Record  M0:3  ; { nonempty, nullable, direct }
+
+[type_members]
+M0: S01 → T5  ; nonempty: T5
+M1: S02 → T7  ; nullable: T7
+M2: S03 → T6  ; direct: T6
+
+[type_names]
+N0: S04 → T2  ; Nonempty
+N1: S05 → T3  ; Nullable
+N2: S06 → T8  ; Q
+
+[entrypoints]
+Q = 00 :: T8
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └─!  _                                58, 59, 61
+  04  -ε-  [ListClose]                      06
+  06  ─‣┘  _ [RecordSet(M1)]                47
+  08  └‣─  (@56)                            56 : 09
+  09  ─‣┘  _ [RecordSet(M0)]                23
+  11                                        ▶
+  12   !   (identifier) [NodeText ArrayPush]  14, 18
+  14  ──!  _                                12, 14
+  16  └─!  _ [ListOpen]                     12, 14
+  18  ─‣┘  _ [ListClose RecordSet(M2)]      28
+  20   !   (array)                          16
+  21   !   (number) [ListOpen ListClose RecordSet(M2)]  28
+  23  ─‣┘  _                                48
+  24  ──!  _                                20, 21, 24
+  26  └─!  _                                20, 21, 24
+  28  ─‣┘² _                                11
+  29  ─‣─  (expression_statement)           26
+  30  -ε-  [ListClose RecordSet(M1)]        47
+  32   !   (identifier) [NodeText ArrayPush]  34, 04
+  34  ──!  _                                32, 34
+  36  └─!  _                                32, 34
+  38  -ε-  [ListOpen]                       36, 30
+  40   !   (array)                          38
+  41   !   (number) [Absent RecordSet(M1)]  47
+  43  ──!  _                                40, 41, 43
+  45  └─!  _                                40, 41, 43
+  47  ─‣┘  _                                29
+  48  ─‣─  (expression_statement)           45
+  49                                        ▶
+  50  -ε-  [ListClose]                      49
+  52   !   (identifier) [NodeText ArrayPush]  54, 50
+  54  ──!  _                                52, 54
+  56   !   _ [ListOpen]                     52, 54
+  58   !   (array)                          08
+  59   !   (number) [Absent RecordSet(M0)]  23
+  61  ──!  _                                58, 59, 61
+--------------------- TRACE ----------------------
+Q:
+  00       (program)                        01
+       ●   program
+  01       (expression_statement)           02
+       ●   expression_statement
+  02       _                                58, 59, 61
+       ●   number
+  58       (array)                          08
+       ○   number
+  02  ❮❮❮ 
+  59       (number) [Absent RecordSet(M0)]  23
+       ●   number
+  23       _                                48
+       ●   expression_statement
+  48       (expression_statement)           45
+       ●   expression_statement
+  45       _                                40, 41, 43
+       ●   number
+  40       (array)                          38
+       ○   number
+  45  ❮❮❮ 
+  41       (number) [Absent RecordSet(M1)]  47
+       ●   number
+  47       _                                29
+       ●   expression_statement
+  29       (expression_statement)           26
+       ●   expression_statement
+  26       _                                20, 21, 24
+       ●   number
+  20       (array)                          16
+       ○   number
+  26  ❮❮❮ 
+  21       (number) [ListOpen ListClose RecordSet(M2)]  28
+       ●   number
+  28       _                                11
+       ●   program
+  11   ◀   (Q)                              ◼

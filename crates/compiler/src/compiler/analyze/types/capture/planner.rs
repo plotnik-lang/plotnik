@@ -51,8 +51,8 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         let on_absence = if absorbs_null {
             AbsencePolicy::CompleteWith(FieldCompletion::Absent)
         } else if matches!(
-            self.types.in_progress().type_shape(plan.final_type()),
-            Some(TypeShape::List { .. })
+            self.inferred_types.shape(inferred.final_type),
+            TypeShape::List { .. }
         ) {
             AbsencePolicy::CompleteWith(FieldCompletion::EmptyList)
         } else {

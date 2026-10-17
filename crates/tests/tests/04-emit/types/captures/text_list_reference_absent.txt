@@ -1,0 +1,36 @@
+Nonempty = (identifier)+
+Nullable = (identifier)*
+
+Q = (program
+  (expression_statement
+    [
+      (array
+        (Nonempty) @nonempty :: text
+      )
+      (number)
+    ]
+  )
+  (expression_statement
+    [
+      (array
+        (Nullable) @nullable :: text
+      )
+      (number)
+    ]
+  )
+  (expression_statement
+    [
+      (array
+        (identifier)+ @direct :: text
+      )
+      (number)
+    ]
+  )
+)
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub nonempty: ::core::option::Option<::std::vec::Vec<&'s str>>,
+    pub nullable: ::core::option::Option<::std::vec::Vec<&'s str>>,
+    pub direct: ::std::vec::Vec<&'s str>,
+}
