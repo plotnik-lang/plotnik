@@ -8,6 +8,7 @@
 /// Current interface required by generated Rust query modules.
 pub const RUNTIME_ABI: u32 = 0;
 
+mod alloc;
 mod checkpoint;
 mod dfa;
 mod frame;
@@ -34,6 +35,9 @@ mod serialize;
 #[cfg(feature = "execution")]
 mod surface;
 
+#[cfg(feature = "failpoints")]
+pub use alloc::failpoints;
+pub use alloc::{Account, Buffer, Meter, Shared, Text};
 pub use checkpoint::{
     CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume,
 };

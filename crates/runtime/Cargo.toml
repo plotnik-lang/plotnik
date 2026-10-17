@@ -18,6 +18,7 @@ default = ["execution"]
 execution = ["dep:tree-sitter"]
 serde = ["execution", "dep:serde"]
 debug = ["serde", "dep:serde_json"]
+failpoints = []
 
 [dependencies]
 regex-automata = { version = "0.4", features = ["dfa-search"] }

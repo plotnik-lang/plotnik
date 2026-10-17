@@ -13,6 +13,9 @@ pub enum LimitExceeded {
     /// entries and estimated cursor storage, not allocated heap bytes.
     /// Sampling can overshoot `limit` without a fixed bound.
     Memory { used: u64, limit: u64 },
+    /// The allocator refused a block of `bytes`, or the requested capacity
+    /// does not fit the address space.
+    Allocation { bytes: u64 },
     /// The committed value's nesting exceeded the decode-depth ceiling.
     /// Reported only by generated matchers (the VM renders output
     /// iteratively and has no such ceiling): their typed decoder recurses,
@@ -35,6 +38,9 @@ impl std::fmt::Display for LimitExceeded {
                     f,
                     "exceeded the memory limit of {limit} bytes (used {used} bytes)"
                 )
+            }
+            LimitExceeded::Allocation { bytes } => {
+                write!(f, "failed to allocate {bytes} bytes")
             }
             LimitExceeded::DecodeDepth(max) => {
                 write!(f, "exceeded the decode depth limit of {max} nested values")
