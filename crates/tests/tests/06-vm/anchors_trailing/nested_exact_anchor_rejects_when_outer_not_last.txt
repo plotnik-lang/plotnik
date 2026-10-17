@@ -43,53 +43,53 @@ Q:
   05                                        ▶
   06  !─┘  _                                05
   07   !   (expression_statement)           14
-  08   !   (identifier) [Node RecordSet(M0)]  03
+  08   !   (identifier) [RecordSet(M0) Node]  03
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  └‣─  (binary_expression)              12
   15  ...
   16  ──!  _                                07, 16
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                07, 16
-       ●   expression_statement
-  07       (expression_statement)           14
-       ●   expression_statement
-  14       (binary_expression)              12
-       ●   binary_expression
-  12       _                                08, 10
-       ●   identifier
-  08       (identifier) [Node RecordSet(M0)]  03
-       ●   identifier
-  03       _                                04
-  12  ❮❮❮ 
-  10       _                                08, 10
-       ●   +
-  08       (identifier) [Node RecordSet(M0)]  03
-       ○   +
-  10  ❮❮❮ 
-  10       _                                08, 10
-       ●   identifier
-  08       (identifier) [Node RecordSet(M0)]  03
-       ●   identifier
-  03       _                                04
-       ●   binary_expression
-  04       _                                06
-       ●   expression_statement
-  06       _                                05
-  10  ❮❮❮ 
-  10       _                                08, 10
-  14  ❮❮❮ 
-       ○   ;
-  01  ❮❮❮ 
-  16       _                                07, 16
-       ●   expression_statement
-  07       (expression_statement)           14
-       ●   expression_statement
-  14       (binary_expression)              12
-       ○   identifier
-       ○   ;
-  16  ❮❮❮ 
-  16       _                                07, 16
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..6]
+0007 StayExact Named(Some(NodeKindId(150)))
+0007 MatchOk expression_statement [0..6]
+0014 Down Named(Some(NodeKindId(217)))
+0014 MatchOk binary_expression [0..5]
+0012 DownExact Any
+0012 MatchOk identifier [0..1]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [0..1]
+0003 UpExact(1) Any
+0003 Backtrack { to_record: 19 }
+0010 NextExact Any
+0010 MatchOk node#85 [2..3]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchFail node#85 [2..3]
+0008 Backtrack { to_record: 31 }
+0010 NextExact Any
+0010 MatchOk identifier [4..5]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [4..5]
+0003 UpExact(1) Any
+0003 MatchOk binary_expression [0..5]
+0004 Up(1) Any
+0004 MatchOk expression_statement [0..6]
+0006 UpExact(1) Any
+0006 Backtrack { to_record: 39 }
+0010 NextExact Any
+0010 Backtrack { to_record: 15 }
+0010 MatchFail node#24 [5..6]
+0010 Backtrack { to_record: 8 }
+0016 NextExact Any
+0016 MatchOk expression_statement [7..9]
+0007 StayExact Named(Some(NodeKindId(150)))
+0007 MatchOk expression_statement [7..9]
+0014 Down Named(Some(NodeKindId(217)))
+0014 MatchFail identifier [7..8]
+0014 MatchFail node#24 [8..9]
+0014 Backtrack { to_record: 63 }
+0016 NextExact Any

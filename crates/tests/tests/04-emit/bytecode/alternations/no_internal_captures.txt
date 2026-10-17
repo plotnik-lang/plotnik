@@ -13,8 +13,8 @@ Q:
   1                                         ▶
   2   !   (expression_statement)            9
   3  ─‣┘  _                                 1
-  4   !   (identifier) [Node RecordSet(x)]  3
-  5   !   (number) [Node RecordSet(x)]      3
+  4   !   (identifier) [RecordSet(x) Node]  3
+  5   !   (number) [RecordSet(x) Node]      3
   8  ──!  _                                 4, 5, 8
   9  └─!  _                                 4, 5, 8
 -------------------- BYTECODE --------------------
@@ -44,7 +44,7 @@ Q:
   00   !   (expression_statement)           01
   01  └─!  _                                04, 06, 08
   03                                        ▶
-  04   !   (identifier) [Node RecordSet(M0)]  10
-  06   !   (number) [Node RecordSet(M0)]    10
+  04   !   (identifier) [RecordSet(M0) Node]  10
+  06   !   (number) [RecordSet(M0) Node]    10
   08  ──!  _                                04, 06, 08
   10  ─‣┘  _                                03

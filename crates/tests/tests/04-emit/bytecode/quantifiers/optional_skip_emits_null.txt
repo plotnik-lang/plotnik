@@ -10,8 +10,8 @@ Q:
   1                                         ▶
   2   !   (statement_block)                 8, 4
   3  ─‣┘  _                                 1
-  4  -ε-  [Absent RecordSet(id)]            1
-  5   !   (identifier) [Node RecordSet(id)]  3
+  4  -ε-  [RecordSet(id) Absent]            1
+  5   !   (identifier) [RecordSet(id) Node]  3
   7  ──!  _                                 5, 7
   8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
@@ -39,9 +39,9 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (statement_block)                10, 06
-  02   !   (identifier) [Node RecordSet(M0)]  04
+  02   !   (identifier) [RecordSet(M0) Node]  04
   04  ─‣┘  _                                05
   05                                        ▶
-  06  -ε-  [Absent RecordSet(M0)]           05
+  06  -ε-  [RecordSet(M0) Absent]           05
   08  ──!  _                                02, 08
   10  └─!  _                                02, 08

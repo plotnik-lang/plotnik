@@ -1,6 +1,6 @@
 #[cfg(any(feature = "lang-javascript", feature = "lang-typescript"))]
 fn capture_name(language: &str, source: &str) -> serde_json::Value {
-    use plotnik_compiler::{BytecodeConfig, Colors, QueryBuilder, VM, materialize_verified};
+    use plotnik_compiler::{BytecodeConfig, QueryBuilder, VM};
 
     let lang = super::langs::resolve(language).unwrap();
     let query = QueryBuilder::from_inline(
@@ -21,14 +21,11 @@ fn capture_name(language: &str, source: &str) -> serde_json::Value {
         .build()
         .execute(&module, &entry)
         .unwrap();
-    let value = materialize_verified(
-        source,
-        &module,
-        &entry,
-        journal.output_events(),
-        Colors::new(false),
-    );
-    serde_json::to_value(value).unwrap()
+    let mut json = String::new();
+    journal
+        .write_json(plotnik_runtime::json::Style::COMPACT, &mut json)
+        .unwrap();
+    serde_json::from_str(&json).unwrap()
 }
 
 #[cfg(feature = "lang-javascript")]

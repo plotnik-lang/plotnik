@@ -38,20 +38,20 @@ Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
   2  └‣─  (array)                           3
-  3  └•─  (number) [Node RecordSet(M0)]     5
+  3  └•─  (number) [RecordSet(M0) Node]     5
   5  ─‣┘³ _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement)            02
-      ●   expression_statement
-  2       (array)                           03
-      ●   array
-  3       (number) [Node RecordSet(M0)]     05
-      ○   [
-      ○   identifier
-  2  ❮❮❮ 
-      ○   ;
-  1  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..7]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..6]
+0003 DownSkip Named(Some(NodeKindId(114)))
+0003 MatchFail node#41 [0..1]
+0003 MatchFail node#1 [1..2]
+0003 Backtrack { to_record: 12 }
+0003 MatchFail node#24 [6..7]
+0003 Backtrack { to_record: 8 }

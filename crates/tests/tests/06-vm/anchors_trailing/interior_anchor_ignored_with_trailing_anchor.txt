@@ -40,27 +40,27 @@ Q:
   00   !   (program)                        14, 04
   02                                        ▶
   03  ─•┘  _                                02
-  04  └•─  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  03
+  04  └•─  (debugger_statement) [RecordSet(M0) Absent RecordSet(M1) Node]  03
   07  ...
-  08  ─•─  (debugger_statement) [Node RecordSet(M1)]  03
-  10   !   (lexical_declaration) [Node RecordSet(M0)]  08
+  08  ─•─  (debugger_statement) [RecordSet(M1) Node]  03
+  10   !   (lexical_declaration) [RecordSet(M0) Node]  08
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        14, 04
-       ●   program
-  14       _                                10, 12
-       ●   expression_statement
-  10       (lexical_declaration) [Node RecordSet(M0)]  08
-       ○   expression_statement
-  14  ❮❮❮ 
-  12       _                                10, 12
-       ●   debugger_statement
-  10       (lexical_declaration) [Node RecordSet(M0)]  08
-       ○   debugger_statement
-  12  ❮❮❮ 
-  12       _                                10, 12
-  00  ❮❮❮ 
-  04       (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  03
-       ○   expression_statement
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..14]
+0014 DownExact Any
+0014 MatchOk node#150 [0..4]
+0010 StayExact Named(Some(NodeKindId(152)))
+0010 MatchFail node#150 [0..4]
+0010 Backtrack { to_record: 9 }
+0012 NextExact Any
+0012 MatchOk debugger_statement [5..14]
+0010 StayExact Named(Some(NodeKindId(152)))
+0010 MatchFail debugger_statement [5..14]
+0010 Backtrack { to_record: 17 }
+0012 NextExact Any
+0012 Backtrack { to_record: 5 }
+0004 DownSkip Named(Some(NodeKindId(168)))
+0004 MatchFail node#150 [0..4]

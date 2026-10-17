@@ -19,7 +19,7 @@ Test:
   04                                        ▶
   05   !   (array)                          14
   06  ─‣┘  _                                04
-  07  ─◦─  (string) [Node RecordSet(next)]  06
+  07  ─◦─  (string) [RecordSet(next) Node]  06
 
 Comma (consuming, routed Down):
   09                                        ▶
@@ -62,7 +62,7 @@ Comma:
 Test:
   02   !   (array)                          03
   03       (@12)                            12 : 04
-  04  ─◦─  (string) [Node RecordSet(M0)]    06
+  04  ─◦─  (string) [RecordSet(M0) Node]    06
   06  ─‣┘  _                                07
   07                                        ▶
   08                                        ▶

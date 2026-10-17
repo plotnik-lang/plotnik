@@ -13,18 +13,18 @@ let x; ; debugger;
 {
   "a": {
     "kind": "lexical_declaration",
-    "span": [0, 6],
-    "text": "let x;"
+    "text": "let x;",
+    "span": [0, 6]
   },
   "b": {
     "kind": "empty_statement",
-    "span": [7, 8],
-    "text": ";"
+    "text": ";",
+    "span": [7, 8]
   },
   "c": {
     "kind": "debugger_statement",
-    "span": [9, 18],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [9, 18]
   }
 }
 -------------------- BYTECODE --------------------
@@ -58,25 +58,26 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                10, 12
-  03  ─•─  (debugger_statement) [Node RecordSet(M2)]  05
+  03  ─•─  (debugger_statement) [RecordSet(M2) Node]  05
   05  ─‣┘  _                                06
   06                                        ▶
   07  ...
-  08  ─•─  (empty_statement) [Node RecordSet(M1)]  03
-  10   !   (lexical_declaration) [Node RecordSet(M0)]  08
+  08  ─•─  (empty_statement) [RecordSet(M1) Node]  03
+  10   !   (lexical_declaration) [RecordSet(M0) Node]  08
   12  ──!  _                                10, 12
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                10, 12
-       ●   lexical_declaration
-  10       (lexical_declaration) [Node RecordSet(M0)]  08
-       ●   lexical_declaration
-  08       (empty_statement) [Node RecordSet(M1)]  03
-       ●   empty_statement
-  03       (debugger_statement) [Node RecordSet(M2)]  05
-       ●   debugger_statement
-  05       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..18]
+0001 DownExact Any
+0001 MatchOk lexical_declaration [0..6]
+0010 StayExact Named(Some(NodeKindId(152)))
+0010 MatchOk lexical_declaration [0..6]
+0008 NextSkip Named(Some(NodeKindId(171)))
+0008 MatchOk empty_statement [7..8]
+0003 NextSkip Named(Some(NodeKindId(168)))
+0003 MatchOk debugger_statement [9..18]
+0005 Up(1) Any
+0005 MatchOk program [0..18]
+0006 Return PortId(0)
+0006 Return

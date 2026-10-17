@@ -22,12 +22,12 @@ Q = (program
 [a, c, b]
 --------------------- OUTPUT ---------------------
 {
+  "choice": null,
   "b": {
     "kind": "identifier",
-    "span": [7, 8],
-    "text": "b"
-  },
-  "choice": null
+    "text": "b",
+    "span": [7, 8]
+  }
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -79,357 +79,338 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _                                07, 61
+  03  └─!  _                                54, 38
   05                                        ▶
-  06  ─‣┘³ _                                05
-  07   !   "["                              58
-  08  ─‣─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
-  11  ─•─  (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
-  14                                        ▶
-  15                                        ▶ p1
-  16                                        ▶ p2
-  17                                        ▶
-  18                                        ▶ p1
-  19  -ε-  [Absent RecordSet(M1) VariantClose]  18
-  21  ─•─  (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  24   !   (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  27  ──!  _                                24, 27
-  29   !   _ [Absent RecordSet(M0)]         24, 27
+  06  ─‣─  (identifier) [RecordSet(M6) Node] == "b"  15
+  08  ─•─  (identifier) [RecordSet(M6) Node] == "b"  15
+  10                                        ▶
+  11                                        ▶ p1
+  12                                        ▶ p2
+  13                                        ▶
+  14                                        ▶ p1
+  15  ─‣┘³ _                                05
+  16  -ε-  [RecordSet(M1) Absent VariantClose]  14
+  18  ─•─  (identifier) [RecordSet(M1) Node VariantClose] == "z"  13
+  21   !   (identifier) [RecordSet(M1) Node VariantClose] == "z"  13
+  24  ──!  _                                21, 24
+  26   !   _ [RecordSet(M0) Absent]         21, 24
+  28   !   (identifier) [RecordSet(M0) Node] == "a"  18, 16
   31  ...
-  32   !   (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  35  ──!  _                                32, 35
-  37   !   _                                32, 35
-  39  ...
-  40  -ε-  [VariantOpen(M3)]                37, 29
-  42   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  17
-  45  -ε-                                   40, 42
-  47  ...
-  48       (@45)                            45 : 14 / 15
-  51  ──!  _                                48, 51
-  53  -ε-  [Absent]                         16
-  55  ...
-  56  -ε-                                   51, 53
-  58       (@56)                            56 : 08 / 11 / 08
-  61  ──!  _                                07, 61
+  32  ──!  _                                28, 32
+  34   !   _                                28, 32
+  36  -ε-  [VariantOpen(M3)]                34, 26
+  38  ──!  _                                54, 38
+  40   !   (identifier) [VariantOpen(M4) RecordSet(M2) Node VariantClose] == "x"  13
+  43  -ε-                                   36, 40
+  45       (@43)                            43 : 10 / 11
+  48  ──!  _                                45, 48
+  50  -ε-  [Absent]                         12
+  52  -ε-                                   48, 50
+  54   !   "[" [RecordSet(M5)]              56
+  56       (@52)                            52 : 06 / 08 / 06
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       _                                07, 61
-       ●   [
-  07       "["                              58
-       ●   [
-  58       (@56)                            56 : 08 / 11 / 08
-       ▶   (@56)
-
-@56:
-  56  -ε-                                   51, 53
-  51       _                                48, 51
-       ●   identifier
-  48       (@45)                            45 : 14 / 15
-       ▶   (@45)
-
-@45:
-  45  -ε-                                   40, 42
-  40  -ε-  [VariantOpen(M3)]                37, 29
-  37       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ●   identifier
-  21       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ,
-  32  ❮❮❮ 
-  19  -ε-  [Absent RecordSet(M1) VariantClose]  18
-  18   ◀   (@45)                            p1
-
-@56:
-  15   ◀   (@56)                            p1
-
-Q:
-  11       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
-       ○   ,
-  37  ❮❮❮ 
-  35       _                                32, 35
-       ●   ,
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ,
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ,
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ,
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ]
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ]
-  35  ❮❮❮ 
-  35       _                                32, 35
-  40  ❮❮❮ 
-  29       _ [Absent RecordSet(M0)]         24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  29  ❮❮❮ 
-  27       _                                24, 27
-       ●   ,
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ,
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   ,
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ,
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   ]
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ]
-  27  ❮❮❮ 
-  27       _                                24, 27
-  45  ❮❮❮ 
-  42       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  17
-  51  ❮❮❮ 
-  51       _                                48, 51
-       ●   ,
-  48       (@45)                            45 : 14 / 15
-       ▶   (@45)
-
-@45:
-  45  -ε-                                   40, 42
-  40  -ε-  [VariantOpen(M3)]                37, 29
-  37       _                                32, 35
-       ●   ,
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ,
-  37  ❮❮❮ 
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ,
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ,
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ]
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ]
-  35  ❮❮❮ 
-  35       _                                32, 35
-  40  ❮❮❮ 
-  29       _ [Absent RecordSet(M0)]         24, 27
-       ●   ,
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ,
-  29  ❮❮❮ 
-  27       _                                24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   ,
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ,
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   ]
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ]
-  27  ❮❮❮ 
-  27       _                                24, 27
-  45  ❮❮❮ 
-  42       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  17
-       ○   ,
-  51  ❮❮❮ 
-  51       _                                48, 51
-       ●   identifier
-  48       (@45)                            45 : 14 / 15
-       ▶   (@45)
-
-@45:
-  45  -ε-                                   40, 42
-  40  -ε-  [VariantOpen(M3)]                37, 29
-  37       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  37  ❮❮❮ 
-  35       _                                32, 35
-       ●   ,
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ,
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ]
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ]
-  35  ❮❮❮ 
-  35       _                                32, 35
-  40  ❮❮❮ 
-  29       _ [Absent RecordSet(M0)]         24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  29  ❮❮❮ 
-  27       _                                24, 27
-       ●   ,
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ,
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   ]
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ]
-  27  ❮❮❮ 
-  27       _                                24, 27
-  45  ❮❮❮ 
-  42       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  17
-  51  ❮❮❮ 
-  51       _                                48, 51
-       ●   ,
-  48       (@45)                            45 : 14 / 15
-       ▶   (@45)
-
-@45:
-  45  -ε-                                   40, 42
-  40  -ε-  [VariantOpen(M3)]                37, 29
-  37       _                                32, 35
-       ●   ,
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ,
-  37  ❮❮❮ 
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ]
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ]
-  35  ❮❮❮ 
-  35       _                                32, 35
-  40  ❮❮❮ 
-  29       _ [Absent RecordSet(M0)]         24, 27
-       ●   ,
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ,
-  29  ❮❮❮ 
-  27       _                                24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  27  ❮❮❮ 
-  27       _                                24, 27
-       ●   ]
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ]
-  27  ❮❮❮ 
-  27       _                                24, 27
-  45  ❮❮❮ 
-  42       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  17
-       ○   ,
-  51  ❮❮❮ 
-  51       _                                48, 51
-       ●   identifier
-  48       (@45)                            45 : 14 / 15
-       ▶   (@45)
-
-@45:
-  45  -ε-                                   40, 42
-  40  -ε-  [VariantOpen(M3)]                37, 29
-  37       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-  37  ❮❮❮ 
-  35       _                                32, 35
-       ●   ]
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ]
-  35  ❮❮❮ 
-  35       _                                32, 35
-  40  ❮❮❮ 
-  29       _ [Absent RecordSet(M0)]         24, 27
-       ●   identifier
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-  29  ❮❮❮ 
-  27       _                                24, 27
-       ●   ]
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ]
-  27  ❮❮❮ 
-  27       _                                24, 27
-  45  ❮❮❮ 
-  42       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  17
-  51  ❮❮❮ 
-  51       _                                48, 51
-       ●   ]
-  48       (@45)                            45 : 14 / 15
-       ▶   (@45)
-
-@45:
-  45  -ε-                                   40, 42
-  40  -ε-  [VariantOpen(M3)]                37, 29
-  37       _                                32, 35
-       ●   ]
-  32       (identifier) [Node RecordSet(M0)] == "a"  21, 19
-       ○   ]
-  37  ❮❮❮ 
-  35       _                                32, 35
-  40  ❮❮❮ 
-  29       _ [Absent RecordSet(M0)]         24, 27
-       ●   ]
-  24       (identifier) [Node RecordSet(M1) VariantClose] == "z"  17
-       ○   ]
-  29  ❮❮❮ 
-  27       _                                24, 27
-  45  ❮❮❮ 
-  42       (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose] == "x"  17
-       ○   ]
-  51  ❮❮❮ 
-  51       _                                48, 51
-  56  ❮❮❮ 
-  53  -ε-  [Absent]                         16
-  16   ◀   (@56)                            p2
-
-Q:
-  08       (identifier) [RecordSet(M5) Node RecordSet(M6)] == "b"  06
-       ○   ,
-       ○   ,
-       ●   identifier
-  06       _                                05
-       ●   program
-  05   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..9]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0003 DownExact Any
+0003 MatchOk [ [0..1]
+0054 StayExact Anonymous(Some(NodeKindId(41)))
+0054 MatchOk [ [0..1]
+0056 Call CodeAddr(52)
+0056 Call { target: 52 }
+0052 Epsilon Any
+0048 NextExact Any
+0048 MatchOk identifier [1..2]
+0045 Call CodeAddr(43)
+0045 Call { target: 43 }
+0043 Epsilon Any
+0036 Epsilon Any
+0034 StayExact Any
+0034 MatchOk identifier [1..2]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchOk identifier [1..2]
+0018 NextSkip Named(Some(NodeKindId(1)))
+0018 MatchFail node#8 [2..3]
+0018 Backtrack { to_record: 45 }
+0016 Epsilon Any
+0014 Return PortId(1)
+0014 Return
+0011 Return PortId(1)
+0011 Return
+0008 NextSkip Named(Some(NodeKindId(1)))
+0008 MatchFail node#8 [2..3]
+0008 Backtrack { to_record: 39 }
+0032 NextExact Any
+0032 MatchOk node#8 [2..3]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#8 [2..3]
+0028 Backtrack { to_record: 69 }
+0032 NextExact Any
+0032 MatchOk identifier [4..5]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 77 }
+0032 NextExact Any
+0032 MatchOk node#8 [5..6]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#8 [5..6]
+0028 Backtrack { to_record: 85 }
+0032 NextExact Any
+0032 MatchOk identifier [7..8]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 93 }
+0032 NextExact Any
+0032 MatchOk node#42 [8..9]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#42 [8..9]
+0028 Backtrack { to_record: 101 }
+0032 NextExact Any
+0032 Backtrack { to_record: 35 }
+0026 StayExact Any
+0026 MatchOk identifier [1..2]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 114 }
+0024 NextExact Any
+0024 MatchOk node#8 [2..3]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#8 [2..3]
+0021 Backtrack { to_record: 122 }
+0024 NextExact Any
+0024 MatchOk identifier [4..5]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 130 }
+0024 NextExact Any
+0024 MatchOk node#8 [5..6]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#8 [5..6]
+0021 Backtrack { to_record: 138 }
+0024 NextExact Any
+0024 MatchOk identifier [7..8]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 146 }
+0024 NextExact Any
+0024 MatchOk node#42 [8..9]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#42 [8..9]
+0021 Backtrack { to_record: 154 }
+0024 NextExact Any
+0024 Backtrack { to_record: 32 }
+0040 StayExact Named(Some(NodeKindId(1)))
+0040 Backtrack { to_record: 28 }
+0048 NextExact Any
+0048 MatchOk node#8 [2..3]
+0045 Call CodeAddr(43)
+0045 Call { target: 43 }
+0043 Epsilon Any
+0036 Epsilon Any
+0034 StayExact Any
+0034 MatchOk node#8 [2..3]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#8 [2..3]
+0028 Backtrack { to_record: 180 }
+0032 NextExact Any
+0032 MatchOk identifier [4..5]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 188 }
+0032 NextExact Any
+0032 MatchOk node#8 [5..6]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#8 [5..6]
+0028 Backtrack { to_record: 196 }
+0032 NextExact Any
+0032 MatchOk identifier [7..8]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 204 }
+0032 NextExact Any
+0032 MatchOk node#42 [8..9]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#42 [8..9]
+0028 Backtrack { to_record: 212 }
+0032 NextExact Any
+0032 Backtrack { to_record: 176 }
+0026 StayExact Any
+0026 MatchOk node#8 [2..3]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#8 [2..3]
+0021 Backtrack { to_record: 225 }
+0024 NextExact Any
+0024 MatchOk identifier [4..5]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 233 }
+0024 NextExact Any
+0024 MatchOk node#8 [5..6]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#8 [5..6]
+0021 Backtrack { to_record: 241 }
+0024 NextExact Any
+0024 MatchOk identifier [7..8]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 249 }
+0024 NextExact Any
+0024 MatchOk node#42 [8..9]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#42 [8..9]
+0021 Backtrack { to_record: 257 }
+0024 NextExact Any
+0024 Backtrack { to_record: 173 }
+0040 StayExact Named(Some(NodeKindId(1)))
+0040 MatchFail node#8 [2..3]
+0040 Backtrack { to_record: 169 }
+0048 NextExact Any
+0048 MatchOk identifier [4..5]
+0045 Call CodeAddr(43)
+0045 Call { target: 43 }
+0043 Epsilon Any
+0036 Epsilon Any
+0034 StayExact Any
+0034 MatchOk identifier [4..5]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 283 }
+0032 NextExact Any
+0032 MatchOk node#8 [5..6]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#8 [5..6]
+0028 Backtrack { to_record: 291 }
+0032 NextExact Any
+0032 MatchOk identifier [7..8]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 299 }
+0032 NextExact Any
+0032 MatchOk node#42 [8..9]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#42 [8..9]
+0028 Backtrack { to_record: 307 }
+0032 NextExact Any
+0032 Backtrack { to_record: 279 }
+0026 StayExact Any
+0026 MatchOk identifier [4..5]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 320 }
+0024 NextExact Any
+0024 MatchOk node#8 [5..6]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#8 [5..6]
+0021 Backtrack { to_record: 328 }
+0024 NextExact Any
+0024 MatchOk identifier [7..8]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 336 }
+0024 NextExact Any
+0024 MatchOk node#42 [8..9]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#42 [8..9]
+0021 Backtrack { to_record: 344 }
+0024 NextExact Any
+0024 Backtrack { to_record: 276 }
+0040 StayExact Named(Some(NodeKindId(1)))
+0040 Backtrack { to_record: 272 }
+0048 NextExact Any
+0048 MatchOk node#8 [5..6]
+0045 Call CodeAddr(43)
+0045 Call { target: 43 }
+0043 Epsilon Any
+0036 Epsilon Any
+0034 StayExact Any
+0034 MatchOk node#8 [5..6]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#8 [5..6]
+0028 Backtrack { to_record: 370 }
+0032 NextExact Any
+0032 MatchOk identifier [7..8]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 378 }
+0032 NextExact Any
+0032 MatchOk node#42 [8..9]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#42 [8..9]
+0028 Backtrack { to_record: 386 }
+0032 NextExact Any
+0032 Backtrack { to_record: 366 }
+0026 StayExact Any
+0026 MatchOk node#8 [5..6]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#8 [5..6]
+0021 Backtrack { to_record: 399 }
+0024 NextExact Any
+0024 MatchOk identifier [7..8]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 407 }
+0024 NextExact Any
+0024 MatchOk node#42 [8..9]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#42 [8..9]
+0021 Backtrack { to_record: 415 }
+0024 NextExact Any
+0024 Backtrack { to_record: 363 }
+0040 StayExact Named(Some(NodeKindId(1)))
+0040 MatchFail node#8 [5..6]
+0040 Backtrack { to_record: 359 }
+0048 NextExact Any
+0048 MatchOk identifier [7..8]
+0045 Call CodeAddr(43)
+0045 Call { target: 43 }
+0043 Epsilon Any
+0036 Epsilon Any
+0034 StayExact Any
+0034 MatchOk identifier [7..8]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 441 }
+0032 NextExact Any
+0032 MatchOk node#42 [8..9]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#42 [8..9]
+0028 Backtrack { to_record: 449 }
+0032 NextExact Any
+0032 Backtrack { to_record: 437 }
+0026 StayExact Any
+0026 MatchOk identifier [7..8]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 462 }
+0024 NextExact Any
+0024 MatchOk node#42 [8..9]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#42 [8..9]
+0021 Backtrack { to_record: 470 }
+0024 NextExact Any
+0024 Backtrack { to_record: 434 }
+0040 StayExact Named(Some(NodeKindId(1)))
+0040 Backtrack { to_record: 430 }
+0048 NextExact Any
+0048 MatchOk node#42 [8..9]
+0045 Call CodeAddr(43)
+0045 Call { target: 43 }
+0043 Epsilon Any
+0036 Epsilon Any
+0034 StayExact Any
+0034 MatchOk node#42 [8..9]
+0028 StayExact Named(Some(NodeKindId(1)))
+0028 MatchFail node#42 [8..9]
+0028 Backtrack { to_record: 496 }
+0032 NextExact Any
+0032 Backtrack { to_record: 492 }
+0026 StayExact Any
+0026 MatchOk node#42 [8..9]
+0021 StayExact Named(Some(NodeKindId(1)))
+0021 MatchFail node#42 [8..9]
+0021 Backtrack { to_record: 509 }
+0024 NextExact Any
+0024 Backtrack { to_record: 489 }
+0040 StayExact Named(Some(NodeKindId(1)))
+0040 MatchFail node#42 [8..9]
+0040 Backtrack { to_record: 485 }
+0048 NextExact Any
+0048 Backtrack { to_record: 24 }
+0050 Epsilon Any
+0012 Return PortId(2)
+0012 Return
+0006 Next Named(Some(NodeKindId(1)))
+0006 MatchFail node#8 [2..3]
+0006 MatchFail node#8 [5..6]
+0006 MatchOk identifier [7..8]
+0015 Up(3) Any
+0015 MatchOk program [0..9]
+0005 Return PortId(0)
+0005 Return

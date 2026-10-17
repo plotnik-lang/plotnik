@@ -8,8 +8,8 @@ Q = (program
 {
   "d": {
     "kind": "debugger_statement",
-    "span": [8, 17],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [8, 17]
   }
 }
 -------------------- BYTECODE --------------------
@@ -36,16 +36,17 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └•─  (debugger_statement) [Node RecordSet(M0)]  3
+  1  └•─  (debugger_statement) [RecordSet(M0) Node]  3
   3  ─‣┘  _                                 4
   4                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (debugger_statement) [Node RecordSet(M0)]  03
-      ○   comment
-      ●   debugger_statement
-  3       _                                 04
-      ●   program
-  4   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..17]
+0001 DownSkip Named(Some(NodeKindId(168)))
+0001 MatchFail node#108 [0..7]
+0001 MatchOk debugger_statement [8..17]
+0003 Up(1) Any
+0003 MatchOk program [0..17]
+0004 Return PortId(0)
+0004 Return

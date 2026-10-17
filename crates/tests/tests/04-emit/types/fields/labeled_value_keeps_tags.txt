@@ -5,12 +5,12 @@ Q = (call_expression
   ] @fn
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q {
     pub r#fn: QFn,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub enum QFn {
     Id,
     Member,

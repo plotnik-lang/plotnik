@@ -26,13 +26,13 @@ help: capture the alternation (`[...] @name`) to make its labels produce variant
 {
   "a": {
     "kind": "expression_statement",
-    "span": [0, 2],
-    "text": "a;"
+    "text": "a;",
+    "span": [0, 2]
   },
   "b": {
     "kind": "expression_statement",
-    "span": [3, 5],
-    "text": "b;"
+    "text": "b;",
+    "span": [3, 5]
   }
 }
 -------------------- BYTECODE --------------------
@@ -63,39 +63,40 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                16, 08, 18
-  03  ─‣─  (expression_statement) [Node RecordSet(M1)]  05
+  03  ─‣─  (expression_statement) [RecordSet(M1) Node]  05
   05  ─‣┘  _                                06
   06                                        ▶
   07  ...
-  08   !   (expression_statement) [Node RecordSet(M0)]  03
-  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  03
+  08   !   (expression_statement) [RecordSet(M0) Node]  03
+  10  ─‣─  (expression_statement) [RecordSet(M0) Node]  03
   12   !   (comment)                        10
   13  ──!  _                                12, 13
   15  ...
   16   !   _                                12, 13
   18  ──!  _                                16, 08, 18
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                16, 08, 18
-       ●   expression_statement
-  16       _                                12, 13
-       ●   expression_statement
-  12       (comment)                        10
-       ○   expression_statement
-  16  ❮❮❮ 
-  13       _                                12, 13
-       ●   expression_statement
-  12       (comment)                        10
-       ○   expression_statement
-  13  ❮❮❮ 
-  13       _                                12, 13
-  01  ❮❮❮ 
-  08       (expression_statement) [Node RecordSet(M0)]  03
-       ●   expression_statement
-  03       (expression_statement) [Node RecordSet(M1)]  05
-       ●   expression_statement
-  05       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..2]
+0016 StayExact Any
+0016 MatchOk expression_statement [0..2]
+0012 StayExact Named(Some(NodeKindId(108)))
+0012 MatchFail expression_statement [0..2]
+0012 Backtrack { to_record: 13 }
+0013 NextExact Any
+0013 MatchOk expression_statement [3..5]
+0012 StayExact Named(Some(NodeKindId(108)))
+0012 MatchFail expression_statement [3..5]
+0012 Backtrack { to_record: 21 }
+0013 NextExact Any
+0013 Backtrack { to_record: 9 }
+0008 StayExact Named(Some(NodeKindId(150)))
+0008 MatchOk expression_statement [0..2]
+0003 Next Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [3..5]
+0005 Up(1) Any
+0005 MatchOk program [0..5]
+0006 Return PortId(0)
+0006 Return

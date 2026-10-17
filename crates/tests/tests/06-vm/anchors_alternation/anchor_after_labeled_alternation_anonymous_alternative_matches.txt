@@ -54,31 +54,34 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (binary_expression)              10, 12
-  04                                        ▶
-  05  ─•─  (identifier) [RecordSet(M2)]     07
-  07  ─‣┘³ _                                04
-  08  ─◦─  (identifier) [RecordSet(M2)]     07
-  10  └‣─  (number) [VariantOpen(M0) VariantClose]  05
-  12  └‣─  "+" [VariantOpen(M1) VariantClose]  08
+  02  └‣─  (binary_expression)              03
+  03  -ε-  [RecordSet(M2)]                  10, 12
+  05                                        ▶
+  06  ─•─  (identifier) [VariantClose]      14
+  08  ─◦─  (identifier) [VariantClose]      14
+  10  └‣─  (number) [VariantOpen(M0)]       06
+  12  └‣─  "+" [VariantOpen(M1)]            08
+  14  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (binary_expression)              10, 12
-       ●   binary_expression
-  10       (number) [VariantOpen(M0) VariantClose]  05
-       ○   identifier
-       ○   +
-       ○   identifier
-  02  ❮❮❮ 
-  12       "+" [VariantOpen(M1) VariantClose]  08
-       ○   identifier
-       ●   +
-  08       (identifier) [RecordSet(M2)]     07
-       ●   identifier
-  07       _                                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..5]
+0002 Down Named(Some(NodeKindId(217)))
+0002 MatchOk binary_expression [0..5]
+0003 Epsilon Any
+0010 Down Named(Some(NodeKindId(114)))
+0010 MatchFail identifier [0..1]
+0010 MatchFail + [2..3]
+0010 MatchFail identifier [4..5]
+0010 Backtrack { to_record: 15 }
+0012 Down Anonymous(Some(NodeKindId(85)))
+0012 MatchFail identifier [0..1]
+0012 MatchOk + [2..3]
+0008 NextSkipExtras Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [4..5]
+0014 Up(3) Any
+0014 MatchOk program [0..5]
+0005 Return PortId(0)
+0005 Return

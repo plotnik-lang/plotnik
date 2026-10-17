@@ -12,8 +12,8 @@ x;
 {
   "value": {
     "kind": "identifier",
-    "span": [0, 1],
-    "text": "x"
+    "text": "x",
+    "span": [0, 1]
   }
 }
 -------------------- BYTECODE --------------------
@@ -46,23 +46,24 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └─!  _                                05, 08, 10
   04                                        ▶
-  05   !   (function_declaration) [Node RecordSet(M0)] == "x"  07
+  05   !   (function_declaration) [RecordSet(M0) Node] == "x"  07
   07  ─‣┘² _                                04
-  08   !   (identifier) [Node RecordSet(M0)] == "x"  07
+  08   !   (identifier) [RecordSet(M0) Node] == "x"  07
   10  ──!  _                                05, 08, 10
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       _                                05, 08, 10
-       ●   identifier
-  05       (function_declaration) [Node RecordSet(M0)] == "x"  07
-       ○   identifier
-  02  ❮❮❮ 
-  08       (identifier) [Node RecordSet(M0)] == "x"  07
-       ●   identifier
-  07       _                                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0002 DownExact Any
+0002 MatchOk identifier [0..1]
+0005 StayExact Named(Some(NodeKindId(201)))
+0005 MatchFail identifier [0..1]
+0005 Backtrack { to_record: 13 }
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [0..1]
+0007 Up(2) Any
+0007 MatchOk program [0..2]
+0004 Return PortId(0)
+0004 Return

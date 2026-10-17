@@ -14,8 +14,8 @@ b`;
 {
   "frag": {
     "kind": "string_fragment",
-    "span": [11, 14],
-    "text": "a\nb"
+    "text": "a\nb",
+    "span": [11, 14]
   }
 }
 -------------------- BYTECODE --------------------
@@ -50,25 +50,26 @@ Q:
   1  └‣─  (lexical_declaration)             2
   2  └‣─  (variable_declarator)             3
   3  └‣─  value: (template_string)          4
-  4  └‣─  (string_fragment) [Node RecordSet(M0)] == "a\nb"  6
+  4  └‣─  (string_fragment) [RecordSet(M0) Node] == "a\nb"  6
   6  ─‣┘⁴ _                                 7
   7                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (lexical_declaration)             02
-      ●   lexical_declaration
-  2       (variable_declarator)             03
-      ○   const
-      ●   variable_declarator
-  3       value: (template_string)          04
-      ○   identifier
-      ○   =
-      ●   template_string
-  4       (string_fragment) [Node RecordSet(M0)] == "a\nb"  06
-      ○   `
-      ●   string_fragment
-  6       _                                 07
-      ●   program
-  7   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..16]
+0001 Down Named(Some(NodeKindId(152)))
+0001 MatchOk lexical_declaration [0..16]
+0002 Down Named(Some(NodeKindId(154)))
+0002 MatchFail node#15 [0..5]
+0002 MatchOk variable_declarator [6..15]
+0003 Down Named(Some(NodeKindId(222)))
+0003 MatchFail node#1 [6..7]
+0003 MatchFail node#40 [8..9]
+0003 MatchOk template_string [10..15]
+0004 Down Named(Some(NodeKindId(130)))
+0004 MatchFail node#109 [10..11]
+0004 MatchOk string_fragment [11..14]
+0006 Up(4) Any
+0006 MatchOk program [0..16]
+0007 Return PortId(0)
+0007 Return

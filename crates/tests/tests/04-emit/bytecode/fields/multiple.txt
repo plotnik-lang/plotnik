@@ -24,8 +24,8 @@ Q:
   1                                         ▶
   2   !   (pair)                            5
   3  ─‣┘  _                                 1
-  4  ─‣─  value: (_) [Node RecordSet(value)]  3
-  5  └‣─  key: (_) [Node RecordSet(key)]    4
+  4  ─‣─  value: (_) [RecordSet(value) Node]  3
+  5  └‣─  key: (_) [RecordSet(key) Node]    4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -51,7 +51,7 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (pair)                            1
-  1  └‣─  key: (_) [Node RecordSet(M0)]     3
-  3  ─‣─  value: (_) [Node RecordSet(M1)]   5
+  1  └‣─  key: (_) [RecordSet(M0) Node]     3
+  3  ─‣─  value: (_) [RecordSet(M1) Node]   5
   5  ─‣┘  _                                 6
   6                                         ▶

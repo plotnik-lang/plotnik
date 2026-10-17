@@ -52,71 +52,70 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _                                14, 26
+  03  └─!  _                                23, 14
   05                                        ▶
   06  ─‣┘³ _                                05
   07  ...
-  08  ─‣─  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
-  11  ─•─  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
-  14   !   "["                              19, 21, 24
-  16  ──!  (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
-  19  ──!  (identifier) [BoolValue(1)] == "a"  11
-  21  ──!  (identifier) [BoolValue(1)] == "x"  08
-  23  ...
-  24  -ε-  [BoolValue(0)]                   16
-  26  ──!  _                                14, 26
+  08  ─‣─  (identifier) [BoolValue(1) RecordSet(M1) Node] == "b"  06
+  11  ─•─  (identifier) [BoolValue(1) RecordSet(M1) Node] == "b"  06
+  14  ──!  _                                23, 14
+  16  ──!  (identifier) [BoolValue(0) RecordSet(M1) Node] == "b"  06
+  19  ──!  (identifier) == "a"              11
+  21  ──!  (identifier) == "x"              08
+  23   !   "["                              24
+  24  -ε-  [RecordSet(M0)]                  19, 21, 16
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       _                                14, 26
-       ●   [
-  14       "["                              19, 21, 24
-       ●   [
-  19       (identifier) [BoolValue(1)] == "a"  11
-       ●   identifier
-  11       (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
-       ○   ,
-  14  ❮❮❮ 
-  21       (identifier) [BoolValue(1)] == "x"  08
-  14  ❮❮❮ 
-  24  -ε-  [BoolValue(0)]                   16
-  16       (identifier) [RecordSet(M0) Node RecordSet(M1)] == "b"  06
-  03  ❮❮❮ 
-  26       _                                14, 26
-       ●   identifier
-  14       "["                              19, 21, 24
-       ○   identifier
-  26  ❮❮❮ 
-  26       _                                14, 26
-       ●   ,
-  14       "["                              19, 21, 24
-       ○   ,
-  26  ❮❮❮ 
-  26       _                                14, 26
-       ●   identifier
-  14       "["                              19, 21, 24
-       ○   identifier
-  26  ❮❮❮ 
-  26       _                                14, 26
-       ●   ,
-  14       "["                              19, 21, 24
-       ○   ,
-  26  ❮❮❮ 
-  26       _                                14, 26
-       ●   identifier
-  14       "["                              19, 21, 24
-       ○   identifier
-  26  ❮❮❮ 
-  26       _                                14, 26
-       ●   ]
-  14       "["                              19, 21, 24
-       ○   ]
-  26  ❮❮❮ 
-  26       _                                14, 26
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..9]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0003 DownExact Any
+0003 MatchOk [ [0..1]
+0023 StayExact Anonymous(Some(NodeKindId(41)))
+0023 MatchOk [ [0..1]
+0024 Epsilon Any
+0019 NextExact Named(Some(NodeKindId(1)))
+0019 MatchOk identifier [1..2]
+0011 NextSkip Named(Some(NodeKindId(1)))
+0011 MatchFail node#8 [2..3]
+0011 Backtrack { to_record: 23 }
+0021 NextExact Named(Some(NodeKindId(1)))
+0021 Backtrack { to_record: 22 }
+0016 NextExact Named(Some(NodeKindId(1)))
+0016 Backtrack { to_record: 16 }
+0014 NextExact Any
+0014 MatchOk identifier [1..2]
+0023 StayExact Anonymous(Some(NodeKindId(41)))
+0023 MatchFail identifier [1..2]
+0023 Backtrack { to_record: 44 }
+0014 NextExact Any
+0014 MatchOk node#8 [2..3]
+0023 StayExact Anonymous(Some(NodeKindId(41)))
+0023 MatchFail node#8 [2..3]
+0023 Backtrack { to_record: 52 }
+0014 NextExact Any
+0014 MatchOk identifier [4..5]
+0023 StayExact Anonymous(Some(NodeKindId(41)))
+0023 MatchFail identifier [4..5]
+0023 Backtrack { to_record: 60 }
+0014 NextExact Any
+0014 MatchOk node#8 [5..6]
+0023 StayExact Anonymous(Some(NodeKindId(41)))
+0023 MatchFail node#8 [5..6]
+0023 Backtrack { to_record: 68 }
+0014 NextExact Any
+0014 MatchOk identifier [7..8]
+0023 StayExact Anonymous(Some(NodeKindId(41)))
+0023 MatchFail identifier [7..8]
+0023 Backtrack { to_record: 76 }
+0014 NextExact Any
+0014 MatchOk node#42 [8..9]
+0023 StayExact Anonymous(Some(NodeKindId(41)))
+0023 MatchFail node#42 [8..9]
+0023 Backtrack { to_record: 84 }
+0014 NextExact Any
+0014 Backtrack { to_record: 12 }
+0014 Backtrack { to_record: 8 }

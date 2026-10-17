@@ -11,9 +11,9 @@ Q:
   01                                        ▶
   02   !   (program)                        10, 04
   03  ─‣┘  _                                01
-  04  └‣─  (debugger_statement) [Absent RecordSet(id) Node RecordSet(n)]  03
-  05  ─‣─  (debugger_statement) [Node RecordSet(n)]  03
-  07   !   (lexical_declaration) [Node RecordSet(id)]  05
+  04  └‣─  (debugger_statement) [RecordSet(id) Absent RecordSet(n) Node]  03
+  05  ─‣─  (debugger_statement) [RecordSet(n) Node]  03
+  07   !   (lexical_declaration) [RecordSet(id) Node]  05
   09  ──!  _                                07, 09
   10  └─!  _                                07, 09
 -------------------- BYTECODE --------------------
@@ -45,9 +45,9 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        12, 03
   02                                        ▶
-  03  └‣─  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
-  06  ─‣─  (debugger_statement) [Node RecordSet(M1)]  14
-  08   !   (lexical_declaration) [Node RecordSet(M0)]  06
+  03  └‣─  (debugger_statement) [RecordSet(M0) Absent RecordSet(M1) Node]  14
+  06  ─‣─  (debugger_statement) [RecordSet(M1) Node]  14
+  08   !   (lexical_declaration) [RecordSet(M0) Node]  06
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  ─‣┘  _                                02

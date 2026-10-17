@@ -7,8 +7,8 @@ a; 1;
   "e": {
     "n": {
       "kind": "number",
-      "span": [3, 4],
-      "text": "1"
+      "text": "1",
+      "span": [3, 4]
     }
   }
 }
@@ -43,43 +43,39 @@ Q = 05 :: T2
 [instructions]
 E:
   00   !   (expression_statement)           01
-  01  └‣─  (number) [Node RecordSet(M0)]    03
+  01  └‣─  (number) [RecordSet(M0) Node]    03
   03  ─‣┘  _                                04
   04                                        ▶
 
 Q:
-  05   !   (program) [RecordOpen]           07
+  05   !   (program) [RecordSet(M1) RecordOpen]  07
   07  └‣─  (E)                              00 : 08
   08  -ε-  [RecordClose]                    10
-  10  ─‣┘  _ [RecordSet(M1)]                12
-  12                                        ▶
+  10  ─‣┘  _                                11
+  11                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  05       (program) [RecordOpen]           07
-       ●   program
-  07       (E)                              00 : 08
-       ▶   (E)
-
-E:
-  00       (expression_statement)           01
-       ●   expression_statement
-  01       (number) [Node RecordSet(M0)]    03
-       ○   identifier
-       ○   ;
-  07  ❮❮❮ 
-       ▶   (E)
-
-E:
-  00       (expression_statement)           01
-       ●   expression_statement
-  01       (number) [Node RecordSet(M0)]    03
-       ●   number
-  03       _                                04
-       ●   expression_statement
-  04   ◀   (E)                              
-
-Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
-       ●   program
-  12   ◀   (Q)                              ◼
+0005 ExecutionStarted { target: 5 }
+0005 StayExact Named(Some(NodeKindId(134)))
+0005 MatchOk program [0..5]
+0007 Call CodeAddr(0)
+0007 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(150)))
+0000 MatchOk expression_statement [0..2]
+0001 Down Named(Some(NodeKindId(114)))
+0001 MatchFail node#1 [0..1]
+0001 MatchFail node#24 [1..2]
+0001 Backtrack { to_record: 9 }
+0001 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(150)))
+0000 MatchOk expression_statement [3..5]
+0001 Down Named(Some(NodeKindId(114)))
+0001 MatchOk number [3..4]
+0003 Up(1) Any
+0003 MatchOk expression_statement [3..5]
+0004 Return PortId(0)
+0004 Return
+0008 Epsilon Any
+0010 Up(1) Any
+0010 MatchOk program [0..5]
+0011 Return PortId(0)
+0011 Return

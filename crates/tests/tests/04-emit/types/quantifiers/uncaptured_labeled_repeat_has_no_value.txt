@@ -16,5 +16,5 @@ warning: alternative labels have no output effect here: captures from the altern
   |
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q;

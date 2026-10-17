@@ -20,7 +20,7 @@ crc32fast = "1.4"
 indexmap = { version = "2", features = ["serde"] }
 log = "0.4"
 logos = "0.16.0"
-plotnik-runtime = { path = "../runtime", version = "0.4.0", default-features = false }
+plotnik-runtime = { path = "../runtime", version = "0.4.0", default-features = false, features = ["serde"] }
 regex-automata = { version = "0.4", features = ["dfa-search"] }
 regex-syntax = "0.8"
 rowan = "0.16.1"

@@ -1259,6 +1259,7 @@ dependencies = [
  "plotnik-compiler",
  "plotnik-macros",
  "plotnik-runtime",
+ "tree-sitter-javascript",
 ]
 
 [[package]]
@@ -1271,6 +1272,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "plotnik-compiler",
+ "plotnik-runtime",
  "serde_json",
  "tempfile",
  "ureq",
@@ -1319,10 +1321,11 @@ dependencies = [
 name = "plotnik-runtime"
 version = "0.4.0"
 dependencies = [
+ "cc",
  "regex-automata",
  "serde",
- "serde_json",
  "tree-sitter",
+ "tree-sitter-language",
 ]
 
 [[package]]
@@ -1353,7 +1356,9 @@ version = "0.4.0"
 dependencies = [
  "cargo_metadata",
  "cc",
+ "js-sys",
  "plotnik-compiler",
+ "plotnik-runtime",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

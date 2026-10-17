@@ -7,8 +7,8 @@ Q = (program
 --------------------- INPUT ----------------------
 --------------------- OUTPUT ---------------------
 {
-  "d": null,
-  "ids": []
+  "ids": [],
+  "d": null
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -38,23 +38,23 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00   !   (program)                        14, 16
+  00   !   (program)                        18, 12
   02                                        ▶
-  03  -ε-  [ListClose RecordSet(M0)]        07
+  03  -ε-  [ListClose]                      07
   05   !   (identifier) [Node ArrayPush]    08, 03
   07  ─‣┘  _                                02
   08  ──!  _                                05, 08
-  10   !   _ [ListOpen]                     05, 08
-  12  -ε-  [Absent RecordSet(M1)]           10
-  14  └─!  _                                12, 19, 22
-  16  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  02
-  19   !   (debugger_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  22  ──!  _                                12, 19, 22
+  10   !   _ [RecordSet(M0) ListOpen]       05, 08
+  12  -ε-  [RecordSet(M0) ListOpen ListClose]  02
+  14   !   (debugger_statement) [RecordSet(M1) Node]  07
+  16  ──!  _                                10, 14, 16
+  18  └─!  _                                10, 14, 16
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        14, 16
-       ●   program
-  14       _                                12, 19, 22
-  00  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  02
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..0]
+0018 DownExact Any
+0018 Backtrack { to_record: 5 }
+0012 Epsilon Any
+0002 Return PortId(0)
+0002 Return

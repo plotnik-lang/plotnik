@@ -9,11 +9,11 @@ Q = (Rec)
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Rec<'t> {
-    A { inner: ::std::boxed::Box<Rec<'t>> },
+#[derive(Clone, Copy)]
+pub enum Rec<'r, 't> {
+    A { inner: &'r Rec<'r, 't> },
     B { id: Node<'t> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q;

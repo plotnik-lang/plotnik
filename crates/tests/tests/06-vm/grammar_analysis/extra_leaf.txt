@@ -7,8 +7,8 @@ Q = (program
 {
   "comment": {
     "kind": "comment",
-    "span": [0, 7],
-    "text": "/* c */"
+    "text": "/* c */",
+    "span": [0, 7]
   }
 }
 -------------------- BYTECODE --------------------
@@ -34,18 +34,19 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (comment) [Node RecordSet(M0)]    3
+  1  └‣─  (comment) [RecordSet(M0) Node]    3
   3  └!┘  _                                 4
   4  ─‣┘  _                                 5
   5                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (comment) [Node RecordSet(M0)]    03
-      ●   comment
-  3       _                                 04
-      ●   comment
-  4       _                                 05
-      ●   program
-  5   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(108)))
+0001 MatchOk comment [0..7]
+0003 ChildlessExact Any
+0003 MatchOk comment [0..7]
+0004 Up(1) Any
+0004 MatchOk program [0..10]
+0005 Return PortId(0)
+0005 Return

@@ -8,17 +8,17 @@ Both = (pair
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Name<'t> {
     pub name: Node<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Value<'t> {
     pub value: Node<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Both<'t> {
     pub key: Node<'t>,
     pub val: Node<'t>,

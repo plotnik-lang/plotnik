@@ -14,8 +14,8 @@ Q:
   1                                         ▶
   2   !   (program)                         8
   3  ─‣┘  _                                 1
-  4  ─•─  (function_declaration) [Node RecordSet(f)]  3
-  5   !   (comment) [Node RecordSet(c)]     4
+  4  ─•─  (function_declaration) [RecordSet(f) Node]  3
+  5   !   (comment) [RecordSet(c) Node]     4
   7  ──!  _                                 5, 7
   8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
@@ -46,9 +46,9 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                08, 10
-  03  ─•─  (function_declaration) [Node RecordSet(M1)]  05
+  03  ─•─  (function_declaration) [RecordSet(M1) Node]  05
   05  ─‣┘  _                                06
   06                                        ▶
   07  ...
-  08   !   (comment) [Node RecordSet(M0)]   03
+  08   !   (comment) [RecordSet(M0) Node]   03
   10  ──!  _                                08, 10

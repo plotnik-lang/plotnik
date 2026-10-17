@@ -75,7 +75,12 @@ impl CaptureEffects {
     }
 
     pub fn post_attaches_value(&self) -> bool {
-        Self::effects_attach_value(&self.post)
+        self.pre
+            .iter()
+            .rev()
+            .find(|effect| !effect.is_span_marker())
+            .is_some_and(|effect| effect.kind() == EffectKind::RecordSet)
+            || Self::effects_attach_value(&self.post)
     }
 
     pub fn effects_attach_value(effects: &[EffectIR]) -> bool {
@@ -158,10 +163,6 @@ impl NfaBuilder<'_> {
         let mut effects = Vec::with_capacity(4);
         let mut member_ref = None;
 
-        if mechanism == CaptureKind::Node {
-            effects.push(EffectIR::node());
-        }
-
         if let Some(name_token) = capture.name() {
             let capture_name = &name_token.text()[1..];
             if let Some(RecordScope(type_id)) = self.scope_stack.last().copied()
@@ -178,6 +179,10 @@ impl NfaBuilder<'_> {
                 effects.push(EffectIR::with_member(EffectKind::RecordSet, member));
                 member_ref = Some(member);
             }
+        }
+
+        if mechanism == CaptureKind::Node {
+            effects.push(EffectIR::node());
         }
 
         if let Some(id) = self.span_id(capture.syntax(), SpanKind::Capture) {

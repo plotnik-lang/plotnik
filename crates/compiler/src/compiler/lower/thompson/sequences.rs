@@ -617,99 +617,116 @@ impl NfaBuilder<'_> {
                 targets,
             );
         }
-        let capture_effects = self.build_capture_effects(captured_pattern, mechanism);
-
-        if let Pattern::QuantifiedPattern(quantified) = &inner {
-            return match mechanism {
-                CaptureKind::List => self.compile_boundary_list_capture(
-                    quantified,
-                    input,
-                    entry,
-                    targets,
-                    capture_effects,
-                ),
-                CaptureKind::Node
-                | CaptureKind::Record
-                | CaptureKind::Ref
-                | CaptureKind::PendingValue => self.compile_boundary_optional_capture(
-                    quantified,
-                    input,
-                    entry,
-                    targets,
-                    capture_effects,
-                ),
-            };
-        }
-
-        if mechanism == CaptureKind::Ref
-            && let Pattern::DefRef(reference) = &inner
-        {
-            let def_id = self.expect_reference_target(reference);
-            return self.compile_boundary_captured_ref_call(
-                def_id,
-                input,
-                entry,
-                targets,
-                &capture_effects,
-            );
-        }
-
-        match mechanism {
-            CaptureKind::Record => {
-                let scope_type_id = self
-                    .ctx
-                    .analysis
-                    .type_analysis
-                    .expect_pattern_flow(&inner)
-                    .type_id();
-                let mut inner_targets = ExitMap::new();
-                for (port, &target) in targets.iter() {
-                    let close = self.emit_record_close_with_effects(
-                        ScopeCloseEffects {
-                            leading: &[],
-                            capture: &capture_effects,
-                            outer: &[],
-                        },
-                        target,
-                    );
-                    inner_targets.insert(port, close);
-                }
-                let inner_entry = self.with_scope_if_present(scope_type_id, |this| {
-                    this.compile_boundary_pattern_to(&inner, input, entry, &inner_targets, false)
-                })?;
-                Some(self.emit_record_open_with_pre(inner_entry, vec![]))
+        let mut capture_effects = self.build_capture_effects(captured_pattern, mechanism);
+        let mut selection = Vec::new();
+        capture_effects.retain(|effect| {
+            if effect.kind() == EffectKind::RecordSet {
+                selection.push(effect.clone());
+                false
+            } else {
+                true
             }
-            CaptureKind::Node | CaptureKind::Ref | CaptureKind::PendingValue => {
-                let capture = CaptureEffects::new_post(capture_effects.clone());
-                let mut inner_targets = ExitMap::new();
-                for (port, &target) in targets.iter() {
-                    let target = if port.consumed() || mechanism == CaptureKind::PendingValue {
-                        self.emit_effects_if_nonempty(target, capture_effects.clone())
-                    } else {
-                        self.emit_absence_for_skip_path(target, &capture)
-                    };
-                    inner_targets.insert(port, target);
-                }
-                if mechanism == CaptureKind::PendingValue
-                    && let Pattern::Alternation(alternation) = &inner
-                    && matches!(
-                        self.ctx.analysis.type_analysis.expect_pattern_flow(&inner),
-                        PatternFlow::Value(_)
-                    )
-                {
-                    return self.compile_boundary_labeled_alternation(
-                        alternation,
+        });
+        let value_entry = (|| {
+            if let Pattern::QuantifiedPattern(quantified) = &inner {
+                return match mechanism {
+                    CaptureKind::List => self.compile_boundary_list_capture(
+                        quantified,
                         input,
                         entry,
-                        &inner_targets,
-                    );
+                        targets,
+                        capture_effects,
+                    ),
+                    CaptureKind::Node
+                    | CaptureKind::Record
+                    | CaptureKind::Ref
+                    | CaptureKind::PendingValue => self.compile_boundary_optional_capture(
+                        quantified,
+                        input,
+                        entry,
+                        targets,
+                        capture_effects,
+                    ),
+                };
+            }
+
+            if mechanism == CaptureKind::Ref
+                && let Pattern::DefRef(reference) = &inner
+            {
+                let def_id = self.expect_reference_target(reference);
+                return self.compile_boundary_captured_ref_call(
+                    def_id,
+                    input,
+                    entry,
+                    targets,
+                    &capture_effects,
+                );
+            }
+
+            match mechanism {
+                CaptureKind::Record => {
+                    let scope_type_id = self
+                        .ctx
+                        .analysis
+                        .type_analysis
+                        .expect_pattern_flow(&inner)
+                        .type_id();
+                    let mut inner_targets = ExitMap::new();
+                    for (port, &target) in targets.iter() {
+                        let close = self.emit_record_close_with_effects(
+                            ScopeCloseEffects {
+                                leading: &[],
+                                capture: &capture_effects,
+                                outer: &[],
+                            },
+                            target,
+                        );
+                        inner_targets.insert(port, close);
+                    }
+                    let inner_entry = self.with_scope_if_present(scope_type_id, |this| {
+                        this.compile_boundary_pattern_to(
+                            &inner,
+                            input,
+                            entry,
+                            &inner_targets,
+                            false,
+                        )
+                    })?;
+                    Some(self.emit_record_open_with_pre(inner_entry, vec![]))
                 }
-                self.compile_boundary_pattern_to(&inner, input, entry, &inner_targets, false)
+                CaptureKind::Node | CaptureKind::Ref | CaptureKind::PendingValue => {
+                    let capture = CaptureEffects::new_post(capture_effects.clone());
+                    let mut inner_targets = ExitMap::new();
+                    for (port, &target) in targets.iter() {
+                        let target = if port.consumed() || mechanism == CaptureKind::PendingValue {
+                            self.emit_effects_if_nonempty(target, capture_effects.clone())
+                        } else {
+                            self.emit_absence_for_skip_path(target, &capture)
+                        };
+                        inner_targets.insert(port, target);
+                    }
+                    if mechanism == CaptureKind::PendingValue
+                        && let Pattern::Alternation(alternation) = &inner
+                        && matches!(
+                            self.ctx.analysis.type_analysis.expect_pattern_flow(&inner),
+                            PatternFlow::Value(_)
+                        )
+                    {
+                        return self.compile_boundary_labeled_alternation(
+                            alternation,
+                            input,
+                            entry,
+                            &inner_targets,
+                        );
+                    }
+                    self.compile_boundary_pattern_to(&inner, input, entry, &inner_targets, false)
+                }
+                CaptureKind::List => {
+                    unreachable!("a list capture is backed by a quantified pattern")
+                }
             }
-            CaptureKind::List => {
-                unreachable!("a list capture is backed by a quantified pattern")
-            }
-        }
+        })()?;
+        Some(self.wrap_entry_pre(value_entry, selection))
     }
 
     fn compile_boundary_alternation(

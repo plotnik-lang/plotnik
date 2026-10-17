@@ -11,22 +11,22 @@ K; K; k; q;
     {
       "id": {
         "kind": "identifier",
-        "span": [0, 1],
-        "text": "K"
+        "text": "K",
+        "span": [0, 1]
       }
     },
     {
       "id": {
         "kind": "identifier",
-        "span": [3, 6],
-        "text": "K"
+        "text": "K",
+        "span": [3, 6]
       }
     },
     {
       "id": {
         "kind": "identifier",
-        "span": [8, 9],
-        "text": "k"
+        "text": "k",
+        "span": [8, 9]
       }
     }
   ]
@@ -66,58 +66,59 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       16, 08
-  03  └‣─  (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
+  01  -ε-  [RecordSet(M1) ListOpen]         16, 08
+  03  └‣─  (identifier) [RecordSet(M0) Node] =~ /(?i)^k$/  05
   05  ─‣┘  _                                10
   06                                        ▶
   07  ...
-  08  -ε-  [ListClose RecordSet(M1)]        06
+  08  -ε-  [ListClose]                      06
   10  -ε-  [RecordClose ArrayPush]          14, 18
   12   !   (expression_statement) [RecordOpen]  03
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
-  18  ─‣┘  _ [ListClose RecordSet(M1)]      06
+  18  ─‣┘  _ [ListClose]                    06
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       16, 08
-  16       _                                12, 14
-       ●   expression_statement
-  12       (expression_statement) [RecordOpen]  03
-       ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
-       ●   identifier
-  05       _                                10
-       ●   expression_statement
-  10  -ε-  [RecordClose ArrayPush]          14, 18
-  14       _                                12, 14
-       ●   expression_statement
-  12       (expression_statement) [RecordOpen]  03
-       ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
-       ●   identifier
-  05       _                                10
-       ●   expression_statement
-  10  -ε-  [RecordClose ArrayPush]          14, 18
-  14       _                                12, 14
-       ●   expression_statement
-  12       (expression_statement) [RecordOpen]  03
-       ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
-       ●   identifier
-  05       _                                10
-       ●   expression_statement
-  10  -ε-  [RecordClose ArrayPush]          14, 18
-  14       _                                12, 14
-       ●   expression_statement
-  12       (expression_statement) [RecordOpen]  03
-       ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /(?i)^k$/  05
-       ○   ;
-  14  ❮❮❮ 
-  14       _                                12, 14
-  10  ❮❮❮ 
-  18       _ [ListClose RecordSet(M1)]      06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..13]
+0001 Epsilon Any
+0016 DownExact Any
+0016 MatchOk expression_statement [0..2]
+0012 StayExact Named(Some(NodeKindId(150)))
+0012 MatchOk expression_statement [0..2]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchOk identifier [0..1]
+0005 Up(1) Any
+0005 MatchOk expression_statement [0..2]
+0010 Epsilon Any
+0014 NextExact Any
+0014 MatchOk expression_statement [3..7]
+0012 StayExact Named(Some(NodeKindId(150)))
+0012 MatchOk expression_statement [3..7]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchOk identifier [3..6]
+0005 Up(1) Any
+0005 MatchOk expression_statement [3..7]
+0010 Epsilon Any
+0014 NextExact Any
+0014 MatchOk expression_statement [8..10]
+0012 StayExact Named(Some(NodeKindId(150)))
+0012 MatchOk expression_statement [8..10]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchOk identifier [8..9]
+0005 Up(1) Any
+0005 MatchOk expression_statement [8..10]
+0010 Epsilon Any
+0014 NextExact Any
+0014 MatchOk expression_statement [11..13]
+0012 StayExact Named(Some(NodeKindId(150)))
+0012 MatchOk expression_statement [11..13]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchFail node#24 [12..13]
+0003 Backtrack { to_record: 75 }
+0014 NextExact Any
+0014 Backtrack { to_record: 71 }
+0018 Up(1) Any
+0018 MatchOk program [0..13]
+0006 Return PortId(0)
+0006 Return

@@ -10,18 +10,18 @@ c
   "stmts": [
     {
       "kind": "expression_statement",
-      "span": [0, 1],
-      "text": "a"
+      "text": "a",
+      "span": [0, 1]
     },
     {
       "kind": "expression_statement",
-      "span": [2, 3],
-      "text": "b"
+      "text": "b",
+      "span": [2, 3]
     },
     {
       "kind": "expression_statement",
-      "span": [4, 5],
-      "text": "c"
+      "text": "c",
+      "span": [4, 5]
     }
   ]
 }
@@ -47,7 +47,12 @@ c
       0,
       5
     ],
-    "bindings": [],
+    "bindings": [
+      {
+        "path": "/stmts",
+        "event_index": 3
+      }
+    ],
     "range": [
       2,
       23
@@ -62,8 +67,8 @@ c
     ],
     "bindings": [],
     "range": [
-      4,
-      18
+      5,
+      19
     ]
   },
   {
@@ -76,12 +81,12 @@ c
     "bindings": [
       {
         "path": "/0",
-        "event_index": 7
+        "event_index": 8
       }
     ],
     "range": [
-      5,
-      9
+      6,
+      10
     ]
   },
   {
@@ -94,12 +99,12 @@ c
     "bindings": [
       {
         "path": "/1",
-        "event_index": 11
+        "event_index": 12
       }
     ],
     "range": [
-      9,
-      13
+      10,
+      14
     ]
   },
   {
@@ -112,26 +117,21 @@ c
     "bindings": [
       {
         "path": "/2",
-        "event_index": 15
+        "event_index": 16
       }
     ],
     "range": [
-      13,
-      17
+      14,
+      18
     ]
   },
   {
     "query_span_id": 2,
     "parent": 1,
     "source_span": null,
-    "bindings": [
-      {
-        "path": "/stmts",
-        "event_index": 20
-      }
-    ],
+    "bindings": [],
     "range": [
-      19,
+      20,
       22
     ]
   }
@@ -168,33 +168,33 @@ P4 pattern    15..37  source_id=0
 [instructions]
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  -ε-  [ListOpen SpanStart#3]           13, 05
-  04                                        ▶
-  05  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
-  08   !   (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
-  11  ──!  _                                08, 11
-  13  └─!  _                                08, 11
-  15  ...
-  16  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
+  02  -ε-  [RecordSet(M0) ListOpen SpanStart#3]  06, 08
+  05                                        ▶
+  06  └─!  _                                11, 14
+  08  -ε-  [SpanEnd#3 ListClose SpanStart#2 SpanEnd#2 SpanEnd#1 SpanEnd#0]  05
+  11   !   (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  14, 16
+  14  ──!  _                                11, 14
+  16  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 SpanEnd#2 SpanEnd#1 SpanEnd#0]  05
 --------------------- TRACE ----------------------
-Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
-       ●   program
-  02  -ε-  [ListOpen SpanStart#3]           13, 05
-  13       _                                08, 11
-       ●   expression_statement
-  08       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
-       ●   expression_statement
-  11       _                                08, 11
-       ●   expression_statement
-  08       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
-       ●   expression_statement
-  11       _                                08, 11
-       ●   expression_statement
-  08       (expression_statement) [SpanStartAt#4 Node ArrayPush SpanEnd#4]  11, 16
-       ●   expression_statement
-  11       _                                08, 11
-  08  ❮❮❮ 
-  16       _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(166)))
+0000 MatchOk program [0..5]
+0002 Epsilon Any
+0006 DownExact Any
+0006 MatchOk expression_statement [0..1]
+0011 StayExact Named(Some(NodeKindId(182)))
+0011 MatchOk expression_statement [0..1]
+0014 NextExact Any
+0014 MatchOk expression_statement [2..3]
+0011 StayExact Named(Some(NodeKindId(182)))
+0011 MatchOk expression_statement [2..3]
+0014 NextExact Any
+0014 MatchOk expression_statement [4..5]
+0011 StayExact Named(Some(NodeKindId(182)))
+0011 MatchOk expression_statement [4..5]
+0014 NextExact Any
+0014 Backtrack { to_record: 47 }
+0016 Up(1) Any
+0016 MatchOk program [0..5]
+0005 Return PortId(0)
+0005 Return

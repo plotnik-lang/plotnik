@@ -7,7 +7,7 @@ Q = (program
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t> {
     pub x: Node<'t>,
 }

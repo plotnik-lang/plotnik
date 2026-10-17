@@ -38,21 +38,20 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00   !   (program)                        14, 08
+  00   !   (program)                        12, 02
   02                                        ▶
-  03   !   (expression_statement)           16
+  03   !   (expression_statement)           14
   04  ──!  _                                03, 04
-  06   !   _ [Absent RecordSet(M0)]         03, 04
-  08  -ε-  [Absent RecordSet(M0)]           02
-  10   !   (debugger_statement) [Node RecordSet(M0)]  16
-  12  ──!  _                                06, 10, 12
-  14  └─!  _                                06, 10, 12
-  16  ─‣┘  _                                02
+  06   !   _                                03, 04
+  08   !   (debugger_statement) [RecordSet(M0) Node]  14
+  10  ──!  _                                06, 08, 10
+  12  └─!  _                                06, 08, 10
+  14  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        14, 08
-       ●   program
-  14       _                                06, 10, 12
-  00  ❮❮❮ 
-  08  -ε-  [Absent RecordSet(M0)]           02
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..0]
+0012 DownExact Any
+0012 Backtrack { to_record: 5 }
+0002 Return PortId(0)
+0002 Return

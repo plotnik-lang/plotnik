@@ -1,3 +1,6 @@
+use crate::LimitExceeded;
+use crate::alloc::{Buffer, Meter};
+
 /// Dense callee-local return port.
 ///
 /// Generalized callees expose only the ports they can reach, numbered from
@@ -125,16 +128,15 @@ impl std::error::Error for CallFrameError {}
 ///
 /// Popping moves the current pointer. Pruning removes frames no active
 /// checkpoint can restore.
-#[derive(Debug)]
 pub struct FrameArena {
-    frames: Vec<Frame>,
+    frames: Buffer<Frame>,
     current: Option<u32>,
 }
 
 impl FrameArena {
     pub fn new() -> Self {
         Self {
-            frames: Vec::new(),
+            frames: Buffer::new(),
             current: None,
         }
     }
@@ -146,15 +148,18 @@ impl FrameArena {
     }
 
     /// Push a new frame, returns its index.
-    pub fn push(&mut self, call_site: u16) -> Result<u32, CallFrameError> {
+    pub fn push(&mut self, meter: &mut Meter<'_>, call_site: u16) -> Result<u32, LimitExceeded> {
         let idx = u32::try_from(self.frames.len()).map_err(|_| CallFrameError::ArenaCapacity {
             call_site,
             existing_frames: self.frames.len(),
         })?;
-        self.frames.push(Frame {
-            call_site,
-            parent: self.current,
-        });
+        self.frames.push(
+            meter,
+            Frame {
+                call_site,
+                parent: self.current,
+            },
+        )?;
         self.current = Some(idx);
         Ok(idx)
     }
@@ -185,12 +190,6 @@ impl FrameArena {
     #[inline]
     pub fn current(&self) -> Option<u32> {
         self.current
-    }
-
-    /// Occupied frame bytes, excluding spare arena capacity.
-    #[inline]
-    pub fn byte_footprint(&self) -> u64 {
-        (self.frames.len() * std::mem::size_of::<Frame>()) as u64
     }
 
     #[inline]

@@ -14,13 +14,13 @@ debugger; debugger;
   "b": [
     {
       "kind": "debugger_statement",
-      "span": [0, 9],
-      "text": "debugger;"
+      "text": "debugger;",
+      "span": [0, 9]
     },
     {
       "kind": "debugger_statement",
-      "span": [10, 19],
-      "text": "debugger;"
+      "text": "debugger;",
+      "span": [10, 19]
     }
   ]
 }
@@ -54,42 +54,43 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        22, 16
   02                                        ▶
-  03  └•┘  _ [ListClose RecordSet(M1)]      02
+  03  └•┘  _ [ListClose]                    02
   05  ─•┘  _                                02
-  06  -ε-  [ListClose RecordSet(M1)]        05
+  06  -ε-  [ListClose]                      05
   08  └•─  (debugger_statement) [Node ArrayPush]  10, 06
   10  ─•─  (debugger_statement) [Node ArrayPush]  10, 06
-  12  -ε-  [ListOpen]                       08, 03
-  14  -ε-  [ListOpen]                       10, 06
-  16  -ε-  [Absent RecordSet(M0)]           12
-  18   !   (lexical_declaration) [Node RecordSet(M0)]  14
+  12  -ε-  [RecordSet(M1) ListOpen]         08, 03
+  14  -ε-  [RecordSet(M1) ListOpen]         10, 06
+  16  -ε-  [RecordSet(M0) Absent]           12
+  18   !   (lexical_declaration) [RecordSet(M0) Node]  14
   20  ──!  _                                18, 20
   22  └─!  _                                18, 20
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        22, 16
-       ●   program
-  22       _                                18, 20
-       ●   debugger_statement
-  18       (lexical_declaration) [Node RecordSet(M0)]  14
-       ○   debugger_statement
-  22  ❮❮❮ 
-  20       _                                18, 20
-       ●   debugger_statement
-  18       (lexical_declaration) [Node RecordSet(M0)]  14
-       ○   debugger_statement
-  20  ❮❮❮ 
-  20       _                                18, 20
-  00  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M0)]           12
-  12  -ε-  [ListOpen]                       08, 03
-  08       (debugger_statement) [Node ArrayPush]  10, 06
-       ●   debugger_statement
-  10       (debugger_statement) [Node ArrayPush]  10, 06
-       ●   debugger_statement
-  10       (debugger_statement) [Node ArrayPush]  10, 06
-  10  ❮❮❮ 
-  06  -ε-  [ListClose RecordSet(M1)]        05
-  05       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..19]
+0022 DownExact Any
+0022 MatchOk debugger_statement [0..9]
+0018 StayExact Named(Some(NodeKindId(152)))
+0018 MatchFail debugger_statement [0..9]
+0018 Backtrack { to_record: 9 }
+0020 NextExact Any
+0020 MatchOk debugger_statement [10..19]
+0018 StayExact Named(Some(NodeKindId(152)))
+0018 MatchFail debugger_statement [10..19]
+0018 Backtrack { to_record: 17 }
+0020 NextExact Any
+0020 Backtrack { to_record: 5 }
+0016 Epsilon Any
+0012 Epsilon Any
+0008 DownSkip Named(Some(NodeKindId(168)))
+0008 MatchOk debugger_statement [0..9]
+0010 NextSkip Named(Some(NodeKindId(168)))
+0010 MatchOk debugger_statement [10..19]
+0010 NextSkip Named(Some(NodeKindId(168)))
+0010 Backtrack { to_record: 43 }
+0006 Epsilon Any
+0005 UpSkipTrivia(1) Any
+0005 MatchOk program [0..19]
+0002 Return PortId(0)
+0002 Return

@@ -34,17 +34,18 @@ Q:
   7   !   "debugger"                        4
   8  ──!  _                                 7, 8
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (debugger_statement)              02
-      ●   debugger_statement
-  2       _                                 07, 08
-      ●   debugger
-  7       "debugger"                        04
-      ●   debugger
-  4       _                                 05
-      ●   debugger_statement
-  5       _                                 06
-      ●   program
-  6   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..16]
+0001 Down Named(Some(NodeKindId(168)))
+0001 MatchOk debugger_statement [0..16]
+0002 DownExact Any
+0002 MatchOk debugger [0..8]
+0007 StayExact Anonymous(Some(NodeKindId(32)))
+0007 MatchOk debugger [0..8]
+0004 UpSkipExtras(1) Any
+0004 MatchOk debugger_statement [0..16]
+0005 Up(1) Any
+0005 MatchOk program [0..16]
+0006 Return PortId(0)
+0006 Return

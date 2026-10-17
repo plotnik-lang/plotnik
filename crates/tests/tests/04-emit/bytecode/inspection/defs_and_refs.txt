@@ -12,13 +12,13 @@ Q     = 05
 [transitions]
 Ident:
   01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  02   !   (identifier) [RecordSet(name) Node]  01
 
 Q:
   04                                        ▶
   05   !   (program)                        07
-  07  └‣─  (expression_statement) [RecordOpen]  11
-  08  ─‣┘² _ [RecordSet(item)]              04
+  07  └‣─  (expression_statement) [RecordSet(item) RecordOpen]  11
+  08  ─‣┘² _                                04
   10  -ε-  [RecordClose]                    08
   11  └‣─  (Ident)                          02 : 10
 -------------------- BYTECODE --------------------
@@ -61,15 +61,15 @@ P7 ref        65..72  source_id=0  T1
 
 [instructions]
 Ident:
-  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 RecordSet(M0) Node SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
   04                                        ▶
 
 Q:
   05   !   (program) [SpanStart#3 SpanStartAt#4]  08
   07  ...
-  08  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#7 RecordOpen]  10
-  10  └‣─  (Ident)                          00 : 11
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘  _ [SpanStart#6 RecordSet(M1) SpanEnd#6 SpanEnd#7]  16
+  08  └‣─  (expression_statement) [SpanStartAt#5 RecordSet(M1) SpanStart#7 RecordOpen]  11
+  11  └‣─  (Ident)                          00 : 12
+  12  -ε-  [RecordClose]                    14
+  14  ─‣┘  _ [SpanStart#6 SpanEnd#6 SpanEnd#7]  16
   16  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  18
   18                                        ▶

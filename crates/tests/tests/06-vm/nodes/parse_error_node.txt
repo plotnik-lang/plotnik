@@ -5,8 +5,8 @@ Q = (program (ERROR) @err)
 {
   "err": {
     "kind": "ERROR",
-    "span": [0, 1],
-    "text": ")"
+    "text": ")",
+    "span": [0, 1]
   }
 }
 -------------------- BYTECODE --------------------
@@ -32,15 +32,16 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (ERROR) [Node RecordSet(M0)]      3
+  1  └‣─  (ERROR) [RecordSet(M0) Node]      3
   3  ─‣┘  _                                 4
   4                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (ERROR) [Node RecordSet(M0)]      03
-      ●   ERROR
-  3       _                                 04
-      ●   program
-  4   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 Down Named(Some(NodeKindId(65535)))
+0001 MatchOk node#65535 [0..1]
+0003 Up(1) Any
+0003 MatchOk program [0..2]
+0004 Return PortId(0)
+0004 Return

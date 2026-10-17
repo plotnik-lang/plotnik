@@ -53,7 +53,7 @@ Saved        = 03 :: T0
 
 [instructions]
 Name:
-  00   !   (identifier) [NodeText RecordSet(M0)]  02
+  00   !   (identifier) [RecordSet(M0) NodeText]  02
   02                                        ▶
 
 Saved:
@@ -66,27 +66,25 @@ Additional:
 
 <expression>:
   07   !   (program)                        08
-  08  └‣─  (expression_statement) [RecordOpen]  10
+  08  └‣─  (expression_statement) [RecordSet(M1) RecordOpen]  10
   10  └‣─  (Name)                           00 : 11
   11  -ε-  [RecordClose]                    13
-  13  ─‣┘² _ [RecordSet(M1)]                15
-  15                                        ▶
+  13  ─‣┘² _                                14
+  14                                        ▶
 --------------------- TRACE ----------------------
-<expression>:
-  07       (program)                        08
-       ●   program
-  08       (expression_statement) [RecordOpen]  10
-       ●   expression_statement
-  10       (Name)                           00 : 11
-       ▶   (Name)
-
-Name:
-  00       (identifier) [NodeText RecordSet(M0)]  02
-       ●   identifier
-  02   ◀   (Name)                           
-
-<expression>:
-  11  -ε-  [RecordClose]                    13
-  13       _ [RecordSet(M1)]                15
-       ●   program
-  15   ◀   (<expression>)                   ◼
+0007 ExecutionStarted { target: 7 }
+0007 StayExact Named(Some(NodeKindId(134)))
+0007 MatchOk program [0..7]
+0008 Down Named(Some(NodeKindId(150)))
+0008 MatchOk expression_statement [0..7]
+0010 Call CodeAddr(0)
+0010 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchOk identifier [0..6]
+0002 Return PortId(0)
+0002 Return
+0011 Epsilon Any
+0013 Up(2) Any
+0013 MatchOk program [0..7]
+0014 Return PortId(0)
+0014 Return

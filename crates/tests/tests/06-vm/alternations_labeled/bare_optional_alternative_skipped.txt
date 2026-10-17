@@ -44,28 +44,29 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        14, 10
-  02   !   (identifier) [Node RecordSet(M0)]  04
+  02   !   (identifier) [RecordSet(M0) Node]  04
   04  ─‣┘  _                                05
   05                                        ▶
   06  ──!  _                                02, 06
   08   !   _                                02, 06
-  10  -ε-  [Absent RecordSet(M0)]           05
+  10  -ε-  [RecordSet(M0) Absent]           05
   12  ──!  _                                08, 12
   14  └─!  _                                08, 12
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        14, 10
-       ●   program
-  14       _                                08, 12
-       ●   lexical_declaration
-  08       _                                02, 06
-       ●   lexical_declaration
-  02       (identifier) [Node RecordSet(M0)]  04
-       ○   lexical_declaration
-  08  ❮❮❮ 
-  06       _                                02, 06
-  14  ❮❮❮ 
-  12       _                                08, 12
-  00  ❮❮❮ 
-  10  -ε-  [Absent RecordSet(M0)]           05
-  05   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0014 DownExact Any
+0014 MatchOk node#152 [0..5]
+0008 StayExact Any
+0008 MatchOk node#152 [0..5]
+0002 StayExact Named(Some(NodeKindId(1)))
+0002 MatchFail node#152 [0..5]
+0002 Backtrack { to_record: 13 }
+0006 NextExact Any
+0006 Backtrack { to_record: 9 }
+0012 NextExact Any
+0012 Backtrack { to_record: 5 }
+0010 Epsilon Any
+0005 Return PortId(0)
+0005 Return

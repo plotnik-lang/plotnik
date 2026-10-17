@@ -16,8 +16,8 @@ class C { a(){}; b(){} }
   "m": {
     "name": {
       "kind": "property_identifier",
-      "span": [17, 18],
-      "text": "b"
+      "text": "b",
+      "span": [17, 18]
     }
   }
 }
@@ -57,7 +57,7 @@ Q      = 05 :: T2
 [instructions]
 Member:
   00   !   (method_definition)              01
-  01  └‣─  name: (property_identifier) [Node RecordSet(M0)] == "b"  03
+  01  └‣─  name: (property_identifier) [RecordSet(M0) Node] == "b"  03
   03  ─‣┘  _                                04
   04                                        ▶
 
@@ -65,44 +65,40 @@ Q:
   05   !   (program)                        06
   06  └‣─  (class_declaration)              08
   07  ...
-  08  └‣─  body: (class_body) [RecordOpen]  10
+  08  └‣─  body: (class_body) [RecordSet(M1) RecordOpen]  10
   10  └‣─  member: (Member)                 00 : 11
   11  -ε-  [RecordClose]                    13
-  13  ─‣┘³ _ [RecordSet(M1)]                15
-  15                                        ▶
+  13  ─‣┘³ _                                14
+  14                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  05       (program)                        06
-       ●   program
-  06       (class_declaration)              08
-       ●   class_declaration
-  08       body: (class_body) [RecordOpen]  10
-       ○   class
-       ○   identifier
-       ●   class_body
-  10       (Member)                         00 : 11
-       ▶   (Member)
-
-Member:
-  00       (method_definition)              01
-       ●   method_definition
-  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  03
-       ○   formal_parameters
-       ○   statement_block
-  10  ❮❮❮ 
-       ▶   (Member)
-
-Member:
-  00       (method_definition)              01
-       ●   method_definition
-  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  03
-       ●   property_identifier
-  03       _                                04
-       ●   method_definition
-  04   ◀   (Member)                         
-
-Q:
-  11  -ε-  [RecordClose]                    13
-  13       _ [RecordSet(M1)]                15
-       ●   program
-  15   ◀   (Q)                              ◼
+0005 ExecutionStarted { target: 5 }
+0005 StayExact Named(Some(NodeKindId(134)))
+0005 MatchOk program [0..24]
+0006 Down Named(Some(NodeKindId(198)))
+0006 MatchOk class_declaration [0..24]
+0008 Down Named(Some(NodeKindId(230)))
+0008 MatchFail node#54 [0..5]
+0008 MatchFail node#1 [6..7]
+0008 MatchOk class_body [8..24]
+0010 Call CodeAddr(0)
+0010 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(236)))
+0000 MatchOk method_definition [10..15]
+0001 Down Named(Some(NodeKindId(261)))
+0001 MatchFail node#232 [11..13]
+0001 MatchFail node#155 [13..15]
+0001 Backtrack { to_record: 25 }
+0001 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(236)))
+0000 MatchOk method_definition [17..22]
+0001 Down Named(Some(NodeKindId(261)))
+0001 MatchOk property_identifier [17..18]
+0003 Up(1) Any
+0003 MatchOk method_definition [17..22]
+0004 Return PortId(0)
+0004 Return
+0011 Epsilon Any
+0013 Up(3) Any
+0013 MatchOk program [0..24]
+0014 Return PortId(0)
+0014 Return

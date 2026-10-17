@@ -3,8 +3,7 @@ use std::thread;
 use indoc::indoc;
 use plotnik_compiler::bytecode::Module;
 use plotnik_compiler::{
-    BytecodeConfig, Colors, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM,
-    Value,
+    BytecodeConfig, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM,
 };
 
 mod support;
@@ -59,9 +58,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
                 match result {
                     Ok(_) => "matched",
                     Err(RuntimeError::NoMatch) => "no-match",
-                    Err(RuntimeError::OutOfFuel(_)) => "fuel",
-                    Err(RuntimeError::MemoryLimitExceeded { .. }) => "memory",
-                    Err(RuntimeError::CallFrame(_)) => "call-frame",
+                    Err(RuntimeError::Limit(_)) => "limit",
                 }
             })
             .expect("spawn deep-backtrack thread");
@@ -73,26 +70,44 @@ fn deep_backtrack_does_not_overflow_native_stack() {
 
 #[test]
 fn deep_value_render_and_drop_do_not_overflow_native_stack() {
-    const VALUE_DEPTH: usize = 200_000;
+    let module = compile(
+        "Rec = [Leaf: (number) @n Deep: (unary_expression (Rec) @inner)] Top = (program (expression_statement (Rec) @value))",
+    );
+    let source = format!("{}1", "!".repeat(DEPTH));
+    let tree = support::parse_javascript(&source);
+    let entry = module.entrypoint("Top").unwrap();
 
-    let len = thread::scope(|scope| {
+    let rendered = thread::scope(|scope| {
         let handle = thread::Builder::new()
             .name("deep-value".into())
             .stack_size(STACK_SIZE)
             .spawn_scoped(scope, || {
-                let mut value = Value::Absent;
-                for _ in 0..VALUE_DEPTH {
-                    value = Value::Record(vec![("inner", value)]);
-                }
-                let rendered = value.format(false, Colors::new(false));
-                rendered.len()
+                let document = VM::builder(&source, &tree)
+                    .limits(RuntimeLimitSpec {
+                        fuel_limit: Limit::Unbounded,
+                        memory: Limit::Unbounded,
+                    })
+                    .build()
+                    .execute(&module, &entry)
+                    .unwrap();
+                let mut rendered = String::new();
+                document
+                    .write_json(plotnik_runtime::json::Style::COMPACT, &mut rendered)
+                    .unwrap();
+                rendered
             })
             .expect("spawn deep-value thread");
         handle.join().expect("deep-value thread did not abort")
     });
 
-    assert!(
-        len > VALUE_DEPTH,
-        "expected rendered output longer than {VALUE_DEPTH}, saw {len}"
-    );
+    let mut expected = String::from("{\"value\":");
+    for _ in 0..DEPTH {
+        expected.push_str("{\"$tag\":\"Deep\",\"$data\":{\"inner\":");
+    }
+    expected.push_str(&format!("{{\"$tag\":\"Leaf\",\"$data\":{{\"n\":{{\"kind\":\"number\",\"text\":\"1\",\"span\":[{DEPTH}, {}]}}}}}}", DEPTH + 1));
+    for _ in 0..DEPTH {
+        expected.push_str("}}");
+    }
+    expected.push('}');
+    assert_eq!(rendered, expected);
 }

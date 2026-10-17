@@ -23,12 +23,12 @@ Q = 02
 [transitions]
 Q:
   01                                        ▶
-  02   !   (program)                        10
+  02   !   (program)                        11
   03  ─‣┘  _                                01
-  05   !   (expression_statement) [BoolValue(1) RecordSet(seen)]  03
-  06   !   (comment) [BoolValue(0) RecordSet(seen)]  03
-  09  ──!  _                                05, 06, 09
-  10  └─!  _                                05, 06, 09
+  05   !   (expression_statement) [RecordSet(seen) BoolValue(1)]  03
+  07   !   (comment) [RecordSet(seen) BoolValue(0)]  03
+  10  ──!  _                                05, 07, 10
+  11  └─!  _                                05, 07, 10
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -56,7 +56,7 @@ Q:
   00   !   (program)                        01
   01  └─!  _                                04, 06, 08
   03                                        ▶
-  04   !   (expression_statement) [BoolValue(1) RecordSet(M0)]  10
-  06   !   (comment) [BoolValue(0) RecordSet(M0)]  10
+  04   !   (expression_statement) [RecordSet(M0) BoolValue(1)]  10
+  06   !   (comment) [RecordSet(M0) BoolValue(0)]  10
   08  ──!  _                                04, 06, 08
   10  ─‣┘  _                                03

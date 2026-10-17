@@ -8,7 +8,7 @@ Q     = 5
 [transitions]
 Inner:
   1                                         ▶
-  2   !   (identifier) [Node RecordSet(name)]  1
+  2   !   (identifier) [RecordSet(name) Node]  1
 
 Q:
   4                                         ▶
@@ -41,7 +41,7 @@ Q     = 3 :: T0
 
 [instructions]
 Inner:
-  0   !   (identifier) [Node RecordSet(M0)]  2
+  0   !   (identifier) [RecordSet(M0) Node]  2
   2                                         ▶
 
 Q:

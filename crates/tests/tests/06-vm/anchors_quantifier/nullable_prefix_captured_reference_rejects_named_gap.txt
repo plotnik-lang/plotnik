@@ -60,90 +60,87 @@ Q:
   05                                        ▶
   06  ─‣┘³ _                                05
   07  ...
-  08  ─‣─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
-  11  ─•─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
-  14   !   "[" [RecordOpen]                 40
-  16  ─◦─  (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
+  08  ─‣─  (identifier) [RecordClose RecordSet(M3) Node] == "b"  06
+  11  ─•─  (identifier) [RecordClose RecordSet(M3) Node] == "b"  06
+  14   !   "[" [RecordSet(M2) RecordOpen]   40
+  16  ─◦─  (identifier) [RecordClose RecordSet(M3) Node] == "b"  06
   19                                        ▶
   20                                        ▶ p1
   21                                        ▶ p2
-  22  -ε-  [Absent RecordSet(M1)]           20
-  24  ─•─  (identifier) [Node RecordSet(M1)] == "x"  19
-  26  -ε-  [Absent RecordSet(M1)]           21
-  28  ─◦─  (identifier) [Node RecordSet(M1)] == "x"  19
-  30  -ε-  [Absent RecordSet(M0)]           28, 26
-  32   !   (identifier) [Node RecordSet(M0)] == "a"  24, 22
+  22  -ε-  [RecordSet(M1) Absent]           20
+  24  ─•─  (identifier) [RecordSet(M1) Node] == "x"  19
+  26  -ε-  [RecordSet(M1) Absent]           21
+  28  ─◦─  (identifier) [RecordSet(M1) Node] == "x"  19
+  30  -ε-  [RecordSet(M0) Absent]           28, 26
+  32   !   (identifier) [RecordSet(M0) Node] == "a"  24, 22
   35  ──!  _                                32, 35
   37  -ε-                                   35, 30
   39  ...
   40       (@37)                            37 : 08 / 11 / 16
   43  ──!  _                                14, 43
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       _                                14, 43
-       ●   [
-  14       "[" [RecordOpen]                 40
-       ●   [
-  40       (@37)                            37 : 08 / 11 / 16
-       ▶   (@37)
-
-@37:
-  37  -ε-                                   35, 30
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  24, 22
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ,
-  32       (identifier) [Node RecordSet(M0)] == "a"  24, 22
-       ○   ,
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   identifier
-  32       (identifier) [Node RecordSet(M0)] == "a"  24, 22
-  35  ❮❮❮ 
-  35       _                                32, 35
-       ●   ]
-  32       (identifier) [Node RecordSet(M0)] == "a"  24, 22
-       ○   ]
-  35  ❮❮❮ 
-  35       _                                32, 35
-  37  ❮❮❮ 
-  30  -ε-  [Absent RecordSet(M0)]           28, 26
-  28       (identifier) [Node RecordSet(M1)] == "x"  19
-  30  ❮❮❮ 
-  26  -ε-  [Absent RecordSet(M1)]           21
-  21   ◀   (@37)                            p2
-
-Q:
-  16       (identifier) [RecordClose RecordSet(M2) Node RecordSet(M3)] == "b"  06
-  03  ❮❮❮ 
-  43       _                                14, 43
-       ●   identifier
-  14       "[" [RecordOpen]                 40
-       ○   identifier
-  43  ❮❮❮ 
-  43       _                                14, 43
-       ●   ,
-  14       "[" [RecordOpen]                 40
-       ○   ,
-  43  ❮❮❮ 
-  43       _                                14, 43
-       ●   identifier
-  14       "[" [RecordOpen]                 40
-       ○   identifier
-  43  ❮❮❮ 
-  43       _                                14, 43
-       ●   ]
-  14       "[" [RecordOpen]                 40
-       ○   ]
-  43  ❮❮❮ 
-  43       _                                14, 43
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..6]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..6]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..6]
+0003 DownExact Any
+0003 MatchOk [ [0..1]
+0014 StayExact Anonymous(Some(NodeKindId(41)))
+0014 MatchOk [ [0..1]
+0040 Call CodeAddr(37)
+0040 Call { target: 37 }
+0037 Epsilon Any
+0035 NextExact Any
+0035 MatchOk identifier [1..2]
+0032 StayExact Named(Some(NodeKindId(1)))
+0032 Backtrack { to_record: 29 }
+0035 NextExact Any
+0035 MatchOk node#8 [2..3]
+0032 StayExact Named(Some(NodeKindId(1)))
+0032 MatchFail node#8 [2..3]
+0032 Backtrack { to_record: 37 }
+0035 NextExact Any
+0035 MatchOk identifier [4..5]
+0032 StayExact Named(Some(NodeKindId(1)))
+0032 Backtrack { to_record: 45 }
+0035 NextExact Any
+0035 MatchOk node#42 [5..6]
+0032 StayExact Named(Some(NodeKindId(1)))
+0032 MatchFail node#42 [5..6]
+0032 Backtrack { to_record: 53 }
+0035 NextExact Any
+0035 Backtrack { to_record: 25 }
+0030 Epsilon Any
+0028 NextSkipExtras Named(Some(NodeKindId(1)))
+0028 Backtrack { to_record: 64 }
+0026 Epsilon Any
+0021 Return PortId(2)
+0021 Return
+0016 NextSkipExtras Named(Some(NodeKindId(1)))
+0016 Backtrack { to_record: 16 }
+0043 NextExact Any
+0043 MatchOk identifier [1..2]
+0014 StayExact Anonymous(Some(NodeKindId(41)))
+0014 MatchFail identifier [1..2]
+0014 Backtrack { to_record: 81 }
+0043 NextExact Any
+0043 MatchOk node#8 [2..3]
+0014 StayExact Anonymous(Some(NodeKindId(41)))
+0014 MatchFail node#8 [2..3]
+0014 Backtrack { to_record: 89 }
+0043 NextExact Any
+0043 MatchOk identifier [4..5]
+0014 StayExact Anonymous(Some(NodeKindId(41)))
+0014 MatchFail identifier [4..5]
+0014 Backtrack { to_record: 97 }
+0043 NextExact Any
+0043 MatchOk node#42 [5..6]
+0014 StayExact Anonymous(Some(NodeKindId(41)))
+0014 MatchFail node#42 [5..6]
+0014 Backtrack { to_record: 105 }
+0043 NextExact Any
+0043 Backtrack { to_record: 12 }
+0043 Backtrack { to_record: 8 }

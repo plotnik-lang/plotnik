@@ -34,9 +34,10 @@ Q:
   7  ...
   8  └─!  _                                 2, 5
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         08, 04
-      ●   program
-  8       _                                 02, 05
-  0  ❮❮❮ 
-  4   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..0]
+0008 DownExact Any
+0008 Backtrack { to_record: 4 }
+0004 Return PortId(0)
+0004 Return

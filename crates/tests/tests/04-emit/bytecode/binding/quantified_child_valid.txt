@@ -8,11 +8,11 @@ Q = 2
 [transitions]
 Q:
   1                                         ▶
-  2   !   (statement_block) [Node RecordSet(block)]  9
-  3  ─‣┘  _ [ListClose RecordSet(fns)]      1
+  2   !   (statement_block) [RecordSet(block) Node]  9
+  3  ─‣┘  _ [ListClose]                     1
   6   !   (function_declaration) [Node ArrayPush]  8, 3
   8  ──!  _                                 6, 8
-  9  └─!  _ [ListOpen]                      6, 8
+  9  └─!  _ [RecordSet(fns) ListOpen]       6, 8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -39,10 +39,10 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00   !   (statement_block) [Node RecordSet(M0)]  02
-  02  └─!  _ [ListOpen]                     05, 08
+  00   !   (statement_block) [RecordSet(M0) Node]  02
+  02  └─!  _ [RecordSet(M1) ListOpen]       05, 08
   04                                        ▶
   05   !   (function_declaration) [Node ArrayPush]  08, 10
   07  ...
   08  ──!  _                                05, 08
-  10  ─‣┘  _ [ListClose RecordSet(M1)]      04
+  10  ─‣┘  _ [ListClose]                    04

@@ -10,8 +10,8 @@ debugger;
 {
   "d": {
     "kind": "debugger_statement",
-    "span": [0, 9],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [0, 9]
   }
 }
 -------------------- BYTECODE --------------------
@@ -43,18 +43,19 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        03, 10
   02                                        ▶
-  03  └‣─  (debugger_statement) [Node RecordSet(M0)]  12
-  05  ─‣─  (debugger_statement) [Node RecordSet(M0)]  12
+  03  └‣─  (debugger_statement) [RecordSet(M0) Node]  12
+  05  ─‣─  (debugger_statement) [RecordSet(M0) Node]  12
   07   !   (expression_statement)           05
   08  ──!  _                                07, 08
   10  └─!  _                                07, 08
   12  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        03, 10
-       ●   program
-  03       (debugger_statement) [Node RecordSet(M0)]  12
-       ●   debugger_statement
-  12       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0003 Down Named(Some(NodeKindId(168)))
+0003 MatchOk debugger_statement [0..9]
+0012 Up(1) Any
+0012 MatchOk program [0..9]
+0002 Return PortId(0)
+0002 Return

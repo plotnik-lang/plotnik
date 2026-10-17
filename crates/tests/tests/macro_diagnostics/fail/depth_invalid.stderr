@@ -1,5 +1,5 @@
-error: `depth` needs an unsigned integer or `auto`
- --> tests/macro_diagnostics/fail/depth_invalid.rs:4:13
+error: unknown argument `depth`; `query!` accepts `grammar`, `file`, `fuel`, `memory`, and the query string
+ --> tests/macro_diagnostics/fail/depth_invalid.rs:4:5
   |
 4 |     depth = nope,
-  |             ^^^^
+  |     ^^^^^

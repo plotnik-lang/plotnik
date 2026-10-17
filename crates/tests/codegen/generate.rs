@@ -60,11 +60,7 @@ pub(crate) fn source(case: &Case) -> Result<(String, bool), String> {
     );
 
     let emission = compiled
-        .emit(
-            RustCodegenConfig::new()
-                .serde(true)
-                .provenance(CodegenProvenance::Full),
-        )
+        .emit(RustCodegenConfig::new().provenance(CodegenProvenance::Full))
         .map_err(|error| format!("emit Rust matcher for `{}`: {error}", case.relative))?;
     if !emission.diagnostics().is_empty() {
         eprint!(

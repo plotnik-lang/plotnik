@@ -42,25 +42,27 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00   !   (program)                        14, 08
-  02  ─‣─  (debugger_statement) [Node RecordSet(M1)]  04
-  04  ─‣┘  _ [RecordClose RecordSet(M2)]    06
-  06                                        ▶
-  07  ...
-  08  -ε-  [Absent RecordSet(M2)]           06
-  10   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  02
+  00   !   (program)                        01
+  01  -ε-  [RecordSet(M2)]                  14, 08
+  03  ─‣─  (debugger_statement) [RecordSet(M1) Node]  05
+  05  ─‣┘  _ [RecordClose]                  07
+  07                                        ▶
+  08  -ε-  [Absent]                         07
+  10   !   (expression_statement) [RecordOpen RecordSet(M0) Node]  03
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        14, 08
-       ●   program
-  14       _                                10, 12
-       ●   class_declaration
-  10       (expression_statement) [RecordOpen Node RecordSet(M0)]  02
-       ○   class_declaration
-  14  ❮❮❮ 
-  12       _                                10, 12
-  00  ❮❮❮ 
-  08  -ε-  [Absent RecordSet(M2)]           06
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Epsilon Any
+0014 DownExact Any
+0014 MatchOk node#198 [0..10]
+0010 StayExact Named(Some(NodeKindId(150)))
+0010 MatchFail node#198 [0..10]
+0010 Backtrack { to_record: 11 }
+0012 NextExact Any
+0012 Backtrack { to_record: 7 }
+0008 Epsilon Any
+0007 Return PortId(0)
+0007 Return

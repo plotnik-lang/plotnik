@@ -4,20 +4,35 @@ use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{TypeId, TypeShape};
 
 pub(super) struct TypeFacts {
-    lifetimes: HashMap<TypeId, LifetimeUsage>,
     by_value_closures: HashMap<TypeId, HashSet<TypeId>>,
 }
 
+/// Which lifetimes a generated type mentions: `'r` (result storage, for
+/// lists and references to recursive values), `'t` (tree) and `'s` (source).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) struct LifetimeUsage {
-    pub(super) tree: bool,
-    pub(super) source: bool,
+pub(crate) struct LifetimeUsage {
+    pub(crate) rows: bool,
+    pub(crate) tree: bool,
+    pub(crate) source: bool,
 }
 
 impl LifetimeUsage {
-    fn merge(&mut self, other: Self) {
-        self.tree |= other.tree;
-        self.source |= other.source;
+    /// Generic parameter list, `'r` first, with `storage` naming `'r`.
+    pub(crate) fn params(self, storage: &str) -> String {
+        let mut params = Vec::new();
+        if self.rows {
+            params.push(storage);
+        }
+        if self.tree {
+            params.push("'t");
+        }
+        if self.source {
+            params.push("'s");
+        }
+        if params.is_empty() {
+            return String::new();
+        }
+        format!("<{}>", params.join(", "))
     }
 }
 
@@ -25,16 +40,8 @@ impl TypeFacts {
     pub(super) fn compute(types: &TypeAnalysis) -> Self {
         let reachable = collect_reachable(types);
         Self {
-            lifetimes: lifetime_fixpoint(types, &reachable),
             by_value_closures: ref_target_closures(types, &reachable),
         }
-    }
-
-    pub(super) fn lifetime_usage(&self, ty: TypeId) -> LifetimeUsage {
-        *self
-            .lifetimes
-            .get(&ty)
-            .expect("lifetime facts cover every type reachable from a definition output")
     }
 
     pub(super) fn is_boxed_in(&self, item_ty: TypeId, ref_ty: TypeId) -> bool {
@@ -66,47 +73,6 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
     }
 
     out
-}
-
-fn lifetime_fixpoint(types: &TypeAnalysis, reachable: &[TypeId]) -> HashMap<TypeId, LifetimeUsage> {
-    let mut facts: HashMap<TypeId, LifetimeUsage> = reachable
-        .iter()
-        .map(|&ty| (ty, LifetimeUsage::default()))
-        .collect();
-
-    loop {
-        let mut changed = false;
-        for &ty in reachable {
-            let mut usage = match types.expect_type_shape(ty) {
-                TypeShape::Node => LifetimeUsage {
-                    tree: true,
-                    source: false,
-                },
-                TypeShape::Text => LifetimeUsage {
-                    tree: false,
-                    source: true,
-                },
-                TypeShape::Ref(declaration) => match types.declaration_body(*declaration) {
-                    None => LifetimeUsage {
-                        tree: true,
-                        source: false,
-                    },
-                    Some(target) => facts[&target],
-                },
-                _ => LifetimeUsage::default(),
-            };
-            for child in types.expect_type_shape(ty).child_type_ids() {
-                usage.merge(facts[&child]);
-            }
-            if usage != facts[&ty] {
-                facts.insert(ty, usage);
-                changed = true;
-            }
-        }
-        if !changed {
-            return facts;
-        }
-    }
 }
 
 fn ref_target_closures(

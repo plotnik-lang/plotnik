@@ -52,7 +52,7 @@ Q = 03 :: T2
 
 [instructions]
 B:
-  00   !   (identifier) [Node RecordSet(M0)] == "b"  02
+  00   !   (identifier) [RecordSet(M0) Node] == "b"  02
   02                                        ▶
 
 Q:
@@ -60,50 +60,48 @@ Q:
   04  └‣─  (expression_statement)           05
   05  └‣─  (call_expression)                06
   06  └‣─  arguments: (arguments)           20, 22
-  08  -ε-  [RecordClose RecordSet(M1)]      10
+  08  -ε-  [RecordClose]                    10
   10  ─‣┘⁴ _                                11
   11                                        ▶
   12                                        ▶
-  13  ─•─  (identifier) [Node RecordSet(M0)] == "b"  12
+  13  ─•─  (identifier) [RecordSet(M0) Node] == "b"  12
   15       (@13)                            13 : 08
   16                                        ▶
-  17  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  16
+  17  ─◦─  (identifier) [RecordSet(M0) Node] == "b"  16
   19       (@17)                            17 : 08
-  20  └‣─  (identifier) [RecordOpen] == "a"  15
-  22  └‣─  ";" [RecordOpen]                 19
+  20  └‣─  (identifier) [RecordSet(M1) RecordOpen] == "a"  15
+  22  └‣─  ";" [RecordSet(M1) RecordOpen]   19
 --------------------- TRACE ----------------------
-Q:
-  03       (program)                        04
-       ●   program
-  04       (expression_statement)           05
-       ●   expression_statement
-  05       (call_expression)                06
-       ●   call_expression
-  06       arguments: (arguments)           20, 22
-       ○   identifier
-       ●   arguments
-  20       (identifier) [RecordOpen] == "a"  15
-       ○   (
-       ●   identifier
-  15       (@13)                            13 : 08
-       ▶   (@13)
-
-@13:
-  13       (identifier) [Node RecordSet(M0)] == "b"  12
-       ○   ,
-  20  ❮❮❮ 
-       ○   ,
-       ○   ,
-       ○   )
-  06  ❮❮❮ 
-  22       ";" [RecordOpen]                 19
-       ○   (
-       ○   identifier
-       ○   ,
-       ○   identifier
-       ○   ,
-       ○   identifier
-       ○   )
-  06  ❮❮❮ 
-  05  ❮❮❮ 
-  04  ❮❮❮ 
+0003 ExecutionStarted { target: 3 }
+0003 StayExact Named(Some(NodeKindId(134)))
+0003 MatchOk program [0..10]
+0004 Down Named(Some(NodeKindId(150)))
+0004 MatchOk expression_statement [0..10]
+0005 Down Named(Some(NodeKindId(205)))
+0005 MatchOk call_expression [0..10]
+0006 Down Named(Some(NodeKindId(226)))
+0006 MatchFail identifier [0..1]
+0006 MatchOk arguments [1..10]
+0020 Down Named(Some(NodeKindId(1)))
+0020 MatchFail node#23 [1..2]
+0020 MatchOk identifier [2..3]
+0015 Call CodeAddr(13)
+0015 Call { target: 13 }
+0013 NextSkip Named(Some(NodeKindId(1)))
+0013 MatchFail node#8 [3..4]
+0013 Backtrack { to_record: 26 }
+0013 MatchFail node#8 [3..4]
+0013 MatchFail node#8 [6..7]
+0013 MatchFail node#25 [9..10]
+0013 Backtrack { to_record: 20 }
+0022 Down Anonymous(Some(NodeKindId(24)))
+0022 MatchFail node#23 [1..2]
+0022 MatchFail identifier [2..3]
+0022 MatchFail node#8 [3..4]
+0022 MatchFail identifier [5..6]
+0022 MatchFail node#8 [6..7]
+0022 MatchFail identifier [8..9]
+0022 MatchFail node#25 [9..10]
+0022 Backtrack { to_record: 19 }
+0022 Backtrack { to_record: 12 }
+0022 Backtrack { to_record: 8 }

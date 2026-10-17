@@ -11,14 +11,14 @@ let a; foo; bar;
   "decls": [
     {
       "kind": "lexical_declaration",
-      "span": [0, 6],
-      "text": "let a;"
+      "text": "let a;",
+      "span": [0, 6]
     }
   ],
   "x": {
     "kind": "expression_statement",
-    "span": [7, 11],
-    "text": "foo;"
+    "text": "foo;",
+    "span": [7, 11]
   }
 }
 -------------------- BYTECODE --------------------
@@ -48,38 +48,38 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       16, 04
+  01  -ε-  [RecordSet(M0) ListOpen]         12, 04
   03                                        ▶
-  04  └‣─  (_) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  07  ─‣┘  _                                03
-  08  ─‣─  (_) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  11   !   (lexical_declaration) [Node ArrayPush]  13, 08
-  13  ──!  _                                11, 13
-  15  ...
-  16  └─!  _                                11, 13
+  04  └‣─  (_) [ListClose RecordSet(M1) Node]  14
+  06  ─‣─  (_) [ListClose RecordSet(M1) Node]  14
+  08   !   (lexical_declaration) [Node ArrayPush]  10, 06
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       16, 04
-  16       _                                11, 13
-       ●   lexical_declaration
-  11       (lexical_declaration) [Node ArrayPush]  13, 08
-       ●   lexical_declaration
-  13       _                                11, 13
-       ●   expression_statement
-  11       (lexical_declaration) [Node ArrayPush]  13, 08
-       ○   expression_statement
-  13  ❮❮❮ 
-  13       _                                11, 13
-       ●   expression_statement
-  11       (lexical_declaration) [Node ArrayPush]  13, 08
-       ○   expression_statement
-  13  ❮❮❮ 
-  13       _                                11, 13
-  11  ❮❮❮ 
-  08       (_) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
-       ●   expression_statement
-  07       _                                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..16]
+0001 Epsilon Any
+0012 DownExact Any
+0012 MatchOk lexical_declaration [0..6]
+0008 StayExact Named(Some(NodeKindId(152)))
+0008 MatchOk lexical_declaration [0..6]
+0010 NextExact Any
+0010 MatchOk node#150 [7..11]
+0008 StayExact Named(Some(NodeKindId(152)))
+0008 MatchFail node#150 [7..11]
+0008 Backtrack { to_record: 22 }
+0010 NextExact Any
+0010 MatchOk node#150 [12..16]
+0008 StayExact Named(Some(NodeKindId(152)))
+0008 MatchFail node#150 [12..16]
+0008 Backtrack { to_record: 30 }
+0010 NextExact Any
+0010 Backtrack { to_record: 18 }
+0006 Next Named(None)
+0006 MatchOk node#150 [7..11]
+0014 Up(1) Any
+0014 MatchOk program [0..16]
+0003 Return PortId(0)
+0003 Return

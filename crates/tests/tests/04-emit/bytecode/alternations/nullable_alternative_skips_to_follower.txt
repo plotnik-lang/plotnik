@@ -14,8 +14,8 @@ Q:
   01                                        ▶
   02   !   (array)                          20, 04
   03  ─‣┘  _                                01
-  04  └‣─  (string) [Node RecordSet(s)]     03
-  05  ─‣─  (string) [Node RecordSet(s)]     03
+  04  └‣─  (string) [RecordSet(s) Node]     03
+  05  ─‣─  (string) [RecordSet(s) Node]     03
   06   !   (identifier)                     05
   08  ──!  _                                06, 08
   09   !   _                                06, 08
@@ -49,8 +49,8 @@ Q = 00 :: T1
 Q:
   00   !   (array)                          16, 03
   02                                        ▶
-  03  └‣─  (string) [Node RecordSet(M0)]    15
-  05  ─‣─  (string) [Node RecordSet(M0)]    15
+  03  └‣─  (string) [RecordSet(M0) Node]    15
+  05  ─‣─  (string) [RecordSet(M0) Node]    15
   07   !   (identifier)                     05
   08  ──!  _                                07, 08
   10   !   _                                07, 08

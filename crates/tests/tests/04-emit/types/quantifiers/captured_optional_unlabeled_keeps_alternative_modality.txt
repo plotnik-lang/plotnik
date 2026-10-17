@@ -7,12 +7,12 @@ Q = (program
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t> {
     pub x: ::core::option::Option<QX<'t>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct QX<'t> {
     pub a: ::core::option::Option<Node<'t>>,
     pub b: ::core::option::Option<Node<'t>>,

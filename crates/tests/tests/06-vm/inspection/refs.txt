@@ -131,7 +131,7 @@ P6 ref        61..67  source_id=0  T2
 
 [instructions]
 Name:
-  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 RecordSet(M0) Node SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
   04                                        ▶
 
 Q:
@@ -143,22 +143,20 @@ Q:
   13  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
   15                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  05       (program) [SpanStart#3 SpanStartAt#4]  08
-       ●   program
-  08       (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  10
-       ●   expression_statement
-  10       (Name)                           00 : 11
-       ▶   (Name)
-
-Name:
-  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
-       ●   identifier
-  04   ◀   (Name)                           
-
-Q:
-  11       _ [SuppressEnd SpanEnd#6]        13
-       ●   expression_statement
-  13       _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
-       ●   program
-  15   ◀   (Q)                              ◼
+0005 ExecutionStarted { target: 5 }
+0005 StayExact Named(Some(NodeKindId(166)))
+0005 MatchOk program [0..1]
+0008 Down Named(Some(NodeKindId(182)))
+0008 MatchOk expression_statement [0..1]
+0010 Call CodeAddr(0)
+0010 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchOk identifier [0..1]
+0004 Return PortId(0)
+0004 Return
+0011 Up(1) Any
+0011 MatchOk expression_statement [0..1]
+0013 Up(1) Any
+0013 MatchOk program [0..1]
+0015 Return PortId(0)
+0015 Return

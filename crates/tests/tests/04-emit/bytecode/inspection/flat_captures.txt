@@ -12,7 +12,7 @@ Q:
   2   !   (program)                         4
   4  └‣─  (expression_statement)            6
   5  ─‣┘² _                                 1
-  6  └‣─  (identifier) [Node RecordSet(id)]  5
+  6  └‣─  (identifier) [RecordSet(id) Node]  5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -46,7 +46,7 @@ P4 pattern    37..49  source_id=0
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
   02  └‣─  (expression_statement) [SpanStartAt#2]  04
-  04  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4]  07
+  04  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 RecordSet(M0) Node SpanEnd#3 SpanEnd#4]  07
   07  ─‣┘  _                                08
   08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
   10                                        ▶

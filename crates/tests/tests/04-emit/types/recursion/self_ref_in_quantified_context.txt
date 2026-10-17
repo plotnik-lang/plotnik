@@ -2,7 +2,7 @@ Item = (array
   (Item)* @children
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Item {
-    pub children: ::std::vec::Vec<Item>,
+#[derive(Clone, Copy)]
+pub struct Item<'r> {
+    pub children: &'r [Item<'r>],
 }

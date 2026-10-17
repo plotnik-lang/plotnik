@@ -16,136 +16,225 @@ const _: () = assert!(
     "Plotnik runtime ABI mismatch"
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'s> {
-    pub comments: ::std::vec::Vec<&'s str>,
+#[derive(Clone, Copy)]
+pub struct Q<'r, 's> {
+    pub comments: &'r [&'s str],
     pub has_statement: bool,
 }
 
-impl<'s> Q<'s> {
-    /// Apply `Q` once at a suitable node. A wrong node kind is no-match.
-    pub fn exec(
-        node: rt::Node<'_>,
-        source: &'s str,
-    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let mut budget = matcher::execution_budget(node);
-        let mut eng = rt::Engine::new(node.walk());
-        matcher::verify_language(node);
-        let mut scratch = rt::DecoderScratch::default();
-        Self::apply(&mut eng, source, &mut budget, &mut scratch)
-    }
+const _: () = assert!(::core::mem::size_of::<Q<'static, 'static>>() <= rt::GENERATED_VALUE_CAP);
 
-    /// Search inclusively in source-order DFS preorder, skipping descendants of matches.
-    /// Matching and traversal share compiled-in limits. An error ends iteration.
-    pub fn each<'t>(
-        scope: rt::Node<'t>,
-        source: &'s str,
-    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
-    + use<'t, 's> {
-        let mut eng = rt::Engine::new(scope.walk());
-        let mut verified = false;
-        let mut scratch = rt::DecoderScratch::default();
-        rt::Traversal::new(
-            scope,
-            matcher::execution_budget(scope),
-            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {
-                if !verified {
-                    matcher::verify_language(node);
-                    verified = true;
-                }
+rt::result_family!(Q<'r, 's>);
 
-                eng.reset(node);
-                Self::apply(&mut eng, source, budget, &mut scratch)
-            },
-        )
-    }
-
-    /// Consume the first item of `each`.
-    pub fn find(
-        scope: rt::Node<'_>,
-        source: &'s str,
-    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        <Self as rt::Execute<'_, '_>>::find(scope, source)
-    }
-
-    /// Collect `each`, returning an error rather than a partial vector.
-    pub fn find_all(
-        scope: rt::Node<'_>,
-        source: &'s str,
-    ) -> ::core::result::Result<::std::vec::Vec<Self>, rt::LimitExceeded> {
-        <Self as rt::Execute<'_, '_>>::find_all(scope, source)
-    }
-
-    fn apply(
-        eng: &mut rt::Engine<'_>,
-        source: &'s str,
-        budget: &mut rt::ExecutionBudget,
-        scratch: &mut rt::DecoderScratch,
-    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let Some(journal) = matcher::q_apply(eng, source, budget)? else {
-            return Ok(None);
-        };
-
-        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source, scratch);
-        let value = decode_q(&mut decoder);
-        decoder.finish();
-        Ok(Some(value))
+impl rt::json::Json for Q<'_, '_> {
+    fn shape(&self) -> rt::json::Shape<'_> {
+        rt::json::Shape::Record(self)
     }
 }
 
-impl<'t, 's> rt::Execute<'t, 's> for Q<'s> {
-    type Item = Self;
+impl rt::json::Fields for Q<'_, '_> {
+    fn count(&self) -> usize {
+        2
+    }
+
+    fn field(&self, index: usize) -> (&'static str, &dyn rt::json::Json) {
+        match index {
+            0 => ("comments", &self.comments),
+            1 => ("has_statement", &self.has_statement),
+            _ => unreachable!("`Q` has 2 fields"),
+        }
+    }
+}
+
+impl<'r, 's> Q<'r, 's> {
+    /// Apply `Q` once at a suitable node. A wrong node kind is no-match.
+    pub fn exec<'t>(
+        node: rt::Node<'t>,
+        source: &'s str,
+    ) -> ::core::result::Result<::core::option::Option<rt::Match<Self>>, rt::LimitExceeded> {
+        rt::run::exec::<Self, matcher::QEntry>(node, source)
+    }
+
+    /// Search inclusively in source-order DFS preorder, skipping descendants of matches.
+    /// Each item owns its result. Matching and traversal share compiled-in limits.
+    /// An error ends iteration.
+    pub fn each<'t>(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> impl ::core::iter::FusedIterator<
+        Item = ::core::result::Result<rt::Match<Self>, rt::LimitExceeded>,
+    > + use<'r, 't, 's> {
+        rt::run::each::<Self, matcher::QEntry>(scope, source)
+    }
+
+    /// Consume the first item of `each`.
+    pub fn find<'t>(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> ::core::result::Result<::core::option::Option<rt::Match<Self>>, rt::LimitExceeded> {
+        Self::each(scope, source).next().transpose()
+    }
+
+    /// Collect `each`, returning an error rather than a partial collection.
+    pub fn find_all<'t>(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> ::core::result::Result<rt::Matches<Self>, rt::LimitExceeded> {
+        rt::run::find_all::<Self, matcher::QEntry>(scope, source)
+    }
+}
+
+impl<'r, 't, 's> rt::Execute<'t, 's> for Q<'r, 's> {
+    type Item = rt::Match<Self>;
+    type All = rt::Matches<Self>;
 
     fn exec(
         node: rt::Node<'t>,
         source: &'s str,
-    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+    ) -> ::core::result::Result<::core::option::Option<rt::Match<Self>>, rt::LimitExceeded> {
         Self::exec(node, source)
     }
 
     fn each(
         scope: rt::Node<'t>,
         source: &'s str,
-    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
-    {
+    ) -> impl ::core::iter::FusedIterator<
+        Item = ::core::result::Result<rt::Match<Self>, rt::LimitExceeded>,
+    > {
         Self::each(scope, source)
     }
+
+    fn find_all(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> ::core::result::Result<rt::Matches<Self>, rt::LimitExceeded> {
+        Self::find_all(scope, source)
+    }
 }
 
-/// Decode one committed `Q` value.
-fn decode_q<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Q<'s> {
-    decoder.expect_record_open();
-    let mut v0 = None; // comments
-    let mut v1 = None; // has_statement
-    while !decoder.at_record_close() {
-        match decoder.peek_record_set() {
-            // comments
-            0 => {
-                v0 = Some({
-                    decoder.expect_list_open();
-                    let mut items0 = ::std::vec::Vec::new();
-                    while !decoder.at_list_close() {
-                        items0.push(decoder.expect_str());
-                        decoder.expect_array_push();
-                    }
-                    decoder.expect_list_close();
-                    items0
-                })
+impl<'r, 't, 's> rt::Publish<'t, 's> for Q<'r, 's> {
+    const SCHEMA: rt::Schema<'static> = publish::SCHEMA;
+    const ROOT: u32 = 0;
+    const LAYOUTS: &'static [::std::alloc::Layout] = publish::LAYOUTS;
+
+    fn build<'a>(
+        walk: &mut rt::Walk<'_, '_, 't, 's>,
+        scope: &rt::Scope<'a>,
+        meter: &mut rt::Meter<'_>,
+    ) -> ::core::result::Result<Q<'a, 's>, rt::LimitExceeded>
+    where
+        Self: 'a,
+    {
+        let mut stacks = publish::Stacks0::new();
+        stacks.run(walk, scope, meter)?;
+        Ok(publish::pop(&mut stacks.t0))
+    }
+
+    fn json<'a>(value: &'a Q<'a, 's>) -> &'a dyn rt::json::Json
+    where
+        Self: 'a,
+    {
+        value
+    }
+}
+
+/// Typed construction of result values from walk steps.
+mod publish {
+    use super::*;
+
+    /// The logical result schema shared with the runtime walk and JSON.
+    pub(super) const SCHEMA: rt::Schema<'static> = rt::Schema {
+        types: &[
+            rt::Ty::Record { fields: rt::Span::new(0, 2) },
+            rt::Ty::Text,
+            rt::Ty::List { element: 1, minimum: 0 },
+            rt::Ty::Bool,
+        ],
+        fields: &[
+            rt::Field { name: "comments", ty: 2 },
+            rt::Field { name: "has_statement", ty: 3 },
+        ],
+        cases: &[],
+        members: &[
+            rt::Member::new(0, 0),
+            rt::Member::new(0, 1),
+        ],
+    };
+
+    /// Native layout of each schema type, for sizing result blocks.
+    pub(super) const LAYOUTS: &[::std::alloc::Layout] = &[
+        ::std::alloc::Layout::new::<Q<'static, 'static>>(),
+        ::std::alloc::Layout::new::<&'static str>(),
+        ::std::alloc::Layout::new::<&'static [&'static str]>(),
+        ::std::alloc::Layout::new::<bool>(),
+    ];
+
+    /// One value stack per schema type, plus one writer stack per list type.
+    pub(super) struct Stacks0<'a, 't, 's> {
+        pub(super) t0: rt::Buffer<Q<'a, 's>>,
+        pub(super) t1: rt::Buffer<&'s str>,
+        pub(super) t2: rt::Buffer<&'a [&'s str]>,
+        w2: rt::Buffer<rt::Slice<'a, &'s str>>,
+        pub(super) t3: rt::Buffer<bool>,
+        _lifetimes: ::core::marker::PhantomData<(&'a (), &'t (), &'s ())>,
+    }
+
+    impl<'a, 't, 's> Stacks0<'a, 't, 's> {
+        pub(super) fn new() -> Self {
+            Self {
+                t0: rt::Buffer::new(),
+                t1: rt::Buffer::new(),
+                t2: rt::Buffer::new(),
+                w2: rt::Buffer::new(),
+                t3: rt::Buffer::new(),
+                _lifetimes: ::core::marker::PhantomData,
             }
-            // has_statement
-            1 => v1 = Some(decoder.expect_bool()),
-            other => unreachable!("journal shape proven at emit: `Q` has no member index {other}"),
         }
-        decoder.expect_record_set();
+
+        /// Apply walk steps until the walk ends.
+        pub(super) fn run(
+            &mut self,
+            walk: &mut rt::Walk<'_, '_, 't, 's>,
+            _scope: &rt::Scope<'a>,
+            meter: &mut rt::Meter<'_>,
+        ) -> Result<(), rt::LimitExceeded> {
+            while let Some(step) = walk.next(meter)? {
+                match step {
+                    rt::Step::Close { ty: 0, .. } => self.close_0(meter)?,
+                    rt::Step::Text { ty: 1, text } => self.t1.push(meter, text)?,
+                    rt::Step::Open { ty: 2, len, .. } => self.w2.push(meter, _scope.slice(len))?,
+                    rt::Step::Element { list: 2 } => {
+                        let value = pop(&mut self.t1);
+                        let writer = self.w2.last_mut().expect("an element belongs to an open list");
+                        writer.write(meter, value)?;
+                    }
+                    rt::Step::Close { ty: 2, .. } => self.close_2(meter)?,
+                    rt::Step::Bool { ty: 3, value } => self.t3.push(meter, value)?,
+                    rt::Step::Open { .. } | rt::Step::Field { .. } => {}
+                    other => unreachable!("the schema admits no step {other:?}"),
+                }
+            }
+            Ok(())
+        }
+
+        #[inline(never)]
+        fn close_0(&mut self, meter: &mut rt::Meter<'_>) -> Result<(), rt::LimitExceeded> {
+            let has_statement = pop(&mut self.t3);
+            let comments = pop(&mut self.t2);
+            self.t0.push(meter, Q { comments, has_statement })
+        }
+
+        #[inline(never)]
+        fn close_2(&mut self, meter: &mut rt::Meter<'_>) -> Result<(), rt::LimitExceeded> {
+            let writer = self.w2.pop().expect("a list closes its writer");
+            self.t2.push(meter, writer.finish())
+        }
     }
-    decoder.expect_record_close();
-    Q {
-        comments: v0.expect("field-stability: every accepting path sets `comments`"),
-        has_statement: v1.expect("field-stability: every accepting path sets `has_statement`"),
+
+    pub(super) fn pop<T>(stack: &mut rt::Buffer<T>) -> T {
+        stack.pop().expect("the walk produced every value before its parent")
     }
 }
-
-pub use self::matcher::q_journal;
 
 /// The compiled matcher: engine machinery shielded from the query's
 /// type namespace.
@@ -159,18 +248,6 @@ mod matcher {
         fuel_limit: rt::Limit::Auto,
         memory: rt::Limit::Auto,
     };
-
-    /// No ceilings — what the unmetered journal entrypoints run under.
-    const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
-        fuel_limit: None,
-        max_memory: None,
-    };
-
-    /// Resolve compiled-in limits once for a supplied application or search scope.
-    pub(super) fn execution_budget(scope: rt::Node<'_>) -> rt::ExecutionBudget {
-        let source_nodes = u32::try_from(scope.descendant_count()).unwrap_or(u32::MAX);
-        rt::ExecutionBudget::new(LIMITS.resolve(source_nodes))
-    }
 
     /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
     /// as the generation-time grammar defines them.
@@ -222,30 +299,32 @@ mod matcher {
     const S07_Q: u16 = 4;
     const S08_Q: u16 = 5;
     const S09_Q: u16 = 6;
-    const S16_Q: u16 = 7;
-    const S18_Q: u16 = 8;
+    const S11_Q: u16 = 7;
+    const S17_Q: u16 = 8;
     const S19_Q: u16 = 9;
-    const S21_Q: u16 = 10;
-    const S23_Q: u16 = 11;
-    const S24_Q: u16 = 12;
-    const S29_Q: u16 = 13;
+    const S20_Q: u16 = 10;
+    const S21_Q: u16 = 11;
+    const S23_Q: u16 = 12;
+    const S25_Q: u16 = 13;
+    const S26_Q: u16 = 14;
+    const S31_Q: u16 = 15;
 
-    /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
-    /// match journal — the same event sequence the VM commits for this query.
-    pub fn q_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
-        let entry = S02_Q;
-        let boundary = EntryBoundary::new(true, false);
-        let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
-        outcome.expect("an unmetered run cannot exceed a limit")
-    }
+    pub(super) struct QEntry;
 
-    /// Apply one candidate using the operation's cumulative budget.
-    pub(super) fn q_apply<'a, 't>(
-        eng: &'a mut rt::Engine<'t>,
-        source: &str,
-        budget: &mut rt::ExecutionBudget,
-    ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        run_at_node::<true, true>(eng, source, S02_Q, EntryBoundary::new(true, false), budget)
+    impl rt::Entry for QEntry {
+        const LIMITS: rt::RuntimeLimitSpec = LIMITS;
+
+        fn verify_language(node: rt::Node<'_>) {
+            verify_language(node);
+        }
+
+        fn run<'t>(
+            eng: &mut rt::Engine<'t>,
+            m: &mut rt::Meter<'_>,
+            source: &str,
+        ) -> Result<bool, rt::LimitExceeded> {
+            run(eng, m, source, S02_Q, EntryBoundary::new(true, false))
+        }
     }
     #[derive(Clone, Copy)]
     struct EntryBoundary {
@@ -258,20 +337,22 @@ mod matcher {
             Self { record, node }
         }
 
-        fn begin(self, eng: &mut rt::Engine<'_>) {
+        fn begin(self, eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<(), rt::LimitExceeded> {
             if self.record {
-                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
+                eng.emit(m, |_| rt::JournalEvent::RecordOpen)?;
             }
+            Ok(())
         }
 
-        fn finish(self, eng: &mut rt::Engine<'_>) {
+        fn finish(self, eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<(), rt::LimitExceeded> {
             if self.node {
-                let _ = eng.emit_output_event(|cursor| rt::JournalEvent::Node(cursor.node()));
-                return;
+                eng.emit(m, |cursor| rt::JournalEvent::Node(cursor.node()))?;
+                return Ok(());
             }
             if self.record {
-                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
+                eng.emit(m, |_| rt::JournalEvent::RecordClose)?;
             }
+            Ok(())
         }
     }
 
@@ -292,245 +373,205 @@ mod matcher {
         NoMatch,
     }
 
-    /// One dispatch loop serves every entrypoint; `entry` selects the definition
-    /// body and `boundary` supplies its root result effects.
-    /// The metering constants come from the compiled-in policy. A fully unbounded
-    /// policy skips budget accounting. Memory checks read `heap_bytes` only when
-    /// memory is bounded. Metered dispatches use the same budget as the VM.
-    /// `RECORD_OUTPUT_EVENTS` disables output allocation for match-only entries. (No
-    /// let-chains: generated code targets the embedding crate's edition.)
-    fn run<
-        't,
-        const METERED_FUEL: bool,
-        const METERED_MEMORY: bool,
-        const RECORD_OUTPUT_EVENTS: bool,
-    >(
-        tree: &'t rt::Tree,
+    fn run<'t>(
+        eng: &mut rt::Engine<'t>,
+        m: &mut rt::Meter<'_>,
         source: &str,
         entry: u16,
         boundary: EntryBoundary,
-        limits: rt::ResolvedRuntimeLimits,
-    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        let mut budget = rt::ExecutionBudget::new(limits);
-        let mut eng = if RECORD_OUTPUT_EVENTS {
-            rt::Engine::new(tree.root_node().walk())
-        } else {
-            rt::Engine::new_match_only(tree.root_node().walk())
-        };
-        verify_language(eng.node());
-        let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
-            &mut eng,
-            source,
-            entry,
-            boundary,
-            &mut budget,
-        )?
-        .is_some();
-        Ok(accepted.then(|| eng.into_journal()))
-    }
-
-    fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
-        eng: &'a mut rt::Engine<'t>,
-        source: &str,
-        entry: u16,
-        boundary: EntryBoundary,
-        budget: &mut rt::ExecutionBudget,
-    ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        boundary.begin(eng);
+    ) -> Result<bool, rt::LimitExceeded> {
+        boundary.begin(eng, m)?;
         let mut ip = entry;
         loop {
-            if METERED_FUEL || METERED_MEMORY {
-                // One matcher dispatch consumes one unit of the operation budget.
-                // Memory-only policies still charge to retain the sample cadence.
-                budget.charge()?;
-                // The shared budget schedules live matcher-heap samples.
-                // Unbounded memory policies skip sampling and heap measurement.
-                if METERED_MEMORY && budget.memory_sample_due() {
-                    let used = eng.heap_bytes();
-                    match budget.limits().max_memory {
-                        Some(max) if used > max => {
-                            return Err(rt::LimitExceeded::Memory { used, limit: max });
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            match dispatch(eng, source, ip) {
+            m.charge(1)?;
+            match dispatch(eng, m, source, ip)? {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => {
-                    boundary.finish(eng);
-                    return Ok(Some(eng.accepted_journal()));
+                    boundary.finish(eng, m)?;
+                    eng.accepted_tape();
+                    return Ok(true);
                 }
-                Flow::Backtrack => match backtrack(eng, source) {
+                Flow::Backtrack => match backtrack(eng, m, source)? {
                     Unwound::Resumed(next) => ip = next,
                     Unwound::Accepted => {
-                        boundary.finish(eng);
-                        return Ok(Some(eng.accepted_journal()));
+                        boundary.finish(eng, m)?;
+                        eng.accepted_tape();
+                        return Ok(true);
                     }
-                    Unwound::NoMatch => return Ok(None),
+                    Unwound::NoMatch => return Ok(false),
                 },
             }
         }
     }
 
-    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
-        match ip {
+    fn dispatch<'t>(eng: &mut rt::Engine<'t>, m: &mut rt::Meter<'_>, _source: &str, ip: u16) -> Result<Flow, rt::LimitExceeded> {
+        Ok(match ip {
             //   01                                        ▶
             S01_Q => Flow::Accept,
-            //   02   !   (program)                        29
+            //   02   !   (program) [RecordSet(comments)]  31
             S02_Q => 'state: {
-                if !cand_s02_q(eng) {
+                if !cand_s02_q(eng, m)? {
                     break 'state Flow::Backtrack;
                 }
-                Flow::Jump(S29_Q)
+                eng.emit(m, |_| rt::JournalEvent::RecordSet(0))?; // RecordSet(comments)
+                Flow::Jump(S31_Q)
             }
             //   03  ─‣┘  _                                01
             S03_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
+                if eng.cursor_mut().navigate(m, rt::Nav::Up(1))?.is_none() {
                     break 'state Flow::Backtrack;
                 }
                 Flow::Jump(S01_Q)
             }
-            //   05   !   (expression_statement) [BoolValue(1) RecordSet(has_statement)]  03
+            //   05   !   (expression_statement) [BoolValue(1)]  03
             S05_Q => 'state: {
-                if !cand_s05_q(eng) {
+                if !cand_s05_q(eng, m)? {
                     break 'state Flow::Backtrack;
                 }
-                eng.bool_value(true);
-                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(has_statement)
+                eng.bool_value(m, true)?;
                 Flow::Jump(S03_Q)
             }
             //   07  ──!  _                                05, 07
             S07_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
+                if eng.cursor_mut().navigate(m, rt::Nav::NextExact)?.is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_successors(&[S07_Q]);
+                eng.push_successors(m, &[S07_Q])?;
                 Flow::Jump(S05_Q)
             }
             //   08  └─!  _                                05, 07
             S08_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::DownExact).is_none() {
+                if eng.cursor_mut().navigate(m, rt::Nav::DownExact)?.is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_successors(&[S07_Q]);
+                eng.push_successors(m, &[S07_Q])?;
                 Flow::Jump(S05_Q)
             }
-            //   09  -ε-  [BoolValue(0) RecordSet(has_statement)]  01
+            //   09  -ε-  [BoolValue(0)]                   01
             S09_Q => {
-                eng.bool_value(false);
-                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(has_statement)
+                eng.bool_value(m, false)?;
                 Flow::Jump(S01_Q)
             }
-            //   16  -ε-  [BoolValue(0) RecordSet(has_statement)]  03
-            S16_Q => {
-                eng.bool_value(false);
-                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(has_statement)
-                Flow::Jump(S03_Q)
-            }
-            //   18  -ε-  [ListClose RecordSet(comments)]  07, 16
-            S18_Q => {
-                eng.emit_output_event(|_| rt::JournalEvent::ListClose);
-                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(comments)
-                eng.push_successors(&[S16_Q]);
-                Flow::Jump(S07_Q)
-            }
-            //   19  -ε-  [ListClose RecordSet(comments)]  08, 09
-            S19_Q => {
-                eng.emit_output_event(|_| rt::JournalEvent::ListClose);
-                eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(comments)
-                eng.push_successors(&[S09_Q]);
+            //   11  -ε-  [RecordSet(has_statement)]       08, 09
+            S11_Q => {
+                eng.emit(m, |_| rt::JournalEvent::RecordSet(1))?; // RecordSet(has_statement)
+                eng.push_successors(m, &[S09_Q])?;
                 Flow::Jump(S08_Q)
             }
-            //   21   !   (comment) [NodeText ArrayPush]   23, 18
-            S21_Q => 'state: {
-                if !cand_s21_q(eng) {
+            //   17  -ε-  [BoolValue(0)]                   03
+            S17_Q => {
+                eng.bool_value(m, false)?;
+                Flow::Jump(S03_Q)
+            }
+            //   19  -ε-  [RecordSet(has_statement)]       07, 17
+            S19_Q => {
+                eng.emit(m, |_| rt::JournalEvent::RecordSet(1))?; // RecordSet(has_statement)
+                eng.push_successors(m, &[S17_Q])?;
+                Flow::Jump(S07_Q)
+            }
+            //   20  -ε-  [ListClose]                      19
+            S20_Q => {
+                eng.emit(m, |_| rt::JournalEvent::ListClose)?;
+                Flow::Jump(S19_Q)
+            }
+            //   21  -ε-  [ListClose]                      11
+            S21_Q => {
+                eng.emit(m, |_| rt::JournalEvent::ListClose)?;
+                Flow::Jump(S11_Q)
+            }
+            //   23   !   (comment) [NodeText ArrayPush]   25, 20
+            S23_Q => 'state: {
+                if !cand_s23_q(eng, m)? {
                     break 'state Flow::Backtrack;
                 }
-                eng.node_text();
-                eng.emit_output_event(|_| rt::JournalEvent::ArrayPush);
-                eng.push_successors(&[S18_Q]);
+                eng.node_text(m)?;
+                eng.emit(m, |_| rt::JournalEvent::ArrayPush)?;
+                eng.push_successors(m, &[S20_Q])?;
+                Flow::Jump(S25_Q)
+            }
+            //   25  ──!  _                                23, 25
+            S25_Q => 'state: {
+                if eng.cursor_mut().navigate(m, rt::Nav::NextExact)?.is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                eng.push_successors(m, &[S25_Q])?;
                 Flow::Jump(S23_Q)
             }
-            //   23  ──!  _                                21, 23
-            S23_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
+            //   26  └─!  _                                23, 25
+            S26_Q => 'state: {
+                if eng.cursor_mut().navigate(m, rt::Nav::DownExact)?.is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_successors(&[S23_Q]);
-                Flow::Jump(S21_Q)
+                eng.push_successors(m, &[S25_Q])?;
+                Flow::Jump(S23_Q)
             }
-            //   24  └─!  _                                21, 23
-            S24_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::DownExact).is_none() {
-                    break 'state Flow::Backtrack;
-                }
-                eng.push_successors(&[S23_Q]);
-                Flow::Jump(S21_Q)
-            }
-            //   29  -ε-  [ListOpen]                       24, 19
-            S29_Q => {
-                eng.emit_output_event(|_| rt::JournalEvent::ListOpen);
-                eng.push_successors(&[S19_Q]);
-                Flow::Jump(S24_Q)
+            //   31  -ε-  [ListOpen]                       26, 21
+            S31_Q => {
+                eng.emit(m, |_| rt::JournalEvent::ListOpen)?;
+                eng.push_successors(m, &[S21_Q])?;
+                Flow::Jump(S26_Q)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
-        }
+        })
     }
 
     /// `S02_Q` candidate: `(program)`.
     #[inline]
-    fn cand_s02_q(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s02_q(eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<bool, rt::LimitExceeded> {
+        m.charge(1)?;
         let node = eng.node();
         // (program)
         if node.kind_id() != 134 || !node.is_named() {
-            return false;
+            return Ok(false);
         }
-        true
+        Ok(true)
     }
 
     /// `S05_Q` candidate: `(expression_statement)`.
     #[inline]
-    fn cand_s05_q(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s05_q(eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<bool, rt::LimitExceeded> {
+        m.charge(1)?;
         let node = eng.node();
         // (expression_statement)
         if node.kind_id() != 150 || !node.is_named() {
-            return false;
+            return Ok(false);
         }
-        true
+        Ok(true)
     }
 
-    /// `S21_Q` candidate: `(comment)`.
+    /// `S23_Q` candidate: `(comment)`.
     #[inline]
-    fn cand_s21_q(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s23_q(eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<bool, rt::LimitExceeded> {
+        m.charge(1)?;
         let node = eng.node();
         // (comment)
         if node.kind_id() != 108 || !node.is_named() {
-            return false;
+            return Ok(false);
         }
-        true
+        Ok(true)
     }
 
     /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
     /// Match checkpoints advance their sibling search and re-enter. Loops, never
     /// recurses — a run of exhausted retries unwinds in one call.
-    fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
+    fn backtrack<'t>(eng: &mut rt::Engine<'t>, m: &mut rt::Meter<'_>, _source: &str) -> Result<Unwound, rt::LimitExceeded> {
         'unwind: loop {
+            m.charge(1)?;
             let Some((cp, snapshot)) = eng.pop_checkpoint() else {
-                return Unwound::NoMatch;
+                return Ok(Unwound::NoMatch);
             };
-            eng.restore_checkpoint_state(cp.state, snapshot);
+            eng.restore_checkpoint_state(m, cp.state, snapshot)?;
 
             match cp.resume {
-                rt::Resume::Successor => return Unwound::Resumed(cp.ip),
+                rt::Resume::Successor => return Ok(Unwound::Resumed(cp.ip)),
 
                 rt::Resume::Call(_) => unreachable!("matcher has no call checkpoints"),
 
                 // Match retry: advance past the accepted-but-failed candidate and
                 // re-run that state's sibling search from there.
-                rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
-                    Some(Flow::Jump(next)) => return Unwound::Resumed(next),
-                    Some(Flow::Accept) => return Unwound::Accepted,
+                rt::Resume::Match => match match_retry(eng, m, _source, cp.ip)? {
+                    Some(Flow::Jump(next)) => return Ok(Unwound::Resumed(next)),
+                    Some(Flow::Accept) => return Ok(Unwound::Accepted),
                     Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
                     None => continue 'unwind,
                 },
@@ -538,7 +579,7 @@ mod matcher {
         }
     }
 
-    fn match_retry(_eng: &mut rt::Engine<'_>, _source: &str, ip: u16) -> Option<Flow> {
+    fn match_retry(_eng: &mut rt::Engine<'_>, _m: &mut rt::Meter<'_>, _source: &str, ip: u16) -> Result<Option<Flow>, rt::LimitExceeded> {
         unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match")
     }
 }

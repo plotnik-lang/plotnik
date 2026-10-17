@@ -15,8 +15,8 @@ Q = (program
 {
   "s": {
     "kind": "string",
-    "span": [7, 10],
-    "text": "\"x\""
+    "text": "\"x\"",
+    "span": [7, 10]
   }
 }
 -------------------- BYTECODE --------------------
@@ -56,7 +56,7 @@ Q:
   03  └‣─  (expression_statement)           04
   04  └‣─  (array)                          05
   05       (@14)                            14 : 06
-  06  ─◦─  (string) [Node RecordSet(M0)]    08
+  06  ─◦─  (string) [RecordSet(M0) Node]    08
   08  ─‣┘³ _                                09
   09                                        ▶
   10                                        ▶
@@ -64,51 +64,48 @@ Q:
   12  ──!  _                                11, 12
   14  └─!  _                                11, 12
 --------------------- TRACE ----------------------
-Q:
-  02       (program)                        03
-       ●   program
-  03       (expression_statement)           04
-       ●   expression_statement
-  04       (array)                          05
-       ●   array
-  05       (@14)                            14 : 06
-       ▶   (@14)
-
-@14:
-  14       _                                11, 12
-       ●   [
-  11       ","                              10
-       ○   [
-  14  ❮❮❮ 
-  12       _                                11, 12
-       ●   number
-  11       ","                              10
-       ○   number
-  12  ❮❮❮ 
-  12       _                                11, 12
-       ●   ,
-  11       ","                              10
-       ●   ,
-  10   ◀   (@14)                            
-
-Q:
-  06       (string) [Node RecordSet(M0)]    08
-       ○   number
-  12  ❮❮❮ 
-  12       _                                11, 12
-       ●   number
-  11       ","                              10
-       ○   number
-  12  ❮❮❮ 
-  12       _                                11, 12
-       ●   ,
-  11       ","                              10
-       ●   ,
-  10   ◀   (@14)                            
-
-Q:
-  06       (string) [Node RecordSet(M0)]    08
-       ●   string
-  08       _                                09
-       ●   program
-  09   ◀   (Q)                              ◼
+0002 ExecutionStarted { target: 2 }
+0002 StayExact Named(Some(NodeKindId(134)))
+0002 MatchOk program [0..11]
+0003 Down Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..11]
+0004 Down Named(Some(NodeKindId(186)))
+0004 MatchOk array [0..11]
+0005 Call CodeAddr(14)
+0005 Call { target: 14 }
+0014 DownExact Any
+0014 MatchOk node#41 [0..1]
+0011 StayExact Anonymous(Some(NodeKindId(8)))
+0011 MatchFail node#41 [0..1]
+0011 Backtrack { to_record: 18 }
+0012 NextExact Any
+0012 MatchOk node#114 [1..2]
+0011 StayExact Anonymous(Some(NodeKindId(8)))
+0011 MatchFail node#114 [1..2]
+0011 Backtrack { to_record: 26 }
+0012 NextExact Any
+0012 MatchOk , [2..3]
+0011 StayExact Anonymous(Some(NodeKindId(8)))
+0011 MatchOk , [2..3]
+0010 Return PortId(0)
+0010 Return
+0006 NextSkipExtras Named(Some(NodeKindId(221)))
+0006 MatchFail node#114 [4..5]
+0006 Backtrack { to_record: 34 }
+0012 NextExact Any
+0012 MatchOk node#114 [4..5]
+0011 StayExact Anonymous(Some(NodeKindId(8)))
+0011 MatchFail node#114 [4..5]
+0011 Backtrack { to_record: 47 }
+0012 NextExact Any
+0012 MatchOk , [5..6]
+0011 StayExact Anonymous(Some(NodeKindId(8)))
+0011 MatchOk , [5..6]
+0010 Return PortId(0)
+0010 Return
+0006 NextSkipExtras Named(Some(NodeKindId(221)))
+0006 MatchOk string [7..10]
+0008 Up(3) Any
+0008 MatchOk program [0..11]
+0009 Return PortId(0)
+0009 Return

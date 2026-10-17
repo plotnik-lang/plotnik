@@ -15,15 +15,15 @@ Q = (program
     {
       "id": {
         "kind": "identifier",
-        "span": [1, 2],
-        "text": "x"
+        "text": "x",
+        "span": [1, 2]
       }
     },
     {
       "id": {
         "kind": "identifier",
-        "span": [4, 5],
-        "text": "y"
+        "text": "y",
+        "span": [4, 5]
       }
     }
   ]
@@ -63,57 +63,58 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └─!  _ [ListOpen]                     12, 14
+  03  └─!  _ [RecordSet(M1) ListOpen]       12, 14
   05                                        ▶
   06  -ε-  [RecordClose ArrayPush]          14, 16
-  08   !   (identifier) [Node RecordSet(M0)]  06
+  08   !   (identifier) [RecordSet(M0) Node]  06
   10  ──!  _                                08, 10
   12   !   _ [RecordOpen]                   08, 10
   14  ──!  _                                12, 14
-  16  ─‣┘³ _ [ListClose RecordSet(M1)]      05
+  16  ─‣┘³ _ [ListClose]                    05
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       _ [ListOpen]                     12, 14
-       ●   [
-  12       _ [RecordOpen]                   08, 10
-       ●   [
-  08       (identifier) [Node RecordSet(M0)]  06
-       ○   [
-  12  ❮❮❮ 
-  10       _                                08, 10
-       ●   identifier
-  08       (identifier) [Node RecordSet(M0)]  06
-       ●   identifier
-  06  -ε-  [RecordClose ArrayPush]          14, 16
-  14       _                                12, 14
-       ●   ,
-  12       _ [RecordOpen]                   08, 10
-       ●   ,
-  08       (identifier) [Node RecordSet(M0)]  06
-       ○   ,
-  12  ❮❮❮ 
-  10       _                                08, 10
-       ●   identifier
-  08       (identifier) [Node RecordSet(M0)]  06
-       ●   identifier
-  06  -ε-  [RecordClose ArrayPush]          14, 16
-  14       _                                12, 14
-       ●   ]
-  12       _ [RecordOpen]                   08, 10
-       ●   ]
-  08       (identifier) [Node RecordSet(M0)]  06
-       ○   ]
-  12  ❮❮❮ 
-  10       _                                08, 10
-  14  ❮❮❮ 
-  14       _                                12, 14
-  06  ❮❮❮ 
-  16       _ [ListClose RecordSet(M1)]      05
-       ●   program
-  05   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..7]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..6]
+0003 DownExact Any
+0003 MatchOk node#41 [0..1]
+0012 StayExact Any
+0012 MatchOk node#41 [0..1]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchFail node#41 [0..1]
+0008 Backtrack { to_record: 23 }
+0010 NextExact Any
+0010 MatchOk identifier [1..2]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [1..2]
+0006 Epsilon Any
+0014 NextExact Any
+0014 MatchOk node#8 [2..3]
+0012 StayExact Any
+0012 MatchOk node#8 [2..3]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchFail node#8 [2..3]
+0008 Backtrack { to_record: 49 }
+0010 NextExact Any
+0010 MatchOk identifier [4..5]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [4..5]
+0006 Epsilon Any
+0014 NextExact Any
+0014 MatchOk node#42 [5..6]
+0012 StayExact Any
+0012 MatchOk node#42 [5..6]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchFail node#42 [5..6]
+0008 Backtrack { to_record: 75 }
+0010 NextExact Any
+0010 Backtrack { to_record: 70 }
+0014 NextExact Any
+0014 Backtrack { to_record: 66 }
+0016 Up(3) Any
+0016 MatchOk program [0..7]
+0005 Return PortId(0)
+0005 Return

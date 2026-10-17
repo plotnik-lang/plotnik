@@ -24,27 +24,27 @@ Q   = 05
 [transitions]
 Arg:
   01                                        ▶
-  02   !   (id) [Node RecordSet(name)]      01
+  02   !   (id) [RecordSet(name) Node]      01
 
 Q:
   04                                        ▶
-  05   !   (args) [RecordOpen]              19
-  08  !─┘  _ [RecordClose RecordSet(last)]  04
+  05   !   (args) [RecordSet(first) RecordOpen]  20
+  08  !─┘  _ [RecordClose]                  04
 
 Arg (consuming, routed Next):
   11                                        ▶
-  12  ─•─  (id) [Node RecordSet(name)]      11
+  12  ─•─  (id) [RecordSet(name) Node]      11
 
 Q:
   13       (Arg (consuming, routed Next))   12 : 08
-  15  -ε-  [RecordClose RecordSet(first) RecordOpen]  13
+  16  -ε-  [RecordClose RecordSet(last) RecordOpen]  13
 
 Arg (consuming, routed Down):
-  17                                        ▶
-  18  └─!  (id) [Node RecordSet(name)]      17
+  18                                        ▶
+  19  └─!  (id) [RecordSet(name) Node]      18
 
 Q:
-  19       (Arg (consuming, routed Down))   18 : 15
+  20       (Arg (consuming, routed Down))   19 : 16
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -76,17 +76,17 @@ Q   = 03 :: T2
 
 [instructions]
 Arg:
-  00   !   (id) [Node RecordSet(M0)]        02
+  00   !   (id) [RecordSet(M0) Node]        02
   02                                        ▶
 
 Q:
-  03   !   (args) [RecordOpen]              05
+  03   !   (args) [RecordSet(M1) RecordOpen]  05
   05       (@16)                            16 : 06
-  06  -ε-  [RecordClose RecordSet(M1) RecordOpen]  08
+  06  -ε-  [RecordClose RecordSet(M2) RecordOpen]  08
   08       (@13)                            13 : 09
-  09  !─┘  _ [RecordClose RecordSet(M2)]    11
+  09  !─┘  _ [RecordClose]                  11
   11                                        ▶
   12                                        ▶
-  13  ─•─  (id) [Node RecordSet(M0)]        12
+  13  ─•─  (id) [RecordSet(M0) Node]        12
   15                                        ▶
-  16  └─!  (id) [Node RecordSet(M0)]        15
+  16  └─!  (id) [RecordSet(M0) Node]        15

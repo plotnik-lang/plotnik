@@ -12,13 +12,13 @@ function f() {}
 {
   "doc": {
     "kind": "comment",
-    "span": [0, 6],
-    "text": "// doc"
+    "text": "// doc",
+    "span": [0, 6]
   },
   "fn": {
     "kind": "function_declaration",
-    "span": [7, 22],
-    "text": "function f() {}"
+    "text": "function f() {}",
+    "span": [7, 22]
   }
 }
 -------------------- BYTECODE --------------------
@@ -49,22 +49,23 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                08, 10
-  03  ─•─  (function_declaration) [Node RecordSet(M1)]  05
+  03  ─•─  (function_declaration) [RecordSet(M1) Node]  05
   05  ─‣┘  _                                06
   06                                        ▶
   07  ...
-  08   !   (comment) [Node RecordSet(M0)]   03
+  08   !   (comment) [RecordSet(M0) Node]   03
   10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                08, 10
-       ●   comment
-  08       (comment) [Node RecordSet(M0)]   03
-       ●   comment
-  03       (function_declaration) [Node RecordSet(M1)]  05
-       ●   function_declaration
-  05       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..22]
+0001 DownExact Any
+0001 MatchOk comment [0..6]
+0008 StayExact Named(Some(NodeKindId(108)))
+0008 MatchOk comment [0..6]
+0003 NextSkip Named(Some(NodeKindId(201)))
+0003 MatchOk function_declaration [7..22]
+0005 Up(1) Any
+0005 MatchOk program [0..22]
+0006 Return PortId(0)
+0006 Return

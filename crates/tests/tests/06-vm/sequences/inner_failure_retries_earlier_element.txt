@@ -10,13 +10,13 @@ Q = (program
 {
   "a": {
     "kind": "identifier",
-    "span": [3, 6],
-    "text": "foo"
+    "text": "foo",
+    "span": [3, 6]
   },
   "d": {
     "kind": "debugger_statement",
-    "span": [8, 17],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [8, 17]
   }
 }
 -------------------- BYTECODE --------------------
@@ -48,28 +48,29 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
-  2  └‣─  (identifier) [Node RecordSet(M0)]  4
+  2  └‣─  (identifier) [RecordSet(M0) Node]  4
   4  ─‣┘  _                                 5
-  5  ─‣─  (debugger_statement) [Node RecordSet(M1)]  7
+  5  ─‣─  (debugger_statement) [RecordSet(M1) Node]  7
   7  ─‣┘  _                                 8
   8                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement)            02
-      ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)]  04
-      ○   number
-      ○   ;
-  1  ❮❮❮ 
-      ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)]  04
-      ●   identifier
-  4       _                                 05
-      ●   expression_statement
-  5       (debugger_statement) [Node RecordSet(M1)]  07
-      ●   debugger_statement
-  7       _                                 08
-      ●   program
-  8   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..17]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchFail node#114 [0..1]
+0002 MatchFail node#24 [1..2]
+0002 Backtrack { to_record: 8 }
+0002 MatchOk expression_statement [3..7]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchOk identifier [3..6]
+0004 Up(1) Any
+0004 MatchOk expression_statement [3..7]
+0005 Next Named(Some(NodeKindId(168)))
+0005 MatchOk debugger_statement [8..17]
+0007 Up(1) Any
+0007 MatchOk program [0..17]
+0008 Return PortId(0)
+0008 Return

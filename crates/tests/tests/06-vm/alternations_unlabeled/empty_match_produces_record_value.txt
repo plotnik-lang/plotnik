@@ -53,28 +53,27 @@ Q = 00 :: T6
 
 [instructions]
 Q:
-  00   !   (program)                        32, 12, 26
+  00   !   (program)                        26, 10, 20
   02                                        ▶
-  03   !   (comment) [Node RecordSet(M0) RecordClose RecordSet(M2)]  15
-  06  ──!  _                                03, 06
-  08   !   _ [RecordOpen]                   03, 06
-  10  -ε-  [Absent RecordSet(M3)]           08
-  12  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  02
-  15  ─‣┘  _                                02
-  16   !   (identifier) [Node RecordSet(M1) RecordClose RecordSet(M3)]  15
-  19  ──!  _                                16, 19
-  21   !   _ [RecordOpen]                   16, 19
+  03   !   (comment) [RecordSet(M0) Node RecordClose]  07
+  05  ──!  _                                03, 05
+  07  ─‣┘  _                                02
+  08   !   _ [RecordSet(M2) RecordOpen]     03, 05
+  10  -ε-  [RecordSet(M2) RecordOpen RecordSet(M0) Absent RecordClose]  02
+  13   !   (identifier) [RecordSet(M1) Node RecordClose]  07
+  15  ...
+  16  ──!  _                                13, 16
+  18   !   _ [RecordSet(M3) RecordOpen]     13, 16
+  20  -ε-  [RecordSet(M3) RecordOpen RecordSet(M1) Absent RecordClose]  02
   23  ...
-  24  -ε-  [Absent RecordSet(M2)]           21
-  26  -ε-  [Absent RecordSet(M2) RecordOpen Absent RecordSet(M1) RecordClose RecordSet(M3)]  02
-  29  ──!  _                                10, 24, 29
-  31  ...
-  32  └─!  _                                10, 24, 29
+  24  ──!  _                                08, 18, 24
+  26  └─!  _                                08, 18, 24
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        32, 12, 26
-       ●   program
-  32       _                                10, 24, 29
-  00  ❮❮❮ 
-  12  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  02
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..0]
+0026 DownExact Any
+0026 Backtrack { to_record: 6 }
+0010 Epsilon Any
+0002 Return PortId(0)
+0002 Return

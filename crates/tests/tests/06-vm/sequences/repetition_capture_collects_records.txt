@@ -15,25 +15,25 @@ let a; let b;
     {
       "decl": {
         "kind": "lexical_declaration",
-        "span": [0, 6],
-        "text": "let a;"
+        "text": "let a;",
+        "span": [0, 6]
       },
       "n": {
         "kind": "identifier",
-        "span": [4, 5],
-        "text": "a"
+        "text": "a",
+        "span": [4, 5]
       }
     },
     {
       "decl": {
         "kind": "lexical_declaration",
-        "span": [7, 13],
-        "text": "let b;"
+        "text": "let b;",
+        "span": [7, 13]
       },
       "n": {
         "kind": "identifier",
-        "span": [11, 12],
-        "text": "b"
+        "text": "b",
+        "span": [11, 12]
       }
     }
   ]
@@ -73,50 +73,51 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       18, 08
-  03  └‣─  name: (identifier) [Node RecordSet(M1)]  05
+  01  -ε-  [RecordSet(M2) ListOpen]         18, 08
+  03  └‣─  name: (identifier) [RecordSet(M1) Node]  05
   05  ─‣┘² _                                10
   06                                        ▶
   07  ...
-  08  -ε-  [ListClose RecordSet(M2)]        06
+  08  -ε-  [ListClose]                      06
   10  -ε-  [RecordClose ArrayPush]          16, 20
   12  └‣─  (variable_declarator)            03
-  13   !   (lexical_declaration) [RecordOpen Node RecordSet(M0)]  12
+  13   !   (lexical_declaration) [RecordOpen RecordSet(M0) Node]  12
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  ─‣┘  _ [ListClose RecordSet(M2)]      06
+  20  ─‣┘  _ [ListClose]                    06
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       18, 08
-  18       _                                13, 16
-       ●   lexical_declaration
-  13       (lexical_declaration) [RecordOpen Node RecordSet(M0)]  12
-       ●   lexical_declaration
-  12       (variable_declarator)            03
-       ○   let
-       ●   variable_declarator
-  03       name: (identifier) [Node RecordSet(M1)]  05
-       ●   identifier
-  05       _                                10
-       ●   lexical_declaration
-  10  -ε-  [RecordClose ArrayPush]          16, 20
-  16       _                                13, 16
-       ●   lexical_declaration
-  13       (lexical_declaration) [RecordOpen Node RecordSet(M0)]  12
-       ●   lexical_declaration
-  12       (variable_declarator)            03
-       ○   let
-       ●   variable_declarator
-  03       name: (identifier) [Node RecordSet(M1)]  05
-       ●   identifier
-  05       _                                10
-       ●   lexical_declaration
-  10  -ε-  [RecordClose ArrayPush]          16, 20
-  16       _                                13, 16
-  10  ❮❮❮ 
-  20       _ [ListClose RecordSet(M2)]      06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..13]
+0001 Epsilon Any
+0018 DownExact Any
+0018 MatchOk lexical_declaration [0..6]
+0013 StayExact Named(Some(NodeKindId(152)))
+0013 MatchOk lexical_declaration [0..6]
+0012 Down Named(Some(NodeKindId(154)))
+0012 MatchFail node#14 [0..3]
+0012 MatchOk variable_declarator [4..5]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchOk identifier [4..5]
+0005 Up(2) Any
+0005 MatchOk lexical_declaration [0..6]
+0010 Epsilon Any
+0016 NextExact Any
+0016 MatchOk lexical_declaration [7..13]
+0013 StayExact Named(Some(NodeKindId(152)))
+0013 MatchOk lexical_declaration [7..13]
+0012 Down Named(Some(NodeKindId(154)))
+0012 MatchFail node#14 [7..10]
+0012 MatchOk variable_declarator [11..12]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchOk identifier [11..12]
+0005 Up(2) Any
+0005 MatchOk lexical_declaration [7..13]
+0010 Epsilon Any
+0016 NextExact Any
+0016 Backtrack { to_record: 68 }
+0020 Up(1) Any
+0020 MatchOk program [0..13]
+0006 Return PortId(0)
+0006 Return

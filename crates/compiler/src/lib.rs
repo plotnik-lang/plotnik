@@ -43,8 +43,6 @@ pub mod diagnostics {
     };
 }
 
-pub use crate::compiler::journal_fn_name as matcher_journal_fn_name;
-
 pub use crate::core::Colors;
 pub use crate::core::grammar::GrammarIdentity;
 
@@ -62,9 +60,8 @@ pub use crate::compiler::{
 
 #[cfg(feature = "vm")]
 pub use crate::vm::{
-    ExecutionTrace, JournalEvent, Limit, MatchJournal, NodeValue, NoopTracer, OutputEvents,
-    PrintTracer, PrintTracerBuilder, ProvenanceBinding, ResolvedRuntimeLimits,
-    ResultProvenanceEntry, RunStats, RuntimeError, RuntimeLimitSpec, TraceEvent, TraceNode,
-    TraceRecord, TraceRecorder, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity,
-    debug_verify_type, extract_result_provenance, materialize_verified,
+    Document, ExecutionTrace, JournalEvent, Limit, NoopTracer, PrintTracer, PrintTracerBuilder,
+    ProvenanceBinding, ResolvedRuntimeLimits, ResultProvenanceEntry, RunStats, RuntimeError,
+    RuntimeLimitSpec, TraceEvent, TraceNode, TraceRecord, TraceRecorder, Tracer, VM, VMBuilder,
+    Verbosity, extract_result_provenance,
 };

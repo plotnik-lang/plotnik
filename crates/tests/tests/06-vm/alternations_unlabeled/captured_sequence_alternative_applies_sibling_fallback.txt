@@ -11,14 +11,14 @@ a;
 --------------------- OUTPUT ---------------------
 {
   "w": {
-    "b": null,
     "grp": {
       "a": {
         "kind": "expression_statement",
-        "span": [0, 2],
-        "text": "a;"
+        "text": "a;",
+        "span": [0, 2]
       }
-    }
+    },
+    "b": null
   }
 }
 -------------------- BYTECODE --------------------
@@ -60,21 +60,21 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _ [RecordOpen]                   04, 08, 11
-  03                                        ▶
-  04   !   (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  13
-  07  ...
-  08   !   (comment) [Absent RecordSet(M1) Node RecordSet(M2)]  13
-  11  ──!  _                                04, 08, 11
-  13  ─‣┘  _ [RecordClose RecordSet(M3)]    03
+  01  └─!  _ [RecordSet(M3) RecordOpen]     05, 08, 10
+  04                                        ▶
+  05   !   (expression_statement) [RecordSet(M1) RecordOpen RecordSet(M0) Node RecordClose]  12
+  08   !   (comment) [RecordSet(M2) Node]   12
+  10  ──!  _                                05, 08, 10
+  12  ─‣┘  _ [RecordClose]                  04
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _ [RecordOpen]                   04, 08, 11
-       ●   expression_statement
-  04       (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  13
-       ●   expression_statement
-  13       _ [RecordClose RecordSet(M3)]    03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..2]
+0005 StayExact Named(Some(NodeKindId(150)))
+0005 MatchOk expression_statement [0..2]
+0012 Up(1) Any
+0012 MatchOk program [0..2]
+0004 Return PortId(0)
+0004 Return

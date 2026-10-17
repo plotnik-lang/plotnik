@@ -8,10 +8,10 @@ Q = (program
 --------------------- OUTPUT ---------------------
 {
   "x": {
+    "$tag": "A",
     "$data": {
       "id": null
-    },
-    "$tag": "A"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -54,19 +54,20 @@ Q = 00 :: T5
 Q:
   00   !   (program)                        18, 10
   02                                        ▶
-  03   !   (identifier) [Node RecordSet(M0) VariantClose RecordSet(M4)]  20
-  06  ──!  _                                03, 06
-  08   !   _ [VariantOpen(M2)]              03, 06
-  10  -ε-  [VariantOpen(M2) Absent RecordSet(M0) VariantClose RecordSet(M4)]  02
-  13   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  20
+  03   !   (identifier) [RecordSet(M0) Node VariantClose]  07
+  05  ──!  _                                03, 05
+  07  ─‣┘  _                                02
+  08   !   _ [RecordSet(M4) VariantOpen(M2)]  03, 05
+  10  -ε-  [RecordSet(M4) VariantOpen(M2) RecordSet(M0) Absent VariantClose]  02
+  13   !   (debugger_statement) [RecordSet(M4) VariantOpen(M3) RecordSet(M1) Node VariantClose]  07
   16  ──!  _                                08, 13, 16
   18  └─!  _                                08, 13, 16
-  20  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        18, 10
-       ●   program
-  18       _                                08, 13, 16
-  00  ❮❮❮ 
-  10  -ε-  [VariantOpen(M2) Absent RecordSet(M0) VariantClose RecordSet(M4)]  02
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..0]
+0018 DownExact Any
+0018 Backtrack { to_record: 5 }
+0010 Epsilon Any
+0002 Return PortId(0)
+0002 Return

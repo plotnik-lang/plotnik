@@ -3,7 +3,7 @@ use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::lower::ir::NfaGraph;
 
 pub(crate) use super::decode::{
-    DecodeCase, DecodeItem, DecodeItemKind, DecodeScope, DecodeValue, ResultDecodePlan,
+    DecodeCase, DecodeItemKind, DecodeScope, DecodeValue, ResultDecodePlan,
 };
 pub(crate) use super::matcher::{
     CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, PredicatePlan,

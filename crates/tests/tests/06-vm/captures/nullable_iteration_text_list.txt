@@ -43,34 +43,36 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00   !   (program)                        01
-  01  -ε-  [ListOpen]                       18, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M0)]        03
-  06  -ε-  [TextClose ArrayPush]            16, 20
-  08   !   (comment) [ScalarMark]           06
-  10  ──!  _                                08, 10
-  12   !   _                                08, 10
-  14  -ε-  [ScalarOpen]                     12
-  16  ──!  _                                14, 16
-  18  └─!  _                                14, 16
-  20  ─‣┘  _ [ListClose RecordSet(M0)]      03
+  00   !   (program) [RecordSet(M0)]        02
+  02  -ε-  [ListOpen]                       20, 05
+  04                                        ▶
+  05  -ε-  [ListClose]                      04
+  07  ...
+  08  -ε-  [TextClose ArrayPush]            18, 22
+  10   !   (comment) [ScalarMark]           08
+  12  ──!  _                                10, 12
+  14   !   _                                10, 12
+  16  -ε-  [ScalarOpen]                     14
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
+  22  ─‣┘  _ [ListClose]                    04
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       18, 04
-  18       _                                14, 16
-       ●   expression_statement
-  14  -ε-  [ScalarOpen]                     12
-  12       _                                08, 10
-       ●   expression_statement
-  08       (comment) [ScalarMark]           06
-       ○   expression_statement
-  12  ❮❮❮ 
-  10       _                                08, 10
-  18  ❮❮❮ 
-  16       _                                14, 16
-  01  ❮❮❮ 
-  04  -ε-  [ListClose RecordSet(M0)]        03
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..6]
+0002 Epsilon Any
+0020 DownExact Any
+0020 MatchOk node#150 [0..6]
+0016 Epsilon Any
+0014 StayExact Any
+0014 MatchOk node#150 [0..6]
+0010 StayExact Named(Some(NodeKindId(108)))
+0010 MatchFail node#150 [0..6]
+0010 Backtrack { to_record: 18 }
+0012 NextExact Any
+0012 Backtrack { to_record: 12 }
+0018 NextExact Any
+0018 Backtrack { to_record: 8 }
+0005 Epsilon Any
+0004 Return PortId(0)
+0004 Return

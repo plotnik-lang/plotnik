@@ -61,402 +61,383 @@ Q:
   000   !   (program)                       001
   001  └‣─  (expression_statement)          002
   002  └‣─  (array)                         003
-  003  └─!  _                               103, 006
+  003  └─!  _                               102, 107
   005                                       ▶
-  006  ──!  _                               103, 006
-  008  ─‣─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  095
-  011  ─•─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  095
-  014                                       ▶
-  015                                       ▶ p1
-  016  -ε-  [ListClose]                     014
-  018  -ε-  [ListClose]                     015
-  020  -ε-  [RecordClose ArrayPush]         053, 016
-  022  -ε-  [RecordClose ArrayPush]         046, 018
-  024                                       ▶
-  025                                       ▶ p1
-  026   !   (identifier) [Node RecordSet(M1)] == "x"  024
-  028  ──!  _                               026, 028
-  030   !   _ [Absent RecordSet(M0)]        026, 028
-  032  -ε-  [Absent RecordSet(M1)]          025
-  034  ─•─  (identifier) [Node RecordSet(M1)] == "x"  024
-  036   !   (identifier) [Node RecordSet(M0)] == "a"  034, 032
+  006  ─‣─  (identifier) [RecordSet(M3) Node] == "b"  071
+  008  ─•─  (identifier) [RecordSet(M3) Node] == "b"  071
+  010                                       ▶
+  011                                       ▶ p1
+  012  -ε-  [ListClose]                     010
+  014  -ε-  [ListClose]                     011
+  016  -ε-  [RecordClose ArrayPush]         048, 012
+  018  -ε-  [RecordClose ArrayPush]         067, 014
+  020                                       ▶
+  021                                       ▶ p1
+  022   !   (identifier) [RecordSet(M1) Node] == "x"  020
+  024  ──!  _                               022, 024
+  026   !   _ [RecordSet(M0) Absent]        022, 024
+  028  -ε-  [RecordSet(M1) Absent]          021
+  030  ─•─  (identifier) [RecordSet(M1) Node] == "x"  020
+  032   !   (identifier) [RecordSet(M0) Node] == "a"  030, 028
+  035  ──!  _                               032, 035
+  037   !   _                               032, 035
   039  ...
-  040  ──!  _                               036, 040
-  042   !   _                               036, 040
-  044  -ε-                                  042, 030
-  046  -ε-  [RecordOpen]                    069
-  048       (@044)                          044 : 020 / 022
-  051  -ε-  [RecordOpen]                    048
-  053  ──!  _                               051, 053
-  055                                       ▶
-  056                                       ▶ p1
-  057  -ε-  [Absent RecordSet(M1)]          056
-  059  ─•─  (identifier) [Node RecordSet(M1)] == "x"  055
-  061  ─•─  (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  055
-  064  ─•─  (identifier) [Node RecordSet(M0)] == "a"  059, 057
-  067  -ε-                                  064, 061
-  069       (@067)                          067 : 020 / 022
-  072                                       ▶
-  073                                       ▶ p1
-  074  -ε-  [Absent RecordSet(M1)]          073
-  076  ─•─  (identifier) [Node RecordSet(M1)] == "x"  072
-  078  ...
-  079  ...
-  080   !   (identifier) [Node RecordSet(M1)] == "x"  072
-  082  ──!  _                               080, 082
-  084   !   _ [Absent RecordSet(M0)]        080, 082
-  086  ...
+  040  -ε-                                  037, 026
+  042       (@040)                          040 : 016 / 018
+  045  -ε-  [RecordOpen]                    042
+  047  ...
+  048  ──!  _                               045, 048
+  050                                       ▶
+  051                                       ▶ p1
+  052  -ε-  [RecordSet(M1) Absent]          051
+  054  ─•─  (identifier) [RecordSet(M1) Node] == "x"  050
+  056  ─•─  (identifier) [RecordSet(M0) Absent RecordSet(M1) Node] == "x"  050
+  059  ─•─  (identifier) [RecordSet(M0) Node] == "a"  054, 052
+  062  -ε-                                  059, 056
+  064       (@062)                          062 : 016 / 018
+  067  -ε-  [RecordOpen]                    064
+  069                                       ▶
+  070                                       ▶ p1
+  071  ─‣┘³ _                               005
+  072  -ε-  [RecordSet(M1) Absent]          070
+  074  ─•─  (identifier) [RecordSet(M1) Node] == "x"  069
+  076   !   (identifier) [RecordSet(M1) Node] == "x"  069
+  078  ──!  _                               076, 078
+  080   !   _ [RecordSet(M0) Absent]        076, 078
+  082   !   (identifier) [RecordSet(M0) Node] == "a"  074, 072
+  085  ──!  _                               082, 085
   087  ...
-  088   !   (identifier) [Node RecordSet(M0)] == "a"  076, 074
-  091  ──!  _                               088, 091
-  093   !   _                               088, 091
-  095  ─‣┘³ _                               005
-  096  -ε-                                  093, 084
-  098       (@096)                          096 : 020 / 022
-  101  -ε-  [RecordOpen]                    098
-  103   !   "["                             108
-  104  ──!  _                               101, 104
-  106  ──!  _ [ListOpen]                    101, 104
-  108       (@106)                          106 : 008 / 011
+  088   !   _                               082, 085
+  090  -ε-                                  088, 080
+  092       (@090)                          090 : 016 / 018
+  095  ...
+  096  -ε-  [RecordOpen]                    092
+  098  ──!  _                               096, 098
+  100  ──!  _ [ListOpen]                    096, 098
+  102   !   "[" [RecordSet(M2)]             104
+  104       (@100)                          100 : 006 / 008
+  107  ──!  _                               102, 107
 --------------------- TRACE ----------------------
-Q:
-  000       (program)                       01
-        ●   program
-  001       (expression_statement)          02
-        ●   expression_statement
-  002       (array)                         03
-        ●   array
-  003       _                               103, 06
-        ●   [
-  103       "["                             108
-        ●   [
-  108       (@106)                          106 : 08 / 11
-        ▶   (@106)
-
-@106:
-  106       _ [ListOpen]                    101, 104
-        ●   identifier
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
-        ▶   (@096)
-
-@096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ●   identifier
-  076       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ,
-  088  ❮❮❮ 
-  074  -ε-  [Absent RecordSet(M1)]          73
-  073   ◀   (@096)                          p1
-
-@106:
-  022  -ε-  [RecordClose ArrayPush]         46, 18
-  046  -ε-  [RecordOpen]                    69
-  069       (@067)                          67 : 20 / 22
-        ▶   (@067)
-
-@067:
-  067  -ε-                                  64, 61
-  064       (identifier) [Node RecordSet(M0)] == "a"  59, 57
-        ○   ,
-  067  ❮❮❮ 
-  061       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  55
-        ○   ,
-  022  ❮❮❮ 
-  018  -ε-  [ListClose]                     15
-  015   ◀   (@106)                          p1
-
-Q:
-  011       (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  95
-        ○   ,
-  093  ❮❮❮ 
-  091       _                               88, 91
-        ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  084  ❮❮❮ 
-  082       _                               80, 82
-        ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  106  ❮❮❮ 
-  104       _                               101, 104
-        ●   ,
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
-        ▶   (@096)
-
-@096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
-        ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ,
-  093  ❮❮❮ 
-  091       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
-        ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ,
-  084  ❮❮❮ 
-  082       _                               80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
-        ●   identifier
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
-        ▶   (@096)
-
-@096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  093  ❮❮❮ 
-  091       _                               88, 91
-        ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  084  ❮❮❮ 
-  082       _                               80, 82
-        ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
-        ●   ,
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
-        ▶   (@096)
-
-@096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
-        ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ,
-  093  ❮❮❮ 
-  091       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
-        ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
-        ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ,
-  084  ❮❮❮ 
-  082       _                               80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
-        ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
-        ●   identifier
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
-        ▶   (@096)
-
-@096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
-        ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  093  ❮❮❮ 
-  091       _                               88, 91
-        ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
-        ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  084  ❮❮❮ 
-  082       _                               80, 82
-        ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
-        ●   ]
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
-        ▶   (@096)
-
-@096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
-        ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-        ○   ]
-  093  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
-        ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-        ○   ]
-  084  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
-  003  ❮❮❮ 
-  006       _                               103, 06
-        ●   identifier
-  103       "["                             108
-        ○   identifier
-  006  ❮❮❮ 
-  006       _                               103, 06
-        ●   ,
-  103       "["                             108
-        ○   ,
-  006  ❮❮❮ 
-  006       _                               103, 06
-        ●   identifier
-  103       "["                             108
-        ○   identifier
-  006  ❮❮❮ 
-  006       _                               103, 06
-        ●   ,
-  103       "["                             108
-        ○   ,
-  006  ❮❮❮ 
-  006       _                               103, 06
-        ●   identifier
-  103       "["                             108
-        ○   identifier
-  006  ❮❮❮ 
-  006       _                               103, 06
-        ●   ]
-  103       "["                             108
-        ○   ]
-  006  ❮❮❮ 
-  006       _                               103, 06
-  002  ❮❮❮ 
-  001  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..9]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0003 DownExact Any
+0003 MatchOk [ [0..1]
+0102 StayExact Anonymous(Some(NodeKindId(41)))
+0102 MatchOk [ [0..1]
+0104 Call CodeAddr(100)
+0104 Call { target: 100 }
+0100 NextExact Any
+0100 MatchOk identifier [1..2]
+0096 Epsilon Any
+0092 Call CodeAddr(90)
+0092 Call { target: 90 }
+0090 Epsilon Any
+0088 StayExact Any
+0088 MatchOk identifier [1..2]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchOk identifier [1..2]
+0074 NextSkip Named(Some(NodeKindId(1)))
+0074 MatchFail node#8 [2..3]
+0074 Backtrack { to_record: 43 }
+0072 Epsilon Any
+0070 Return PortId(1)
+0070 Return
+0018 Epsilon Any
+0067 Epsilon Any
+0064 Call CodeAddr(62)
+0064 Call { target: 62 }
+0062 Epsilon Any
+0059 NextSkip Named(Some(NodeKindId(1)))
+0059 MatchFail node#8 [2..3]
+0059 Backtrack { to_record: 64 }
+0056 NextSkip Named(Some(NodeKindId(1)))
+0056 MatchFail node#8 [2..3]
+0056 Backtrack { to_record: 58 }
+0014 Epsilon Any
+0011 Return PortId(1)
+0011 Return
+0008 NextSkip Named(Some(NodeKindId(1)))
+0008 MatchFail node#8 [2..3]
+0008 Backtrack { to_record: 37 }
+0085 NextExact Any
+0085 MatchOk node#8 [2..3]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#8 [2..3]
+0082 Backtrack { to_record: 90 }
+0085 NextExact Any
+0085 MatchOk identifier [4..5]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 98 }
+0085 NextExact Any
+0085 MatchOk node#8 [5..6]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#8 [5..6]
+0082 Backtrack { to_record: 106 }
+0085 NextExact Any
+0085 MatchOk identifier [7..8]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 114 }
+0085 NextExact Any
+0085 MatchOk node#42 [8..9]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#42 [8..9]
+0082 Backtrack { to_record: 122 }
+0085 NextExact Any
+0085 Backtrack { to_record: 33 }
+0080 StayExact Any
+0080 MatchOk identifier [1..2]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 135 }
+0078 NextExact Any
+0078 MatchOk node#8 [2..3]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#8 [2..3]
+0076 Backtrack { to_record: 143 }
+0078 NextExact Any
+0078 MatchOk identifier [4..5]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 151 }
+0078 NextExact Any
+0078 MatchOk node#8 [5..6]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#8 [5..6]
+0076 Backtrack { to_record: 159 }
+0078 NextExact Any
+0078 MatchOk identifier [7..8]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 167 }
+0078 NextExact Any
+0078 MatchOk node#42 [8..9]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#42 [8..9]
+0076 Backtrack { to_record: 175 }
+0078 NextExact Any
+0078 Backtrack { to_record: 27 }
+0098 NextExact Any
+0098 MatchOk node#8 [2..3]
+0096 Epsilon Any
+0092 Call CodeAddr(90)
+0092 Call { target: 90 }
+0090 Epsilon Any
+0088 StayExact Any
+0088 MatchOk node#8 [2..3]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#8 [2..3]
+0082 Backtrack { to_record: 196 }
+0085 NextExact Any
+0085 MatchOk identifier [4..5]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 204 }
+0085 NextExact Any
+0085 MatchOk node#8 [5..6]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#8 [5..6]
+0082 Backtrack { to_record: 212 }
+0085 NextExact Any
+0085 MatchOk identifier [7..8]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 220 }
+0085 NextExact Any
+0085 MatchOk node#42 [8..9]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#42 [8..9]
+0082 Backtrack { to_record: 228 }
+0085 NextExact Any
+0085 Backtrack { to_record: 192 }
+0080 StayExact Any
+0080 MatchOk node#8 [2..3]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#8 [2..3]
+0076 Backtrack { to_record: 241 }
+0078 NextExact Any
+0078 MatchOk identifier [4..5]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 249 }
+0078 NextExact Any
+0078 MatchOk node#8 [5..6]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#8 [5..6]
+0076 Backtrack { to_record: 257 }
+0078 NextExact Any
+0078 MatchOk identifier [7..8]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 265 }
+0078 NextExact Any
+0078 MatchOk node#42 [8..9]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#42 [8..9]
+0076 Backtrack { to_record: 273 }
+0078 NextExact Any
+0078 Backtrack { to_record: 186 }
+0098 NextExact Any
+0098 MatchOk identifier [4..5]
+0096 Epsilon Any
+0092 Call CodeAddr(90)
+0092 Call { target: 90 }
+0090 Epsilon Any
+0088 StayExact Any
+0088 MatchOk identifier [4..5]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 294 }
+0085 NextExact Any
+0085 MatchOk node#8 [5..6]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#8 [5..6]
+0082 Backtrack { to_record: 302 }
+0085 NextExact Any
+0085 MatchOk identifier [7..8]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 310 }
+0085 NextExact Any
+0085 MatchOk node#42 [8..9]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#42 [8..9]
+0082 Backtrack { to_record: 318 }
+0085 NextExact Any
+0085 Backtrack { to_record: 290 }
+0080 StayExact Any
+0080 MatchOk identifier [4..5]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 331 }
+0078 NextExact Any
+0078 MatchOk node#8 [5..6]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#8 [5..6]
+0076 Backtrack { to_record: 339 }
+0078 NextExact Any
+0078 MatchOk identifier [7..8]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 347 }
+0078 NextExact Any
+0078 MatchOk node#42 [8..9]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#42 [8..9]
+0076 Backtrack { to_record: 355 }
+0078 NextExact Any
+0078 Backtrack { to_record: 284 }
+0098 NextExact Any
+0098 MatchOk node#8 [5..6]
+0096 Epsilon Any
+0092 Call CodeAddr(90)
+0092 Call { target: 90 }
+0090 Epsilon Any
+0088 StayExact Any
+0088 MatchOk node#8 [5..6]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#8 [5..6]
+0082 Backtrack { to_record: 376 }
+0085 NextExact Any
+0085 MatchOk identifier [7..8]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 384 }
+0085 NextExact Any
+0085 MatchOk node#42 [8..9]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#42 [8..9]
+0082 Backtrack { to_record: 392 }
+0085 NextExact Any
+0085 Backtrack { to_record: 372 }
+0080 StayExact Any
+0080 MatchOk node#8 [5..6]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#8 [5..6]
+0076 Backtrack { to_record: 405 }
+0078 NextExact Any
+0078 MatchOk identifier [7..8]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 413 }
+0078 NextExact Any
+0078 MatchOk node#42 [8..9]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#42 [8..9]
+0076 Backtrack { to_record: 421 }
+0078 NextExact Any
+0078 Backtrack { to_record: 366 }
+0098 NextExact Any
+0098 MatchOk identifier [7..8]
+0096 Epsilon Any
+0092 Call CodeAddr(90)
+0092 Call { target: 90 }
+0090 Epsilon Any
+0088 StayExact Any
+0088 MatchOk identifier [7..8]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 Backtrack { to_record: 442 }
+0085 NextExact Any
+0085 MatchOk node#42 [8..9]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#42 [8..9]
+0082 Backtrack { to_record: 450 }
+0085 NextExact Any
+0085 Backtrack { to_record: 438 }
+0080 StayExact Any
+0080 MatchOk identifier [7..8]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 Backtrack { to_record: 463 }
+0078 NextExact Any
+0078 MatchOk node#42 [8..9]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#42 [8..9]
+0076 Backtrack { to_record: 471 }
+0078 NextExact Any
+0078 Backtrack { to_record: 432 }
+0098 NextExact Any
+0098 MatchOk node#42 [8..9]
+0096 Epsilon Any
+0092 Call CodeAddr(90)
+0092 Call { target: 90 }
+0090 Epsilon Any
+0088 StayExact Any
+0088 MatchOk node#42 [8..9]
+0082 StayExact Named(Some(NodeKindId(1)))
+0082 MatchFail node#42 [8..9]
+0082 Backtrack { to_record: 492 }
+0085 NextExact Any
+0085 Backtrack { to_record: 488 }
+0080 StayExact Any
+0080 MatchOk node#42 [8..9]
+0076 StayExact Named(Some(NodeKindId(1)))
+0076 MatchFail node#42 [8..9]
+0076 Backtrack { to_record: 505 }
+0078 NextExact Any
+0078 Backtrack { to_record: 482 }
+0098 NextExact Any
+0098 Backtrack { to_record: 16 }
+0107 NextExact Any
+0107 MatchOk identifier [1..2]
+0102 StayExact Anonymous(Some(NodeKindId(41)))
+0102 MatchFail identifier [1..2]
+0102 Backtrack { to_record: 519 }
+0107 NextExact Any
+0107 MatchOk node#8 [2..3]
+0102 StayExact Anonymous(Some(NodeKindId(41)))
+0102 MatchFail node#8 [2..3]
+0102 Backtrack { to_record: 527 }
+0107 NextExact Any
+0107 MatchOk identifier [4..5]
+0102 StayExact Anonymous(Some(NodeKindId(41)))
+0102 MatchFail identifier [4..5]
+0102 Backtrack { to_record: 535 }
+0107 NextExact Any
+0107 MatchOk node#8 [5..6]
+0102 StayExact Anonymous(Some(NodeKindId(41)))
+0102 MatchFail node#8 [5..6]
+0102 Backtrack { to_record: 543 }
+0107 NextExact Any
+0107 MatchOk identifier [7..8]
+0102 StayExact Anonymous(Some(NodeKindId(41)))
+0102 MatchFail identifier [7..8]
+0102 Backtrack { to_record: 551 }
+0107 NextExact Any
+0107 MatchOk node#42 [8..9]
+0102 StayExact Anonymous(Some(NodeKindId(41)))
+0102 MatchFail node#42 [8..9]
+0102 Backtrack { to_record: 559 }
+0107 NextExact Any
+0107 Backtrack { to_record: 12 }
+0107 Backtrack { to_record: 8 }

@@ -66,12 +66,6 @@ pub(crate) enum LintPolicy {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum SerdePolicy {
-    Include,
-    Omit,
-}
-
-#[derive(Debug, Clone, Copy)]
 pub(crate) enum VmMode {
     StructuredTrace,
     TextTrace { inspection: InspectionPolicy },
@@ -88,7 +82,6 @@ pub(crate) enum SnapshotKind {
         lints: LintPolicy,
     },
     Types {
-        serde: SerdePolicy,
         lints: LintPolicy,
     },
     Matcher {
@@ -124,14 +117,7 @@ impl SnapshotKind {
                 },
                 lints,
             }),
-            "04" if name.contains("types") => Ok(Self::Types {
-                serde: if name.contains("serde") {
-                    SerdePolicy::Include
-                } else {
-                    SerdePolicy::Omit
-                },
-                lints,
-            }),
+            "04" if name.contains("types") => Ok(Self::Types { lints }),
             "04" if name.contains_path(&["rust", "module"]) => Ok(Self::Matcher { lints }),
             "06" => Ok(Self::Vm {
                 mode: if name.contains("execution_trace") {

@@ -9,8 +9,8 @@ a; b;
 {
   "id": {
     "kind": "identifier",
-    "span": [3, 4],
-    "text": "b"
+    "text": "b",
+    "span": [3, 4]
   }
 }
 -------------------- BYTECODE --------------------
@@ -40,21 +40,22 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
-  2  └‣─  (identifier) [Node RecordSet(M0)] == "b"  4
+  2  └‣─  (identifier) [RecordSet(M0) Node] == "b"  4
   4  ─‣┘² _                                 5
   5                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement)            02
-      ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)] == "b"  04
-      ○   ;
-  1  ❮❮❮ 
-      ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)] == "b"  04
-      ●   identifier
-  4       _                                 05
-      ●   program
-  5   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchFail node#24 [1..2]
+0002 Backtrack { to_record: 8 }
+0002 MatchOk expression_statement [3..5]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchOk identifier [3..4]
+0004 Up(2) Any
+0004 MatchOk program [0..5]
+0005 Return PortId(0)
+0005 Return

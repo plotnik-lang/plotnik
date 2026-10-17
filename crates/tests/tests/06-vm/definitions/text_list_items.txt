@@ -42,31 +42,31 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00   !   (program)                        01
-  01  -ε-  [ListOpen]                       14, 08
-  03  -ε-  [ListClose]                      05
-  05  ─‣┘  _ [RecordSet(M0)]                07
-  07                                        ▶
-  08  -ε-  [ListClose RecordSet(M0)]        07
-  10   !   (comment) [NodeText ArrayPush]   12, 03
-  12  ──!  _                                10, 12
-  14  └─!  _                                10, 12
+  00   !   (program) [RecordSet(M0)]        02
+  02  -ε-  [ListOpen]                       12, 05
+  04                                        ▶
+  05  -ε-  [ListClose]                      04
+  07  ...
+  08   !   (comment) [NodeText ArrayPush]   10, 14
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14  ─‣┘  _ [ListClose]                    04
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       14, 08
-  14       _                                10, 12
-       ●   comment
-  10       (comment) [NodeText ArrayPush]   12, 03
-       ●   comment
-  12       _                                10, 12
-       ●   comment
-  10       (comment) [NodeText ArrayPush]   12, 03
-       ●   comment
-  12       _                                10, 12
-  10  ❮❮❮ 
-  03  -ε-  [ListClose]                      05
-  05       _ [RecordSet(M0)]                07
-       ●   program
-  07   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..19]
+0002 Epsilon Any
+0012 DownExact Any
+0012 MatchOk comment [0..8]
+0008 StayExact Named(Some(NodeKindId(108)))
+0008 MatchOk comment [0..8]
+0010 NextExact Any
+0010 MatchOk comment [10..19]
+0008 StayExact Named(Some(NodeKindId(108)))
+0008 MatchOk comment [10..19]
+0010 NextExact Any
+0010 Backtrack { to_record: 28 }
+0014 Up(1) Any
+0014 MatchOk program [0..19]
+0004 Return PortId(0)
+0004 Return

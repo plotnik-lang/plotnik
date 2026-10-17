@@ -8,10 +8,10 @@ let x
 --------------------- OUTPUT ---------------------
 {
   "x": {
+    "$tag": "A",
     "$data": {
       "id": null
-    },
-    "$tag": "A"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -47,30 +47,31 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        18, 12
-  02   !   (identifier) [Node RecordSet(M0)]  04
-  04  ─‣┘  _ [VariantClose RecordSet(M2)]   06
+  02   !   (identifier) [RecordSet(M0) Node]  04
+  04  ─‣┘  _ [VariantClose]                 06
   06                                        ▶
   07  ...
   08  ──!  _                                02, 08
-  10   !   _ [VariantOpen(M1)]              02, 08
-  12  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  06
+  10   !   _ [RecordSet(M2) VariantOpen(M1)]  02, 08
+  12  -ε-  [RecordSet(M2) VariantOpen(M1) RecordSet(M0) Absent VariantClose]  06
   15  ...
   16  ──!  _                                10, 16
   18  └─!  _                                10, 16
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        18, 12
-       ●   program
-  18       _                                10, 16
-       ●   lexical_declaration
-  10       _ [VariantOpen(M1)]              02, 08
-       ●   lexical_declaration
-  02       (identifier) [Node RecordSet(M0)]  04
-       ○   lexical_declaration
-  10  ❮❮❮ 
-  08       _                                02, 08
-  18  ❮❮❮ 
-  16       _                                10, 16
-  00  ❮❮❮ 
-  12  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  06
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0018 DownExact Any
+0018 MatchOk node#152 [0..5]
+0010 StayExact Any
+0010 MatchOk node#152 [0..5]
+0002 StayExact Named(Some(NodeKindId(1)))
+0002 MatchFail node#152 [0..5]
+0002 Backtrack { to_record: 15 }
+0008 NextExact Any
+0008 Backtrack { to_record: 9 }
+0016 NextExact Any
+0016 Backtrack { to_record: 5 }
+0012 Epsilon Any
+0006 Return PortId(0)
+0006 Return

@@ -25,7 +25,7 @@ Q:
   1  └!┘  _                                 2
   2                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       _                                 02
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 ChildlessExact Any

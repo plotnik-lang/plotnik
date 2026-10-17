@@ -5,5 +5,5 @@ Q = (program
   ] @_
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q;

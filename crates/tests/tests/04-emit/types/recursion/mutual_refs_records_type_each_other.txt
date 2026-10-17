@@ -12,17 +12,17 @@ Q = (program
   (expression_statement (Arr) @top)
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Obj {
-    pub arr: ::core::option::Option<::std::boxed::Box<Arr>>,
+#[derive(Clone, Copy)]
+pub struct Obj<'r> {
+    pub arr: ::core::option::Option<&'r Arr<'r>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Arr {
-    pub obj: ::core::option::Option<::std::boxed::Box<Obj>>,
+#[derive(Clone, Copy)]
+pub struct Arr<'r> {
+    pub obj: ::core::option::Option<&'r Obj<'r>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q {
-    pub top: Arr,
+#[derive(Clone, Copy)]
+pub struct Q<'r> {
+    pub top: Arr<'r>,
 }

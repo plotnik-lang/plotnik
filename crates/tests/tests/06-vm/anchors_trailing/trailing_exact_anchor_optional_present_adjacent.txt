@@ -12,13 +12,13 @@ let x; debugger;
 {
   "a": {
     "kind": "lexical_declaration",
-    "span": [0, 6],
-    "text": "let x;"
+    "text": "let x;",
+    "span": [0, 6]
   },
   "b": {
     "kind": "debugger_statement",
-    "span": [7, 16],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [7, 16]
   }
 }
 -------------------- BYTECODE --------------------
@@ -51,22 +51,23 @@ Q:
   00   !   (program)                        14, 04
   02                                        ▶
   03  !─┘  _                                02
-  04  └─!  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  03
+  04  └─!  (debugger_statement) [RecordSet(M0) Absent RecordSet(M1) Node]  03
   07  ...
-  08  ──!  (debugger_statement) [Node RecordSet(M1)]  03
-  10   !   (lexical_declaration) [Node RecordSet(M0)]  08
+  08  ──!  (debugger_statement) [RecordSet(M1) Node]  03
+  10   !   (lexical_declaration) [RecordSet(M0) Node]  08
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        14, 04
-       ●   program
-  14       _                                10, 12
-       ●   lexical_declaration
-  10       (lexical_declaration) [Node RecordSet(M0)]  08
-       ●   lexical_declaration
-  08       (debugger_statement) [Node RecordSet(M1)]  03
-       ●   debugger_statement
-  03       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..16]
+0014 DownExact Any
+0014 MatchOk lexical_declaration [0..6]
+0010 StayExact Named(Some(NodeKindId(152)))
+0010 MatchOk lexical_declaration [0..6]
+0008 NextExact Named(Some(NodeKindId(168)))
+0008 MatchOk debugger_statement [7..16]
+0003 UpExact(1) Any
+0003 MatchOk program [0..16]
+0002 Return PortId(0)
+0002 Return

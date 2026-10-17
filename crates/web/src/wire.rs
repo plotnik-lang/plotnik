@@ -1,9 +1,9 @@
-use plotnik_compiler::bytecode::{
-    Entrypoint, Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind,
-};
+use plotnik_compiler::bytecode::{Labeling, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_compiler::{
-    Colors, MatchJournal, RunStats, RuntimeError, extract_result_provenance, materialize_verified,
+    Document, ExecutionTrace, RunStats, RuntimeError, extract_result_provenance,
 };
+use plotnik_runtime::json::Style;
+use plotnik_runtime::{Account, Text};
 use serde_json::{Map, Value as JsonValue, json};
 use wasm_bindgen::JsValue;
 
@@ -35,32 +35,58 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
 
 pub fn result_json(
     module: &Module,
-    entrypoint: &Entrypoint,
-    source: &str,
-    result: (Result<MatchJournal<'_>, RuntimeError>, RunStats),
-    execution_trace: Option<JsonValue>,
-) -> JsonValue {
-    let (result, stats) = result;
-    let mut out = match result {
-        Ok(journal) => {
-            let colors = Colors::new(false);
-            let result =
-                materialize_verified(source, module, entrypoint, journal.output_events(), colors);
-            let result_provenance =
-                (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, module));
-            json!({
-                "result": json_value!(result),
-                "result_provenance": json_value!(result_provenance),
-                "run_stats": json_value!(stats),
-            })
+    account: &Account,
+    result: (Result<Document<'_, '_, '_>, RuntimeError>, RunStats),
+    execution_trace: Option<ExecutionTrace<'_>>,
+) -> JsValue {
+    let (result, mut stats) = result;
+    let response = js_sys::Object::new();
+    let outcome = match result {
+        Ok(document) => {
+            let mut output = Text::new(account);
+            document
+                .write_json(Style::COMPACT, &mut output)
+                .map_err(|error| {
+                    output
+                        .error()
+                        .map_or_else(|| error.to_string(), |error| error.to_string())
+                })
+                .and_then(|()| {
+                    let provenance = if module.spans().is_empty() {
+                        None
+                    } else {
+                        Some(
+                            extract_result_provenance(&document, module)
+                                .map_err(|error| error.to_string())?,
+                        )
+                    };
+                    set(
+                        &response,
+                        "result",
+                        &js_sys::JSON::parse(&output).expect("runtime emits valid JSON"),
+                    );
+                    set(&response, "result_provenance", &to_js(&provenance));
+                    Ok(())
+                })
         }
-        Err(RuntimeError::NoMatch) => error_json("no match"),
-        Err(error) => error_json(error.to_string()),
+        Err(RuntimeError::NoMatch) => Err("no match".to_string()),
+        Err(error) => Err(error.to_string()),
     };
-    if let Some(execution_trace) = execution_trace {
-        out["execution_trace"] = execution_trace;
+    if let Err(error) = outcome {
+        set(&response, "error", &JsValue::from_str(&error));
     }
-    out
+    if let Some(execution_trace) = execution_trace {
+        set(&response, "execution_trace", &to_js(&execution_trace));
+    }
+    stats.fuel_used = account.fuel_used();
+    stats.peak_live_heap_bytes = account.memory_peak();
+    set(&response, "run_stats", &to_js(&stats));
+    response.into()
+}
+
+fn set(object: &js_sys::Object, key: &str, value: &JsValue) {
+    js_sys::Reflect::set(object, &JsValue::from_str(key), value)
+        .expect("fresh response object accepts fields");
 }
 
 pub fn error_json(error: impl Into<String>) -> JsonValue {
@@ -116,9 +142,7 @@ fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
     }
 }
 
-pub fn to_js(value: &JsonValue) -> JsValue {
-    use serde::Serialize;
-
+pub fn to_js(value: &impl serde::Serialize) -> JsValue {
     // The default serializer turns JSON objects into ES Maps; json_compatible
     // produces plain objects, which is what the playground consumes.
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();

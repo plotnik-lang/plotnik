@@ -9,8 +9,8 @@ x;
 {
   "expression": {
     "kind": "expression_statement",
-    "span": [0, 2],
-    "text": "x;"
+    "text": "x;",
+    "span": [0, 2]
   }
 }
 -------------------- BYTECODE --------------------
@@ -37,21 +37,22 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (expression_statement) [Node RecordSet(M0)]  3
+  1  └‣─  (expression_statement) [RecordSet(M0) Node]  3
   3  └‣─  (_)                               4
   4  └!┘  _                                 5
   5  ─‣┘² _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement) [Node RecordSet(M0)]  03
-      ●   expression_statement
-  3       (_)                               04
-      ●   identifier
-  4       _                                 05
-      ●   identifier
-  5       _                                 06
-      ●   program
-  6   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0003 Down Named(None)
+0003 MatchOk node#1 [0..1]
+0004 ChildlessExact Any
+0004 MatchOk node#1 [0..1]
+0005 Up(2) Any
+0005 MatchOk program [0..2]
+0006 Return PortId(0)
+0006 Return

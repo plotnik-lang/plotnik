@@ -12,14 +12,14 @@ Q = 02
 Q:
   01                                        ▶
   02   !   (array)                          18
-  03  ─‣┘  _ [ListClose RecordSet(items)]   01
-  05  -ε-  [ListClose RecordSet(items)]     01
+  03  ─‣┘  _ [ListClose]                    01
+  05  -ε-  [ListClose]                      01
   07  -ε-  [RecordClose ArrayPush]          12, 03
-  08  ─‣─  (number) [Node RecordSet(b)]     07
-  09   !   (identifier) [RecordOpen Node RecordSet(a)]  08
+  08  ─‣─  (number) [RecordSet(b) Node]     07
+  09   !   (identifier) [RecordOpen RecordSet(a) Node]  08
   12  ──!  _                                09, 12
   13  └─!  _                                09, 12
-  18  -ε-  [ListOpen]                       13, 05
+  18  -ε-  [RecordSet(items) ListOpen]      13, 05
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -53,12 +53,12 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (array)                          01
-  01  -ε-  [ListOpen]                       14, 04
+  01  -ε-  [RecordSet(M2) ListOpen]         14, 04
   03                                        ▶
-  04  -ε-  [ListClose RecordSet(M2)]        03
+  04  -ε-  [ListClose]                      03
   06  -ε-  [RecordClose ArrayPush]          12, 16
-  08  ─‣─  (number) [Node RecordSet(M1)]    06
-  10   !   (identifier) [RecordOpen Node RecordSet(M0)]  08
+  08  ─‣─  (number) [RecordSet(M1) Node]    06
+  10   !   (identifier) [RecordOpen RecordSet(M0) Node]  08
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  ─‣┘  _ [ListClose RecordSet(M2)]      03
+  16  ─‣┘  _ [ListClose]                    03

@@ -20,7 +20,7 @@ Q:
   06  └‣─  (call_expression)                08
   08  └‣─  arguments: (arguments)           11
   10  ─‣┘⁴ _                                01
-  11  └•─  (identifier) [Node RecordSet(arg)]  10
+  11  └•─  (identifier) [RecordSet(arg) Node]  10
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -51,6 +51,6 @@ Q:
   1  └‣─  (expression_statement)            2
   2  └‣─  (call_expression)                 3
   3  └‣─  arguments: (arguments)            4
-  4  └•─  (identifier) [Node RecordSet(M0)]  6
+  4  └•─  (identifier) [RecordSet(M0) Node]  6
   6  ─‣┘⁴ _                                 7
   7                                         ▶

@@ -48,33 +48,36 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       20, 08
-  03  └‣─  (identifier) [Node RecordSet(M0)]  05
-  05  ─‣┘  _ [RecordClose RecordSet(M1)]    10
+  01  -ε-  [RecordSet(M2) ListOpen]         22, 08
+  03  └‣─  (identifier) [RecordSet(M0) Node]  05
+  05  ─‣┘  _ [RecordClose]                  10
   07                                        ▶
-  08  -ε-  [ListClose RecordSet(M2)]        07
-  10  -ε-  [RecordClose ArrayPush]          18, 22
+  08  -ε-  [ListClose]                      07
+  10  -ε-  [RecordClose ArrayPush]          20, 24
   12   !   (expression_statement) [RecordOpen]  03
   14  ──!  _                                12, 14
-  16   !   _ [RecordOpen]                   12, 14
-  18  ──!  _                                16, 18
-  20  └─!  _                                16, 18
-  22  ─‣┘  _ [ListClose RecordSet(M2)]      07
+  16   !   _ [RecordSet(M1)]                12, 14
+  18  -ε-  [RecordOpen]                     16
+  20  ──!  _                                18, 20
+  22  └─!  _                                18, 20
+  24  ─‣┘  _ [ListClose]                    07
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       20, 08
-  20       _                                16, 18
-       ●   debugger_statement
-  16       _ [RecordOpen]                   12, 14
-       ●   debugger_statement
-  12       (expression_statement) [RecordOpen]  03
-       ○   debugger_statement
-  16  ❮❮❮ 
-  14       _                                12, 14
-  20  ❮❮❮ 
-  18       _                                16, 18
-  01  ❮❮❮ 
-  08  -ε-  [ListClose RecordSet(M2)]        07
-  07   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 Epsilon Any
+0022 DownExact Any
+0022 MatchOk node#168 [0..9]
+0018 Epsilon Any
+0016 StayExact Any
+0016 MatchOk node#168 [0..9]
+0012 StayExact Named(Some(NodeKindId(150)))
+0012 MatchFail node#168 [0..9]
+0012 Backtrack { to_record: 19 }
+0014 NextExact Any
+0014 Backtrack { to_record: 12 }
+0020 NextExact Any
+0020 Backtrack { to_record: 8 }
+0008 Epsilon Any
+0007 Return PortId(0)
+0007 Return

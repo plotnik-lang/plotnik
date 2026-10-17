@@ -22,8 +22,19 @@
 //!     let q = Q::exec(tree.root_node(), source)
 //!         .expect("auto limits fit")
 //!         .expect("matches");
+//!     assert_eq!(q.view().id.utf8_text(source.as_bytes()).unwrap(), "x");
 //! }
 //! ```
+//!
+//! Value-producing queries return an owning `rt::Match`. Read the generated
+//! row through `view()`. Rows are shallow `Copy` values: lists are borrowed
+//! slices and recursive values are references into the match's storage.
+//! Each item from `each` owns its storage independently. `find_all` returns
+//! `rt::Matches`, which supports borrowing iteration with `for row in &matches`.
+//! Node fields borrow the parse tree, text fields borrow the source, and
+//! slices and recursive references cannot outlive their result owner.
+//! Use `Match::write_json` to render a result without recursive serialization.
+//! Match-only queries return the matched node instead of a result owner.
 //!
 //! There is no built-in language list: `grammar = "..."` names any package in
 //! your own dependency graph that ships a `grammar.json` (`tree-sitter-*` or

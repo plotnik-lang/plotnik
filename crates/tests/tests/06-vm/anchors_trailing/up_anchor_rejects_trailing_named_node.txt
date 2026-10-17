@@ -36,26 +36,26 @@ Q:
   08   !   (expression_statement)           03
   09  ──!  _                                08, 09
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                08, 09
-       ●   expression_statement
-  08       (expression_statement)           03
-       ●   expression_statement
-  03       (identifier) == "a"              05
-       ●   identifier
-  05       _                                07
-       ●   expression_statement
-  07       _                                06
-  03  ❮❮❮ 
-       ○   ;
-  01  ❮❮❮ 
-  09       _                                08, 09
-       ●   expression_statement
-  08       (expression_statement)           03
-       ●   expression_statement
-  03       (identifier) == "a"              05
-       ○   ;
-  09  ❮❮❮ 
-  09       _                                08, 09
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..2]
+0008 StayExact Named(Some(NodeKindId(150)))
+0008 MatchOk expression_statement [0..2]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchOk identifier [0..1]
+0005 Up(1) Any
+0005 MatchOk expression_statement [0..2]
+0007 UpSkipTrivia(1) Any
+0007 Backtrack { to_record: 14 }
+0007 MatchFail node#24 [1..2]
+0007 Backtrack { to_record: 7 }
+0009 NextExact Any
+0009 MatchOk expression_statement [3..5]
+0008 StayExact Named(Some(NodeKindId(150)))
+0008 MatchOk expression_statement [3..5]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchFail node#24 [4..5]
+0003 Backtrack { to_record: 27 }
+0009 NextExact Any

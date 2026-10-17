@@ -11,8 +11,8 @@ let x
 {
   "n": {
     "kind": "identifier",
-    "span": [4, 5],
-    "text": "x"
+    "text": "x",
+    "span": [4, 5]
   }
 }
 -------------------- BYTECODE --------------------
@@ -44,20 +44,21 @@ Q:
   0   !   (program)                         1
   1  └‣─  (lexical_declaration)             2
   2  └‣─  (variable_declarator)             3
-  3  └‣─  name: (identifier) [Node RecordSet(M0)]  5
+  3  └‣─  name: (identifier) [RecordSet(M0) Node]  5
   5  ─‣┘³ _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (lexical_declaration)             02
-      ●   lexical_declaration
-  2       (variable_declarator)             03
-      ○   let
-      ●   variable_declarator
-  3       name: (identifier) [Node RecordSet(M0)]  05
-      ●   identifier
-  5       _                                 06
-      ●   program
-  6   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 Down Named(Some(NodeKindId(152)))
+0001 MatchOk lexical_declaration [0..5]
+0002 Down Named(Some(NodeKindId(154)))
+0002 MatchFail node#14 [0..3]
+0002 MatchOk variable_declarator [4..5]
+0003 Down Named(Some(NodeKindId(1)))
+0003 MatchOk identifier [4..5]
+0005 Up(3) Any
+0005 MatchOk program [0..5]
+0006 Return PortId(0)
+0006 Return

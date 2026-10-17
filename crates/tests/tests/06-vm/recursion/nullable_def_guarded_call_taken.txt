@@ -14,8 +14,8 @@ Q = (program
 {
   "e": {
     "kind": "expression_statement",
-    "span": [28, 32],
-    "text": "f();"
+    "text": "f();",
+    "span": [28, 32]
   }
 }
 -------------------- BYTECODE --------------------
@@ -48,8 +48,8 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        27, 03
   02                                        ▶
-  03  └‣─  (expression_statement) [Node RecordSet(M0)]  29
-  05  ─‣─  (expression_statement) [Node RecordSet(M0)]  29
+  03  └‣─  (expression_statement) [RecordSet(M0) Node]  29
+  05  ─‣─  (expression_statement) [RecordSet(M0) Node]  29
   07  └•─  (debugger_statement)             23
   08  ─‣─  (debugger_statement)             23
   09                                        ▶
@@ -67,47 +67,42 @@ Q:
   27  └─!  _                                24, 25
   29  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        27, 03
-       ●   program
-  27       _                                24, 25
-       ●   statement_block
-  24       (statement_block)                20
-       ●   statement_block
-  20       (@18)                            18 : 08 / 07
-       ▶   (@18)
-
-@18:
-  18  -ε-                                   17, 10
-  17       (statement_block)                13
-       ○   {
-       ●   statement_block
-  13       (@18)                            18 : 12 / 11
-       ▶   (@18)
-
-@18:
-  18  -ε-                                   17, 10
-  17       (statement_block)                13
-       ○   {
-       ○   debugger_statement
-  18  ❮❮❮ 
-  10   ◀   (@18)                            p1
-
-@18:
-  11       (debugger_statement)             16
-       ○   {
-       ●   debugger_statement
-  16       _                                09
-       ●   statement_block
-  09   ◀   (@18)                            
-
-Q:
-  08       (debugger_statement)             23
-       ●   debugger_statement
-  23       _                                05
-       ●   statement_block
-  05       (expression_statement) [Node RecordSet(M0)]  29
-       ●   expression_statement
-  29       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..32]
+0027 DownExact Any
+0027 MatchOk statement_block [0..27]
+0024 StayExact Named(Some(NodeKindId(155)))
+0024 MatchOk statement_block [0..27]
+0020 Call CodeAddr(18)
+0020 Call { target: 18 }
+0018 Epsilon Any
+0017 DownSkip Named(Some(NodeKindId(155)))
+0017 MatchFail node#7 [0..1]
+0017 MatchOk statement_block [2..15]
+0013 Call CodeAddr(18)
+0013 Call { target: 18 }
+0018 Epsilon Any
+0017 DownSkip Named(Some(NodeKindId(155)))
+0017 MatchFail node#7 [2..3]
+0017 MatchFail debugger_statement [4..13]
+0017 Backtrack { to_record: 25 }
+0010 Return PortId(1)
+0010 Return
+0011 DownSkip Named(Some(NodeKindId(168)))
+0011 MatchFail node#7 [2..3]
+0011 MatchOk debugger_statement [4..13]
+0016 Up(1) Any
+0016 MatchOk statement_block [2..15]
+0009 Return PortId(0)
+0009 Return
+0008 Next Named(Some(NodeKindId(168)))
+0008 MatchOk debugger_statement [16..25]
+0023 Up(1) Any
+0023 MatchOk statement_block [0..27]
+0005 Next Named(Some(NodeKindId(150)))
+0005 MatchOk expression_statement [28..32]
+0029 Up(1) Any
+0029 MatchOk program [0..32]
+0002 Return PortId(0)
+0002 Return

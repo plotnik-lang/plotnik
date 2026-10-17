@@ -2,8 +2,14 @@ use std::iter::FusedIterator;
 
 use crate::{LimitExceeded, Node};
 
+/// The execution points of a generated entrypoint, for generic callers.
+///
+/// Value entrypoints produce [`Match`](crate::Match) results and collect
+/// into [`Matches`](crate::Matches); match-only entrypoints produce the
+/// matched `Node`s.
 pub trait Execute<'t, 's> {
     type Item;
+    type All;
 
     fn exec(node: Node<'t>, source: &'s str) -> Result<Option<Self::Item>, LimitExceeded>;
 
@@ -16,9 +22,7 @@ pub trait Execute<'t, 's> {
         Self::each(scope, source).next().transpose()
     }
 
-    fn find_all(scope: Node<'t>, source: &'s str) -> Result<Vec<Self::Item>, LimitExceeded> {
-        Self::each(scope, source).collect::<Result<Vec<_>, _>>()
-    }
+    fn find_all(scope: Node<'t>, source: &'s str) -> Result<Self::All, LimitExceeded>;
 }
 
 pub fn exec<'t, 's, Q: Execute<'t, 's>>(
@@ -45,6 +49,6 @@ pub fn find<'t, 's, Q: Execute<'t, 's>>(
 pub fn find_all<'t, 's, Q: Execute<'t, 's>>(
     scope: Node<'t>,
     source: &'s str,
-) -> Result<Vec<Q::Item>, LimitExceeded> {
+) -> Result<Q::All, LimitExceeded> {
     Q::find_all(scope, source)
 }

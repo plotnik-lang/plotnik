@@ -5,12 +5,12 @@ Q = [
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t> {
     pub result: QResult<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub enum QResult<'t> {
     Str { s: Node<'t> },
     Num { n: Node<'t> },

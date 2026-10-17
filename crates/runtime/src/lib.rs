@@ -1,9 +1,10 @@
 //! Shared runtime engine for Plotnik queries.
 //!
 //! The compiler and executors share instruction types, backtracking state,
-//! regex automata, and execution limits. The default `execution` feature adds
-//! Tree-sitter navigation, match journals, and typed result decoding. Compiler-only
-//! builds disable it to avoid linking Tree-sitter's C runtime.
+//! regex automata, accounted storage, and execution limits. The default
+//! `execution` feature adds Tree-sitter navigation, the output tape, result
+//! publication, and JSON rendering. Compiler-only builds disable it to avoid
+//! linking Tree-sitter's C runtime.
 
 /// Current interface required by generated Rust query modules.
 pub const RUNTIME_ABI: u32 = 0;
@@ -17,9 +18,6 @@ mod limits;
 mod nav;
 mod node_class;
 
-#[cfg(feature = "debug")]
-pub mod debug;
-
 #[cfg(feature = "execution")]
 mod cursor;
 #[cfg(feature = "execution")]
@@ -27,26 +25,26 @@ mod engine;
 #[cfg(feature = "execution")]
 mod execution;
 #[cfg(feature = "execution")]
-mod journal;
+pub mod json;
 #[cfg(feature = "execution")]
-mod result_decoder;
-#[cfg(feature = "serde")]
-mod serialize;
+mod result;
 #[cfg(feature = "execution")]
 mod surface;
+#[cfg(feature = "execution")]
+mod tape;
 
 #[cfg(feature = "failpoints")]
 pub use alloc::failpoints;
 pub use alloc::{Account, Buffer, Meter, Shared, Text};
 pub use checkpoint::{
-    CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume,
+    CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume, TapeMark,
 };
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{CallFrameError, Frame, FrameArena, PortId};
 pub use ids::{InvalidNodeKindId, NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
-    DecodeDepth, GENERATED_NODE_VALUE_BYTES, Limit, LimitExceeded, ResolvedRuntimeLimits,
-    RuntimeLimitSpec, decode_depth_auto,
+    GENERATED_NODE_VALUE_BYTES, GENERATED_VALUE_CAP, Limit, LimitExceeded, ResolvedRuntimeLimits,
+    RuntimeLimitSpec,
 };
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
@@ -57,15 +55,23 @@ pub use cursor::CursorWrapper;
 pub use engine::Engine;
 #[cfg(feature = "execution")]
 #[doc(hidden)]
-pub use execution::{ExecutionBudget, Traversal};
+pub use execution::{Each, Entry, Search, each_node, exec_node, find_all_nodes};
 #[cfg(feature = "execution")]
-pub use journal::{JournalEvent, MatchJournal, OutputEvents, node_text, source_text};
-#[cfg(feature = "execution")]
-pub use result_decoder::{DecoderScratch, ResultDecoder};
-#[cfg(feature = "serde")]
-pub use serialize::{SerializeWithSource, WithSource};
+pub use result::{
+    Case, Document, Field, Iter, Match, Matches, Member, Normalizer, Publish, Publisher,
+    ResultFamily, Rows, Schema, SchemaTables, Scope, Slice, Span, Step, Ty, Walk, WalkStack,
+};
 #[cfg(feature = "execution")]
 pub use surface::{Execute, each, exec, find, find_all};
+#[cfg(feature = "execution")]
+pub use tape::{Events, JournalEvent, Tape, node_text, predicate_text, source_text};
+
+/// Generic operations behind generated execution points.
+#[cfg(feature = "execution")]
+#[doc(hidden)]
+pub mod run {
+    pub use crate::execution::{each, exec, find_all};
+}
 
 /// Tree-sitter types used by the execution engine.
 #[cfg(feature = "execution")]
@@ -82,10 +88,5 @@ pub use tree_sitter::{Node, Tree};
 #[cfg(feature = "execution")]
 const _: () = assert!(
     GENERATED_NODE_VALUE_BYTES >= std::mem::size_of::<Node<'static>>() as u64,
-    "generated decoder-frame estimate must cover tree_sitter::Node"
+    "generated size estimates must cover tree_sitter::Node"
 );
-
-/// Generated `SerializeWithSource` impls spell serde paths through this
-/// re-export, so user crates don't need their own serde dependency.
-#[cfg(feature = "serde")]
-pub use serde;

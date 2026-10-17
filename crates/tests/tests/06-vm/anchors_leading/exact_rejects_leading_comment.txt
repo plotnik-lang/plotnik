@@ -30,12 +30,12 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └─!  (debugger_statement) [Node RecordSet(M0)]  3
+  1  └─!  (debugger_statement) [RecordSet(M0) Node]  3
   3  ─‣┘  _                                 4
   4                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (debugger_statement) [Node RecordSet(M0)]  03
-      ○   comment
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..17]
+0001 DownExact Named(Some(NodeKindId(168)))
+0001 MatchFail node#108 [0..7]

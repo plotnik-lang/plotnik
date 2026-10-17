@@ -1,6 +1,16 @@
 use std::num::NonZeroU64;
 
-use crate::{NodeFieldId, SkipPolicy};
+use crate::alloc::{Buffer, Meter};
+use crate::{LimitExceeded, NodeFieldId, SkipPolicy};
+
+/// Lengths of the output tape's buffers. Restoring a mark rolls back every
+/// operation recorded after it in O(1).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TapeMark {
+    pub ops: usize,
+    pub nodes: usize,
+    pub inspection: usize,
+}
 
 /// Effect-control depths restored together on backtracking.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,8 +75,8 @@ pub struct CheckpointState {
     /// Cursor position (tree-sitter descendant_index) — always present; the
     /// restore fallback when the pooled snapshot was evicted.
     pub descendant_index: u32,
-    /// Match journal length at checkpoint.
-    pub journal_watermark: usize,
+    /// Output tape lengths at checkpoint.
+    pub tape: TapeMark,
     /// Frame arena state at checkpoint.
     pub frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
@@ -136,18 +146,17 @@ impl Checkpoint {
 /// highest frame index referenced by any checkpoint so pruning knows which
 /// frames are safe to remove. It is kept current through each checkpoint's
 /// `max_frame_idx_below` prefix-max rather than recomputed on backtrack.
-#[derive(Debug)]
 pub struct CheckpointStack {
-    stack: Vec<Checkpoint>,
-    snapshots: Vec<CheckpointSnapshot>,
+    stack: Buffer<Checkpoint>,
+    snapshots: Buffer<CheckpointSnapshot>,
     max_frame_idx: Option<u32>,
 }
 
 impl CheckpointStack {
     pub fn new() -> Self {
         Self {
-            stack: Vec::new(),
-            snapshots: Vec::new(),
+            stack: Buffer::new(),
+            snapshots: Buffer::new(),
             max_frame_idx: None,
         }
     }
@@ -159,28 +168,76 @@ impl CheckpointStack {
         self.max_frame_idx = None;
     }
 
-    pub fn push(&mut self, mut checkpoint: Checkpoint) {
-        self.push_inner(&mut checkpoint);
-        self.stack.push(checkpoint);
+    pub fn push(
+        &mut self,
+        meter: &mut Meter<'_>,
+        mut checkpoint: Checkpoint,
+    ) -> Result<(), LimitExceeded> {
+        let max_frame_idx = self.prefix_max(&mut checkpoint);
+        self.stack.push(meter, checkpoint)?;
+        self.max_frame_idx = max_frame_idx;
+        Ok(())
     }
 
-    pub fn push_with_snapshot(&mut self, mut checkpoint: Checkpoint, snapshot: NonZeroU64) {
+    pub fn push_with_snapshot(
+        &mut self,
+        meter: &mut Meter<'_>,
+        mut checkpoint: Checkpoint,
+        snapshot: Option<NonZeroU64>,
+    ) -> Result<(), LimitExceeded> {
+        let Some(snapshot) = snapshot else {
+            return self.push(meter, checkpoint);
+        };
         let stack_index = self.stack.len();
-        self.push_inner(&mut checkpoint);
-        self.stack.push(checkpoint);
-        self.snapshots.push(CheckpointSnapshot {
-            stack_index,
-            snapshot,
-        });
+        let max_frame_idx = self.prefix_max(&mut checkpoint);
+        self.snapshots.reserve(meter, 1)?;
+        self.stack.push(meter, checkpoint)?;
+        self.snapshots.push(
+            meter,
+            CheckpointSnapshot {
+                stack_index,
+                snapshot,
+            },
+        )?;
+        self.max_frame_idx = max_frame_idx;
+        Ok(())
     }
 
-    fn push_inner(&mut self, checkpoint: &mut Checkpoint) {
+    /// Ensure room for `additional` more checkpoints, with snapshot metadata
+    /// when `snapshots` is set, so the pushes that follow cannot fail.
+    pub fn reserve(
+        &mut self,
+        meter: &mut Meter<'_>,
+        additional: usize,
+        snapshots: bool,
+    ) -> Result<bool, LimitExceeded> {
+        self.stack.reserve(meter, additional)?;
+        if snapshots {
+            if self
+                .snapshots
+                .capacity_bytes()
+                .saturating_add(self.snapshots.reservation_bytes(additional)?)
+                > 32 * 1024
+            {
+                return Ok(false);
+            }
+
+            match self.snapshots.reserve(meter, additional) {
+                Ok(()) => return Ok(true),
+                Err(LimitExceeded::Memory { .. } | LimitExceeded::Allocation { .. }) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(false)
+    }
+
+    fn prefix_max(&self, checkpoint: &mut Checkpoint) -> Option<u32> {
         let prev = self.stack.last().and_then(|c| c.max_frame_idx_below);
         checkpoint.max_frame_idx_below = match (checkpoint.state.frame_index, prev) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (a, b) => a.or(b),
         };
-        self.max_frame_idx = checkpoint.max_frame_idx_below;
+        checkpoint.max_frame_idx_below
     }
 
     pub fn pop(&mut self) -> Option<Checkpoint> {
@@ -238,13 +295,6 @@ impl CheckpointStack {
     #[inline]
     pub fn max_frame_idx(&self) -> Option<u32> {
         self.max_frame_idx
-    }
-
-    /// Occupied checkpoint and snapshot-metadata bytes, excluding spare capacity.
-    #[inline]
-    pub fn byte_footprint(&self) -> u64 {
-        (self.stack.len() * std::mem::size_of::<Checkpoint>()
-            + self.snapshots.len() * std::mem::size_of::<CheckpointSnapshot>()) as u64
     }
 }
 

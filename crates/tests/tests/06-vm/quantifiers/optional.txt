@@ -6,15 +6,15 @@ Q = (program
 let x; debugger;
 --------------------- OUTPUT ---------------------
 {
-  "d": {
-    "kind": "debugger_statement",
-    "span": [7, 16],
-    "text": "debugger;"
-  },
   "decl": {
     "kind": "lexical_declaration",
-    "span": [0, 6],
-    "text": "let x;"
+    "text": "let x;",
+    "span": [0, 6]
+  },
+  "d": {
+    "kind": "debugger_statement",
+    "text": "debugger;",
+    "span": [7, 16]
   }
 }
 -------------------- BYTECODE --------------------
@@ -46,22 +46,23 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        12, 03
   02                                        ▶
-  03  └‣─  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
-  06  ─‣─  (debugger_statement) [Node RecordSet(M1)]  14
-  08   !   (lexical_declaration) [Node RecordSet(M0)]  06
+  03  └‣─  (debugger_statement) [RecordSet(M0) Absent RecordSet(M1) Node]  14
+  06  ─‣─  (debugger_statement) [RecordSet(M1) Node]  14
+  08   !   (lexical_declaration) [RecordSet(M0) Node]  06
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        12, 03
-       ●   program
-  12       _                                08, 10
-       ●   lexical_declaration
-  08       (lexical_declaration) [Node RecordSet(M0)]  06
-       ●   lexical_declaration
-  06       (debugger_statement) [Node RecordSet(M1)]  14
-       ●   debugger_statement
-  14       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..16]
+0012 DownExact Any
+0012 MatchOk lexical_declaration [0..6]
+0008 StayExact Named(Some(NodeKindId(152)))
+0008 MatchOk lexical_declaration [0..6]
+0006 Next Named(Some(NodeKindId(168)))
+0006 MatchOk debugger_statement [7..16]
+0014 Up(1) Any
+0014 MatchOk program [0..16]
+0002 Return PortId(0)
+0002 Return

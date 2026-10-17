@@ -111,15 +111,13 @@ impl Session {
     /// Returns a result with provenance on success, or `{error}` on failure,
     /// including when no match is found.
     pub fn run(&self, source: &str, entry: Option<String>) -> JsValue {
-        let value = self.execute(source, entry.as_deref(), TraceMode::None);
-        to_js(&value)
+        self.execute(source, entry.as_deref(), TraceMode::None)
     }
 
     /// Run with a bounded execution trace.
     pub fn trace(&self, source: &str, entry: Option<String>, max_records: u32) -> JsValue {
         let max_records = usize::try_from(max_records).expect("u32 fits usize");
-        let value = self.execute(source, entry.as_deref(), TraceMode::Structured(max_records));
-        to_js(&value)
+        self.execute(source, entry.as_deref(), TraceMode::Structured(max_records))
     }
 }
 
@@ -145,37 +143,35 @@ pub fn tokenize_js(query: &str) -> JsValue {
 }
 
 impl Session {
-    fn execute(&self, source: &str, entry: Option<&str>, trace: TraceMode) -> JsonValue {
+    fn execute(&self, source: &str, entry: Option<&str>, trace: TraceMode) -> JsValue {
         let Some(module) = self.module.as_ref() else {
-            return error_json("query did not compile");
+            return to_js(&error_json("query did not compile"));
         };
 
         let entrypoint = match resolve_entrypoint(module, entry, &self.entrypoints) {
             Ok(entrypoint) => entrypoint,
-            Err(error) => return error_json(error),
+            Err(error) => return to_js(&error_json(error)),
         };
 
         let tree = self.lang.parse_source(source);
         let vm = VM::builder(source, &tree)
             .limits(RuntimeLimitSpec::default())
             .build();
+        let account = match vm.account() {
+            Ok(account) => account.clone(),
+            Err(error) => return to_js(&error_json(error.to_string())),
+        };
         match trace {
             TraceMode::None => {
                 let mut tracer = NoopTracer;
                 let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
-                result_json(module, &entrypoint, source, result, None)
+                result_json(module, &account, result, None)
             }
             TraceMode::Structured(max_records) => {
                 let mut tracer = TraceRecorder::new(module, max_records);
                 let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
                 let execution_trace = tracer.finish();
-                result_json(
-                    module,
-                    &entrypoint,
-                    source,
-                    result,
-                    Some(json_value!(execution_trace)),
-                )
+                result_json(module, &account, result, Some(execution_trace))
             }
         }
     }

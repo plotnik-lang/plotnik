@@ -51,33 +51,35 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _                                10, 13, 16
+  01  └─!  _ [RecordSet(M3)]                10, 13, 16
   03  ─‣┘  _ [VariantClose]                 05
-  05  ─‣┘  _ [RecordSet(M3)]                07
-  07                                        ▶
-  08  └‣─  (identifier) [Node RecordSet(M0)]  03
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  └‣─  (identifier) [RecordSet(M0) Node]  03
   10   !   (expression_statement) [VariantOpen(M1)]  08
   12  └‣─  (string)                         03
   13   !   (expression_statement) [VariantOpen(M2)]  12
   15  ...
   16  ──!  _                                10, 13, 16
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                10, 13, 16
-       ●   expression_statement
-  10       (expression_statement) [VariantOpen(M1)]  08
-       ●   expression_statement
-  08       (identifier) [Node RecordSet(M0)]  03
-       ○   string
-  01  ❮❮❮ 
-  13       (expression_statement) [VariantOpen(M2)]  12
-       ●   expression_statement
-  12       (string)                         03
-       ●   string
-  03       _ [VariantClose]                 05
-       ●   expression_statement
-  05       _ [RecordSet(M3)]                07
-       ●   program
-  07   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..3]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..3]
+0010 StayExact Named(Some(NodeKindId(150)))
+0010 MatchOk expression_statement [0..3]
+0008 Down Named(Some(NodeKindId(1)))
+0008 MatchFail string [0..3]
+0008 Backtrack { to_record: 10 }
+0013 StayExact Named(Some(NodeKindId(150)))
+0013 MatchOk expression_statement [0..3]
+0012 Down Named(Some(NodeKindId(221)))
+0012 MatchOk string [0..3]
+0003 Up(1) Any
+0003 MatchOk expression_statement [0..3]
+0005 Up(1) Any
+0005 MatchOk program [0..3]
+0006 Return PortId(0)
+0006 Return

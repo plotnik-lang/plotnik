@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::result::{
@@ -15,7 +13,7 @@ pub(crate) struct ResultDecodePlan {
 }
 
 impl ResultDecodePlan {
-    pub(super) fn build(schema: &ResultSchema<'_>) -> Self {
+    pub(crate) fn build(schema: &ResultSchema<'_>) -> Self {
         let builder = DecodePlanBuilder { schema };
         let items = schema
             .entrypoint_items()
@@ -31,12 +29,6 @@ impl ResultDecodePlan {
     pub(crate) fn items(&self) -> impl Iterator<Item = &DecodeItem> {
         self.items.values()
     }
-
-    pub(crate) fn item(&self, name: Symbol) -> &DecodeItem {
-        self.items
-            .get(&name)
-            .expect("every decode target declares a result item")
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -44,20 +36,6 @@ pub(crate) struct DecodeItem {
     pub(crate) name: Symbol,
     pub(crate) output: DefinitionOutput,
     pub(crate) kind: DecodeItemKind,
-    pub(crate) enters_depth: bool,
-    pub(crate) fallible: bool,
-}
-
-impl DecodeItem {
-    pub(crate) fn has_decoder(&self) -> bool {
-        !matches!(self.kind, DecodeItemKind::MatchOnlyDefinition)
-    }
-
-    pub(crate) fn value_type(&self) -> TypeId {
-        self.output
-            .value()
-            .expect("value decoder must have a value type")
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -93,8 +71,14 @@ pub(crate) enum DecodeValue {
     Text,
     Bool,
     Option(Box<DecodeValue>),
-    List(Box<DecodeValue>),
-    Nested { item: Symbol, source_type: TypeId },
+    List {
+        element: Box<DecodeValue>,
+        minimum: bool,
+    },
+    Nested {
+        item: Symbol,
+        source_type: TypeId,
+    },
 }
 
 struct DecodePlanBuilder<'p, 'a> {
@@ -119,8 +103,6 @@ impl DecodePlanBuilder<'_, '_> {
             name: item.name,
             output: item.output,
             kind,
-            enters_depth: self.item_enters_depth(item.name),
-            fallible: self.item_is_fallible(item),
         }
     }
 
@@ -180,7 +162,13 @@ impl DecodePlanBuilder<'_, '_> {
             TypeShape::Text => DecodeValue::Text,
             TypeShape::Bool => DecodeValue::Bool,
             TypeShape::Option(inner) => DecodeValue::Option(Box::new(self.value(*inner))),
-            TypeShape::List { element, .. } => DecodeValue::List(Box::new(self.value(*element))),
+            TypeShape::List { element, minimum } => DecodeValue::List {
+                element: Box::new(self.value(*element)),
+                minimum: matches!(
+                    minimum,
+                    crate::compiler::analyze::types::type_shape::ListMinimum::One
+                ),
+            },
             TypeShape::Record(_) | TypeShape::Variant(_) => DecodeValue::Nested {
                 item: self
                     .schema
@@ -198,46 +186,6 @@ impl DecodePlanBuilder<'_, '_> {
                     source_type: ty,
                 }
             }
-        }
-    }
-
-    fn item_enters_depth(&self, name: Symbol) -> bool {
-        self.schema
-            .definitions
-            .id_for_symbol(name)
-            .is_some_and(|definition| self.schema.definitions.is_recursive(definition))
-    }
-
-    fn item_is_fallible(&self, item: ResultItem) -> bool {
-        self.item_enters_depth(item.name)
-            || item.output.value().is_some_and(|type_id| {
-                self.type_reaches_recursive_ref(type_id, &mut HashSet::new())
-            })
-    }
-
-    fn type_reaches_recursive_ref(&self, ty: TypeId, seen: &mut HashSet<TypeId>) -> bool {
-        if !seen.insert(ty) {
-            return false;
-        }
-        if let Some(name) = self.schema.types.type_name_of(ty)
-            && self.item_enters_depth(name)
-        {
-            return true;
-        }
-        match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Ref(declaration) => {
-                let Some(target) = self.schema.types.declaration_body(*declaration) else {
-                    return false;
-                };
-                self.schema
-                    .types
-                    .declaration_definition(*declaration)
-                    .is_some_and(|definition| self.schema.definitions.is_recursive(definition))
-                    || self.type_reaches_recursive_ref(target, seen)
-            }
-            shape => shape
-                .child_type_ids()
-                .any(|child| self.type_reaches_recursive_ref(child, seen)),
         }
     }
 }

@@ -16,34 +16,34 @@ Q = (program
 {
   "items": [
     {
+      "$tag": "Id",
       "$data": {
         "id": {
           "kind": "identifier",
-          "span": [1, 2],
-          "text": "a"
+          "text": "a",
+          "span": [1, 2]
         }
-      },
-      "$tag": "Id"
+      }
     },
     {
+      "$tag": "Num",
       "$data": {
         "num": {
           "kind": "number",
-          "span": [4, 5],
-          "text": "1"
+          "text": "1",
+          "span": [4, 5]
         }
-      },
-      "$tag": "Num"
+      }
     },
     {
+      "$tag": "Id",
       "$data": {
         "id": {
           "kind": "identifier",
-          "span": [7, 8],
-          "text": "b"
+          "text": "b",
+          "span": [7, 8]
         }
-      },
-      "$tag": "Id"
+      }
     }
   ]
 }
@@ -90,133 +90,115 @@ Q     = 02 :: T5
 
 [instructions]
 Entry:
-  00  -ε-                                   13, 16
+  00  -ε-                                   09, 12
 
 Q:
   02   !   (program)                        03
   03  └‣─  (expression_statement)           04
-  04  └‣─  (array)                          05
-  05  -ε-  [ListOpen]                       27, 20
-  07  ─‣┘² _                                19
-  08  -ε-  [ListClose]                      10
-  10  ─‣┘  _ [RecordSet(M4)]                07
-  12                                        ▶
-  13   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-  16   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-  19                                        ▶
-  20  -ε-  [ListClose RecordSet(M4)]        07
-  22  -ε-  [ArrayPush]                      25, 08
-  24   !   (Entry)                          00 : 22
-  25  ──!  _                                24, 25
-  27  └─!  _                                24, 25
+  04  └‣─  (array) [RecordSet(M4)]          06
+  06  -ε-  [ListOpen]                       24, 16
+  08                                        ▶
+  09   !   (identifier) [VariantOpen(M2) RecordSet(M0) Node VariantClose]  08
+  12   !   (number) [VariantOpen(M3) RecordSet(M1) Node VariantClose]  08
+  15                                        ▶
+  16  -ε-  [ListClose]                      23
+  18  -ε-  [ArrayPush]                      21, 26
+  20   !   (Entry)                          00 : 18
+  21  ──!  _                                20, 21
+  23  ─‣┘² _                                15
+  24  └─!  _                                20, 21
+  26  ─‣┘  _ [ListClose]                    23
 --------------------- TRACE ----------------------
-Q:
-  02       (program)                        03
-       ●   program
-  03       (expression_statement)           04
-       ●   expression_statement
-  04       (array)                          05
-       ●   array
-  05  -ε-  [ListOpen]                       27, 20
-  27       _                                24, 25
-       ●   [
-  24       (Entry)                          00 : 22
-       ▶   (Entry)
-
-Entry:
-  00  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   [
-  00  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ○   [
-  27  ❮❮❮ 
-  25       _                                24, 25
-       ●   identifier
-  24       (Entry)                          00 : 22
-       ▶   (Entry)
-
-Entry:
-  00  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ●   identifier
-  12   ◀   (Entry)                          
-
-Q:
-  22  -ε-  [ArrayPush]                      25, 08
-  25       _                                24, 25
-       ●   ,
-  24       (Entry)                          00 : 22
-       ▶   (Entry)
-
-Entry:
-  00  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   ,
-  00  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ○   ,
-  25  ❮❮❮ 
-  25       _                                24, 25
-       ●   number
-  24       (Entry)                          00 : 22
-       ▶   (Entry)
-
-Entry:
-  00  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   number
-  00  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ●   number
-  12   ◀   (Entry)                          
-
-Q:
-  22  -ε-  [ArrayPush]                      25, 08
-  25       _                                24, 25
-       ●   ,
-  24       (Entry)                          00 : 22
-       ▶   (Entry)
-
-Entry:
-  00  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   ,
-  00  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ○   ,
-  25  ❮❮❮ 
-  25       _                                24, 25
-       ●   identifier
-  24       (Entry)                          00 : 22
-       ▶   (Entry)
-
-Entry:
-  00  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ●   identifier
-  12   ◀   (Entry)                          
-
-Q:
-  22  -ε-  [ArrayPush]                      25, 08
-  25       _                                24, 25
-       ●   ]
-  24       (Entry)                          00 : 22
-       ▶   (Entry)
-
-Entry:
-  00  -ε-                                   13, 16
-  13       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  12
-       ○   ]
-  00  ❮❮❮ 
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-       ○   ]
-  25  ❮❮❮ 
-  25       _                                24, 25
-  22  ❮❮❮ 
-  08  -ε-  [ListClose]                      10
-  10       _ [RecordSet(M4)]                07
-       ●   array
-  07       _                                19
-       ●   program
-  19   ◀   (Q)                              ◼
+0002 ExecutionStarted { target: 2 }
+0002 StayExact Named(Some(NodeKindId(134)))
+0002 MatchOk program [0..10]
+0003 Down Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..10]
+0004 Down Named(Some(NodeKindId(186)))
+0004 MatchOk array [0..9]
+0006 Epsilon Any
+0024 DownExact Any
+0024 MatchOk node#41 [0..1]
+0020 Call CodeAddr(0)
+0020 Call { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchFail node#41 [0..1]
+0009 Backtrack { to_record: 24 }
+0012 StayExact Named(Some(NodeKindId(114)))
+0012 MatchFail node#41 [0..1]
+0012 Backtrack { to_record: 20 }
+0021 NextExact Any
+0021 MatchOk identifier [1..2]
+0020 Call CodeAddr(0)
+0020 Call { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchOk identifier [1..2]
+0008 Return PortId(0)
+0008 Return
+0018 Epsilon Any
+0021 NextExact Any
+0021 MatchOk node#8 [2..3]
+0020 Call CodeAddr(0)
+0020 Call { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchFail node#8 [2..3]
+0009 Backtrack { to_record: 60 }
+0012 StayExact Named(Some(NodeKindId(114)))
+0012 MatchFail node#8 [2..3]
+0012 Backtrack { to_record: 56 }
+0021 NextExact Any
+0021 MatchOk number [4..5]
+0020 Call CodeAddr(0)
+0020 Call { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchFail number [4..5]
+0009 Backtrack { to_record: 76 }
+0012 StayExact Named(Some(NodeKindId(114)))
+0012 MatchOk number [4..5]
+0008 Return PortId(0)
+0008 Return
+0018 Epsilon Any
+0021 NextExact Any
+0021 MatchOk node#8 [5..6]
+0020 Call CodeAddr(0)
+0020 Call { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchFail node#8 [5..6]
+0009 Backtrack { to_record: 100 }
+0012 StayExact Named(Some(NodeKindId(114)))
+0012 MatchFail node#8 [5..6]
+0012 Backtrack { to_record: 96 }
+0021 NextExact Any
+0021 MatchOk identifier [7..8]
+0020 Call CodeAddr(0)
+0020 Call { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchOk identifier [7..8]
+0008 Return PortId(0)
+0008 Return
+0018 Epsilon Any
+0021 NextExact Any
+0021 MatchOk node#42 [8..9]
+0020 Call CodeAddr(0)
+0020 Call { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchFail node#42 [8..9]
+0009 Backtrack { to_record: 136 }
+0012 StayExact Named(Some(NodeKindId(114)))
+0012 MatchFail node#42 [8..9]
+0012 Backtrack { to_record: 132 }
+0021 NextExact Any
+0021 Backtrack { to_record: 128 }
+0026 Up(1) Any
+0026 MatchOk array [0..9]
+0023 Up(2) Any
+0023 MatchOk program [0..10]
+0015 Return PortId(0)
+0015 Return

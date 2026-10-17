@@ -12,17 +12,17 @@ Foo = (function_declaration
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Foo<'t> {
     pub items: FooItems<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct FooItems<'t> {
     pub inner: FooItemsInner<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct FooItemsInner<'t> {
     pub v: Node<'t>,
 }

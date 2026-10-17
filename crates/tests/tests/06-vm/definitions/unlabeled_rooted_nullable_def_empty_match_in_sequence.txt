@@ -16,8 +16,8 @@ debugger;
   },
   "d": {
     "kind": "debugger_statement",
-    "span": [0, 9],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [0, 9]
   }
 }
 -------------------- BYTECODE --------------------
@@ -55,42 +55,41 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [RecordOpen]                     24, 20
-  03  └‣─  (identifier) [Node RecordSet(M0)]  05
-  05  ─‣┘  _                                11
+  01  -ε-  [RecordSet(M1) RecordOpen]       20, 08
+  03  └‣─  (identifier) [RecordSet(M0) Node]  05
+  05  ─‣┘  _                                10
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [RecordClose RecordSet(M1) Node RecordSet(M2)]  07
-  11  ─‣─  (debugger_statement) [RecordClose RecordSet(M1) Node RecordSet(M2)]  07
-  14   !   (expression_statement)           03
-  15   !   (empty_statement)                11
-  16  ──!  _                                15, 16
-  18   !   _ [Absent RecordSet(M0)]         15, 16
-  20  -ε-  [Absent RecordSet(M0)]           08
-  22  ──!  _                                14, 18, 22
-  24  └─!  _                                14, 18, 22
+  08  └‣─  (debugger_statement) [RecordClose RecordSet(M2) Node]  07
+  10  ─‣─  (debugger_statement) [RecordClose RecordSet(M2) Node]  07
+  12   !   (expression_statement)           03
+  13   !   (empty_statement)                10
+  14  ──!  _                                13, 14
+  16   !   _                                13, 14
+  18  ──!  _                                12, 16, 18
+  20  └─!  _                                12, 16, 18
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [RecordOpen]                     24, 20
-  24       _                                14, 18, 22
-       ●   debugger_statement
-  14       (expression_statement)           03
-       ○   debugger_statement
-  24  ❮❮❮ 
-  18       _ [Absent RecordSet(M0)]         15, 16
-       ●   debugger_statement
-  15       (empty_statement)                11
-       ○   debugger_statement
-  18  ❮❮❮ 
-  16       _                                15, 16
-  24  ❮❮❮ 
-  22       _                                14, 18, 22
-  01  ❮❮❮ 
-  20  -ε-  [Absent RecordSet(M0)]           08
-  08       (debugger_statement) [RecordClose RecordSet(M1) Node RecordSet(M2)]  07
-       ●   debugger_statement
-  07       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 Epsilon Any
+0020 DownExact Any
+0020 MatchOk debugger_statement [0..9]
+0012 StayExact Named(Some(NodeKindId(150)))
+0012 MatchFail debugger_statement [0..9]
+0012 Backtrack { to_record: 13 }
+0016 StayExact Any
+0016 MatchOk debugger_statement [0..9]
+0013 StayExact Named(Some(NodeKindId(171)))
+0013 MatchFail debugger_statement [0..9]
+0013 Backtrack { to_record: 21 }
+0014 NextExact Any
+0014 Backtrack { to_record: 12 }
+0018 NextExact Any
+0018 Backtrack { to_record: 8 }
+0008 Down Named(Some(NodeKindId(168)))
+0008 MatchOk debugger_statement [0..9]
+0007 Up(1) Any
+0007 MatchOk program [0..9]
+0006 Return PortId(0)
+0006 Return

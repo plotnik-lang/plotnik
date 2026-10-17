@@ -18,8 +18,8 @@ Q:
   4  └‣─  (expression_statement)            6
   6  └‣─  (binary_expression)               9
   7  ─‣┘³ _                                 1
-  8  ─‣─  right: (identifier) [Node RecordSet(right)]  7
-  9  └‣─  left: (identifier) [Node RecordSet(left)]  8
+  8  ─‣─  right: (identifier) [RecordSet(right) Node]  7
+  9  └‣─  left: (identifier) [RecordSet(left) Node]  8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -64,8 +64,8 @@ Q:
   04  └‣─  (binary_expression) [SpanStartAt#3]  08
   06  ─‣┘  _                                16
   07  ...
-  08  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  12
-  12  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  06
+  08  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 RecordSet(M0) Node SpanEnd#4 SpanEnd#6 SpanEnd#5]  12
+  12  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 RecordSet(M1) Node SpanEnd#7 SpanEnd#9 SpanEnd#8]  06
   16  ─‣┘  _ [SpanEnd#3]                    18
   18  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  20
   20                                        ▶

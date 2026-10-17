@@ -30,18 +30,18 @@ Q = 0 :: T2
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └─!  _ [ListOpen]                      4, 6
+  1  └─!  _ [RecordSet(M0) ListOpen]        4, 6
   3                                         ▶
   4   !   (lexical_declaration) [Node ArrayPush]  6, 8
   6  ──!  _                                 4, 6
-  8  ─‣┘  _ [ListClose RecordSet(M0)]       3
+  8  ─‣┘  _ [ListClose]                     3
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       _ [ListOpen]                      04, 06
-      ●   expression_statement
-  4       (lexical_declaration) [Node ArrayPush]  06, 08
-      ○   expression_statement
-  1  ❮❮❮ 
-  6       _                                 04, 06
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0001 DownExact Any
+0001 MatchOk node#150 [0..4]
+0004 StayExact Named(Some(NodeKindId(152)))
+0004 MatchFail node#150 [0..4]
+0004 Backtrack { to_record: 10 }
+0006 NextExact Any

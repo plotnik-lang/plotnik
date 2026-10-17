@@ -46,62 +46,62 @@ Q:
   05  ─•┘² _                                06
   06  ─‣┘² _                                07
   07                                        ▶
-  08   !   (pair) [Node RecordSet(M0)]      05
+  08   !   (pair) [RecordSet(M0) Node]      05
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14   !   (object)                         12
   15  ...
   16  ──!  _                                14, 16
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       _                                14, 16
-       ●   [
-  14       (object)                         12
-       ○   [
-  03  ❮❮❮ 
-  16       _                                14, 16
-       ●   object
-  14       (object)                         12
-       ●   object
-  12       _                                08, 10
-       ●   {
-  08       (pair) [Node RecordSet(M0)]      05
-       ○   {
-  12  ❮❮❮ 
-  10       _                                08, 10
-       ●   pair
-  08       (pair) [Node RecordSet(M0)]      05
-       ●   pair
-  05       _                                06
-  10  ❮❮❮ 
-  10       _                                08, 10
-       ●   }
-  08       (pair) [Node RecordSet(M0)]      05
-       ○   }
-  10  ❮❮❮ 
-  10       _                                08, 10
-  16  ❮❮❮ 
-  16       _                                14, 16
-       ●   ,
-  14       (object)                         12
-       ○   ,
-  16  ❮❮❮ 
-  16       _                                14, 16
-       ●   identifier
-  14       (object)                         12
-       ○   identifier
-  16  ❮❮❮ 
-  16       _                                14, 16
-       ●   ]
-  14       (object)                         12
-       ○   ]
-  16  ❮❮❮ 
-  16       _                                14, 16
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..10]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..10]
+0003 DownExact Any
+0003 MatchOk node#41 [0..1]
+0014 StayExact Named(Some(NodeKindId(182)))
+0014 MatchFail node#41 [0..1]
+0014 Backtrack { to_record: 16 }
+0016 NextExact Any
+0016 MatchOk object [1..6]
+0014 StayExact Named(Some(NodeKindId(182)))
+0014 MatchOk object [1..6]
+0012 DownExact Any
+0012 MatchOk node#7 [1..2]
+0008 StayExact Named(Some(NodeKindId(237)))
+0008 MatchFail node#7 [1..2]
+0008 Backtrack { to_record: 31 }
+0010 NextExact Any
+0010 MatchOk pair [2..5]
+0008 StayExact Named(Some(NodeKindId(237)))
+0008 MatchOk pair [2..5]
+0005 UpSkipTrivia(2) Any
+0005 Backtrack { to_record: 39 }
+0010 NextExact Any
+0010 MatchOk node#9 [5..6]
+0008 StayExact Named(Some(NodeKindId(237)))
+0008 MatchFail node#9 [5..6]
+0008 Backtrack { to_record: 51 }
+0010 NextExact Any
+0010 Backtrack { to_record: 24 }
+0016 NextExact Any
+0016 MatchOk node#8 [6..7]
+0014 StayExact Named(Some(NodeKindId(182)))
+0014 MatchFail node#8 [6..7]
+0014 Backtrack { to_record: 62 }
+0016 NextExact Any
+0016 MatchOk node#1 [8..9]
+0014 StayExact Named(Some(NodeKindId(182)))
+0014 MatchFail node#1 [8..9]
+0014 Backtrack { to_record: 70 }
+0016 NextExact Any
+0016 MatchOk node#42 [9..10]
+0014 StayExact Named(Some(NodeKindId(182)))
+0014 MatchFail node#42 [9..10]
+0014 Backtrack { to_record: 78 }
+0016 NextExact Any
+0016 Backtrack { to_record: 12 }
+0016 Backtrack { to_record: 8 }

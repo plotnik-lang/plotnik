@@ -16,11 +16,11 @@ Func:
 Q:
   04                                        ▶
   05   !   (program)                        13
-  06  ─‣┘  _ [ListClose RecordSet(funcs)]   04
+  06  ─‣┘  _ [ListClose]                    04
   09  -ε-  [Node ArrayPush]                 12, 06
   10   !   (Func)                           02 : 09
   12  ──!  _                                10, 12
-  13  └─!  _ [ListOpen]                     10, 12
+  13  └─!  _ [RecordSet(funcs) ListOpen]    10, 12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -53,9 +53,9 @@ Func:
 
 Q:
   02   !   (program)                        03
-  03  └─!  _ [ListOpen]                     08, 09
+  03  └─!  _ [RecordSet(M0) ListOpen]       08, 09
   05                                        ▶
   06  -ε-  [Node ArrayPush]                 09, 11
   08   !   (Func)                           00 : 06
   09  ──!  _                                08, 09
-  11  ─‣┘  _ [ListClose RecordSet(M0)]      05
+  11  ─‣┘  _ [ListClose]                    05

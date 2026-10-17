@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 
-use crate::compiler::analyze::result::{ResultItem, ResultSchema};
+use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::analyze::types::type_shape::TypeId;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 use crate::core::Symbol;
 
-use super::representation::{LifetimeUsage, TypeFacts};
+use super::representation::TypeFacts;
 
-pub(crate) struct TypeModel<'a> {
-    schema: ResultSchema<'a>,
+pub(crate) struct TypeModel {
     facts: TypeFacts,
     item_idents: HashMap<Symbol, String>,
 }
@@ -28,8 +27,8 @@ impl TypeContext {
     }
 }
 
-impl<'a> TypeModel<'a> {
-    pub(crate) fn new(schema: ResultSchema<'a>) -> Self {
+impl TypeModel {
+    pub(crate) fn new(schema: ResultSchema<'_>) -> Self {
         let facts = TypeFacts::compute(schema.types);
         let interner = schema.interner;
         let items = schema.entrypoint_items();
@@ -39,29 +38,13 @@ impl<'a> TypeModel<'a> {
             .zip(idents)
             .map(|(item, ident)| (item.name, ident))
             .collect();
-        Self {
-            schema,
-            facts,
-            item_idents,
-        }
-    }
-
-    pub(crate) fn schema(&self) -> &ResultSchema<'a> {
-        &self.schema
-    }
-
-    pub(crate) fn items(&self) -> &[ResultItem] {
-        self.schema.entrypoint_items()
+        Self { facts, item_idents }
     }
 
     pub(crate) fn item_ident(&self, name: Symbol) -> &str {
         self.item_idents
             .get(&name)
             .expect("every declared item name has an identifier")
-    }
-
-    pub(super) fn lifetime_usage(&self, ty: TypeId) -> LifetimeUsage {
-        self.facts.lifetime_usage(ty)
     }
 
     pub(crate) fn is_boxed_ref(&self, context: TypeContext, ref_ty: TypeId) -> bool {

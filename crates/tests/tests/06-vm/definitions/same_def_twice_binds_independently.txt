@@ -11,15 +11,15 @@ x; y;
   "a": {
     "name": {
       "kind": "identifier",
-      "span": [0, 1],
-      "text": "x"
+      "text": "x",
+      "span": [0, 1]
     }
   },
   "b": {
     "name": {
       "kind": "identifier",
-      "span": [3, 4],
-      "text": "y"
+      "text": "y",
+      "span": [3, 4]
     }
   }
 }
@@ -55,52 +55,45 @@ Q  = 03 :: T2
 
 [instructions]
 Id:
-  00   !   (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier) [RecordSet(M0) Node]  02
   02                                        ▶
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement) [RecordSet(M1) RecordOpen]  06
   06  └‣─  (Id)                             00 : 08
-  07  ...
+  07  ─‣┘² _                                16
   08  -ε-  [RecordClose]                    10
-  10  ─‣┘  _ [RecordSet(M1)]                12
-  12  ─‣─  (expression_statement) [RecordOpen]  14
-  14  └‣─  (Id)                             00 : 16
-  15  ...
-  16  -ε-  [RecordClose]                    18
-  18  ─‣┘² _ [RecordSet(M2)]                20
-  20                                        ▶
+  10  ─‣┘  _                                11
+  11  ─‣─  (expression_statement) [RecordSet(M2) RecordOpen]  13
+  13  └‣─  (Id)                             00 : 14
+  14  -ε-  [RecordClose]                    07
+  16                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  03       (program)                        04
-       ●   program
-  04       (expression_statement) [RecordOpen]  06
-       ●   expression_statement
-  06       (Id)                             00 : 08
-       ▶   (Id)
-
-Id:
-  00       (identifier) [Node RecordSet(M0)]  02
-       ●   identifier
-  02   ◀   (Id)                             
-
-Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
-       ●   expression_statement
-  12       (expression_statement) [RecordOpen]  14
-       ●   expression_statement
-  14       (Id)                             00 : 16
-       ▶   (Id)
-
-Id:
-  00       (identifier) [Node RecordSet(M0)]  02
-       ●   identifier
-  02   ◀   (Id)                             
-
-Q:
-  16  -ε-  [RecordClose]                    18
-  18       _ [RecordSet(M2)]                20
-       ●   program
-  20   ◀   (Q)                              ◼
+0003 ExecutionStarted { target: 3 }
+0003 StayExact Named(Some(NodeKindId(134)))
+0003 MatchOk program [0..5]
+0004 Down Named(Some(NodeKindId(150)))
+0004 MatchOk expression_statement [0..2]
+0006 Call CodeAddr(0)
+0006 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchOk identifier [0..1]
+0002 Return PortId(0)
+0002 Return
+0008 Epsilon Any
+0010 Up(1) Any
+0010 MatchOk expression_statement [0..2]
+0011 Next Named(Some(NodeKindId(150)))
+0011 MatchOk expression_statement [3..5]
+0013 Call CodeAddr(0)
+0013 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchOk identifier [3..4]
+0002 Return PortId(0)
+0002 Return
+0014 Epsilon Any
+0007 Up(2) Any
+0007 MatchOk program [0..5]
+0016 Return PortId(0)
+0016 Return

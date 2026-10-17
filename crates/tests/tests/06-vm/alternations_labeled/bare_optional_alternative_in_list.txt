@@ -10,14 +10,14 @@ x;
 {
   "items": [
     {
+      "$tag": "A",
       "$data": {
         "c": {
           "kind": "comment",
-          "span": [0, 4],
-          "text": "// c"
+          "text": "// c",
+          "span": [0, 4]
         }
-      },
-      "$tag": "A"
+      }
     }
   ]
 }
@@ -55,39 +55,40 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       16, 04
+  01  -ε-  [RecordSet(M2) ListOpen]         16, 04
   03                                        ▶
-  04  -ε-  [ListClose RecordSet(M2)]        03
+  04  -ε-  [ListClose]                      03
   06  -ε-  [VariantClose ArrayPush]         14, 18
-  08   !   (comment) [Node RecordSet(M0)]   06
+  08   !   (comment) [RecordSet(M0) Node]   06
   10  ──!  _                                08, 10
   12   !   _ [VariantOpen(M1)]              08, 10
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
-  18  ─‣┘  _ [ListClose RecordSet(M2)]      03
+  18  ─‣┘  _ [ListClose]                    03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       16, 04
-  16       _                                12, 14
-       ●   comment
-  12       _ [VariantOpen(M1)]              08, 10
-       ●   comment
-  08       (comment) [Node RecordSet(M0)]   06
-       ●   comment
-  06  -ε-  [VariantClose ArrayPush]         14, 18
-  14       _                                12, 14
-       ●   expression_statement
-  12       _ [VariantOpen(M1)]              08, 10
-       ●   expression_statement
-  08       (comment) [Node RecordSet(M0)]   06
-       ○   expression_statement
-  12  ❮❮❮ 
-  10       _                                08, 10
-  14  ❮❮❮ 
-  14       _                                12, 14
-  06  ❮❮❮ 
-  18       _ [ListClose RecordSet(M2)]      03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 Epsilon Any
+0016 DownExact Any
+0016 MatchOk comment [0..4]
+0012 StayExact Any
+0012 MatchOk comment [0..4]
+0008 StayExact Named(Some(NodeKindId(108)))
+0008 MatchOk comment [0..4]
+0006 Epsilon Any
+0014 NextExact Any
+0014 MatchOk node#150 [5..7]
+0012 StayExact Any
+0012 MatchOk node#150 [5..7]
+0008 StayExact Named(Some(NodeKindId(108)))
+0008 MatchFail node#150 [5..7]
+0008 Backtrack { to_record: 35 }
+0010 NextExact Any
+0010 Backtrack { to_record: 30 }
+0014 NextExact Any
+0014 Backtrack { to_record: 26 }
+0018 Up(1) Any
+0018 MatchOk program [0..7]
+0003 Return PortId(0)
+0003 Return

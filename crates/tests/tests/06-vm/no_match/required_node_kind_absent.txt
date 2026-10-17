@@ -31,16 +31,16 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
-  2  └‣─  (number) [Node RecordSet(M0)]     4
+  2  └‣─  (number) [RecordSet(M0) Node]     4
   4  ─‣┘² _                                 5
   5                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement)            02
-      ●   expression_statement
-  2       (number) [Node RecordSet(M0)]     04
-      ○   identifier
-      ○   ;
-  1  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..4]
+0002 Down Named(Some(NodeKindId(114)))
+0002 MatchFail node#1 [0..3]
+0002 MatchFail node#24 [3..4]
+0002 Backtrack { to_record: 8 }

@@ -19,12 +19,12 @@ warning: alternative labels have no output effect here: captures from the altern
 help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 --------------------- OUTPUT ---------------------
 {
-  "d": null,
   "e": {
     "kind": "expression_statement",
-    "span": [0, 4],
-    "text": "foo;"
-  }
+    "text": "foo;",
+    "span": [0, 4]
+  },
+  "d": null
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -54,20 +54,21 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _                                04, 08, 11
+  01  └─!  _                                04, 06, 08
   03                                        ▶
-  04   !   (expression_statement) [Absent RecordSet(M1) Node RecordSet(M0)]  07
-  07  ─‣┘  _                                03
-  08   !   (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  07
-  11  ──!  _                                04, 08, 11
+  04   !   (expression_statement) [RecordSet(M0) Node]  10
+  06   !   (debugger_statement) [RecordSet(M1) Node]  10
+  08  ──!  _                                04, 06, 08
+  10  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                04, 08, 11
-       ●   expression_statement
-  04       (expression_statement) [Absent RecordSet(M1) Node RecordSet(M0)]  07
-       ●   expression_statement
-  07       _                                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..4]
+0004 StayExact Named(Some(NodeKindId(150)))
+0004 MatchOk expression_statement [0..4]
+0010 Up(1) Any
+0010 MatchOk program [0..4]
+0003 Return PortId(0)
+0003 Return

@@ -12,15 +12,15 @@ Q = 02
 Q:
   01                                        ▶
   02   !   (program)                        19
-  03  ─‣┘  _ [ListClose RecordSet(funcs)]   01
-  05  -ε-  [ListClose RecordSet(funcs)]     01
+  03  ─‣┘  _ [ListClose]                    01
+  05  -ε-  [ListClose]                      01
   07  -ε-  [RecordClose ArrayPush]          13, 03
   08   !   (function_declaration) [RecordOpen]  10
   09  ─‣┘  _                                07
-  10  └‣─  name: (identifier) [Node RecordSet(name)]  09
+  10  └‣─  name: (identifier) [RecordSet(name) Node]  09
   13  ──!  _                                08, 13
   14  └─!  _                                08, 13
-  19  -ε-  [ListOpen]                       14, 05
+  19  -ε-  [RecordSet(funcs) ListOpen]      14, 05
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -62,15 +62,16 @@ P7 pattern    47..59  source_id=0
 [instructions]
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  -ε-  [ListOpen SpanStart#3]           20, 11
-  04  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  08
-  08  ─‣┘  _ [SpanEnd#4]                    14
-  10                                        ▶
-  11  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  14  -ε-  [RecordClose ArrayPush]          18, 24
-  16   !   (function_declaration) [RecordOpen SpanStartAt#4]  04
-  18  ──!  _                                16, 18
-  20  └─!  _                                16, 18
-  22  ...
+  02  -ε-  [RecordSet(M1) ListOpen SpanStart#3]  24, 16
+  05  ──!  _                                21, 05
+  07  ...
+  08  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 RecordSet(M0) Node SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
+  12  ─‣┘  _ [SpanEnd#4]                    19
+  14                                        ▶
+  15  ...
+  16  -ε-  [SpanEnd#3 ListClose SpanStart#2 SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  19  -ε-  [RecordClose ArrayPush]          05, 26
+  21   !   (function_declaration) [RecordOpen SpanStartAt#4]  08
   23  ...
-  24  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  24  └─!  _                                21, 05
+  26  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 SpanEnd#2 SpanEnd#1 SpanEnd#0]  14

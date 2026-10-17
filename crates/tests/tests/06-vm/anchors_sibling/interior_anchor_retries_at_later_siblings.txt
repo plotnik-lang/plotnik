@@ -11,13 +11,13 @@ let x; let y; foo;
 {
   "a": {
     "kind": "lexical_declaration",
-    "span": [7, 13],
-    "text": "let y;"
+    "text": "let y;",
+    "span": [7, 13]
   },
   "b": {
     "kind": "expression_statement",
-    "span": [14, 18],
-    "text": "foo;"
+    "text": "foo;",
+    "span": [14, 18]
   }
 }
 -------------------- BYTECODE --------------------
@@ -48,29 +48,30 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                08, 10
-  03  ─•─  (expression_statement) [Node RecordSet(M1)]  05
+  03  ─•─  (expression_statement) [RecordSet(M1) Node]  05
   05  ─‣┘  _                                06
   06                                        ▶
   07  ...
-  08   !   (lexical_declaration) [Node RecordSet(M0)]  03
+  08   !   (lexical_declaration) [RecordSet(M0) Node]  03
   10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                08, 10
-       ●   lexical_declaration
-  08       (lexical_declaration) [Node RecordSet(M0)]  03
-       ●   lexical_declaration
-  03       (expression_statement) [Node RecordSet(M1)]  05
-       ○   lexical_declaration
-  01  ❮❮❮ 
-  10       _                                08, 10
-       ●   lexical_declaration
-  08       (lexical_declaration) [Node RecordSet(M0)]  03
-       ●   lexical_declaration
-  03       (expression_statement) [Node RecordSet(M1)]  05
-       ●   expression_statement
-  05       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..18]
+0001 DownExact Any
+0001 MatchOk lexical_declaration [0..6]
+0008 StayExact Named(Some(NodeKindId(152)))
+0008 MatchOk lexical_declaration [0..6]
+0003 NextSkip Named(Some(NodeKindId(150)))
+0003 MatchFail lexical_declaration [7..13]
+0003 Backtrack { to_record: 8 }
+0010 NextExact Any
+0010 MatchOk lexical_declaration [7..13]
+0008 StayExact Named(Some(NodeKindId(152)))
+0008 MatchOk lexical_declaration [7..13]
+0003 NextSkip Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [14..18]
+0005 Up(1) Any
+0005 MatchOk program [0..18]
+0006 Return PortId(0)
+0006 Return

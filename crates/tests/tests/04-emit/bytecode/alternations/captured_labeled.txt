@@ -4,14 +4,14 @@ Q = [
 ] @item
 ---------------------- NFA -----------------------
 [entrypoints]
-Q = 0
+Q = 6
 
 [transitions]
 Q:
-  0  -ε-                                    3, 4
   1                                         ▶
-  3   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose RecordSet(item)]  1
-  4   !   (number) [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]  1
+  3   !   (identifier) [VariantOpen(A) RecordSet(a) Node VariantClose]  1
+  4   !   (number) [VariantOpen(B) RecordSet(b) Node VariantClose]  1
+  6  -ε-  [RecordSet(item)]                 3, 4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -48,9 +48,9 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00  -ε-                                   03, 08
+  00  -ε-  [RecordSet(M4)]                  03, 08
   02                                        ▶
-  03   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose RecordSet(M4)]  02
+  03   !   (identifier) [VariantOpen(M2) RecordSet(M0) Node VariantClose]  02
   06  ...
   07  ...
-  08   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  02
+  08   !   (number) [VariantOpen(M3) RecordSet(M1) Node VariantClose]  02

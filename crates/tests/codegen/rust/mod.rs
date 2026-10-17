@@ -122,6 +122,10 @@ fn prepare_cases(cases: &[Case]) -> Result<Vec<RustCase<'_>>, String> {
 fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
     fs::create_dir_all(root.join("generated"))
         .map_err(|error| format!("create Rust staging tree: {error}"))?;
+    if cases.is_empty() {
+        return Ok(());
+    }
+
     let mut shards: BTreeMap<&str, Vec<(&RustCase<'_>, bool)>> = BTreeMap::new();
 
     for case in cases {
@@ -162,11 +166,15 @@ fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
             .push((case, match_only));
     }
 
+    let mut formatter = Command::new("rustfmt");
+    formatter.args(["--edition", "2024"]);
     for (shard, cases) in shards {
         let source = render_shard(&cases);
-        fs::write(root.join(format!("{shard}.rs")), source)
-            .map_err(|error| format!("write Rust shard `{shard}`: {error}"))?;
+        let path = root.join(format!("{shard}.rs"));
+        fs::write(&path, source).map_err(|error| format!("write Rust shard `{shard}`: {error}"))?;
+        formatter.arg(path);
     }
+    process::capture(&mut formatter, "format staged Rust tests and matchers")?;
     Ok(())
 }
 
@@ -226,14 +234,17 @@ fn render_shard(cases: &[(&RustCase<'_>, bool)]) -> String {
             let _ = writeln!(out, "        }})");
         } else {
             let _ = writeln!(out, "        .map(|value| {{");
+            let _ = writeln!(out, "            let mut json = String::new();");
+            let _ = writeln!(out, "            value");
             let _ = writeln!(
                 out,
-                "            plotnik_runtime::debug::to_json(&plotnik_runtime::WithSource::new(&value, source))"
+                "                .write_json(source, plotnik_runtime::json::Style::PRETTY, &mut json)"
             );
             let _ = writeln!(
                 out,
-                "                .expect(\"generated result serializes\")"
+                "                .expect(\"generated result serializes\");"
             );
+            let _ = writeln!(out, "            json");
             let _ = writeln!(out, "        }})");
         }
         let _ = writeln!(

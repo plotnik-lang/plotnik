@@ -9,13 +9,13 @@ Q = (program
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t> {
     pub a: Info<'t>,
     pub b: Info<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Info<'t> {
     pub stmt: Node<'t>,
 }

@@ -6,8 +6,6 @@ use plotnik_runtime::Nav;
 
 pub mod cols {
     pub const INDENT: usize = 2;
-    pub const GAP: usize = 1;
-    pub const SYMBOL: usize = 5;
     pub const TOTAL_WIDTH: usize = 44;
 }
 
@@ -75,21 +73,6 @@ pub fn nav_symbol(nav: Nav) -> Symbol {
     }
 }
 
-pub mod trace {
-    use super::Symbol;
-
-    pub const MATCH_SUCCESS: Symbol = Symbol::new("  ", "●", "  ");
-    pub const MATCH_FAILURE: Symbol = Symbol::new("  ", "○", "  ");
-
-    pub const EFFECT: Symbol = Symbol::new("  ", "⬥", "  ");
-    pub const EFFECT_SUPPRESSED: Symbol = Symbol::new("  ", "⬦", "  ");
-
-    pub const CALL: Symbol = Symbol::new("  ", "▶", "  ");
-    pub const RETURN: Symbol = Symbol::new("  ", "◀", "  ");
-
-    pub const BACKTRACK: Symbol = Symbol::new(" ", "❮❮❮", " ");
-}
-
 const SUPERSCRIPT_DIGITS: &[char] = &['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
 pub fn superscript(n: u8) -> String {
@@ -121,15 +104,6 @@ pub fn width_for_count(count: usize) -> usize {
         1
     } else {
         (count - 1).ilog10() as usize + 1
-    }
-}
-
-pub fn truncate_text(s: &str, max_len: usize) -> String {
-    if s.chars().count() <= max_len {
-        s.to_string()
-    } else {
-        let truncated: String = s.chars().take(max_len - 1).collect();
-        format!("{}…", truncated)
     }
 }
 

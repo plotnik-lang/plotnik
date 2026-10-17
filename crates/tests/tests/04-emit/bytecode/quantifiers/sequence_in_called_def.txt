@@ -13,7 +13,7 @@ Q    = 05
 [transitions]
 Item:
   01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  02   !   (identifier) [RecordSet(name) Node]  01
 
 Q:
   04                                        ▶
@@ -61,7 +61,7 @@ Q    = 03 :: T0
 
 [instructions]
 Item:
-  00   !   (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier) [RecordSet(M0) Node]  02
   02                                        ▶
 
 Q:

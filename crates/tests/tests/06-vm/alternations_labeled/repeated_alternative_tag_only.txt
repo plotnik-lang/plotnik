@@ -44,7 +44,7 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _                                10, 12, 14
+  01  └─!  _ [RecordSet(M2)]                10, 12, 14
   03                                        ▶
   04  -ε-  [VariantClose]                   16
   06   !   (expression_statement)           08, 04
@@ -52,28 +52,29 @@ Q:
   10   !   _ [VariantOpen(M0)]              06, 08
   12   !   (debugger_statement) [VariantOpen(M1) VariantClose]  16
   14  ──!  _                                10, 12, 14
-  16  ─‣┘  _ [RecordSet(M2)]                03
+  16  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                10, 12, 14
-       ●   expression_statement
-  10       _ [VariantOpen(M0)]              06, 08
-       ●   expression_statement
-  06       (expression_statement)           08, 04
-       ●   expression_statement
-  08       _                                06, 08
-       ●   expression_statement
-  06       (expression_statement)           08, 04
-       ●   expression_statement
-  08       _                                06, 08
-       ●   expression_statement
-  06       (expression_statement)           08, 04
-       ●   expression_statement
-  08       _                                06, 08
-  06  ❮❮❮ 
-  04  -ε-  [VariantClose]                   16
-  16       _ [RecordSet(M2)]                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..8]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..2]
+0010 StayExact Any
+0010 MatchOk expression_statement [0..2]
+0006 StayExact Named(Some(NodeKindId(150)))
+0006 MatchOk expression_statement [0..2]
+0008 NextExact Any
+0008 MatchOk expression_statement [3..5]
+0006 StayExact Named(Some(NodeKindId(150)))
+0006 MatchOk expression_statement [3..5]
+0008 NextExact Any
+0008 MatchOk expression_statement [6..8]
+0006 StayExact Named(Some(NodeKindId(150)))
+0006 MatchOk expression_statement [6..8]
+0008 NextExact Any
+0008 Backtrack { to_record: 35 }
+0004 Epsilon Any
+0016 Up(1) Any
+0016 MatchOk program [0..8]
+0003 Return PortId(0)
+0003 Return

@@ -18,7 +18,7 @@ help: capture the alternation (`[...] @name`) to make its labels produce variant
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t> {
     pub e: ::core::option::Option<Node<'t>>,
     pub d: ::core::option::Option<Node<'t>>,

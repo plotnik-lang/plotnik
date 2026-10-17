@@ -361,12 +361,9 @@ impl NfaBuilder<'_> {
                     FieldCompletion::AlwaysPresent => {
                         unreachable!("an always-present field cannot be absent from an alternative")
                     }
-                    FieldCompletion::Absent => vec![EffectIR::absent(), set],
-                    FieldCompletion::EmptyList => {
-                        vec![EffectIR::list_open(), EffectIR::list_close(), set]
-                    }
+                    FieldCompletion::Absent | FieldCompletion::EmptyList => vec![],
                     FieldCompletion::False => {
-                        vec![EffectIR::bool_value(false), set]
+                        vec![set, EffectIR::bool_value(false)]
                     }
                 }
             })

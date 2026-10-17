@@ -30,23 +30,27 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00   !   (program)                        08, 10
-  02   !   (expression_statement)           03
-  03  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   05
-  05                                        ▶
-  06  ──!  _                                02, 06
-  08  └─!  _                                02, 06
-  10  -ε-  [BoolValue(0) RecordSet(M0)]     05
+  00   !   (program)                        01
+  01  -ε-  [RecordSet(M0)]                  10, 12
+  03   !   (expression_statement)           04
+  04  ─‣┘  _ [BoolValue(1)]                 06
+  06                                        ▶
+  07  ...
+  08  ──!  _                                03, 08
+  10  └─!  _                                03, 08
+  12  -ε-  [BoolValue(0)]                   06
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        08, 10
-       ●   program
-  08       _                                02, 06
-       ●   comment
-  02       (expression_statement)           03
-       ○   comment
-  08  ❮❮❮ 
-  06       _                                02, 06
-  00  ❮❮❮ 
-  10  -ε-  [BoolValue(0) RecordSet(M0)]     05
-  05   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..17]
+0001 Epsilon Any
+0010 DownExact Any
+0010 MatchOk node#108 [0..17]
+0003 StayExact Named(Some(NodeKindId(150)))
+0003 MatchFail node#108 [0..17]
+0003 Backtrack { to_record: 11 }
+0008 NextExact Any
+0008 Backtrack { to_record: 7 }
+0012 Epsilon Any
+0006 Return PortId(0)
+0006 Return

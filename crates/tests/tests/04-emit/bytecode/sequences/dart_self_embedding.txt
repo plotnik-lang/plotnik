@@ -12,8 +12,8 @@ Q:
   1                                         ▶
   2   !   (list_literal)                    5
   3  ─‣┘  _                                 1
-  4  ─‣─  (list_literal) [Node RecordSet(inner)]  3
-  5  └‣─  (list_literal) [Node RecordSet(outer)]  4
+  4  ─‣─  (list_literal) [RecordSet(inner) Node]  3
+  5  └‣─  (list_literal) [RecordSet(outer) Node]  4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -39,7 +39,7 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (list_literal)                    1
-  1  └‣─  (list_literal) [Node RecordSet(M0)]  3
-  3  ─‣─  (list_literal) [Node RecordSet(M1)]  5
+  1  └‣─  (list_literal) [RecordSet(M0) Node]  3
+  3  ─‣─  (list_literal) [RecordSet(M1) Node]  5
   5  ─‣┘  _                                 6
   6                                         ▶

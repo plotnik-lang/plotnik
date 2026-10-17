@@ -33,23 +33,23 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       12, 04
+  01  -ε-  [RecordSet(M0) ListOpen]         12, 04
   03                                        ▶
-  04  └!┘  _ [ListClose RecordSet(M0)]      03
-  06  !─┘  _ [ListClose RecordSet(M0)]      03
+  04  └!┘  _ [ListClose]                    03
+  06  !─┘  _ [ListClose]                    03
   08   !   (debugger_statement) [Node ArrayPush]  10, 06
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       12, 04
-  12       _                                08, 10
-       ●   comment
-  08       (debugger_statement) [Node ArrayPush]  10, 06
-       ○   comment
-  12  ❮❮❮ 
-  10       _                                08, 10
-  01  ❮❮❮ 
-  04       _ [ListClose RecordSet(M0)]      03
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 Epsilon Any
+0012 DownExact Any
+0012 MatchOk node#108 [0..7]
+0008 StayExact Named(Some(NodeKindId(168)))
+0008 MatchFail node#108 [0..7]
+0008 Backtrack { to_record: 12 }
+0010 NextExact Any
+0010 Backtrack { to_record: 8 }
+0004 ChildlessExact Any

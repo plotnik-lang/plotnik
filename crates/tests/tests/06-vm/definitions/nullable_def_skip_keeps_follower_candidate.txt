@@ -10,8 +10,8 @@ y(); g();
 {
   "e": {
     "kind": "expression_statement",
-    "span": [0, 4],
-    "text": "y();"
+    "text": "y();",
+    "span": [0, 4]
   }
 }
 -------------------- BYTECODE --------------------
@@ -43,30 +43,31 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        10, 03
   02                                        ▶
-  03  └‣─  (expression_statement) [Node RecordSet(M0)]  12
-  05  ─‣─  (expression_statement) [Node RecordSet(M0)]  12
+  03  └‣─  (expression_statement) [RecordSet(M0) Node]  12
+  05  ─‣─  (expression_statement) [RecordSet(M0) Node]  12
   07   !   (debugger_statement)             05
   08  ──!  _                                07, 08
   10  └─!  _                                07, 08
   12  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        10, 03
-       ●   program
-  10       _                                07, 08
-       ●   expression_statement
-  07       (debugger_statement)             05
-       ○   expression_statement
-  10  ❮❮❮ 
-  08       _                                07, 08
-       ●   expression_statement
-  07       (debugger_statement)             05
-       ○   expression_statement
-  08  ❮❮❮ 
-  08       _                                07, 08
-  00  ❮❮❮ 
-  03       (expression_statement) [Node RecordSet(M0)]  12
-       ●   expression_statement
-  12       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0010 DownExact Any
+0010 MatchOk expression_statement [0..4]
+0007 StayExact Named(Some(NodeKindId(168)))
+0007 MatchFail expression_statement [0..4]
+0007 Backtrack { to_record: 9 }
+0008 NextExact Any
+0008 MatchOk expression_statement [5..9]
+0007 StayExact Named(Some(NodeKindId(168)))
+0007 MatchFail expression_statement [5..9]
+0007 Backtrack { to_record: 17 }
+0008 NextExact Any
+0008 Backtrack { to_record: 5 }
+0003 Down Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..4]
+0012 Up(1) Any
+0012 MatchOk program [0..9]
+0002 Return PortId(0)
+0002 Return

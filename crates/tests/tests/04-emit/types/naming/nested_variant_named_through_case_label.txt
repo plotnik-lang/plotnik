@@ -9,17 +9,17 @@ Q = (program
   ] @item
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q {
     pub item: QItem,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub enum QItem {
     Stmt { kind: QItemStmtKind },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub enum QItemStmtKind {
     Yes,
     No,

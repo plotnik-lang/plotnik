@@ -10,8 +10,8 @@ foo;
 {
   "x": {
     "kind": "identifier",
-    "span": [0, 3],
-    "text": "foo"
+    "text": "foo",
+    "span": [0, 3]
   }
 }
 -------------------- BYTECODE --------------------
@@ -41,24 +41,25 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (identifier) [Node RecordSet(M0)]  04
+  02  └‣─  (identifier) [RecordSet(M0) Node]  04
   04  ─‣┘  _                                08, 10
   06                                        ▶
   07   !   (debugger_statement)             10
   08  ──!  _                                07, 08
   10  ─‣┘  _                                06
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (identifier) [Node RecordSet(M0)]  04
-       ●   identifier
-  04       _                                08, 10
-       ●   expression_statement
-  08       _                                07, 08
-  04  ❮❮❮ 
-  10       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..4]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchOk identifier [0..3]
+0004 Up(1) Any
+0004 MatchOk expression_statement [0..4]
+0008 NextExact Any
+0008 Backtrack { to_record: 18 }
+0010 Up(1) Any
+0010 MatchOk program [0..4]
+0006 Return PortId(0)
+0006 Return

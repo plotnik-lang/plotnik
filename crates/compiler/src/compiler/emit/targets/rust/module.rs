@@ -9,19 +9,44 @@ use crate::compiler::emit::plan::{
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::Config;
 use crate::compiler::emit::targets::rust::TypeModel;
-use crate::compiler::emit::targets::rust::decode::DecoderGen;
 use crate::compiler::emit::targets::rust::ident::{shouty_ident, snake_ident};
 use crate::compiler::emit::targets::rust::literal::{decimal_byte_lines, rust_string};
+use crate::compiler::emit::targets::rust::model::ResultModel;
+use crate::compiler::emit::targets::rust::publish::{EntryPoint, PublishGen};
 use crate::compiler::emit::targets::rust::template::splice;
 use crate::compiler::regex::compile_native_dfa;
 use crate::core::NodeFieldId;
-use plotnik_runtime::{Limit, Nav, SkipPolicy};
-
-use super::entry_names::{apply_fn_name, journal_fn_name};
+use plotnik_runtime::{GENERATED_VALUE_CAP, Limit, Nav, SkipPolicy};
 
 pub(crate) fn generate(plan: &CodegenPlan<'_>, config: &Config) -> Result<String, String> {
     let generator = Generator::new(plan, config)?;
-    Ok(generator.render())
+    let types = TypeModel::new(*plan.result());
+    let model = ResultModel::new(plan.result(), &types, plan.decode());
+    check_value_sizes(&model)?;
+    Ok(generator.render(&model))
+}
+
+/// Generated values are built and moved by value on the native stack, so
+/// every result type must stay below the runtime's per-value cap.
+fn check_value_sizes(model: &ResultModel) -> Result<(), String> {
+    for item in model.items() {
+        let ty = match item.shape {
+            super::model::ItemShape::Alias(ty) => ty,
+            _ => match item.ty {
+                Some(ty) => ty,
+                None => continue,
+            },
+        };
+        let estimate = model.size_estimate(ty);
+        if estimate > GENERATED_VALUE_CAP as u64 {
+            return Err(format!(
+                "result type `{}` is too large for generated Rust: an estimated {estimate} \
+                 bytes by value, over the {GENERATED_VALUE_CAP}-byte limit",
+                item.display
+            ));
+        }
+    }
+    Ok(())
 }
 
 struct StateInfo {
@@ -40,7 +65,7 @@ impl CandidateFailure {
     fn code(self) -> &'static str {
         match self {
             CandidateFailure::StateBacktrack => "break 'state Flow::Backtrack;",
-            CandidateFailure::RetryExhausted => "return None;",
+            CandidateFailure::RetryExhausted => "return Ok(None);",
         }
     }
 }
@@ -148,25 +173,12 @@ impl RustRepresentation {
 struct Generator<'a> {
     config: &'a Config,
     plan: &'a CodegenPlan<'a>,
-    limits: RustLimits,
     rust: RustRepresentation,
     has_calls: bool,
 }
 
-#[derive(Clone, Copy)]
-struct RustLimits {
-    fuel: Limit,
-    memory: Limit,
-    decode_depth: Limit,
-}
-
 impl<'a> Generator<'a> {
     fn new(plan: &'a CodegenPlan<'a>, config: &'a Config) -> Result<Self, String> {
-        let limits = RustLimits {
-            fuel: config.limits.fuel_limit,
-            memory: config.limits.memory,
-            decode_depth: config.decode_depth,
-        };
         let rust = RustRepresentation::from_plan(plan.matcher())?;
         let has_calls = plan
             .matcher()
@@ -176,7 +188,6 @@ impl<'a> Generator<'a> {
         Ok(Self {
             config,
             plan,
-            limits,
             rust,
             has_calls,
         })
@@ -198,35 +209,25 @@ impl<'a> Generator<'a> {
         format!("RE_{}", id.index())
     }
 
-    fn render(&self) -> String {
-        let rust_config = &self.config.rust_types;
-        let type_model = TypeModel::new(*self.plan.result());
-        let decoders = DecoderGen::new(self.plan.result(), &type_model, self.plan.decode());
+    fn render(&self, model: &ResultModel) -> String {
+        let publish = PublishGen::new(model);
+        let entries = self.entry_points(model);
 
         let mut out = String::new();
         self.header(&mut out);
         out.push('\n');
         out.push_str(&crate::compiler::emit::targets::rust::emit_model(
-            &type_model,
-            rust_config,
+            model,
+            &self.config.rust_types,
         ));
-        out.push_str(
-            &decoders.execution_api(
-                self.plan
-                    .matcher()
-                    .entrypoints()
-                    .iter()
-                    .map(|entry| entry.definition),
-            ),
-        );
-        out.push_str(&decoders.decoders());
-        self.entry_reexports(&mut out);
+        out.push('\n');
+        out.push_str(&publish.type_checks());
+        out.push_str(&publish.json_impls());
+        out.push_str(&publish.execution_api(&entries));
+        out.push_str(&publish.publisher(&entries));
 
         let mut machinery = String::new();
-        let decoder_frame_bytes = decoders
-            .uses_decode_depth()
-            .then(|| decoders.max_decoder_frame_bytes());
-        self.mod_header(&mut machinery, decoder_frame_bytes);
+        self.mod_header(&mut machinery);
         self.language_check(&mut machinery);
         self.field_consts(&mut machinery);
         self.regex_statics(&mut machinery);
@@ -234,7 +235,7 @@ impl<'a> Generator<'a> {
         if self.has_calls {
             self.call_return_fn(&mut machinery);
         }
-        self.entry_fns(&mut machinery);
+        self.entry_types(&mut machinery, &entries);
         self.driver_fn(&mut machinery);
         self.dispatch_fn(&mut machinery);
         self.cand_fns(&mut machinery);
@@ -251,6 +252,22 @@ impl<'a> Generator<'a> {
         out.push_str(nested.plain());
         out.push_str("}\n");
         out
+    }
+
+    fn entry_points<'m>(&self, model: &'m ResultModel) -> Vec<EntryPoint<'m>> {
+        let definitions = self.plan.result().definitions;
+        self.plan
+            .matcher()
+            .entrypoints()
+            .iter()
+            .map(|entry| {
+                let item = model.item(definitions.definition(entry.definition).name());
+                EntryPoint {
+                    item,
+                    entry: entry_type(&item.ident),
+                }
+            })
+            .collect()
     }
 
     fn header(&self, out: &mut String) {
@@ -270,43 +287,18 @@ impl<'a> Generator<'a> {
         );
     }
 
-    fn entry_reexports(&self, out: &mut String) {
-        let mut names: Vec<String> = self
-            .plan
-            .matcher()
-            .entrypoints()
-            .iter()
-            .map(|entry| journal_fn_name(&entry.name))
-            .collect();
-        names.sort();
-        out.push('\n');
-        if let [name] = names.as_slice() {
-            let _ = writeln!(out, "pub use self::matcher::{name};");
-        } else {
-            let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
-        }
-    }
-
-    fn mod_header(&self, out: &mut String, decoder_frame_bytes: Option<u64>) {
-        let limits = self.limits;
+    fn mod_header(&self, out: &mut String) {
+        let limits = self.config.limits;
         splice(
             out,
             "",
             MOD_HEADER,
             &[
                 ("RT", self.config.rt_crate_path()),
-                ("FUEL", &limit_expr(limits.fuel)),
+                ("FUEL", &limit_expr(limits.fuel_limit)),
                 ("MEMORY", &limit_expr(limits.memory)),
             ],
         );
-        if let Some(frame_bytes) = decoder_frame_bytes {
-            splice(
-                out,
-                "",
-                DECODE_DEPTH_CONST,
-                &[("DEPTH", &depth_expr(limits.decode_depth, frame_bytes))],
-            );
-        }
     }
 
     fn language_check(&self, out: &mut String) {
@@ -438,76 +430,38 @@ impl<'a> Generator<'a> {
         out.push_str("}\n");
     }
 
-    fn entry_fns(&self, out: &mut String) {
-        let limits = self.limits;
-        let fuel_metered = limits.fuel != Limit::Unbounded;
-        let memory_metered = limits.memory != Limit::Unbounded;
-        let fuel_metered = if fuel_metered { "true" } else { "false" };
-        let memory_metered = if memory_metered { "true" } else { "false" };
-        for entry in self.plan.matcher().entrypoints() {
-            let def = entry.name.as_str();
-            let info = self.state(entry.entry);
+    fn entry_types(&self, out: &mut String, points: &[EntryPoint<'_>]) {
+        for (entry, point) in self.plan.matcher().entrypoints().iter().zip(points) {
             let boundary = match entry.boundary {
                 EntryBoundary::Passthrough => "EntryBoundary::new(false, false)",
                 EntryBoundary::Node => "EntryBoundary::new(false, true)",
                 EntryBoundary::Record => "EntryBoundary::new(true, false)",
             };
-            let driver = format!("run_at_node::<{fuel_metered}, {memory_metered}>");
-            let state = &info.const_name;
-            let args = format!("eng, source, {state}, {boundary}, budget");
-            let compact = format!("    {driver}({args})");
-            let apply_call = if compact.len() + 4 <= 100 && args.len() <= 60 {
+            let state = &self.state(entry.entry).const_name;
+            let compact = format!("run(eng, m, source, {state}, {boundary})");
+            let call = if compact.len() + 8 <= 100 {
                 compact
             } else {
                 format!(
-                    "    {driver}(\n        eng,\n        source,\n        {state},\n        {boundary},\n        budget,\n    )"
+                    "run(\n            eng,\n            m,\n            source,\n            {state},\n            {boundary},\n        )"
                 )
             };
-            let subs = [
-                ("DEF", def),
-                ("JOURNAL_FN", &journal_fn_name(def)),
-                ("APPLY_FN", &apply_fn_name(def)),
-                ("APPLY_CALL", apply_call.as_str()),
-                ("ENTRY", info.const_name.as_str()),
-                ("BOUNDARY", boundary),
-            ];
             out.push('\n');
-            splice(out, "", JOURNAL_ENTRY_FN, &subs);
-            out.push('\n');
-            splice(out, "", APPLY_ENTRY_FN, &subs);
+            splice(
+                out,
+                "",
+                ENTRY_TYPE,
+                &[
+                    ("DEF", entry.name.as_str()),
+                    ("TYPE", &point.entry),
+                    ("CALL", &call),
+                ],
+            );
         }
     }
 
     fn driver_fn(&self, out: &mut String) {
-        let (
-            flow_call_error_variant,
-            unwound_call_error_variant,
-            flow_call_error_arm,
-            unwound_call_error_arm,
-        ) = if self.has_calls {
-            (
-                concat!(
-                    "\n    /// Source-driven call state exceeded a fixed-width runtime capacity.\n",
-                    "    CallFrameError(rt::CallFrameError),"
-                ),
-                "\n    CallFrameError(rt::CallFrameError),",
-                "\n            Flow::CallFrameError(error) => return Err(error.into()),",
-                "\n                Unwound::CallFrameError(error) => return Err(error.into()),",
-            )
-        } else {
-            ("", "", "", "")
-        };
-        splice(
-            out,
-            "",
-            DRIVER_SKELETON,
-            &[
-                ("FLOW_CALL_ERROR_VARIANT", flow_call_error_variant),
-                ("UNWOUND_CALL_ERROR_VARIANT", unwound_call_error_variant),
-                ("FLOW_CALL_ERROR_ARM", flow_call_error_arm),
-                ("UNWOUND_CALL_ERROR_ARM", unwound_call_error_arm),
-            ],
-        );
+        splice(out, "", DRIVER_SKELETON, &[]);
     }
 
     fn dispatch_fn(&self, out: &mut String) {
@@ -516,8 +470,14 @@ impl<'a> Generator<'a> {
         } else {
             "_source"
         };
+        let meter = if self.dispatch_meters() { "m" } else { "_m" };
         out.push('\n');
-        splice(out, "", DISPATCH_OPEN, &[("SOURCE", source_param)]);
+        splice(
+            out,
+            "",
+            DISPATCH_OPEN,
+            &[("SOURCE", source_param), ("METER", meter)],
+        );
         for state in self.plan.matcher().states() {
             for line in state.provenance.lines() {
                 let _ = writeln!(out, "        // {}", line.trim_end());
@@ -587,7 +547,7 @@ impl<'a> Generator<'a> {
         self.retry_checkpoint(out, state, plan, "            ");
 
         if plan.retry.is_some() {
-            let _ = writeln!(out, "            finish_{}(eng)", info.fn_stem);
+            let _ = writeln!(out, "            finish_{}(eng, m)?", info.fn_stem);
         } else {
             self.effects_and_flow(out, &plan.effects, &plan.flow, "            ");
         }
@@ -641,7 +601,7 @@ impl<'a> Generator<'a> {
         let policy = policy_expr(policy);
         let state = &self.state(state.id).const_name;
         let compact_len = format!(
-            "{indent}    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), {state}));"
+            "{indent}    eng.push_checkpoint(m, rt::Checkpoint::match_retry(eng.checkpoint_state(), {state}))?;"
         )
         .len()
             + 4;
@@ -660,7 +620,7 @@ impl<'a> Generator<'a> {
 
     fn navigate_or_backtrack(&self, out: &mut String, nav: Nav) {
         let nav = nav_expr(nav);
-        let chain = format!("eng.cursor_mut().navigate({nav}).is_none()");
+        let chain = format!("eng.cursor_mut().navigate(m, {nav})?.is_none()");
         let template = if chain.len() <= 60 {
             NAVIGATE_OR_BACKTRACK
         } else {
@@ -672,9 +632,9 @@ impl<'a> Generator<'a> {
     fn cand_call(&self, state: &StatePlan, plan: &MatchPlan) -> String {
         let stem = &self.state(state.id).fn_stem;
         if plan.has_predicate() {
-            format!("cand_{stem}(eng, source)")
+            format!("cand_{stem}(eng, m, source)?")
         } else {
-            format!("cand_{stem}(eng)")
+            format!("cand_{stem}(eng, m)?")
         }
     }
 
@@ -701,7 +661,10 @@ impl<'a> Generator<'a> {
                     .map(|successor| self.state(*successor).const_name.as_str())
                     .collect::<Vec<_>>()
                     .join(", ");
-                let _ = writeln!(out, "{indent}eng.push_successors(&[{successor_names}]);");
+                let _ = writeln!(
+                    out,
+                    "{indent}eng.push_successors(m, &[{successor_names}])?;"
+                );
                 let _ = writeln!(out, "{indent}Flow::Jump({})", self.state(*next).const_name);
             }
         }
@@ -711,14 +674,14 @@ impl<'a> Generator<'a> {
         let unit = |out: &mut String, variant: &str| {
             let _ = writeln!(
                 out,
-                "{indent}eng.emit_output_event(|_| rt::JournalEvent::{variant});"
+                "{indent}eng.emit(m, |_| rt::JournalEvent::{variant})?;"
             );
         };
         match effect.kind {
             EffectKind::Node => {
                 let _ = writeln!(
                     out,
-                    "{indent}eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));"
+                    "{indent}eng.emit(m, |c| rt::JournalEvent::Node(c.node()))?;"
                 );
             }
             EffectKind::ListOpen => unit(out, "ListOpen"),
@@ -736,7 +699,7 @@ impl<'a> Generator<'a> {
                 };
                 let _ = writeln!(
                     out,
-                    "{indent}eng.emit_output_event(|_| rt::JournalEvent::{variant}({})); // {}",
+                    "{indent}eng.emit(m, |_| rt::JournalEvent::{variant}({}))?; // {}",
                     effect.payload, effect.display
                 );
             }
@@ -747,27 +710,27 @@ impl<'a> Generator<'a> {
                 let _ = writeln!(out, "{indent}eng.suppress_end();");
             }
             EffectKind::ScalarOpen => {
-                let _ = writeln!(out, "{indent}eng.scalar_open();");
+                let _ = writeln!(out, "{indent}eng.scalar_open(m)?;");
             }
             EffectKind::ScalarMark => {
-                let _ = writeln!(out, "{indent}eng.scalar_mark();");
+                let _ = writeln!(out, "{indent}eng.scalar_mark(m)?;");
             }
             EffectKind::TextClose => {
-                let _ = writeln!(out, "{indent}eng.scalar_close_text();");
+                let _ = writeln!(out, "{indent}eng.scalar_close_text(m)?;");
             }
             EffectKind::BoolClose => {
                 let value = effect.payload != 0;
-                let _ = writeln!(out, "{indent}eng.scalar_close_bool({value});");
+                let _ = writeln!(out, "{indent}eng.scalar_close_bool(m, {value})?;");
             }
             EffectKind::NodeText => {
-                let _ = writeln!(out, "{indent}eng.node_text();");
+                let _ = writeln!(out, "{indent}eng.node_text(m)?;");
             }
             EffectKind::NodeBool => {
-                let _ = writeln!(out, "{indent}eng.node_bool();");
+                let _ = writeln!(out, "{indent}eng.node_bool(m)?;");
             }
             EffectKind::BoolValue => {
                 let value = effect.payload != 0;
-                let _ = writeln!(out, "{indent}eng.bool_value({value});");
+                let _ = writeln!(out, "{indent}eng.bool_value(m, {value})?;");
             }
             EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd => {
                 unreachable!("inspection spans rejected before generation")
@@ -837,12 +800,7 @@ impl<'a> Generator<'a> {
             );
         }
 
-        let _ = writeln!(
-            out,
-            "            if let Err(error) = eng.enter_frame({state}) {{"
-        );
-        out.push_str("                return Flow::CallFrameError(error);\n");
-        out.push_str("            }\n");
+        let _ = writeln!(out, "            eng.enter_frame(m, {state})?;");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
     }
@@ -851,12 +809,7 @@ impl<'a> Generator<'a> {
         let state = &self.state(state_plan.id).const_name;
         let target = &self.state(plan.target).const_name;
         let _ = writeln!(out, "        {state} => {{");
-        let _ = writeln!(
-            out,
-            "            if let Err(error) = eng.enter_frame({state}) {{"
-        );
-        out.push_str("                return Flow::CallFrameError(error);\n");
-        out.push_str("            }\n");
+        let _ = writeln!(out, "            eng.enter_frame(m, {state})?;");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
     }
@@ -882,28 +835,38 @@ impl<'a> Generator<'a> {
             info.const_name, plan.candidate_pattern
         );
         out.push_str("#[inline]\n");
-        let source_param = if plan.has_predicate() {
-            ", source: &str"
+        let metered = plan.has_predicate();
+        if metered {
+            let _ = writeln!(
+                out,
+                "fn cand_{}(\n    eng: &mut rt::Engine<'_>,\n    m: &mut rt::Meter<'_>,\n    source: &str,\n) -> Result<bool, rt::LimitExceeded> {{",
+                info.fn_stem
+            );
         } else {
-            ""
-        };
-        let _ = writeln!(
-            out,
-            "fn cand_{}(eng: &rt::Engine<'_>{source_param}) -> bool {{",
-            info.fn_stem
-        );
+            let _ = writeln!(
+                out,
+                "fn cand_{}(eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<bool, rt::LimitExceeded> {{",
+                info.fn_stem
+            );
+        }
+        out.push_str("    m.charge(1)?;\n");
         if plan.needs_node_binding() {
             out.push_str("    let node = eng.node();\n");
         }
+        let (reject, accept) = ("return Ok(false);", "    Ok(true)\n}\n");
         for check in self.candidate_checks(&plan.checks) {
             splice(
                 out,
                 "    ",
                 CHECK,
-                &[("COMMENT", &check.comment), ("FAIL", &check.fail)],
+                &[
+                    ("COMMENT", &check.comment),
+                    ("FAIL", &check.fail),
+                    ("REJECT", reject),
+                ],
             );
         }
-        out.push_str("    true\n}\n");
+        out.push_str(accept);
     }
 
     fn candidate_checks(&self, plans: &[CheckPlan]) -> Vec<CandidateCheck> {
@@ -940,14 +903,14 @@ impl<'a> Generator<'a> {
                 CheckPlan::Field(field) => CandidateCheck::new(
                     format!("{}:", field.name),
                     format!(
-                        "eng.cursor().field_id() != Some({})",
+                        "!eng.cursor_mut().has_field(m, {})?",
                         self.field_const(field.id)
                     ),
                 ),
                 CheckPlan::NegField(field) => CandidateCheck::new(
                     format!("-{}", field.name),
                     format!(
-                        "node.child_by_field_id(u16::from({})).is_some()",
+                        "!eng.cursor_mut().field_absent(m, {})?",
                         self.field_const(field.id)
                     ),
                 ),
@@ -957,7 +920,7 @@ impl<'a> Generator<'a> {
     }
 
     fn predicate_check(&self, predicate: &PredicatePlan) -> CandidateCheck {
-        let text = "rt::node_text(source, &node)";
+        let text = "rt::predicate_text(m, source, &node)?";
         match &predicate.value {
             PredicateValuePlan::String(value) => {
                 let lit = rust_string(value);
@@ -994,10 +957,12 @@ impl<'a> Generator<'a> {
                 continue;
             }
             let info = self.state(state.id);
-            let eng = if plan.effects.is_empty() && !matches!(plan.flow, FlowPlan::Fork { .. }) {
-                "_eng"
+            let (eng, meter) = if self.flow_meters(&plan.effects, &plan.flow) {
+                ("eng", "m")
+            } else if plan.effects.is_empty() {
+                ("_eng", "_m")
             } else {
-                "eng"
+                ("eng", "_m")
             };
             out.push('\n');
             splice(
@@ -1008,9 +973,12 @@ impl<'a> Generator<'a> {
                     ("STATE", &info.const_name),
                     ("STEM", &info.fn_stem),
                     ("ENG", eng),
+                    ("METER", meter),
                 ],
             );
-            self.effects_and_flow(out, &plan.effects, &plan.flow, "    ");
+            out.push_str("    let flow = {\n");
+            self.effects_and_flow(out, &plan.effects, &plan.flow, "        ");
+            out.push_str("    };\n    Ok(flow)\n");
             out.push_str("}\n");
         }
     }
@@ -1021,21 +989,17 @@ impl<'a> Generator<'a> {
         } else {
             "_source"
         };
-        let (call_resume, match_retry_call_error) = if self.has_calls {
-            (BACKTRACK_CALL_RESUME, MATCH_RETRY_CALL_ERROR)
+        let call_resume = if self.has_calls {
+            BACKTRACK_CALL_RESUME
         } else {
-            (BACKTRACK_CALL_RESUME_UNREACHABLE, "")
+            BACKTRACK_CALL_RESUME_UNREACHABLE
         };
         out.push('\n');
         splice(
             out,
             "",
             BACKTRACK_SKELETON,
-            &[
-                ("SOURCE", source_arg),
-                ("CALL_RESUME", call_resume),
-                ("MATCH_RETRY_CALL_ERROR", match_retry_call_error),
-            ],
+            &[("SOURCE", source_arg), ("CALL_RESUME", call_resume)],
         );
     }
 
@@ -1081,11 +1045,49 @@ impl<'a> Generator<'a> {
             );
             self.candidate_search(out, state, plan, CandidateFailure::RetryExhausted);
             self.retry_checkpoint(out, state, plan, "            ");
-            let _ = writeln!(out, "            Some(finish_{}(eng))", info.fn_stem);
+            let _ = writeln!(out, "            finish_{}(eng, m).map(Some)", info.fn_stem);
             out.push_str("        }\n");
         }
         out.push_str(MATCH_RETRY_CLOSE);
     }
+}
+
+impl Generator<'_> {
+    /// Whether any dispatch arm charges the meter. Unused parameters are
+    /// named with a leading underscore to keep generated code warning-free.
+    fn dispatch_meters(&self) -> bool {
+        self.plan
+            .matcher()
+            .states()
+            .iter()
+            .any(|state| match &state.kind {
+                StatePlanKind::Epsilon { effects, flow } => self.flow_meters(effects, flow),
+                StatePlanKind::Match(plan) => {
+                    plan.navigates()
+                        || plan.has_predicate()
+                        || plan.retry.is_some()
+                        || plan.has_candidate_checks()
+                        || self.flow_meters(&plan.effects, &plan.flow)
+                }
+                StatePlanKind::Call(_) => true,
+                StatePlanKind::Return(_) => false,
+            })
+    }
+
+    fn flow_meters(&self, effects: &[EffectPlan], flow: &FlowPlan) -> bool {
+        matches!(flow, FlowPlan::Fork { .. })
+            || effects.iter().any(|effect| {
+                !matches!(
+                    effect.kind,
+                    EffectKind::SuppressBegin | EffectKind::SuppressEnd
+                )
+            })
+    }
+}
+
+/// The matcher-module type implementing `rt::Entry` for one entrypoint.
+fn entry_type(item_ident: &str) -> String {
+    format!("{item_ident}Entry")
 }
 
 pub(super) fn nav_expr(nav: Nav) -> String {
@@ -1131,14 +1133,6 @@ pub(super) fn limit_expr(limit: Limit) -> String {
     format!("rt::Limit::{limit:?}")
 }
 
-pub(super) fn depth_expr(limit: Limit, max_decoder_frame_bytes: u64) -> String {
-    match limit {
-        Limit::Auto => format!("Some(rt::decode_depth_auto({max_decoder_frame_bytes}))"),
-        Limit::Of(n) => format!("Some({n})"),
-        Limit::Unbounded => "None".to_string(),
-    }
-}
-
 const HEADER: &str = r#"
 // Generated Plotnik query module: typed result types, supplied-node execution
 // points, per-type result decoders, and the compiled matcher (`mod matcher`).
@@ -1165,23 +1159,6 @@ const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
     memory: @MEMORY@,
 };
 
-/// No ceilings — what the unmetered journal entrypoints run under.
-const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
-    fuel_limit: None,
-    max_memory: None,
-};
-
-/// Resolve compiled-in limits once for a supplied application or search scope.
-pub(super) fn execution_budget(scope: rt::Node<'_>) -> rt::ExecutionBudget {
-    let source_nodes = u32::try_from(scope.descendant_count()).unwrap_or(u32::MAX);
-    rt::ExecutionBudget::new(LIMITS.resolve(source_nodes))
-}
-"#;
-
-const DECODE_DEPTH_CONST: &str = r#"
-/// Ceiling on recursive typed decoding (`None` opts out). The
-/// matcher itself is iterative; only decoder recursion enters this guard.
-pub(super) const MAX_DECODE_DEPTH: Option<u64> = @DEPTH@;
 "#;
 
 const VERIFY_LANGUAGE: &str = r#"
@@ -1250,25 +1227,23 @@ pub(super) fn verify_language(node: rt::Node<'_>) {
 }
 "#;
 
-const JOURNAL_ENTRY_FN: &str = r#"
-/// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
-/// match journal — the same event sequence the VM commits for this query.
-pub fn @JOURNAL_FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
-    let entry = @ENTRY@;
-    let boundary = @BOUNDARY@;
-    let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
-    outcome.expect("an unmetered run cannot exceed a limit")
-}
-"#;
+const ENTRY_TYPE: &str = r#"
+pub(super) struct @TYPE@;
 
-const APPLY_ENTRY_FN: &str = r#"
-/// Apply one candidate using the operation's cumulative budget.
-pub(super) fn @APPLY_FN@<'a, 't>(
-    eng: &'a mut rt::Engine<'t>,
-    source: &str,
-    budget: &mut rt::ExecutionBudget,
-) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-@APPLY_CALL@
+impl rt::Entry for @TYPE@ {
+    const LIMITS: rt::RuntimeLimitSpec = LIMITS;
+
+    fn verify_language(node: rt::Node<'_>) {
+        verify_language(node);
+    }
+
+    fn run<'t>(
+        eng: &mut rt::Engine<'t>,
+        m: &mut rt::Meter<'_>,
+        source: &str,
+    ) -> Result<bool, rt::LimitExceeded> {
+        @CALL@
+    }
 }
 "#;
 
@@ -1284,20 +1259,22 @@ impl EntryBoundary {
         Self { record, node }
     }
 
-    fn begin(self, eng: &mut rt::Engine<'_>) {
+    fn begin(self, eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<(), rt::LimitExceeded> {
         if self.record {
-            let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
+            eng.emit(m, |_| rt::JournalEvent::RecordOpen)?;
         }
+        Ok(())
     }
 
-    fn finish(self, eng: &mut rt::Engine<'_>) {
+    fn finish(self, eng: &mut rt::Engine<'_>, m: &mut rt::Meter<'_>) -> Result<(), rt::LimitExceeded> {
         if self.node {
-            let _ = eng.emit_output_event(|cursor| rt::JournalEvent::Node(cursor.node()));
-            return;
+            eng.emit(m, |cursor| rt::JournalEvent::Node(cursor.node()))?;
+            return Ok(());
         }
         if self.record {
-            let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
+            eng.emit(m, |_| rt::JournalEvent::RecordClose)?;
         }
+        Ok(())
     }
 }
 
@@ -1308,92 +1285,42 @@ enum Flow {
     /// The entrypoint accepted; the match journal is committed.
     Accept,
     /// The state failed; unwind the checkpoint stack.
-    Backtrack,@FLOW_CALL_ERROR_VARIANT@
+    Backtrack,
 }
 
 /// How the backtrack unwind resumed execution.
 enum Unwound {
     Resumed(u16),
     Accepted,
-    NoMatch,@UNWOUND_CALL_ERROR_VARIANT@
+    NoMatch,
 }
 
-/// One dispatch loop serves every entrypoint; `entry` selects the definition
-/// body and `boundary` supplies its root result effects.
-/// The metering constants come from the compiled-in policy. A fully unbounded
-/// policy skips budget accounting. Memory checks read `heap_bytes` only when
-/// memory is bounded. Metered dispatches use the same budget as the VM.
-/// `RECORD_OUTPUT_EVENTS` disables output allocation for match-only entries. (No
-/// let-chains: generated code targets the embedding crate's edition.)
-fn run<
-    't,
-    const METERED_FUEL: bool,
-    const METERED_MEMORY: bool,
-    const RECORD_OUTPUT_EVENTS: bool,
->(
-    tree: &'t rt::Tree,
+fn run<'t>(
+    eng: &mut rt::Engine<'t>,
+    m: &mut rt::Meter<'_>,
     source: &str,
     entry: u16,
     boundary: EntryBoundary,
-    limits: rt::ResolvedRuntimeLimits,
-) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    let mut budget = rt::ExecutionBudget::new(limits);
-    let mut eng = if RECORD_OUTPUT_EVENTS {
-        rt::Engine::new(tree.root_node().walk())
-    } else {
-        rt::Engine::new_match_only(tree.root_node().walk())
-    };
-    verify_language(eng.node());
-    let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
-        &mut eng,
-        source,
-        entry,
-        boundary,
-        &mut budget,
-    )?
-    .is_some();
-    Ok(accepted.then(|| eng.into_journal()))
-}
-
-fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
-    eng: &'a mut rt::Engine<'t>,
-    source: &str,
-    entry: u16,
-    boundary: EntryBoundary,
-    budget: &mut rt::ExecutionBudget,
-) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    boundary.begin(eng);
+) -> Result<bool, rt::LimitExceeded> {
+    boundary.begin(eng, m)?;
     let mut ip = entry;
     loop {
-        if METERED_FUEL || METERED_MEMORY {
-            // One matcher dispatch consumes one unit of the operation budget.
-            // Memory-only policies still charge to retain the sample cadence.
-            budget.charge()?;
-            // The shared budget schedules live matcher-heap samples.
-            // Unbounded memory policies skip sampling and heap measurement.
-            if METERED_MEMORY && budget.memory_sample_due() {
-                let used = eng.heap_bytes();
-                match budget.limits().max_memory {
-                    Some(max) if used > max => {
-                        return Err(rt::LimitExceeded::Memory { used, limit: max });
-                    }
-                    _ => {}
-                }
-            }
-        }
-        match dispatch(eng, source, ip) {
+        m.charge(1)?;
+        match dispatch(eng, m, source, ip)? {
             Flow::Jump(next) => ip = next,
             Flow::Accept => {
-                boundary.finish(eng);
-                return Ok(Some(eng.accepted_journal()));
-            }@FLOW_CALL_ERROR_ARM@
-            Flow::Backtrack => match backtrack(eng, source) {
+                boundary.finish(eng, m)?;
+                eng.accepted_tape();
+                return Ok(true);
+            }
+            Flow::Backtrack => match backtrack(eng, m, source)? {
                 Unwound::Resumed(next) => ip = next,
                 Unwound::Accepted => {
-                    boundary.finish(eng);
-                    return Ok(Some(eng.accepted_journal()));
+                    boundary.finish(eng, m)?;
+                    eng.accepted_tape();
+                    return Ok(true);
                 }
-                Unwound::NoMatch => return Ok(None),@UNWOUND_CALL_ERROR_ARM@
+                Unwound::NoMatch => return Ok(false),
             },
         }
     }
@@ -1401,17 +1328,17 @@ fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
 "#;
 
 const DISPATCH_OPEN: &str = r#"
-fn dispatch<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Flow {
-    match ip {
+fn dispatch<'t>(eng: &mut rt::Engine<'t>, @METER@: &mut rt::Meter<'_>, @SOURCE@: &str, ip: u16) -> Result<Flow, rt::LimitExceeded> {
+    Ok(match ip {
 "#;
 
 const DISPATCH_CLOSE: &str = "        _ => unreachable!(\"ip {ip} is not a generated state\"),
-    }
+    })
 }
 ";
 
 const NAVIGATE_OR_BACKTRACK: &str = r#"
-if eng.cursor_mut().navigate(@NAV@).is_none() {
+if eng.cursor_mut().navigate(m, @NAV@)?.is_none() {
     break 'state Flow::Backtrack;
 }
 "#;
@@ -1419,7 +1346,7 @@ if eng.cursor_mut().navigate(@NAV@).is_none() {
 const NAVIGATE_OR_BACKTRACK_EXPANDED: &str = r#"
 if eng
     .cursor_mut()
-    .navigate(@NAV@)
+    .navigate(m, @NAV@)?
     .is_none()
 {
     break 'state Flow::Backtrack;
@@ -1437,7 +1364,7 @@ loop {
     if @CAND@ {
         break;
     }
-    if !eng.cursor_mut().continue_search(@POLICY@) {
+    if !eng.cursor_mut().continue_search(m, @POLICY@)? {
         @FAIL@
     }
 }
@@ -1445,45 +1372,45 @@ loop {
 
 const RETRY_CHECKPOINT_COMPACT: &str = r#"
 if @POLICY@.admits(&eng.node()) {
-    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), @STATE@));
+    eng.push_checkpoint(m, rt::Checkpoint::match_retry(eng.checkpoint_state(), @STATE@))?;
 }
 "#;
 
 const RETRY_CHECKPOINT_EXPANDED: &str = r#"
 if @POLICY@.admits(&eng.node()) {
-    eng.push_checkpoint(rt::Checkpoint::match_retry(
+    eng.push_checkpoint(m, rt::Checkpoint::match_retry(
         eng.checkpoint_state(),
         @STATE@,
-    ));
+    ))?;
 }
 "#;
 
 const CHECK: &str = r#"
 // @COMMENT@
 if @FAIL@ {
-    return false;
+    @REJECT@
 }
 "#;
 
 const CALL_FIELD_CHECK: &str = r#"
-if eng.cursor().field_id() != Some(@FIELD@) {
+if !eng.cursor_mut().has_field(m, @FIELD@)? {
     break 'state Flow::Backtrack;
 }
 "#;
 
 const CALL_FIELD_SCAN: &str = r#"
 loop {
-    if eng.cursor().field_id() == Some(@FIELD@) {
+    if eng.cursor_mut().has_field(m, @FIELD@)? {
         break;
     }
-    if !eng.cursor_mut().continue_search(@POLICY@) {
+    if !eng.cursor_mut().continue_search(m, @POLICY@)? {
         break 'state Flow::Backtrack;
     }
 }
 "#;
 
 const CALL_RETRY_PUSH: &str = r#"
-eng.push_checkpoint(rt::Checkpoint::call_retry(
+eng.push_checkpoint(m, rt::Checkpoint::call_retry(
     eng.checkpoint_state(),
     @STATE@,
     rt::CallResume {
@@ -1492,7 +1419,7 @@ eng.push_checkpoint(rt::Checkpoint::call_retry(
         field: @FIELD@,
         policy: @POLICY@,
     },
-));
+))?;
 "#;
 
 const RETURN_ARM: &str = r#"
@@ -1515,30 +1442,31 @@ const FINISH_FN_OPEN: &str = r#"
 /// path and the match-retry resume, so a retried candidate emits exactly
 /// what the original acceptance would have emitted.
 #[inline]
-fn finish_@STEM@(@ENG@: &mut rt::Engine<'_>) -> Flow {
+fn finish_@STEM@(@ENG@: &mut rt::Engine<'_>, @METER@: &mut rt::Meter<'_>) -> Result<Flow, rt::LimitExceeded> {
 "#;
 
 const BACKTRACK_SKELETON: &str = r#"
 /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
 /// Match checkpoints advance their sibling search and re-enter. Loops, never
 /// recurses — a run of exhausted retries unwinds in one call.
-fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
+fn backtrack<'t>(eng: &mut rt::Engine<'t>, m: &mut rt::Meter<'_>, @SOURCE@: &str) -> Result<Unwound, rt::LimitExceeded> {
     'unwind: loop {
+        m.charge(1)?;
         let Some((cp, snapshot)) = eng.pop_checkpoint() else {
-            return Unwound::NoMatch;
+            return Ok(Unwound::NoMatch);
         };
-        eng.restore_checkpoint_state(cp.state, snapshot);
+        eng.restore_checkpoint_state(m, cp.state, snapshot)?;
 
         match cp.resume {
-            rt::Resume::Successor => return Unwound::Resumed(cp.ip),
+            rt::Resume::Successor => return Ok(Unwound::Resumed(cp.ip)),
 
 @CALL_RESUME@
 
             // Match retry: advance past the accepted-but-failed candidate and
             // re-run that state's sibling search from there.
-            rt::Resume::Match => match match_retry(eng, @SOURCE@, cp.ip) {
-                Some(Flow::Jump(next)) => return Unwound::Resumed(next),
-                Some(Flow::Accept) => return Unwound::Accepted,@MATCH_RETRY_CALL_ERROR@
+            rt::Resume::Match => match match_retry(eng, m, @SOURCE@, cp.ip)? {
+                Some(Flow::Jump(next)) => return Ok(Unwound::Resumed(next)),
+                Some(Flow::Accept) => return Ok(Unwound::Accepted),
                 Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
                 None => continue 'unwind,
             },
@@ -1551,40 +1479,33 @@ const BACKTRACK_CALL_RESUME: &str = r#"            // Call retry: advance to the
             // constraint, then re-enter the callee. Exhausted siblings keep
             // unwinding to an earlier checkpoint.
             rt::Resume::Call(resume) => {
-                if !eng.cursor_mut().continue_search(resume.policy) {
+                if !eng.cursor_mut().continue_search(m, resume.policy)? {
                     continue 'unwind;
                 }
                 if let Some(field_id) = resume.field {
                     loop {
-                        if eng.cursor().field_id() == Some(field_id) {
+                        if eng.cursor_mut().has_field(m, field_id)? {
                             break;
                         }
-                        if !eng.cursor_mut().continue_search(resume.policy) {
+                        if !eng.cursor_mut().continue_search(m, resume.policy)? {
                             continue 'unwind;
                         }
                     }
                 }
-                eng.push_checkpoint(rt::Checkpoint::call_retry(
+                eng.push_checkpoint(m, rt::Checkpoint::call_retry(
                     eng.checkpoint_state(),
                     cp.ip,
                     resume,
-                ));
-                if let Err(error) = eng.enter_frame(resume.call_site) {
-                    return Unwound::CallFrameError(error);
-                }
-                return Unwound::Resumed(resume.target);
+                ))?;
+                eng.enter_frame(m, resume.call_site)?;
+                return Ok(Unwound::Resumed(resume.target));
             }"#;
 
 const BACKTRACK_CALL_RESUME_UNREACHABLE: &str =
     r#"            rt::Resume::Call(_) => unreachable!("matcher has no call checkpoints"),"#;
 
-const MATCH_RETRY_CALL_ERROR: &str = r#"
-                Some(Flow::CallFrameError(error)) => {
-                    return Unwound::CallFrameError(error);
-                }"#;
-
 const MATCH_RETRY_OPEN: &str = r#"
-fn match_retry<'t>(@ENG@: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Option<Flow> {
+fn match_retry<'t>(@ENG@: &mut rt::Engine<'t>, m: &mut rt::Meter<'_>, @SOURCE@: &str, ip: u16) -> Result<Option<Flow>, rt::LimitExceeded> {
     match ip {
 "#;
 
@@ -1594,13 +1515,13 @@ const MATCH_RETRY_CLOSE: &str = "        _ => unreachable!(\"match-retry checkpo
 ";
 
 const MATCH_RETRY_EMPTY: &str = r#"
-fn match_retry(_eng: &mut rt::Engine<'_>, @SOURCE@: &str, ip: u16) -> Option<Flow> {
+fn match_retry(_eng: &mut rt::Engine<'_>, _m: &mut rt::Meter<'_>, @SOURCE@: &str, ip: u16) -> Result<Option<Flow>, rt::LimitExceeded> {
     unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match")
 }
 "#;
 
 const RETRY_ADVANCE: &str = r#"
-if !eng.cursor_mut().continue_search(@POLICY@) {
-    return None;
+if !eng.cursor_mut().continue_search(m, @POLICY@)? {
+    return Ok(None);
 }
 "#;

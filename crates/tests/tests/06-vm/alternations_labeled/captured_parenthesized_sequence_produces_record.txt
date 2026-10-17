@@ -40,8 +40,8 @@ help: replace the outer parentheses with braces
   "x": {
     "a": {
       "kind": "expression_statement",
-      "span": [0, 2],
-      "text": "a;"
+      "text": "a;",
+      "span": [0, 2]
     }
   }
 }
@@ -69,24 +69,25 @@ N0: S3 → T1  ; QX
 N1: S4 → T2  ; Q
 
 [entrypoints]
-Q = 0 :: T2
+Q = 00 :: T2
 
 [instructions]
 Q:
-  0   !   (program)                         1
-  1  └─!  _                                 3, 8
-  3   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  5
-  5  ─‣┘  _ [RecordClose RecordSet(M1)]     7
-  7                                         ▶
-  8  ──!  _                                 3, 8
+  00   !   (program)                        01
+  01  └─!  _                                03, 09
+  03   !   (expression_statement) [RecordSet(M1) RecordOpen RecordSet(M0) Node]  06
+  06  ─‣┘  _ [RecordClose]                  08
+  08                                        ▶
+  09  ──!  _                                03, 09
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       _                                 03, 08
-      ●   expression_statement
-  3       (expression_statement) [RecordOpen Node RecordSet(M0)]  05
-      ●   expression_statement
-  5       _ [RecordClose RecordSet(M1)]     07
-      ●   program
-  7   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..2]
+0003 StayExact Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..2]
+0006 Up(1) Any
+0006 MatchOk program [0..2]
+0008 Return PortId(0)
+0008 Return

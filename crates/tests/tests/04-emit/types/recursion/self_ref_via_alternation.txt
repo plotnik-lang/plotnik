@@ -8,13 +8,13 @@ Expr = [
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Expr<'t> {
+#[derive(Clone, Copy)]
+pub enum Expr<'r, 't> {
     Lit {
         value: Node<'t>,
     },
     Binary {
-        left: ::std::boxed::Box<Expr<'t>>,
-        right: ::std::boxed::Box<Expr<'t>>,
+        left: &'r Expr<'r, 't>,
+        right: &'r Expr<'r, 't>,
     },
 }

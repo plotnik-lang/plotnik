@@ -14,15 +14,15 @@ b
   "first": {
     "name": {
       "kind": "identifier",
-      "span": [0, 1],
-      "text": "a"
+      "text": "a",
+      "span": [0, 1]
     }
   },
   "second": {
     "name": {
       "kind": "identifier",
-      "span": [2, 3],
-      "text": "b"
+      "text": "b",
+      "span": [2, 3]
     }
   }
 }
@@ -74,7 +74,12 @@ b
       0,
       1
     ],
-    "bindings": [],
+    "bindings": [
+      {
+        "path": "/first",
+        "event_index": 5
+      }
+    ],
     "range": [
       4,
       21
@@ -89,7 +94,7 @@ b
     ],
     "bindings": [],
     "range": [
-      5,
+      6,
       20
     ]
   },
@@ -102,8 +107,8 @@ b
     ],
     "bindings": [],
     "range": [
-      7,
-      15
+      8,
+      16
     ]
   },
   {
@@ -115,8 +120,8 @@ b
     ],
     "bindings": [],
     "range": [
-      8,
-      14
+      9,
+      15
     ]
   },
   {
@@ -133,22 +138,17 @@ b
       }
     ],
     "range": [
-      9,
-      13
+      10,
+      14
     ]
   },
   {
     "query_span_id": 7,
     "parent": 4,
     "source_span": null,
-    "bindings": [
-      {
-        "path": "/first",
-        "event_index": 17
-      }
-    ],
+    "bindings": [],
     "range": [
-      16,
+      17,
       19
     ]
   },
@@ -159,7 +159,12 @@ b
       2,
       3
     ],
-    "bindings": [],
+    "bindings": [
+      {
+        "path": "/second",
+        "event_index": 22
+      }
+    ],
     "range": [
       21,
       38
@@ -174,7 +179,7 @@ b
     ],
     "bindings": [],
     "range": [
-      22,
+      23,
       37
     ]
   },
@@ -187,8 +192,8 @@ b
     ],
     "bindings": [],
     "range": [
-      24,
-      32
+      25,
+      33
     ]
   },
   {
@@ -200,8 +205,8 @@ b
     ],
     "bindings": [],
     "range": [
-      25,
-      31
+      26,
+      32
     ]
   },
   {
@@ -218,22 +223,17 @@ b
       }
     ],
     "range": [
-      26,
-      30
+      27,
+      31
     ]
   },
   {
     "query_span_id": 10,
     "parent": 10,
     "source_span": null,
-    "bindings": [
-      {
-        "path": "/second",
-        "event_index": 34
-      }
-    ],
+    "bindings": [],
     "range": [
-      33,
+      34,
       36
     ]
   }
@@ -284,54 +284,49 @@ P11 ref        111..117  source_id=0  T1
 
 [instructions]
 Name:
-  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 RecordSet(M0) Node SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
   04                                        ▶
 
 Q:
   05   !   (program) [SpanStart#3 SpanStartAt#4]  08
   07  ...
-  08  └‣─  (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  11
+  08  └‣─  (expression_statement) [SpanStart#5 SpanStartAt#6 RecordSet(M1) SpanStart#8 RecordOpen]  11
   11  └‣─  (Name)                           00 : 12
-  12  -ε-  [RecordClose]                    16
-  14  -ε-  [RecordClose]                    24
-  16  ─‣┘  _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  19
-  19  ─‣─  (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  22
-  22  └‣─  (Name)                           00 : 14
-  23                                        ▶
-  24  ─‣┘  _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  27
-  27  ─‣┘  _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  23
+  12  -ε-  [RecordClose]                    14
+  14  ─‣┘  _ [SpanStart#7 SpanEnd#7 SpanEnd#8]  16
+  16  ─‣─  (expression_statement) [SpanEnd#6 SpanStartAt#9 RecordSet(M2) SpanStart#11 RecordOpen]  19
+  19  └‣─  (Name)                           00 : 20
+  20  -ε-  [RecordClose]                    22
+  22  ─‣┘  _ [SpanStart#10 SpanEnd#10 SpanEnd#11]  24
+  24  ─‣┘  _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  27
+  27                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  05       (program) [SpanStart#3 SpanStartAt#4]  08
-       ●   program
-  08       (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  11
-       ●   expression_statement
-  11       (Name)                           00 : 12
-       ▶   (Name)
-
-Name:
-  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
-       ●   identifier
-  04   ◀   (Name)                           
-
-Q:
-  12  -ε-  [RecordClose]                    16
-  16       _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  19
-       ●   expression_statement
-  19       (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  22
-       ●   expression_statement
-  22       (Name)                           00 : 14
-       ▶   (Name)
-
-Name:
-  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
-       ●   identifier
-  04   ◀   (Name)                           
-
-Q:
-  14  -ε-  [RecordClose]                    24
-  24       _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  27
-       ●   expression_statement
-  27       _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  23
-       ●   program
-  23   ◀   (Q)                              ◼
+0005 ExecutionStarted { target: 5 }
+0005 StayExact Named(Some(NodeKindId(166)))
+0005 MatchOk program [0..3]
+0008 Down Named(Some(NodeKindId(182)))
+0008 MatchOk expression_statement [0..1]
+0011 Call CodeAddr(0)
+0011 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchOk identifier [0..1]
+0004 Return PortId(0)
+0004 Return
+0012 Epsilon Any
+0014 Up(1) Any
+0014 MatchOk expression_statement [0..1]
+0016 Next Named(Some(NodeKindId(182)))
+0016 MatchOk expression_statement [2..3]
+0019 Call CodeAddr(0)
+0019 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchOk identifier [2..3]
+0004 Return PortId(0)
+0004 Return
+0020 Epsilon Any
+0022 Up(1) Any
+0022 MatchOk expression_statement [2..3]
+0024 Up(1) Any
+0024 MatchOk program [0..3]
+0027 Return PortId(0)
+0027 Return

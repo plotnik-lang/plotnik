@@ -7,7 +7,7 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_compiler::bytecode::Module;
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
-use plotnik_compiler::{Colors, Limit, QueryBuilder, RuntimeLimitSpec, VM, materialize_verified};
+use plotnik_compiler::{Limit, QueryBuilder, RuntimeLimitSpec, VM};
 
 #[path = "../test_support/grammar_loader.rs"]
 mod grammar_loader;
@@ -205,14 +205,7 @@ fn bench_scenarios(c: &mut Criterion) {
             group.bench_function(*size_name, |b| {
                 b.iter(|| {
                     let vm = VM::builder(source, &tree).build();
-                    let journal = vm.execute(&module, &entry).expect("bench query matches");
-                    materialize_verified(
-                        source,
-                        &module,
-                        &entry,
-                        journal.output_events(),
-                        Colors::new(false),
-                    )
+                    vm.execute(&module, &entry).expect("bench query matches")
                 })
             });
         }
@@ -232,7 +225,7 @@ fn bench_scan_execute(c: &mut Criterion) {
         b.iter(|| {
             let vm = VM::builder(source, &tree).build();
             let journal = vm.execute(&module, &entry).expect("bench query matches");
-            black_box(journal.as_slice().len());
+            black_box(journal);
         })
     });
     group.finish();

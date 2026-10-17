@@ -7,24 +7,24 @@ Q = (array (Nested) @top)
 ---------------------- NFA -----------------------
 [entrypoints]
 Nested = 00
-Q      = 12
+Q      = 13
 
 [transitions]
 Nested:
   00  -ε-                                   02, 03
   01                                        ▶
-  02   !   (identifier) [Absent RecordSet(inner) Node RecordSet(leaf)]  01
-  03   !   (array) [Absent RecordSet(leaf) RecordOpen]  07
-  04  ─‣┘  _ [RecordSet(inner)]             01
+  02   !   (identifier) [RecordSet(leaf) Node]  01
+  03   !   (array) [RecordSet(inner) RecordOpen]  07
+  04  ─‣┘  _                                01
   06  -ε-  [RecordClose]                    04
   07  └‣─  (Nested)                         00 : 06
 
 Q:
-  11                                        ▶
-  12   !   (array) [RecordOpen]             16
-  13  ─‣┘  _ [RecordSet(top)]               11
-  15  -ε-  [RecordClose]                    13
-  16  └‣─  (Nested)                         00 : 15
+  12                                        ▶
+  13   !   (array) [RecordSet(top) RecordOpen]  17
+  14  ─‣┘  _                                12
+  16  -ε-  [RecordClose]                    14
+  17  └‣─  (Nested)                         00 : 16
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -58,18 +58,17 @@ Q      = 02 :: T4
 
 [instructions]
 Nested:
-  00  -ε-                                   16, 20
+  00  -ε-                                   13, 16
 
 Q:
-  02   !   (array) [RecordOpen]             04
+  02   !   (array) [RecordSet(M2) RecordOpen]  04
   04  └‣─  (Nested)                         00 : 05
-  05  -ε-  [RecordClose]                    08
-  07  ...
-  08  ─‣┘  _ [RecordSet(M2)]                10
-  10                                        ▶
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘  _ [RecordSet(M1)]                15
-  15                                        ▶
-  16   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  15
-  19  └‣─  (Nested)                         00 : 11
-  20   !   (array) [Absent RecordSet(M0) RecordOpen]  19
+  05  -ε-  [RecordClose]                    07
+  07  ─‣┘  _                                08
+  08                                        ▶
+  09  -ε-  [RecordClose]                    11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13   !   (identifier) [RecordSet(M0) Node]  12
+  15  └‣─  (Nested)                         00 : 09
+  16   !   (array) [RecordSet(M1) RecordOpen]  15

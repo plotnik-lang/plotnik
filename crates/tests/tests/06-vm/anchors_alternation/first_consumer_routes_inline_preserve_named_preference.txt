@@ -22,19 +22,19 @@ Q = (program
 --------------------- OUTPUT ---------------------
 {
   "choice": {
+    "$tag": "Named",
     "$data": {
       "a": {
         "kind": "identifier",
-        "span": [4, 5],
-        "text": "a"
+        "text": "a",
+        "span": [4, 5]
       },
       "b": {
         "kind": "identifier",
-        "span": [7, 8],
-        "text": "b"
+        "text": "b",
+        "span": [7, 8]
       }
-    },
-    "$tag": "Named"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -84,35 +84,38 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  └‣─  "["                              18
+  03  └‣─  "["                              20
   04                                        ▶
-  05  ─‣─  (identifier) [Node RecordSet(M1) VariantClose] == "b"  20
-  08  ─•─  (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  05
-  11  ─‣─  (identifier) [Node RecordSet(M2) VariantClose] == "b"  20
-  14  ─◦─  "," [VariantOpen(M5) Node RecordSet(M3)]  11
-  16   !   (identifier) == "p"              08, 14
-  18  ──!  _                                16, 18
-  20  ─‣┘³ _ [RecordSet(M6)]                04
+  05  ─‣─  (identifier) [RecordSet(M1) Node VariantClose] == "b"  22
+  08  ─•─  (identifier) [VariantOpen(M4) RecordSet(M0) Node] == "a"  05
+  11  ─‣─  (identifier) [RecordSet(M2) Node VariantClose] == "b"  22
+  14  ─◦─  "," [VariantOpen(M5) RecordSet(M3) Node]  11
+  16  -ε-  [RecordSet(M6)]                  08, 14
+  18   !   (identifier) == "p"              16
+  20  ──!  _                                18, 20
+  22  ─‣┘³ _                                04
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       "["                              18
-       ●   [
-  18       _                                16, 18
-       ●   identifier
-  16       (identifier) == "p"              08, 14
-       ●   identifier
-  08       (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  05
-       ○   ,
-       ●   identifier
-  05       (identifier) [Node RecordSet(M1) VariantClose] == "b"  20
-       ○   ,
-       ●   identifier
-  20       _ [RecordSet(M6)]                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..9]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0003 Down Anonymous(Some(NodeKindId(41)))
+0003 MatchOk [ [0..1]
+0020 NextExact Any
+0020 MatchOk identifier [1..2]
+0018 StayExact Named(Some(NodeKindId(1)))
+0018 MatchOk identifier [1..2]
+0016 Epsilon Any
+0008 NextSkip Named(Some(NodeKindId(1)))
+0008 MatchFail , [2..3]
+0008 MatchOk identifier [4..5]
+0005 Next Named(Some(NodeKindId(1)))
+0005 MatchFail , [5..6]
+0005 MatchOk identifier [7..8]
+0022 Up(3) Any
+0022 MatchOk program [0..9]
+0004 Return PortId(0)
+0004 Return

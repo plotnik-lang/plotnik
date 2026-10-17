@@ -11,13 +11,14 @@ Q = 02
 [transitions]
 Q:
   01                                        ▶
-  02   !   (program)                        11, 04
-  03  ─‣┘  _ [RecordSet(statement)]         01
-  04  -ε-  [Absent RecordSet(statement)]    01
-  06   !   (expression_statement) [VariantOpen(Expression) Node RecordSet(expression) VariantClose]  03
-  07   !   (debugger_statement) [VariantOpen(Debugger) Node RecordSet(debugger) VariantClose]  03
-  10  ──!  _                                06, 07, 10
-  11  └─!  _                                06, 07, 10
+  02   !   (program)                        12
+  03  ─‣┘  _                                01
+  04  -ε-  [Absent]                         01
+  05   !   (expression_statement) [VariantOpen(Expression) RecordSet(expression) Node VariantClose]  03
+  06   !   (debugger_statement) [VariantOpen(Debugger) RecordSet(debugger) Node VariantClose]  03
+  09  ──!  _                                05, 06, 09
+  10  └─!  _                                05, 06, 09
+  12  -ε-  [RecordSet(statement)]           10, 04
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -56,12 +57,13 @@ Q = 00 :: T5
 
 [instructions]
 Q:
-  00   !   (program)                        13, 03
-  02                                        ▶
-  03  -ε-  [Absent RecordSet(M4)]           02
-  05   !   (expression_statement) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  16
-  08   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  16
-  11  ──!  _                                05, 08, 11
-  13  └─!  _                                05, 08, 11
-  15  ...
-  16  ─‣┘  _ [RecordSet(M4)]                02
+  00   !   (program)                        01
+  01  -ε-  [RecordSet(M4)]                  16, 04
+  03                                        ▶
+  04  -ε-  [Absent]                         03
+  06  ─‣┘  _                                03
+  07  ...
+  08   !   (expression_statement) [VariantOpen(M2) RecordSet(M0) Node VariantClose]  06
+  11   !   (debugger_statement) [VariantOpen(M3) RecordSet(M1) Node VariantClose]  06
+  14  ──!  _                                08, 11, 14
+  16  └─!  _                                08, 11, 14

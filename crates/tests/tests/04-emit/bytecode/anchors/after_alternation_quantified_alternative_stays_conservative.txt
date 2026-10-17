@@ -13,15 +13,16 @@ Q = 02
 [transitions]
 Q:
   01                                        ▶
-  02   !   (array)                          10, 12, 04
+  02   !   (array)                          10, 13, 12
   03  ─‣┘  _                                01
-  04  └•─  (identifier) [Absent RecordSet(x) Node RecordSet(y)]  03
-  05  ─•─  (identifier) [Node RecordSet(y)]  03
-  06  ─◦─  (identifier) [Node RecordSet(y)]  03
-  07   !   (identifier) [Node RecordSet(x)]  05
+  04  └•─  (identifier) [Absent RecordSet(y) Node]  03
+  05  ─•─  (identifier) [RecordSet(y) Node]  03
+  06  ─◦─  (identifier) [RecordSet(y) Node]  03
+  07   !   (identifier) [RecordSet(x) Node]  05
   09  ──!  _                                07, 09
   10  └─!  _                                07, 09
-  12  └‣─  ";" [Absent RecordSet(x)]        06
+  12  -ε-  [RecordSet(x)]                   04
+  13  └‣─  ";"                              06
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -49,13 +50,14 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00   !   (array)                          14, 16, 03
+  00   !   (array)                          14, 07, 16
   02                                        ▶
-  03  └•─  (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  18
-  06  ─•─  (identifier) [Node RecordSet(M1)]  18
-  08  ─◦─  (identifier) [Node RecordSet(M1)]  18
-  10   !   (identifier) [Node RecordSet(M0)]  06
+  03  └•─  (identifier) [Absent RecordSet(M1) Node]  18
+  05  ─•─  (identifier) [RecordSet(M1) Node]  18
+  07  └‣─  ";"                              08
+  08  ─◦─  (identifier) [RecordSet(M1) Node]  18
+  10   !   (identifier) [RecordSet(M0) Node]  05
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  └‣─  ";" [Absent RecordSet(M0)]       08
+  16  -ε-  [RecordSet(M0)]                  03
   18  ─‣┘  _                                02

@@ -46,27 +46,29 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _ [ListOpen]                     14, 16
-  03  └‣─  (identifier) [Node RecordSet(M0)]  05
-  05  ─‣┘  _ [RecordClose RecordSet(M1)]    08
+  01  └─!  _ [RecordSet(M2) ListOpen]       16, 18
+  03  └‣─  (identifier) [RecordSet(M0) Node]  05
+  05  ─‣┘  _ [RecordClose]                  08
   07                                        ▶
-  08  -ε-  [RecordClose ArrayPush]          16, 18
+  08  -ε-  [RecordClose ArrayPush]          18, 20
   10   !   (expression_statement) [RecordOpen]  03
   12  ──!  _                                10, 12
-  14   !   _ [RecordOpen]                   10, 12
-  16  ──!  _                                14, 16
-  18  ─‣┘  _ [ListClose RecordSet(M2)]      07
+  14   !   _ [RecordSet(M1)]                10, 12
+  16  -ε-  [RecordOpen]                     14
+  18  ──!  _                                16, 18
+  20  ─‣┘  _ [ListClose]                    07
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _ [ListOpen]                     14, 16
-       ●   debugger_statement
-  14       _ [RecordOpen]                   10, 12
-       ●   debugger_statement
-  10       (expression_statement) [RecordOpen]  03
-       ○   debugger_statement
-  14  ❮❮❮ 
-  12       _                                10, 12
-  01  ❮❮❮ 
-  16       _                                14, 16
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 DownExact Any
+0001 MatchOk node#168 [0..9]
+0016 Epsilon Any
+0014 StayExact Any
+0014 MatchOk node#168 [0..9]
+0010 StayExact Named(Some(NodeKindId(150)))
+0010 MatchFail node#168 [0..9]
+0010 Backtrack { to_record: 17 }
+0012 NextExact Any
+0012 Backtrack { to_record: 10 }
+0018 NextExact Any

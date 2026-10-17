@@ -76,10 +76,10 @@ dependencies = [
 name = "plotnik-runtime"
 version = "0.4.0"
 dependencies = [
+ "cc",
  "regex-automata",
- "serde",
- "serde_json",
  "tree-sitter",
+ "tree-sitter-language",
 ]
 
 [[package]]

@@ -1,23 +1,24 @@
+use std::fmt;
+
 use serde::Serialize;
 use tree_sitter::Node;
 
-use crate::bytecode::{CodeAddr, EffectKind, Instruction, Module, ModuleRenderContext, Nav};
-use crate::core::NodeFieldId;
-
 use super::trace::Tracer;
-use plotnik_runtime::JournalEvent;
+use crate::bytecode::{CodeAddr, EffectKind, Instruction, Module, Nav};
+use crate::core::NodeFieldId;
+use plotnik_runtime::{Account, Buffer, JournalEvent, LimitExceeded, Meter};
 
 #[derive(Debug, Serialize)]
-pub struct ExecutionTrace {
+pub struct ExecutionTrace<'m> {
     pub v: u32,
-    pub records: Vec<TraceRecord>,
+    pub records: Buffer<TraceRecord<'m>>,
     pub truncated: bool,
 }
 
 #[derive(Debug, Serialize)]
-pub struct TraceRecord {
+pub struct TraceRecord<'m> {
     pub ip: u16,
-    pub event: TraceEvent,
+    pub event: TraceEvent<'m>,
     pub query_span_id: Option<u16>,
     pub node: Option<TraceNode>,
     pub journal_len: u32,
@@ -25,7 +26,7 @@ pub struct TraceRecord {
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum TraceEvent {
+pub enum TraceEvent<'m> {
     Instruction,
     Nav,
     NavFail,
@@ -35,14 +36,40 @@ pub enum TraceEvent {
     FieldFail,
     PredicateFail,
     NegFieldFail,
-    Effect { effect: String },
-    JournalEvent { event: String },
-    SuppressedEffect { effect: String },
+    Effect { effect: TraceLabel<'m> },
+    JournalEvent { event: TraceLabel<'m> },
+    SuppressedEffect { effect: TraceLabel<'m> },
     Call { target: u16 },
     Return,
     CheckpointNew,
     Backtrack { to_record: u32 },
     ExecutionStarted { target: u16 },
+}
+
+/// Labels borrow prepared member names instead of allocating formatted strings.
+#[derive(Debug)]
+pub enum TraceLabel<'m> {
+    Plain(&'static str),
+    Member(&'static str, &'m str),
+    Id(&'static str, usize),
+    Bool(&'static str, bool),
+}
+
+impl fmt::Display for TraceLabel<'_> {
+    fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Plain(name) => out.write_str(name),
+            Self::Member(name, member) => write!(out, "{name} \"{member}\""),
+            Self::Id(name, id) => write!(out, "{name}#{id}"),
+            Self::Bool(name, value) => write!(out, "{name}({value})"),
+        }
+    }
+}
+
+impl Serialize for TraceLabel<'_> {
+    fn serialize<S: serde::Serializer>(&self, out: S) -> Result<S::Ok, S::Error> {
+        out.collect_str(self)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -53,16 +80,24 @@ pub struct TraceNode {
 }
 
 struct Shadow {
-    span_depth: usize,
+    span: Option<usize>,
     journal_len: u32,
     record_idx: u32,
 }
 
-pub struct TraceRecorder {
-    render: ModuleRenderContext,
-    records: Vec<TraceRecord>,
-    span_stack: Vec<u16>,
-    shadow: Vec<Shadow>,
+struct Span {
+    id: u16,
+    parent: Option<usize>,
+}
+
+pub struct TraceRecorder<'m> {
+    module: &'m Module,
+    account: Option<Account>,
+    error: Option<LimitExceeded>,
+    records: Buffer<TraceRecord<'m>>,
+    spans: Buffer<Span>,
+    span: Option<usize>,
+    shadow: Buffer<Shadow>,
     max_records: usize,
     truncated: bool,
     current_ip: CodeAddr,
@@ -70,13 +105,16 @@ pub struct TraceRecorder {
     records_seen: u32,
 }
 
-impl TraceRecorder {
-    pub fn new(module: &Module, max_records: usize) -> Self {
+impl<'m> TraceRecorder<'m> {
+    pub fn new(module: &'m Module, max_records: usize) -> Self {
         Self {
-            render: ModuleRenderContext::new(module),
-            records: Vec::new(),
-            span_stack: Vec::new(),
-            shadow: Vec::new(),
+            module,
+            account: None,
+            error: None,
+            records: Buffer::new(),
+            spans: Buffer::new(),
+            span: None,
+            shadow: Buffer::new(),
             max_records,
             truncated: false,
             current_ip: CodeAddr::ZERO,
@@ -85,269 +123,289 @@ impl TraceRecorder {
         }
     }
 
-    pub fn finish(self) -> ExecutionTrace {
+    pub fn finish(self) -> ExecutionTrace<'m> {
         ExecutionTrace {
             v: 0,
             records: self.records,
-            truncated: self.truncated,
+            truncated: self.truncated || self.error.is_some(),
         }
     }
 
-    fn add_record(&mut self, event: TraceEvent, node: Option<TraceNode>) -> u32 {
-        self.add_record_at(self.current_ip, event, node)
+    pub(super) fn records(&self) -> &[TraceRecord<'m>] {
+        self.records.as_slice()
     }
 
-    fn add_record_at(&mut self, ip: CodeAddr, event: TraceEvent, node: Option<TraceNode>) -> u32 {
-        let record_idx = self.records_seen;
-        self.records_seen = self
-            .records_seen
-            .checked_add(1)
-            .expect("execution-trace record count fits in u32");
+    fn record(
+        &mut self,
+        call: impl FnOnce(&mut Self, &mut Meter<'_>) -> Result<(), LimitExceeded>,
+    ) {
+        if self.error.is_some() {
+            return;
+        }
 
+        let account = self
+            .account
+            .as_ref()
+            .expect("tracer is attached before callbacks")
+            .clone();
+        let result = call(self, &mut account.meter());
+        if let Err(error) = result {
+            self.error = Some(error);
+        }
+    }
+
+    fn add(
+        &mut self,
+        meter: &mut Meter<'_>,
+        ip: CodeAddr,
+        event: TraceEvent<'m>,
+        node: Option<TraceNode>,
+    ) -> Result<u32, LimitExceeded> {
+        meter.charge(1)?;
+        let index = self.records_seen;
+        self.records_seen = index
+            .checked_add(1)
+            .ok_or(LimitExceeded::Allocation { bytes: u64::MAX })?;
         if self.records.len() < self.max_records {
-            self.records.push(TraceRecord {
-                ip: ip.get(),
-                event,
-                query_span_id: self.span_stack.last().copied(),
-                node,
-                journal_len: self.journal_len,
-            });
+            self.records.push(
+                meter,
+                TraceRecord {
+                    ip: ip.get(),
+                    event,
+                    query_span_id: self.span.map(|index| self.spans[index].id),
+                    node,
+                    journal_len: self.journal_len,
+                },
+            )?;
         } else {
             self.truncated = true;
         }
-
-        record_idx
+        Ok(index)
     }
 
-    fn keeps_records(&self) -> bool {
-        self.records.len() < self.max_records
+    fn event(&mut self, event: TraceEvent<'m>, node: Option<TraceNode>) {
+        self.record(|this, meter| {
+            this.add(meter, this.current_ip, event, node)?;
+            Ok(())
+        });
     }
 
-    fn bump_journal_len(&mut self) {
-        self.journal_len = self
-            .journal_len
-            .checked_add(1)
-            .expect("match journal length fits in u32");
-    }
-
-    fn member_name(&self, idx: u16) -> &str {
-        self.render
-            .member_name(idx)
-            .expect("effect member index names a type member")
-    }
-
-    fn format_journal_event(&self, event: &JournalEvent<'_>) -> String {
-        match event {
-            JournalEvent::Node(_) => "Node".to_string(),
-            JournalEvent::ListOpen => "ListOpen".to_string(),
-            JournalEvent::ArrayPush => "ArrayPush".to_string(),
-            JournalEvent::ListClose => "ListClose".to_string(),
-            JournalEvent::RecordOpen => "RecordOpen".to_string(),
-            JournalEvent::RecordClose => "RecordClose".to_string(),
-            JournalEvent::RecordSet(idx) => {
-                format!("RecordSet \"{}\"", self.member_name(*idx))
-            }
-            JournalEvent::VariantOpen(idx) => {
-                format!("VariantOpen \"{}\"", self.member_name(*idx))
-            }
-            JournalEvent::VariantClose => "VariantClose".to_string(),
-            JournalEvent::Absent => "Absent".to_string(),
-            JournalEvent::ScalarOpen => "ScalarOpen".to_string(),
-            JournalEvent::ScalarMark(_) => "ScalarMark".to_string(),
-            JournalEvent::TextClose => "TextClose".to_string(),
-            JournalEvent::BoolClose(value) => format!("BoolClose({value})"),
-            JournalEvent::NodeText(_) => "NodeText".to_string(),
-            JournalEvent::NodeBool(_) => "NodeBool".to_string(),
-            JournalEvent::BoolValue(value) => format!("BoolValue({value})"),
-            JournalEvent::SpanStart { id, node } => {
-                if node.is_some() {
-                    format!("SpanStartAt#{id}")
+    fn label(&self, kind: EffectKind, payload: usize) -> TraceLabel<'m> {
+        use EffectKind::*;
+        match kind {
+            RecordSet | VariantOpen => TraceLabel::Member(
+                if kind == RecordSet {
+                    "RecordSet"
                 } else {
-                    format!("SpanStart#{id}")
-                }
-            }
-            JournalEvent::SpanEnd(id) => format!("SpanEnd#{id}"),
-        }
-    }
-
-    fn format_opcode(&self, opcode: EffectKind, payload: usize) -> String {
-        match opcode {
-            EffectKind::Node => "Node".to_string(),
-            EffectKind::ListOpen => "ListOpen".to_string(),
-            EffectKind::ArrayPush => "ArrayPush".to_string(),
-            EffectKind::ListClose => "ListClose".to_string(),
-            EffectKind::RecordOpen => "RecordOpen".to_string(),
-            EffectKind::RecordClose => "RecordClose".to_string(),
-            EffectKind::RecordSet => {
-                format!("RecordSet \"{}\"", self.member_name(payload as u16))
-            }
-            EffectKind::VariantOpen => {
-                format!("VariantOpen \"{}\"", self.member_name(payload as u16))
-            }
-            EffectKind::VariantClose => "VariantClose".to_string(),
-            EffectKind::Absent => "Absent".to_string(),
-            EffectKind::SuppressBegin => "SuppressBegin".to_string(),
-            EffectKind::SuppressEnd => "SuppressEnd".to_string(),
-            EffectKind::SpanStartAt => format!("SpanStartAt#{payload}"),
-            EffectKind::SpanStart => format!("SpanStart#{payload}"),
-            EffectKind::SpanEnd => format!("SpanEnd#{payload}"),
-            EffectKind::ScalarOpen => "ScalarOpen".to_string(),
-            EffectKind::ScalarMark => "ScalarMark".to_string(),
-            EffectKind::TextClose => "TextClose".to_string(),
-            EffectKind::BoolClose => format!("BoolClose({})", payload != 0),
-            EffectKind::NodeText => "NodeText".to_string(),
-            EffectKind::NodeBool => "NodeBool".to_string(),
-            EffectKind::BoolValue => format!("BoolValue({})", payload != 0),
-        }
-    }
-
-    fn event_node(event: &JournalEvent<'_>) -> Option<TraceNode> {
-        match event {
-            JournalEvent::Node(node) => Some(trace_node(*node)),
-            JournalEvent::ScalarMark(node) => Some(trace_node(*node)),
-            JournalEvent::NodeText(node) | JournalEvent::NodeBool(node) => Some(trace_node(*node)),
-            JournalEvent::SpanStart {
-                node: Some(node), ..
-            } => Some(trace_node(*node)),
-            _ => None,
+                    "VariantOpen"
+                },
+                self.module
+                    .strings()
+                    .get(self.module.types().get_member(payload).name_id),
+            ),
+            SpanStartAt | SpanStart | SpanEnd => TraceLabel::Id(
+                match kind {
+                    SpanStartAt => "SpanStartAt",
+                    SpanStart => "SpanStart",
+                    _ => "SpanEnd",
+                },
+                payload,
+            ),
+            BoolClose | BoolValue => TraceLabel::Bool(
+                if kind == BoolClose {
+                    "BoolClose"
+                } else {
+                    "BoolValue"
+                },
+                payload != 0,
+            ),
+            _ => TraceLabel::Plain(match kind {
+                Node => "Node",
+                ListOpen => "ListOpen",
+                ArrayPush => "ArrayPush",
+                ListClose => "ListClose",
+                RecordOpen => "RecordOpen",
+                RecordClose => "RecordClose",
+                VariantClose => "VariantClose",
+                Absent => "Absent",
+                ScalarOpen => "ScalarOpen",
+                ScalarMark => "ScalarMark",
+                TextClose => "TextClose",
+                NodeText => "NodeText",
+                NodeBool => "NodeBool",
+                SuppressBegin => "SuppressBegin",
+                SuppressEnd => "SuppressEnd",
+                _ => unreachable!("operand labels handled above"),
+            }),
         }
     }
 }
 
-impl Tracer for TraceRecorder {
-    fn trace_instruction(&mut self, ip: CodeAddr, _instr: &Instruction<'_>) {
+impl Tracer for TraceRecorder<'_> {
+    fn start(&mut self, account: &Account) {
+        self.account = Some(account.clone());
+    }
+    fn check(&self) -> Result<(), LimitExceeded> {
+        self.error.map_or(Ok(()), Err)
+    }
+    fn trace_instruction(&mut self, ip: CodeAddr, _: &Instruction<'_>) {
         self.current_ip = ip;
-        self.add_record(TraceEvent::Instruction, None);
+        self.event(TraceEvent::Instruction, None);
     }
-
-    fn trace_nav(&mut self, _nav: Nav, node: Node<'_>) {
-        self.add_record(TraceEvent::Nav, Some(trace_node(node)));
+    fn trace_nav(&mut self, _: Nav, node: Node<'_>) {
+        self.event(TraceEvent::Nav, Some(trace_node(node)));
     }
-
-    fn trace_nav_failure(&mut self, _nav: Nav) {
-        self.add_record(TraceEvent::NavFail, None);
+    fn trace_nav_failure(&mut self, _: Nav) {
+        self.event(TraceEvent::NavFail, None);
     }
-
     fn trace_match_success(&mut self, node: Node<'_>) {
-        self.add_record(TraceEvent::MatchOk, Some(trace_node(node)));
+        self.event(TraceEvent::MatchOk, Some(trace_node(node)));
     }
-
     fn trace_match_failure(&mut self, node: Node<'_>) {
-        self.add_record(TraceEvent::MatchFail, Some(trace_node(node)));
+        self.event(TraceEvent::MatchFail, Some(trace_node(node)));
     }
-
-    fn trace_field_success(&mut self, _field_id: NodeFieldId) {
-        self.add_record(TraceEvent::FieldOk, None);
+    fn trace_field_success(&mut self, _: NodeFieldId) {
+        self.event(TraceEvent::FieldOk, None);
     }
-
     fn trace_field_failure(&mut self, node: Node<'_>) {
-        self.add_record(TraceEvent::FieldFail, Some(trace_node(node)));
+        self.event(TraceEvent::FieldFail, Some(trace_node(node)));
     }
-
     fn trace_predicate_failure(&mut self, node: Node<'_>) {
-        self.add_record(TraceEvent::PredicateFail, Some(trace_node(node)));
+        self.event(TraceEvent::PredicateFail, Some(trace_node(node)));
     }
-
-    fn trace_neg_field_failure(&mut self, node: Node<'_>, _field: NodeFieldId) {
-        self.add_record(TraceEvent::NegFieldFail, Some(trace_node(node)));
+    fn trace_neg_field_failure(&mut self, node: Node<'_>, _: NodeFieldId) {
+        self.event(TraceEvent::NegFieldFail, Some(trace_node(node)));
     }
-
     fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
-        let event_name = if self.keeps_records() {
-            self.format_journal_event(event)
-        } else {
-            String::new()
+        use JournalEvent::*;
+        let (kind, payload, node) = match *event {
+            Node(node) => (EffectKind::Node, 0, Some(node)),
+            NodeText(node) => (EffectKind::NodeText, 0, Some(node)),
+            NodeBool(node) => (EffectKind::NodeBool, 0, Some(node)),
+            ScalarMark(node) => (EffectKind::ScalarMark, 0, Some(node)),
+            ListOpen => (EffectKind::ListOpen, 0, None),
+            ArrayPush => (EffectKind::ArrayPush, 0, None),
+            ListClose => (EffectKind::ListClose, 0, None),
+            RecordOpen => (EffectKind::RecordOpen, 0, None),
+            RecordClose => (EffectKind::RecordClose, 0, None),
+            RecordSet(id) => (EffectKind::RecordSet, id as usize, None),
+            VariantOpen(id) => (EffectKind::VariantOpen, id as usize, None),
+            VariantClose => (EffectKind::VariantClose, 0, None),
+            Absent => (EffectKind::Absent, 0, None),
+            ScalarOpen => (EffectKind::ScalarOpen, 0, None),
+            TextClose => (EffectKind::TextClose, 0, None),
+            BoolClose(value) => (EffectKind::BoolClose, value as usize, None),
+            BoolValue(value) => (EffectKind::BoolValue, value as usize, None),
+            SpanStart { id, node } => (
+                if node.is_some() {
+                    EffectKind::SpanStartAt
+                } else {
+                    EffectKind::SpanStart
+                },
+                id as usize,
+                node,
+            ),
+            SpanEnd(id) => (EffectKind::SpanEnd, id as usize, None),
         };
-        let node = Self::event_node(event);
-        self.bump_journal_len();
-
-        match event {
-            JournalEvent::SpanStart { id, .. } => {
-                self.span_stack.push(*id);
-                self.add_record(TraceEvent::JournalEvent { event: event_name }, node);
+        let label = self.label(kind, payload);
+        self.record(|this, meter| {
+            this.journal_len = this
+                .journal_len
+                .checked_add(1)
+                .ok_or(LimitExceeded::Allocation { bytes: u64::MAX })?;
+            if let SpanStart { id, .. } = event {
+                let index = this.spans.len();
+                this.spans.push(
+                    meter,
+                    Span {
+                        id: *id,
+                        parent: this.span,
+                    },
+                )?;
+                this.span = Some(index);
             }
-            JournalEvent::SpanEnd(id) => {
-                self.add_record(TraceEvent::JournalEvent { event: event_name }, node);
-                let popped = self
-                    .span_stack
-                    .pop()
-                    .expect("SpanEnd requires an open query span");
-                assert_eq!(popped, *id, "execution-trace query spans must be balanced");
+            this.add(
+                meter,
+                this.current_ip,
+                TraceEvent::JournalEvent { event: label },
+                node.map(trace_node),
+            )?;
+            if let SpanEnd(id) = event {
+                let span = &this.spans[this.span.expect("open trace span")];
+                assert_eq!(span.id, *id, "balanced trace spans");
+                this.span = span.parent;
             }
-            _ => {
-                self.add_record(TraceEvent::JournalEvent { event: event_name }, node);
-            }
-        }
-    }
-
-    fn trace_effect_suppressed(&mut self, opcode: EffectKind, payload: usize) {
-        let effect = if self.keeps_records() {
-            self.format_opcode(opcode, payload)
-        } else {
-            String::new()
-        };
-        self.add_record(TraceEvent::SuppressedEffect { effect }, None);
-    }
-
-    fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool) {
-        let effect = if self.keeps_records() {
-            self.format_opcode(opcode, 0)
-        } else {
-            String::new()
-        };
-        let event = if suppressed {
-            TraceEvent::SuppressedEffect { effect }
-        } else {
-            TraceEvent::Effect { effect }
-        };
-        self.add_record(event, None);
-    }
-
-    fn trace_call(&mut self, target_ip: CodeAddr) {
-        self.add_record(
-            TraceEvent::Call {
-                target: target_ip.get(),
-            },
-            None,
-        );
-    }
-
-    fn trace_return(&mut self, _port: plotnik_runtime::PortId) {
-        self.add_record(TraceEvent::Return, None);
-    }
-
-    fn trace_checkpoint_created(&mut self, ip: CodeAddr) {
-        let record_idx = self.add_record_at(ip, TraceEvent::CheckpointNew, None);
-        self.shadow.push(Shadow {
-            span_depth: self.span_stack.len(),
-            journal_len: self.journal_len,
-            record_idx,
+            Ok(())
         });
     }
-
-    fn trace_backtrack(&mut self, _depth: u32) {
-        let shadow = self
-            .shadow
-            .pop()
-            .expect("trace_backtrack requires a matching checkpoint");
-        self.span_stack.truncate(shadow.span_depth);
-        self.journal_len = shadow.journal_len;
-        self.add_record(
-            TraceEvent::Backtrack {
-                to_record: shadow.record_idx,
+    fn trace_effect_suppressed(&mut self, kind: EffectKind, payload: usize) {
+        self.event(
+            TraceEvent::SuppressedEffect {
+                effect: self.label(kind, payload),
             },
             None,
         );
     }
-
-    fn trace_execution_started(&mut self, target_ip: CodeAddr) {
-        self.span_stack.clear();
+    fn trace_suppress_control(&mut self, kind: EffectKind, suppressed: bool) {
+        let effect = self.label(kind, 0);
+        self.event(
+            if suppressed {
+                TraceEvent::SuppressedEffect { effect }
+            } else {
+                TraceEvent::Effect { effect }
+            },
+            None,
+        );
+    }
+    fn trace_call(&mut self, target: CodeAddr) {
+        self.event(
+            TraceEvent::Call {
+                target: target.get(),
+            },
+            None,
+        );
+    }
+    fn trace_return(&mut self, _: plotnik_runtime::PortId) {
+        self.event(TraceEvent::Return, None);
+    }
+    fn trace_checkpoint_created(&mut self, ip: CodeAddr) {
+        self.record(|this, meter| {
+            let record_idx = this.add(meter, ip, TraceEvent::CheckpointNew, None)?;
+            this.shadow.push(
+                meter,
+                Shadow {
+                    span: this.span,
+                    journal_len: this.journal_len,
+                    record_idx,
+                },
+            )
+        });
+    }
+    fn trace_backtrack(&mut self, _: u32) {
+        self.record(|this, meter| {
+            let shadow = this.shadow.pop().expect("trace checkpoint exists");
+            this.span = shadow.span;
+            this.journal_len = shadow.journal_len;
+            this.add(
+                meter,
+                this.current_ip,
+                TraceEvent::Backtrack {
+                    to_record: shadow.record_idx,
+                },
+                None,
+            )?;
+            Ok(())
+        });
+    }
+    fn trace_execution_started(&mut self, target: CodeAddr) {
+        self.spans.clear();
+        self.span = None;
         self.shadow.clear();
         self.journal_len = 0;
-        self.current_ip = target_ip;
-        self.add_record(
+        self.current_ip = target;
+        self.event(
             TraceEvent::ExecutionStarted {
-                target: target_ip.get(),
+                target: target.get(),
             },
             None,
         );
@@ -355,10 +413,9 @@ impl Tracer for TraceRecorder {
 }
 
 fn trace_node(node: Node<'_>) -> TraceNode {
-    let range = node.byte_range();
     TraceNode {
         kind_id: node.kind_id(),
-        start: u32::try_from(range.start).expect("node start byte fits in u32"),
-        end: u32::try_from(range.end).expect("node end byte fits in u32"),
+        start: u32::try_from(node.start_byte()).expect("node offset fits u32"),
+        end: u32::try_from(node.end_byte()).expect("node offset fits u32"),
     }
 }

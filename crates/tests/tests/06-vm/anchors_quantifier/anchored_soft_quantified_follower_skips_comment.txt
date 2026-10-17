@@ -17,14 +17,14 @@ Q = (program
   "b": [
     {
       "kind": "debugger_statement",
-      "span": [8, 17],
-      "text": "debugger;"
+      "text": "debugger;",
+      "span": [8, 17]
     }
   ],
   "c": {
     "kind": "expression_statement",
-    "span": [18, 22],
-    "text": "foo;"
+    "text": "foo;",
+    "span": [18, 22]
   }
 }
 -------------------- BYTECODE --------------------
@@ -60,60 +60,60 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00   !   (program)                        30, 24
+  00   !   (program)                        28, 22
   02  └‣─  (identifier) == "foo"            04
   04  ─‣┘  _                                05
   05  ─‣┘  _                                06
   06                                        ▶
   07  ...
-  08  └•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
-  11  ─•─  (expression_statement) [Node RecordSet(M2)]  02
-  13  -ε-  [ListClose RecordSet(M1)]        11
-  15  ...
-  16  └•─  (debugger_statement) [Node ArrayPush]  18, 13
-  18  ─•─  (debugger_statement) [Node ArrayPush]  18, 13
-  20  -ε-  [ListOpen]                       16, 08
-  22  -ε-  [ListOpen]                       18, 13
-  24  -ε-  [Absent RecordSet(M0)]           20
-  26   !   (lexical_declaration) [Node RecordSet(M0)]  22
-  28  ──!  _                                26, 28
-  30  └─!  _                                26, 28
+  08  └•─  (expression_statement) [ListClose RecordSet(M2) Node]  02
+  10  ─•─  (expression_statement) [RecordSet(M2) Node]  02
+  12  -ε-  [ListClose]                      10
+  14  └•─  (debugger_statement) [Node ArrayPush]  16, 12
+  16  ─•─  (debugger_statement) [Node ArrayPush]  16, 12
+  18  -ε-  [RecordSet(M1) ListOpen]         14, 08
+  20  -ε-  [RecordSet(M1) ListOpen]         16, 12
+  22  -ε-  [RecordSet(M0) Absent]           18
+  24   !   (lexical_declaration) [RecordSet(M0) Node]  20
+  26  ──!  _                                24, 26
+  28  └─!  _                                24, 26
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        30, 24
-       ●   program
-  30       _                                26, 28
-       ●   comment
-  26       (lexical_declaration) [Node RecordSet(M0)]  22
-       ○   comment
-  30  ❮❮❮ 
-  28       _                                26, 28
-       ●   debugger_statement
-  26       (lexical_declaration) [Node RecordSet(M0)]  22
-       ○   debugger_statement
-  28  ❮❮❮ 
-  28       _                                26, 28
-       ●   expression_statement
-  26       (lexical_declaration) [Node RecordSet(M0)]  22
-       ○   expression_statement
-  28  ❮❮❮ 
-  28       _                                26, 28
-  00  ❮❮❮ 
-  24  -ε-  [Absent RecordSet(M0)]           20
-  20  -ε-  [ListOpen]                       16, 08
-  16       (debugger_statement) [Node ArrayPush]  18, 13
-       ○   comment
-       ●   debugger_statement
-  18       (debugger_statement) [Node ArrayPush]  18, 13
-       ○   expression_statement
-  16  ❮❮❮ 
-  13  -ε-  [ListClose RecordSet(M1)]        11
-  11       (expression_statement) [Node RecordSet(M2)]  02
-       ●   expression_statement
-  02       (identifier) == "foo"            04
-       ●   identifier
-  04       _                                05
-       ●   expression_statement
-  05       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..22]
+0028 DownExact Any
+0028 MatchOk node#108 [0..7]
+0024 StayExact Named(Some(NodeKindId(152)))
+0024 MatchFail node#108 [0..7]
+0024 Backtrack { to_record: 9 }
+0026 NextExact Any
+0026 MatchOk debugger_statement [8..17]
+0024 StayExact Named(Some(NodeKindId(152)))
+0024 MatchFail debugger_statement [8..17]
+0024 Backtrack { to_record: 17 }
+0026 NextExact Any
+0026 MatchOk expression_statement [18..22]
+0024 StayExact Named(Some(NodeKindId(152)))
+0024 MatchFail expression_statement [18..22]
+0024 Backtrack { to_record: 25 }
+0026 NextExact Any
+0026 Backtrack { to_record: 5 }
+0022 Epsilon Any
+0018 Epsilon Any
+0014 DownSkip Named(Some(NodeKindId(168)))
+0014 MatchFail node#108 [0..7]
+0014 MatchOk debugger_statement [8..17]
+0016 NextSkip Named(Some(NodeKindId(168)))
+0016 MatchFail expression_statement [18..22]
+0016 Backtrack { to_record: 47 }
+0012 Epsilon Any
+0010 NextSkip Named(Some(NodeKindId(150)))
+0010 MatchOk expression_statement [18..22]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchOk identifier [18..21]
+0004 Up(1) Any
+0004 MatchOk expression_statement [18..22]
+0005 Up(1) Any
+0005 MatchOk program [0..22]
+0006 Return PortId(0)
+0006 Return

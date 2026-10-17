@@ -2,9 +2,9 @@ use std::io::{IsTerminal, Read as _};
 
 use clap::ArgMatches;
 use plotnik_compiler::bytecode::{Entrypoint, Module};
-use plotnik_compiler::{
-    Colors, NoopTracer, PrintTracer, QueryBuilder, SourceMap, Tracer, VM, Value, Verbosity,
-};
+use plotnik_compiler::{NoopTracer, PrintTracer, QueryBuilder, SourceMap, Tracer, VM, Verbosity};
+use plotnik_runtime::Text;
+use plotnik_runtime::json::{Palette, Style};
 
 use super::{
     compile,
@@ -67,6 +67,10 @@ pub fn run(m: &ArgMatches, command: &str) -> CliResult {
     let vm = VM::builder(&source, &tree)
         .limits(runtime_limits(m))
         .build();
+    let style = Style {
+        pretty: !m.get_flag("compact") && std::io::stdout().is_terminal(),
+        palette: if color { Palette::ANSI } else { Palette::PLAIN },
+    };
     let result = if m.get_flag("trace") {
         let verbosity = match m.get_count("verbose") {
             0 => Verbosity::Default,
@@ -77,19 +81,22 @@ pub fn run(m: &ArgMatches, command: &str) -> CliResult {
             .verbosity(verbosity)
             .colored(color)
             .build();
-        let result = execute(vm, &module, entrypoint, command, &mut tracer);
-        writeln_stderr(format_args!("{}", tracer.render()))?;
+        let result = execute(vm, &module, entrypoint, command, &mut tracer, style);
+        match tracer.render() {
+            Ok(trace) => writeln_stderr(format_args!("{trace}"))?,
+            Err(error) if result.is_ok() => return Err(CliError::fatal(error.to_string())),
+            Err(_) => {}
+        }
         result
     } else {
-        execute(vm, &module, entrypoint, command, &mut NoopTracer)
+        execute(vm, &module, entrypoint, command, &mut NoopTracer, style)
     };
     let Some(value) = result? else {
         writeln_stderr(format_args!("no match"))?;
         return Err(CliError::No);
     };
 
-    let pretty = !m.get_flag("compact") && std::io::stdout().is_terminal();
-    writeln_stdout(format_args!("{}", value.format(pretty, Colors::new(color))))
+    writeln_stdout(format_args!("{value}"))
 }
 
 fn execute<'s, 't, T: Tracer>(
@@ -98,18 +105,56 @@ fn execute<'s, 't, T: Tracer>(
     entrypoint: Entrypoint,
     command: &str,
     tracer: &mut T,
-) -> Result<Option<Value<'s, 't>>, CliError> {
-    match command {
+    style: Style,
+) -> Result<Option<Text>, CliError> {
+    let account = vm
+        .account()
+        .map_err(|error| CliError::fatal(error.to_string()))?
+        .clone();
+    let mut output = Text::new(&account);
+    if command == "find-all" {
+        output
+            .push(&mut account.meter(), "[")
+            .map_err(|error| CliError::fatal(error.to_string()))?;
+        for (index, result) in vm.traverse_with(module, entrypoint, tracer).enumerate() {
+            let result = result.map_err(|error| CliError::fatal(error.to_string()))?;
+            if index > 0 {
+                output
+                    .push(&mut account.meter(), ",")
+                    .map_err(|error| CliError::fatal(error.to_string()))?;
+            }
+            result.write_json(style, &mut output).map_err(|error| {
+                CliError::fatal(
+                    output
+                        .error()
+                        .map_or_else(|| error.to_string(), |error| error.to_string()),
+                )
+            })?;
+        }
+        output
+            .push(&mut account.meter(), "]")
+            .map_err(|error| CliError::fatal(error.to_string()))?;
+        return Ok(Some(output));
+    }
+
+    let result = match command {
         "exec" => vm.apply_with(module, &entrypoint, tracer),
         "find" => vm
             .traverse_with(module, entrypoint, tracer)
             .next()
             .transpose(),
-        "find-all" => vm
-            .traverse_with(module, entrypoint, tracer)
-            .collect::<Result<Vec<_>, _>>()
-            .map(|values| Some(Value::List(values))),
         _ => unreachable!("unexpected execution command: {command:?}"),
     }
-    .map_err(|error| CliError::fatal(error.to_string()))
+    .map_err(|error| CliError::fatal(error.to_string()))?;
+    let Some(result) = result else {
+        return Ok(None);
+    };
+    result.write_json(style, &mut output).map_err(|error| {
+        CliError::fatal(
+            output
+                .error()
+                .map_or_else(|| error.to_string(), |error| error.to_string()),
+        )
+    })?;
+    Ok(Some(output))
 }

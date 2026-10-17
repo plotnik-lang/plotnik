@@ -29,7 +29,12 @@ x
       0,
       1
     ],
-    "bindings": [],
+    "bindings": [
+      {
+        "path": "/present",
+        "event_index": 3
+      }
+    ],
     "range": [
       2,
       10
@@ -42,14 +47,9 @@ x
       0,
       1
     ],
-    "bindings": [
-      {
-        "path": "/present",
-        "event_index": 6
-      }
-    ],
+    "bindings": [],
     "range": [
-      3,
+      4,
       9
     ]
   },
@@ -62,7 +62,7 @@ x
     ],
     "bindings": [],
     "range": [
-      4,
+      5,
       8
     ]
   }
@@ -99,24 +99,25 @@ P5 pattern    15..37  source_id=0
 [instructions]
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  -ε-  [SpanStart#2]                    13, 16
-  04   !   (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  08
+  02  -ε-  [RecordSet(M0) SpanStart#2]      13, 16
+  04   !   (expression_statement) [SpanStartAt#5 NodeBool SpanEnd#5 SpanEnd#2]  08
   07  ...
   08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
   10                                        ▶
   11  ──!  _                                04, 11
   13  └─!  _                                04, 11
   15  ...
-  16  -ε-  [BoolValue(0) RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  16  -ε-  [BoolValue(0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
 --------------------- TRACE ----------------------
-Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
-       ●   program
-  02  -ε-  [SpanStart#2]                    13, 16
-  13       _                                04, 11
-       ●   expression_statement
-  04       (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  08
-       ●   expression_statement
-  08       _ [SpanEnd#1 SpanEnd#0]          10
-       ●   program
-  10   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..1]
+0002 Epsilon Any
+0013 DownExact Any
+0013 MatchOk expression_statement [0..1]
+0004 StayExact Named(Some(NodeKindId(150)))
+0004 MatchOk expression_statement [0..1]
+0008 Up(1) Any
+0008 MatchOk program [0..1]
+0010 Return PortId(0)
+0010 Return

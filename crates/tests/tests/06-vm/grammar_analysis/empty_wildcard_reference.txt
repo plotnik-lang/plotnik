@@ -9,8 +9,8 @@ x;
 {
   "expression": {
     "kind": "expression_statement",
-    "span": [0, 2],
-    "text": "x;"
+    "text": "x;",
+    "span": [0, 2]
   }
 }
 -------------------- BYTECODE --------------------
@@ -45,27 +45,25 @@ Leaf:
 
 Q:
   3   !   (program)                         4
-  4  └‣─  (expression_statement) [Node RecordSet(M0)]  6
+  4  └‣─  (expression_statement) [RecordSet(M0) Node]  6
   6  └‣─  (Leaf)                            0 : 7
   7  ─‣┘² _                                 8
   8                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  3       (program)                         04
-      ●   program
-  4       (expression_statement) [Node RecordSet(M0)]  06
-      ●   expression_statement
-  6       (Leaf)                            00 : 07
-      ▶   (Leaf)
-
-Leaf:
-  0       (_)                               01
-      ●   identifier
-  1       _                                 02
-      ●   identifier
-  2   ◀   (Leaf)                            
-
-Q:
-  7       _                                 08
-      ●   program
-  8   ◀   (Q)                               ◼
+0003 ExecutionStarted { target: 3 }
+0003 StayExact Named(Some(NodeKindId(134)))
+0003 MatchOk program [0..2]
+0004 Down Named(Some(NodeKindId(150)))
+0004 MatchOk expression_statement [0..2]
+0006 Call CodeAddr(0)
+0006 Call { target: 0 }
+0000 StayExact Named(None)
+0000 MatchOk node#1 [0..1]
+0001 ChildlessExact Any
+0001 MatchOk node#1 [0..1]
+0002 Return PortId(0)
+0002 Return
+0007 Up(2) Any
+0007 MatchOk program [0..2]
+0008 Return PortId(0)
+0008 Return

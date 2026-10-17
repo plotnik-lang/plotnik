@@ -41,22 +41,22 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          10, 05
   04                                        ▶
-  05  └•─  (identifier) [Node RecordSet(M0)] == "b"  07
+  05  └•─  (identifier) [RecordSet(M0) Node] == "b"  07
   07  ─‣┘³ _                                04
-  08  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  07
+  08  ─‣─  (identifier) [RecordSet(M0) Node] == "b"  07
   10  └•─  (identifier) == "a"              08
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          10, 05
-       ●   array
-  10       (identifier) == "a"              08
-       ○   [
-  02  ❮❮❮ 
-  05       (identifier) [Node RecordSet(M0)] == "b"  07
-       ○   [
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..6]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..6]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..6]
+0010 DownSkip Named(Some(NodeKindId(1)))
+0010 MatchFail node#41 [0..1]
+0010 Backtrack { to_record: 13 }
+0005 DownSkip Named(Some(NodeKindId(1)))
+0005 MatchFail node#41 [0..1]
+0005 Backtrack { to_record: 12 }
+0005 Backtrack { to_record: 8 }

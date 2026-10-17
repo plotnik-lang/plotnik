@@ -12,8 +12,8 @@ a;
   "outer": {
     "id": {
       "kind": "identifier",
-      "span": [0, 1],
-      "text": "a"
+      "text": "a",
+      "span": [0, 1]
     }
   }
 }
@@ -48,26 +48,29 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └‣─  (expression_statement)           12, 08
-  03   !   (identifier) [RecordOpen Node RecordSet(M0)]  05
-  05  ─‣┘  _ [RecordClose RecordSet(M1)]    14
-  07                                        ▶
-  08  -ε-  [Absent RecordSet(M1)]           14
-  10  ──!  _                                03, 10
-  12  └─!  _                                03, 10
-  14  ─‣┘  _                                07
+  01  └‣─  (expression_statement)           02
+  02  -ε-  [RecordSet(M1)]                  13, 09
+  04   !   (identifier) [RecordOpen RecordSet(M0) Node]  06
+  06  ─‣┘  _ [RecordClose]                  15
+  08                                        ▶
+  09  -ε-  [Absent]                         15
+  11  ──!  _                                04, 11
+  13  └─!  _                                04, 11
+  15  ─‣┘  _                                08
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           12, 08
-       ●   expression_statement
-  12       _                                03, 10
-       ●   identifier
-  03       (identifier) [RecordOpen Node RecordSet(M0)]  05
-       ●   identifier
-  05       _ [RecordClose RecordSet(M1)]    14
-       ●   expression_statement
-  14       _                                07
-       ●   program
-  07   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0002 Epsilon Any
+0013 DownExact Any
+0013 MatchOk identifier [0..1]
+0004 StayExact Named(Some(NodeKindId(1)))
+0004 MatchOk identifier [0..1]
+0006 Up(1) Any
+0006 MatchOk expression_statement [0..2]
+0015 Up(1) Any
+0015 MatchOk program [0..2]
+0008 Return PortId(0)
+0008 Return

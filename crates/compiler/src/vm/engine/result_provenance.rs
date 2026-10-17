@@ -2,424 +2,344 @@ use serde::Serialize;
 use tree_sitter::Node;
 
 use crate::bytecode::{Module, SpanKind};
-
-use plotnik_runtime::{JournalEvent, MatchJournal};
+use plotnik_runtime::{Buffer, Document, JournalEvent, LimitExceeded, Meter, Text};
 
 #[derive(Debug, Serialize)]
 pub struct ResultProvenanceEntry {
     pub query_span_id: u16,
     pub parent: Option<u32>,
     pub source_span: Option<(u32, u32)>,
-    pub bindings: Vec<ProvenanceBinding>,
+    pub bindings: Buffer<ProvenanceBinding>,
     #[serde(rename = "range")]
     pub event_range: (u32, u32),
 }
 
 #[derive(Debug, Serialize)]
 pub struct ProvenanceBinding {
-    /// JSON-pointer-style path of the bound value, relative to the builder
-    /// frames open when the binding event fired. Not absolute: a container
-    /// assigned after its close (`RecordSet`/`ArrayPush` following `ListClose` etc.)
-    /// binds on its own entry, while the elements bound under indices on the
-    /// entries active during construction — a consumer absolutizes by joining
-    /// paths down the entry parent chain.
-    pub path: String,
+    /// JSON-pointer path relative to the containing provenance entry.
+    pub path: Text,
     pub event_index: u32,
 }
 
-enum Frame {
-    List {
-        len: u32,
-        provenance: ValueProvenance,
-    },
-    Record {
-        provenance: ValueProvenance,
-    },
-    Variant {
-        provenance: ValueProvenance,
-    },
-}
-
-struct ScalarProvenance {
-    item_owner: Option<u32>,
-    source_span: Option<(u32, u32)>,
-}
-
 #[derive(Clone, Copy)]
-struct ValueProvenance {
-    item_owner: Option<u32>,
-    source_span: Option<(u32, u32)>,
+enum Kind {
+    List,
+    Record,
+    Variant,
 }
 
-impl ValueProvenance {
-    fn is_unowned_absence(self) -> bool {
-        self.item_owner.is_none() && self.source_span.is_none()
-    }
+struct Selection {
+    path: Text,
+    event: u32,
+    owner: Option<u32>,
 }
 
+struct Frame {
+    kind: Kind,
+    len: u32,
+    value: Value,
+    selected: Option<Selection>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct Value {
+    owner: Option<u32>,
+    span: Option<(u32, u32)>,
+}
+
+/// Extract provenance with the same operation account as the retained result.
 pub fn extract_result_provenance(
-    journal: &MatchJournal<'_>,
+    document: &Document<'_, '_, '_>,
     module: &Module,
-) -> Vec<ResultProvenanceEntry> {
-    let extractor = ProvenanceExtractor::new(module);
-    extractor.extract(journal.as_slice())
-}
-
-struct ProvenanceExtractor<'m> {
-    member_names: Box<[&'m str]>,
-    span_kinds: Box<[SpanKind]>,
-    span_members: Box<[u16]>,
-    entries: Vec<ResultProvenanceEntry>,
-    open: Vec<u32>,
-    frames: Vec<Frame>,
-    scalar_frames: Vec<ScalarProvenance>,
-    pending: Option<ValueProvenance>,
-}
-
-impl<'m> ProvenanceExtractor<'m> {
-    fn new(module: &'m Module) -> Self {
-        let types = module.types();
-        let strings = module.strings();
-        let member_names = types.members().map(|m| strings.get(m.name_id)).collect();
-        let span_kinds = module.spans().iter().map(|span| span.kind).collect();
-        let span_members = module.spans().iter().map(|span| span.member).collect();
-        Self {
-            member_names,
-            span_kinds,
-            span_members,
-            entries: Vec::new(),
-            open: Vec::new(),
-            frames: Vec::new(),
-            scalar_frames: Vec::new(),
-            pending: None,
-        }
+) -> Result<Buffer<ResultProvenanceEntry>, LimitExceeded> {
+    let mut meter = document.account().meter();
+    let mut extractor = Extractor {
+        module,
+        entries: Buffer::new(),
+        open: Buffer::new(),
+        frames: Buffer::new(),
+        scalars: Buffer::new(),
+        pending: None,
+    };
+    for (index, event) in document.inspection_events().enumerate() {
+        meter.charge(1)?;
+        let index =
+            u32::try_from(index).map_err(|_| LimitExceeded::Allocation { bytes: u64::MAX })?;
+        extractor.event(&mut meter, event, index)?;
     }
+    assert!(
+        extractor.open.is_empty() && extractor.frames.is_empty() && extractor.scalars.is_empty(),
+        "accepted provenance has balanced frames"
+    );
+    Ok(extractor.entries)
+}
 
-    fn extract(mut self, events: &[JournalEvent<'_>]) -> Vec<ResultProvenanceEntry> {
-        for (event_index, event) in events.iter().enumerate() {
-            let event_index = u32::try_from(event_index).expect("journal event index fits in u32");
-            match event {
-                JournalEvent::SpanStart { id, node } => {
-                    let parent = self.open.last().copied();
-                    let idx = u32::try_from(self.entries.len())
-                        .expect("result provenance entry count fits in u32");
-                    self.entries.push(ResultProvenanceEntry {
-                        query_span_id: *id,
-                        parent,
+struct Extractor<'m> {
+    module: &'m Module,
+    entries: Buffer<ResultProvenanceEntry>,
+    open: Buffer<u32>,
+    frames: Buffer<Frame>,
+    scalars: Buffer<Value>,
+    pending: Option<Value>,
+}
+
+impl Extractor<'_> {
+    fn event(
+        &mut self,
+        meter: &mut Meter<'_>,
+        event: JournalEvent<'_>,
+        index: u32,
+    ) -> Result<(), LimitExceeded> {
+        match event {
+            JournalEvent::SpanStart { id, node } => {
+                let entry = u32::try_from(self.entries.len())
+                    .map_err(|_| LimitExceeded::Allocation { bytes: u64::MAX })?;
+                self.entries.push(
+                    meter,
+                    ResultProvenanceEntry {
+                        query_span_id: id,
+                        parent: self.open.last().copied(),
                         source_span: node.map(node_span),
-                        bindings: Vec::new(),
-                        event_range: (event_index, event_index),
-                    });
-                    self.open.push(idx);
-                    self.record_scalar_item_owner(idx);
+                        bindings: Buffer::new(),
+                        event_range: (index, index),
+                    },
+                )?;
+                self.open.push(meter, entry)?;
+                if self.module.spans().get(id as usize).kind != SpanKind::Capture
+                    && let Some(scalar) = self.scalars.last_mut()
+                    && scalar.owner.is_none()
+                {
+                    scalar.owner = Some(entry);
                 }
-                JournalEvent::SpanEnd(id) => self.close_span(*id, event_index),
-                JournalEvent::Node(node) => {
-                    self.pending = Some(ValueProvenance {
-                        item_owner: self.open.last().copied(),
-                        source_span: Some(node_span(*node)),
-                    });
-                    if let Some(entry) = self.current_entry_mut() {
-                        extend_bounding_range(&mut entry.source_span, Some(node_span(*node)));
+            }
+            JournalEvent::SpanEnd(id) => {
+                let entry = self.open.pop().expect("balanced inspection span") as usize;
+                assert_eq!(
+                    self.entries[entry].query_span_id, id,
+                    "paired inspection spans"
+                );
+                self.entries[entry].event_range.1 =
+                    index.checked_add(1).expect("event index fits u32");
+                self.extend_current(self.entries[entry].source_span);
+            }
+            JournalEvent::RecordSet(member) => {
+                let mut path = self.path(meter)?;
+                let name = self
+                    .module
+                    .strings()
+                    .get(self.module.types().get_member(member as usize).name_id);
+                segment(meter, &mut path, name)?;
+                let mut owner = None;
+                for &entry in self.open.iter().rev() {
+                    meter.charge(1)?;
+                    let span = self
+                        .module
+                        .spans()
+                        .get(self.entries[entry as usize].query_span_id as usize);
+                    if span.kind == SpanKind::Capture && span.member == member {
+                        owner = Some(entry);
+                        break;
                     }
                 }
-                JournalEvent::ListOpen => {
-                    let provenance = self.open_value();
-                    self.frames.push(Frame::List { len: 0, provenance });
+                let frame = self.frames.last_mut().expect("selected field has a frame");
+                assert!(
+                    frame.selected.is_none(),
+                    "field selection is complete before the next"
+                );
+                frame.selected = Some(Selection {
+                    path,
+                    event: index,
+                    owner: owner.or_else(|| self.open.last().copied()),
+                });
+            }
+            JournalEvent::ListOpen | JournalEvent::RecordOpen | JournalEvent::VariantOpen(_) => {
+                let kind = match event {
+                    JournalEvent::ListOpen => Kind::List,
+                    JournalEvent::RecordOpen => Kind::Record,
+                    _ => {
+                        let mut path = self.path(meter)?;
+                        segment(meter, &mut path, "$tag")?;
+                        self.bind(meter, self.open.last().copied(), path, index)?;
+                        Kind::Variant
+                    }
+                };
+                self.frames.push(
+                    meter,
+                    Frame {
+                        kind,
+                        len: 0,
+                        value: Value::default(),
+                        selected: None,
+                    },
+                )?;
+            }
+            JournalEvent::ListClose | JournalEvent::RecordClose | JournalEvent::VariantClose => {
+                let frame = self.frames.pop().expect("balanced provenance value");
+                assert!(
+                    frame.selected.is_none(),
+                    "selected provenance field has a value"
+                );
+                self.produce(meter, frame.value)?;
+            }
+            JournalEvent::ArrayPush => {
+                let value = self.pending.take().expect("array element follows a value");
+                let path = self.path(meter)?;
+                let frame = self.frames.last_mut().expect("open list");
+                assert!(
+                    matches!(frame.kind, Kind::List),
+                    "array element belongs to list"
+                );
+                frame.len = frame.len.checked_add(1).expect("list count fits u32");
+                extend(&mut frame.value.span, value.span);
+                if value.owner.is_some() || value.span.is_some() {
+                    self.bind(
+                        meter,
+                        value.owner.or_else(|| self.open.last().copied()),
+                        path,
+                        index,
+                    )?;
                 }
-                JournalEvent::ArrayPush => self.bind_push(event_index),
-                JournalEvent::ListClose => match self.frames.pop() {
-                    Some(Frame::List { provenance, .. }) => self.pending = Some(provenance),
-                    other => panic!(
-                        "ListClose expects List on provenance frame stack, found {:?}",
-                        frame_kind(other.as_ref())
-                    ),
-                },
-                JournalEvent::RecordOpen => {
-                    let provenance = self.open_value();
-                    self.frames.push(Frame::Record { provenance });
-                }
-                JournalEvent::RecordSet(member) => self.bind_set(*member, event_index),
-                JournalEvent::RecordClose => match self.frames.pop() {
-                    Some(Frame::Record { provenance }) => self.pending = Some(provenance),
-                    other => panic!(
-                        "RecordClose expects Record on provenance frame stack, found {:?}",
-                        frame_kind(other.as_ref())
-                    ),
-                },
-                JournalEvent::VariantOpen(member) => self.open_variant(*member, event_index),
-                JournalEvent::VariantClose => match self.frames.pop() {
-                    Some(Frame::Variant { provenance }) => self.pending = Some(provenance),
-                    other => panic!(
-                        "VariantClose expects Variant on provenance frame stack, found {:?}",
-                        frame_kind(other.as_ref())
-                    ),
-                },
-                JournalEvent::Absent => {
-                    self.pending = Some(ValueProvenance {
-                        item_owner: None,
-                        source_span: None,
-                    });
-                }
-                JournalEvent::NodeText(node) | JournalEvent::NodeBool(node) => {
-                    let source_span = Some(node_span(*node));
-                    self.pending = Some(ValueProvenance {
-                        item_owner: None,
-                        source_span,
-                    });
-                    if let Some(entry) = self.current_entry_mut() {
-                        extend_bounding_range(&mut entry.source_span, source_span);
+            }
+            JournalEvent::ScalarOpen => self.scalars.push(meter, Value::default())?,
+            JournalEvent::ScalarMark(node) => {
+                extend(
+                    &mut self.scalars.last_mut().expect("open scalar").span,
+                    Some(node_span(node)),
+                );
+                self.extend_current(Some(node_span(node)));
+            }
+            JournalEvent::TextClose | JournalEvent::BoolClose(_) => {
+                let scalar = self.scalars.pop().expect("balanced scalar");
+                if let Some(parent) = self.scalars.last_mut() {
+                    extend(&mut parent.span, scalar.span);
+                    if parent.owner.is_none() {
+                        parent.owner = scalar.owner;
                     }
                 }
-                JournalEvent::BoolValue(_) => {
-                    self.pending = Some(ValueProvenance {
-                        item_owner: None,
-                        source_span: None,
-                    });
+                self.produce(meter, scalar)?;
+            }
+            JournalEvent::Node(node)
+            | JournalEvent::NodeText(node)
+            | JournalEvent::NodeBool(node) => {
+                let value = Value {
+                    owner: if matches!(event, JournalEvent::Node(_)) {
+                        self.open.last().copied()
+                    } else {
+                        None
+                    },
+                    span: Some(node_span(node)),
+                };
+                self.extend_current(value.span);
+                self.produce(meter, value)?;
+            }
+            JournalEvent::Absent | JournalEvent::BoolValue(_) => {
+                self.produce(meter, Value::default())?
+            }
+        }
+        Ok(())
+    }
+
+    fn produce(&mut self, meter: &mut Meter<'_>, value: Value) -> Result<(), LimitExceeded> {
+        if let Some(frame) = self.frames.last_mut() {
+            extend(&mut frame.value.span, value.span);
+            if let Some(selected) = frame.selected.take() {
+                if value.owner.is_some() || value.span.is_some() {
+                    self.bind(
+                        meter,
+                        selected.owner.or(value.owner),
+                        selected.path,
+                        selected.event,
+                    )?;
                 }
-                JournalEvent::ScalarOpen => self.scalar_frames.push(ScalarProvenance {
-                    item_owner: None,
-                    source_span: None,
-                }),
-                JournalEvent::ScalarMark(node) => {
-                    let source_span = Some(node_span(*node));
-                    for scalar in &mut self.scalar_frames {
-                        extend_bounding_range(&mut scalar.source_span, source_span);
+                return Ok(());
+            }
+        }
+        self.pending = Some(value);
+        Ok(())
+    }
+
+    fn bind(
+        &mut self,
+        meter: &mut Meter<'_>,
+        owner: Option<u32>,
+        path: Text,
+        event_index: u32,
+    ) -> Result<(), LimitExceeded> {
+        if let Some(owner) = owner {
+            self.entries[owner as usize]
+                .bindings
+                .push(meter, ProvenanceBinding { path, event_index })?;
+        }
+        Ok(())
+    }
+
+    fn path(&self, meter: &mut Meter<'_>) -> Result<Text, LimitExceeded> {
+        let mut path = Text::new(meter.account());
+        for frame in self.frames.iter() {
+            meter.charge(1)?;
+            match frame.kind {
+                Kind::Record => {}
+                Kind::Variant => segment(meter, &mut path, "$data")?,
+                Kind::List => {
+                    let mut digits = [0u8; 10];
+                    let mut at = digits.len();
+                    let mut value = frame.len;
+                    loop {
+                        at -= 1;
+                        digits[at] = b'0' + (value % 10) as u8;
+                        value /= 10;
+                        if value == 0 {
+                            break;
+                        }
                     }
-                    if let Some(entry) = self.current_entry_mut() {
-                        extend_bounding_range(&mut entry.source_span, source_span);
-                    }
-                }
-                JournalEvent::TextClose | JournalEvent::BoolClose(_) => {
-                    let scalar = self
-                        .scalar_frames
-                        .pop()
-                        .expect("scalar event frames are balanced on the winning path");
-                    self.pending = Some(ValueProvenance {
-                        item_owner: scalar.item_owner,
-                        source_span: scalar.source_span,
-                    });
+                    segment(
+                        meter,
+                        &mut path,
+                        std::str::from_utf8(&digits[at..]).expect("ASCII index"),
+                    )?;
                 }
             }
         }
-
-        assert!(
-            self.open.is_empty(),
-            "provenance extraction finished with {} unclosed span frame(s) after consuming the \
-             match journal",
-            self.open.len()
-        );
-        assert!(
-            self.frames.is_empty(),
-            "provenance extraction finished with {} unclosed value frame(s) after consuming the \
-             match journal",
-            self.frames.len()
-        );
-        assert!(
-            self.scalar_frames.is_empty(),
-            "provenance extraction finished with {} unclosed scalar frame(s) after consuming the \
-             match journal",
-            self.scalar_frames.len()
-        );
-        self.entries
+        Ok(path)
     }
 
-    fn close_span(&mut self, id: u16, event_index: u32) {
-        let closed = self
-            .open
-            .pop()
-            .expect("span brackets are balanced on the winning path");
-        let closed_idx = usize::try_from(closed).expect("provenance entry index fits usize");
-        let source_span = {
-            let entry = self
-                .entries
-                .get_mut(closed_idx)
-                .expect("open span index addresses a provenance entry");
-            assert_eq!(entry.query_span_id, id, "span bracket ids must pair");
-            entry.event_range.1 = event_index
-                .checked_add(1)
-                .expect("journal event count fits in u32");
-            entry.source_span
-        };
-
-        if let Some(&parent) = self.open.last() {
-            let parent_idx = usize::try_from(parent).expect("provenance entry index fits usize");
-            extend_bounding_range(&mut self.entries[parent_idx].source_span, source_span);
+    fn extend_current(&mut self, span: Option<(u32, u32)>) {
+        if let Some(&entry) = self.open.last() {
+            extend(&mut self.entries[entry as usize].source_span, span);
         }
-    }
-
-    fn bind_push(&mut self, event_index: u32) {
-        let Some(Frame::List { len, .. }) = self.frames.last() else {
-            panic!("ArrayPush expects List on provenance frame stack");
-        };
-        let index = *len;
-        let mut path = path_for_frames(&self.frames[..self.frames.len() - 1]);
-        push_segment(&mut path, &index.to_string());
-        let provenance = self.pending.take();
-        if !provenance.is_some_and(ValueProvenance::is_unowned_absence) {
-            if let Some(owner) = provenance.and_then(|value| value.item_owner) {
-                self.bind_entry(owner, path, event_index);
-            } else {
-                self.bind_current(path, event_index);
-            }
-        }
-
-        let Some(Frame::List {
-            len,
-            provenance: list,
-        }) = self.frames.last_mut()
-        else {
-            unreachable!("list frame was checked before binding ArrayPush");
-        };
-        if let Some(value) = provenance {
-            extend_bounding_range(&mut list.source_span, value.source_span);
-        }
-        *len += 1;
-    }
-
-    fn bind_set(&mut self, member: u16, event_index: u32) {
-        let mut path = path_for_frames(&self.frames);
-        push_segment(&mut path, self.resolve_member_name(member));
-        let provenance = self.pending.take();
-        if let Some(value) = provenance {
-            self.record_child_span(value.source_span);
-        }
-        if let Some(owner) = self.open_capture_for_member(member) {
-            self.bind_entry(owner, path, event_index);
-            return;
-        }
-        if provenance.is_some_and(ValueProvenance::is_unowned_absence) {
-            return;
-        }
-        self.bind_current(path, event_index);
-    }
-
-    fn open_variant(&mut self, _member: u16, event_index: u32) {
-        let mut path = path_for_frames(&self.frames);
-        push_segment(&mut path, "$tag");
-        self.bind_current(path, event_index);
-        let provenance = self.open_value();
-        self.frames.push(Frame::Variant { provenance });
-    }
-
-    fn bind_current(&mut self, path: String, event_index: u32) {
-        let Some(&entry) = self.open.last() else {
-            return;
-        };
-        self.bind_entry(entry, path, event_index);
-    }
-
-    fn bind_entry(&mut self, entry: u32, path: String, event_index: u32) {
-        let entry = usize::try_from(entry).expect("provenance entry index fits usize");
-        let entry = self
-            .entries
-            .get_mut(entry)
-            .expect("open span index addresses a provenance entry");
-        entry.bindings.push(ProvenanceBinding { path, event_index });
-    }
-
-    fn open_capture_for_member(&self, member: u16) -> Option<u32> {
-        self.open.iter().rev().copied().find(|&entry| {
-            let entry = usize::try_from(entry).expect("provenance entry index fits usize");
-            let span_id = self.entries[entry].query_span_id as usize;
-            self.span_kinds[span_id] == SpanKind::Capture && self.span_members[span_id] == member
-        })
-    }
-
-    fn record_scalar_item_owner(&mut self, entry: u32) {
-        let entry_idx = usize::try_from(entry).expect("provenance entry index fits usize");
-        let span_id = self.entries[entry_idx].query_span_id as usize;
-        if self.span_kinds[span_id] == SpanKind::Capture {
-            return;
-        }
-        for scalar in &mut self.scalar_frames {
-            if scalar.item_owner.is_none() {
-                scalar.item_owner = Some(entry);
-            }
-        }
-    }
-
-    fn open_value(&self) -> ValueProvenance {
-        ValueProvenance {
-            item_owner: None,
-            source_span: None,
-        }
-    }
-
-    fn record_child_span(&mut self, source_span: Option<(u32, u32)>) {
-        let Some(frame) = self.frames.last_mut() else {
-            return;
-        };
-        let provenance = match frame {
-            Frame::List { provenance, .. }
-            | Frame::Record { provenance }
-            | Frame::Variant { provenance } => provenance,
-        };
-        extend_bounding_range(&mut provenance.source_span, source_span);
-    }
-
-    fn current_entry_mut(&mut self) -> Option<&mut ResultProvenanceEntry> {
-        let idx = *self.open.last()?;
-        let idx = usize::try_from(idx).expect("provenance entry index fits usize");
-        Some(
-            self.entries
-                .get_mut(idx)
-                .expect("open span index addresses a provenance entry"),
-        )
-    }
-
-    fn resolve_member_name(&self, idx: u16) -> &'m str {
-        self.member_names[idx as usize]
     }
 }
 
 fn node_span(node: Node<'_>) -> (u32, u32) {
     (
-        u32::try_from(node.start_byte()).expect("node start byte fits in u32"),
-        u32::try_from(node.end_byte()).expect("node end byte fits in u32"),
+        u32::try_from(node.start_byte()).expect("node offset fits u32"),
+        u32::try_from(node.end_byte()).expect("node offset fits u32"),
     )
 }
 
-fn extend_bounding_range(target: &mut Option<(u32, u32)>, span: Option<(u32, u32)>) {
+fn extend(target: &mut Option<(u32, u32)>, span: Option<(u32, u32)>) {
     let Some((start, end)) = span else {
         return;
     };
-    match target {
-        Some((current_start, current_end)) => {
-            *current_start = (*current_start).min(start);
-            *current_end = (*current_end).max(end);
-        }
-        None => *target = Some((start, end)),
-    }
+    *target = Some(match *target {
+        Some((a, b)) => (a.min(start), b.max(end)),
+        None => (start, end),
+    });
 }
 
-fn path_for_frames(frames: &[Frame]) -> String {
-    let mut path = String::new();
-    for frame in frames {
-        match frame {
-            Frame::List { len, .. } => push_segment(&mut path, &len.to_string()),
-            Frame::Record { .. } => {}
-            Frame::Variant { .. } => push_segment(&mut path, "$data"),
-        }
+fn segment(meter: &mut Meter<'_>, path: &mut Text, text: &str) -> Result<(), LimitExceeded> {
+    meter.charge_bytes(text.len() as u64)?;
+    path.push(meter, "/")?;
+    let mut start = 0;
+    for (index, byte) in text.bytes().enumerate() {
+        let escape = match byte {
+            b'~' => "~0",
+            b'/' => "~1",
+            _ => continue,
+        };
+        path.push(meter, &text[start..index])?;
+        path.push(meter, escape)?;
+        start = index + 1;
     }
-    path
-}
-
-fn push_segment(path: &mut String, segment: &str) {
-    path.push('/');
-    for ch in segment.chars() {
-        match ch {
-            '~' => path.push_str("~0"),
-            '/' => path.push_str("~1"),
-            _ => path.push(ch),
-        }
-    }
-}
-
-fn frame_kind(frame: Option<&Frame>) -> Option<&'static str> {
-    frame.map(|frame| match frame {
-        Frame::List { .. } => "List",
-        Frame::Record { .. } => "Record",
-        Frame::Variant { .. } => "Variant",
-    })
+    path.push(meter, &text[start..])
 }

@@ -15,10 +15,10 @@ Q:
   2   !   (program)                         7
   4  ─‣─  (expression_statement)            6
   5  ─‣┘² _                                 1
-  6  └‣─  (number) [Node RecordSet(b)]      5
+  6  └‣─  (number) [RecordSet(b) Node]      5
   7  └‣─  (expression_statement)            9
   8  ─‣┘  _                                 4
-  9  └‣─  (identifier) [Node RecordSet(a)]  8
+  9  └‣─  (identifier) [RecordSet(a) Node]  8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -59,10 +59,10 @@ P8 pattern    86..94  source_id=0
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
   02  └‣─  (expression_statement) [SpanStart#2 SpanStartAt#3]  04
-  04  └‣─  (identifier) [SpanStartAt#5 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#5]  07
+  04  └‣─  (identifier) [SpanStartAt#5 SpanStart#4 RecordSet(M0) Node SpanEnd#4 SpanEnd#5]  07
   07  ─‣┘  _                                08
   08  ─‣─  (expression_statement) [SpanEnd#3 SpanStartAt#6]  10
-  10  └‣─  (number) [SpanStartAt#8 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#8]  13
+  10  └‣─  (number) [SpanStartAt#8 SpanStart#7 RecordSet(M1) Node SpanEnd#7 SpanEnd#8]  13
   13  ─‣┘  _                                16
   14  ...
   15  ...

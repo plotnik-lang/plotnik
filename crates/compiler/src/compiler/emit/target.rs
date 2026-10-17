@@ -130,9 +130,7 @@ pub enum CodegenProvenance {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RustCodegenConfig {
     runtime_crate: Cow<'static, str>,
-    serde: bool,
     limits: RuntimeLimitSpec,
-    decode_depth: Limit,
     provenance: CodegenProvenance,
 }
 
@@ -140,12 +138,10 @@ impl Default for RustCodegenConfig {
     fn default() -> Self {
         Self {
             runtime_crate: Cow::Borrowed("::plotnik_runtime"),
-            serde: false,
             limits: RuntimeLimitSpec {
                 fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
-            decode_depth: Limit::Auto,
             provenance: CodegenProvenance::Omit,
         }
     }
@@ -161,18 +157,8 @@ impl RustCodegenConfig {
         self
     }
 
-    pub fn serde(mut self, enabled: bool) -> Self {
-        self.serde = enabled;
-        self
-    }
-
     pub fn limits(mut self, limits: RuntimeLimitSpec) -> Self {
         self.limits = limits;
-        self
-    }
-
-    pub fn decode_depth(mut self, depth: Limit) -> Self {
-        self.decode_depth = depth;
         self
     }
 
@@ -195,15 +181,12 @@ impl RustCodegenConfig {
     pub(crate) fn rust_types_config(&self) -> crate::compiler::emit::targets::rust::TypesConfig {
         crate::compiler::emit::targets::rust::TypesConfig::new()
             .rt_crate(self.runtime_crate.clone())
-            .serde(self.serde)
     }
 
     pub(crate) fn matcher_config(&self) -> crate::compiler::emit::targets::rust::Config {
         crate::compiler::emit::targets::rust::Config::new()
             .rt_crate(self.runtime_crate.clone())
-            .serde(self.serde)
             .limits(self.limits)
-            .decode_depth(self.decode_depth)
     }
 
     pub(crate) fn provenance_mode(&self) -> CodegenProvenance {

@@ -38,7 +38,7 @@ warning: capture type `text` replaces the record value captured by `@chunk` with
    |
 help: remove `:: text` to return the record value instead
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'s> {
     pub chunk: &'s str,
 }

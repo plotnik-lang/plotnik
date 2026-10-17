@@ -10,12 +10,12 @@ Q = (program
 x;
 --------------------- OUTPUT ---------------------
 {
+  "b": null,
   "a": {
     "kind": "identifier",
-    "span": [0, 1],
-    "text": "x"
-  },
-  "b": null
+    "text": "x",
+    "span": [0, 1]
+  }
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -46,41 +46,42 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └‣─  (expression_statement)           18, 10
+  01  └‣─  (expression_statement)           16, 10
   03                                        ▶
-  04   !   (number) [Node RecordSet(M0)]    20
+  04   !   (number) [RecordSet(M0) Node]    18
   06  ──!  _                                04, 06
-  08   !   _ [Absent RecordSet(M1)]         04, 06
-  10  -ε-  [Absent RecordSet(M1) Absent RecordSet(M0)]  21
-  13   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  20
-  16  ──!  _                                08, 13, 16
-  18  └─!  _                                08, 13, 16
-  20  ─‣┘  _                                21
-  21  ─‣┘  _                                03
+  08   !   _                                04, 06
+  10  -ε-  [RecordSet(M0) Absent]           19
+  12   !   (identifier) [RecordSet(M1) Node]  18
+  14  ──!  _                                08, 12, 14
+  16  └─!  _                                08, 12, 14
+  18  ─‣┘  _                                19
+  19  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           18, 10
-       ●   expression_statement
-  18       _                                08, 13, 16
-       ●   identifier
-  08       _ [Absent RecordSet(M1)]         04, 06
-       ●   identifier
-  04       (number) [Node RecordSet(M0)]    20
-       ○   identifier
-  08  ❮❮❮ 
-  06       _                                04, 06
-       ●   ;
-  04       (number) [Node RecordSet(M0)]    20
-       ○   ;
-  06  ❮❮❮ 
-  06       _                                04, 06
-  18  ❮❮❮ 
-  13       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  20
-       ●   identifier
-  20       _                                21
-       ●   expression_statement
-  21       _                                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0016 DownExact Any
+0016 MatchOk identifier [0..1]
+0008 StayExact Any
+0008 MatchOk identifier [0..1]
+0004 StayExact Named(Some(NodeKindId(114)))
+0004 MatchFail identifier [0..1]
+0004 Backtrack { to_record: 18 }
+0006 NextExact Any
+0006 MatchOk node#24 [1..2]
+0004 StayExact Named(Some(NodeKindId(114)))
+0004 MatchFail node#24 [1..2]
+0004 Backtrack { to_record: 26 }
+0006 NextExact Any
+0006 Backtrack { to_record: 14 }
+0012 StayExact Named(Some(NodeKindId(1)))
+0012 MatchOk identifier [0..1]
+0018 Up(1) Any
+0018 MatchOk expression_statement [0..2]
+0019 Up(1) Any
+0019 MatchOk program [0..2]
+0003 Return PortId(0)
+0003 Return

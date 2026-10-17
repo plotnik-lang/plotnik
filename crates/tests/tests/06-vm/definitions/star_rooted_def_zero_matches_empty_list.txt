@@ -41,44 +41,43 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (array)                          03
-  03  -ε-  [ListOpen]                       18, 11
-  05  -ε-  [ListClose]                      08
-  07  ─‣┘² _                                10
-  08  ─‣┘  _ [RecordSet(M0)]                07
-  10                                        ▶
-  11  -ε-  [ListClose RecordSet(M0)]        07
-  13   !   (identifier) [Node ArrayPush]    16, 05
-  15  ...
-  16  ──!  _                                13, 16
-  18  └─!  _                                13, 16
+  02  └‣─  (array) [RecordSet(M0)]          04
+  04  -ε-  [ListOpen]                       14, 08
+  06                                        ▶
+  07  ─‣┘² _                                06
+  08  -ε-  [ListClose]                      07
+  10   !   (identifier) [Node ArrayPush]    12, 16
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
+  16  ─‣┘  _ [ListClose]                    07
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03  -ε-  [ListOpen]                       18, 11
-  18       _                                13, 16
-       ●   [
-  13       (identifier) [Node ArrayPush]    16, 05
-       ○   [
-  18  ❮❮❮ 
-  16       _                                13, 16
-       ●   number
-  13       (identifier) [Node ArrayPush]    16, 05
-       ○   number
-  16  ❮❮❮ 
-  16       _                                13, 16
-       ●   ]
-  13       (identifier) [Node ArrayPush]    16, 05
-       ○   ]
-  16  ❮❮❮ 
-  16       _                                13, 16
-  03  ❮❮❮ 
-  11  -ε-  [ListClose RecordSet(M0)]        07
-  07       _                                10
-       ●   program
-  10   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..4]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..3]
+0004 Epsilon Any
+0014 DownExact Any
+0014 MatchOk node#41 [0..1]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#41 [0..1]
+0010 Backtrack { to_record: 20 }
+0012 NextExact Any
+0012 MatchOk node#114 [1..2]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#114 [1..2]
+0010 Backtrack { to_record: 28 }
+0012 NextExact Any
+0012 MatchOk node#42 [2..3]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#42 [2..3]
+0010 Backtrack { to_record: 36 }
+0012 NextExact Any
+0012 Backtrack { to_record: 16 }
+0008 Epsilon Any
+0007 Up(2) Any
+0007 MatchOk program [0..4]
+0006 Return PortId(0)
+0006 Return

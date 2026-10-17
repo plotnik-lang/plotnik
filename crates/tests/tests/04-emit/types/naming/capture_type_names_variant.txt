@@ -5,12 +5,12 @@ Q = (program
   ] @kind :: Kind
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q {
     pub kind: Kind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub enum Kind {
     A,
     B,

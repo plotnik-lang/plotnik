@@ -18,10 +18,6 @@ workspace = true
 proc-macro = true
 
 [features]
-# Emit `SerializeWithSource` impls for generated result types. Feature, not a
-# macro argument: it must be on iff the runtime's `serde` feature is on, and
-# the `plotnik` facade forwards both from one flag.
-serde = []
 
 [dependencies]
 cargo_metadata = "0.23"

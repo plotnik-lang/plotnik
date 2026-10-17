@@ -9,8 +9,8 @@ foo;
   "decl": null,
   "stmt": {
     "kind": "expression_statement",
-    "span": [0, 4],
-    "text": "foo;"
+    "text": "foo;",
+    "span": [0, 4]
   }
 }
 -------------------- BYTECODE --------------------
@@ -42,25 +42,26 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        12, 03
   02                                        ▶
-  03  └‣─  (expression_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
-  06  ─‣─  (expression_statement) [Node RecordSet(M1)]  14
-  08   !   (lexical_declaration) [Node RecordSet(M0)]  06
+  03  └‣─  (expression_statement) [RecordSet(M0) Absent RecordSet(M1) Node]  14
+  06  ─‣─  (expression_statement) [RecordSet(M1) Node]  14
+  08   !   (lexical_declaration) [RecordSet(M0) Node]  06
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        12, 03
-       ●   program
-  12       _                                08, 10
-       ●   expression_statement
-  08       (lexical_declaration) [Node RecordSet(M0)]  06
-       ○   expression_statement
-  12  ❮❮❮ 
-  10       _                                08, 10
-  00  ❮❮❮ 
-  03       (expression_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
-       ●   expression_statement
-  14       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0012 DownExact Any
+0012 MatchOk expression_statement [0..4]
+0008 StayExact Named(Some(NodeKindId(152)))
+0008 MatchFail expression_statement [0..4]
+0008 Backtrack { to_record: 9 }
+0010 NextExact Any
+0010 Backtrack { to_record: 5 }
+0003 Down Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..4]
+0014 Up(1) Any
+0014 MatchOk program [0..4]
+0002 Return PortId(0)
+0002 Return

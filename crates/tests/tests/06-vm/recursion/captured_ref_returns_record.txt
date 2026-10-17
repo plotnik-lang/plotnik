@@ -13,15 +13,15 @@ a()();
 --------------------- OUTPUT ---------------------
 {
   "top": {
+    "name": null,
     "inner": {
-      "inner": null,
       "name": {
         "kind": "identifier",
-        "span": [0, 1],
-        "text": "a"
-      }
-    },
-    "name": null
+        "text": "a",
+        "span": [0, 1]
+      },
+      "inner": null
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -61,61 +61,57 @@ Q      = 03 :: T4
 [instructions]
 Nested:
   00   !   (call_expression)                01
-  01  └‣─  function: _                      16, 14
+  01  └‣─  function: _                      13, 19
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement) [RecordSet(M2) RecordOpen]  06
   06  └‣─  (Nested)                         00 : 08
-  07  ─‣┘  _                                13
+  07  ─‣┘  _                                12
   08  -ε-  [RecordClose]                    10
-  10  ─‣┘² _ [RecordSet(M2)]                12
+  10  ─‣┘² _                                11
+  11                                        ▶
   12                                        ▶
-  13                                        ▶
-  14  -ε-  [Absent RecordSet(M0) RecordOpen]  21
-  16   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  07
-  19  -ε-  [RecordClose RecordSet(M1)]      07
-  21   !   (Nested)                         00 : 19
+  13   !   (identifier) [RecordSet(M0) Node]  07
+  15  ...
+  16  -ε-  [RecordClose]                    07
+  18   !   (Nested)                         00 : 16
+  19  -ε-  [RecordSet(M1) RecordOpen]       18
 --------------------- TRACE ----------------------
-Q:
-  03       (program)                        04
-       ●   program
-  04       (expression_statement) [RecordOpen]  06
-       ●   expression_statement
-  06       (Nested)                         00 : 08
-       ▶   (Nested)
-
-Nested:
-  00       (call_expression)                01
-       ●   call_expression
-  01       function: _                      16, 14
-       ●   call_expression
-  16       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  07
-       ○   call_expression
-  01  ❮❮❮ 
-  14  -ε-  [Absent RecordSet(M0) RecordOpen]  21
-  21       (Nested)                         00 : 19
-       ▶   (Nested)
-
-Nested:
-  00       (call_expression)                01
-       ●   call_expression
-  01       function: _                      16, 14
-       ●   identifier
-  16       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  07
-       ●   identifier
-  07       _                                13
-       ●   call_expression
-  13   ◀   (Nested)                         
-
-Nested:
-  19  -ε-  [RecordClose RecordSet(M1)]      07
-  07       _                                13
-       ●   call_expression
-  13   ◀   (Nested)                         
-
-Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M2)]                12
-       ●   program
-  12   ◀   (Q)                              ◼
+0003 ExecutionStarted { target: 3 }
+0003 StayExact Named(Some(NodeKindId(134)))
+0003 MatchOk program [0..6]
+0004 Down Named(Some(NodeKindId(150)))
+0004 MatchOk expression_statement [0..6]
+0006 Call CodeAddr(0)
+0006 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(205)))
+0000 MatchOk call_expression [0..5]
+0001 Down Any
+0001 MatchOk call_expression [0..3]
+0013 StayExact Named(Some(NodeKindId(1)))
+0013 MatchFail call_expression [0..3]
+0013 Backtrack { to_record: 23 }
+0019 Epsilon Any
+0018 Call CodeAddr(0)
+0018 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(205)))
+0000 MatchOk call_expression [0..3]
+0001 Down Any
+0001 MatchOk identifier [0..1]
+0013 StayExact Named(Some(NodeKindId(1)))
+0013 MatchOk identifier [0..1]
+0007 Up(1) Any
+0007 MatchOk call_expression [0..3]
+0012 Return PortId(0)
+0012 Return
+0016 Epsilon Any
+0007 Up(1) Any
+0007 MatchOk call_expression [0..5]
+0012 Return PortId(0)
+0012 Return
+0008 Epsilon Any
+0010 Up(2) Any
+0010 MatchOk program [0..6]
+0011 Return PortId(0)
+0011 Return

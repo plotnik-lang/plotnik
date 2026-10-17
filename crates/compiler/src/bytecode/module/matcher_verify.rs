@@ -568,6 +568,7 @@ enum FrameKind {
         wrote_payload_fields: bool,
     },
     Scalar,
+    Field,
 }
 
 impl FrameKind {
@@ -577,6 +578,7 @@ impl FrameKind {
             Self::Record => KS_RECORD,
             Self::Variant { .. } => KS_VARIANT,
             Self::Scalar => KS_SCALAR,
+            Self::Field => KS_FIELD,
         }
     }
 }
@@ -606,7 +608,8 @@ const KS_LIST: u8 = 0b001;
 const KS_RECORD: u8 = 0b010;
 const KS_VARIANT: u8 = 0b100;
 const KS_SCALAR: u8 = 0b1000;
-const KS_ANY: u8 = KS_LIST | KS_RECORD | KS_VARIANT | KS_SCALAR;
+const KS_FIELD: u8 = 0b10000;
+const KS_ANY: u8 = KS_LIST | KS_RECORD | KS_VARIANT | KS_SCALAR | KS_FIELD;
 const KS_RECORD_SET_TARGET: u8 = KS_RECORD | KS_VARIANT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -837,7 +840,8 @@ where
                         EffectKind::ListOpen
                         | EffectKind::RecordOpen
                         | EffectKind::VariantOpen
-                        | EffectKind::ScalarOpen => frame_openers += 1,
+                        | EffectKind::ScalarOpen
+                        | EffectKind::RecordSet => frame_openers += 1,
                         EffectKind::SuppressBegin => suppression_openers += 1,
                         EffectKind::SpanStartAt | EffectKind::SpanStart => span_openers += 1,
                         _ => {}
@@ -952,10 +956,14 @@ where
                     Some(_) => {}
                 }
 
-                let post_pending = summary
+                let mut post_pending = summary
                     .returns_pending
                     .map(PendingState::from_bool)
                     .unwrap_or(PendingState::Unknown);
+                if stack.last() == Some(&FrameKind::Field) && post_pending != PendingState::Empty {
+                    stack.pop();
+                    post_pending = PendingState::Empty;
+                }
                 if summary.record_sets_caller_top
                     && let Some(FrameKind::Variant {
                         wrote_payload_fields: false,
@@ -1057,7 +1065,7 @@ fn apply_effect<A: Copy>(
             if *state.pending == PendingState::Full {
                 return Err(VerifyError::EffectStack(address));
             }
-            *state.pending = PendingState::Full;
+            produce_value(state.stack, state.pending);
         }
         SuppressBegin => *state.suppress += 1,
         SuppressEnd => return Err(VerifyError::EffectStack(address)),
@@ -1074,14 +1082,16 @@ fn apply_effect<A: Copy>(
             *state.pending = PendingState::Empty;
         }
         RecordSet => {
-            require_pending(state.pending, address)?;
+            if *state.pending == PendingState::Full {
+                return Err(VerifyError::EffectStack(address));
+            }
             match state.stack.last_mut() {
                 Some(FrameKind::Record) => {}
                 Some(FrameKind::Variant {
                     wrote_payload_fields,
                     ..
                 }) => *wrote_payload_fields = true,
-                Some(FrameKind::List | FrameKind::Scalar) => {
+                Some(FrameKind::List | FrameKind::Scalar | FrameKind::Field) => {
                     return Err(VerifyError::EffectStack(address));
                 }
                 None => {
@@ -1089,7 +1099,7 @@ fn apply_effect<A: Copy>(
                     *state.record_sets_caller_top = true;
                 }
             }
-            *state.pending = PendingState::Empty;
+            state.stack.push(FrameKind::Field);
         }
         ListOpen | ListClose | RecordOpen | RecordClose | VariantOpen | VariantClose
         | ScalarOpen | TextClose | BoolClose => {
@@ -1138,7 +1148,7 @@ fn apply_frame_action<A: Copy>(
                 {
                     return Err(VerifyError::EffectStack(address));
                 }
-                *state.pending = PendingState::Full;
+                produce_value(state.stack, state.pending);
             }
             _ => return Err(VerifyError::EffectStack(address)),
         },
@@ -1184,8 +1194,17 @@ fn close_simple_frame<A: Copy>(
     if stack.pop() != Some(expected) || *pending == PendingState::Full {
         return Err(VerifyError::EffectStack(address));
     }
-    *pending = PendingState::Full;
+    produce_value(stack, pending);
     Ok(())
+}
+
+fn produce_value(stack: &mut Vec<FrameKind>, pending: &mut PendingState) {
+    *pending = if stack.last() == Some(&FrameKind::Field) {
+        stack.pop();
+        PendingState::Empty
+    } else {
+        PendingState::Full
+    };
 }
 
 fn close_span<A: Copy>(

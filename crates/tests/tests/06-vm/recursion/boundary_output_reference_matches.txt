@@ -28,8 +28,8 @@ Q = (program
 {
   "b": {
     "kind": "identifier",
-    "span": [7, 8],
-    "text": "b"
+    "text": "b",
+    "span": [7, 8]
   }
 }
 -------------------- BYTECODE --------------------
@@ -83,8 +83,8 @@ Q:
   02  └‣─  (array)                          03
   03  └─!  _                                31, 32
   05                                        ▶
-  06  ─‣─  (identifier) [Node RecordSet(M7)] == "b"  34
-  08  ─•─  (identifier) [Node RecordSet(M7)] == "b"  34
+  06  ─‣─  (identifier) [RecordSet(M7) Node] == "b"  34
+  08  ─•─  (identifier) [RecordSet(M7) Node] == "b"  34
   10                                        ▶
   11                                        ▶ p1
   12  ─•─  (identifier) == "x"              10
@@ -100,64 +100,58 @@ Q:
   32  ──!  _                                31, 32
   34  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       _                                31, 32
-       ●   [
-  31       "["                              28
-       ●   [
-  28       (@26)                            26 : 06 / 08
-       ▶   (@26)
-
-@26:
-  26       _                                14, 24, 26
-       ●   identifier
-  14       (identifier) == "a"              12, 11
-       ●   identifier
-  12       (identifier) == "x"              10
-       ○   ,
-  14  ❮❮❮ 
-  11   ◀   (@26)                            p1
-
-Q:
-  08       (identifier) [Node RecordSet(M7)] == "b"  34
-       ○   ,
-  26  ❮❮❮ 
-  24       (identifier) == "a"              22
-       ●   identifier
-  22       _                                21, 22
-       ●   ,
-  21       ","                              18
-       ●   ,
-  18       (@26)                            26 : 16 / 16
-       ▶   (@26)
-
-@26:
-  26       _                                14, 24, 26
-       ●   identifier
-  14       (identifier) == "a"              12, 11
-       ●   identifier
-  12       (identifier) == "x"              10
-       ○   ,
-  14  ❮❮❮ 
-  11   ◀   (@26)                            p1
-
-@26:
-  16  -ε-                                   12, 11
-  12       (identifier) == "x"              10
-       ○   ,
-  16  ❮❮❮ 
-  11   ◀   (@26)                            p1
-
-Q:
-  08       (identifier) [Node RecordSet(M7)] == "b"  34
-       ○   ,
-       ●   identifier
-  34       _                                05
-       ●   program
-  05   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..9]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0003 DownExact Any
+0003 MatchOk [ [0..1]
+0031 StayExact Anonymous(Some(NodeKindId(41)))
+0031 MatchOk [ [0..1]
+0028 Call CodeAddr(26)
+0028 Call { target: 26 }
+0026 NextExact Any
+0026 MatchOk identifier [1..2]
+0014 StayExact Named(Some(NodeKindId(1)))
+0014 MatchOk identifier [1..2]
+0012 NextSkip Named(Some(NodeKindId(1)))
+0012 MatchFail , [2..3]
+0012 Backtrack { to_record: 30 }
+0011 Return PortId(1)
+0011 Return
+0008 NextSkip Named(Some(NodeKindId(1)))
+0008 MatchFail , [2..3]
+0008 Backtrack { to_record: 26 }
+0024 StayExact Named(Some(NodeKindId(1)))
+0024 MatchOk identifier [1..2]
+0022 NextExact Any
+0022 MatchOk , [2..3]
+0021 StayExact Anonymous(Some(NodeKindId(8)))
+0021 MatchOk , [2..3]
+0018 Call CodeAddr(26)
+0018 Call { target: 26 }
+0026 NextExact Any
+0026 MatchOk identifier [4..5]
+0014 StayExact Named(Some(NodeKindId(1)))
+0014 MatchOk identifier [4..5]
+0012 NextSkip Named(Some(NodeKindId(1)))
+0012 MatchFail , [5..6]
+0012 Backtrack { to_record: 65 }
+0011 Return PortId(1)
+0011 Return
+0016 Epsilon Any
+0012 NextSkip Named(Some(NodeKindId(1)))
+0012 MatchFail , [5..6]
+0012 Backtrack { to_record: 75 }
+0011 Return PortId(1)
+0011 Return
+0008 NextSkip Named(Some(NodeKindId(1)))
+0008 MatchFail , [5..6]
+0008 MatchOk identifier [7..8]
+0034 Up(3) Any
+0034 MatchOk program [0..9]
+0005 Return PortId(0)
+0005 Return

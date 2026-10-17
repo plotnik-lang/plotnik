@@ -46,51 +46,49 @@ Q = 00 :: T3
 
 [instructions]
 Q:
-  00   !   (program)                        22, 29
+  00   !   (program)                        30, 24
   02  └‣─  (identifier) == "foo"            04
   04  ─‣┘  _                                05
   05  ─‣┘  _                                06
   06                                        ▶
   07  ...
-  08  └─!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
-  11  ─•─  (expression_statement) [Node RecordSet(M2)]  02
-  13  -ε-  [ListClose RecordSet(M1)]        11
-  15  ...
-  16  └─!  (debugger_statement) [Node ArrayPush]  18, 13
-  18  ──!  (debugger_statement) [Node ArrayPush]  18, 13
-  20  -ε-  [ListOpen]                       16, 08
-  22  └─!  _                                32, 34
-  24  ──!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
-  27  -ε-  [ListOpen]                       18, 24
-  29  -ε-  [Absent RecordSet(M0)]           20
-  31  ...
-  32   !   (lexical_declaration) [Node RecordSet(M0)]  27
-  34  ──!  _                                32, 34
+  08  └─!  (expression_statement) [ListClose RecordSet(M2) Node]  02
+  10  ─•─  (expression_statement) [RecordSet(M2) Node]  02
+  12  -ε-  [ListClose]                      10
+  14  └─!  (debugger_statement) [Node ArrayPush]  16, 12
+  16  ──!  (debugger_statement) [Node ArrayPush]  16, 12
+  18  -ε-  [RecordSet(M1) ListOpen]         14, 08
+  20  ──!  (expression_statement) [ListClose RecordSet(M2) Node]  02
+  22  -ε-  [RecordSet(M1) ListOpen]         16, 20
+  24  -ε-  [RecordSet(M0) Absent]           18
+  26   !   (lexical_declaration) [RecordSet(M0) Node]  22
+  28  ──!  _                                26, 28
+  30  └─!  _                                26, 28
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        22, 29
-       ●   program
-  22       _                                32, 34
-       ●   comment
-  32       (lexical_declaration) [Node RecordSet(M0)]  27
-       ○   comment
-  22  ❮❮❮ 
-  34       _                                32, 34
-       ●   debugger_statement
-  32       (lexical_declaration) [Node RecordSet(M0)]  27
-       ○   debugger_statement
-  34  ❮❮❮ 
-  34       _                                32, 34
-       ●   expression_statement
-  32       (lexical_declaration) [Node RecordSet(M0)]  27
-       ○   expression_statement
-  34  ❮❮❮ 
-  34       _                                32, 34
-  00  ❮❮❮ 
-  29  -ε-  [Absent RecordSet(M0)]           20
-  20  -ε-  [ListOpen]                       16, 08
-  16       (debugger_statement) [Node ArrayPush]  18, 13
-       ○   comment
-  20  ❮❮❮ 
-  08       (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
-       ○   comment
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..22]
+0030 DownExact Any
+0030 MatchOk node#108 [0..7]
+0026 StayExact Named(Some(NodeKindId(152)))
+0026 MatchFail node#108 [0..7]
+0026 Backtrack { to_record: 9 }
+0028 NextExact Any
+0028 MatchOk debugger_statement [8..17]
+0026 StayExact Named(Some(NodeKindId(152)))
+0026 MatchFail debugger_statement [8..17]
+0026 Backtrack { to_record: 17 }
+0028 NextExact Any
+0028 MatchOk expression_statement [18..22]
+0026 StayExact Named(Some(NodeKindId(152)))
+0026 MatchFail expression_statement [18..22]
+0026 Backtrack { to_record: 25 }
+0028 NextExact Any
+0028 Backtrack { to_record: 5 }
+0024 Epsilon Any
+0018 Epsilon Any
+0014 DownExact Named(Some(NodeKindId(168)))
+0014 MatchFail node#108 [0..7]
+0014 Backtrack { to_record: 39 }
+0008 DownExact Named(Some(NodeKindId(150)))
+0008 MatchFail node#108 [0..7]

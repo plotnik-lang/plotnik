@@ -18,23 +18,23 @@ Q = (program
   "parts": [
     {
       "kind": "[",
-      "span": [0, 1],
-      "text": "["
+      "text": "[",
+      "span": [0, 1]
     },
     {
       "kind": "identifier",
-      "span": [1, 2],
-      "text": "x"
+      "text": "x",
+      "span": [1, 2]
     },
     {
       "kind": "identifier",
-      "span": [7, 8],
-      "text": "y"
+      "text": "y",
+      "span": [7, 8]
     },
     {
       "kind": "]",
-      "span": [8, 9],
-      "text": "]"
+      "text": "]",
+      "span": [8, 9]
     }
   ]
 }
@@ -68,73 +68,74 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (array)                          03
-  03  -ε-  [ListOpen]                       16, 17, 18
-  05  !─┘  _                                06
-  06  ─‣┘² _                                07
-  07                                        ▶
-  08  -ε-  [ListClose RecordSet(M0)]        05
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13  ─‣─  "["                              10
-  14  ─‣─  (identifier)                     10
-  15  ─‣─  "]"                              10
-  16  └─!  "["                              10
-  17  └─!  (identifier)                     10
-  18  └─!  "]"                              10
+  02  └‣─  (array) [RecordSet(M0)]          04
+  04  -ε-  [ListOpen]                       17, 18, 19
+  06  !─┘  _                                07
+  07  ─‣┘² _                                08
+  08                                        ▶
+  09  -ε-  [ListClose]                      06
+  11  -ε-  [Node ArrayPush]                 14, 15, 16, 09
+  14  ─‣─  "["                              11
+  15  ─‣─  (identifier)                     11
+  16  ─‣─  "]"                              11
+  17  └─!  "["                              11
+  18  └─!  (identifier)                     11
+  19  └─!  "]"                              11
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03  -ε-  [ListOpen]                       16, 17, 18
-  16       "["                              10
-       ●   [
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
-       ○   identifier
-       ○   ,
-       ○   number
-       ○   ,
-       ○   identifier
-       ○   ]
-  10  ❮❮❮ 
-  14       (identifier)                     10
-       ●   identifier
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
-       ○   ,
-       ○   number
-       ○   ,
-       ○   identifier
-       ○   ]
-  10  ❮❮❮ 
-  14       (identifier)                     10
-       ○   ,
-       ○   number
-       ○   ,
-       ●   identifier
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
-       ○   ]
-  10  ❮❮❮ 
-  14       (identifier)                     10
-       ○   ]
-  10  ❮❮❮ 
-  15       "]"                              10
-       ●   ]
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
-  10  ❮❮❮ 
-  14       (identifier)                     10
-  10  ❮❮❮ 
-  15       "]"                              10
-  10  ❮❮❮ 
-  08  -ε-  [ListClose RecordSet(M0)]        05
-  05       _                                06
-       ●   array
-  06       _                                07
-       ●   program
-  07   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..10]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0004 Epsilon Any
+0017 DownExact Anonymous(Some(NodeKindId(41)))
+0017 MatchOk [ [0..1]
+0011 Epsilon Any
+0014 Next Anonymous(Some(NodeKindId(41)))
+0014 MatchFail identifier [1..2]
+0014 MatchFail node#8 [2..3]
+0014 MatchFail node#114 [4..5]
+0014 MatchFail node#8 [5..6]
+0014 MatchFail identifier [7..8]
+0014 MatchFail ] [8..9]
+0014 Backtrack { to_record: 26 }
+0015 Next Named(Some(NodeKindId(1)))
+0015 MatchOk identifier [1..2]
+0011 Epsilon Any
+0014 Next Anonymous(Some(NodeKindId(41)))
+0014 MatchFail node#8 [2..3]
+0014 MatchFail node#114 [4..5]
+0014 MatchFail node#8 [5..6]
+0014 MatchFail identifier [7..8]
+0014 MatchFail ] [8..9]
+0014 Backtrack { to_record: 50 }
+0015 Next Named(Some(NodeKindId(1)))
+0015 MatchFail node#8 [2..3]
+0015 MatchFail node#114 [4..5]
+0015 MatchFail node#8 [5..6]
+0015 MatchOk identifier [7..8]
+0011 Epsilon Any
+0014 Next Anonymous(Some(NodeKindId(41)))
+0014 MatchFail ] [8..9]
+0014 Backtrack { to_record: 78 }
+0015 Next Named(Some(NodeKindId(1)))
+0015 MatchFail ] [8..9]
+0015 Backtrack { to_record: 77 }
+0016 Next Anonymous(Some(NodeKindId(42)))
+0016 MatchOk ] [8..9]
+0011 Epsilon Any
+0014 Next Anonymous(Some(NodeKindId(41)))
+0014 Backtrack { to_record: 96 }
+0015 Next Named(Some(NodeKindId(1)))
+0015 Backtrack { to_record: 95 }
+0016 Next Anonymous(Some(NodeKindId(42)))
+0016 Backtrack { to_record: 94 }
+0009 Epsilon Any
+0006 UpExact(1) Any
+0006 MatchOk array [0..9]
+0007 Up(2) Any
+0007 MatchOk program [0..10]
+0008 Return PortId(0)
+0008 Return

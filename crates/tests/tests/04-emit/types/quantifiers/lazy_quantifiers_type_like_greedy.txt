@@ -5,8 +5,8 @@ Q = (array
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub many: ::std::vec::Vec<Node<'t>>,
+#[derive(Clone, Copy)]
+pub struct Q<'r, 't> {
+    pub many: &'r [Node<'t>],
     pub one: ::core::option::Option<Node<'t>>,
 }

@@ -13,8 +13,8 @@ warning: this capture already has type `Expr`. Naming it `Foo` has no effect
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Expr<'t> {
+#[derive(Clone, Copy)]
+pub enum Expr<'r, 't> {
     Lit { n: Node<'t> },
-    Rec { inner: ::std::boxed::Box<Expr<'t>> },
+    Rec { inner: &'r Expr<'r, 't> },
 }

@@ -10,8 +10,8 @@ let a; let b;
   "d": [
     {
       "kind": "lexical_declaration",
-      "span": [0, 6],
-      "text": "let a;"
+      "text": "let a;",
+      "span": [0, 6]
     }
   ]
 }
@@ -40,19 +40,20 @@ Q = 0 :: T2
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └─!  _ [ListOpen]                      4, 6
+  1  └─!  _ [RecordSet(M0) ListOpen]        4, 6
   3                                         ▶
   4   !   (lexical_declaration) [Node ArrayPush]  8, 6
   6  ──!  _                                 4, 6
-  8  ─‣┘  _ [ListClose RecordSet(M0)]       3
+  8  ─‣┘  _ [ListClose]                     3
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       _ [ListOpen]                      04, 06
-      ●   lexical_declaration
-  4       (lexical_declaration) [Node ArrayPush]  08, 06
-      ●   lexical_declaration
-  8       _ [ListClose RecordSet(M0)]       03
-      ●   program
-  3   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..13]
+0001 DownExact Any
+0001 MatchOk lexical_declaration [0..6]
+0004 StayExact Named(Some(NodeKindId(152)))
+0004 MatchOk lexical_declaration [0..6]
+0008 Up(1) Any
+0008 MatchOk program [0..13]
+0003 Return PortId(0)
+0003 Return

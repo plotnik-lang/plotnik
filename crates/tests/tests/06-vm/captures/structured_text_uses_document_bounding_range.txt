@@ -48,30 +48,30 @@ Q = 00 :: T1
 
 [instructions]
 Q:
-  00   !   (program)                        01
-  01  -ε-  [ScalarOpen]                     03
-  03  └‣─  (comment) [ScalarMark]           05
-  05  ─‣─  (expression_statement) [ScalarMark]  08
-  07  ...
+  00   !   (program) [RecordSet(M0)]        02
+  02  -ε-  [ScalarOpen]                     04
+  04  └‣─  (comment) [ScalarMark]           06
+  06  ─‣─  (expression_statement) [ScalarMark]  08
   08  └‣─  (identifier) [ScalarMark]        10
   10  ─‣┘  _                                11
-  11  -ε-  [TextClose RecordSet(M0)]        13
+  11  -ε-  [TextClose]                      13
   13  ─‣┘  _                                14
   14                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ScalarOpen]                     03
-  03       (comment) [ScalarMark]           05
-       ●   comment
-  05       (expression_statement) [ScalarMark]  08
-       ●   expression_statement
-  08       (identifier) [ScalarMark]        10
-       ●   identifier
-  10       _                                11
-       ●   expression_statement
-  11  -ε-  [TextClose RecordSet(M0)]        13
-  13       _                                14
-       ●   program
-  14   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..13]
+0002 Epsilon Any
+0004 Down Named(Some(NodeKindId(108)))
+0004 MatchOk comment [0..6]
+0006 Next Named(Some(NodeKindId(150)))
+0006 MatchOk expression_statement [7..13]
+0008 Down Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [7..12]
+0010 Up(1) Any
+0010 MatchOk expression_statement [7..13]
+0011 Epsilon Any
+0013 Up(1) Any
+0013 MatchOk program [0..13]
+0014 Return PortId(0)
+0014 Return

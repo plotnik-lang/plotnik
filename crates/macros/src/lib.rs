@@ -34,18 +34,13 @@ mod grammar_source;
 ///     `include_str!` — relative to the invoking file).
 /// - `file = "queries/q.ptk"` — read the query from a file (relative to the
 ///   invoking file) instead of an inline literal.
-/// - `fuel = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`,
-///   `depth = <n> | auto` — the limit policy compiled into the safe entry
-///   points (default `auto`). `fuel` bounds cumulative traversal and matcher work,
-///   `memory` samples live matcher state, `depth` bounds the committed
-///   value's nesting (typed decoding recurses once per nested value, so
-///   this is its native-stack guard).
+/// - `fuel = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`: the limit policy compiled into the safe entrypoints (default `auto`). Fuel covers traversal, matching, publication, and JSON output. Memory covers admitted runtime storage, including retained results.
 ///
 /// The expansion is item-position only (it defines types); invoke it at
 /// module scope, not inside a function body.
 /// Eligible entries expose `exec(node, source)`, `each(scope, source)`,
 /// `find(scope, source)`, and `find_all(scope, source)`. Match-only entries
-/// return the matched node. Data-producing entries return their generated type.
+/// return the matched node. Data-producing entries return an owning `Match` whose `view()` borrows the generated result. `find_all` returns `Matches`, which lends result roots through borrowing iteration.
 #[proc_macro]
 pub fn query(input: TokenStream) -> TokenStream {
     expand::expand(input)

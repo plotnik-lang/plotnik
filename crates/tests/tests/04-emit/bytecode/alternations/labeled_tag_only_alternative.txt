@@ -12,11 +12,11 @@ Q = 02
 Q:
   01                                        ▶
   02   !   (expression_statement)           10
-  03  ─‣┘  _ [RecordSet(kind)]              01
-  05   !   (identifier) [VariantOpen(A) Node RecordSet(id) VariantClose]  03
+  03  ─‣┘  _                                01
+  05   !   (identifier) [VariantOpen(A) RecordSet(id) Node VariantClose]  03
   06   !   (number) [VariantOpen(B) VariantClose]  03
   09  ──!  _                                05, 06, 09
-  10  └─!  _                                05, 06, 09
+  10  └─!  _ [RecordSet(kind)]              05, 06, 09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -53,10 +53,9 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (expression_statement)           01
-  01  └─!  _                                04, 08, 10
+  01  └─!  _ [RecordSet(M3)]                04, 08, 10
   03                                        ▶
-  04   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  12
-  07  ...
-  08   !   (number) [VariantOpen(M2) VariantClose]  12
+  04   !   (identifier) [VariantOpen(M1) RecordSet(M0) Node VariantClose]  07
+  07  ─‣┘  _                                03
+  08   !   (number) [VariantOpen(M2) VariantClose]  07
   10  ──!  _                                04, 08, 10
-  12  ─‣┘  _ [RecordSet(M3)]                03

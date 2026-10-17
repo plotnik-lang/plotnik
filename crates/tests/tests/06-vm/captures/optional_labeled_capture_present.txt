@@ -10,14 +10,14 @@ x
 --------------------- OUTPUT ---------------------
 {
   "e": {
+    "$tag": "A",
     "$data": {
       "a": {
         "kind": "identifier",
-        "span": [0, 1],
-        "text": "x"
+        "text": "x",
+        "span": [0, 1]
       }
-    },
-    "$tag": "A"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -54,26 +54,29 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └‣─  (expression_statement)           13, 09
-  03   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  06
-  06  ─‣┘  _ [RecordSet(M2)]                15
+  01  └‣─  (expression_statement)           02
+  02  -ε-  [RecordSet(M2)]                  13, 09
+  04   !   (identifier) [VariantOpen(M1) RecordSet(M0) Node VariantClose]  07
+  07  ─‣┘  _                                15
   08                                        ▶
-  09  -ε-  [Absent RecordSet(M2)]           15
-  11  ──!  _                                03, 11
-  13  └─!  _                                03, 11
+  09  -ε-  [Absent]                         15
+  11  ──!  _                                04, 11
+  13  └─!  _                                04, 11
   15  ─‣┘  _                                08
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           13, 09
-       ●   expression_statement
-  13       _                                03, 11
-       ●   identifier
-  03       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  06
-       ●   identifier
-  06       _ [RecordSet(M2)]                15
-       ●   expression_statement
-  15       _                                08
-       ●   program
-  08   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..1]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..1]
+0002 Epsilon Any
+0013 DownExact Any
+0013 MatchOk identifier [0..1]
+0004 StayExact Named(Some(NodeKindId(1)))
+0004 MatchOk identifier [0..1]
+0007 Up(1) Any
+0007 MatchOk expression_statement [0..1]
+0015 Up(1) Any
+0015 MatchOk program [0..1]
+0008 Return PortId(0)
+0008 Return

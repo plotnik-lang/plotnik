@@ -41,7 +41,12 @@ help: remove `:: text` to return the record value instead
       0,
       6
     ],
-    "bindings": [],
+    "bindings": [
+      {
+        "path": "/value",
+        "event_index": 3
+      }
+    ],
     "range": [
       2,
       13
@@ -51,14 +56,9 @@ help: remove `:: text` to return the record value instead
     "query_span_id": 2,
     "parent": 1,
     "source_span": null,
-    "bindings": [
-      {
-        "path": "/value",
-        "event_index": 10
-      }
-    ],
+    "bindings": [],
     "range": [
-      3,
+      4,
       12
     ]
   },
@@ -68,8 +68,8 @@ help: remove `:: text` to return the record value instead
     "source_span": null,
     "bindings": [],
     "range": [
-      5,
-      9
+      6,
+      10
     ]
   },
   {
@@ -78,8 +78,8 @@ help: remove `:: text` to return the record value instead
     "source_span": null,
     "bindings": [],
     "range": [
-      6,
-      8
+      7,
+      9
     ]
   }
 ]
@@ -117,30 +117,33 @@ P7 pattern    21..30  source_id=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  02
-  02  -ε-  [ScalarOpen SpanStart#4]         04
-  04  -ε-  [SpanStart#6]                    21, 14
-  06  -ε-  [TextClose RecordSet(M0) SpanEnd#2]  08
-  08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
-  10                                        ▶
-  11  -ε-  [TextClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
-  16   !   (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
-  19  ──!  _                                16, 19
-  21  └─!  _                                16, 19
+  00   !   (program) [SpanStart#0 SpanStartAt#1 RecordSet(M0) SpanStart#2]  03
+  03  -ε-  [ScalarOpen SpanStart#4]         05
+  05  -ε-  [SpanStart#6]                    24, 16
+  07  ...
+  08  -ε-  [TextClose SpanEnd#2]            10
+  10  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          12
+  12                                        ▶
+  13  -ε-  [TextClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
+  16  -ε-  [SpanEnd#6 SpanEnd#4]            13
+  18   !   (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  08
+  21  ──!  _                                18, 21
+  23  ...
+  24  └─!  _                                18, 21
 --------------------- TRACE ----------------------
-Q:
-  00       (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  02
-       ●   program
-  02  -ε-  [ScalarOpen SpanStart#4]         04
-  04  -ε-  [SpanStart#6]                    21, 14
-  21       _                                16, 19
-       ●   expression_statement
-  16       (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
-       ○   expression_statement
-  21  ❮❮❮ 
-  19       _                                16, 19
-  04  ❮❮❮ 
-  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
-  11  -ε-  [TextClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  10   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..6]
+0003 Epsilon Any
+0005 Epsilon Any
+0024 DownExact Any
+0024 MatchOk node#150 [0..6]
+0018 StayExact Named(Some(NodeKindId(108)))
+0018 MatchFail node#150 [0..6]
+0018 Backtrack { to_record: 18 }
+0021 NextExact Any
+0021 Backtrack { to_record: 14 }
+0016 Epsilon Any
+0013 Epsilon Any
+0012 Return PortId(0)
+0012 Return

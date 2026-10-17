@@ -8,12 +8,12 @@ Q = (program
 function f() {}
 --------------------- OUTPUT ---------------------
 {
+  "stmt": null,
   "name": {
     "kind": "identifier",
-    "span": [9, 10],
-    "text": "f"
-  },
-  "stmt": null
+    "text": "f",
+    "span": [9, 10]
+  }
 }
 ------------------- INSPECTION -------------------
 [
@@ -57,12 +57,7 @@ function f() {}
     "query_span_id": 2,
     "parent": 2,
     "source_span": null,
-    "bindings": [
-      {
-        "path": "/stmt",
-        "event_index": 6
-      }
-    ],
+    "bindings": [],
     "range": [
       4,
       8
@@ -117,7 +112,7 @@ function f() {}
     "bindings": [
       {
         "path": "/name",
-        "event_index": 14
+        "event_index": 13
       }
     ],
     "range": [
@@ -167,37 +162,38 @@ P8 pattern    79..91  source_id=0
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
   02  -ε-  [SpanStart#3]                    26, 18
-  04  └‣─  name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  08
+  04  └‣─  name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 RecordSet(M1) Node SpanEnd#6 SpanEnd#8 SpanEnd#7]  08
   08  ─‣┘  _ [SpanEnd#5]                    10
   10  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          12
   12                                        ▶
   13  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  04
   15  ...
   16  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  04
-  18  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2]  13
-  21   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  16
+  18  -ε-  [SpanStart#2 RecordSet(M0) Absent SpanEnd#2]  13
+  21   !   (expression_statement) [SpanStartAt#4 SpanStart#2 RecordSet(M0) Node SpanEnd#2 SpanEnd#4]  16
   24  ──!  _                                21, 24
   26  └─!  _                                21, 24
 --------------------- TRACE ----------------------
-Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
-       ●   program
-  02  -ε-  [SpanStart#3]                    26, 18
-  26       _                                21, 24
-       ●   function_declaration
-  21       (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  16
-       ○   function_declaration
-  26  ❮❮❮ 
-  24       _                                21, 24
-  02  ❮❮❮ 
-  18  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2]  13
-  13       (function_declaration) [SpanEnd#3 SpanStartAt#5]  04
-       ●   function_declaration
-  04       name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  08
-       ○   function
-       ●   identifier
-  08       _ [SpanEnd#5]                    10
-       ●   function_declaration
-  10       _ [SpanEnd#1 SpanEnd#0]          12
-       ●   program
-  12   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(166)))
+0000 MatchOk program [0..15]
+0002 Epsilon Any
+0026 DownExact Any
+0026 MatchOk function_declaration [0..15]
+0021 StayExact Named(Some(NodeKindId(182)))
+0021 MatchFail function_declaration [0..15]
+0021 Backtrack { to_record: 13 }
+0024 NextExact Any
+0024 Backtrack { to_record: 9 }
+0018 Epsilon Any
+0013 Down Named(Some(NodeKindId(224)))
+0013 MatchOk function_declaration [0..15]
+0004 Down Named(Some(NodeKindId(1)))
+0004 MatchFail node#50 [0..8]
+0004 MatchOk identifier [9..10]
+0008 Up(1) Any
+0008 MatchOk function_declaration [0..15]
+0010 Up(1) Any
+0010 MatchOk program [0..15]
+0012 Return PortId(0)
+0012 Return

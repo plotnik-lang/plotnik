@@ -10,8 +10,8 @@ Q = (program
 {
   "statement": {
     "kind": "expression_statement",
-    "span": [19, 21],
-    "text": "x;"
+    "text": "x;",
+    "span": [19, 21]
   }
 }
 -------------------- BYTECODE --------------------
@@ -42,19 +42,20 @@ Q:
   0   !   (program)                         1
   1  └─!  (comment)                         2
   2  ─‣─  (lexical_declaration)             3
-  3  ─‣─  (expression_statement) [Node RecordSet(M0)]  5
+  3  ─‣─  (expression_statement) [RecordSet(M0) Node]  5
   5  ─‣┘  _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (comment)                         02
-      ●   comment
-  2       (lexical_declaration)             03
-      ●   lexical_declaration
-  3       (expression_statement) [Node RecordSet(M0)]  05
-      ●   expression_statement
-  5       _                                 06
-      ●   program
-  6   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..21]
+0001 DownExact Named(Some(NodeKindId(108)))
+0001 MatchOk comment [0..7]
+0002 Next Named(Some(NodeKindId(152)))
+0002 MatchOk lexical_declaration [8..18]
+0003 Next Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [19..21]
+0005 Up(1) Any
+0005 MatchOk program [0..21]
+0006 Return PortId(0)
+0006 Return

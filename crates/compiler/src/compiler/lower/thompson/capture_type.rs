@@ -41,6 +41,17 @@ impl ValueDestination {
             Self::Effects(effects) => effects,
         }
     }
+
+    fn produce(self, value: EffectIR) -> Vec<EffectIR> {
+        let mut effects = self.into_effects();
+        let start = usize::from(
+            effects
+                .first()
+                .is_some_and(|effect| effect.kind() == EffectKind::RecordSet),
+        );
+        effects.insert(start, value);
+        effects
+    }
 }
 
 struct CaptureBinding {
@@ -129,7 +140,11 @@ impl<'a> NfaBuilder<'a> {
         compile(self)
     }
 
-    fn capture_type_binding(&mut self, captured_pattern: &ast::CapturedPattern) -> CaptureBinding {
+    fn capture_type_binding(
+        &mut self,
+        captured_pattern: &ast::CapturedPattern,
+        plan: &CaptureTypePlan,
+    ) -> CaptureBinding {
         let capture = captured_pattern.capture();
         let name = capture
             .name()
@@ -138,7 +153,27 @@ impl<'a> NfaBuilder<'a> {
             .lookup_member_in_scope(&name.text()[1..])
             .expect("captured result field resolves in its result scope");
         let mut entry = Vec::new();
-        let mut effects = vec![EffectIR::with_member(EffectKind::RecordSet, member)];
+        let mut effects = Vec::new();
+        let selection = EffectIR::with_member(EffectKind::RecordSet, member);
+        if matches!(
+            plan.kind(),
+            CaptureTypePlanKind::TextTerminal {
+                data: TerminalData::NodeRepresentation
+            } | CaptureTypePlanKind::BoolTerminal {
+                data: TerminalData::NodeRepresentation
+            }
+        ) && matches!(
+            captured_pattern.inner(),
+            Some(
+                Pattern::NamedNodePattern(_)
+                    | Pattern::AnonymousNodePattern(_)
+                    | Pattern::NodeWildcard(_)
+            )
+        ) {
+            effects.push(selection);
+        } else {
+            entry.push(selection);
+        }
         if let Some(id) = self.span_id(capture.syntax(), SpanKind::Capture) {
             self.bind_span(id, SpanBindingIR::Member(member));
             entry.push(EffectIR::span_start(id.0));
@@ -203,7 +238,7 @@ impl<'a> NfaBuilder<'a> {
         let inner = captured_pattern
             .inner()
             .expect("a capture-type transformation has an ordinary captured value");
-        let binding = self.capture_type_binding(captured_pattern);
+        let binding = self.capture_type_binding(captured_pattern, plan);
         let entry = self.compile_boundary_capture_type_plan(
             &inner,
             plan,
@@ -449,7 +484,9 @@ impl CaptureTypeLowerer<'_, '_> {
             .inner()
             .expect("a capture-type transformation has an ordinary captured value");
         let CaptureEffects { mut pre, post } = outer;
-        let binding = self.compiler.capture_type_binding(captured_pattern);
+        let binding = self
+            .compiler
+            .capture_type_binding(captured_pattern, &self.plan);
         pre.extend(binding.entry);
         let destination = binding.destination.followed_by(&post);
         let entry = self.lower(&inner, destination);
@@ -580,8 +617,7 @@ impl CaptureTypeLowerer<'_, '_> {
     }
 
     fn bool_value(&mut self, exit: Label, destination: ValueDestination, value: bool) -> Label {
-        let mut effects = vec![EffectIR::bool_value(value)];
-        effects.extend(destination.into_effects());
+        let effects = destination.produce(EffectIR::bool_value(value));
         self.compiler.emit_effects_epsilon(exit, effects)
     }
 
@@ -591,8 +627,7 @@ impl CaptureTypeLowerer<'_, '_> {
         destination: ValueDestination,
         terminal: CaptureTerminal,
     ) -> Label {
-        let mut effects = vec![terminal.node_value()];
-        effects.extend(destination.into_effects());
+        let effects = destination.produce(terminal.node_value());
         let pattern_ctx = PatternCtx {
             exit: self.exits.match_exit(),
             nav: self.nav,

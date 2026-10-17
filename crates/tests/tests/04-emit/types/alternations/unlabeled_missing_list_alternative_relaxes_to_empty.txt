@@ -9,8 +9,8 @@ Q = (program
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub stmts: ::std::vec::Vec<Node<'t>>,
+#[derive(Clone, Copy)]
+pub struct Q<'r, 't> {
+    pub stmts: &'r [Node<'t>],
     pub d: ::core::option::Option<Node<'t>>,
 }

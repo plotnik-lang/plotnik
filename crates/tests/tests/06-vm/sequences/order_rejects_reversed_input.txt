@@ -35,16 +35,16 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (lexical_declaration) [Node RecordSet(M0)]  3
-  3  ─‣─  (expression_statement) [Node RecordSet(M1)]  5
+  1  └‣─  (lexical_declaration) [RecordSet(M0) Node]  3
+  3  ─‣─  (expression_statement) [RecordSet(M1) Node]  5
   5  ─‣┘  _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (lexical_declaration) [Node RecordSet(M0)]  03
-      ○   expression_statement
-      ●   lexical_declaration
-  3       (expression_statement) [Node RecordSet(M1)]  05
-  1  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..11]
+0001 Down Named(Some(NodeKindId(152)))
+0001 MatchFail expression_statement [0..4]
+0001 MatchOk lexical_declaration [5..11]
+0003 Next Named(Some(NodeKindId(150)))
+0003 Backtrack { to_record: 10 }

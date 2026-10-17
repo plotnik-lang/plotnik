@@ -4,8 +4,8 @@ Q = (program) @p
 {
   "p": {
     "kind": "program",
-    "span": [0, 0],
-    "text": ""
+    "text": "",
+    "span": [0, 0]
   }
 }
 -------------------- BYTECODE --------------------
@@ -30,10 +30,11 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (program) [Node RecordSet(M0)]    2
+  0   !   (program) [RecordSet(M0) Node]    2
   2                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program) [Node RecordSet(M0)]    02
-      ●   program
-  2   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..0]
+0002 Return PortId(0)
+0002 Return

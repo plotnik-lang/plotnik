@@ -4,9 +4,9 @@ Q = (program
   (expression_statement)? @has_statement :: bool
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'s> {
+#[derive(Clone, Copy)]
+pub struct Q<'r, 's> {
     pub doc: ::core::option::Option<&'s str>,
-    pub comments: ::std::vec::Vec<&'s str>,
+    pub comments: &'r [&'s str],
     pub has_statement: bool,
 }

@@ -27,26 +27,26 @@ Value = 00
 Value:
   00  -ε-                                   02, 03
   01                                        ▶
-  02   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  01
-  03   !   (number) [VariantOpen(Num) Node RecordSet(num) VariantClose]  01
+  02   !   (identifier) [VariantOpen(Id) RecordSet(id) Node VariantClose]  01
+  03   !   (number) [VariantOpen(Num) RecordSet(num) Node VariantClose]  01
 
 Q:
   06                                        ▶
-  07   !   (program)                        37, 09
+  07   !   (program)                        35, 09
   08  ─‣┘  _                                06
-  09  └‣─  (lexical_declaration) [Node RecordSet(decl)]  11
-  11  └‣─  (variable_declarator)            20
+  09  └‣─  (lexical_declaration) [RecordSet(decl) Node]  11
+  11  └‣─  (variable_declarator)            19
   12  ─‣┘² _                                08
   13  -ε-  [SuppressEnd]                    12
   14   !   (Value)                          00 : 13
-  16  -ε-  [Absent RecordSet(str) SuppressBegin]  14
-  17   !   (string) [Node RecordSet(str)]   12
-  19  ─‣─  value: _                         16, 17
-  20  └‣─  name: (identifier) [Node RecordSet(name)]  19
-  21  ─‣─  (lexical_declaration) [Node RecordSet(decl)]  11
-  34   !   (expression_statement)           36, 21
-  36  ──!  _                                34, 36
-  37  └─!  _                                34, 36
+  15  -ε-  [SuppressBegin]                  14
+  16   !   (string) [RecordSet(str) Node]   12
+  18  ─‣─  value: _                         15, 16
+  19  └‣─  name: (identifier) [RecordSet(name) Node]  18
+  20  ─‣─  (lexical_declaration) [RecordSet(decl) Node]  11
+  32   !   (expression_statement)           34, 20
+  34  ──!  _                                32, 34
+  35  └─!  _                                32, 34
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -137,20 +137,20 @@ Q:
   08  ─‣┘  _ [SpanEnd#15 SpanEnd#14]        10
   10  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  07
   12                                        ▶
-  13  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
-  16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
+  13  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 RecordSet(M4) Node SpanEnd#13]  52
+  16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 RecordSet(M0) Node SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
   22  └─!  _                                59, 54
-  24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  12
+  24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 RecordSet(M1) Node SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  12
   30  ...
   31  ...
   32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21 SpanEnd#20]  06
   35   !   (Value)                          00 : 32
-  36  -ε-  [SpanStart#20 SpanStart#21 SpanStart#22 Absent RecordSet(M6) SpanStart#23 SuppressBegin]  35
+  36  -ε-  [SpanStart#20 SpanStart#21 SpanStart#22 SpanStart#23 SuppressBegin]  35
   39  ...
-  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node RecordSet(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  06
+  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 RecordSet(M6) Node SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  06
   46  ─‣─  value: _                         36, 40
-  48  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 Node RecordSet(M5) SpanEnd#16 SpanEnd#19 SpanEnd#18]  46
+  48  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 RecordSet(M5) Node SpanEnd#16 SpanEnd#19 SpanEnd#18]  46
   52  └‣─  (variable_declarator) [SpanStartAt#15]  48
   54  ──!  _                                59, 54
-  56  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
+  56  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 RecordSet(M4) Node SpanEnd#13]  52
   59   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  54, 56

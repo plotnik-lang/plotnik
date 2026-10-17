@@ -11,14 +11,14 @@ foo
 --------------------- OUTPUT ---------------------
 {
   "e": {
+    "$tag": "A",
     "$data": {
       "a": {
         "kind": "identifier",
-        "span": [0, 3],
-        "text": "foo"
+        "text": "foo",
+        "span": [0, 3]
       }
-    },
-    "$tag": "A"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -61,22 +61,23 @@ Q = 00 :: T4
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └─!  _                                05, 08, 11
+  02  └─!  _ [RecordSet(M4)]                05, 08, 11
   04                                        ▶
-  05   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  13
-  08   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  13
+  05   !   (identifier) [VariantOpen(M2) RecordSet(M0) Node VariantClose]  13
+  08   !   (number) [VariantOpen(M3) RecordSet(M1) Node VariantClose]  13
   11  ──!  _                                05, 08, 11
-  13  ─‣┘² _ [RecordSet(M4)]                04
+  13  ─‣┘² _                                04
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       _                                05, 08, 11
-       ●   identifier
-  05       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  13
-       ●   identifier
-  13       _ [RecordSet(M4)]                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..3]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..3]
+0002 DownExact Any
+0002 MatchOk identifier [0..3]
+0005 StayExact Named(Some(NodeKindId(1)))
+0005 MatchOk identifier [0..3]
+0013 Up(2) Any
+0013 MatchOk program [0..3]
+0004 Return PortId(0)
+0004 Return

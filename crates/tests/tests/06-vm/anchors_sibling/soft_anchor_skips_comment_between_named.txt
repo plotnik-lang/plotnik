@@ -13,13 +13,13 @@ a + /* c */ b
 {
   "left": {
     "kind": "identifier",
-    "span": [0, 1],
-    "text": "a"
+    "text": "a",
+    "span": [0, 1]
   },
   "right": {
     "kind": "identifier",
-    "span": [12, 13],
-    "text": "b"
+    "text": "b",
+    "span": [12, 13]
   }
 }
 -------------------- BYTECODE --------------------
@@ -53,27 +53,28 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (binary_expression)              03
   03  └─!  _                                09, 11
-  05  ─•─  (identifier) [Node RecordSet(M1)]  07
+  05  ─•─  (identifier) [RecordSet(M1) Node]  07
   07  ─‣┘³ _                                08
   08                                        ▶
-  09   !   (identifier) [Node RecordSet(M0)]  05
+  09   !   (identifier) [RecordSet(M0) Node]  05
   11  ──!  _                                09, 11
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (binary_expression)              03
-       ●   binary_expression
-  03       _                                09, 11
-       ●   identifier
-  09       (identifier) [Node RecordSet(M0)]  05
-       ●   identifier
-  05       (identifier) [Node RecordSet(M1)]  07
-       ○   +
-       ○   comment
-       ●   identifier
-  07       _                                08
-       ●   program
-  08   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..13]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..13]
+0002 Down Named(Some(NodeKindId(217)))
+0002 MatchOk binary_expression [0..13]
+0003 DownExact Any
+0003 MatchOk identifier [0..1]
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchOk identifier [0..1]
+0005 NextSkip Named(Some(NodeKindId(1)))
+0005 MatchFail node#85 [2..3]
+0005 MatchFail node#108 [4..11]
+0005 MatchOk identifier [12..13]
+0007 Up(3) Any
+0007 MatchOk program [0..13]
+0008 Return PortId(0)
+0008 Return

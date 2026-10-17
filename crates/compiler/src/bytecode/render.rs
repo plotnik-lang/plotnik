@@ -10,10 +10,8 @@ use super::node_kind_constraint::NodeKindConstraint;
 pub(crate) struct ModuleRenderContext {
     node_kind_names: BTreeMap<NodeKindId, String>,
     node_field_names: BTreeMap<NodeFieldId, String>,
-    member_names: Vec<String>,
     all_strings: Vec<String>,
     regex_patterns: Vec<String>,
-    entrypoint_by_ip: BTreeMap<u16, String>,
 }
 
 impl ModuleRenderContext {
@@ -21,10 +19,8 @@ impl ModuleRenderContext {
         let header = module.header();
         let strings = module.strings();
         let regexes = module.regexes();
-        let types = module.types();
         let node_kinds = module.node_kinds();
         let node_fields = module.node_fields();
-        let entrypoints = module.entrypoints();
 
         let mut node_kind_names = BTreeMap::new();
         for t in node_kinds.iter() {
@@ -36,11 +32,6 @@ impl ModuleRenderContext {
             node_field_names.insert(f.symbol(), strings.get(f.name()).to_string());
         }
 
-        let member_names: Vec<String> = types
-            .members()
-            .map(|member| strings.get(member.name_id).to_string())
-            .collect();
-
         let all_strings: Vec<String> = (0..header.str_table_count as usize)
             .map(|i| strings.at(i).to_string())
             .collect();
@@ -51,22 +42,11 @@ impl ModuleRenderContext {
             regex_patterns.push(strings.get(string_id).to_string());
         }
 
-        let mut entrypoint_by_ip = BTreeMap::new();
-        for e in entrypoints.iter() {
-            let name = match e.identity() {
-                super::EntrypointIdentity::Named(name) => strings.get(name),
-                super::EntrypointIdentity::Expression => "<expression>",
-            };
-            entrypoint_by_ip.insert(u16::from(e.target()), name.to_string());
-        }
-
         Self {
             node_kind_names,
             node_field_names,
-            member_names,
             all_strings,
             regex_patterns,
-            entrypoint_by_ip,
         }
     }
 
@@ -78,10 +58,6 @@ impl ModuleRenderContext {
         self.node_field_names.get(&id).map(|s| s.as_str())
     }
 
-    pub(crate) fn member_name(&self, idx: u16) -> Option<&str> {
-        self.member_names.get(idx as usize).map(|s| s.as_str())
-    }
-
     pub(crate) fn string(&self, idx: usize) -> &str {
         &self.all_strings[idx]
     }
@@ -90,38 +66,22 @@ impl ModuleRenderContext {
         &self.regex_patterns[idx]
     }
 
-    pub(crate) fn entrypoint_name(&self, ip: u16) -> Option<&str> {
-        self.entrypoint_by_ip.get(&ip).map(|s| s.as_str())
-    }
-
     pub(crate) fn dump_node_field_name(&self, id: NodeFieldId) -> String {
         self.node_field_name(id)
             .map(String::from)
-            .unwrap_or_else(|| MissingSymbolPolicy::Dump.format("field", id))
+            .unwrap_or_else(|| format!("field#{id}"))
     }
 
     pub(crate) fn dump_match_content(&self, m: &Match<'_>) -> String {
-        MatchRenderer::new(self, MissingSymbolPolicy::Dump).format_match_content(m)
-    }
-
-    pub(crate) fn trace_match_content(&self, m: &Match<'_>) -> String {
-        MatchRenderer::new(self, MissingSymbolPolicy::Trace).format_match_content(m)
+        MatchRenderer { context: self }.format_match_content(m)
     }
 }
 
 struct MatchRenderer<'a> {
     context: &'a ModuleRenderContext,
-    missing_symbols: MissingSymbolPolicy,
 }
 
 impl<'a> MatchRenderer<'a> {
-    fn new(context: &'a ModuleRenderContext, missing_symbols: MissingSymbolPolicy) -> Self {
-        Self {
-            context,
-            missing_symbols,
-        }
-    }
-
     fn format_match_content(&self, m: &Match<'_>) -> String {
         let mut parts = Vec::new();
 
@@ -220,29 +180,14 @@ impl<'a> MatchRenderer<'a> {
         }
         match self.context.node_kind_name(id) {
             Some(name) => name.to_string(),
-            None => self.missing_symbols.format(dump_prefix, id),
+            None => format!("{dump_prefix}#{id}"),
         }
     }
 
     fn format_node_field_name(&self, id: NodeFieldId) -> String {
         match self.context.node_field_name(id) {
             Some(name) => name.to_string(),
-            None => self.missing_symbols.format("field", id),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-enum MissingSymbolPolicy {
-    Dump,
-    Trace,
-}
-
-impl MissingSymbolPolicy {
-    fn format(self, prefix: &str, id: impl std::fmt::Display) -> String {
-        match self {
-            Self::Dump => format!("{prefix}#{id}"),
-            Self::Trace => "?".to_string(),
+            None => format!("field#{id}"),
         }
     }
 }

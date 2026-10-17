@@ -8,12 +8,12 @@ Q     = 5
 [transitions]
 Inner:
   1                                         ▶
-  2   !   (identifier) [Node RecordSet(name)]  1
+  2   !   (identifier) [RecordSet(name) Node]  1
 
 Q:
   4                                         ▶
-  5   !   (expression_statement) [RecordOpen]  9
-  6  ─‣┘  _ [RecordSet(item)]               4
+  5   !   (expression_statement) [RecordSet(item) RecordOpen]  9
+  6  ─‣┘  _                                 4
   8  -ε-  [RecordClose]                     6
   9  └‣─  (Inner)                           2 : 8
 -------------------- BYTECODE --------------------
@@ -40,17 +40,17 @@ N0: S3 → T1  ; Inner
 N1: S4 → T2  ; Q
 
 [entrypoints]
-Inner = 00 :: T1
-Q     = 03 :: T2
+Inner = 0 :: T1
+Q     = 3 :: T2
 
 [instructions]
 Inner:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  0   !   (identifier) [RecordSet(M0) Node]  2
+  2                                         ▶
 
 Q:
-  03   !   (expression_statement) [RecordOpen]  05
-  05  └‣─  (Inner)                          00 : 06
-  06  -ε-  [RecordClose]                    08
-  08  ─‣┘  _ [RecordSet(M1)]                10
-  10                                        ▶
+  3   !   (expression_statement) [RecordSet(M1) RecordOpen]  5
+  5  └‣─  (Inner)                           0 : 6
+  6  -ε-  [RecordClose]                     8
+  8  ─‣┘  _                                 9
+  9                                         ▶

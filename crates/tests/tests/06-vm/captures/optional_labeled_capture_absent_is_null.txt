@@ -41,23 +41,26 @@ Q = 00 :: T4
 
 [instructions]
 Q:
-  00   !   (program)                        12, 08
-  02   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  05
-  05  ─‣┘  _ [RecordSet(M2)]                07
+  00   !   (program)                        01
+  01  -ε-  [RecordSet(M2)]                  12, 08
+  03   !   (identifier) [VariantOpen(M1) RecordSet(M0) Node VariantClose]  06
+  06  ─‣┘  _                                07
   07                                        ▶
-  08  -ε-  [Absent RecordSet(M2)]           07
-  10  ──!  _                                02, 10
-  12  └─!  _                                02, 10
+  08  -ε-  [Absent]                         07
+  10  ──!  _                                03, 10
+  12  └─!  _                                03, 10
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        12, 08
-       ●   program
-  12       _                                02, 10
-       ●   lexical_declaration
-  02       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  05
-       ○   lexical_declaration
-  12  ❮❮❮ 
-  10       _                                02, 10
-  00  ❮❮❮ 
-  08  -ε-  [Absent RecordSet(M2)]           07
-  07   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 Epsilon Any
+0012 DownExact Any
+0012 MatchOk node#152 [0..5]
+0003 StayExact Named(Some(NodeKindId(1)))
+0003 MatchFail node#152 [0..5]
+0003 Backtrack { to_record: 11 }
+0010 NextExact Any
+0010 Backtrack { to_record: 7 }
+0008 Epsilon Any
+0007 Return PortId(0)
+0007 Return

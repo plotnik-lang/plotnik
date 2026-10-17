@@ -34,66 +34,60 @@ N1: S4 → T0  ; Q
 
 [entrypoints]
 A = 00 :: T2
-Q = 02 :: T0
+Q = 03 :: T0
 
 [instructions]
 A:
-  00   !   (_)                              24, 16
+  00   !   (_)                              01
+  01  -ε-  [RecordSet(M1)]                  21, 14
 
 Q:
-  02   !   (_) [RecordOpen]                 04
-  04  └‣─  (A)                              00 : 05
-  05  -ε-  [RecordClose]                    08
-  07  ...
-  08  ─‣┘  _ [RecordSet(M0)]                10
-  10                                        ▶
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘  _ [RecordSet(M1)]                15
-  15                                        ▶
-  16  -ε-  [Absent RecordSet(M1)]           15
-  18   !   (Q)                              02 : 11
-  19  -ε-  [RecordOpen]                     18
-  21  ──!  _                                19, 21
-  23  ...
-  24  └─!  _                                19, 21
+  03   !   (_) [RecordSet(M0) RecordOpen]   05
+  05  └‣─  (A)                              00 : 06
+  06  -ε-  [RecordClose]                    08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10  -ε-  [RecordClose]                    12
+  12  ─‣┘  _                                13
+  13                                        ▶
+  14  -ε-  [Absent]                         13
+  16   !   (Q)                              03 : 10
+  17  -ε-  [RecordOpen]                     16
+  19  ──!  _                                17, 19
+  21  └─!  _                                17, 19
 --------------------- TRACE ----------------------
-Q:
-  02       (_) [RecordOpen]                 04
-       ●   program
-  04       (A)                              00 : 05
-       ▶   (A)
-
-A:
-  00       (_)                              24, 16
-       ●   expression_statement
-  24       _                                19, 21
-       ●   number
-  19  -ε-  [RecordOpen]                     18
-  18       (Q)                              02 : 11
-       ▶   (Q)
-
-Q:
-  02       (_) [RecordOpen]                 04
-       ●   number
-  04       (A)                              00 : 05
-  24  ❮❮❮ 
-  21       _                                19, 21
-       ●   ;
-  19  -ε-  [RecordOpen]                     18
-  18       (Q)                              02 : 11
-       ▶   (Q)
-
-Q:
-  02       (_) [RecordOpen]                 04
-       ○   ;
-  21  ❮❮❮ 
-  21       _                                19, 21
-  00  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M1)]           15
-  15   ◀   (A)                              
-
-Q:
-  05  -ε-  [RecordClose]                    08
-  08       _ [RecordSet(M0)]                10
-       ●   program
-  10   ◀   (Q)                              ◼
+0003 ExecutionStarted { target: 3 }
+0003 StayExact Named(None)
+0003 MatchOk node#134 [0..2]
+0005 Call CodeAddr(0)
+0005 Call { target: 0 }
+0000 StayExact Named(None)
+0000 MatchOk node#150 [0..2]
+0001 Epsilon Any
+0021 DownExact Any
+0021 MatchOk node#114 [0..1]
+0017 Epsilon Any
+0016 Call CodeAddr(3)
+0016 Call { target: 3 }
+0003 StayExact Named(None)
+0003 MatchOk node#114 [0..1]
+0005 Call CodeAddr(0)
+0005 Backtrack { to_record: 20 }
+0019 NextExact Any
+0019 MatchOk node#24 [1..2]
+0017 Epsilon Any
+0016 Call CodeAddr(3)
+0016 Call { target: 3 }
+0003 StayExact Named(None)
+0003 MatchFail node#24 [1..2]
+0003 Backtrack { to_record: 36 }
+0019 NextExact Any
+0019 Backtrack { to_record: 16 }
+0014 Epsilon Any
+0013 Return PortId(0)
+0013 Return
+0006 Epsilon Any
+0008 Up(1) Any
+0008 MatchOk node#134 [0..2]
+0009 Return PortId(0)
+0009 Return

@@ -15,13 +15,13 @@ Q = (program
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Row<'t> {
     pub key: Node<'t>,
     pub val: Node<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub rows: ::std::vec::Vec<Row<'t>>,
+#[derive(Clone, Copy)]
+pub struct Q<'r, 't> {
+    pub rows: &'r [Row<'t>],
 }

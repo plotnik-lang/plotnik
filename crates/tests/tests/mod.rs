@@ -28,7 +28,7 @@
 //! | `02-parser`  | cst, ast                                                                     |
 //! | `03-analyze` | definitions                                                                  |
 //! | `04-emit/bytecode` | nfa, bytecode                                                         |
-//! | `04-emit/types` | rust types (serde impls under a `serde/` folder)                        |
+//! | `04-emit/types` | rust types                                                              |
 //! | `04-emit/rust/module` | generated Rust matcher module                                      |
 //! | `06-vm`      | output, inspection if enabled, bytecode, trace (requires input)             |
 //!
@@ -76,12 +76,12 @@ use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
 use plotnik_compiler::{
     BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, InputKind, PrintTracer,
     QueryBuilder, RuntimeError, RustCodegenConfig, SourceCollection, SourceMap, SourcePath,
-    TraceRecorder, VM, Verbosity, extract_result_provenance, materialize_verified,
+    TraceRecorder, VM, Verbosity, extract_result_provenance,
 };
 use plotnik_tests::snapshot::{Fixture, Language, Section};
 use support::snapshots::{
-    GeneratedOutput, GeneratedSection, InspectionPolicy, SectionKind, SerdePolicy, Snapshot,
-    SnapshotKind, SnapshotMode, TriviaPolicy, VmMode, snapshot,
+    GeneratedOutput, GeneratedSection, InspectionPolicy, SectionKind, Snapshot, SnapshotKind,
+    SnapshotMode, TriviaPolicy, VmMode, snapshot,
 };
 
 mod support;
@@ -326,9 +326,9 @@ fn render_compiled(
                 dump_bytecode(module, Colors::new(false)),
             ));
         }
-        SnapshotKind::Types { serde, .. } => {
+        SnapshotKind::Types { .. } => {
             out.extend(diag);
-            let rust_config = RustCodegenConfig::new().serde(matches!(serde, SerdePolicy::Include));
+            let rust_config = RustCodegenConfig::new();
             let rust = compiled
                 .emit_types(rust_config)
                 .expect("Rust type emission answers")
@@ -471,6 +471,14 @@ enum VmArtifacts {
     },
 }
 
+fn render_document(document: &plotnik_compiler::Document<'_, '_, '_>) -> String {
+    let mut output = String::new();
+    document
+        .write_json(plotnik_runtime::json::Style::PRETTY, &mut output)
+        .expect("result renders");
+    output
+}
+
 fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let tree = scenario.lang.parse(scenario.source)?;
     let entrypoint = scenario.entry;
@@ -486,17 +494,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         execution_trace_json.push('\n');
 
         let output = match result {
-            Ok(journal) => {
-                let value = materialize_verified(
-                    scenario.source,
-                    scenario.module,
-                    entrypoint,
-                    journal.output_events(),
-                    Colors::new(false),
-                );
-                plotnik_runtime::debug::to_json(&value)
-                    .expect("materialized result must serialize to debug JSON")
-            }
+            Ok(document) => render_document(&document),
             Err(RuntimeError::NoMatch) => "<no match>".to_string(),
             Err(err) => {
                 return Err(format!("VM run failed: {err}"));
@@ -518,28 +516,21 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         .build();
 
     let result = vm.execute_with(scenario.module, entrypoint, &mut tracer);
-    let trace = tracer.render();
+    let trace = tracer
+        .render()
+        .map_err(|error| format!("trace rendering failed: {error}"))?
+        .to_string();
     let (output, inspection) = match result {
         Ok(journal) => {
             let inspection = (inspection == InspectionPolicy::Include).then(|| {
-                let result_provenance = extract_result_provenance(&journal, scenario.module);
+                let result_provenance = extract_result_provenance(&journal, scenario.module)
+                    .expect("provenance fits test limits");
                 let mut rendered = serde_json::to_string_pretty(&result_provenance)
                     .expect("result provenance serialization cannot fail");
                 rendered.push('\n');
                 rendered
             });
-            let value = materialize_verified(
-                scenario.source,
-                scenario.module,
-                entrypoint,
-                journal.output_events(),
-                Colors::new(false),
-            );
-            (
-                plotnik_runtime::debug::to_json(&value)
-                    .expect("materialized result must serialize to debug JSON"),
-                inspection,
-            )
+            (render_document(&journal), inspection)
         }
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
         Err(err) => return Err(format!("VM run failed: {err}")),
@@ -704,8 +695,8 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
         ),
         (
             "06-vm/definitions/captureless_program_root_is_match_only.txt",
-            Some(json!({"kind": "program", "text": "x;", "span": [0, 2]})),
-            vec![json!({"kind": "program", "text": "x;", "span": [0, 2]})],
+            Some(json!(null)),
+            vec![json!(null)],
         ),
         (
             "06-vm/anchors_trailing/up_anchor_rejects_trailing_named_node.txt",
@@ -746,7 +737,9 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
                 vm.apply(&module, &entry)
             }
             .unwrap()
-            .map(|value| serde_json::to_value(value).unwrap());
+            .map(|value| {
+                serde_json::from_str::<serde_json::Value>(&render_document(&value)).unwrap()
+            });
 
             if traced {
                 assert!(tracer.finish().records.iter().any(|record| matches!(
@@ -765,7 +758,9 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
             }
             .unwrap()
             .into_iter()
-            .map(|value| serde_json::to_value(value).unwrap())
+            .map(|value| {
+                serde_json::from_str::<serde_json::Value>(&render_document(&value)).unwrap()
+            })
             .collect::<Vec<_>>();
 
             assert_eq!(
@@ -850,14 +845,7 @@ fn one_module_runs_named_and_expression_entrypoints() {
             .build()
             .execute(&module, &entry)
             .unwrap();
-        let value = materialize_verified(
-            source,
-            &module,
-            &entry,
-            journal.output_events(),
-            Colors::new(false),
-        );
-        let json = plotnik_runtime::debug::to_json(&value).unwrap();
+        let json = render_document(&journal);
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&json).unwrap(),
             expected

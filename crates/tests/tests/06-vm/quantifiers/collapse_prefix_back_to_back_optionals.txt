@@ -39,17 +39,18 @@ Q:
   18  └─!  _                                14, 16
   20  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        18, 12, 06, 02
-       ●   program
-  18       _                                14, 16
-       ●   comment
-  14       (comment)                        10, 04, 20
-       ●   comment
-  10       _                                08, 10
-  14  ❮❮❮ 
-  04       _                                03, 04
-  14  ❮❮❮ 
-  20       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0018 DownExact Any
+0018 MatchOk comment [0..4]
+0014 StayExact Named(Some(NodeKindId(108)))
+0014 MatchOk comment [0..4]
+0010 NextExact Any
+0010 Backtrack { to_record: 15 }
+0004 NextExact Any
+0004 Backtrack { to_record: 14 }
+0020 Up(1) Any
+0020 MatchOk program [0..4]
+0002 Return PortId(0)
+0002 Return

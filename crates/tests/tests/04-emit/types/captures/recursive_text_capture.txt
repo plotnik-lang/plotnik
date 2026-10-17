@@ -9,10 +9,10 @@ B = [
 
 Q = (A)
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct A<'s> {
-    pub comments: ::std::vec::Vec<&'s str>,
+#[derive(Clone, Copy)]
+pub struct A<'r, 's> {
+    pub comments: &'r [&'s str],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q;

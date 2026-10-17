@@ -12,13 +12,13 @@ Q = (program
   "commas": [
     {
       "kind": ",",
-      "span": [2, 3],
-      "text": ","
+      "text": ",",
+      "span": [2, 3]
     },
     {
       "kind": ",",
-      "span": [5, 6],
-      "text": ","
+      "text": ",",
+      "span": [5, 6]
     }
   ]
 }
@@ -51,60 +51,61 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  -ε-  [ListOpen]                       12, 06
+  03  -ε-  [RecordSet(M0) ListOpen]         12, 06
   05                                        ▶
-  06  -ε-  [ListClose RecordSet(M0)]        16
+  06  -ε-  [ListClose]                      16
   08   !   "," [Node ArrayPush]             10, 14
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
-  14  ─‣┘  _ [ListClose RecordSet(M0)]      16
+  14  ─‣┘  _ [ListClose]                    16
   16  ─‣┘² _                                05
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03  -ε-  [ListOpen]                       12, 06
-  12       _                                08, 10
-       ●   [
-  08       "," [Node ArrayPush]             10, 14
-       ○   [
-  12  ❮❮❮ 
-  10       _                                08, 10
-       ●   number
-  08       "," [Node ArrayPush]             10, 14
-       ○   number
-  10  ❮❮❮ 
-  10       _                                08, 10
-       ●   ,
-  08       "," [Node ArrayPush]             10, 14
-       ●   ,
-  10       _                                08, 10
-       ●   number
-  08       "," [Node ArrayPush]             10, 14
-       ○   number
-  10  ❮❮❮ 
-  10       _                                08, 10
-       ●   ,
-  08       "," [Node ArrayPush]             10, 14
-       ●   ,
-  10       _                                08, 10
-       ●   number
-  08       "," [Node ArrayPush]             10, 14
-       ○   number
-  10  ❮❮❮ 
-  10       _                                08, 10
-       ●   ]
-  08       "," [Node ArrayPush]             10, 14
-       ○   ]
-  10  ❮❮❮ 
-  10       _                                08, 10
-  08  ❮❮❮ 
-  14       _ [ListClose RecordSet(M0)]      16
-       ●   array
-  16       _                                05
-       ●   program
-  05   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..10]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0003 Epsilon Any
+0012 DownExact Any
+0012 MatchOk node#41 [0..1]
+0008 StayExact Anonymous(Some(NodeKindId(8)))
+0008 MatchFail node#41 [0..1]
+0008 Backtrack { to_record: 20 }
+0010 NextExact Any
+0010 MatchOk node#114 [1..2]
+0008 StayExact Anonymous(Some(NodeKindId(8)))
+0008 MatchFail node#114 [1..2]
+0008 Backtrack { to_record: 28 }
+0010 NextExact Any
+0010 MatchOk , [2..3]
+0008 StayExact Anonymous(Some(NodeKindId(8)))
+0008 MatchOk , [2..3]
+0010 NextExact Any
+0010 MatchOk node#114 [4..5]
+0008 StayExact Anonymous(Some(NodeKindId(8)))
+0008 MatchFail node#114 [4..5]
+0008 Backtrack { to_record: 46 }
+0010 NextExact Any
+0010 MatchOk , [5..6]
+0008 StayExact Anonymous(Some(NodeKindId(8)))
+0008 MatchOk , [5..6]
+0010 NextExact Any
+0010 MatchOk node#114 [7..8]
+0008 StayExact Anonymous(Some(NodeKindId(8)))
+0008 MatchFail node#114 [7..8]
+0008 Backtrack { to_record: 64 }
+0010 NextExact Any
+0010 MatchOk node#42 [8..9]
+0008 StayExact Anonymous(Some(NodeKindId(8)))
+0008 MatchFail node#42 [8..9]
+0008 Backtrack { to_record: 72 }
+0010 NextExact Any
+0010 Backtrack { to_record: 60 }
+0014 Up(1) Any
+0014 MatchOk array [0..9]
+0016 Up(2) Any
+0016 MatchOk program [0..10]
+0005 Return PortId(0)
+0005 Return

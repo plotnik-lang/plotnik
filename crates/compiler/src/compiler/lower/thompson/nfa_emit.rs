@@ -146,7 +146,7 @@ impl NfaBuilder<'_> {
                 capture_span
                     .map(EffectIR::span_start)
                     .into_iter()
-                    .chain([EffectIR::absent(), record_set.clone()])
+                    .chain([record_set.clone(), EffectIR::absent()])
                     .chain(capture_span.map(EffectIR::span_end))
             })
             .collect();
@@ -180,8 +180,8 @@ impl NfaBuilder<'_> {
                     self.bind_span(span, SpanBindingIR::Member(member_ref));
                     absence_effects.push(EffectIR::span_start(span.0));
                 }
-                absence_effects.push(EffectIR::absent());
                 absence_effects.push(EffectIR::with_member(EffectKind::RecordSet, member_ref));
+                absence_effects.push(EffectIR::absent());
                 if let Some(span) = span {
                     absence_effects.push(EffectIR::span_end(span.0));
                 }

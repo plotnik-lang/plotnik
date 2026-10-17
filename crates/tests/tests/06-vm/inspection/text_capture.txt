@@ -60,7 +60,7 @@ value;
     "bindings": [
       {
         "path": "/name",
-        "event_index": 7
+        "event_index": 6
       }
     ],
     "range": [
@@ -116,20 +116,21 @@ P5 pattern    41..53  source_id=0
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
   02  └‣─  (expression_statement) [SpanStartAt#2]  04
-  04  └‣─  (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  07
+  04  └‣─  (identifier) [SpanStart#3 SpanStartAt#5 RecordSet(M0) NodeText SpanEnd#5 SpanEnd#3]  07
   07  ─‣┘  _                                08
   08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
   10                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
-       ●   program
-  02       (expression_statement) [SpanStartAt#2]  04
-       ●   expression_statement
-  04       (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  07
-       ●   identifier
-  07       _                                08
-       ●   expression_statement
-  08       _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-       ●   program
-  10   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..6]
+0002 Down Named(Some(NodeKindId(150)))
+0002 MatchOk expression_statement [0..6]
+0004 Down Named(Some(NodeKindId(1)))
+0004 MatchOk identifier [0..5]
+0007 Up(1) Any
+0007 MatchOk expression_statement [0..6]
+0008 Up(1) Any
+0008 MatchOk program [0..6]
+0010 Return PortId(0)
+0010 Return

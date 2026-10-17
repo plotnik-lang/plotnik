@@ -13,8 +13,8 @@ Q = (program
   "a": null,
   "b": {
     "kind": "number",
-    "span": [0, 2],
-    "text": "42"
+    "text": "42",
+    "span": [0, 2]
   }
 }
 -------------------- BYTECODE --------------------
@@ -46,34 +46,35 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └‣─  (expression_statement)           14, 16
+  01  └‣─  (expression_statement)           16, 12
   03                                        ▶
-  04   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  21
-  07  ─‣┘  _                                03
-  08   !   (number) [Node RecordSet(M1)]    21
-  10  ──!  _                                08, 10
-  12   !   _ [Absent RecordSet(M0)]         08, 10
-  14  └─!  _                                04, 12, 19
-  16  -ε-  [Absent RecordSet(M0) Absent RecordSet(M1)]  07
-  19  ──!  _                                04, 12, 19
-  21  ─‣┘  _                                07
+  04   !   (identifier) [RecordSet(M0) Node]  18
+  06   !   (number) [RecordSet(M1) Node]    18
+  08  ──!  _                                06, 08
+  10   !   _                                06, 08
+  12  -ε-  [RecordSet(M1) Absent]           19
+  14  ──!  _                                04, 10, 14
+  16  └─!  _                                04, 10, 14
+  18  ─‣┘  _                                19
+  19  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           14, 16
-       ●   expression_statement
-  14       _                                04, 12, 19
-       ●   number
-  04       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  21
-       ○   number
-  14  ❮❮❮ 
-  12       _ [Absent RecordSet(M0)]         08, 10
-       ●   number
-  08       (number) [Node RecordSet(M1)]    21
-       ●   number
-  21       _                                07
-       ●   expression_statement
-  07       _                                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..3]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..3]
+0016 DownExact Any
+0016 MatchOk number [0..2]
+0004 StayExact Named(Some(NodeKindId(1)))
+0004 MatchFail number [0..2]
+0004 Backtrack { to_record: 14 }
+0010 StayExact Any
+0010 MatchOk number [0..2]
+0006 StayExact Named(Some(NodeKindId(114)))
+0006 MatchOk number [0..2]
+0018 Up(1) Any
+0018 MatchOk expression_statement [0..3]
+0019 Up(1) Any
+0019 MatchOk program [0..3]
+0003 Return PortId(0)
+0003 Return

@@ -12,20 +12,20 @@ a; b; debugger;
   "a": [
     {
       "kind": "expression_statement",
-      "span": [0, 2],
-      "text": "a;"
+      "text": "a;",
+      "span": [0, 2]
     },
     {
       "kind": "expression_statement",
-      "span": [3, 5],
-      "text": "b;"
+      "text": "b;",
+      "span": [3, 5]
     }
   ],
   "b": [],
   "d": {
     "kind": "debugger_statement",
-    "span": [6, 15],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [6, 15]
   }
 }
 -------------------- BYTECODE --------------------
@@ -58,55 +58,55 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       34, 28
+  01  -ε-  [RecordSet(M0) ListOpen]         30, 24
   03                                        ▶
-  04  └‣─  (debugger_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  07
-  07  ─‣┘  _                                03
-  08  ─‣─  (debugger_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  07
-  11   !   (expression_statement) [Node ArrayPush]  13, 08
-  13  ──!  _                                11, 13
-  15  ...
-  16  └─!  _                                11, 13
-  18  -ε-  [ListOpen]                       16, 04
-  20   !   (expression_statement) [Node ArrayPush]  22, 08
-  22  ──!  _                                20, 22
-  24  -ε-  [ListOpen]                       22, 08
-  26  -ε-  [ListClose RecordSet(M0)]        24
-  28  -ε-  [ListClose RecordSet(M0)]        18
-  30   !   (expression_statement) [Node ArrayPush]  32, 26
-  32  ──!  _                                30, 32
-  34  └─!  _                                30, 32
+  04  └‣─  (debugger_statement) [ListClose RecordSet(M2) Node]  32
+  06  ─‣─  (debugger_statement) [ListClose RecordSet(M2) Node]  32
+  08   !   (expression_statement) [Node ArrayPush]  10, 06
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14  -ε-  [RecordSet(M1) ListOpen]         12, 04
+  16   !   (expression_statement) [Node ArrayPush]  18, 06
+  18  ──!  _                                16, 18
+  20  -ε-  [RecordSet(M1) ListOpen]         18, 06
+  22  -ε-  [ListClose]                      20
+  24  -ε-  [ListClose]                      14
+  26   !   (expression_statement) [Node ArrayPush]  28, 22
+  28  ──!  _                                26, 28
+  30  └─!  _                                26, 28
+  32  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01  -ε-  [ListOpen]                       34, 28
-  34       _                                30, 32
-       ●   expression_statement
-  30       (expression_statement) [Node ArrayPush]  32, 26
-       ●   expression_statement
-  32       _                                30, 32
-       ●   expression_statement
-  30       (expression_statement) [Node ArrayPush]  32, 26
-       ●   expression_statement
-  32       _                                30, 32
-       ●   debugger_statement
-  30       (expression_statement) [Node ArrayPush]  32, 26
-       ○   debugger_statement
-  32  ❮❮❮ 
-  32       _                                30, 32
-  30  ❮❮❮ 
-  26  -ε-  [ListClose RecordSet(M0)]        24
-  24  -ε-  [ListOpen]                       22, 08
-  22       _                                20, 22
-       ●   debugger_statement
-  20       (expression_statement) [Node ArrayPush]  22, 08
-       ○   debugger_statement
-  22  ❮❮❮ 
-  22       _                                20, 22
-  24  ❮❮❮ 
-  08       (debugger_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  07
-       ●   debugger_statement
-  07       _                                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..15]
+0001 Epsilon Any
+0030 DownExact Any
+0030 MatchOk expression_statement [0..2]
+0026 StayExact Named(Some(NodeKindId(150)))
+0026 MatchOk expression_statement [0..2]
+0028 NextExact Any
+0028 MatchOk expression_statement [3..5]
+0026 StayExact Named(Some(NodeKindId(150)))
+0026 MatchOk expression_statement [3..5]
+0028 NextExact Any
+0028 MatchOk debugger_statement [6..15]
+0026 StayExact Named(Some(NodeKindId(150)))
+0026 MatchFail debugger_statement [6..15]
+0026 Backtrack { to_record: 32 }
+0028 NextExact Any
+0028 Backtrack { to_record: 28 }
+0022 Epsilon Any
+0020 Epsilon Any
+0018 NextExact Any
+0018 MatchOk debugger_statement [6..15]
+0016 StayExact Named(Some(NodeKindId(150)))
+0016 MatchFail debugger_statement [6..15]
+0016 Backtrack { to_record: 49 }
+0018 NextExact Any
+0018 Backtrack { to_record: 45 }
+0006 Next Named(Some(NodeKindId(168)))
+0006 MatchOk debugger_statement [6..15]
+0032 Up(1) Any
+0032 MatchOk program [0..15]
+0003 Return PortId(0)
+0003 Return

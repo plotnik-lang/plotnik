@@ -36,19 +36,20 @@ Q:
   5  ─‣┘³ _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (if_statement)                    02
-      ●   if_statement
-  2       consequence: (statement_block)    03
-      ○   if
-      ○   parenthesized_expression
-      ●   statement_block
-  3       (MISSING "}")                     05
-      ○   {
-      ○   expression_statement
-      ●   }
-  5       _                                 06
-      ●   program
-  6   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(157)))
+0001 MatchOk if_statement [0..10]
+0002 Down Named(Some(NodeKindId(155)))
+0002 MatchFail node#20 [0..2]
+0002 MatchFail node#178 [3..6]
+0002 MatchOk statement_block [7..10]
+0003 Down Anonymous(Some(NodeKindId(9)))
+0003 MatchFail node#7 [7..8]
+0003 MatchFail node#150 [9..10]
+0003 MatchOk } [10..10]
+0005 Up(3) Any
+0005 MatchOk program [0..10]
+0006 Return PortId(0)
+0006 Return

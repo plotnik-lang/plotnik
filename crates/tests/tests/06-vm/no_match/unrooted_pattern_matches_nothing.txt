@@ -25,9 +25,9 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (identifier) [Node RecordSet(M0)]  2
+  0   !   (identifier) [RecordSet(M0) Node]  2
   2                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (identifier) [Node RecordSet(M0)]  02
-      ○   program
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchFail node#134 [0..1]

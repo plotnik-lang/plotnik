@@ -18,20 +18,20 @@ Ident      = 02
 [transitions]
 Ident:
   01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  02   !   (identifier) [RecordSet(name) Node]  01
 
 Expression:
   03  -ε-                                   05, 06
   04                                        ▶
-  05   !   (number) [VariantOpen(Literal) Node RecordSet(value) VariantClose]  04
-  06   !   (identifier) [VariantOpen(Variable) Node RecordSet(name) VariantClose]  04
+  05   !   (number) [VariantOpen(Literal) RecordSet(value) Node VariantClose]  04
+  06   !   (identifier) [VariantOpen(Variable) RecordSet(name) Node VariantClose]  04
 
 Assignment:
   09                                        ▶
-  10   !   (assignment_expression)          14
-  11  ─‣┘  _ [RecordSet(value)]             09
+  10   !   (assignment_expression)          15
+  11  ─‣┘  _                                09
   13  ─‣─  right: (Expression)              03 : 11
-  14  └‣─  left: (identifier) [Node RecordSet(target)]  13
+  15  └‣─  left: (identifier) [RecordSet(target) Node RecordSet(value)]  13
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -78,18 +78,19 @@ Ident      = 00 :: T1
 
 [instructions]
 Ident:
-  00   !   (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier) [RecordSet(M0) Node]  02
   02                                        ▶
 
 Expression:
-  03  -ε-                                   13, 16
+  03  -ε-                                   12, 16
 
 Assignment:
   05   !   (assignment_expression)          06
-  06  └‣─  left: (identifier) [Node RecordSet(M6)]  08
+  06  └‣─  left: (identifier) [RecordSet(M6) Node RecordSet(M5)]  08
   08  ─‣─  right: (Expression)              03 : 09
-  09  ─‣┘  _ [RecordSet(M5)]                11
+  09  ─‣┘  _                                10
+  10                                        ▶
   11                                        ▶
-  12                                        ▶
-  13   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-  16   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose]  12
+  12   !   (number) [VariantOpen(M3) RecordSet(M1) Node VariantClose]  11
+  15  ...
+  16   !   (identifier) [VariantOpen(M4) RecordSet(M2) Node VariantClose]  11

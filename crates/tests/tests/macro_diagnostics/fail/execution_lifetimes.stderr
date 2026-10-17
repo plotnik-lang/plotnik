@@ -16,14 +16,32 @@ error[E0515]: cannot return value referencing local variable `source`
    |     |                `source` is borrowed here
    |     returns a value referencing data owned by the current function
 
-error[E0597]: `source` does not live long enough
-  --> tests/macro_diagnostics/fail/execution_lifetimes.rs:22:34
+error[E0515]: cannot return value referencing local variable `result`
+  --> tests/macro_diagnostics/fail/execution_lifetimes.rs:20:5
    |
-21 |         let source = String::from("name");
+20 |     *result.view()
+   |     ^------^^^^^^^
+   |     ||
+   |     |`result` is borrowed here
+   |     returns a value referencing data owned by the current function
+
+error[E0515]: cannot return value referencing local variable `results`
+  --> tests/macro_diagnostics/fail/execution_lifetimes.rs:25:5
+   |
+25 |     *(&results).into_iter().next().unwrap()
+   |     ^----------^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |     ||
+   |     |`results` is borrowed here
+   |     returns a value referencing data owned by the current function
+
+error[E0597]: `source` does not live long enough
+  --> tests/macro_diagnostics/fail/execution_lifetimes.rs:32:34
+   |
+31 |         let source = String::from("name");
    |             ------ binding `source` declared here
-22 |         each = Probe::each(node, &source);
+32 |         each = Probe::each(node, &source);
    |                                  ^^^^^^^ borrowed value does not live long enough
-23 |     }
+33 |     }
    |     - `source` dropped here while still borrowed
-24 |     let _ = each.next();
+34 |     let _ = each.next();
    |             ---- borrow later used here

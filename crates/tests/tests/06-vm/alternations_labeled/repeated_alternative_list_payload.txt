@@ -9,21 +9,21 @@ a; b;
 --------------------- OUTPUT ---------------------
 {
   "x": {
+    "$tag": "A",
     "$data": {
       "stmts": [
         {
           "kind": "expression_statement",
-          "span": [0, 2],
-          "text": "a;"
+          "text": "a;",
+          "span": [0, 2]
         },
         {
           "kind": "expression_statement",
-          "span": [3, 5],
-          "text": "b;"
+          "text": "b;",
+          "span": [3, 5]
         }
       ]
-    },
-    "$tag": "A"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -64,34 +64,35 @@ Q = 00 :: T5
 Q:
   00   !   (program)                        14, 16
   02                                        ▶
-  03  -ε-  [ListClose RecordSet(M0) VariantClose RecordSet(M3)]  23
-  06   !   (expression_statement) [Node ArrayPush]  08, 03
-  08  ──!  _                                06, 08
-  10   !   _ [ListOpen]                     06, 08
-  12  -ε-  [VariantOpen(M1)]                10
+  03  -ε-  [ListClose VariantClose]         07
+  05   !   (expression_statement) [Node ArrayPush]  08, 03
+  07  ─‣┘  _                                02
+  08  ──!  _                                05, 08
+  10   !   _ [RecordSet(M0) ListOpen]       05, 08
+  12  -ε-  [RecordSet(M3) VariantOpen(M1)]  10
   14  └─!  _                                12, 19, 21
-  16  -ε-  [VariantOpen(M1) ListOpen ListClose RecordSet(M0) VariantClose RecordSet(M3)]  02
-  19   !   (debugger_statement) [VariantOpen(M2) VariantClose RecordSet(M3)]  23
+  16  -ε-  [RecordSet(M3) VariantOpen(M1) RecordSet(M0) ListOpen ListClose VariantClose]  02
+  19   !   (debugger_statement) [RecordSet(M3) VariantOpen(M2) VariantClose]  07
   21  ──!  _                                12, 19, 21
-  23  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        14, 16
-       ●   program
-  14       _                                12, 19, 21
-       ●   expression_statement
-  12  -ε-  [VariantOpen(M1)]                10
-  10       _ [ListOpen]                     06, 08
-       ●   expression_statement
-  06       (expression_statement) [Node ArrayPush]  08, 03
-       ●   expression_statement
-  08       _                                06, 08
-       ●   expression_statement
-  06       (expression_statement) [Node ArrayPush]  08, 03
-       ●   expression_statement
-  08       _                                06, 08
-  06  ❮❮❮ 
-  03  -ε-  [ListClose RecordSet(M0) VariantClose RecordSet(M3)]  23
-  23       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0014 DownExact Any
+0014 MatchOk expression_statement [0..2]
+0012 Epsilon Any
+0010 StayExact Any
+0010 MatchOk expression_statement [0..2]
+0005 StayExact Named(Some(NodeKindId(150)))
+0005 MatchOk expression_statement [0..2]
+0008 NextExact Any
+0008 MatchOk expression_statement [3..5]
+0005 StayExact Named(Some(NodeKindId(150)))
+0005 MatchOk expression_statement [3..5]
+0008 NextExact Any
+0008 Backtrack { to_record: 35 }
+0003 Epsilon Any
+0007 Up(1) Any
+0007 MatchOk program [0..5]
+0002 Return PortId(0)
+0002 Return

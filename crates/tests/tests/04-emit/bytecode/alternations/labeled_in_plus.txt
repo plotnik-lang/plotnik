@@ -12,11 +12,11 @@ Q = 02
 Q:
   01                                        ▶
   02   !   (program)                        11
-  03  ─‣┘  _ [ListClose RecordSet(statements)]  01
-  06   !   (expression_statement) [VariantOpen(Expression) Node RecordSet(expression) VariantClose ArrayPush]  10, 03
-  07   !   (debugger_statement) [VariantOpen(Debugger) Node RecordSet(debugger) VariantClose ArrayPush]  10, 03
+  03  ─‣┘  _ [ListClose]                    01
+  06   !   (expression_statement) [VariantOpen(Expression) RecordSet(expression) Node VariantClose ArrayPush]  10, 03
+  07   !   (debugger_statement) [VariantOpen(Debugger) RecordSet(debugger) Node VariantClose ArrayPush]  10, 03
   10  ──!  _                                06, 07, 10
-  11  └─!  _ [ListOpen]                     06, 07, 10
+  11  └─!  _ [RecordSet(statements) ListOpen]  06, 07, 10
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -56,10 +56,9 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _ [ListOpen]                     04, 08, 11
-  03                                        ▶
-  04   !   (expression_statement) [VariantOpen(M2) Node RecordSet(M0) VariantClose ArrayPush]  11, 13
-  07  ...
-  08   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose ArrayPush]  11, 13
-  11  ──!  _                                04, 08, 11
-  13  ─‣┘  _ [ListClose RecordSet(M4)]      03
+  01  └─!  _ [RecordSet(M4) ListOpen]       05, 08, 11
+  04                                        ▶
+  05   !   (expression_statement) [VariantOpen(M2) RecordSet(M0) Node VariantClose ArrayPush]  11, 13
+  08   !   (debugger_statement) [VariantOpen(M3) RecordSet(M1) Node VariantClose ArrayPush]  11, 13
+  11  ──!  _                                05, 08, 11
+  13  ─‣┘  _ [ListClose]                    04

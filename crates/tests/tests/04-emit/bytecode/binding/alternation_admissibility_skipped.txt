@@ -13,8 +13,8 @@ Q:
   1                                         ▶
   2   !   (function_declaration)            7
   3  ─‣┘  _                                 1
-  4   !   (statement_block) [Absent RecordSet(b) Node RecordSet(a)]  3
-  5   !   (class_declaration) [Absent RecordSet(a) Node RecordSet(b)]  3
+  4   !   (statement_block) [RecordSet(a) Node]  3
+  5   !   (class_declaration) [RecordSet(b) Node]  3
   7  └‣─  body: _                           4, 5
 -------------------- BYTECODE --------------------
 [strings]
@@ -40,13 +40,13 @@ M1: S2 → T1  ; b: T1
 N0: S3 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 0 :: T2
 
 [instructions]
 Q:
-  00   !   (function_declaration)           01
-  01  └‣─  body: _                          04, 08
-  03                                        ▶
-  04   !   (statement_block) [Absent RecordSet(M1) Node RecordSet(M0)]  07
-  07  ─‣┘  _                                03
-  08   !   (class_declaration) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  0   !   (function_declaration)            1
+  1  └‣─  body: _                           4, 6
+  3                                         ▶
+  4   !   (statement_block) [RecordSet(M0) Node]  8
+  6   !   (class_declaration) [RecordSet(M1) Node]  8
+  8  ─‣┘  _                                 3

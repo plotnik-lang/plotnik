@@ -44,20 +44,21 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _                                04, 06, 08
+  01  └─!  _ [RecordSet(M2)]                04, 06, 08
   03                                        ▶
   04   !   (debugger_statement) [VariantOpen(M0) VariantClose]  10
   06   !   (expression_statement) [VariantOpen(M1) VariantClose]  10
   08  ──!  _                                04, 06, 08
-  10  ─‣┘  _ [RecordSet(M2)]                03
+  10  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       _                                04, 06, 08
-       ●   debugger_statement
-  04       (debugger_statement) [VariantOpen(M0) VariantClose]  10
-       ●   debugger_statement
-  10       _ [RecordSet(M2)]                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0001 DownExact Any
+0001 MatchOk debugger_statement [0..9]
+0004 StayExact Named(Some(NodeKindId(168)))
+0004 MatchOk debugger_statement [0..9]
+0010 Up(1) Any
+0010 MatchOk program [0..9]
+0003 Return PortId(0)
+0003 Return

@@ -42,21 +42,21 @@ Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
   2  └‣─  (template_string)                 3
-  3  └‣─  (string_fragment) [Node RecordSet(M0)] =~ /c$/  5
+  3  └‣─  (string_fragment) [RecordSet(M0) Node] =~ /c$/  5
   5  ─‣┘³ _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement)            02
-      ●   expression_statement
-  2       (template_string)                 03
-      ●   template_string
-  3       (string_fragment) [Node RecordSet(M0)] =~ /c$/  05
-      ○   `
-      ○   template_substitution
-      ○   `
-  2  ❮❮❮ 
-      ○   ;
-  1  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..11]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..11]
+0002 Down Named(Some(NodeKindId(222)))
+0002 MatchOk template_string [0..10]
+0003 Down Named(Some(NodeKindId(130)))
+0003 MatchFail node#109 [0..1]
+0003 MatchFail node#223 [5..9]
+0003 MatchFail node#109 [9..10]
+0003 Backtrack { to_record: 12 }
+0003 MatchFail node#24 [10..11]
+0003 Backtrack { to_record: 8 }

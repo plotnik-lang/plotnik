@@ -13,24 +13,24 @@ a()();
 --------------------- OUTPUT ---------------------
 {
   "top": {
+    "$tag": "Step",
     "$data": {
       "inner": {
+        "$tag": "Step",
         "$data": {
           "inner": {
+            "$tag": "Base",
             "$data": {
               "name": {
                 "kind": "identifier",
-                "span": [0, 1],
-                "text": "a"
+                "text": "a",
+                "span": [0, 1]
               }
-            },
-            "$tag": "Base"
+            }
           }
-        },
-        "$tag": "Step"
+        }
       }
-    },
-    "$tag": "Step"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -77,62 +77,54 @@ Chain:
 
 Q:
   02   !   (program)                        03
-  03  └‣─  (expression_statement)           04
-  04  └‣─  (Chain)                          00 : 05
-  05  ─‣┘² _ [RecordSet(M4)]                07
+  03  └‣─  (expression_statement) [RecordSet(M4)]  05
+  05  └‣─  (Chain)                          00 : 06
+  06  ─‣┘² _                                07
   07                                        ▶
   08  └‣─  function: (Chain)                00 : 09
-  09  ─‣┘  _ [RecordSet(M1) VariantClose]   11
+  09  ─‣┘  _ [VariantClose]                 11
   11                                        ▶
-  12   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
+  12   !   (identifier) [VariantOpen(M2) RecordSet(M0) Node VariantClose]  11
   15  ...
-  16   !   (call_expression) [VariantOpen(M3)]  08
+  16   !   (call_expression) [VariantOpen(M3) RecordSet(M1)]  08
 --------------------- TRACE ----------------------
-Q:
-  02       (program)                        03
-       ●   program
-  03       (expression_statement)           04
-       ●   expression_statement
-  04       (Chain)                          00 : 05
-       ▶   (Chain)
-
-Chain:
-  00  -ε-                                   12, 16
-  12       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
-       ○   call_expression
-  00  ❮❮❮ 
-  16       (call_expression) [VariantOpen(M3)]  08
-       ●   call_expression
-  08       (Chain)                          00 : 09
-       ▶   (Chain)
-
-Chain:
-  00  -ε-                                   12, 16
-  12       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
-       ○   call_expression
-  00  ❮❮❮ 
-  16       (call_expression) [VariantOpen(M3)]  08
-       ●   call_expression
-  08       (Chain)                          00 : 09
-       ▶   (Chain)
-
-Chain:
-  00  -ε-                                   12, 16
-  12       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
-       ●   identifier
-  11   ◀   (Chain)                          
-
-Chain:
-  09       _ [RecordSet(M1) VariantClose]   11
-       ●   call_expression
-  11   ◀   (Chain)                          
-
-Chain:
-  09       _ [RecordSet(M1) VariantClose]   11
-       ●   call_expression
-  11   ◀   (Chain)                          
-
-Q:
-  05       _ [RecordSet(M4)]                07
-       ●   program
-  07   ◀   (Q)                              ◼
+0002 ExecutionStarted { target: 2 }
+0002 StayExact Named(Some(NodeKindId(134)))
+0002 MatchOk program [0..6]
+0003 Down Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..6]
+0005 Call CodeAddr(0)
+0005 Call { target: 0 }
+0000 Epsilon Any
+0012 StayExact Named(Some(NodeKindId(1)))
+0012 MatchFail call_expression [0..5]
+0012 Backtrack { to_record: 15 }
+0016 StayExact Named(Some(NodeKindId(205)))
+0016 MatchOk call_expression [0..5]
+0008 Call CodeAddr(0)
+0008 Call { target: 0 }
+0000 Epsilon Any
+0012 StayExact Named(Some(NodeKindId(1)))
+0012 MatchFail call_expression [0..3]
+0012 Backtrack { to_record: 31 }
+0016 StayExact Named(Some(NodeKindId(205)))
+0016 MatchOk call_expression [0..3]
+0008 Call CodeAddr(0)
+0008 Call { target: 0 }
+0000 Epsilon Any
+0012 StayExact Named(Some(NodeKindId(1)))
+0012 MatchOk identifier [0..1]
+0011 Return PortId(0)
+0011 Return
+0009 Up(1) Any
+0009 MatchOk call_expression [0..3]
+0011 Return PortId(0)
+0011 Return
+0009 Up(1) Any
+0009 MatchOk call_expression [0..5]
+0011 Return PortId(0)
+0011 Return
+0006 Up(2) Any
+0006 MatchOk program [0..6]
+0007 Return PortId(0)
+0007 Return

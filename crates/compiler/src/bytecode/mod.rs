@@ -37,9 +37,7 @@ pub(crate) use constants::{
 };
 pub(crate) use effects::{Effect, EffectKind, EffectSuppression, FrameAction, ValueFrameKind};
 pub(crate) use entrypoint::EntryBoundary;
-pub(crate) use format::{
-    LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
-};
+pub(crate) use format::{LineBuilder, Symbol, nav_symbol, width_for_count};
 pub(crate) use header::Header;
 pub(crate) use instructions::{
     Call, CallOwnership, CalleeContract, Match, MatchCounts, MatchInstr, MatchPredicate,
@@ -49,5 +47,4 @@ pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicat
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use plotnik_runtime::{Nav, deserialize_dfa};
 pub(crate) use predicate_op::PredicateOp;
-pub(crate) use render::ModuleRenderContext;
 pub(crate) use sections::{FieldEntry, NodeKindEntry, SYMBOL_NAME_ENTRY_SIZE};

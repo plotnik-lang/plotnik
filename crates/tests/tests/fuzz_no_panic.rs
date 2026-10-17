@@ -6,9 +6,7 @@ use proptest::test_runner::FileFailurePersistence;
 use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_compiler::bytecode::Module;
-use plotnik_compiler::{
-    BytecodeConfig, Colors, QueryBuilder, VM, Value, format_query, materialize_verified,
-};
+use plotnik_compiler::{BytecodeConfig, QueryBuilder, VM, format_query};
 
 mod support;
 
@@ -76,15 +74,14 @@ fn run_source_smoke(source: &str) {
         .build()
         .execute(module, &entry)
         .expect("wildcard root matches every parsed tree");
-    let value = materialize_verified(
-        source,
-        module,
-        &entry,
-        journal.output_events(),
-        Colors::new(false),
+    let mut output = String::new();
+    journal
+        .write_json(plotnik_runtime::json::Style::COMPACT, &mut output)
+        .expect("match-only result renders");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&output).expect("result emits valid JSON"),
+        serde_json::Value::Null
     );
-
-    assert_eq!(value, Value::Absent);
 }
 
 fn arb_query_text() -> impl Strategy<Value = String> {

@@ -16,13 +16,13 @@ a + /* c */ b
 {
   "left": {
     "kind": "identifier",
-    "span": [0, 1],
-    "text": "a"
+    "text": "a",
+    "span": [0, 1]
   },
   "right": {
     "kind": "identifier",
-    "span": [12, 13],
-    "text": "b"
+    "text": "b",
+    "span": [12, 13]
   }
 }
 -------------------- BYTECODE --------------------
@@ -56,27 +56,28 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (binary_expression)              10, 12
+  02  └‣─  (binary_expression)              10, 07
   04                                        ▶
-  05  ─•─  (identifier) [Node RecordSet(M1)]  07
-  07  ─‣┘³ _                                04
-  08  ─◦─  (identifier) [Node RecordSet(M1)]  07
-  10  └‣─  (identifier) [Node RecordSet(M0)]  05
-  12  └‣─  ";" [Absent RecordSet(M0)]       08
+  05  ─•─  (identifier) [RecordSet(M1) Node]  12
+  07  └‣─  ";"                              08
+  08  ─◦─  (identifier) [RecordSet(M1) Node]  12
+  10  └‣─  (identifier) [RecordSet(M0) Node]  05
+  12  ─‣┘³ _                                04
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (binary_expression)              10, 12
-       ●   binary_expression
-  10       (identifier) [Node RecordSet(M0)]  05
-       ●   identifier
-  05       (identifier) [Node RecordSet(M1)]  07
-       ○   +
-       ○   comment
-       ●   identifier
-  07       _                                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..13]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..13]
+0002 Down Named(Some(NodeKindId(217)))
+0002 MatchOk binary_expression [0..13]
+0010 Down Named(Some(NodeKindId(1)))
+0010 MatchOk identifier [0..1]
+0005 NextSkip Named(Some(NodeKindId(1)))
+0005 MatchFail node#85 [2..3]
+0005 MatchFail node#108 [4..11]
+0005 MatchOk identifier [12..13]
+0012 Up(3) Any
+0012 MatchOk program [0..13]
+0004 Return PortId(0)
+0004 Return

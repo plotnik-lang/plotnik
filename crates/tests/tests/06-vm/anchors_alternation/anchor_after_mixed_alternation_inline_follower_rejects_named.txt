@@ -49,40 +49,40 @@ Q:
   02  └‣─  (call_expression)                03
   03  └‣─  arguments: (arguments)           10, 12
   05                                        ▶
-  06  ─•─  (identifier) [Node RecordSet(M0)] == "b"  13
-  08  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  13
+  06  ─•─  (identifier) [RecordSet(M0) Node] == "b"  13
+  08  ─◦─  (identifier) [RecordSet(M0) Node] == "b"  13
   10  └‣─  (identifier) == "a"              06
   12  └‣─  ";"                              08
   13  ─‣┘⁴ _                                05
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (call_expression)                03
-       ●   call_expression
-  03       arguments: (arguments)           10, 12
-       ○   identifier
-       ●   arguments
-  10       (identifier) == "a"              06
-       ○   (
-       ●   identifier
-  06       (identifier) [Node RecordSet(M0)] == "b"  13
-       ○   ,
-  10  ❮❮❮ 
-       ○   ,
-       ○   ,
-       ○   )
-  03  ❮❮❮ 
-  12       ";"                              08
-       ○   (
-       ○   identifier
-       ○   ,
-       ○   identifier
-       ○   ,
-       ○   identifier
-       ○   )
-  03  ❮❮❮ 
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..10]
+0002 Down Named(Some(NodeKindId(205)))
+0002 MatchOk call_expression [0..10]
+0003 Down Named(Some(NodeKindId(226)))
+0003 MatchFail identifier [0..1]
+0003 MatchOk arguments [1..10]
+0010 Down Named(Some(NodeKindId(1)))
+0010 MatchFail node#23 [1..2]
+0010 MatchOk identifier [2..3]
+0006 NextSkip Named(Some(NodeKindId(1)))
+0006 MatchFail node#8 [3..4]
+0006 Backtrack { to_record: 26 }
+0006 MatchFail node#8 [3..4]
+0006 MatchFail node#8 [6..7]
+0006 MatchFail node#25 [9..10]
+0006 Backtrack { to_record: 20 }
+0012 Down Anonymous(Some(NodeKindId(24)))
+0012 MatchFail node#23 [1..2]
+0012 MatchFail identifier [2..3]
+0012 MatchFail node#8 [3..4]
+0012 MatchFail identifier [5..6]
+0012 MatchFail node#8 [6..7]
+0012 MatchFail identifier [8..9]
+0012 MatchFail node#25 [9..10]
+0012 Backtrack { to_record: 19 }
+0012 Backtrack { to_record: 12 }
+0012 Backtrack { to_record: 8 }

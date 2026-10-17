@@ -17,8 +17,8 @@ x
   "args": [],
   "id": {
     "kind": "identifier",
-    "span": [0, 1],
-    "text": "x"
+    "text": "x",
+    "span": [0, 1]
   }
 }
 -------------------- BYTECODE --------------------
@@ -53,31 +53,31 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └─!  _                                16, 18, 21
+  02  └─!  _                                15, 16, 18
   04                                        ▶
   05   !   (identifier) [Node ArrayPush]    08, 12
   07  ─‣┘² _                                04
   08  ──!  _                                05, 08
-  10  └─!  _ [ListOpen]                     05, 08
-  12  ─‣┘² _ [ListClose RecordSet(M0)]      07
+  10  └─!  _ [RecordSet(M0) ListOpen]       05, 08
+  12  ─‣┘² _ [ListClose]                    07
   14  └‣─  (arguments)                      10
-  15  ...
-  16   !   (call_expression) [Absent RecordSet(M1)]  14
-  18   !   (identifier) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
-  21  ──!  _                                16, 18, 21
+  15   !   (call_expression)                14
+  16   !   (identifier) [RecordSet(M1) Node]  07
+  18  ──!  _                                15, 16, 18
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       _                                16, 18, 21
-       ●   identifier
-  16       (call_expression) [Absent RecordSet(M1)]  14
-       ○   identifier
-  02  ❮❮❮ 
-  18       (identifier) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
-       ●   identifier
-  07       _                                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..1]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..1]
+0002 DownExact Any
+0002 MatchOk identifier [0..1]
+0015 StayExact Named(Some(NodeKindId(205)))
+0015 MatchFail identifier [0..1]
+0015 Backtrack { to_record: 13 }
+0016 StayExact Named(Some(NodeKindId(1)))
+0016 MatchOk identifier [0..1]
+0007 Up(2) Any
+0007 MatchOk program [0..1]
+0004 Return PortId(0)
+0004 Return

@@ -10,8 +10,8 @@ foo; debugger;
 {
   "d": {
     "kind": "debugger_statement",
-    "span": [5, 14],
-    "text": "debugger;"
+    "text": "debugger;",
+    "span": [5, 14]
   }
 }
 -------------------- BYTECODE --------------------
@@ -43,21 +43,22 @@ Q:
   1  └‣─  (expression_statement)            2
   2  └‣─  (identifier)                      3
   3  ─‣┘  _                                 4
-  4  ─‣─  (debugger_statement) [Node RecordSet(M0)]  6
+  4  ─‣─  (debugger_statement) [RecordSet(M0) Node]  6
   6  ─‣┘  _                                 7
   7                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement)            02
-      ●   expression_statement
-  2       (identifier)                      03
-      ●   identifier
-  3       _                                 04
-      ●   expression_statement
-  4       (debugger_statement) [Node RecordSet(M0)]  06
-      ●   debugger_statement
-  6       _                                 07
-      ●   program
-  7   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..14]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..4]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchOk identifier [0..3]
+0003 Up(1) Any
+0003 MatchOk expression_statement [0..4]
+0004 Next Named(Some(NodeKindId(168)))
+0004 MatchOk debugger_statement [5..14]
+0006 Up(1) Any
+0006 MatchOk program [0..14]
+0007 Return PortId(0)
+0007 Return

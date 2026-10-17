@@ -43,13 +43,14 @@ Q:
   5                                         ▶
   6  ──!  _                                 3, 6
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       _                                 03, 06
-      ●   expression_statement
-  3       (expression_statement)            04
-      ●   expression_statement
-  4       _                                 05
-      ●   program
-  5   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 DownExact Any
+0001 MatchOk expression_statement [0..2]
+0003 StayExact Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..2]
+0004 Up(1) Any
+0004 MatchOk program [0..2]
+0005 Return PortId(0)
+0005 Return

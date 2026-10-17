@@ -13,7 +13,7 @@ Q:
   2   !   (binary_expression)               8
   3  ─‣┘  _                                 1
   4  ─◦─  (identifier)                      3
-  5   !   "+" [Node RecordSet(op)]          4
+  5   !   "+" [RecordSet(op) Node]          4
   7  ──!  _                                 5, 7
   8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
@@ -45,5 +45,5 @@ Q:
   3  ─◦─  (identifier)                      4
   4  ─‣┘  _                                 5
   5                                         ▶
-  6   !   "+" [Node RecordSet(M0)]          3
+  6   !   "+" [RecordSet(M0) Node]          3
   8  ──!  _                                 6, 8

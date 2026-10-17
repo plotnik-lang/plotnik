@@ -13,15 +13,15 @@ Q = (program
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub enum Entry<'t> {
     Id { id: Node<'t> },
     Num { num: Node<'t> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub items: Items<'t>,
+#[derive(Clone, Copy)]
+pub struct Q<'r, 't> {
+    pub items: Items<'r, 't>,
 }
 
-pub type Items<'t> = ::std::vec::Vec<Entry<'t>>;
+pub type Items<'r, 't> = &'r [Entry<'t>];

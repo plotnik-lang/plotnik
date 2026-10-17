@@ -74,14 +74,5 @@ error[E0433]: cannot find type `Mixed` in this scope
 error[E0425]: cannot find function `left_journal` in this scope
   --> tests/macro_diagnostics/fail/contextual_entry_execution.rs:19:13
    |
- 1 | plotnik::query! {
-   | --------------- similarly named function `q_journal` defined here
-...
 19 |     let _ = left_journal(tree, source);
-   |             ^^^^^^^^^^^^
-   |
-help: a function with a similar name exists
-   |
-19 -     let _ = left_journal(tree, source);
-19 +     let _ = q_journal(tree, source);
-   |
+   |             ^^^^^^^^^^^^ not found in this scope

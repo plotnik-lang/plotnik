@@ -9,14 +9,14 @@ debugger;
 --------------------- OUTPUT ---------------------
 {
   "x": {
+    "$tag": "B",
     "$data": {
       "d": {
         "kind": "debugger_statement",
-        "span": [0, 9],
-        "text": "debugger;"
+        "text": "debugger;",
+        "span": [0, 9]
       }
-    },
-    "$tag": "B"
+    }
   }
 }
 -------------------- BYTECODE --------------------
@@ -59,29 +59,30 @@ Q = 00 :: T5
 Q:
   00   !   (program)                        18, 10
   02                                        ▶
-  03   !   (identifier) [Node RecordSet(M0) VariantClose RecordSet(M4)]  20
-  06  ──!  _                                03, 06
-  08   !   _ [VariantOpen(M2)]              03, 06
-  10  -ε-  [VariantOpen(M2) Absent RecordSet(M0) VariantClose RecordSet(M4)]  02
-  13   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  20
+  03   !   (identifier) [RecordSet(M0) Node VariantClose]  07
+  05  ──!  _                                03, 05
+  07  ─‣┘  _                                02
+  08   !   _ [RecordSet(M4) VariantOpen(M2)]  03, 05
+  10  -ε-  [RecordSet(M4) VariantOpen(M2) RecordSet(M0) Absent VariantClose]  02
+  13   !   (debugger_statement) [RecordSet(M4) VariantOpen(M3) RecordSet(M1) Node VariantClose]  07
   16  ──!  _                                08, 13, 16
   18  └─!  _                                08, 13, 16
-  20  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        18, 10
-       ●   program
-  18       _                                08, 13, 16
-       ●   debugger_statement
-  08       _ [VariantOpen(M2)]              03, 06
-       ●   debugger_statement
-  03       (identifier) [Node RecordSet(M0) VariantClose RecordSet(M4)]  20
-       ○   debugger_statement
-  08  ❮❮❮ 
-  06       _                                03, 06
-  18  ❮❮❮ 
-  13       (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  20
-       ●   debugger_statement
-  20       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0018 DownExact Any
+0018 MatchOk debugger_statement [0..9]
+0008 StayExact Any
+0008 MatchOk debugger_statement [0..9]
+0003 StayExact Named(Some(NodeKindId(1)))
+0003 MatchFail debugger_statement [0..9]
+0003 Backtrack { to_record: 16 }
+0005 NextExact Any
+0005 Backtrack { to_record: 10 }
+0013 StayExact Named(Some(NodeKindId(168)))
+0013 MatchOk debugger_statement [0..9]
+0007 Up(1) Any
+0007 MatchOk program [0..9]
+0002 Return PortId(0)
+0002 Return

@@ -17,16 +17,15 @@ Q:
   01                                        ▶
   02   !   (program)                        04
   03  ─‣┘  _                                01
-  04  └‣─  (expression_statement)           23, 19
+  04  └‣─  (expression_statement)           21, 03
   05  ─‣┘  _                                03
-  06   !   (identifier) [Absent RecordSet(num) Node RecordSet(id)]  05
-  07   !   (number) [Absent RecordSet(id) Node RecordSet(num)]  05
+  06   !   (identifier) [RecordSet(id) Node]  05
+  07   !   (number) [RecordSet(num) Node]   05
   08   !   (string)                         05
   10  ──!  _                                08, 10
-  11   !   _ [Absent RecordSet(id) Absent RecordSet(num)]  08, 10
-  19  -ε-  [Absent RecordSet(id) Absent RecordSet(num)]  03
-  22  ──!  _                                06, 07, 11, 22
-  23  └─!  _                                06, 07, 11, 22
+  11   !   _                                08, 10
+  20  ──!  _                                06, 07, 11, 20
+  21  └─!  _                                06, 07, 11, 20
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -72,20 +71,18 @@ P12 pattern    92..100  source_id=0
 [instructions]
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStartAt#2]  22, 35
+  02  └‣─  (expression_statement) [SpanStartAt#2]  05, 26
   04                                        ▶
-  05  ─‣┘  _                                06
-  06  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
-  08   !   (identifier) [SpanStart#3 SpanStart#4 Absent RecordSet(M1) SpanStartAt#6 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#6 SpanEnd#4 SpanEnd#3]  05
-  14  ...
-  15  ...
-  16   !   (number) [SpanStart#3 SpanStart#7 Absent RecordSet(M0) SpanStartAt#9 SpanStart#8 Node RecordSet(M1) SpanEnd#8 SpanEnd#9 SpanEnd#7 SpanEnd#3]  05
-  22  └─!  _                                08, 16, 32, 40
-  24   !   (string) [SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#10 SpanEnd#3]  05
-  27  ──!  _                                24, 27
-  29   !   _ [SpanStart#11]                 24, 27
+  05  └─!  _                                08, 12, 24, 29
+  07  ─‣┘  _                                32
+  08   !   (identifier) [SpanStart#3 SpanStart#4 SpanStartAt#6 SpanStart#5 RecordSet(M0) Node SpanEnd#5 SpanEnd#6 SpanEnd#4 SpanEnd#3]  07
+  12   !   (number) [SpanStart#3 SpanStart#7 SpanStartAt#9 SpanStart#8 RecordSet(M1) Node SpanEnd#8 SpanEnd#9 SpanEnd#7 SpanEnd#3]  07
+  16   !   (string) [SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#10 SpanEnd#3]  07
+  19  ──!  _                                16, 19
+  21   !   _ [SpanStart#11]                 16, 19
+  23  ...
+  24  -ε-  [SpanStart#3 SpanStart#10]       21
+  26  -ε-  [SpanStart#3 SpanStart#10 SpanStart#11 SpanEnd#11 SpanEnd#10 SpanEnd#3]  32
+  29  ──!  _                                08, 12, 24, 29
   31  ...
-  32  -ε-  [SpanStart#3 SpanStart#10 Absent RecordSet(M0) Absent RecordSet(M1)]  29
-  35  -ε-  [SpanStart#3 SpanStart#10 Absent RecordSet(M0) Absent RecordSet(M1) SpanStart#11 SpanEnd#11 SpanEnd#10 SpanEnd#3]  06
-  39  ...
-  40  ──!  _                                08, 16, 32, 40
+  32  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  04

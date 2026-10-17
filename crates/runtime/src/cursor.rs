@@ -1,390 +1,315 @@
-use std::collections::VecDeque;
+pub(crate) mod checked;
+
 use std::num::NonZeroU64;
 
-use tree_sitter::{Node, TreeCursor};
+use tree_sitter::Node;
 
-use crate::{Nav, NodeClass, NodeFieldId, SkipClass, SkipPolicy};
+use crate::alloc::{Buffer, Meter};
+use crate::{LimitExceeded, Nav, NodeClass, NodeFieldId, SkipClass, SkipPolicy};
+use checked::CheckedCursor;
 
 const SNAPSHOT_CAP: usize = 64;
-
-const SNAPSHOT_FOOTPRINT_ESTIMATE: u64 = 2048;
-
 const SNAPSHOT_ACTIVATION_WIDE_MISSES: u32 = 32;
-
 const SNAPSHOT_ACTIVATION_MIN_JUMP: u32 = 32;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum UpMode {
-    Any,
-    SkipTrivia,
-    SkipExtras,
-    Exact,
+struct Snapshot<'t> {
+    seq: u64,
+    refs: u32,
+    cursor: CheckedCursor<'t>,
 }
 
-impl UpMode {
-    fn skip_class(self) -> SkipClass {
-        match self {
-            Self::Any => SkipClass::Any,
-            Self::SkipTrivia => SkipClass::Trivia,
-            Self::SkipExtras => SkipClass::Extras,
-            Self::Exact => SkipClass::Exact,
-        }
-    }
-}
-
-/// Wrapper around TreeCursor with Plotnik navigation semantics.
-///
-/// Critical: The cursor is rooted at the application node, which need not be
-/// the tree root. Pooled snapshots clone that cursor, and `reset_to` copies its
-/// root along with the stack. Every cursor within an application shares a root,
-/// so descendant indices remain scope-relative and navigation cannot escape.
+/// A checked cursor rooted at the application node. All paths, including
+/// cached snapshots and field-test scratch, retain exact admitted capacities.
 pub struct CursorWrapper<'t> {
-    cursor: TreeCursor<'t>,
-    snapshots: SnapshotPool<'t>,
-}
-
-pub(crate) struct SnapshotPool<'t> {
-    live: VecDeque<SnapshotEntry<'t>>,
-    free: Vec<TreeCursor<'t>>,
+    cursor: CheckedCursor<'t>,
+    scratch: CheckedCursor<'t>,
+    snapshots: Buffer<Snapshot<'t>>,
     next_seq: u64,
     wide_restore_misses: u32,
 }
 
-struct SnapshotEntry<'t> {
-    seq: NonZeroU64,
-    refs: u32,
-    cursor: TreeCursor<'t>,
-}
-
-impl<'t> SnapshotPool<'t> {
-    fn new() -> Self {
+impl<'t> CursorWrapper<'t> {
+    pub fn new(node: Node<'t>) -> Self {
         Self {
-            live: VecDeque::new(),
-            free: Vec::new(),
+            cursor: CheckedCursor::new(node),
+            scratch: CheckedCursor::new(node),
+            snapshots: Buffer::new(),
             next_seq: 0,
             wide_restore_misses: 0,
         }
     }
 
-    fn byte_footprint(&self) -> u64 {
-        (self.live.len() + self.free.len()) as u64 * SNAPSHOT_FOOTPRINT_ESTIMATE
-    }
-}
-
-impl<'t> CursorWrapper<'t> {
-    pub fn new(cursor: TreeCursor<'t>) -> Self {
-        Self {
-            cursor,
-            snapshots: SnapshotPool::new(),
-        }
-    }
-
     pub(crate) fn reset(&mut self, node: Node<'t>) {
-        while let Some(entry) = self.snapshots.live.pop_front() {
-            self.snapshots.free.push(entry.cursor);
+        for snapshot in self.snapshots.as_mut_slice() {
+            snapshot.refs = 0;
+            snapshot.seq = 0;
         }
-
-        self.snapshots.next_seq = 0;
-        self.snapshots.wide_restore_misses = 0;
+        self.next_seq = 0;
+        self.wide_restore_misses = 0;
         self.cursor.reset(node);
-        assert_eq!(
-            self.descendant_index(),
-            0,
-            "candidate cursor must be rooted"
-        );
+        self.scratch.reset(node);
     }
 
-    #[inline]
     pub fn node(&self) -> Node<'t> {
         self.cursor.node()
     }
-
-    #[inline]
     pub fn descendant_index(&self) -> u32 {
-        self.cursor.descendant_index() as u32
+        self.cursor.index()
     }
 
-    #[inline]
-    pub fn goto_descendant(&mut self, index: u32) {
-        self.cursor.goto_descendant(index as usize);
+    pub fn goto_descendant(
+        &mut self,
+        meter: &mut Meter<'_>,
+        index: u32,
+    ) -> Result<(), LimitExceeded> {
+        self.cursor.seek(meter, index)
     }
 
-    /// Snapshot the current position for `refs` checkpoints about to be pushed.
-    /// Costs one clone the first few times, then one `reset_to` (O(depth) memcpy)
-    /// per call.
-    #[inline]
-    pub fn snapshot(&mut self, refs: u32) -> Option<NonZeroU64> {
+    pub fn snapshot(
+        &mut self,
+        meter: &mut Meter<'_>,
+        refs: u32,
+    ) -> Result<Option<NonZeroU64>, LimitExceeded> {
         if !self.snapshots_active() {
-            return None;
+            return Ok(None);
         }
-        assert!(refs > 0, "snapshot needs at least one checkpoint reference");
-
-        let pool = &mut self.snapshots;
-        pool.next_seq = pool
+        assert!(refs > 0, "snapshot has checkpoint references");
+        let seq = self
             .next_seq
             .checked_add(1)
-            .expect("snapshot sequence overflow");
-        let seq = NonZeroU64::new(pool.next_seq).expect("seq starts at 1");
-        let cursor = match pool.free.pop() {
-            Some(mut cursor) => {
-                cursor.reset_to(&self.cursor);
-                cursor
+            .ok_or(LimitExceeded::Allocation { bytes: u64::MAX })?;
+        let index = (seq - 1) as usize % SNAPSHOT_CAP;
+        meter.charge(self.snapshots.len() as u64)?;
+        let cache = self.snapshots.capacity_bytes()
+            + self
+                .snapshots
+                .iter()
+                .map(|slot| slot.cursor.capacity_bytes())
+                .sum::<u64>();
+        let destination = self
+            .snapshots
+            .get(index)
+            .map_or(0, |slot| slot.cursor.capacity_bytes());
+        let growth = 2 * self.cursor.capacity_bytes().max(destination);
+        let metadata = if index == self.snapshots.len() {
+            self.snapshots.reservation_bytes(1)?
+        } else {
+            0
+        };
+        if cache.saturating_add(growth).saturating_add(metadata) > 96 * 1024 {
+            return Ok(None);
+        }
+
+        let admission = (|| {
+            if index == self.snapshots.len() {
+                self.snapshots.push(
+                    meter,
+                    Snapshot {
+                        seq: 0,
+                        refs: 0,
+                        cursor: CheckedCursor::new(self.node()),
+                    },
+                )?;
             }
-            None => self.cursor.clone(),
-        };
-
-        pool.live.push_back(SnapshotEntry { seq, refs, cursor });
-        if pool.live.len() > SNAPSHOT_CAP {
-            let evicted = pool.live.pop_front().expect("len > CAP > 0");
-            pool.free.push(evicted.cursor);
+            let snapshot = &mut self.snapshots[index];
+            snapshot.seq = 0;
+            snapshot.refs = 0;
+            snapshot.cursor.copy_from(meter, &self.cursor)?;
+            snapshot.seq = seq;
+            snapshot.refs = refs;
+            self.next_seq = seq;
+            Ok(NonZeroU64::new(seq))
+        })();
+        match admission {
+            Err(LimitExceeded::Memory { .. } | LimitExceeded::Allocation { .. }) => Ok(None),
+            result => result,
         }
-
-        Some(seq)
     }
 
-    /// Restore to a checkpoint position, using its pooled snapshot when it
-    /// survived eviction. Always releases the checkpoint's reference on a hit.
-    #[inline(always)]
-    pub fn restore(&mut self, snapshot: Option<NonZeroU64>, index: u32) {
-        let Some(seq) = snapshot else {
-            self.restore_without_snapshot(index);
-            return;
-        };
-        self.restore_snapshot(seq, index);
+    pub fn restore(
+        &mut self,
+        meter: &mut Meter<'_>,
+        snapshot: Option<NonZeroU64>,
+        index: u32,
+    ) -> Result<bool, LimitExceeded> {
+        if let Some(seq) = snapshot {
+            let slot = (seq.get() - 1) as usize % SNAPSHOT_CAP;
+            if let Some(snapshot) = self.snapshots.as_mut_slice().get_mut(slot)
+                && snapshot.seq == seq.get()
+            {
+                snapshot.refs = snapshot
+                    .refs
+                    .checked_sub(1)
+                    .expect("snapshot reference is live");
+                if self.cursor.index() != index {
+                    match self.cursor.copy_from(meter, &snapshot.cursor) {
+                        Err(LimitExceeded::Memory { .. } | LimitExceeded::Allocation { .. }) => {
+                            self.cursor.seek(meter, index)?
+                        }
+                        result => result?,
+                    }
+                }
+                assert_eq!(
+                    self.cursor.index(),
+                    index,
+                    "snapshot restores its checkpoint"
+                );
+                return Ok(false);
+            }
+        }
+        self.restore_without_snapshot(meter, index)
     }
 
-    #[inline(always)]
-    pub fn restore_without_snapshot(&mut self, index: u32) -> bool {
-        let current_index = self.cursor.descendant_index() as u32;
-        if current_index == index {
-            return false;
+    pub fn restore_without_snapshot(
+        &mut self,
+        meter: &mut Meter<'_>,
+        index: u32,
+    ) -> Result<bool, LimitExceeded> {
+        let current = self.descendant_index();
+        if current == index {
+            return Ok(false);
         }
-        self.restore_to_from_moved(current_index, index)
-    }
-
-    #[inline(always)]
-    fn restore_snapshot(&mut self, seq: NonZeroU64, index: u32) {
-        let current_index = self.descendant_index();
-        if self.consume_snapshot(seq, index, current_index) {
-            return;
+        let was_active = self.snapshots_active();
+        if current.abs_diff(index) >= SNAPSHOT_ACTIVATION_MIN_JUMP && !was_active {
+            self.wide_restore_misses += 1;
         }
-        if current_index == index {
-            return;
-        }
-        self.restore_to_from_moved(current_index, index);
-    }
-
-    /// Bytes charged against the VM memory ceiling for pooled cursor snapshots.
-    #[inline]
-    pub fn snapshot_footprint(&self) -> u64 {
-        self.snapshots.byte_footprint()
-    }
-
-    fn consume_snapshot(&mut self, seq: NonZeroU64, index: u32, current_index: u32) -> bool {
-        let cursor_is_at_index = current_index == index;
-        let pool = &mut self.snapshots;
-
-        while let Some(back) = pool.live.back()
-            && back.seq > seq
-        {
-            assert_eq!(
-                back.refs, 0,
-                "snapshot pool found a newer snapshot still referenced while restoring an older \
-                 checkpoint: snapshot_seq={}, checkpoint_seq={seq}",
-                back.seq
-            );
-            let entry = pool.live.pop_back().expect("back exists");
-            pool.free.push(entry.cursor);
-        }
-
-        let Some(back) = pool.live.back_mut() else {
-            return false;
-        };
-        if back.seq != seq {
-            return false;
-        }
-
-        if !cursor_is_at_index {
-            self.cursor.reset_to(&back.cursor);
-            assert_eq!(
-                self.cursor.descendant_index() as u32,
-                index,
-                "cursor snapshot {seq} restored a different descendant than its checkpoint recorded"
-            );
-        }
-
-        back.refs = back
-            .refs
-            .checked_sub(1)
-            .expect("snapshot reference released more times than acquired");
-        if back.refs == 0 {
-            let entry = pool.live.pop_back().expect("back exists");
-            pool.free.push(entry.cursor);
-        }
-
-        true
-    }
-
-    #[inline]
-    fn restore_to_from_moved(&mut self, current_index: u32, index: u32) -> bool {
-        let mut activated = false;
-        if current_index.abs_diff(index) >= SNAPSHOT_ACTIVATION_MIN_JUMP {
-            activated = self.record_wide_restore_miss();
-        }
-        self.cursor.goto_descendant(index as usize);
+        self.cursor.seek(meter, index)?;
         assert_eq!(
-            self.cursor.descendant_index() as u32,
+            self.descendant_index(),
             index,
-            "cursor fallback restore did not reach the checkpoint descendant index; \
-             previous_descendant={current_index}"
+            "checked seek restores its checkpoint"
         );
-        activated
+        Ok(!was_active && self.snapshots_active())
     }
 
-    #[inline]
     pub fn snapshots_active(&self) -> bool {
-        self.snapshots.wide_restore_misses >= SNAPSHOT_ACTIVATION_WIDE_MISSES
+        self.wide_restore_misses >= SNAPSHOT_ACTIVATION_WIDE_MISSES
     }
 
-    fn record_wide_restore_miss(&mut self) -> bool {
-        if self.snapshots.wide_restore_misses >= SNAPSHOT_ACTIVATION_WIDE_MISSES {
-            return false;
-        }
-        self.snapshots.wide_restore_misses += 1;
-        self.snapshots.wide_restore_misses == SNAPSHOT_ACTIVATION_WIDE_MISSES
+    pub fn has_field(
+        &mut self,
+        meter: &mut Meter<'_>,
+        field: NodeFieldId,
+    ) -> Result<bool, LimitExceeded> {
+        self.cursor.has_field(meter, u16::from(field))
     }
 
-    #[inline]
-    pub fn field_id(&self) -> Option<NodeFieldId> {
-        self.cursor.field_id().map(NodeFieldId::from)
-    }
-
-    #[inline]
-    pub fn is_trivia(node: &Node<'_>) -> bool {
-        SkipClass::Trivia.admits(NodeClass::from_node(node))
-    }
-
-    /// Navigate according to Nav command, preparing for match attempt.
-    ///
-    /// Returns the skip policy to use for the subsequent match attempt
-    /// ([`Nav::skip_policy`] — the single source of the nav→policy mapping),
-    /// or None if navigation failed (no children/siblings).
-    pub fn navigate(&mut self, nav: Nav) -> Option<SkipPolicy> {
-        let moved = match nav {
-            Nav::Epsilon => unreachable!(
-                "runtime cursor received `Nav::Epsilon`; executors must bypass cursor navigation \
-                 for epsilon transitions"
-            ),
-            Nav::Stay | Nav::StayExact => true,
-            Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => {
-                self.go_first_child()
-            }
-            Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact => {
-                self.go_next_sibling()
-            }
-            Nav::ChildlessSkipTrivia => self.childless_holds(SkipClass::Trivia),
-            Nav::ChildlessSkipExtras => self.childless_holds(SkipClass::Extras),
-            Nav::ChildlessExact => self.childless_holds(SkipClass::Exact),
-            Nav::Up(n) => self.go_up(n, UpMode::Any),
-            Nav::UpSkipTrivia(n) => self.go_up(n, UpMode::SkipTrivia),
-            Nav::UpSkipExtras(n) => self.go_up(n, UpMode::SkipExtras),
-            Nav::UpExact(n) => self.go_up(n, UpMode::Exact),
-        };
-        moved.then_some(nav.skip_policy())
-    }
-
-    fn go_first_child(&mut self) -> bool {
-        self.cursor.goto_first_child()
-    }
-
-    fn childless_holds(&mut self, skip_class: SkipClass) -> bool {
-        let origin = self.descendant_index();
-        if !self.cursor.goto_first_child() {
-            return true;
+    pub fn field_absent(
+        &mut self,
+        meter: &mut Meter<'_>,
+        field: NodeFieldId,
+    ) -> Result<bool, LimitExceeded> {
+        self.scratch.copy_from(meter, &self.cursor)?;
+        if !self.scratch.first_child(meter)? {
+            return Ok(true);
         }
         loop {
-            if !skip_class.admits(NodeClass::from_node(&self.cursor.node())) {
-                self.goto_descendant(origin);
-                return false;
+            if self.scratch.has_field(meter, u16::from(field))? {
+                return Ok(false);
             }
-            if !self.cursor.goto_next_sibling() {
-                break;
+            if !self.scratch.next_sibling(meter)? {
+                return Ok(true);
             }
         }
-        self.goto_descendant(origin);
-        true
     }
 
-    fn go_next_sibling(&mut self) -> bool {
-        self.cursor.goto_next_sibling()
+    fn class(&mut self, meter: &mut Meter<'_>) -> Result<NodeClass, LimitExceeded> {
+        Ok(NodeClass {
+            anonymous: !self.node().is_named(),
+            extra: self.node().is_extra() || self.cursor.path_extra(meter)?,
+        })
     }
 
-    fn go_up(&mut self, levels: u8, mode: UpMode) -> bool {
+    pub fn navigate(
+        &mut self,
+        meter: &mut Meter<'_>,
+        nav: Nav,
+    ) -> Result<Option<SkipPolicy>, LimitExceeded> {
+        let moved = match nav {
+            Nav::Epsilon => unreachable!("epsilon transitions bypass navigation"),
+            Nav::Stay | Nav::StayExact => true,
+            Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => {
+                self.cursor.first_child(meter)?
+            }
+            Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact => {
+                self.cursor.next_sibling(meter)?
+            }
+            Nav::ChildlessSkipTrivia => self.childless(meter, SkipClass::Trivia)?,
+            Nav::ChildlessSkipExtras => self.childless(meter, SkipClass::Extras)?,
+            Nav::ChildlessExact => self.childless(meter, SkipClass::Exact)?,
+            Nav::Up(n) => self.up(meter, n, SkipClass::Any)?,
+            Nav::UpSkipTrivia(n) => self.up(meter, n, SkipClass::Trivia)?,
+            Nav::UpSkipExtras(n) => self.up(meter, n, SkipClass::Extras)?,
+            Nav::UpExact(n) => self.up(meter, n, SkipClass::Exact)?,
+        };
+        Ok(moved.then_some(nav.skip_policy()))
+    }
+
+    fn childless(&mut self, meter: &mut Meter<'_>, skip: SkipClass) -> Result<bool, LimitExceeded> {
+        let origin = self.descendant_index();
+        if !self.cursor.first_child(meter)? {
+            return Ok(true);
+        }
+        let holds = self.remaining_skippable(meter, skip)?;
+        self.cursor.seek(meter, origin)?;
+        Ok(holds)
+    }
+
+    fn remaining_skippable(
+        &mut self,
+        meter: &mut Meter<'_>,
+        skip: SkipClass,
+    ) -> Result<bool, LimitExceeded> {
+        loop {
+            if !skip.admits(self.class(meter)?) {
+                return Ok(false);
+            }
+            if !self.cursor.next_sibling(meter)? {
+                return Ok(true);
+            }
+        }
+    }
+
+    fn up(
+        &mut self,
+        meter: &mut Meter<'_>,
+        levels: u8,
+        skip: SkipClass,
+    ) -> Result<bool, LimitExceeded> {
         let origin = self.descendant_index();
         for _ in 0..levels {
-            if !self.exit_constraint_holds(mode) || !self.cursor.goto_parent() {
-                self.goto_descendant(origin);
-                return false;
-            }
-        }
-        true
-    }
-
-    fn exit_constraint_holds(&mut self, mode: UpMode) -> bool {
-        match mode {
-            UpMode::Any => true,
-            UpMode::Exact => {
-                // Must be the last child — no next sibling at all. The probe is
-                // undone with goto_descendant, not goto_previous_sibling: the
-                // latter can rebuild the cursor entry with an off-by-one
-                // descendant index when a hidden supertype sits between parent
-                // and child, silently skewing every index-based restore after it.
+            if skip != SkipClass::Any {
                 let saved = self.descendant_index();
-                if self.cursor.goto_next_sibling() {
-                    self.goto_descendant(saved);
-                    return false;
+                let holds =
+                    !self.cursor.next_sibling(meter)? || self.remaining_skippable(meter, skip)?;
+                self.cursor.seek(meter, saved)?;
+                if !holds {
+                    self.cursor.seek(meter, origin)?;
+                    return Ok(false);
                 }
-                true
             }
-            UpMode::SkipTrivia => self.is_last_child_skipping(Self::is_trivia),
-            UpMode::SkipExtras => {
-                let skip_class = mode.skip_class();
-                self.is_last_child_skipping(|n| skip_class.admits(NodeClass::from_node(n)))
+            if !self.cursor.parent(meter)? {
+                self.cursor.seek(meter, origin)?;
+                return Ok(false);
             }
         }
+        Ok(true)
     }
 
-    fn is_last_child_skipping(&mut self, skippable: impl Fn(&Node<'t>) -> bool) -> bool {
-        let saved = self.descendant_index();
-        while self.cursor.goto_next_sibling() {
-            if !skippable(&self.cursor.node()) {
-                self.goto_descendant(saved);
-                return false;
-            }
+    pub fn continue_search(
+        &mut self,
+        meter: &mut Meter<'_>,
+        policy: SkipPolicy,
+    ) -> Result<bool, LimitExceeded> {
+        let skip = match policy {
+            SkipPolicy::Exact => return Ok(false),
+            SkipPolicy::Trivia => SkipClass::Trivia,
+            SkipPolicy::Extras => SkipClass::Extras,
+            SkipPolicy::Any => SkipClass::Any,
+        };
+        if !skip.admits(self.class(meter)?) {
+            return Ok(false);
         }
-        self.goto_descendant(saved);
-        true
-    }
-
-    /// Continue searching for a match with the given skip policy.
-    ///
-    /// This is called when a match attempt fails. It advances to the next
-    /// sibling based on the skip policy and returns whether to retry.
-    ///
-    /// - `Exact`: Return false (no skipping allowed)
-    /// - `Trivia`: Skip trivia siblings only, fail if non-trivia
-    /// - `Extras`: Skip tree-sitter extras only, fail otherwise
-    /// - `Any`: Skip any siblings
-    pub fn continue_search(&mut self, policy: SkipPolicy) -> bool {
-        match policy {
-            SkipPolicy::Exact => false,
-            SkipPolicy::Trivia | SkipPolicy::Extras => {
-                if !policy.admits(&self.cursor.node()) {
-                    return false;
-                }
-                self.cursor.goto_next_sibling()
-            }
-            SkipPolicy::Any => self.cursor.goto_next_sibling(),
-        }
+        self.cursor.next_sibling(meter)
     }
 }

@@ -6,7 +6,7 @@ Q = 2
 [transitions]
 Q:
   1                                         ▶
-  2   !   (identifier) [Node RecordSet(name)]  1
+  2   !   (identifier) [RecordSet(name) Node]  1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -32,5 +32,5 @@ Q = 0 :: T2
 
 [instructions]
 Q:
-  0   !   (identifier) [Node RecordSet(M0)]  2
+  0   !   (identifier) [RecordSet(M0) Node]  2
   2                                         ▶

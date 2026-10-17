@@ -18,8 +18,8 @@ Q = (program
 {
   "n": {
     "kind": "number",
-    "span": [3, 4],
-    "text": "1"
+    "text": "1",
+    "span": [3, 4]
   }
 }
 -------------------- BYTECODE --------------------
@@ -54,7 +54,7 @@ Q:
   05  ─•┘³ _                                06
   06  ─‣┘² _                                07
   07                                        ▶
-  08   !   (number) [Node RecordSet(M0)]    05
+  08   !   (number) [RecordSet(M0) Node]    05
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14   !   (array)                          12
@@ -63,42 +63,43 @@ Q:
   18  └─!  _                                14, 16
   20  ──!  _                                15, 20
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          03
-       ●   array
-  03       _                                15, 20
-       ●   [
-  15       (array)                          18
-       ○   [
-  03  ❮❮❮ 
-  20       _                                15, 20
-       ●   array
-  15       (array)                          18
-       ●   array
-  18       _                                14, 16
-       ●   [
-  14       (array)                          12
-       ○   [
-  18  ❮❮❮ 
-  16       _                                14, 16
-       ●   array
-  14       (array)                          12
-       ●   array
-  12       _                                08, 10
-       ●   [
-  08       (number) [Node RecordSet(M0)]    05
-       ○   [
-  12  ❮❮❮ 
-  10       _                                08, 10
-       ●   number
-  08       (number) [Node RecordSet(M0)]    05
-       ●   number
-  05       _                                06
-       ●   array
-  06       _                                07
-       ●   program
-  07   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..7]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..7]
+0003 DownExact Any
+0003 MatchOk node#41 [0..1]
+0015 StayExact Named(Some(NodeKindId(186)))
+0015 MatchFail node#41 [0..1]
+0015 Backtrack { to_record: 16 }
+0020 NextExact Any
+0020 MatchOk array [1..6]
+0015 StayExact Named(Some(NodeKindId(186)))
+0015 MatchOk array [1..6]
+0018 DownExact Any
+0018 MatchOk node#41 [1..2]
+0014 StayExact Named(Some(NodeKindId(186)))
+0014 MatchFail node#41 [1..2]
+0014 Backtrack { to_record: 31 }
+0016 NextExact Any
+0016 MatchOk array [2..5]
+0014 StayExact Named(Some(NodeKindId(186)))
+0014 MatchOk array [2..5]
+0012 DownExact Any
+0012 MatchOk node#41 [2..3]
+0008 StayExact Named(Some(NodeKindId(114)))
+0008 MatchFail node#41 [2..3]
+0008 Backtrack { to_record: 46 }
+0010 NextExact Any
+0010 MatchOk number [3..4]
+0008 StayExact Named(Some(NodeKindId(114)))
+0008 MatchOk number [3..4]
+0005 UpSkipTrivia(3) Any
+0005 MatchOk array [0..7]
+0006 Up(2) Any
+0006 MatchOk program [0..7]
+0007 Return PortId(0)
+0007 Return

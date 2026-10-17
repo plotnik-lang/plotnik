@@ -49,7 +49,3 @@ impl Default for Sink {
         Self::new()
     }
 }
-
-pub(crate) fn indentation(level: usize) -> String {
-    INDENT.repeat(level)
-}

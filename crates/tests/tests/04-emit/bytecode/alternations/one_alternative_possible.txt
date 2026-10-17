@@ -10,10 +10,10 @@ Q = 0
 Q:
   0  -ε-                                    2, 5
   1                                         ▶
-  2   !   (function_declaration) [Absent RecordSet(id) Node RecordSet(fn)]  4
+  2   !   (function_declaration) [RecordSet(fn) Node]  4
   3  ─‣┘  _                                 1
   4  └‣─  (program)                         3
-  5   !   (identifier) [Absent RecordSet(fn) Node RecordSet(id)]  1
+  5   !   (identifier) [RecordSet(id) Node]  1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -37,13 +37,14 @@ M1: S2 → T1  ; id: T1
 N0: S3 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 0 :: T2
 
 [instructions]
 Q:
-  00  -ε-                                   05, 08
-  02  └‣─  (program)                        03
-  03  ─‣┘  _                                04
-  04                                        ▶
-  05   !   (function_declaration) [Absent RecordSet(M1) Node RecordSet(M0)]  02
-  08   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  04
+  0  -ε-                                    5, 8
+  2  └‣─  (program)                         3
+  3  ─‣┘  _                                 4
+  4                                         ▶
+  5   !   (function_declaration) [RecordSet(M0) Node]  2
+  7  ...
+  8   !   (identifier) [RecordSet(M1) Node]  4

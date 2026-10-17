@@ -39,17 +39,18 @@ Q:
   08   !   (identifier) == "a"              04
   10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       _                                08, 10
-       ●   identifier
-  08       (identifier) == "a"              04
-       ●   identifier
-  04       _                                05
-       ●   expression_statement
-  05       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..1]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..1]
+0002 DownExact Any
+0002 MatchOk identifier [0..1]
+0008 StayExact Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [0..1]
+0004 UpExact(1) Any
+0004 MatchOk expression_statement [0..1]
+0005 Up(1) Any
+0005 MatchOk program [0..1]
+0006 Return PortId(0)
+0006 Return

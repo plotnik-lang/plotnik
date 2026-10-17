@@ -15,8 +15,8 @@ Q = (program
   "tail": {
     "last": {
       "kind": "identifier",
-      "span": [4, 5],
-      "text": "y"
+      "text": "y",
+      "span": [4, 5]
     }
   }
 }
@@ -52,55 +52,52 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (array) [RecordOpen]             04
+  02  └‣─  (array) [RecordSet(M1) RecordOpen]  04
   04       (@14)                            14 : 05
-  05  ─•┘  _ [RecordClose RecordSet(M1)]    07
+  05  ─•┘  _ [RecordClose]                  07
   07  ─‣┘² _                                08
   08                                        ▶
   09                                        ▶
-  10   !   (identifier) [Node RecordSet(M0)]  09
+  10   !   (identifier) [RecordSet(M0) Node]  09
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array) [RecordOpen]             04
-       ●   array
-  04       (@14)                            14 : 05
-       ▶   (@14)
-
-@14:
-  14       _                                10, 12
-       ●   [
-  10       (identifier) [Node RecordSet(M0)]  09
-       ○   [
-  14  ❮❮❮ 
-  12       _                                10, 12
-       ●   identifier
-  10       (identifier) [Node RecordSet(M0)]  09
-       ●   identifier
-  09   ◀   (@14)                            
-
-Q:
-  05       _ [RecordClose RecordSet(M1)]    07
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   ,
-  10       (identifier) [Node RecordSet(M0)]  09
-       ○   ,
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   identifier
-  10       (identifier) [Node RecordSet(M0)]  09
-       ●   identifier
-  09   ◀   (@14)                            
-
-Q:
-  05       _ [RecordClose RecordSet(M1)]    07
-       ●   array
-  07       _                                08
-       ●   program
-  08   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..7]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..6]
+0004 Call CodeAddr(14)
+0004 Call { target: 14 }
+0014 DownExact Any
+0014 MatchOk node#41 [0..1]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#41 [0..1]
+0010 Backtrack { to_record: 20 }
+0012 NextExact Any
+0012 MatchOk identifier [1..2]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchOk identifier [1..2]
+0009 Return PortId(0)
+0009 Return
+0005 UpSkipTrivia(1) Any
+0005 Backtrack { to_record: 28 }
+0012 NextExact Any
+0012 MatchOk node#8 [2..3]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#8 [2..3]
+0010 Backtrack { to_record: 42 }
+0012 NextExact Any
+0012 MatchOk identifier [4..5]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchOk identifier [4..5]
+0009 Return PortId(0)
+0009 Return
+0005 UpSkipTrivia(1) Any
+0005 MatchOk array [0..6]
+0007 Up(2) Any
+0007 MatchOk program [0..7]
+0008 Return PortId(0)
+0008 Return

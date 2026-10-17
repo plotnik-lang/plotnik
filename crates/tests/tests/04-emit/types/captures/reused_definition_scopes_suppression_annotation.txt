@@ -20,12 +20,12 @@ help: remove `:: text` to return the record value instead
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Foo<'t> {
     pub x: Node<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t, 's> {
     pub suppressed: &'s str,
     pub kept: Foo<'t>,

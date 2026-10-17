@@ -12,8 +12,8 @@ function foo(){}
   "fn": {
     "text": {
       "kind": "identifier",
-      "span": [9, 12],
-      "text": "foo"
+      "text": "foo",
+      "span": [9, 12]
     }
   }
 }
@@ -48,33 +48,31 @@ Q    = 03 :: T2
 
 [instructions]
 Name:
-  00   !   (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier) [RecordSet(M0) Node]  02
   02                                        ▶
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (function_declaration) [RecordOpen]  06
+  04  └‣─  (function_declaration) [RecordSet(M1) RecordOpen]  06
   06  └‣─  name: (Name)                     00 : 08
   07  ...
   08  -ε-  [RecordClose]                    10
-  10  ─‣┘² _ [RecordSet(M1)]                12
-  12                                        ▶
+  10  ─‣┘² _                                11
+  11                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  03       (program)                        04
-       ●   program
-  04       (function_declaration) [RecordOpen]  06
-       ●   function_declaration
-  06       (Name)                           00 : 08
-       ▶   (Name)
-
-Name:
-  00       (identifier) [Node RecordSet(M0)]  02
-       ●   identifier
-  02   ◀   (Name)                           
-
-Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
-       ●   program
-  12   ◀   (Q)                              ◼
+0003 ExecutionStarted { target: 3 }
+0003 StayExact Named(Some(NodeKindId(134)))
+0003 MatchOk program [0..16]
+0004 Down Named(Some(NodeKindId(201)))
+0004 MatchOk function_declaration [0..16]
+0006 Call CodeAddr(0)
+0006 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(1)))
+0000 MatchOk identifier [9..12]
+0002 Return PortId(0)
+0002 Return
+0008 Epsilon Any
+0010 Up(2) Any
+0010 MatchOk program [0..16]
+0011 Return PortId(0)
+0011 Return

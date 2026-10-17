@@ -5,7 +5,7 @@ Q = (function_declaration
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t> {
     pub func: FunctionInfo<'t>,
     pub name: Node<'t>,

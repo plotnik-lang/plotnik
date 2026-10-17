@@ -52,14 +52,23 @@ impl CaptureRequest {
         captured_pattern: &ast::CapturedPattern,
         nav: Option<Nav>,
         mechanism: CaptureKind,
-        outer_capture: CaptureEffects,
+        mut outer_capture: CaptureEffects,
     ) -> Self {
+        let mut capture_effects = compiler.build_capture_effects(captured_pattern, mechanism);
+        capture_effects.retain(|effect| {
+            if mechanism != CaptureKind::Node && effect.kind() == EffectKind::RecordSet {
+                outer_capture.pre.push(effect.clone());
+                false
+            } else {
+                true
+            }
+        });
         Self {
             inner: captured_pattern
                 .inner()
                 .expect("ordinary capture request has an inner pattern"),
             nav,
-            capture_effects: compiler.build_capture_effects(captured_pattern, mechanism),
+            capture_effects,
             outer_capture,
         }
     }
@@ -140,27 +149,25 @@ impl NfaBuilder<'_> {
         while let Some(eff) = iter.next() {
             match eff.kind() {
                 EffectKind::SpanStart
+                    if iter.peek().is_some_and(|e| {
+                        matches!(e.kind(), EffectKind::Node | EffectKind::RecordSet)
+                    }) =>
+                {
+                    entry_effects.push(eff);
+                }
+                EffectKind::RecordSet
                     if iter.peek().is_some_and(|e| e.kind() == EffectKind::Node) =>
                 {
                     entry_effects.push(eff);
                     entry_effects.push(iter.next().expect("peeked Node"));
-                    if iter
-                        .peek()
-                        .is_some_and(|e| e.kind() == EffectKind::RecordSet)
-                    {
-                        entry_effects.push(iter.next().expect("peeked RecordSet"));
-                    }
                     if iter.peek().is_some_and(|e| e.kind() == EffectKind::SpanEnd) {
                         entry_effects.push(iter.next().expect("peeked SpanEnd"));
                     }
                 }
                 EffectKind::Node => {
                     entry_effects.push(eff);
-                    if iter
-                        .peek()
-                        .is_some_and(|e| e.kind() == EffectKind::RecordSet)
-                    {
-                        entry_effects.push(iter.next().expect("peeked RecordSet"));
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::SpanEnd) {
+                        entry_effects.push(iter.next().expect("peeked SpanEnd"));
                     }
                 }
                 _ => exit_effects.push(eff),

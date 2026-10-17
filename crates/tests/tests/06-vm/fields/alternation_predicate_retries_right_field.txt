@@ -17,8 +17,8 @@ other + target;
   "left": null,
   "right": {
     "kind": "identifier",
-    "span": [8, 14],
-    "text": "target"
+    "text": "target",
+    "span": [8, 14]
   }
 }
 -------------------- BYTECODE --------------------
@@ -52,36 +52,36 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └─!  _                                10, 14, 16
+  02  └─!  _                                07, 12, 13
   04  ─‣┘  _                                05
   05  ─‣┘² _                                06
   06                                        ▶
-  07  ...
-  08  └‣─  left: (identifier) [Node RecordSet(M0)] == "target"  04
-  10   !   (binary_expression) [Absent RecordSet(M1)]  08
-  12  └‣─  right: (identifier) [Node RecordSet(M1)] == "target"  04
-  14   !   (binary_expression) [Absent RecordSet(M0)]  12
-  16  ──!  _                                10, 14, 16
+  07   !   (binary_expression)              08
+  08  └‣─  left: (identifier) [RecordSet(M0) Node] == "target"  04
+  10  └‣─  right: (identifier) [RecordSet(M1) Node] == "target"  04
+  12   !   (binary_expression)              10
+  13  ──!  _                                07, 12, 13
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       _                                10, 14, 16
-       ●   binary_expression
-  10       (binary_expression) [Absent RecordSet(M1)]  08
-       ●   binary_expression
-  08       left: (identifier) [Node RecordSet(M0)] == "target"  04
-       ○   +
-  02  ❮❮❮ 
-  14       (binary_expression) [Absent RecordSet(M0)]  12
-       ●   binary_expression
-  12       right: (identifier) [Node RecordSet(M1)] == "target"  04
-       ○   +
-       ●   identifier
-  04       _                                05
-       ●   binary_expression
-  05       _                                06
-       ●   program
-  06   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..15]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..15]
+0002 DownExact Any
+0002 MatchOk binary_expression [0..14]
+0007 StayExact Named(Some(NodeKindId(217)))
+0007 MatchOk binary_expression [0..14]
+0008 Down Named(Some(NodeKindId(1)))
+0008 MatchFail node#85 [6..7]
+0008 Backtrack { to_record: 13 }
+0012 StayExact Named(Some(NodeKindId(217)))
+0012 MatchOk binary_expression [0..14]
+0010 Down Named(Some(NodeKindId(1)))
+0010 MatchFail node#85 [6..7]
+0010 MatchOk identifier [8..14]
+0004 Up(1) Any
+0004 MatchOk binary_expression [0..14]
+0005 Up(2) Any
+0005 MatchOk program [0..15]
+0006 Return PortId(0)
+0006 Return

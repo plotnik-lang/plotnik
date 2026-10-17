@@ -20,25 +20,25 @@ Q = (program
     {
       "key": {
         "kind": "property_identifier",
-        "span": [2, 3],
-        "text": "a"
+        "text": "a",
+        "span": [2, 3]
       },
       "val": {
         "kind": "number",
-        "span": [5, 6],
-        "text": "1"
+        "text": "1",
+        "span": [5, 6]
       }
     },
     {
       "key": {
         "kind": "property_identifier",
-        "span": [8, 9],
-        "text": "b"
+        "text": "b",
+        "span": [8, 9]
       },
       "val": {
         "kind": "number",
-        "span": [11, 12],
-        "text": "2"
+        "text": "2",
+        "span": [11, 12]
       }
     }
   ]
@@ -82,8 +82,8 @@ Row = 00 :: T1
 [instructions]
 Row:
   00   !   (pair)                           01
-  01  └‣─  key: (_) [Node RecordSet(M0)]    03
-  03  ─‣─  value: (_) [Node RecordSet(M1)]  05
+  01  └‣─  key: (_) [RecordSet(M0) Node]    03
+  03  ─‣─  value: (_) [RecordSet(M1) Node]  05
   05  ─‣┘  _                                06
   06                                        ▶
 
@@ -91,110 +91,96 @@ Q:
   07   !   (program)                        08
   08  └‣─  (expression_statement)           09
   09  └‣─  (parenthesized_expression)       10
-  10  └‣─  (object)                         11
-  11  -ε-  [ListOpen]                       32, 19
-  13  -ε-  [ListClose]                      16
-  15  ─‣┘³ _                                18
-  16  ─‣┘  _ [RecordSet(M2)]                15
-  18                                        ▶
-  19  -ε-  [ListClose RecordSet(M2)]        15
-  21  -ε-  [ArrayPush]                      29, 13
+  10  └‣─  (object) [RecordSet(M2)]         12
+  12  -ε-  [ListOpen]                       28, 16
+  14                                        ▶
+  15  ─‣┘³ _                                14
+  16  -ε-  [ListClose]                      15
+  18  -ε-  [ArrayPush]                      26, 30
+  20  -ε-  [RecordClose]                    18
+  22   !   (Row)                            00 : 20
   23  ...
-  24  -ε-  [RecordClose]                    21
-  26   !   (Row)                            00 : 24
-  27  -ε-  [RecordOpen]                     26
-  29  ──!  _                                27, 29
-  31  ...
-  32  └─!  _                                27, 29
+  24  -ε-  [RecordOpen]                     22
+  26  ──!  _                                24, 26
+  28  └─!  _                                24, 26
+  30  ─‣┘  _ [ListClose]                    15
 --------------------- TRACE ----------------------
-Q:
-  07       (program)                        08
-       ●   program
-  08       (expression_statement)           09
-       ●   expression_statement
-  09       (parenthesized_expression)       10
-       ●   parenthesized_expression
-  10       (object)                         11
-       ○   (
-       ●   object
-  11  -ε-  [ListOpen]                       32, 19
-  32       _                                27, 29
-       ●   {
-  27  -ε-  [RecordOpen]                     26
-  26       (Row)                            00 : 24
-       ▶   (Row)
-
-Row:
-  00       (pair)                           01
-       ○   {
-  32  ❮❮❮ 
-  29       _                                27, 29
-       ●   pair
-  27  -ε-  [RecordOpen]                     26
-  26       (Row)                            00 : 24
-       ▶   (Row)
-
-Row:
-  00       (pair)                           01
-       ●   pair
-  01       key: (_) [Node RecordSet(M0)]    03
-       ●   property_identifier
-  03       value: (_) [Node RecordSet(M1)]  05
-       ○   :
-       ●   number
-  05       _                                06
-       ●   pair
-  06   ◀   (Row)                            
-
-Q:
-  24  -ε-  [RecordClose]                    21
-  21  -ε-  [ArrayPush]                      29, 13
-  29       _                                27, 29
-       ●   ,
-  27  -ε-  [RecordOpen]                     26
-  26       (Row)                            00 : 24
-       ▶   (Row)
-
-Row:
-  00       (pair)                           01
-       ○   ,
-  29  ❮❮❮ 
-  29       _                                27, 29
-       ●   pair
-  27  -ε-  [RecordOpen]                     26
-  26       (Row)                            00 : 24
-       ▶   (Row)
-
-Row:
-  00       (pair)                           01
-       ●   pair
-  01       key: (_) [Node RecordSet(M0)]    03
-       ●   property_identifier
-  03       value: (_) [Node RecordSet(M1)]  05
-       ○   :
-       ●   number
-  05       _                                06
-       ●   pair
-  06   ◀   (Row)                            
-
-Q:
-  24  -ε-  [RecordClose]                    21
-  21  -ε-  [ArrayPush]                      29, 13
-  29       _                                27, 29
-       ●   }
-  27  -ε-  [RecordOpen]                     26
-  26       (Row)                            00 : 24
-       ▶   (Row)
-
-Row:
-  00       (pair)                           01
-       ○   }
-  29  ❮❮❮ 
-  29       _                                27, 29
-  21  ❮❮❮ 
-  13  -ε-  [ListClose]                      16
-  16       _ [RecordSet(M2)]                15
-       ●   object
-  15       _                                18
-       ●   program
-  18   ◀   (Q)                              ◼
+0007 ExecutionStarted { target: 7 }
+0007 StayExact Named(Some(NodeKindId(134)))
+0007 MatchOk program [0..15]
+0008 Down Named(Some(NodeKindId(150)))
+0008 MatchOk expression_statement [0..15]
+0009 Down Named(Some(NodeKindId(178)))
+0009 MatchOk parenthesized_expression [0..14]
+0010 Down Named(Some(NodeKindId(182)))
+0010 MatchFail node#23 [0..1]
+0010 MatchOk object [1..13]
+0012 Epsilon Any
+0028 DownExact Any
+0028 MatchOk node#7 [1..2]
+0024 Epsilon Any
+0022 Call CodeAddr(0)
+0022 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(237)))
+0000 MatchFail node#7 [1..2]
+0000 Backtrack { to_record: 26 }
+0026 NextExact Any
+0026 MatchOk pair [2..6]
+0024 Epsilon Any
+0022 Call CodeAddr(0)
+0022 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(237)))
+0000 MatchOk pair [2..6]
+0001 Down Named(None)
+0001 MatchOk node#261 [2..3]
+0003 Next Named(None)
+0003 MatchFail node#35 [3..4]
+0003 MatchOk node#114 [5..6]
+0005 Up(1) Any
+0005 MatchOk pair [2..6]
+0006 Return PortId(0)
+0006 Return
+0020 Epsilon Any
+0018 Epsilon Any
+0026 NextExact Any
+0026 MatchOk node#8 [6..7]
+0024 Epsilon Any
+0022 Call CodeAddr(0)
+0022 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(237)))
+0000 MatchFail node#8 [6..7]
+0000 Backtrack { to_record: 75 }
+0026 NextExact Any
+0026 MatchOk pair [8..12]
+0024 Epsilon Any
+0022 Call CodeAddr(0)
+0022 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(237)))
+0000 MatchOk pair [8..12]
+0001 Down Named(None)
+0001 MatchOk node#261 [8..9]
+0003 Next Named(None)
+0003 MatchFail node#35 [9..10]
+0003 MatchOk node#114 [11..12]
+0005 Up(1) Any
+0005 MatchOk pair [8..12]
+0006 Return PortId(0)
+0006 Return
+0020 Epsilon Any
+0018 Epsilon Any
+0026 NextExact Any
+0026 MatchOk node#9 [12..13]
+0024 Epsilon Any
+0022 Call CodeAddr(0)
+0022 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(237)))
+0000 MatchFail node#9 [12..13]
+0000 Backtrack { to_record: 124 }
+0026 NextExact Any
+0026 Backtrack { to_record: 120 }
+0030 Up(1) Any
+0030 MatchOk object [1..13]
+0015 Up(3) Any
+0015 MatchOk program [0..15]
+0014 Return PortId(0)
+0014 Return

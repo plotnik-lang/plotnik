@@ -20,7 +20,7 @@ warning: capture type `bool` replaces the list value captured by `@items` with a
   |
 help: remove `:: bool` to return the list value instead
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q {
     pub items: bool,
 }

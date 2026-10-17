@@ -42,35 +42,35 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (binary_expression)              03
   03  └─!  _                                09, 11
-  05  ─•─  (identifier) [Node RecordSet(M1)]  07
+  05  ─•─  (identifier) [RecordSet(M1) Node]  07
   07  ─‣┘³ _                                08
   08                                        ▶
-  09   !   (identifier) [Node RecordSet(M0)]  05
+  09   !   (identifier) [RecordSet(M0) Node]  05
   11  ──!  _                                09, 11
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (binary_expression)              03
-       ●   binary_expression
-  03       _                                09, 11
-       ●   binary_expression
-  09       (identifier) [Node RecordSet(M0)]  05
-       ○   binary_expression
-  03  ❮❮❮ 
-  11       _                                09, 11
-       ●   +
-  09       (identifier) [Node RecordSet(M0)]  05
-       ○   +
-  11  ❮❮❮ 
-  11       _                                09, 11
-       ●   identifier
-  09       (identifier) [Node RecordSet(M0)]  05
-       ●   identifier
-  05       (identifier) [Node RecordSet(M1)]  07
-  11  ❮❮❮ 
-  11       _                                09, 11
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..11]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..11]
+0002 Down Named(Some(NodeKindId(217)))
+0002 MatchOk binary_expression [0..11]
+0003 DownExact Any
+0003 MatchOk binary_expression [0..7]
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchFail binary_expression [0..7]
+0009 Backtrack { to_record: 16 }
+0011 NextExact Any
+0011 MatchOk node#85 [8..9]
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchFail node#85 [8..9]
+0009 Backtrack { to_record: 24 }
+0011 NextExact Any
+0011 MatchOk identifier [10..11]
+0009 StayExact Named(Some(NodeKindId(1)))
+0009 MatchOk identifier [10..11]
+0005 NextSkip Named(Some(NodeKindId(1)))
+0005 Backtrack { to_record: 32 }
+0011 NextExact Any
+0011 Backtrack { to_record: 12 }
+0011 Backtrack { to_record: 8 }

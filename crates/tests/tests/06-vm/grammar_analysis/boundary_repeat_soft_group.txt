@@ -16,27 +16,27 @@ Q = (program
 [x,,y,,z];
 --------------------- OUTPUT ---------------------
 {
-  "last": {
-    "kind": "identifier",
-    "span": [7, 8],
-    "text": "z"
-  },
   "pairs": [
     {
       "id": {
         "kind": "identifier",
-        "span": [1, 2],
-        "text": "x"
+        "text": "x",
+        "span": [1, 2]
       }
     },
     {
       "id": {
         "kind": "identifier",
-        "span": [4, 5],
-        "text": "y"
+        "text": "y",
+        "span": [4, 5]
       }
     }
-  ]
+  ],
+  "last": {
+    "kind": "identifier",
+    "text": "z",
+    "span": [7, 8]
+  }
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -75,52 +75,53 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (array) [ListOpen]               04
-  04  └•─  (identifier) [RecordOpen Node RecordSet(M0)]  15
+  02  └‣─  (array) [RecordSet(M1) ListOpen]  04
+  04  └•─  (identifier) [RecordOpen RecordSet(M0) Node]  16
   06  !─┘  _                                07
   07  ─‣┘² _                                08
   08                                        ▶
   09   !   "]"                              06
   10  ──!  _                                09, 10
-  12  ─‣─  (identifier) [ListClose RecordSet(M1) Node RecordSet(M2)]  10
-  15  ─‣─  ","                              16
-  16  -ε-  [RecordClose ArrayPush]          18, 12
-  18  ─•─  (identifier) [RecordOpen Node RecordSet(M0)]  15
+  12  ─‣─  (identifier) [ListClose RecordSet(M2) Node]  10
+  14  -ε-  [RecordClose ArrayPush]          17, 12
+  16  ─‣─  ","                              14
+  17  ─•─  (identifier) [RecordOpen RecordSet(M0) Node]  16
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array) [ListOpen]               04
-       ●   array
-  04       (identifier) [RecordOpen Node RecordSet(M0)]  15
-       ○   [
-       ●   identifier
-  15       ","                              16
-       ●   ,
-  16  -ε-  [RecordClose ArrayPush]          18, 12
-  18       (identifier) [RecordOpen Node RecordSet(M0)]  15
-       ○   ,
-       ●   identifier
-  15       ","                              16
-       ●   ,
-  16  -ε-  [RecordClose ArrayPush]          18, 12
-  18       (identifier) [RecordOpen Node RecordSet(M0)]  15
-       ○   ,
-       ●   identifier
-  15       ","                              16
-       ○   ]
-  16  ❮❮❮ 
-  12       (identifier) [ListClose RecordSet(M1) Node RecordSet(M2)]  10
-       ○   ,
-       ●   identifier
-  10       _                                09, 10
-       ●   ]
-  09       "]"                              06
-       ●   ]
-  06       _                                07
-       ●   array
-  07       _                                08
-       ●   program
-  08   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..10]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0004 DownSkip Named(Some(NodeKindId(1)))
+0004 MatchFail node#41 [0..1]
+0004 MatchOk identifier [1..2]
+0016 Next Anonymous(Some(NodeKindId(8)))
+0016 MatchOk , [2..3]
+0014 Epsilon Any
+0017 NextSkip Named(Some(NodeKindId(1)))
+0017 MatchFail , [3..4]
+0017 MatchOk identifier [4..5]
+0016 Next Anonymous(Some(NodeKindId(8)))
+0016 MatchOk , [5..6]
+0014 Epsilon Any
+0017 NextSkip Named(Some(NodeKindId(1)))
+0017 MatchFail , [6..7]
+0017 MatchOk identifier [7..8]
+0016 Next Anonymous(Some(NodeKindId(8)))
+0016 MatchFail ] [8..9]
+0016 Backtrack { to_record: 46 }
+0012 Next Named(Some(NodeKindId(1)))
+0012 MatchFail , [6..7]
+0012 MatchOk identifier [7..8]
+0010 NextExact Any
+0010 MatchOk ] [8..9]
+0009 StayExact Anonymous(Some(NodeKindId(42)))
+0009 MatchOk ] [8..9]
+0006 UpExact(1) Any
+0006 MatchOk array [0..9]
+0007 Up(2) Any
+0007 MatchOk program [0..10]
+0008 Return PortId(0)
+0008 Return

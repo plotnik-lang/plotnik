@@ -1,4 +1,4 @@
-error: `depth = unbounded` is not supported; use `depth = auto` or an integer
+error: unknown argument `depth`; `query!` accepts `grammar`, `file`, `fuel`, `memory`, and the query string
  --> tests/macro_diagnostics/fail/depth_unbounded.rs:4:5
   |
 4 |     depth = unbounded,

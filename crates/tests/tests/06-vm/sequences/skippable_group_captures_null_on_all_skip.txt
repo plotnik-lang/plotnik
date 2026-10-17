@@ -9,13 +9,13 @@ Q = (program
 debugger;
 --------------------- OUTPUT ---------------------
 {
+  "e": null,
+  "s": null,
   "d": {
     "kind": "debugger_statement",
-    "span": [0, 9],
-    "text": "debugger;"
-  },
-  "e": null,
-  "s": null
+    "text": "debugger;",
+    "span": [0, 9]
+  }
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -49,38 +49,39 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        22, 16
   02                                        ▶
-  03  └‣─  (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  24
-  06  ─‣─  (debugger_statement) [Node RecordSet(M2)]  24
-  08   !   (empty_statement) [Node RecordSet(M1)]  06
+  03  └‣─  (debugger_statement) [RecordSet(M1) Absent RecordSet(M2) Node]  24
+  06  ─‣─  (debugger_statement) [RecordSet(M2) Node]  24
+  08   !   (empty_statement) [RecordSet(M1) Node]  06
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
-  14  -ε-  [Absent RecordSet(M1)]           06
-  16  -ε-  [Absent RecordSet(M0)]           12, 03
-  18   !   (expression_statement) [Node RecordSet(M0)]  10, 14
+  14  -ε-  [RecordSet(M1) Absent]           06
+  16  -ε-  [RecordSet(M0) Absent]           12, 03
+  18   !   (expression_statement) [RecordSet(M0) Node]  10, 14
   20  ──!  _                                18, 20
   22  └─!  _                                18, 20
   24  ─‣┘  _                                02
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        22, 16
-       ●   program
-  22       _                                18, 20
-       ●   debugger_statement
-  18       (expression_statement) [Node RecordSet(M0)]  10, 14
-       ○   debugger_statement
-  22  ❮❮❮ 
-  20       _                                18, 20
-  00  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M0)]           12, 03
-  12       _                                08, 10
-       ●   debugger_statement
-  08       (empty_statement) [Node RecordSet(M1)]  06
-       ○   debugger_statement
-  12  ❮❮❮ 
-  10       _                                08, 10
-  16  ❮❮❮ 
-  03       (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  24
-       ●   debugger_statement
-  24       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..9]
+0022 DownExact Any
+0022 MatchOk debugger_statement [0..9]
+0018 StayExact Named(Some(NodeKindId(150)))
+0018 MatchFail debugger_statement [0..9]
+0018 Backtrack { to_record: 9 }
+0020 NextExact Any
+0020 Backtrack { to_record: 5 }
+0016 Epsilon Any
+0012 DownExact Any
+0012 MatchOk debugger_statement [0..9]
+0008 StayExact Named(Some(NodeKindId(171)))
+0008 MatchFail debugger_statement [0..9]
+0008 Backtrack { to_record: 24 }
+0010 NextExact Any
+0010 Backtrack { to_record: 20 }
+0003 Down Named(Some(NodeKindId(168)))
+0003 MatchOk debugger_statement [0..9]
+0024 Up(1) Any
+0024 MatchOk program [0..9]
+0002 Return PortId(0)
+0002 Return

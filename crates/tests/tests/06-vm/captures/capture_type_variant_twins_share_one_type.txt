@@ -18,14 +18,14 @@ x;
 --------------------- OUTPUT ---------------------
 {
   "a": {
+    "$tag": "Id",
     "$data": {
       "id": {
         "kind": "identifier",
-        "span": [0, 1],
-        "text": "x"
+        "text": "x",
+        "span": [0, 1]
       }
-    },
-    "$tag": "Id"
+    }
   },
   "b": {
     "$tag": "Num"
@@ -77,39 +77,40 @@ Q = 00 :: T6
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └─!  _                                17, 20, 22
+  02  └─!  _ [RecordSet(M6)]                16, 19, 21
   04                                        ▶
-  05   !   (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  14
+  05   !   (identifier) [VariantOpen(M4) RecordSet(M3) Node VariantClose]  14
   08   !   (number) [VariantOpen(M5) VariantClose]  14
   10  ──!  _                                05, 08, 10
-  12  └─!  _                                05, 08, 10
-  14  ─‣┘² _ [RecordSet(M7)]                04
-  16  ─‣─  (expression_statement)           12
-  17   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  24
-  20   !   (number) [VariantOpen(M2) VariantClose]  24
-  22  ──!  _                                17, 20, 22
-  24  ─‣┘  _ [RecordSet(M6)]                16
+  12  └─!  _ [RecordSet(M7)]                05, 08, 10
+  14  ─‣┘² _                                04
+  15  ─‣─  (expression_statement)           12
+  16   !   (identifier) [VariantOpen(M1) RecordSet(M0) Node VariantClose]  23
+  19   !   (number) [VariantOpen(M2) VariantClose]  23
+  21  ──!  _                                16, 19, 21
+  23  ─‣┘  _                                15
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       _                                17, 20, 22
-       ●   identifier
-  17       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  24
-       ●   identifier
-  24       _ [RecordSet(M6)]                16
-       ●   expression_statement
-  16       (expression_statement)           12
-       ●   expression_statement
-  12       _                                05, 08, 10
-       ●   number
-  05       (identifier) [VariantOpen(M4) Node RecordSet(M3) VariantClose]  14
-       ○   number
-  12  ❮❮❮ 
-  08       (number) [VariantOpen(M5) VariantClose]  14
-       ●   number
-  14       _ [RecordSet(M7)]                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0002 DownExact Any
+0002 MatchOk identifier [0..1]
+0016 StayExact Named(Some(NodeKindId(1)))
+0016 MatchOk identifier [0..1]
+0023 Up(1) Any
+0023 MatchOk expression_statement [0..2]
+0015 Next Named(Some(NodeKindId(150)))
+0015 MatchOk expression_statement [3..5]
+0012 DownExact Any
+0012 MatchOk number [3..4]
+0005 StayExact Named(Some(NodeKindId(1)))
+0005 MatchFail number [3..4]
+0005 Backtrack { to_record: 34 }
+0008 StayExact Named(Some(NodeKindId(114)))
+0008 MatchOk number [3..4]
+0014 Up(2) Any
+0014 MatchOk program [0..5]
+0004 Return PortId(0)
+0004 Return

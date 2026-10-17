@@ -12,12 +12,12 @@ warning: this capture already has type `QInfo`. Naming it `QInfo` has no effect
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t> {
     pub info: QInfo<'t>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct QInfo<'t> {
     pub stmt: Node<'t>,
 }

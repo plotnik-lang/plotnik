@@ -47,23 +47,23 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └─!  _                                05, 08, 10
+  02  └─!  _ [RecordSet(M2)]                05, 08, 10
   04                                        ▶
-  05   !   (_) [VariantOpen(M0) VariantClose]  12
-  07  ...
-  08   !   (identifier) [VariantOpen(M1) VariantClose]  12
+  05   !   (_) [VariantOpen(M0) VariantClose]  07
+  07  ─‣┘² _                                04
+  08   !   (identifier) [VariantOpen(M1) VariantClose]  07
   10  ──!  _                                05, 08, 10
-  12  ─‣┘² _ [RecordSet(M2)]                04
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       _                                05, 08, 10
-       ●   identifier
-  05       (_) [VariantOpen(M0) VariantClose]  12
-       ●   identifier
-  12       _ [RecordSet(M2)]                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..2]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0002 DownExact Any
+0002 MatchOk identifier [0..1]
+0005 StayExact Named(None)
+0005 MatchOk identifier [0..1]
+0007 Up(2) Any
+0007 MatchOk program [0..2]
+0004 Return PortId(0)
+0004 Return

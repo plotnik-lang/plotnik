@@ -11,4 +11,3 @@ pub use target::{
 };
 
 pub(crate) use plan::CodegenPlan;
-pub use targets::rust::journal_fn_name;

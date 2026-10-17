@@ -14,8 +14,8 @@ Q = (program
 {
   "n": {
     "kind": "number",
-    "span": [7, 8],
-    "text": "1"
+    "text": "1",
+    "span": [7, 8]
   }
 }
 -------------------- BYTECODE --------------------
@@ -51,58 +51,59 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          14, 05
   04                                        ▶
-  05  └‣─  (number) [Node RecordSet(M0)]    07
+  05  └‣─  (number) [RecordSet(M0) Node]    07
   07  ─‣┘³ _                                04
-  08  ─‣─  (number) [Node RecordSet(M0)]    07
+  08  ─‣─  (number) [RecordSet(M0) Node]    07
   10   !   (identifier)                     12, 08
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (array)                          14, 05
-       ●   array
-  14       _                                10, 12
-       ●   [
-  10       (identifier)                     12, 08
-       ○   [
-  14  ❮❮❮ 
-  12       _                                10, 12
-       ●   identifier
-  10       (identifier)                     12, 08
-       ●   identifier
-  12       _                                10, 12
-       ●   ,
-  10       (identifier)                     12, 08
-       ○   ,
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   identifier
-  10       (identifier)                     12, 08
-       ●   identifier
-  12       _                                10, 12
-       ●   ,
-  10       (identifier)                     12, 08
-       ○   ,
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   number
-  10       (identifier)                     12, 08
-       ○   number
-  12  ❮❮❮ 
-  12       _                                10, 12
-       ●   ]
-  10       (identifier)                     12, 08
-       ○   ]
-  12  ❮❮❮ 
-  12       _                                10, 12
-  10  ❮❮❮ 
-  08       (number) [Node RecordSet(M0)]    07
-       ○   ,
-       ●   number
-  07       _                                04
-       ●   program
-  04   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..10]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..10]
+0002 Down Named(Some(NodeKindId(186)))
+0002 MatchOk array [0..9]
+0014 DownExact Any
+0014 MatchOk node#41 [0..1]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#41 [0..1]
+0010 Backtrack { to_record: 17 }
+0012 NextExact Any
+0012 MatchOk identifier [1..2]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchOk identifier [1..2]
+0012 NextExact Any
+0012 MatchOk node#8 [2..3]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#8 [2..3]
+0010 Backtrack { to_record: 33 }
+0012 NextExact Any
+0012 MatchOk identifier [4..5]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchOk identifier [4..5]
+0012 NextExact Any
+0012 MatchOk node#8 [5..6]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#8 [5..6]
+0010 Backtrack { to_record: 49 }
+0012 NextExact Any
+0012 MatchOk number [7..8]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail number [7..8]
+0010 Backtrack { to_record: 57 }
+0012 NextExact Any
+0012 MatchOk node#42 [8..9]
+0010 StayExact Named(Some(NodeKindId(1)))
+0010 MatchFail node#42 [8..9]
+0010 Backtrack { to_record: 65 }
+0012 NextExact Any
+0012 Backtrack { to_record: 45 }
+0008 Next Named(Some(NodeKindId(114)))
+0008 MatchFail node#8 [5..6]
+0008 MatchOk number [7..8]
+0007 Up(3) Any
+0007 MatchOk program [0..10]
+0004 Return PortId(0)
+0004 Return

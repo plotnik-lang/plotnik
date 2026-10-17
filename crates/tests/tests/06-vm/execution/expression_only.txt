@@ -3,10 +3,10 @@
 chosen;
 --------------------- OUTPUT ---------------------
 {
+  "$tag": "Name",
   "$data": {
     "text": "chosen"
-  },
-  "$tag": "Name"
+  }
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -42,23 +42,24 @@ M3: S4 → T2  ; Number: T2
   02  ─‣┘  _                                03
   03  ─‣┘  _ [VariantClose]                 05
   05                                        ▶
-  06  └‣─  (identifier) [NodeText RecordSet(M0)]  02
+  06  └‣─  (identifier) [RecordSet(M0) NodeText]  02
   08  └‣─  (expression_statement)           06
   09   !   (program) [VariantOpen(M2)]      08
-  11  └‣─  (number) [NodeText RecordSet(M1)]  02
+  11  └‣─  (number) [RecordSet(M1) NodeText]  02
   13  └‣─  (expression_statement)           11
   14   !   (program) [VariantOpen(M3)]      13
 --------------------- TRACE ----------------------
-<expression>:
-  00  -ε-                                   09, 14
-  09       (program) [VariantOpen(M2)]      08
-       ●   program
-  08       (expression_statement)           06
-       ●   expression_statement
-  06       (identifier) [NodeText RecordSet(M0)]  02
-       ●   identifier
-  02       _                                03
-       ●   expression_statement
-  03       _ [VariantClose]                 05
-       ●   program
-  05   ◀   (<expression>)                   ◼
+0000 ExecutionStarted { target: 0 }
+0000 Epsilon Any
+0009 StayExact Named(Some(NodeKindId(134)))
+0009 MatchOk program [0..7]
+0008 Down Named(Some(NodeKindId(150)))
+0008 MatchOk expression_statement [0..7]
+0006 Down Named(Some(NodeKindId(1)))
+0006 MatchOk identifier [0..6]
+0002 Up(1) Any
+0002 MatchOk expression_statement [0..7]
+0003 Up(1) Any
+0003 MatchOk program [0..7]
+0005 Return PortId(0)
+0005 Return

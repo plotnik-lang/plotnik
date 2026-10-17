@@ -18,7 +18,7 @@ warning: capture type `text` replaces the variant value captured by `@value` wit
   |
 help: remove `:: text` to return the variant value instead
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'s> {
     pub value: &'s str,
 }

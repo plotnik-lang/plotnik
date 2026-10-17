@@ -18,19 +18,19 @@ Q = (program
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum B<'t> {
+#[derive(Clone, Copy)]
+pub enum B<'r, 't> {
     Leaf { n: Node<'t> },
-    Wrap { a: ::std::boxed::Box<A<'t>> },
+    Wrap { a: &'r A<'r, 't> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum A<'t> {
+#[derive(Clone, Copy)]
+pub enum A<'r, 't> {
     Base { id: Node<'t> },
-    Nest { b: ::std::boxed::Box<B<'t>> },
+    Nest { b: &'r B<'r, 't> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Q<'t> {
-    pub root: A<'t>,
+#[derive(Clone, Copy)]
+pub struct Q<'r, 't> {
+    pub root: A<'r, 't>,
 }

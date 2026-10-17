@@ -5,17 +5,21 @@ use crate::bytecode::{
     EntryBoundary, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp, TypeDefKind, TypeKind,
 };
 
-use crate::core::{Colors, NodeFieldId};
+use crate::core::NodeFieldId;
 
 use plotnik_runtime::{
-    CallResume, Checkpoint, Engine, ExecutionBudget, JournalEvent, LimitExceeded, MatchJournal,
-    PortId, ResolvedRuntimeLimits, Resume, RuntimeLimitSpec, SkipPolicy, Traversal,
+    Account, CallResume, Checkpoint, Document, Engine, JournalEvent, LimitExceeded, Meter, PortId,
+    ResolvedRuntimeLimits, Resume, RuntimeLimitSpec, SchemaTables, Search, Shared, SkipPolicy,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
-use super::materializer::ValueMaterializer;
 use super::trace::{NoopTracer, Tracer};
-use super::value::{NodeValue, Value, node_text};
+
+macro_rules! trace {
+    ($meter:expr, $tracer:ident, $method:ident($($args:expr),* $(,)?)) => {
+        $meter.callback(|| { $tracer.$method($($args),*); $tracer.check() })?
+    };
+}
 
 /// Resource usage observed during one VM run.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
@@ -23,50 +27,8 @@ pub struct RunStats {
     /// Fuel consumed by execution. Each matcher dispatch currently
     /// consumes one unit; this is not a stable cross-version performance metric.
     pub fuel_used: u64,
-    /// Peak estimated runtime memory for occupied entries, sampled during execution
-    /// and at run exit. Excludes spare allocation capacity.
+    /// Peak admitted capacity, including metadata and growth overlap.
     pub peak_live_heap_bytes: u64,
-}
-
-trait StatsObserver: Default {
-    const ENABLED: bool;
-    type Report;
-
-    fn observe_heap(&mut self, used: u64);
-    fn finish(self, budget: &ExecutionBudget) -> Self::Report;
-}
-
-#[derive(Default)]
-struct NoStats;
-
-impl StatsObserver for NoStats {
-    const ENABLED: bool = false;
-    type Report = ();
-
-    fn observe_heap(&mut self, _used: u64) {}
-
-    fn finish(self, _budget: &ExecutionBudget) {}
-}
-
-#[derive(Default)]
-struct CollectStats {
-    peak_live_heap_bytes: u64,
-}
-
-impl StatsObserver for CollectStats {
-    const ENABLED: bool = true;
-    type Report = RunStats;
-
-    fn observe_heap(&mut self, used: u64) {
-        self.peak_live_heap_bytes = self.peak_live_heap_bytes.max(used);
-    }
-
-    fn finish(self, budget: &ExecutionBudget) -> RunStats {
-        RunStats {
-            fuel_used: budget.fuel_used(),
-            peak_live_heap_bytes: self.peak_live_heap_bytes,
-        }
-    }
 }
 
 /// Virtual machine state for query execution.
@@ -74,7 +36,7 @@ pub struct VM<'s, 't> {
     pub(crate) engine: Engine<'t>,
     pub(crate) ip: CodeAddr,
 
-    pub(crate) limits: ResolvedRuntimeLimits,
+    account: Result<Account, LimitExceeded>,
 
     pub(crate) source: &'s str,
 }
@@ -113,41 +75,40 @@ impl<'s, 't> VMBuilder<'s, 't> {
     }
 }
 
-struct Application<'s, 't> {
+struct Application<'q, 's, 't> {
     vm: VM<'s, 't>,
-    module: &'s Module,
+    module: &'q Module,
     entrypoint: Entrypoint,
-    materializer: Option<ValueMaterializer<'s, 't>>,
+    schema: Option<Shared<SchemaTables<'q>>>,
 }
 
-impl<'s, 't> Application<'s, 't> {
-    fn new(vm: VM<'s, 't>, module: &'s Module, entrypoint: Entrypoint) -> Self {
+impl<'q, 's, 't> Application<'q, 's, 't> {
+    fn new(vm: VM<'s, 't>, module: &'q Module, entrypoint: Entrypoint) -> Self {
         Self {
             vm,
             module,
             entrypoint,
-            materializer: None,
+            schema: None,
         }
     }
 
     fn apply_budgeted<T: Tracer>(
         &mut self,
         tracer: &mut T,
-        budget: &mut ExecutionBudget,
-    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
+        budget: &mut Meter<'_>,
+    ) -> Result<Option<Document<'q, 't, 's>>, LimitExceeded> {
         let node = self.vm.engine.node();
         let source = self.vm.source;
-        let (result, _) =
-            self.vm
-                .run_budgeted::<T, NoStats>(self.module, &self.entrypoint, tracer, budget);
+        if self.schema.is_none() {
+            self.schema = Some(super::schema::build(budget, self.module)?);
+        }
+        let result = self
+            .vm
+            .run_budgeted(self.module, &self.entrypoint, tracer, budget);
         match result {
             Ok(()) => {}
             Err(RuntimeError::NoMatch) => return Ok(None),
-            Err(RuntimeError::OutOfFuel(limit)) => return Err(LimitExceeded::OutOfFuel(limit)),
-            Err(RuntimeError::MemoryLimitExceeded { used, limit }) => {
-                return Err(LimitExceeded::Memory { used, limit });
-            }
-            Err(RuntimeError::CallFrame(error)) => return Err(error.into()),
+            Err(RuntimeError::Limit(error)) => return Err(error),
         }
 
         let result_type = self
@@ -159,43 +120,77 @@ impl<'s, 't> Application<'s, 't> {
             result_type.decode(),
             TypeDefKind::Primitive(TypeKind::NoValue)
         ) {
-            return Ok(Some(Value::Node(NodeValue::from_node(node, source))));
+            self.vm.engine.emit(budget, |_| JournalEvent::Node(node))?;
         }
 
-        let materializer = self
-            .materializer
-            .get_or_insert_with(|| ValueMaterializer::new(source, self.module));
-        Ok(Some(materializer.materialize_verified(
-            &self.entrypoint,
-            self.vm.engine.journal().output_events(),
-            Colors::new(false),
-        )))
+        Document::new(
+            budget,
+            self.schema.as_ref().expect("schema built above").clone(),
+            self.vm.engine.take_tape(),
+            source,
+            u32::from(u16::from(self.entrypoint.result_type())),
+        )
+        .map(Some)
     }
 
     fn traverse_impl<F>(
         mut self,
         mut apply: F,
-    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>>
+    ) -> impl std::iter::FusedIterator<Item = Result<Document<'q, 't, 's>, LimitExceeded>>
     where
-        F: FnMut(&mut Self, &mut ExecutionBudget) -> Result<Option<Value<'s, 't>>, LimitExceeded>,
+        F: FnMut(&mut Self, &mut Meter<'_>) -> Result<Option<Document<'q, 't, 's>>, LimitExceeded>,
     {
-        Traversal::new(
-            self.vm.engine.node(),
-            ExecutionBudget::new(self.vm.limits),
-            move |node, budget: &mut ExecutionBudget| {
+        let account = self.vm.account.clone();
+        let mut search = Search::new(self.vm.engine.node());
+        let mut done = false;
+        std::iter::from_fn(move || {
+            if done {
+                return None;
+            }
+            let account = match &account {
+                Ok(account) => account,
+                Err(error) => {
+                    done = true;
+                    return Some(Err(*error));
+                }
+            };
+            let mut meter = account.meter();
+            loop {
+                let node = match search.next(&mut meter) {
+                    Ok(Some(node)) => node,
+                    Ok(None) => {
+                        done = true;
+                        return None;
+                    }
+                    Err(error) => {
+                        done = true;
+                        return Some(Err(error));
+                    }
+                };
                 self.vm.engine.reset(node);
-                apply(&mut self, budget)
-            },
-        )
+                match apply(&mut self, &mut meter) {
+                    Ok(Some(result)) => {
+                        search.accepted();
+                        return Some(Ok(result));
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        done = true;
+                        return Some(Err(error));
+                    }
+                }
+            }
+        })
+        .fuse()
     }
 }
 
 impl<'s, 't> VM<'s, 't> {
     fn at_node(source: &'s str, node: Node<'t>, limits: ResolvedRuntimeLimits) -> Self {
         VM {
-            engine: Engine::new(node.walk()),
+            engine: Engine::new(node),
+            account: Account::new(limits),
             ip: CodeAddr::ZERO,
-            limits,
             source,
         }
     }
@@ -204,37 +199,42 @@ impl<'s, 't> VM<'s, 't> {
         VMBuilder::new(source, tree)
     }
 
+    /// Shared execution and output account, including retained results.
+    pub fn account(&self) -> Result<&Account, LimitExceeded> {
+        self.account.as_ref().map_err(|error| *error)
+    }
+
     /// Apply an emitted, independently eligible entry at the supplied node.
     /// Match-only entries return that node in the VM's existing value format.
     /// A suitable entry applied to the wrong node is ordinary `None`.
-    pub fn apply(
+    pub fn apply<'q>(
         self,
-        module: &'s Module,
+        module: &'q Module,
         entrypoint: &Entrypoint,
-    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
+    ) -> Result<Option<Document<'q, 't, 's>>, LimitExceeded> {
         self.apply_with(module, entrypoint, &mut NoopTracer)
     }
 
     /// Apply as in [`Self::apply`], tracing the attempt.
-    pub fn apply_with<T: Tracer>(
+    pub fn apply_with<'q, T: Tracer>(
         self,
-        module: &'s Module,
+        module: &'q Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
-    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
-        let mut budget = ExecutionBudget::new(self.limits);
-        Application::new(self, module, *entrypoint).apply_budgeted(tracer, &mut budget)
+    ) -> Result<Option<Document<'q, 't, 's>>, LimitExceeded> {
+        let account = self.account.clone()?;
+        Application::new(self, module, *entrypoint).apply_budgeted(tracer, &mut account.meter())
     }
 
     /// Lazily return outermost matches in inclusive, source-order DFS preorder.
     /// A successful candidate prunes its descendants from further search.
     /// All traversal and matching work shares the limits already resolved for
     /// this VM's scope. Recursive captures and collections remain inside each result.
-    pub fn traverse(
+    pub fn traverse<'q>(
         self,
-        module: &'s Module,
+        module: &'q Module,
         entrypoint: Entrypoint,
-    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
+    ) -> impl std::iter::FusedIterator<Item = Result<Document<'q, 't, 's>, LimitExceeded>> {
         let mut tracer = NoopTracer;
         Application::new(self, module, entrypoint)
             .traverse_impl(move |app, budget| app.apply_budgeted(&mut tracer, budget))
@@ -243,12 +243,12 @@ impl<'s, 't> VM<'s, 't> {
     /// Traverse as in [`Self::traverse`], tracing each attempted candidate, including failures,
     /// only as the iterator is consumed.
     /// Drop the iterator before inspecting the borrowed tracer.
-    pub fn traverse_with<T: Tracer>(
+    pub fn traverse_with<'q, T: Tracer>(
         self,
-        module: &'s Module,
+        module: &'q Module,
         entrypoint: Entrypoint,
         tracer: &mut T,
-    ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
+    ) -> impl std::iter::FusedIterator<Item = Result<Document<'q, 't, 's>, LimitExceeded>> {
         Application::new(self, module, entrypoint)
             .traverse_impl(move |app, budget| app.apply_budgeted(tracer, budget))
     }
@@ -261,11 +261,11 @@ impl<'s, 't> VM<'s, 't> {
     ///
     /// This is a convenience method that uses `NoopTracer`, which gets
     /// completely optimized away at compile time.
-    pub fn execute(
+    pub fn execute<'q>(
         self,
-        module: &Module,
+        module: &'q Module,
         entrypoint: &Entrypoint,
-    ) -> Result<MatchJournal<'t>, RuntimeError> {
+    ) -> Result<Document<'q, 't, 's>, RuntimeError> {
         self.execute_with(module, entrypoint, &mut NoopTracer)
     }
 
@@ -274,76 +274,67 @@ impl<'s, 't> VM<'s, 't> {
     /// The tracer is generic, so `NoopTracer` calls are optimized away
     /// while `PrintTracer` calls collect execution trace.
     ///
-    pub fn execute_with<T: Tracer>(
+    pub fn execute_with<'q, T: Tracer>(
         self,
-        module: &Module,
+        module: &'q Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
-    ) -> Result<MatchJournal<'t>, RuntimeError> {
-        self.execute_impl::<T, NoStats>(module, entrypoint, tracer)
-            .0
+    ) -> Result<Document<'q, 't, 's>, RuntimeError> {
+        self.apply_with(module, entrypoint, tracer)?
+            .ok_or(RuntimeError::NoMatch)
     }
 
     /// Execute query with a tracer and report run statistics.
-    pub fn execute_with_stats<T: Tracer>(
+    pub fn execute_with_stats<'q, T: Tracer>(
         self,
-        module: &Module,
+        module: &'q Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
-    ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
-        self.execute_impl::<T, CollectStats>(module, entrypoint, tracer)
+    ) -> (Result<Document<'q, 't, 's>, RuntimeError>, RunStats) {
+        let account = match self.account.clone() {
+            Ok(account) => account,
+            Err(error) => {
+                return (
+                    Err(error.into()),
+                    RunStats {
+                        fuel_used: 0,
+                        peak_live_heap_bytes: 0,
+                    },
+                );
+            }
+        };
+        let result = Application::new(self, module, *entrypoint)
+            .apply_budgeted(tracer, &mut account.meter())
+            .map_err(RuntimeError::from)
+            .and_then(|result| result.ok_or(RuntimeError::NoMatch));
+        let stats = RunStats {
+            fuel_used: account.fuel_used(),
+            peak_live_heap_bytes: account.memory_peak(),
+        };
+        (result, stats)
     }
 
-    fn execute_impl<T: Tracer, S: StatsObserver>(
-        mut self,
-        module: &Module,
-        entrypoint: &Entrypoint,
-        tracer: &mut T,
-    ) -> (Result<MatchJournal<'t>, RuntimeError>, S::Report) {
-        let mut budget = ExecutionBudget::new(self.limits);
-        let (result, report) = self.run_budgeted::<T, S>(module, entrypoint, tracer, &mut budget);
-        (result.map(|()| self.engine.into_journal()), report)
-    }
-
-    fn run_budgeted<T: Tracer, S: StatsObserver>(
+    fn run_budgeted<T: Tracer>(
         &mut self,
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
-        budget: &mut ExecutionBudget,
-    ) -> (Result<(), RuntimeError>, S::Report) {
+        budget: &mut Meter<'_>,
+    ) -> Result<(), RuntimeError> {
         self.ip = entrypoint.target();
         if T::ENABLED {
-            tracer.trace_execution_started(self.ip);
+            let account = budget.account();
+            budget.callback(|| {
+                tracer.start(account);
+                tracer.check()
+            })?;
+            trace!(budget, tracer, trace_execution_started(self.ip));
         }
         let boundary = entrypoint.boundary();
-        self.begin_entry(boundary, tracer);
+        self.begin_entry(boundary, tracer, budget)?;
 
-        let mut stats = S::default();
-        if S::ENABLED {
-            stats.observe_heap(self.engine.heap_bytes());
-        }
-
-        let result = loop {
-            if let Err(error) = budget.charge() {
-                let LimitExceeded::OutOfFuel(limit) = error else {
-                    unreachable!("charging fuel only reports fuel exhaustion");
-                };
-                break Err(RuntimeError::OutOfFuel(limit));
-            }
-
-            if budget.memory_sample_due() && (S::ENABLED || self.limits.max_memory.is_some()) {
-                let used = self.engine.heap_bytes();
-                if S::ENABLED {
-                    stats.observe_heap(used);
-                }
-
-                if let Some(max) = self.limits.max_memory
-                    && used > max
-                {
-                    break Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
-                }
-            }
+        loop {
+            budget.charge(1)?;
 
             #[cfg(debug_assertions)]
             debug_assert!(
@@ -352,13 +343,17 @@ impl<'s, 't> VM<'s, 't> {
                 self.ip
             );
             if T::ENABLED {
-                tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));
+                trace!(
+                    budget,
+                    tracer,
+                    trace_instruction(self.ip, &module.decode_instruction(self.ip))
+                );
             }
 
             let result = match module.decoded().instruction_at(self.ip) {
-                DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
-                DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
-                DecodedInstr::Return(port) => self.exec_return(port, module, tracer),
+                DecodedInstr::Match(m) => self.exec_match(m, module, tracer, budget),
+                DecodedInstr::Call(c) => self.exec_call(c, module, tracer, budget),
+                DecodedInstr::Return(port) => self.exec_return(port, module, tracer, budget),
                 DecodedInstr::Interior => {
                     unreachable!(
                         "decoded bytecode lookup returned an interior word at instruction pointer \
@@ -371,36 +366,41 @@ impl<'s, 't> VM<'s, 't> {
             match result {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
                 Err(Signal::Flow(ControlFlow::Accept)) => {
-                    self.finish_entry(boundary, tracer);
-                    self.engine.accepted_journal();
+                    self.finish_entry(boundary, tracer, budget)?;
+                    self.engine.accepted_tape();
                     break Ok(());
                 }
                 Err(Signal::Error(e)) => {
                     break Err(e);
                 }
             }
-        };
-
-        if S::ENABLED {
-            stats.observe_heap(self.engine.heap_bytes());
         }
-
-        (result, stats.finish(budget))
     }
 
-    fn begin_entry<T: Tracer>(&mut self, boundary: EntryBoundary, tracer: &mut T) {
+    fn begin_entry<T: Tracer>(
+        &mut self,
+        boundary: EntryBoundary,
+        tracer: &mut T,
+        meter: &mut Meter<'_>,
+    ) -> Result<(), LimitExceeded> {
         if boundary == EntryBoundary::Record {
-            self.emit_effect(Effect::new(EffectKind::RecordOpen, 0), tracer);
+            self.emit_effect(Effect::new(EffectKind::RecordOpen, 0), tracer, meter)?;
         }
+        Ok(())
     }
 
-    fn finish_entry<T: Tracer>(&mut self, boundary: EntryBoundary, tracer: &mut T) {
+    fn finish_entry<T: Tracer>(
+        &mut self,
+        boundary: EntryBoundary,
+        tracer: &mut T,
+        meter: &mut Meter<'_>,
+    ) -> Result<(), LimitExceeded> {
         let kind = match boundary {
-            EntryBoundary::Passthrough => return,
+            EntryBoundary::Passthrough => return Ok(()),
             EntryBoundary::Node => EffectKind::Node,
             EntryBoundary::Record => EffectKind::RecordClose,
         };
-        self.emit_effect(Effect::new(kind, 0), tracer);
+        self.emit_effect(Effect::new(kind, 0), tracer, meter)
     }
 
     fn exec_match<T: Tracer>(
@@ -408,12 +408,13 @@ impl<'s, 't> VM<'s, 't> {
         m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
         if !m.is_epsilon() {
-            self.navigate_and_match(m, module, tracer)?;
+            self.navigate_and_match(m, module, tracer, meter)?;
         }
 
-        self.finish_match(m, module, tracer)
+        self.finish_match(m, module, tracer, meter)
     }
 
     fn finish_match<T: Tracer>(
@@ -421,12 +422,13 @@ impl<'s, 't> VM<'s, 't> {
         m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
         for &op in module.decoded().effects(&m) {
-            self.emit_effect(op, tracer);
+            self.emit_effect(op, tracer, meter)?;
         }
 
-        self.follow_successors(m, module, tracer)
+        self.follow_successors(m, module, tracer, meter)
     }
 
     fn navigate_and_match<T: Tracer>(
@@ -434,35 +436,36 @@ impl<'s, 't> VM<'s, 't> {
         m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
-        let Some(policy) = self.engine.cursor_mut().navigate(m.nav) else {
+        let Some(policy) = self.engine.cursor_mut().navigate(meter, m.nav)? else {
             if T::ENABLED {
-                tracer.trace_nav_failure(m.nav);
+                trace!(meter, tracer, trace_nav_failure(m.nav));
             }
-            return Err(self.backtrack(module, tracer));
+            return self.backtrack(module, tracer, meter);
         };
         if T::ENABLED {
-            tracer.trace_nav(m.nav, self.engine.node());
+            trace!(meter, tracer, trace_nav(m.nav, self.engine.node()));
         }
 
         let cont_nav = m.nav.sibling_continuation();
         loop {
-            if self.candidate_matches(m, module, tracer) {
+            if self.candidate_matches(m, module, tracer, meter)? {
                 break;
             }
-            self.advance_or_backtrack(policy, cont_nav, module, tracer)?;
+            self.advance_or_backtrack(policy, cont_nav, module, tracer, meter)?;
         }
 
         if T::ENABLED {
-            tracer.trace_match_success(self.engine.node());
+            trace!(meter, tracer, trace_match_success(self.engine.node()));
         }
         if T::ENABLED
             && let Some(field_id) = m.node_field
         {
-            tracer.trace_field_success(field_id);
+            trace!(meter, tracer, trace_field_success(field_id));
         }
 
-        self.push_match_retry_if_resumable(m, policy, tracer);
+        self.push_match_retry_if_resumable(m, policy, tracer, meter)?;
 
         Ok(())
     }
@@ -472,23 +475,30 @@ impl<'s, 't> VM<'s, 't> {
         m: DecodedMatch,
         policy: SkipPolicy,
         tracer: &mut T,
-    ) {
+        meter: &mut Meter<'_>,
+    ) -> Result<(), LimitExceeded> {
         if !m.nav.is_sibling_search() || !policy.admits(&self.engine.node()) {
-            return;
+            return Ok(());
         }
 
         let cp = Checkpoint::match_retry(self.engine.checkpoint_state(), u16::from(self.ip));
-        self.engine.push_checkpoint(cp);
+        self.engine.push_checkpoint(meter, cp)?;
         if T::ENABLED {
-            tracer.trace_checkpoint_created(self.ip);
+            trace!(meter, tracer, trace_checkpoint_created(self.ip));
         }
+        Ok(())
     }
 
-    fn evaluate_predicate(&self, p: DecodedPredicate, module: &Module) -> bool {
+    fn evaluate_predicate(
+        &self,
+        p: DecodedPredicate,
+        module: &Module,
+        meter: &mut Meter<'_>,
+    ) -> Result<bool, LimitExceeded> {
         let node = self.engine.node();
-        let node_text = node_text(self.source, &node);
+        let node_text = plotnik_runtime::predicate_text(meter, self.source, &node)?;
 
-        if p.op.is_regex_op() {
+        Ok(if p.op.is_regex_op() {
             let matched = module
                 .regex_dfas()
                 .is_match(p.value_ref as usize, node_text);
@@ -509,15 +519,16 @@ impl<'s, 't> VM<'s, 't> {
                 PredicateOp::Contains => node_text.contains(target),
                 _ => unreachable!("regex operator in string evaluation"),
             }
-        }
+        })
     }
 
     fn candidate_matches<T: Tracer>(
-        &self,
+        &mut self,
         m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
-    ) -> bool {
+        meter: &mut Meter<'_>,
+    ) -> Result<bool, LimitExceeded> {
         let node = self.engine.node();
 
         match m.node_kind {
@@ -525,72 +536,73 @@ impl<'s, 't> VM<'s, 't> {
             NodeKindConstraint::Named(None) => {
                 if !node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        trace!(meter, tracer, trace_match_failure(node));
                     }
-                    return false;
+                    return Ok(false);
                 }
             }
             NodeKindConstraint::Named(Some(expected)) => {
                 if node.kind_id() != u16::from(expected) || !node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        trace!(meter, tracer, trace_match_failure(node));
                     }
-                    return false;
+                    return Ok(false);
                 }
             }
             NodeKindConstraint::Anonymous(None) => {
                 if node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        trace!(meter, tracer, trace_match_failure(node));
                     }
-                    return false;
+                    return Ok(false);
                 }
             }
             NodeKindConstraint::Anonymous(Some(expected)) => {
                 if node.kind_id() != u16::from(expected) || node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        trace!(meter, tracer, trace_match_failure(node));
                     }
-                    return false;
+                    return Ok(false);
                 }
             }
         }
 
         if m.missing && !node.is_missing() {
             if T::ENABLED {
-                tracer.trace_match_failure(node);
+                trace!(meter, tracer, trace_match_failure(node));
             }
-            return false;
+            return Ok(false);
         }
 
         if let Some(expected) = m.node_field
-            && self.engine.cursor().field_id() != Some(expected)
+            && !self.engine.cursor_mut().has_field(meter, expected)?
         {
             if T::ENABLED {
-                tracer.trace_field_failure(node);
+                trace!(meter, tracer, trace_field_failure(node));
             }
-            return false;
+            return Ok(false);
         }
 
         for &field_id in module.decoded().neg_fields(&m) {
-            if node.child_by_field_id(u16::from(field_id)).is_some() {
+            meter.charge(1)?;
+            if !self.engine.cursor_mut().field_absent(meter, field_id)? {
                 if T::ENABLED {
-                    tracer.trace_neg_field_failure(node, field_id);
+                    trace!(meter, tracer, trace_neg_field_failure(node, field_id));
                 }
-                return false;
+                return Ok(false);
             }
         }
 
         if let Some(p) = m.predicate
-            && !self.evaluate_predicate(p, module)
+            && !self.evaluate_predicate(p, module, meter)?
         {
             if T::ENABLED {
-                tracer.trace_predicate_failure(node);
+                trace!(meter, tracer, trace_predicate_failure(node));
             }
-            return false;
+            return Ok(false);
         }
 
-        true
+        Ok(true)
     }
 
     fn follow_successors<T: Tracer>(
@@ -598,6 +610,7 @@ impl<'s, 't> VM<'s, 't> {
         m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
         let succs = module.decoded().successors(&m);
         if succs.is_empty() {
@@ -605,10 +618,10 @@ impl<'s, 't> VM<'s, 't> {
         }
 
         if succs.len() > 1 {
-            self.engine.push_successors(&succs[1..]);
+            self.engine.push_successors(meter, &succs[1..])?;
             if T::ENABLED {
                 for _ in &succs[1..] {
-                    tracer.trace_checkpoint_created(self.ip);
+                    trace!(meter, tracer, trace_checkpoint_created(self.ip));
                 }
             }
         }
@@ -622,15 +635,16 @@ impl<'s, 't> VM<'s, 't> {
         c: DecodedCall,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
         let call_site = self.ip;
         if !c.caller_owned() {
-            self.enter_callee(c.target, call_site, tracer)?;
+            self.enter_callee(c.target, call_site, tracer, meter)?;
             return Ok(());
         }
 
         let skip_policy =
-            self.navigate_to_field_with_policy(c.nav, c.node_field, module, tracer)?;
+            self.navigate_to_field_with_policy(c.nav, c.node_field, module, tracer, meter)?;
 
         if let Some(policy) = skip_policy
             && policy != SkipPolicy::Exact
@@ -642,13 +656,13 @@ impl<'s, 't> VM<'s, 't> {
                 policy,
             };
             let cp = self.call_retry_checkpoint(call_site, resume);
-            self.engine.push_checkpoint(cp);
+            self.engine.push_checkpoint(meter, cp)?;
             if T::ENABLED {
-                tracer.trace_checkpoint_created(call_site);
+                trace!(meter, tracer, trace_checkpoint_created(call_site));
             }
         }
 
-        self.enter_callee(c.target, call_site, tracer)?;
+        self.enter_callee(c.target, call_site, tracer, meter)?;
         Ok(())
     }
 
@@ -657,10 +671,11 @@ impl<'s, 't> VM<'s, 't> {
         target: CodeAddr,
         call_site: CodeAddr,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), RuntimeError> {
-        self.engine.enter_frame(u16::from(call_site))?;
+        self.engine.enter_frame(meter, u16::from(call_site))?;
         if T::ENABLED {
-            tracer.trace_call(target);
+            trace!(meter, tracer, trace_call(target));
         }
         self.ip = target;
         Ok(())
@@ -672,20 +687,22 @@ impl<'s, 't> VM<'s, 't> {
         field: Option<NodeFieldId>,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<Option<SkipPolicy>, Signal> {
         if nav == Nav::Stay || nav == Nav::StayExact {
-            self.check_field(field, module, tracer)?;
+            self.check_field(field, module, tracer, meter)?;
             return Ok(None);
         }
 
-        let Some(policy) = self.engine.cursor_mut().navigate(nav) else {
+        let Some(policy) = self.engine.cursor_mut().navigate(meter, nav)? else {
             if T::ENABLED {
-                tracer.trace_nav_failure(nav);
+                trace!(meter, tracer, trace_nav_failure(nav));
             }
-            return Err(self.backtrack(module, tracer));
+            self.backtrack(module, tracer, meter)?;
+            unreachable!("backtracking returns a control signal");
         };
         if T::ENABLED {
-            tracer.trace_nav(nav, self.engine.node());
+            trace!(meter, tracer, trace_nav(nav, self.engine.node()));
         }
 
         let Some(field_id) = field else {
@@ -694,16 +711,16 @@ impl<'s, 't> VM<'s, 't> {
 
         let cont_nav = nav.sibling_continuation();
         loop {
-            if self.engine.cursor().field_id() == Some(field_id) {
+            if self.engine.cursor_mut().has_field(meter, field_id)? {
                 if T::ENABLED {
-                    tracer.trace_field_success(field_id);
+                    trace!(meter, tracer, trace_field_success(field_id));
                 }
                 return Ok(Some(policy));
             }
             if T::ENABLED {
-                tracer.trace_field_failure(self.engine.node());
+                trace!(meter, tracer, trace_field_failure(self.engine.node()));
             }
-            self.advance_or_backtrack(policy, cont_nav, module, tracer)?;
+            self.advance_or_backtrack(policy, cont_nav, module, tracer, meter)?;
         }
     }
 
@@ -712,18 +729,19 @@ impl<'s, 't> VM<'s, 't> {
         field: Option<NodeFieldId>,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
         let Some(field_id) = field else {
             return Ok(());
         };
-        if self.engine.cursor().field_id() != Some(field_id) {
+        if !self.engine.cursor_mut().has_field(meter, field_id)? {
             if T::ENABLED {
-                tracer.trace_field_failure(self.engine.node());
+                trace!(meter, tracer, trace_field_failure(self.engine.node()));
             }
-            return Err(self.backtrack(module, tracer));
+            return self.backtrack(module, tracer, meter);
         }
         if T::ENABLED {
-            tracer.trace_field_success(field_id);
+            trace!(meter, tracer, trace_field_success(field_id));
         }
         Ok(())
     }
@@ -733,9 +751,10 @@ impl<'s, 't> VM<'s, 't> {
         port: PortId,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
         if T::ENABLED {
-            tracer.trace_return(port);
+            trace!(meter, tracer, trace_return(port));
         }
 
         if self.engine.frames_empty() {
@@ -755,66 +774,88 @@ impl<'s, 't> VM<'s, 't> {
         Ok(())
     }
 
-    fn backtrack<T: Tracer>(&mut self, module: &Module, tracer: &mut T) -> Signal {
+    fn backtrack<T: Tracer>(
+        &mut self,
+        module: &Module,
+        tracer: &mut T,
+        meter: &mut Meter<'_>,
+    ) -> Result<(), Signal> {
         'unwind: loop {
             let Some((cp, snapshot)) = self.engine.pop_checkpoint() else {
-                return RuntimeError::NoMatch.into();
+                return Err(RuntimeError::NoMatch.into());
             };
             if T::ENABLED {
-                tracer.trace_backtrack(cp.state.recursion_depth);
+                trace!(meter, tracer, trace_backtrack(cp.state.recursion_depth));
             }
-            self.engine.restore_checkpoint_state(cp.state, snapshot);
+            self.engine
+                .restore_checkpoint_state(meter, cp.state, snapshot)?;
 
             match cp.resume {
                 Resume::Successor => {
                     self.ip = CodeAddr::from(cp.ip);
-                    return ControlFlow::Backtracked.into();
+                    return Err(ControlFlow::Backtracked.into());
                 }
 
                 Resume::Call(resume) => {
-                    if !self.engine.cursor_mut().continue_search(resume.policy) {
+                    if !self
+                        .engine
+                        .cursor_mut()
+                        .continue_search(meter, resume.policy)?
+                    {
                         continue 'unwind;
                     }
                     if T::ENABLED {
-                        tracer.trace_nav(Nav::Down.sibling_continuation(), self.engine.node());
+                        trace!(
+                            meter,
+                            tracer,
+                            trace_nav(Nav::Down.sibling_continuation(), self.engine.node())
+                        );
                     }
 
                     if let Some(field_id) = resume.field {
                         loop {
-                            if self.engine.cursor().field_id() == Some(field_id) {
+                            if self.engine.cursor_mut().has_field(meter, field_id)? {
                                 if T::ENABLED {
-                                    tracer.trace_field_success(field_id);
+                                    trace!(meter, tracer, trace_field_success(field_id));
                                 }
                                 break;
                             }
                             if T::ENABLED {
-                                tracer.trace_field_failure(self.engine.node());
+                                trace!(meter, tracer, trace_field_failure(self.engine.node()));
                             }
-                            if !self.engine.cursor_mut().continue_search(resume.policy) {
+                            if !self
+                                .engine
+                                .cursor_mut()
+                                .continue_search(meter, resume.policy)?
+                            {
                                 continue 'unwind;
                             }
                             if T::ENABLED {
-                                tracer.trace_nav(
-                                    Nav::Down.sibling_continuation(),
-                                    self.engine.node(),
+                                trace!(
+                                    meter,
+                                    tracer,
+                                    trace_nav(Nav::Down.sibling_continuation(), self.engine.node(),)
                                 );
                             }
                         }
                     }
 
                     let retry = self.call_retry_checkpoint(CodeAddr::from(cp.ip), resume);
-                    self.engine.push_checkpoint(retry);
+                    self.engine.push_checkpoint(meter, retry)?;
                     if T::ENABLED {
-                        tracer.trace_checkpoint_created(CodeAddr::from(cp.ip));
+                        trace!(
+                            meter,
+                            tracer,
+                            trace_checkpoint_created(CodeAddr::from(cp.ip))
+                        );
                     }
-                    if let Err(error) = self.enter_callee(
+                    self.enter_callee(
                         CodeAddr::from(resume.target),
                         CodeAddr::from(resume.call_site),
                         tracer,
-                    ) {
-                        return error.into();
-                    }
-                    return ControlFlow::Backtracked.into();
+                        meter,
+                    )?;
+                    return Err(ControlFlow::Backtracked.into());
                 }
 
                 Resume::Match => {
@@ -824,41 +865,39 @@ impl<'s, 't> VM<'s, 't> {
                         unreachable!("match-retry checkpoint ip must address a Match");
                     };
                     let policy = m.nav.skip_policy();
-                    if !self.engine.cursor_mut().continue_search(policy) {
+                    if !self.engine.cursor_mut().continue_search(meter, policy)? {
                         continue 'unwind;
                     }
                     let cont_nav = m.nav.sibling_continuation();
                     if T::ENABLED {
-                        tracer.trace_nav(cont_nav, self.engine.node());
+                        trace!(meter, tracer, trace_nav(cont_nav, self.engine.node()));
                     }
 
                     loop {
-                        if self.candidate_matches(m, module, tracer) {
+                        if self.candidate_matches(m, module, tracer, meter)? {
                             break;
                         }
-                        if !self.engine.cursor_mut().continue_search(policy) {
+                        if !self.engine.cursor_mut().continue_search(meter, policy)? {
                             continue 'unwind;
                         }
                         if T::ENABLED {
-                            tracer.trace_nav(cont_nav, self.engine.node());
+                            trace!(meter, tracer, trace_nav(cont_nav, self.engine.node()));
                         }
                     }
 
                     if T::ENABLED {
-                        tracer.trace_match_success(self.engine.node());
+                        trace!(meter, tracer, trace_match_success(self.engine.node()));
                     }
                     if T::ENABLED
                         && let Some(field_id) = m.node_field
                     {
-                        tracer.trace_field_success(field_id);
+                        trace!(meter, tracer, trace_field_success(field_id));
                     }
 
                     self.ip = CodeAddr::from(cp.ip);
-                    self.push_match_retry_if_resumable(m, policy, tracer);
-                    return match self.finish_match(m, module, tracer) {
-                        Ok(()) => ControlFlow::Backtracked.into(),
-                        Err(signal) => signal,
-                    };
+                    self.push_match_retry_if_resumable(m, policy, tracer, meter)?;
+                    self.finish_match(m, module, tracer, meter)?;
+                    return Err(ControlFlow::Backtracked.into());
                 }
             }
         }
@@ -870,17 +909,23 @@ impl<'s, 't> VM<'s, 't> {
         cont_nav: Nav,
         module: &Module,
         tracer: &mut T,
+        meter: &mut Meter<'_>,
     ) -> Result<(), Signal> {
-        if !self.engine.cursor_mut().continue_search(policy) {
-            return Err(self.backtrack(module, tracer));
+        if !self.engine.cursor_mut().continue_search(meter, policy)? {
+            return self.backtrack(module, tracer, meter);
         }
         if T::ENABLED {
-            tracer.trace_nav(cont_nav, self.engine.node());
+            trace!(meter, tracer, trace_nav(cont_nav, self.engine.node()));
         }
         Ok(())
     }
 
-    fn emit_effect<T: Tracer>(&mut self, op: Effect, tracer: &mut T) {
+    fn emit_effect<T: Tracer>(
+        &mut self,
+        op: Effect,
+        tracer: &mut T,
+        meter: &mut Meter<'_>,
+    ) -> Result<(), LimitExceeded> {
         use crate::bytecode::EffectSuppression;
         use EffectKind::*;
 
@@ -889,29 +934,39 @@ impl<'s, 't> VM<'s, 't> {
                 SuppressBegin => {
                     let was_suppressed = self.engine.suppress_begin();
                     if T::ENABLED {
-                        tracer.trace_suppress_control(SuppressBegin, was_suppressed);
+                        trace!(
+                            meter,
+                            tracer,
+                            trace_suppress_control(SuppressBegin, was_suppressed)
+                        );
                     }
-                    return;
+                    return Ok(());
                 }
                 SuppressEnd => {
                     let still_suppressed = self.engine.suppress_end();
                     if T::ENABLED {
-                        tracer.trace_suppress_control(SuppressEnd, still_suppressed);
+                        trace!(
+                            meter,
+                            tracer,
+                            trace_suppress_control(SuppressEnd, still_suppressed)
+                        );
                     }
-                    return;
+                    return Ok(());
                 }
                 _ => unreachable!("control metadata only classifies suppression brackets"),
             },
             EffectSuppression::Bypass => match op.kind {
                 ScalarMark => {
-                    let logged = self.engine.scalar_mark();
+                    let logged = self.engine.scalar_mark(meter)?;
                     if T::ENABLED {
                         match logged {
-                            Some(event) => tracer.trace_journal_event(event),
-                            None => tracer.trace_effect_suppressed(op.kind, op.payload),
+                            Some(event) => trace!(meter, tracer, trace_journal_event(&event)),
+                            None => {
+                                trace!(meter, tracer, trace_effect_suppressed(op.kind, op.payload))
+                            }
                         }
                     }
-                    return;
+                    return Ok(());
                 }
                 SpanStartAt => JournalEvent::SpanStart {
                     id: op.payload as u16,
@@ -926,13 +981,13 @@ impl<'s, 't> VM<'s, 't> {
             },
             EffectSuppression::Output => {
                 let logged = match op.kind {
-                    ScalarOpen => self.engine.scalar_open(),
-                    TextClose => self.engine.scalar_close_text(),
-                    BoolClose => self.engine.scalar_close_bool(op.payload != 0),
-                    NodeText => self.engine.node_text(),
-                    NodeBool => self.engine.node_bool(),
-                    BoolValue => self.engine.bool_value(op.payload != 0),
-                    _ => self.engine.emit_output_event(|cursor| match op.kind {
+                    ScalarOpen => self.engine.scalar_open(meter),
+                    TextClose => self.engine.scalar_close_text(meter),
+                    BoolClose => self.engine.scalar_close_bool(meter, op.payload != 0),
+                    NodeText => self.engine.node_text(meter),
+                    NodeBool => self.engine.node_bool(meter),
+                    BoolValue => self.engine.bool_value(meter, op.payload != 0),
+                    _ => self.engine.emit(meter, |cursor| match op.kind {
                         Node => JournalEvent::Node(cursor.node()),
                         ListOpen => JournalEvent::ListOpen,
                         ArrayPush => JournalEvent::ArrayPush,
@@ -949,20 +1004,21 @@ impl<'s, 't> VM<'s, 't> {
                             unreachable!("metadata routes non-ordinary output effects first")
                         }
                     }),
-                };
+                }?;
                 if T::ENABLED {
                     match logged {
-                        Some(event) => tracer.trace_journal_event(event),
-                        None => tracer.trace_effect_suppressed(op.kind, op.payload),
+                        Some(event) => trace!(meter, tracer, trace_journal_event(&event)),
+                        None => trace!(meter, tracer, trace_effect_suppressed(op.kind, op.payload)),
                     }
                 }
-                return;
+                return Ok(());
             }
         };
 
         if T::ENABLED {
-            tracer.trace_journal_event(&event);
+            trace!(meter, tracer, trace_journal_event(&event));
         }
-        self.engine.emit_span(event);
+        self.engine.emit_span(meter, event)?;
+        Ok(())
     }
 }

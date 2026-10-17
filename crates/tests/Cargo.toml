@@ -17,7 +17,7 @@ codegen-tests = []
 
 [dependencies]
 plotnik-compiler = { workspace = true }
-plotnik-runtime = { workspace = true, features = ["serde", "debug"] }
+plotnik-runtime = { workspace = true, features = ["failpoints"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["unbounded_depth"] }
 tree-sitter = "=0.27.0"
@@ -26,7 +26,7 @@ tree-sitter-javascript = "=0.25.0"
 tree-sitter-typescript = "=0.23.2"
 
 [dev-dependencies]
-plotnik = { path = "../plotnik", features = ["serde"] }
+plotnik = { path = "../plotnik" }
 criterion = "=0.8.2"
 indoc = "=2.0.7"
 proptest = "=1.11.0"

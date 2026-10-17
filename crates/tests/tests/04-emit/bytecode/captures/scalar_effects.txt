@@ -11,15 +11,16 @@ Q = 02
 [transitions]
 Q:
   01                                        ▶
-  02   !   (program)                        14, 04
+  02   !   (program)                        17
   03  ─‣┘  _                                01
-  04  └‣─  (expression_statement) [BoolValue(0) RecordSet(has_comment)]  06
+  04  └‣─  (expression_statement) [BoolValue(0)]  06
   05  ─‣┘  _                                03
-  06  └‣─  (identifier) [NodeText RecordSet(name)]  05
-  07  ─‣─  (expression_statement) [BoolValue(1) RecordSet(has_comment)]  06
+  06  └‣─  (identifier) [RecordSet(name) NodeText]  05
+  07  ─‣─  (expression_statement) [BoolValue(1)]  06
   11   !   (comment)                        07
   13  ──!  _                                11, 13
   14  └─!  _                                11, 13
+  17  -ε-  [RecordSet(has_comment)]         14, 04
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -48,14 +49,14 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00   !   (program)                        16, 08
-  02  └‣─  (identifier) [NodeText RecordSet(M1)]  04
-  04  ─‣┘  _                                05
+  00   !   (program)                        01
+  01  -ε-  [RecordSet(M0)]                  16, 08
+  03  └‣─  (identifier) [RecordSet(M1) NodeText]  05
   05  ─‣┘  _                                06
-  06                                        ▶
-  07  ...
-  08  └‣─  (expression_statement) [BoolValue(0) RecordSet(M0)]  02
-  10  ─‣─  (expression_statement) [BoolValue(1) RecordSet(M0)]  02
+  06  ─‣┘  _                                07
+  07                                        ▶
+  08  └‣─  (expression_statement) [BoolValue(0)]  03
+  10  ─‣─  (expression_statement) [BoolValue(1)]  03
   12   !   (comment)                        10
   13  ──!  _                                12, 13
   15  ...

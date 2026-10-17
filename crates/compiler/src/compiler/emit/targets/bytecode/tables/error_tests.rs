@@ -23,7 +23,7 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
 fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
     let mut query = String::from("Q = (program");
     for index in 0..=u8::MAX {
-        write!(query, " (expression_statement) @field_{index}").unwrap();
+        write!(query, " (expression_statement) @field_{index} :: text").unwrap();
     }
     query.push(')');
     let compiled = QueryBuilder::from_inline(&query)

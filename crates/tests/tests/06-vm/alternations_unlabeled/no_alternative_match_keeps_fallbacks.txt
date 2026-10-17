@@ -42,55 +42,56 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └‣─  (expression_statement)           14, 16
+  01  └‣─  (expression_statement)           16, 12
   03                                        ▶
-  04   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  21
-  07  ─‣┘  _                                03
-  08   !   (number) [Node RecordSet(M1)]    21
-  10  ──!  _                                08, 10
-  12   !   _ [Absent RecordSet(M0)]         08, 10
-  14  └─!  _                                04, 12, 19
-  16  -ε-  [Absent RecordSet(M0) Absent RecordSet(M1)]  07
-  19  ──!  _                                04, 12, 19
-  21  ─‣┘  _                                07
+  04   !   (identifier) [RecordSet(M0) Node]  18
+  06   !   (number) [RecordSet(M1) Node]    18
+  08  ──!  _                                06, 08
+  10   !   _                                06, 08
+  12  -ε-  [RecordSet(M1) Absent]           19
+  14  ──!  _                                04, 10, 14
+  16  └─!  _                                04, 10, 14
+  18  ─‣┘  _                                19
+  19  ─‣┘  _                                03
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           14, 16
-       ●   expression_statement
-  14       _                                04, 12, 19
-       ●   string
-  04       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  21
-       ○   string
-  14  ❮❮❮ 
-  12       _ [Absent RecordSet(M0)]         08, 10
-       ●   string
-  08       (number) [Node RecordSet(M1)]    21
-       ○   string
-  12  ❮❮❮ 
-  10       _                                08, 10
-       ●   ;
-  08       (number) [Node RecordSet(M1)]    21
-       ○   ;
-  10  ❮❮❮ 
-  10       _                                08, 10
-  14  ❮❮❮ 
-  19       _                                04, 12, 19
-       ●   ;
-  04       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  21
-       ○   ;
-  19  ❮❮❮ 
-  12       _ [Absent RecordSet(M0)]         08, 10
-       ●   ;
-  08       (number) [Node RecordSet(M1)]    21
-       ○   ;
-  12  ❮❮❮ 
-  10       _                                08, 10
-  19  ❮❮❮ 
-  19       _                                04, 12, 19
-  01  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M0) Absent RecordSet(M1)]  07
-  07       _                                03
-       ●   program
-  03   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..4]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..4]
+0016 DownExact Any
+0016 MatchOk node#221 [0..3]
+0004 StayExact Named(Some(NodeKindId(1)))
+0004 MatchFail node#221 [0..3]
+0004 Backtrack { to_record: 14 }
+0010 StayExact Any
+0010 MatchOk node#221 [0..3]
+0006 StayExact Named(Some(NodeKindId(114)))
+0006 MatchFail node#221 [0..3]
+0006 Backtrack { to_record: 22 }
+0008 NextExact Any
+0008 MatchOk node#24 [3..4]
+0006 StayExact Named(Some(NodeKindId(114)))
+0006 MatchFail node#24 [3..4]
+0006 Backtrack { to_record: 30 }
+0008 NextExact Any
+0008 Backtrack { to_record: 13 }
+0014 NextExact Any
+0014 MatchOk node#24 [3..4]
+0004 StayExact Named(Some(NodeKindId(1)))
+0004 MatchFail node#24 [3..4]
+0004 Backtrack { to_record: 42 }
+0010 StayExact Any
+0010 MatchOk node#24 [3..4]
+0006 StayExact Named(Some(NodeKindId(114)))
+0006 MatchFail node#24 [3..4]
+0006 Backtrack { to_record: 50 }
+0008 NextExact Any
+0008 Backtrack { to_record: 41 }
+0014 NextExact Any
+0014 Backtrack { to_record: 9 }
+0012 Epsilon Any
+0019 Up(1) Any
+0019 MatchOk program [0..4]
+0003 Return PortId(0)
+0003 Return

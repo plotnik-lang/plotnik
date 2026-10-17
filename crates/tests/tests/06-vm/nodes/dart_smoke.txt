@@ -11,8 +11,8 @@ void f() {}
 {
   "name": {
     "kind": "identifier",
-    "span": [5, 6],
-    "text": "f"
+    "text": "f",
+    "span": [5, 6]
   }
 }
 -------------------- BYTECODE --------------------
@@ -44,20 +44,21 @@ Q:
   0   !   (source_file)                     1
   1  └‣─  (function_declaration)            2
   2  └‣─  signature: (function_signature)   3
-  3  └‣─  name: (identifier) [Node RecordSet(M0)]  5
+  3  └‣─  name: (identifier) [RecordSet(M0) Node]  5
   5  ─‣┘³ _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (source_file)                     01
-      ●   source_file
-  1       (function_declaration)            02
-      ●   function_declaration
-  2       signature: (function_signature)   03
-      ●   function_signature
-  3       name: (identifier) [Node RecordSet(M0)]  05
-      ○   type
-      ●   identifier
-  5       _                                 06
-      ●   source_file
-  6   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(166)))
+0000 MatchOk source_file [0..11]
+0001 Down Named(Some(NodeKindId(392)))
+0001 MatchOk function_declaration [0..11]
+0002 Down Named(Some(NodeKindId(342)))
+0002 MatchOk function_signature [0..8]
+0003 Down Named(Some(NodeKindId(425)))
+0003 MatchFail node#188 [0..4]
+0003 MatchOk identifier [5..6]
+0005 Up(3) Any
+0005 MatchOk source_file [0..11]
+0006 Return PortId(0)
+0006 Return

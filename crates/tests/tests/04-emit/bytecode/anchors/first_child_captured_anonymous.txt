@@ -11,7 +11,7 @@ Q:
   1                                         ▶
   2   !   (statement_block)                 5
   4  ─‣┘  _                                 1
-  5  └◦─  "{" [Node RecordSet(op)]          4
+  5  └◦─  "{" [RecordSet(op) Node]          4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -36,6 +36,6 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (statement_block)                 1
-  1  └◦─  "{" [Node RecordSet(M0)]          3
+  1  └◦─  "{" [RecordSet(M0) Node]          3
   3  ─‣┘  _                                 4
   4                                         ▶

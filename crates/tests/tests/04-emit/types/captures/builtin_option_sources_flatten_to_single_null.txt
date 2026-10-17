@@ -7,7 +7,7 @@ Q = (program
   ]
 )
 ---------------------- RUST ----------------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'s> {
     pub x: ::core::option::Option<&'s str>,
 }

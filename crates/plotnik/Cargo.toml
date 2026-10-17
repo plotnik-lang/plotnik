@@ -15,10 +15,13 @@ include = ["src/**/*", "Cargo.toml"]
 workspace = true
 
 [features]
-serde = ["plotnik-macros/serde", "plotnik-runtime/serde"]
 wasm = ["dep:plotnik-compiler", "plotnik-compiler/wasm"]
 
 [dependencies]
 plotnik-macros = { path = "../macros", version = "0.4.0" }
 plotnik-runtime = { path = "../runtime", version = "0.4.0" }
 plotnik-compiler = { path = "../compiler", version = "0.4.0", default-features = false, optional = true }
+
+[dev-dependencies]
+plotnik-runtime = { path = "../runtime", version = "0.4.0", features = ["failpoints"] }
+tree-sitter-javascript = "0.25.0"

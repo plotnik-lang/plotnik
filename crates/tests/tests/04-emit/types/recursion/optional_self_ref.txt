@@ -7,8 +7,8 @@ NestedCall = (call_expression
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct NestedCall<'t> {
+#[derive(Clone, Copy)]
+pub struct NestedCall<'r, 't> {
     pub name: ::core::option::Option<Node<'t>>,
-    pub inner: ::core::option::Option<::std::boxed::Box<NestedCall<'t>>>,
+    pub inner: ::core::option::Option<&'r NestedCall<'r, 't>>,
 }

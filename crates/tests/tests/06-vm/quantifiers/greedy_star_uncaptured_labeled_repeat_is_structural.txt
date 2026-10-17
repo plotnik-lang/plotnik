@@ -47,22 +47,23 @@ Q:
   08  ──!  _                                03, 05, 08
   10  └─!  _                                03, 05, 08
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        10, 02
-       ●   program
-  10       _                                03, 05, 08
-       ●   expression_statement
-  03       (expression_statement)           08, 07
-       ●   expression_statement
-  08       _                                03, 05, 08
-       ●   lexical_declaration
-  03       (expression_statement)           08, 07
-       ○   lexical_declaration
-  08  ❮❮❮ 
-  05       (lexical_declaration)            08, 07
-       ●   lexical_declaration
-  08       _                                03, 05, 08
-  05  ❮❮❮ 
-  07       _                                02
-       ●   program
-  02   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..12]
+0010 DownExact Any
+0010 MatchOk expression_statement [0..6]
+0003 StayExact Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [0..6]
+0008 NextExact Any
+0008 MatchOk lexical_declaration [7..12]
+0003 StayExact Named(Some(NodeKindId(150)))
+0003 MatchFail lexical_declaration [7..12]
+0003 Backtrack { to_record: 18 }
+0005 StayExact Named(Some(NodeKindId(152)))
+0005 MatchOk lexical_declaration [7..12]
+0008 NextExact Any
+0008 Backtrack { to_record: 26 }
+0007 Up(1) Any
+0007 MatchOk program [0..12]
+0002 Return PortId(0)
+0002 Return

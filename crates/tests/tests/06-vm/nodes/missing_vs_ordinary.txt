@@ -14,8 +14,8 @@ if (x) { y }
 {
   "m": {
     "kind": "}",
-    "span": [11, 12],
-    "text": "}"
+    "text": "}",
+    "span": [11, 12]
   }
 }
 -------------------- BYTECODE --------------------
@@ -49,43 +49,44 @@ Q:
   02  └‣─  consequence: (statement_block)   03
   03  └─!  _                                06, 08, 10
   05                                        ▶
-  06   !   (MISSING "}") [Node RecordSet(M0)]  12
-  08   !   "}" [Node RecordSet(M0)]         12
+  06   !   (MISSING "}") [RecordSet(M0) Node]  12
+  08   !   "}" [RecordSet(M0) Node]         12
   10  ──!  _                                06, 08, 10
   12  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (if_statement)                   02
-       ●   if_statement
-  02       consequence: (statement_block)   03
-       ○   if
-       ○   parenthesized_expression
-       ●   statement_block
-  03       _                                06, 08, 10
-       ●   {
-  06       (MISSING "}") [Node RecordSet(M0)]  12
-       ○   {
-  03  ❮❮❮ 
-  08       "}" [Node RecordSet(M0)]         12
-       ○   {
-  03  ❮❮❮ 
-  10       _                                06, 08, 10
-       ●   expression_statement
-  06       (MISSING "}") [Node RecordSet(M0)]  12
-       ○   expression_statement
-  10  ❮❮❮ 
-  08       "}" [Node RecordSet(M0)]         12
-       ○   expression_statement
-  10  ❮❮❮ 
-  10       _                                06, 08, 10
-       ●   }
-  06       (MISSING "}") [Node RecordSet(M0)]  12
-       ○   }
-  10  ❮❮❮ 
-  08       "}" [Node RecordSet(M0)]         12
-       ●   }
-  12       _                                05
-       ●   program
-  05   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..12]
+0001 Down Named(Some(NodeKindId(157)))
+0001 MatchOk if_statement [0..12]
+0002 Down Named(Some(NodeKindId(155)))
+0002 MatchFail node#20 [0..2]
+0002 MatchFail node#178 [3..6]
+0002 MatchOk statement_block [7..12]
+0003 DownExact Any
+0003 MatchOk node#7 [7..8]
+0006 StayExact Anonymous(Some(NodeKindId(9)))
+0006 MatchFail node#7 [7..8]
+0006 Backtrack { to_record: 22 }
+0008 StayExact Anonymous(Some(NodeKindId(9)))
+0008 MatchFail node#7 [7..8]
+0008 Backtrack { to_record: 21 }
+0010 NextExact Any
+0010 MatchOk node#150 [9..10]
+0006 StayExact Anonymous(Some(NodeKindId(9)))
+0006 MatchFail node#150 [9..10]
+0006 Backtrack { to_record: 35 }
+0008 StayExact Anonymous(Some(NodeKindId(9)))
+0008 MatchFail node#150 [9..10]
+0008 Backtrack { to_record: 34 }
+0010 NextExact Any
+0010 MatchOk } [11..12]
+0006 StayExact Anonymous(Some(NodeKindId(9)))
+0006 MatchFail } [11..12]
+0006 Backtrack { to_record: 48 }
+0008 StayExact Anonymous(Some(NodeKindId(9)))
+0008 MatchOk } [11..12]
+0012 Up(3) Any
+0012 MatchOk program [0..12]
+0005 Return PortId(0)
+0005 Return

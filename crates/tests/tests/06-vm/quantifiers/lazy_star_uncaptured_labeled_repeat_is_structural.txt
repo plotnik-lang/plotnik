@@ -52,43 +52,38 @@ Q:
   15  ─‣┘  _                                05
   16  └─!  _                                11, 13
 --------------------- TRACE ----------------------
-Q:
-  03       (program)                        06, 16
-       ●   program
-  06       (debugger_statement)             15
-       ○   expression_statement
-  03  ❮❮❮ 
-  16       _                                11, 13
-       ●   expression_statement
-  11  -ε-  [SuppressBegin]                  10
-  10       (A)                              00 : 08
-       ▶   (A)
-
-A:
-  00       (expression_statement) [VariantOpen(M0) VariantClose]  02
-       ●   expression_statement
-  02   ◀   (A)                              
-
-Q:
-  08  -ε-  [SuppressEnd]                    07, 13
-  07       (debugger_statement)             15
-       ○   expression_statement
-  08  ❮❮❮ 
-  13       _                                11, 13
-       ●   expression_statement
-  11  -ε-  [SuppressBegin]                  10
-  10       (A)                              00 : 08
-       ▶   (A)
-
-A:
-  00       (expression_statement) [VariantOpen(M0) VariantClose]  02
-       ●   expression_statement
-  02   ◀   (A)                              
-
-Q:
-  08  -ε-  [SuppressEnd]                    07, 13
-  07       (debugger_statement)             15
-       ●   debugger_statement
-  15       _                                05
-       ●   program
-  05   ◀   (Q)                              ◼
+0003 ExecutionStarted { target: 3 }
+0003 StayExact Named(Some(NodeKindId(134)))
+0003 MatchOk program [0..15]
+0006 DownSkip Named(Some(NodeKindId(168)))
+0006 MatchFail expression_statement [0..2]
+0006 Backtrack { to_record: 4 }
+0016 DownExact Any
+0016 MatchOk expression_statement [0..2]
+0011 Epsilon Any
+0010 Call CodeAddr(0)
+0010 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(150)))
+0000 MatchOk expression_statement [0..2]
+0002 Return PortId(0)
+0002 Return
+0008 Epsilon Any
+0007 NextSkip Named(Some(NodeKindId(168)))
+0007 MatchFail expression_statement [3..5]
+0007 Backtrack { to_record: 26 }
+0013 NextExact Any
+0013 MatchOk expression_statement [3..5]
+0011 Epsilon Any
+0010 Call CodeAddr(0)
+0010 Call { target: 0 }
+0000 StayExact Named(Some(NodeKindId(150)))
+0000 MatchOk expression_statement [3..5]
+0002 Return PortId(0)
+0002 Return
+0008 Epsilon Any
+0007 NextSkip Named(Some(NodeKindId(168)))
+0007 MatchOk debugger_statement [6..15]
+0015 Up(1) Any
+0015 MatchOk program [0..15]
+0005 Return PortId(0)
+0005 Return

@@ -15,21 +15,21 @@ Q = (program
 [a, b]
 --------------------- OUTPUT ---------------------
 {
-  "b": {
-    "kind": "identifier",
-    "span": [4, 5],
-    "text": "b"
-  },
   "prefixes": [
     {
       "a": {
         "kind": "identifier",
-        "span": [1, 2],
-        "text": "a"
+        "text": "a",
+        "span": [1, 2]
       },
       "x": null
     }
-  ]
+  ],
+  "b": {
+    "kind": "identifier",
+    "text": "b",
+    "span": [4, 5]
+  }
 }
 ------------------- INSPECTION -------------------
 [
@@ -79,7 +79,12 @@ Q = (program
       0,
       6
     ],
-    "bindings": [],
+    "bindings": [
+      {
+        "path": "/prefixes",
+        "event_index": 7
+      }
+    ],
     "range": [
       4,
       38
@@ -108,12 +113,12 @@ Q = (program
     "bindings": [
       {
         "path": "/0",
-        "event_index": 25
+        "event_index": 26
       }
     ],
     "range": [
-      8,
-      27
+      9,
+      28
     ]
   },
   {
@@ -125,8 +130,8 @@ Q = (program
     ],
     "bindings": [],
     "range": [
-      10,
-      18
+      11,
+      19
     ]
   },
   {
@@ -138,8 +143,8 @@ Q = (program
     ],
     "bindings": [],
     "range": [
-      11,
-      17
+      12,
+      18
     ]
   },
   {
@@ -156,8 +161,8 @@ Q = (program
       }
     ],
     "range": [
-      12,
-      16
+      13,
+      17
     ]
   },
   {
@@ -166,37 +171,27 @@ Q = (program
     "source_span": null,
     "bindings": [],
     "range": [
-      18,
-      24
+      19,
+      25
     ]
   },
   {
     "query_span_id": 11,
     "parent": 9,
     "source_span": null,
-    "bindings": [
-      {
-        "path": "/0/x",
-        "event_index": 21
-      }
-    ],
+    "bindings": [],
     "range": [
-      19,
-      23
+      20,
+      24
     ]
   },
   {
     "query_span_id": 5,
     "parent": 3,
     "source_span": null,
-    "bindings": [
-      {
-        "path": "/prefixes",
-        "event_index": 29
-      }
-    ],
+    "bindings": [],
     "range": [
-      28,
+      29,
       31
     ]
   },
@@ -223,7 +218,7 @@ Q = (program
     "bindings": [
       {
         "path": "/b",
-        "event_index": 34
+        "event_index": 33
       }
     ],
     "range": [
@@ -290,85 +285,82 @@ Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
   02  └‣─  (expression_statement) [SpanStartAt#2]  04
   04  └‣─  (array) [SpanStartAt#3]          06
-  06  └─!  _                                54, 76
+  06  └─!  _                                14, 70
   08  ─‣┘  _                                09
   09  ─‣┘  _ [SpanEnd#3]                    11
   11  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
   13                                        ▶
-  14  ...
-  15  ...
-  16  ─‣─  (identifier) [SpanEnd#6 ListClose SpanStart#5 RecordSet(M2) SpanEnd#5 SpanStartAt#15 SpanStart#14 Node RecordSet(M3) SpanEnd#14 SpanEnd#15] == "b"  08
-  22  ──!  _                                70, 22
-  24  ─•─  (identifier) [SpanEnd#6 ListClose SpanStart#5 RecordSet(M2) SpanEnd#5 SpanStartAt#15 SpanStart#14 Node RecordSet(M3) SpanEnd#14 SpanEnd#15] == "b"  08
-  30  -ε-  [RecordClose ArrayPush]          22, 16
-  32  -ε-  [RecordClose ArrayPush]          45, 24
-  34   !   (identifier) [SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
-  38  ──!  _                                34, 38
-  40   !   _ [SpanStart#12]                 34, 38
-  42  -ε-  [SpanStart#11 Absent RecordSet(M1) SpanEnd#11 SpanEnd#12]  32
-  45  -ε-  [RecordOpen]                     88
-  47  ...
-  48  ─•─  (identifier) [SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
-  52  -ε-  [SpanStart#12]                   48, 42
-  54   !   "[" [SpanStartAt#4 SpanEnd#4]    90
-  56  -ε-  [SpanStart#8 Absent RecordSet(M0) SpanEnd#8 SpanEnd#9]  40
-  59   !   (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
-  63  ...
-  64  ──!  _                                59, 64
-  66   !   _                                59, 64
-  68  -ε-  [SpanStart#9]                    66, 56
-  70  -ε-  [RecordOpen]                     68
-  72  ─•─  (identifier) [SpanStart#12 SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
-  76  ──!  _                                54, 76
-  78  ...
+  14   !   "[" [SpanStartAt#4 SpanEnd#4 RecordSet(M2)]  82
+  16  ─‣─  (identifier) [SpanEnd#6 ListClose SpanStart#5 SpanEnd#5 SpanStartAt#15 SpanStart#14 RecordSet(M3) Node SpanEnd#14 SpanEnd#15] == "b"  08
+  20  ─•─  (identifier) [SpanEnd#6 ListClose SpanStart#5 SpanEnd#5 SpanStartAt#15 SpanStart#14 RecordSet(M3) Node SpanEnd#14 SpanEnd#15] == "b"  08
+  24  -ε-  [RecordClose ArrayPush]          64, 16
+  26  -ε-  [RecordClose ArrayPush]          46, 20
+  28   !   (identifier) [SpanStartAt#13 SpanStart#11 RecordSet(M1) Node SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  24
+  32  ──!  _                                28, 32
+  34   !   _ [SpanStart#12]                 28, 32
+  36  -ε-  [SpanStart#11 RecordSet(M1) Absent SpanEnd#11 SpanEnd#12]  26
+  39  ...
+  40  ─•─  (identifier) [SpanStartAt#13 SpanStart#11 RecordSet(M1) Node SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  24
+  44  -ε-  [SpanStart#12]                   40, 36
+  46  -ε-  [RecordOpen]                     80
+  48  -ε-  [SpanStart#8 RecordSet(M0) Absent SpanEnd#8 SpanEnd#9]  34
+  51   !   (identifier) [SpanStartAt#10 SpanStart#8 RecordSet(M0) Node SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  44
+  55  ...
+  56  ──!  _                                51, 56
+  58   !   _                                51, 56
+  60  -ε-  [SpanStart#9]                    58, 48
+  62  -ε-  [RecordOpen]                     60
+  64  ──!  _                                62, 64
+  66  ─•─  (identifier) [SpanStart#12 SpanStartAt#13 SpanStart#11 RecordSet(M1) Node SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  24
+  70  ──!  _                                14, 70
+  72  -ε-  [SpanStart#8 RecordSet(M0) Absent SpanEnd#8 SpanEnd#9]  66
+  75  ─•─  (identifier) [SpanStartAt#10 SpanStart#8 RecordSet(M0) Node SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  44
   79  ...
-  80  -ε-  [SpanStart#8 Absent RecordSet(M0) SpanEnd#8 SpanEnd#9]  72
-  83  ─•─  (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
-  87  ...
-  88  -ε-  [SpanStart#9]                    83, 80
-  90  ──!  _ [ListOpen SpanStart#6]         70, 22
+  80  -ε-  [SpanStart#9]                    75, 72
+  82  ──!  _ [ListOpen SpanStart#6]         62, 64
 --------------------- TRACE ----------------------
-Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
-       ●   program
-  02       (expression_statement) [SpanStartAt#2]  04
-       ●   expression_statement
-  04       (array) [SpanStartAt#3]          06
-       ●   array
-  06       _                                54, 76
-       ●   [
-  54       "[" [SpanStartAt#4 SpanEnd#4]    90
-       ●   [
-  90       _ [ListOpen SpanStart#6]         70, 22
-       ●   identifier
-  70  -ε-  [RecordOpen]                     68
-  68  -ε-  [SpanStart#9]                    66, 56
-  66       _                                59, 64
-       ●   identifier
-  59       (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
-       ●   identifier
-  52  -ε-  [SpanStart#12]                   48, 42
-  48       (identifier) [SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
-       ○   ,
-  52  ❮❮❮ 
-  42  -ε-  [SpanStart#11 Absent RecordSet(M1) SpanEnd#11 SpanEnd#12]  32
-  32  -ε-  [RecordClose ArrayPush]          45, 24
-  45  -ε-  [RecordOpen]                     88
-  88  -ε-  [SpanStart#9]                    83, 80
-  83       (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
-       ○   ,
-  88  ❮❮❮ 
-  80  -ε-  [SpanStart#8 Absent RecordSet(M0) SpanEnd#8 SpanEnd#9]  72
-  72       (identifier) [SpanStart#12 SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
-       ○   ,
-  32  ❮❮❮ 
-  24       (identifier) [SpanEnd#6 ListClose SpanStart#5 RecordSet(M2) SpanEnd#5 SpanStartAt#15 SpanStart#14 Node RecordSet(M3) SpanEnd#14 SpanEnd#15] == "b"  08
-       ○   ,
-       ●   identifier
-  08       _                                09
-       ●   array
-  09       _ [SpanEnd#3]                    11
-       ●   expression_statement
-  11       _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
-       ●   program
-  13   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..6]
+0002 Down Named(Some(NodeKindId(150)))
+0002 MatchOk expression_statement [0..6]
+0004 Down Named(Some(NodeKindId(186)))
+0004 MatchOk array [0..6]
+0006 DownExact Any
+0006 MatchOk [ [0..1]
+0014 StayExact Anonymous(Some(NodeKindId(41)))
+0014 MatchOk [ [0..1]
+0082 NextExact Any
+0082 MatchOk identifier [1..2]
+0062 Epsilon Any
+0060 Epsilon Any
+0058 StayExact Any
+0058 MatchOk identifier [1..2]
+0051 StayExact Named(Some(NodeKindId(1)))
+0051 MatchOk identifier [1..2]
+0044 Epsilon Any
+0040 NextSkip Named(Some(NodeKindId(1)))
+0040 MatchFail node#8 [2..3]
+0040 Backtrack { to_record: 54 }
+0036 Epsilon Any
+0026 Epsilon Any
+0046 Epsilon Any
+0080 Epsilon Any
+0075 NextSkip Named(Some(NodeKindId(1)))
+0075 MatchFail node#8 [2..3]
+0075 Backtrack { to_record: 75 }
+0072 Epsilon Any
+0066 NextSkip Named(Some(NodeKindId(1)))
+0066 MatchFail node#8 [2..3]
+0066 Backtrack { to_record: 70 }
+0020 NextSkip Named(Some(NodeKindId(1)))
+0020 MatchFail node#8 [2..3]
+0020 MatchOk identifier [4..5]
+0008 Up(1) Any
+0008 MatchOk array [0..6]
+0009 Up(1) Any
+0009 MatchOk expression_statement [0..6]
+0011 Up(1) Any
+0011 MatchOk program [0..6]
+0013 Return PortId(0)
+0013 Return

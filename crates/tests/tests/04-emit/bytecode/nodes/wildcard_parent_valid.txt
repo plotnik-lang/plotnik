@@ -11,8 +11,8 @@ Q:
   1                                         ▶
   2   !   (_)                               5
   3  ─‣┘  _                                 1
-  4  ─‣─  (identifier) [Node RecordSet(b)]  3
-  5  └‣─  (identifier) [Node RecordSet(a)]  4
+  4  ─‣─  (identifier) [RecordSet(b) Node]  3
+  5  └‣─  (identifier) [RecordSet(a) Node]  4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -38,7 +38,7 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (_)                               1
-  1  └‣─  (identifier) [Node RecordSet(M0)]  3
-  3  ─‣─  (identifier) [Node RecordSet(M1)]  5
+  1  └‣─  (identifier) [RecordSet(M0) Node]  3
+  3  ─‣─  (identifier) [RecordSet(M1) Node]  5
   5  ─‣┘  _                                 6
   6                                         ▶

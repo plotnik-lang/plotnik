@@ -10,13 +10,13 @@ let x; foo;
 {
   "a": {
     "kind": "lexical_declaration",
-    "span": [0, 6],
-    "text": "let x;"
+    "text": "let x;",
+    "span": [0, 6]
   },
   "b": {
     "kind": "expression_statement",
-    "span": [7, 11],
-    "text": "foo;"
+    "text": "foo;",
+    "span": [7, 11]
   }
 }
 -------------------- BYTECODE --------------------
@@ -46,18 +46,19 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (lexical_declaration) [Node RecordSet(M0)]  3
-  3  ─‣─  (expression_statement) [Node RecordSet(M1)]  5
+  1  └‣─  (lexical_declaration) [RecordSet(M0) Node]  3
+  3  ─‣─  (expression_statement) [RecordSet(M1) Node]  5
   5  ─‣┘  _                                 6
   6                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (lexical_declaration) [Node RecordSet(M0)]  03
-      ●   lexical_declaration
-  3       (expression_statement) [Node RecordSet(M1)]  05
-      ●   expression_statement
-  5       _                                 06
-      ●   program
-  6   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..11]
+0001 Down Named(Some(NodeKindId(152)))
+0001 MatchOk lexical_declaration [0..6]
+0003 Next Named(Some(NodeKindId(150)))
+0003 MatchOk expression_statement [7..11]
+0005 Up(1) Any
+0005 MatchOk program [0..11]
+0006 Return PortId(0)
+0006 Return

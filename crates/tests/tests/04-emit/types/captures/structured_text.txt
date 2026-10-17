@@ -22,7 +22,7 @@ help: remove `:: text` to return the record value instead
 ---------------------- RUST ----------------------
 use ::plotnik_runtime::Node;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct Q<'t, 's> {
     pub chunk: &'s str,
     pub statement: &'s str,

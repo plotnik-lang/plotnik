@@ -13,14 +13,14 @@ x
 --------------------- OUTPUT ---------------------
 {
   "expr": {
+    "$tag": "Good",
     "$data": {
       "good": {
         "kind": "identifier",
-        "span": [0, 1],
-        "text": "x"
+        "text": "x",
+        "span": [0, 1]
       }
-    },
-    "$tag": "Good"
+    }
   }
 }
 ---------------- EXECUTION_TRACE -----------------
@@ -144,11 +144,12 @@ x
     {
       "ip": 2,
       "event": {
-        "kind": "checkpoint_new"
+        "kind": "journal_event",
+        "event": "RecordSet \"expr\""
       },
       "query_span_id": 1,
       "node": null,
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 2,
@@ -157,7 +158,16 @@ x
       },
       "query_span_id": 1,
       "node": null,
-      "journal_len": 3
+      "journal_len": 4
+    },
+    {
+      "ip": 2,
+      "event": {
+        "kind": "checkpoint_new"
+      },
+      "query_span_id": 1,
+      "node": null,
+      "journal_len": 4
     },
     {
       "ip": 20,
@@ -166,7 +176,7 @@ x
       },
       "query_span_id": 1,
       "node": null,
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 20,
@@ -179,7 +189,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 20,
@@ -192,7 +202,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 20,
@@ -202,7 +212,7 @@ x
       },
       "query_span_id": 3,
       "node": null,
-      "journal_len": 4
+      "journal_len": 5
     },
     {
       "ip": 20,
@@ -212,7 +222,7 @@ x
       },
       "query_span_id": 4,
       "node": null,
-      "journal_len": 5
+      "journal_len": 6
     },
     {
       "ip": 20,
@@ -222,7 +232,7 @@ x
       },
       "query_span_id": 4,
       "node": null,
-      "journal_len": 6
+      "journal_len": 7
     },
     {
       "ip": 20,
@@ -236,7 +246,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 4,
@@ -245,7 +255,7 @@ x
       },
       "query_span_id": 5,
       "node": null,
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 4,
@@ -258,7 +268,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 4,
@@ -271,17 +281,17 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 4,
       "event": {
         "kind": "backtrack",
-        "to_record": 11
+        "to_record": 12
       },
       "query_span_id": 1,
       "node": null,
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 24,
@@ -290,7 +300,7 @@ x
       },
       "query_span_id": 1,
       "node": null,
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 24,
@@ -303,7 +313,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 24,
@@ -316,7 +326,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 3
+      "journal_len": 4
     },
     {
       "ip": 24,
@@ -326,7 +336,7 @@ x
       },
       "query_span_id": 3,
       "node": null,
-      "journal_len": 4
+      "journal_len": 5
     },
     {
       "ip": 24,
@@ -336,7 +346,7 @@ x
       },
       "query_span_id": 8,
       "node": null,
-      "journal_len": 5
+      "journal_len": 6
     },
     {
       "ip": 24,
@@ -346,7 +356,7 @@ x
       },
       "query_span_id": 8,
       "node": null,
-      "journal_len": 6
+      "journal_len": 7
     },
     {
       "ip": 24,
@@ -360,7 +370,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 11,
@@ -369,7 +379,7 @@ x
       },
       "query_span_id": 9,
       "node": null,
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 11,
@@ -382,7 +392,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 11,
@@ -395,7 +405,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 11,
@@ -404,7 +414,7 @@ x
       },
       "query_span_id": 9,
       "node": null,
-      "journal_len": 7
+      "journal_len": 8
     },
     {
       "ip": 11,
@@ -418,7 +428,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 8
+      "journal_len": 9
     },
     {
       "ip": 11,
@@ -428,20 +438,6 @@ x
       },
       "query_span_id": 10,
       "node": null,
-      "journal_len": 9
-    },
-    {
-      "ip": 11,
-      "event": {
-        "kind": "journal_event",
-        "event": "Node"
-      },
-      "query_span_id": 10,
-      "node": {
-        "kind_id": 1,
-        "start": 0,
-        "end": 1
-      },
       "journal_len": 10
     },
     {
@@ -458,11 +454,25 @@ x
       "ip": 11,
       "event": {
         "kind": "journal_event",
+        "event": "Node"
+      },
+      "query_span_id": 10,
+      "node": {
+        "kind_id": 1,
+        "start": 0,
+        "end": 1
+      },
+      "journal_len": 12
+    },
+    {
+      "ip": 11,
+      "event": {
+        "kind": "journal_event",
         "event": "SpanEnd#10"
       },
       "query_span_id": 10,
       "node": null,
-      "journal_len": 12
+      "journal_len": 13
     },
     {
       "ip": 11,
@@ -472,7 +482,7 @@ x
       },
       "query_span_id": 11,
       "node": null,
-      "journal_len": 13
+      "journal_len": 14
     },
     {
       "ip": 16,
@@ -481,7 +491,7 @@ x
       },
       "query_span_id": 9,
       "node": null,
-      "journal_len": 13
+      "journal_len": 14
     },
     {
       "ip": 16,
@@ -494,7 +504,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 13
+      "journal_len": 14
     },
     {
       "ip": 16,
@@ -507,7 +517,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 13
+      "journal_len": 14
     },
     {
       "ip": 16,
@@ -517,7 +527,7 @@ x
       },
       "query_span_id": 9,
       "node": null,
-      "journal_len": 14
+      "journal_len": 15
     },
     {
       "ip": 16,
@@ -527,7 +537,7 @@ x
       },
       "query_span_id": 8,
       "node": null,
-      "journal_len": 15
+      "journal_len": 16
     },
     {
       "ip": 16,
@@ -537,7 +547,7 @@ x
       },
       "query_span_id": 8,
       "node": null,
-      "journal_len": 16
+      "journal_len": 17
     },
     {
       "ip": 16,
@@ -547,7 +557,7 @@ x
       },
       "query_span_id": 3,
       "node": null,
-      "journal_len": 17
+      "journal_len": 18
     },
     {
       "ip": 27,
@@ -556,7 +566,7 @@ x
       },
       "query_span_id": 1,
       "node": null,
-      "journal_len": 17
+      "journal_len": 18
     },
     {
       "ip": 27,
@@ -569,7 +579,7 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 17
+      "journal_len": 18
     },
     {
       "ip": 27,
@@ -582,23 +592,13 @@ x
         "start": 0,
         "end": 1
       },
-      "journal_len": 17
-    },
-    {
-      "ip": 27,
-      "event": {
-        "kind": "journal_event",
-        "event": "SpanStart#2"
-      },
-      "query_span_id": 2,
-      "node": null,
       "journal_len": 18
     },
     {
       "ip": 27,
       "event": {
         "kind": "journal_event",
-        "event": "RecordSet \"expr\""
+        "event": "SpanStart#2"
       },
       "query_span_id": 2,
       "node": null,
@@ -718,15 +718,15 @@ P11 pattern    126..138  source_id=0
 [instructions]
 Q:
   00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └─!  _                                20, 24, 14
-  04  └‣─  (identifier) [SpanStartAt#7 SpanStart#6 Node RecordSet(M0) SpanEnd#6 SpanEnd#7] == "nope"  08
+  02  └─!  _ [RecordSet(M4)]                20, 24, 14
+  04  └‣─  (identifier) [SpanStartAt#7 SpanStart#6 RecordSet(M0) Node SpanEnd#6 SpanEnd#7] == "nope"  08
   07  ...
   08  ─‣┘  _ [SpanEnd#5 VariantClose SpanEnd#4 SpanEnd#3]  27
-  11  └‣─  (identifier) [SpanStartAt#11 SpanStart#10 Node RecordSet(M1) SpanEnd#10 SpanEnd#11]  16
+  11  └‣─  (identifier) [SpanStartAt#11 SpanStart#10 RecordSet(M1) Node SpanEnd#10 SpanEnd#11]  16
   14  ──!  _                                20, 24, 14
   16  ─‣┘  _ [SpanEnd#9 VariantClose SpanEnd#8 SpanEnd#3]  27
   19                                        ▶
   20   !   (expression_statement) [SpanStart#3 SpanStart#4 VariantOpen(M2) SpanStartAt#5]  04
   23  ...
   24   !   (expression_statement) [SpanStart#3 SpanStart#8 VariantOpen(M3) SpanStartAt#9]  11
-  27  ─‣┘  _ [SpanStart#2 RecordSet(M4) SpanEnd#2 SpanEnd#1 SpanEnd#0]  19
+  27  ─‣┘  _ [SpanStart#2 SpanEnd#2 SpanEnd#1 SpanEnd#0]  19

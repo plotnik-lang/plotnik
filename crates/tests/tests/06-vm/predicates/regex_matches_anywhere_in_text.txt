@@ -9,8 +9,8 @@ foobar;
 {
   "id": {
     "kind": "identifier",
-    "span": [0, 6],
-    "text": "foobar"
+    "text": "foobar",
+    "span": [0, 6]
   }
 }
 -------------------- BYTECODE --------------------
@@ -43,17 +43,18 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
-  2  └‣─  (identifier) [Node RecordSet(M0)] =~ /oo/  4
+  2  └‣─  (identifier) [RecordSet(M0) Node] =~ /oo/  4
   4  ─‣┘² _                                 5
   5                                         ▶
 --------------------- TRACE ----------------------
-Q:
-  0       (program)                         01
-      ●   program
-  1       (expression_statement)            02
-      ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)] =~ /oo/  04
-      ●   identifier
-  4       _                                 05
-      ●   program
-  5   ◀   (Q)                               ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..7]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..7]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchOk identifier [0..6]
+0004 Up(2) Any
+0004 MatchOk program [0..7]
+0005 Return PortId(0)
+0005 Return

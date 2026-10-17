@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use crate::bytecode::{EffectKind, Nav, SpanKind};
+use crate::bytecode::{Nav, SpanKind};
 use crate::compiler::analyze::boundary::BoundaryState;
 use crate::compiler::analyze::boundary::ExitPort;
 use crate::compiler::analyze::types::CaptureTypePlan;
@@ -740,7 +740,6 @@ impl NfaBuilder<'_> {
         }
 
         let span = self.span_id(quant.syntax(), SpanKind::Quantifier);
-        let capture = CaptureEffects::new_post(capture_effects.clone());
         let mut final_targets = ExitMap::new();
         for (port, &target) in targets.iter() {
             let target = span.map_or(target, |span| {
@@ -749,7 +748,7 @@ impl NfaBuilder<'_> {
             let target = if port.consumed() {
                 target
             } else {
-                self.emit_absence_for_skip_path(target, &capture)
+                self.emit_effects_epsilon(target, [EffectIR::absent()])
             };
             final_targets.insert(port, target);
         }
@@ -1161,11 +1160,7 @@ impl NfaBuilder<'_> {
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
                 let quant_end = self.quant_end_for(&brackets, skip);
-                let mut skip_effects: Vec<EffectIR> = capture_effects
-                    .iter()
-                    .filter(|eff| eff.kind() == EffectKind::RecordSet)
-                    .flat_map(|set_eff| [EffectIR::absent(), set_eff.clone()])
-                    .collect();
+                let mut skip_effects = vec![EffectIR::absent()];
                 skip_effects.extend(brackets.inner_capture.post.iter().cloned());
                 Some(self.emit_effects_if_nonempty(quant_end, skip_effects))
             }

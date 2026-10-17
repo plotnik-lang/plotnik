@@ -49,7 +49,6 @@ pub struct MacroArgs {
 pub struct LimitArgs {
     pub fuel: Option<LimitArg>,
     pub memory: Option<LimitArg>,
-    pub depth: Option<LimitArg>,
 }
 
 impl LimitArgs {
@@ -62,7 +61,6 @@ impl LimitArgs {
 enum LimitKey {
     Fuel,
     Memory,
-    Depth,
 }
 
 impl LimitKey {
@@ -70,7 +68,6 @@ impl LimitKey {
         match name {
             "fuel" => Some(Self::Fuel),
             "memory" => Some(Self::Memory),
-            "depth" => Some(Self::Depth),
             _ => None,
         }
     }
@@ -79,19 +76,13 @@ impl LimitKey {
         match self {
             Self::Fuel => "fuel",
             Self::Memory => "memory",
-            Self::Depth => "depth",
         }
-    }
-
-    fn allows_unbounded(self) -> bool {
-        !matches!(self, Self::Depth)
     }
 
     fn slot(self, args: &mut LimitArgs) -> &mut Option<LimitArg> {
         match self {
             Self::Fuel => &mut args.fuel,
             Self::Memory => &mut args.memory,
-            Self::Depth => &mut args.depth,
         }
     }
 }
@@ -204,22 +195,14 @@ impl ArgCursor {
                 format!(
                     "`{}` needs a value: {}",
                     key.name(),
-                    accepted_limit_values(key)
+                    accepted_limit_values()
                 ),
             ));
         };
         self.advance();
         match &token {
             TokenTree::Ident(ident) if ident.to_string() == "auto" => Ok(LimitArg::Auto),
-            TokenTree::Ident(ident) if ident.to_string() == "unbounded" => {
-                if key.allows_unbounded() {
-                    return Ok(LimitArg::Unbounded);
-                }
-                Err(ExpandError::new(
-                    key_span,
-                    "`depth = unbounded` is not supported; use `depth = auto` or an integer",
-                ))
-            }
+            TokenTree::Ident(ident) if ident.to_string() == "unbounded" => Ok(LimitArg::Unbounded),
             TokenTree::Literal(_) => take_integer_limit(&token, key),
             other => Err(invalid_limit_value(other.span(), key)),
         }
@@ -257,7 +240,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                                 key_span,
                                 format!(
                                     "unknown argument `{other}`; `query!` accepts `grammar`, \
-                                     `file`, `fuel`, `memory`, `depth`, and the query string"
+                                     `file`, `fuel`, `memory`, and the query string"
                                 ),
                             ));
                         };
@@ -315,17 +298,13 @@ fn take_integer_limit(token: &TokenTree, key: LimitKey) -> Result<LimitArg, Expa
     Ok(LimitArg::Of(value))
 }
 
-fn accepted_limit_values(key: LimitKey) -> &'static str {
-    if key.allows_unbounded() {
-        "an unsigned integer, `auto`, or `unbounded`"
-    } else {
-        "an unsigned integer or `auto`"
-    }
+fn accepted_limit_values() -> &'static str {
+    "an unsigned integer, `auto`, or `unbounded`"
 }
 
 fn invalid_limit_value(span: Span, key: LimitKey) -> ExpandError {
     ExpandError::new(
         span,
-        format!("`{}` needs {}", key.name(), accepted_limit_values(key)),
+        format!("`{}` needs {}", key.name(), accepted_limit_values()),
     )
 }

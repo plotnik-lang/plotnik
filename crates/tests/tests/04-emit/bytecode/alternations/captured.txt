@@ -10,8 +10,8 @@ Q = 0
 Q:
   0  -ε-                                    2, 3
   1                                         ▶
-  2   !   (identifier) [Node RecordSet(value)]  1
-  3   !   (number) [Node RecordSet(value)]  1
+  2   !   (identifier) [RecordSet(value) Node]  1
+  3   !   (number) [RecordSet(value) Node]  1
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -37,5 +37,5 @@ Q = 0 :: T1
 Q:
   0  -ε-                                    3, 5
   2                                         ▶
-  3   !   (identifier) [Node RecordSet(M0)]  2
-  5   !   (number) [Node RecordSet(M0)]     2
+  3   !   (identifier) [RecordSet(M0) Node]  2
+  5   !   (number) [RecordSet(M0) Node]     2

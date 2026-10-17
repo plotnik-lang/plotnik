@@ -18,15 +18,15 @@ y;
   "a": {
     "v": {
       "kind": "identifier",
-      "span": [0, 1],
-      "text": "x"
+      "text": "x",
+      "span": [0, 1]
     }
   },
   "b": {
     "v": {
       "kind": "identifier",
-      "span": [3, 4],
-      "text": "y"
+      "text": "y",
+      "span": [3, 4]
     }
   }
 }
@@ -66,27 +66,27 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (identifier) [RecordOpen Node RecordSet(M0)]  04
-  04  ─‣┘  _ [RecordClose RecordSet(M2)]    06
-  06  ─‣─  (expression_statement)           08
-  07  ...
-  08  └‣─  (identifier) [RecordOpen Node RecordSet(M1)]  10
-  10  ─‣┘² _ [RecordClose RecordSet(M3)]    12
-  12                                        ▶
+  02  └‣─  (identifier) [RecordSet(M2) RecordOpen RecordSet(M0) Node]  05
+  05  ─‣┘  _ [RecordClose]                  07
+  07  ─‣─  (expression_statement)           08
+  08  └‣─  (identifier) [RecordSet(M3) RecordOpen RecordSet(M1) Node]  11
+  11  ─‣┘² _ [RecordClose]                  13
+  13                                        ▶
 --------------------- TRACE ----------------------
-Q:
-  00       (program)                        01
-       ●   program
-  01       (expression_statement)           02
-       ●   expression_statement
-  02       (identifier) [RecordOpen Node RecordSet(M0)]  04
-       ●   identifier
-  04       _ [RecordClose RecordSet(M2)]    06
-       ●   expression_statement
-  06       (expression_statement)           08
-       ●   expression_statement
-  08       (identifier) [RecordOpen Node RecordSet(M1)]  10
-       ●   identifier
-  10       _ [RecordClose RecordSet(M3)]    12
-       ●   program
-  12   ◀   (Q)                              ◼
+0000 ExecutionStarted { target: 0 }
+0000 StayExact Named(Some(NodeKindId(134)))
+0000 MatchOk program [0..5]
+0001 Down Named(Some(NodeKindId(150)))
+0001 MatchOk expression_statement [0..2]
+0002 Down Named(Some(NodeKindId(1)))
+0002 MatchOk identifier [0..1]
+0005 Up(1) Any
+0005 MatchOk expression_statement [0..2]
+0007 Next Named(Some(NodeKindId(150)))
+0007 MatchOk expression_statement [3..5]
+0008 Down Named(Some(NodeKindId(1)))
+0008 MatchOk identifier [3..4]
+0011 Up(2) Any
+0011 MatchOk program [0..5]
+0013 Return PortId(0)
+0013 Return

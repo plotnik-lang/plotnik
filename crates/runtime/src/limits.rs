@@ -1,28 +1,17 @@
-use std::cell::Cell;
-
 use crate::frame::CallFrameError;
 
 /// A safe run exceeded a configured limit or a fixed runtime capacity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LimitExceeded {
-    /// The matcher exhausted its fuel before the run finished. The value is
-    /// the resolved fuel limit for that run.
+    /// The operation exhausted its fuel. The value is the resolved fuel limit.
     OutOfFuel(u64),
-    /// A memory sample exceeded the ceiling. `used` counts occupied arena
-    /// entries and estimated cursor storage, not allocated heap bytes.
-    /// Sampling can overshoot `limit` without a fixed bound.
+    /// Admitting more owned capacity would exceed the memory limit. `used`
+    /// is the charge the refused request would have reached, in bytes.
     Memory { used: u64, limit: u64 },
     /// The allocator refused a block of `bytes`, or the requested capacity
     /// does not fit the address space.
     Allocation { bytes: u64 },
-    /// The committed value's nesting exceeded the decode-depth ceiling.
-    /// Reported only by generated matchers (the VM renders output
-    /// iteratively and has no such ceiling): their typed decoder recurses,
-    /// so the metered path refuses the match before decoding could exhaust
-    /// the native stack. Raise the module's `depth` policy — and run with a
-    /// stack to match — if values this deep are expected.
-    DecodeDepth(u64),
     /// The source-driven call stack exceeded a fixed-width runtime capacity.
     CallFrame(CallFrameError),
 }
@@ -36,14 +25,11 @@ impl std::fmt::Display for LimitExceeded {
             LimitExceeded::Memory { used, limit } => {
                 write!(
                     f,
-                    "exceeded the memory limit of {limit} bytes (used {used} bytes)"
+                    "exceeded the memory limit of {limit} bytes (needed {used} bytes)"
                 )
             }
             LimitExceeded::Allocation { bytes } => {
                 write!(f, "failed to allocate {bytes} bytes")
-            }
-            LimitExceeded::DecodeDepth(max) => {
-                write!(f, "exceeded the decode depth limit of {max} nested values")
             }
             LimitExceeded::CallFrame(error) => error.fmt(f),
         }
@@ -55,50 +41,6 @@ impl std::error::Error for LimitExceeded {}
 impl From<CallFrameError> for LimitExceeded {
     fn from(error: CallFrameError) -> Self {
         Self::CallFrame(error)
-    }
-}
-
-pub struct DecodeDepth {
-    max: Option<u64>,
-    current: Cell<u64>,
-}
-
-impl DecodeDepth {
-    pub fn new(max: Option<u64>) -> Self {
-        Self {
-            max,
-            current: Cell::new(0),
-        }
-    }
-
-    pub fn enter(&self) -> Result<DecodeDepthGuard<'_>, LimitExceeded> {
-        let current = self.current.get();
-        let next = current.checked_add(1).unwrap_or_else(|| {
-            panic!(
-                "result decoding depth overflowed u64 while entering a nested value: \
-                 current_depth={current}"
-            )
-        });
-        if let Some(max) = self.max
-            && next > max
-        {
-            return Err(LimitExceeded::DecodeDepth(max));
-        }
-        self.current.set(next);
-        Ok(DecodeDepthGuard { depth: self })
-    }
-}
-
-pub struct DecodeDepthGuard<'a> {
-    depth: &'a DecodeDepth,
-}
-
-impl Drop for DecodeDepthGuard<'_> {
-    fn drop(&mut self) {
-        let current = self.depth.current.get();
-        self.depth
-            .current
-            .set(current.checked_sub(1).expect("decode depth underflow"));
     }
 }
 
@@ -128,7 +70,7 @@ impl Limit {
 pub struct RuntimeLimitSpec {
     /// Matcher work budget, in fuel units.
     pub fuel_limit: Limit,
-    /// Sampled memory-accounting ceiling in bytes, not a hard allocation limit.
+    /// Ceiling on owned capacity, in bytes.
     pub memory: Limit,
 }
 
@@ -159,31 +101,28 @@ impl RuntimeLimitSpec {
 pub struct ResolvedRuntimeLimits {
     /// Available operation fuel, or `None` for unbounded.
     pub fuel_limit: Option<u64>,
-    /// Sampled memory-accounting ceiling in bytes, or `None` for unbounded.
+    /// Ceiling on owned capacity in bytes, or `None` for unbounded.
     pub max_memory: Option<u64>,
 }
 
-const DECODE_STACK_BUDGET_BYTES: u64 = 2 * 1024 * 1024;
-
-const DECODE_FRAME_OVERHEAD_BYTES: u64 = 512;
-
-/// Space reserved for one native node handle in generated decoder frames.
+/// Space reserved for one native node handle in generated size estimates.
 ///
 /// Execution builds assert that `tree_sitter::Node` fits this estimate, allowing
-/// the compiler to estimate frames without linking Tree-sitter.
+/// the compiler to estimate generated value sizes without linking Tree-sitter.
 #[doc(hidden)]
 pub const GENERATED_NODE_VALUE_BYTES: u64 = 48;
 
-/// Compute the default decode-depth ceiling for a generated matcher module.
+/// Largest by-value generated result type, in bytes.
 ///
-/// The emitter passes its conservative maximum decoder-frame estimate. The
-/// ceiling then scales down for wide readers and up for narrow readers while
-/// staying tied to the native-stack budget this limit protects.
-pub const fn decode_depth_auto(decoder_frame_bytes: u64) -> u64 {
-    let frame_bytes = decoder_frame_bytes.saturating_add(DECODE_FRAME_OVERHEAD_BYTES);
-    let depth = DECODE_STACK_BUDGET_BYTES / frame_bytes;
-    if depth == 0 { 1 } else { depth }
-}
+/// Result construction never recurses on the shape of the input, but each
+/// generated value is still built and moved by value: its constructor, the
+/// typed construction stacks, and the root moving through `Match`, `Option`
+/// and `Result`. Unoptimized builds keep several copies in one frame.
+/// Bounding every generated type keeps native stack use a small constant
+/// multiple of this cap, independent of source and result depth. 8 KiB fits
+/// more than 150 node captures in one record and leaves wide margin on a
+/// 256 KiB thread stack in debug builds.
+pub const GENERATED_VALUE_CAP: usize = 8 * 1024;
 
 const FUEL_BASE: u64 = 1_000_000;
 const FUEL_PER_NODE: u64 = 1_024;

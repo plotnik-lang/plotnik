@@ -6,7 +6,6 @@ use plotnik_runtime::{Limit, RuntimeLimitSpec};
 pub struct Config {
     pub(crate) rust_types: RustTypesConfig,
     pub(crate) limits: RuntimeLimitSpec,
-    pub(crate) decode_depth: Limit,
     pub(crate) grammar_identity: Option<GrammarIdentity>,
 }
 
@@ -18,7 +17,6 @@ impl Default for Config {
                 fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
-            decode_depth: Limit::Auto,
             grammar_identity: None,
         }
     }
@@ -34,18 +32,8 @@ impl Config {
         self
     }
 
-    pub fn serde(mut self, enabled: bool) -> Self {
-        self.rust_types = self.rust_types.serde(enabled);
-        self
-    }
-
     pub fn limits(mut self, limits: RuntimeLimitSpec) -> Self {
         self.limits = limits;
-        self
-    }
-
-    pub fn decode_depth(mut self, depth: Limit) -> Self {
-        self.decode_depth = depth;
         self
     }
 
