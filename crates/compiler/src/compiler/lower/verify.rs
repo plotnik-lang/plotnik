@@ -34,7 +34,7 @@ mod release_impl {
     }
 
     #[inline(always)]
-    pub fn verify_constructed(_nfa: &NfaGraph, _ctx: &LowerInput) {}
+    pub fn verify_constructed(_nfa: &NfaGraph) {}
 
     #[inline(always)]
     pub fn verify_fresh_build(_instructions: &[InstructionIR]) {}
@@ -45,6 +45,7 @@ mod debug_impl {
     use std::collections::hash_map::DefaultHasher;
     use std::collections::{HashMap, HashSet};
     use std::hash::{Hash, Hasher};
+    use std::ops::ControlFlow;
 
     use crate::bytecode::{EffectKind, EntryBoundary, Nav};
     use indexmap::IndexMap;
@@ -53,11 +54,9 @@ mod debug_impl {
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
-        DefRoute, DefSpecialization, EffectArg, InstructionIR, Label, MatchIR, NfaGraph,
+        DefRoute, DefSpecialization, EffectArg, EffectIR, InstructionIR, Label, MatchIR, NfaGraph,
         NodeKindConstraint, PortId, PredicateValueIR,
     };
-
-    const MAX_PATHS: usize = 50_000;
 
     const MAX_DEPTH: u32 = 200_000;
 
@@ -347,29 +346,26 @@ mod debug_impl {
             }
         }
 
-        fn walk(&self, entry: Label, max_paths: usize, mut on_path: impl FnMut(Path)) -> bool {
-            let mut count = 0usize;
+        fn walk(&self, entry: Label, mut on_path: impl FnMut(Path) -> ControlFlow<()>) -> bool {
             let mut truncated = false;
 
             let mut stack: Vec<(Label, Vec<SemanticOp>, HashSet<Label>, u32)> =
                 vec![(entry, Vec::new(), HashSet::new(), 0)];
 
             while let Some((label, mut ops, mut visited, depth)) = stack.pop() {
-                if count >= max_paths {
-                    truncated = true;
-                    break;
-                }
                 if depth >= MAX_DEPTH {
                     ops.push(SemanticOp::DepthCut);
-                    on_path(normalize_path(ops));
-                    count += 1;
+                    if on_path(normalize_path(ops)).is_break() {
+                        return true;
+                    }
                     truncated = true;
                     continue;
                 }
                 if visited.contains(&label) {
                     ops.push(SemanticOp::CycleRef);
-                    on_path(normalize_path(ops));
-                    count += 1;
+                    if on_path(normalize_path(ops)).is_break() {
+                        return true;
+                    }
                     continue;
                 }
 
@@ -386,8 +382,9 @@ mod debug_impl {
                 ops.extend(contribution.ops);
 
                 if contribution.succs.is_empty() {
-                    on_path(normalize_path(ops));
-                    count += 1;
+                    if on_path(normalize_path(ops)).is_break() {
+                        return true;
+                    }
                     continue;
                 }
 
@@ -401,33 +398,24 @@ mod debug_impl {
 
         fn fingerprint(&self, entry: Label) -> Fingerprint {
             let mut hashes = Vec::new();
-            let truncated = self.walk(entry, MAX_PATHS, |path| {
+            let truncated = self.walk(entry, |path| {
                 hashes.push(hash_path(&path));
+                ControlFlow::Continue(())
             });
             Fingerprint { hashes, truncated }
         }
 
         fn paths(&self, entry: Label, max: usize) -> Vec<Path> {
             let mut paths = Vec::new();
-            self.walk(entry, max, |path| {
+            self.walk(entry, |path| {
                 paths.push(path);
+                if paths.len() >= max {
+                    return ControlFlow::Break(());
+                }
+
+                ControlFlow::Continue(())
             });
             paths
-        }
-
-        fn check_scopes(&self, entry: Label) -> Result<(), String> {
-            let mut err: Option<String> = None;
-            self.walk(entry, MAX_PATHS, |path| {
-                if err.is_none()
-                    && let Err(e) = check_path_scopes(&path)
-                {
-                    err = Some(format!("{e}\n  path: {path:?}"));
-                }
-            });
-            match err {
-                Some(e) => Err(e),
-                None => Ok(()),
-            }
         }
     }
 
@@ -453,58 +441,129 @@ mod debug_impl {
         Some(role)
     }
 
-    fn check_path_scopes(path: &Path) -> Result<(), String> {
-        let mut stack: Vec<EffectKind> = Vec::new();
-        let mut spans: Vec<Option<String>> = Vec::new();
-        for op in path {
-            let SemanticOp::Effect(opcode, payload) = op else {
-                continue;
-            };
-            let opcode = *opcode;
-            if matches!(opcode, EffectKind::SpanStartAt | EffectKind::SpanStart) {
-                spans.push(payload.clone());
-                continue;
-            }
-            if opcode == EffectKind::SpanEnd {
-                match spans.pop() {
-                    Some(open) if open == *payload => {}
-                    Some(open) => {
-                        return Err(format!(
-                            "SpanEnd({payload:?}) closes a span but the innermost open span is {open:?}"
-                        ));
-                    }
-                    None => return Err("SpanEnd has no matching open span".to_string()),
+    #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+    struct ScopeState {
+        scopes: Vec<EffectKind>,
+        spans: Vec<EffectArg>,
+    }
+
+    impl ScopeState {
+        fn apply(&mut self, effects: &[EffectIR]) -> Result<(), String> {
+            for effect in effects {
+                let opcode = effect.kind();
+                if matches!(opcode, EffectKind::SpanStartAt | EffectKind::SpanStart) {
+                    self.spans.push(effect.argument().clone());
+                    continue;
                 }
-                continue;
+
+                if opcode == EffectKind::SpanEnd {
+                    let expected = effect.argument();
+                    match self.spans.pop() {
+                        Some(open) if open == *expected => {}
+                        Some(open) => {
+                            return Err(format!(
+                                "SpanEnd({expected:?}) closes a span but the innermost open span is {open:?}"
+                            ));
+                        }
+                        None => return Err("SpanEnd has no matching open span".to_string()),
+                    }
+                    continue;
+                }
+
+                match scope_role(opcode) {
+                    None => {}
+                    Some(ScopeRole::Open(open)) => self.scopes.push(open),
+                    Some(ScopeRole::Close(expected)) => match self.scopes.pop() {
+                        Some(top) if top == expected => {}
+                        Some(top) => {
+                            return Err(format!(
+                                "{opcode:?} closes a {expected:?} scope but the innermost open scope is {top:?}"
+                            ));
+                        }
+                        None => return Err(format!("{opcode:?} has no matching open scope")),
+                    },
+                }
             }
-            match scope_role(opcode) {
-                None => {}
-                Some(ScopeRole::Open(open)) => stack.push(open),
-                Some(ScopeRole::Close(expected)) => match stack.pop() {
-                    Some(top) if top == expected => {}
-                    Some(top) => {
-                        return Err(format!(
-                            "{opcode:?} closes a {expected:?} scope but the innermost open scope is {top:?}"
-                        ));
-                    }
-                    None => {
-                        return Err(format!("{opcode:?} has no matching open scope"));
-                    }
-                },
+
+            Ok(())
+        }
+    }
+
+    enum ScopeVisit {
+        Enter(Label, ScopeState),
+        Exit(Label),
+    }
+
+    struct ScopeCheck<'a> {
+        instructions: HashMap<Label, &'a InstructionIR>,
+        checked: HashSet<(Label, ScopeState)>,
+    }
+
+    impl<'a> ScopeCheck<'a> {
+        fn new(instructions: &'a [InstructionIR]) -> Self {
+            Self {
+                instructions: instructions.iter().map(|i| (i.label(), i)).collect(),
+                checked: HashSet::new(),
             }
         }
 
-        let truncated = matches!(
-            path.last(),
-            Some(SemanticOp::CycleRef | SemanticOp::DanglingLabel | SemanticOp::DepthCut)
-        );
-        if !truncated && !stack.is_empty() {
-            return Err(format!("path ends with unclosed scope(s): {stack:?}"));
+        fn check(&mut self, entry: Label) -> Result<(), String> {
+            let mut active = HashMap::new();
+            let mut work = vec![ScopeVisit::Enter(entry, ScopeState::default())];
+
+            while let Some(visit) = work.pop() {
+                let (label, mut state) = match visit {
+                    ScopeVisit::Enter(label, state) => (label, state),
+                    ScopeVisit::Exit(label) => {
+                        let state = active
+                            .remove(&label)
+                            .expect("exiting an active scope label");
+                        self.checked.insert((label, state));
+                        continue;
+                    }
+                };
+
+                if let Some(incoming) = active.get(&label) {
+                    if incoming != &state {
+                        return Err(format!(
+                            "cycle at {label:?} changes scope state from {incoming:?} to {state:?}"
+                        ));
+                    }
+
+                    continue;
+                }
+
+                if self.checked.contains(&(label, state.clone())) {
+                    continue;
+                }
+
+                active.insert(label, state.clone());
+                work.push(ScopeVisit::Exit(label));
+
+                let instr = self.instructions.get(&label).expect("labels are validated");
+                if let InstructionIR::Match(m) = instr {
+                    state
+                        .apply(&m.effects)
+                        .map_err(|e| format!("{label:?}: {e}"))?;
+                }
+
+                if instr.successors().is_empty() {
+                    if !state.scopes.is_empty() || !state.spans.is_empty() {
+                        return Err(format!(
+                            "path ends at {label:?} with unclosed scopes: {state:?}"
+                        ));
+                    }
+
+                    continue;
+                }
+
+                for &succ in instr.successors().iter().rev() {
+                    work.push(ScopeVisit::Enter(succ, state.clone()));
+                }
+            }
+
+            Ok(())
         }
-        if !truncated && !spans.is_empty() {
-            return Err(format!("path ends with unclosed span(s): {spans:?}"));
-        }
-        Ok(())
     }
 
     fn check_labels(instructions: &[InstructionIR]) -> Result<(), String> {
@@ -870,7 +929,7 @@ mod debug_impl {
         verify_after_pass(name, &before, nfa, ctx);
     }
 
-    pub fn verify_constructed(nfa: &NfaGraph, ctx: &LowerInput) {
+    pub fn verify_constructed(nfa: &NfaGraph) {
         if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
         }
@@ -878,9 +937,9 @@ mod debug_impl {
         if let Err(e) = check_no_node_on_empty_paths(nfa) {
             panic!("[verify] construction produced empty-match Node effect: {e}");
         }
-        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        let mut scopes = ScopeCheck::new(&nfa.instructions);
         for (key, entry) in entries(nfa) {
-            if let Err(e) = walk.check_scopes(entry) {
+            if let Err(e) = scopes.check(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");
             }
         }

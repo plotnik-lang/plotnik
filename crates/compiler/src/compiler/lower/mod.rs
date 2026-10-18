@@ -27,18 +27,18 @@ pub(crate) use input::LowerInput;
 
 pub(crate) fn lower_semantic(input: &LowerInput<'_>) -> SemanticNfa {
     let mut ir = NfaBuilder::build_ir(input);
-    verify_constructed(&ir, input);
+    verify_constructed(&ir);
     run_verified("eliminate_epsilons", &mut ir, input, eliminate_epsilons);
     run_root_pruning_verified("remove_unreachable", &mut ir, input, remove_unreachable);
     run_verified("collapse_up", &mut ir, input, collapse_up);
     dedup_states(&mut ir);
-    verify_constructed(&ir, input);
+    verify_constructed(&ir);
     SemanticNfa::new(ir)
 }
 
 pub(crate) fn pack_lowered(semantic: SemanticNfa, input: &LowerInput<'_>) -> LoweredNfa {
     let mut ir = semantic.into_raw();
     run_verified("pack_instructions", &mut ir, input, pack_instructions);
-    verify_constructed(&ir, input);
+    verify_constructed(&ir);
     LoweredNfa::new(ir)
 }
