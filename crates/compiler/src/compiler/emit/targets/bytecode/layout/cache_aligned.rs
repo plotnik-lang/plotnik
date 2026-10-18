@@ -387,23 +387,21 @@ impl<'a> LayoutBuilder<'a> {
             });
             let size = instr.size() as u8;
 
-            let scores: Vec<_> = (0..current_block)
-                .map(|c| block_score(pred_block, c, &refs))
-                .collect();
             let best = (0..current_block)
                 .filter(|&c| self.arena.blocks[c].can_fit(size))
-                .max_by(|&a, &b| {
-                    scores[a].partial_cmp(&scores[b]).unwrap_or_else(|| {
+                .map(|c| (c, block_score(pred_block, c, &refs)))
+                .max_by(|(a, score_a), (b, score_b)| {
+                    score_a.partial_cmp(score_b).unwrap_or_else(|| {
                         panic!(
                             "cache-aligned layout cannot compare packing scores: block {a} has \
                                  score {:?}, block {b} has score {:?}, candidate={succ_label:?}, \
                                  predecessor_block={pred_block}",
-                            scores[a], scores[b]
+                            score_a, score_b
                         )
                     })
                 });
 
-            if let Some(candidate) = best {
+            if let Some((candidate, _)) = best {
                 self.arena.move_to(succ_label, candidate, size);
             }
         }
