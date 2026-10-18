@@ -465,12 +465,16 @@ pub struct CompiledQuery {
     bound: BindOutcome,
     result: Option<ResultModel>,
     semantic_nfa: Option<SemanticNfa>,
+    bytecode: Option<Vec<u8>>,
     diagnostics: Diagnostics,
 }
 
 impl CompiledQuery {
     pub fn is_valid(&self) -> bool {
-        self.result.is_some() && self.semantic_nfa.is_some() && !self.diagnostics.has_errors()
+        self.result.is_some()
+            && self.semantic_nfa.is_some()
+            && self.bytecode.is_some()
+            && !self.diagnostics.has_errors()
     }
 
     pub fn emit<T: EmitTarget>(
@@ -494,6 +498,18 @@ impl CompiledQuery {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
+
+        if !config.inspection_enabled() {
+            let bytes = self
+                .bytecode
+                .as_ref()
+                .expect("valid compiled query retains bytecode");
+            let module = Module::validate_and_load(bytes).unwrap_or_else(|error| {
+                panic!("compiler-emitted bytecode failed immediate module validation: {error}")
+            });
+            return Ok(Emission::success(module, Diagnostics::new()));
+        }
+
         let bound = self
             .bound
             .bound()
@@ -505,16 +521,9 @@ impl CompiledQuery {
             inspection: config.inspection_enabled(),
         };
         let mut diagnostics = Diagnostics::new();
-        let semantic = if input.inspection {
-            self.bound
-                .report_inspection_span_degradation_for(&input, &mut diagnostics);
-            lower_semantic(&input)
-        } else {
-            self.semantic_nfa
-                .as_ref()
-                .expect("valid query retains semantic NFA")
-                .clone()
-        };
+        self.bound
+            .report_inspection_span_degradation_for(&input, &mut diagnostics);
+        let semantic = lower_semantic(&input);
         let lowered = pack_lowered(semantic, &input);
         let bytes = match crate::compiler::emit::targets::bytecode::emit(
             bound.analysis_input(),
@@ -713,17 +722,19 @@ impl BindOutcome {
     }
 
     pub(crate) fn compile(self) -> crate::compiler::QueryResult<CompiledQuery> {
-        let mut diagnostics = self.diagnostics().clone();
-        let Some(bound) = self.bound() else {
-            return Ok(CompiledQuery {
-                bound: self,
-                result: None,
-                semantic_nfa: None,
-                diagnostics,
-            });
+        let mut compiled = CompiledQuery {
+            diagnostics: self.diagnostics().clone(),
+            bound: self,
+            result: None,
+            semantic_nfa: None,
+            bytecode: None,
         };
+        let Some(bound) = compiled.bound.bound() else {
+            return Ok(compiled);
+        };
+
         assert!(
-            !diagnostics.has_errors(),
+            !compiled.diagnostics.has_errors(),
             "grammar binding returned a bound query together with error diagnostics; failed \
              binding must not expose artifacts"
         );
@@ -731,13 +742,10 @@ impl BindOutcome {
         let result = match ResultModel::from_artifacts(bound.analysis_input()) {
             Ok(result) => result,
             Err(error) => {
-                self.report_shared_limit_error(&mut diagnostics, error.to_string());
-                return Ok(CompiledQuery {
-                    bound: self,
-                    result: None,
-                    semantic_nfa: None,
-                    diagnostics,
-                });
+                compiled
+                    .bound
+                    .report_shared_limit_error(&mut compiled.diagnostics, error.to_string());
+                return Ok(compiled);
             }
         };
         let input = LowerInput {
@@ -746,12 +754,26 @@ impl BindOutcome {
             inspection: false,
         };
         let semantic_nfa = lower_semantic(&input);
-        Ok(CompiledQuery {
-            bound: self,
-            result: Some(result),
-            semantic_nfa: Some(semantic_nfa),
-            diagnostics,
-        })
+        let lowered = pack_lowered(semantic_nfa.clone(), &input);
+        let schema = result.schema(bound.analysis_input());
+        let bytecode = match crate::compiler::emit::targets::bytecode::emit(
+            bound.analysis_input(),
+            &schema,
+            &lowered,
+        ) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                compiled
+                    .bound
+                    .report_shared_limit_error(&mut compiled.diagnostics, error.to_string());
+                return Ok(compiled);
+            }
+        };
+
+        compiled.result = Some(result);
+        compiled.semantic_nfa = Some(semantic_nfa);
+        compiled.bytecode = Some(bytecode);
+        Ok(compiled)
     }
 
     fn bound(&self) -> Option<&BoundQuery> {

@@ -20,7 +20,7 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
 }
 
 #[test]
-fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
+fn fields_256_exceed_query_limits() {
     let mut query = String::from("Q = (program");
     for index in 0..=u8::MAX {
         write!(query, " (expression_statement) @field_{index}").unwrap();
@@ -28,34 +28,36 @@ fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
     query.push(')');
     let compiled = QueryBuilder::from_inline(&query)
         .compile(grammar())
-        .expect("target-neutral compilation answers");
+        .expect("compilation answers with diagnostics");
 
-    assert!(compiled.is_valid());
+    assert!(!compiled.is_valid());
+    assert_eq!(
+        compiled.diagnostics().kinds().collect::<Vec<_>>(),
+        vec![DiagnosticKind::QueryTooComplex]
+    );
     assert!(
         compiled
             .emit_types(RustCodegenConfig::new())
             .expect("Rust type emission answers")
-            .is_valid()
+            .artifact()
+            .is_none()
     );
     assert!(
         compiled
             .emit(RustCodegenConfig::new())
             .expect("Rust module emission answers")
-            .is_valid()
+            .artifact()
+            .is_none()
     );
 
     let bytecode = compiled
         .emit(BytecodeConfig::new())
-        .expect("bytecode target answers with a domain rejection");
+        .expect("bytecode target answers");
     assert!(bytecode.artifact().is_none());
-    assert_eq!(
-        bytecode.diagnostics().kinds().collect::<Vec<_>>(),
-        vec![DiagnosticKind::TargetLimitExceeded]
-    );
 }
 
 #[test]
-fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
+fn variant_cases_256_exceed_query_limits() {
     let mut query = String::from("Q = (program [");
     for index in 0..=u8::MAX {
         write!(query, " Variant{index}: (_) @value_{index}").unwrap();
@@ -63,30 +65,32 @@ fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
     query.push_str("] @choice)");
     let compiled = QueryBuilder::from_inline(&query)
         .compile(grammar())
-        .expect("target-neutral compilation answers");
+        .expect("compilation answers with diagnostics");
 
-    assert!(compiled.is_valid());
+    assert!(!compiled.is_valid());
+    assert_eq!(
+        compiled.diagnostics().kinds().collect::<Vec<_>>(),
+        vec![DiagnosticKind::QueryTooComplex]
+    );
     assert!(
         compiled
             .emit_types(RustCodegenConfig::new())
             .expect("Rust type emission answers")
-            .is_valid()
+            .artifact()
+            .is_none()
     );
     assert!(
         compiled
             .emit(RustCodegenConfig::new())
             .expect("Rust module emission answers")
-            .is_valid()
+            .artifact()
+            .is_none()
     );
 
     let bytecode = compiled
         .emit(BytecodeConfig::new())
-        .expect("bytecode target answers with a domain rejection");
+        .expect("bytecode target answers");
     assert!(bytecode.artifact().is_none());
-    assert_eq!(
-        bytecode.diagnostics().kinds().collect::<Vec<_>>(),
-        vec![DiagnosticKind::TargetLimitExceeded]
-    );
 }
 
 #[test]
