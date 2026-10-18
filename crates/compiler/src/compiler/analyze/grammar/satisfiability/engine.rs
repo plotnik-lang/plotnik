@@ -216,7 +216,7 @@ impl<'a> Frozen<'a> {
     }
 }
 
-pub const DEFAULT_SATISFIABILITY_WORK_BUDGET: u64 = 32_000_000;
+pub const DEFAULT_SATISFIABILITY_WORK_BUDGET: u64 = 10_000_000_000;
 
 #[derive(Default)]
 struct Solve {

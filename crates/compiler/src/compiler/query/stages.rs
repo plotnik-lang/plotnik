@@ -92,10 +92,7 @@ impl QueryBuilder {
         self
     }
 
-    /// Override the satisfiability solve's work ceiling. Raise it for a query that
-    /// legitimately needs a wide child list the default rejects as too complex; the
-    /// default protects against an adversarial one driving the quadratic solve for an
-    /// unbounded stretch.
+    /// Set the work budget for each satisfiability phase, not an elapsed-time limit.
     pub fn with_satisfiability_work_budget(mut self, budget: u64) -> Self {
         self.input.limits = self.input.limits.with_satisfiability_work_budget(budget);
         self
