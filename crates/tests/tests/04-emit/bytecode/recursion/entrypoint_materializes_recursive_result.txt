@@ -11,21 +11,21 @@ Q      = 12
 
 [transitions]
 Nested:
-  01                                        ▶
-  02   !   (identifier) [Absent RecordSet(inner) Node RecordSet(leaf)]  01
-  03   !   (array) [Absent RecordSet(leaf) RecordOpen]  07
-  04  ─‣┘  _ [RecordSet(inner)]             01
-  06  -ε-  [RecordClose]                    04
+  01       return
+  02   !   (identifier)                     01          [Absent RecordSet(inner) Node RecordSet(leaf)]
+  03   !   (array)                          07          [Absent RecordSet(leaf) RecordOpen]
+  04  ─‣┘  _                                01          [RecordSet(inner)]
+  06  -ε-                                   04          [RecordClose]
   07  └‣─  (Nested)                         09 : 06
   09   !   switch
              (identifier)                   02
              (array)                        03
 
 Q:
-  11                                        ▶
-  12   !   (array) [RecordOpen]             16
-  13  ─‣┘  _ [RecordSet(top)]               11
-  15  -ε-  [RecordClose]                    13
+  11       return
+  12   !   (array)                          16          [RecordOpen]
+  13  ─‣┘  _                                11          [RecordSet(top)]
+  15  -ε-                                   13          [RecordClose]
   16  └‣─  (Nested)                         09 : 15
 -------------------- BYTECODE --------------------
 [strings]
@@ -65,14 +65,14 @@ Nested:
              (identifier)                   16
 
 Q:
-  01   !   (array) [RecordOpen]             03
+  01   !   (array)                          03          [RecordOpen]
   03  └‣─  (Nested)                         00 : 04
-  04  -ε-  [RecordClose]                    06
-  06  ─‣┘  _ [RecordSet(M2)]                08
-  08                                        ▶
-  09  -ε-  [RecordClose]                    11
-  11  ─‣┘  _ [RecordSet(M1)]                13
-  13                                        ▶
-  14   !   (array) [Absent RecordSet(M0) RecordOpen]  19
-  16   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  13
+  04  -ε-                                   06          [RecordClose]
+  06  ─‣┘  _                                08          [RecordSet(M2 top)]
+  08       return
+  09  -ε-                                   11          [RecordClose]
+  11  ─‣┘  _                                13          [RecordSet(M1 inner)]
+  13       return
+  14   !   (array)                          19          [Absent RecordSet(M0 leaf) RecordOpen]
+  16   !   (identifier)                     13          [Absent RecordSet(M1 inner) Node RecordSet(M0 leaf)]
   19  └‣─  (Nested)                         00 : 09

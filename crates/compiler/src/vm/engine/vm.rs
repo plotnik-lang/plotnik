@@ -761,16 +761,15 @@ impl<'s, 't> VM<'s, 't> {
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
-        if T::ENABLED {
-            tracer.trace_return(port);
-        }
-
         if self.engine.frames_empty() {
             assert_eq!(
                 port.to_byte(),
                 0,
                 "entrypoint returned through a non-zero call port"
             );
+            if T::ENABLED {
+                tracer.trace_return(port, None);
+            }
             return Err(ControlFlow::Accept.into());
         }
 
@@ -778,7 +777,11 @@ impl<'s, 't> VM<'s, 't> {
         let DecodedInstr::Call(call) = module.decoded().instruction_at(call_site) else {
             unreachable!("frame call-site token must address a Call");
         };
-        self.ip = CodeAddr::from(u16::from(module.decoded().call_return(&call, port)));
+        let target = CodeAddr::from(u16::from(module.decoded().call_return(&call, port)));
+        if T::ENABLED {
+            tracer.trace_return(port, Some(target));
+        }
+        self.ip = target;
         Ok(())
     }
 

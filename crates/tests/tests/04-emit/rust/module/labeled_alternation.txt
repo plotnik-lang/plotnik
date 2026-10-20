@@ -418,7 +418,7 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   01                                        ▶
+            //   01       return
             S01_Q => Flow::Accept,
             //   02   !   (program)                        04
             S02_Q => 'state: {
@@ -445,7 +445,7 @@ mod matcher {
                 }
                 finish_s04_q(eng)
             }
-            //   05  ─‣┘² _ [RecordSet(expr)]              01
+            //   05  ─‣┘² _                                01          [RecordSet(expr)]
             S05_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() {
                     break 'state Flow::Backtrack;
@@ -453,7 +453,7 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::RecordSet(4)); // RecordSet(expr)
                 Flow::Jump(S01_Q)
             }
-            //   07   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  05
+            //   07   !   (identifier)                     05          [VariantOpen(Id) Node RecordSet(id) VariantClose]
             S07_Q => 'state: {
                 if !cand_s07_q(eng) {
                     break 'state Flow::Backtrack;
@@ -464,7 +464,7 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::VariantClose);
                 Flow::Jump(S05_Q)
             }
-            //   08   !   (number) [VariantOpen(Num) Node RecordSet(num) VariantClose]  05
+            //   08   !   (number)                         05          [VariantOpen(Num) Node RecordSet(num) VariantClose]
             S08_Q => 'state: {
                 if !cand_s08_q(eng) {
                     break 'state Flow::Backtrack;

@@ -21,9 +21,9 @@ Q = 0
 
 [transitions]
 Q:
-  0  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  9
-  1                                         ▶
-  9   !   (identifier) [RecordOpen Node RecordSet(a) RecordClose RecordSet(b) RecordClose RecordSet(c) RecordClose RecordSet(d) RecordClose RecordSet(e) RecordClose RecordSet(f) RecordClose RecordSet(g) RecordClose RecordSet(h)]  1
+  0  -ε-                                    9           [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]
+  1       return
+  9   !   (identifier)                      1           [RecordOpen Node RecordSet(a) RecordClose RecordSet(b) RecordClose RecordSet(c) RecordClose RecordSet(d) RecordClose RecordSet(e) RecordClose RecordSet(f) RecordClose RecordSet(g) RecordClose RecordSet(h)]
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -81,11 +81,11 @@ Q = 00 :: T8
 
 [instructions]
 Q:
-  00  -ε-  [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]  08
-  03                                        ▶
+  00  -ε-                                   08          [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]
+  03       return
   04  ...
   05  ...
   06  ...
   07  ...
-  08   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1) RecordClose RecordSet(M2) RecordClose RecordSet(M3) RecordClose RecordSet(M4) RecordClose RecordSet(M5) RecordClose RecordSet(M6)]  14
-  14  -ε-  [RecordClose RecordSet(M7)]      03
+  08   !   (identifier)                     14          [RecordOpen Node RecordSet(M0 a) RecordClose RecordSet(M1 b) RecordClose RecordSet(M2 c) RecordClose RecordSet(M3 d) RecordClose RecordSet(M4 e) RecordClose RecordSet(M5 f) RecordClose RecordSet(M6 g)]
+  14  -ε-                                   03          [RecordClose RecordSet(M7 h)]

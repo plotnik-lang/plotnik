@@ -48,44 +48,44 @@ Q:
   01  └‣─  (if_statement)                   02
   02  └‣─  consequence: (statement_block)   03
   03  └─!  _                                06, 08, 10
-  05                                        ▶
-  06   !   (MISSING "}") [Node RecordSet(M0)]  12
-  08   !   "}" [Node RecordSet(M0)]         12
+  05       return
+  06   !   (MISSING "}")                    12          [Node RecordSet(M0 m)]
+  08   !   "}"                              12          [Node RecordSet(M0 m)]
   10  ──!  _                                06, 08, 10
   12  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (if_statement)                   02
+  01  └‣─  (if_statement)                   02
        ●   if_statement
-  02       consequence: (statement_block)   03
+  02  └‣─  consequence: (statement_block)   03
        ○   if
        ○   parenthesized_expression
        ●   statement_block
-  03       _                                06, 08, 10
+  03  └─!  _                                06, 08, 10
        ●   {
-  06       (MISSING "}") [Node RecordSet(M0)]  12
+  06   !   (MISSING "}")                    12          [Node RecordSet(M0 m)]
        ○   {
-  03  ❮❮❮ 
-  08       "}" [Node RecordSet(M0)]         12
+  03  ❮❮❮
+  08   !   "}"                              12          [Node RecordSet(M0 m)]
        ○   {
-  03  ❮❮❮ 
-  10       _                                06, 08, 10
+  03  ❮❮❮
+  10  ──!  _                                06, 08, 10
        ●   expression_statement
-  06       (MISSING "}") [Node RecordSet(M0)]  12
+  06   !   (MISSING "}")                    12          [Node RecordSet(M0 m)]
        ○   expression_statement
-  10  ❮❮❮ 
-  08       "}" [Node RecordSet(M0)]         12
+  10  ❮❮❮
+  08   !   "}"                              12          [Node RecordSet(M0 m)]
        ○   expression_statement
-  10  ❮❮❮ 
-  10       _                                06, 08, 10
+  10  ❮❮❮
+  10  ──!  _                                06, 08, 10
        ●   }
-  06       (MISSING "}") [Node RecordSet(M0)]  12
+  06   !   (MISSING "}")                    12          [Node RecordSet(M0 m)]
        ○   }
-  10  ❮❮❮ 
-  08       "}" [Node RecordSet(M0)]         12
+  10  ❮❮❮
+  08   !   "}"                              12          [Node RecordSet(M0 m)]
        ●   }
-  12       _                                05
+  12  ─‣┘³ _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

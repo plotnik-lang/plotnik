@@ -45,35 +45,35 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └─!  _                                10, 12, 14
-  03                                        ▶
-  04  -ε-  [VariantClose]                   16
+  03       return
+  04  -ε-                                   16          [VariantClose]
   06   !   (expression_statement)           08, 04
   08  ──!  _                                06, 08
-  10   !   _ [VariantOpen(M0)]              06, 08
-  12   !   (debugger_statement) [VariantOpen(M1) VariantClose]  16
+  10   !   _                                06, 08      [VariantOpen(M0 A)]
+  12   !   (debugger_statement)             16          [VariantOpen(M1 B) VariantClose]
   14  ──!  _                                10, 12, 14
-  16  ─‣┘  _ [RecordSet(M2)]                03
+  16  ─‣┘  _                                03          [RecordSet(M2 x)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                10, 12, 14
+  01  └─!  _                                10, 12, 14
        ●   expression_statement
-  10       _ [VariantOpen(M0)]              06, 08
+  10   !   _                                06, 08      [VariantOpen(M0 A)]
        ●   expression_statement
-  06       (expression_statement)           08, 04
+  06   !   (expression_statement)           08, 04
        ●   expression_statement
-  08       _                                06, 08
+  08  ──!  _                                06, 08
        ●   expression_statement
-  06       (expression_statement)           08, 04
+  06   !   (expression_statement)           08, 04
        ●   expression_statement
-  08       _                                06, 08
+  08  ──!  _                                06, 08
        ●   expression_statement
-  06       (expression_statement)           08, 04
+  06   !   (expression_statement)           08, 04
        ●   expression_statement
-  08       _                                06, 08
-  06  ❮❮❮ 
-  04  -ε-  [VariantClose]                   16
-  16       _ [RecordSet(M2)]                03
+  08  ──!  _                                06, 08
+  06  ❮❮❮
+  04  -ε-                                   16          [VariantClose]
+  16  ─‣┘  _                                03          [RecordSet(M2 x)]
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

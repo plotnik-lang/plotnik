@@ -38,7 +38,8 @@ pub(crate) use constants::{
 pub(crate) use effects::{Effect, EffectKind, EffectSuppression, FrameAction, ValueFrameKind};
 pub(crate) use entrypoint::EntryBoundary;
 pub(crate) use format::{
-    LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
+    LineBuilder, Symbol, cols, format_effect, nav_symbol, pattern_constraints, return_content,
+    trace, truncate_text, width_for_count,
 };
 pub(crate) use header::Header;
 pub(crate) use instructions::{

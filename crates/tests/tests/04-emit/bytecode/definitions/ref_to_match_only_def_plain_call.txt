@@ -7,11 +7,11 @@ Q     = 5
 
 [transitions]
 Blank:
-  1                                         ▶
+  1       return
   2   !   (identifier)                      1
 
 Q:
-  4                                         ▶
+  4       return
   5   !   (expression_statement)            7
   6  ─‣┘  _                                 4
   7  └‣─  (Blank)                           2 : 6
@@ -37,10 +37,10 @@ Q     = 2 :: T0
 [instructions]
 Blank:
   0   !   (identifier)                      1
-  1                                         ▶
+  1       return
 
 Q:
   2   !   (expression_statement)            3
   3  └‣─  (Blank)                           0 : 4
   4  ─‣┘  _                                 5
-  5                                         ▶
+  5       return

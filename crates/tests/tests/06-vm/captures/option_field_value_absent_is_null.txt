@@ -51,26 +51,26 @@ Q:
   00   !   (program)                        01
   01  └‣─  (lexical_declaration)            02
   02  └‣─  (variable_declarator)            03
-  03  └‣─  name: (identifier) [Node RecordSet(M0)]  10, 06
-  05                                        ▶
-  06  -ε-  [Absent RecordSet(M1)]           12
-  08   !   value: (number) [Node RecordSet(M1)]  12
+  03  └‣─  name: (identifier)               10, 06      [Node RecordSet(M0 n)]
+  05       return
+  06  -ε-                                   12          [Absent RecordSet(M1 v)]
+  08   !   value: (number)                  12          [Node RecordSet(M1 v)]
   10  ──!  _                                08, 10
   12  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (lexical_declaration)            02
+  01  └‣─  (lexical_declaration)            02
        ●   lexical_declaration
-  02       (variable_declarator)            03
+  02  └‣─  (variable_declarator)            03
        ○   let
        ●   variable_declarator
-  03       name: (identifier) [Node RecordSet(M0)]  10, 06
+  03  └‣─  name: (identifier)               10, 06      [Node RecordSet(M0 n)]
        ●   identifier
-  10       _                                08, 10
-  03  ❮❮❮ 
-  06  -ε-  [Absent RecordSet(M1)]           12
-  12       _                                05
+  10  ──!  _                                08, 10
+  03  ❮❮❮
+  06  -ε-                                   12          [Absent RecordSet(M1 v)]
+  12  ─‣┘³ _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

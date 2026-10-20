@@ -55,52 +55,52 @@ Q  = 03 :: T2
 
 [instructions]
 Id:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
+  02       return
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement)           06          [RecordOpen]
   06  └‣─  (Id)                             00 : 08
   07  ...
-  08  -ε-  [RecordClose]                    10
-  10  ─‣┘  _ [RecordSet(M1)]                12
-  12  ─‣─  (expression_statement) [RecordOpen]  14
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘  _                                12          [RecordSet(M1 a)]
+  12  ─‣─  (expression_statement)           14          [RecordOpen]
   14  └‣─  (Id)                             00 : 16
   15  ...
-  16  -ε-  [RecordClose]                    18
-  18  ─‣┘² _ [RecordSet(M2)]                20
-  20                                        ▶
+  16  -ε-                                   18          [RecordClose]
+  18  ─‣┘² _                                20          [RecordSet(M2 b)]
+  20       return
 --------------------- TRACE ----------------------
 Q:
-  03       (program)                        04
+  03   !   (program)                        04
        ●   program
-  04       (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement)           06          [RecordOpen]
        ●   expression_statement
-  06       (Id)                             00 : 08
+  06  └‣─  (Id)                             00 : 08
        ▶   (Id)
 
 Id:
-  00       (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
        ●   identifier
-  02   ◀   (Id)                             
+  02   ◀   return                           08
 
 Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘  _                                12          [RecordSet(M1 a)]
        ●   expression_statement
-  12       (expression_statement) [RecordOpen]  14
+  12  ─‣─  (expression_statement)           14          [RecordOpen]
        ●   expression_statement
-  14       (Id)                             00 : 16
+  14  └‣─  (Id)                             00 : 16
        ▶   (Id)
 
 Id:
-  00       (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
        ●   identifier
-  02   ◀   (Id)                             
+  02   ◀   return                           16
 
 Q:
-  16  -ε-  [RecordClose]                    18
-  18       _ [RecordSet(M2)]                20
+  16  -ε-                                   18          [RecordClose]
+  18  ─‣┘² _                                20          [RecordSet(M2 b)]
        ●   program
-  20   ◀   (Q)                              ◼
+  20   ◀   return                           ◼

@@ -7,12 +7,12 @@ Foo = 2
 
 [transitions]
 Foo:
-  1                                         ▶
-  2   !   (identifier) [Node RecordSet(id)]  1
+  1       return
+  2   !   (identifier)                      1           [Node RecordSet(id)]
 
 Bar:
-  4                                         ▶
-  5   !   (string) [Node RecordSet(str)]    4
+  4       return
+  5   !   (string)                          4           [Node RecordSet(str)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -42,9 +42,9 @@ Foo = 0 :: T1
 
 [instructions]
 Foo:
-  0   !   (identifier) [Node RecordSet(M0)]  2
-  2                                         ▶
+  0   !   (identifier)                      2           [Node RecordSet(M0 id)]
+  2       return
 
 Bar:
-  3   !   (string) [Node RecordSet(M1)]     5
-  5                                         ▶
+  3   !   (string)                          5           [Node RecordSet(M1 str)]
+  5       return

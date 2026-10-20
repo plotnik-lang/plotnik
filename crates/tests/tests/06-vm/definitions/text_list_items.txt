@@ -43,30 +43,30 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       14, 08
-  03  -ε-  [ListClose]                      05
-  05  ─‣┘  _ [RecordSet(M0)]                07
-  07                                        ▶
-  08  -ε-  [ListClose RecordSet(M0)]        07
-  10   !   (comment) [NodeText ArrayPush]   12, 03
+  01  -ε-                                   14, 08      [ListOpen]
+  03  -ε-                                   05          [ListClose]
+  05  ─‣┘  _                                07          [RecordSet(M0 comments)]
+  07       return
+  08  -ε-                                   07          [ListClose RecordSet(M0 comments)]
+  10   !   (comment)                        12, 03      [NodeText ArrayPush]
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       14, 08
-  14       _                                10, 12
+  01  -ε-                                   14, 08      [ListOpen]
+  14  └─!  _                                10, 12
        ●   comment
-  10       (comment) [NodeText ArrayPush]   12, 03
+  10   !   (comment)                        12, 03      [NodeText ArrayPush]
        ●   comment
-  12       _                                10, 12
+  12  ──!  _                                10, 12
        ●   comment
-  10       (comment) [NodeText ArrayPush]   12, 03
+  10   !   (comment)                        12, 03      [NodeText ArrayPush]
        ●   comment
-  12       _                                10, 12
-  10  ❮❮❮ 
-  03  -ε-  [ListClose]                      05
-  05       _ [RecordSet(M0)]                07
+  12  ──!  _                                10, 12
+  10  ❮❮❮
+  03  -ε-                                   05          [ListClose]
+  05  ─‣┘  _                                07          [RecordSet(M0 comments)]
        ●   program
-  07   ◀   (Q)                              ◼
+  07   ◀   return                           ◼

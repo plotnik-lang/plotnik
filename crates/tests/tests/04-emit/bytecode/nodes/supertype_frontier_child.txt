@@ -5,10 +5,10 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (array)                           4
   3  ─‣┘  _                                 1
-  4  └‣─  (call_expression) [Node RecordSet(call)]  3
+  4  └‣─  (call_expression)                 3           [Node RecordSet(call)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -33,6 +33,6 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (array)                           1
-  1  └‣─  (call_expression) [Node RecordSet(M0)]  3
+  1  └‣─  (call_expression)                 3           [Node RecordSet(M0 call)]
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

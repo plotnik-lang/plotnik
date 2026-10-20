@@ -45,8 +45,8 @@ Q:
   03  └─!  _                                14, 16
   05  ─•┘² _                                06
   06  ─‣┘² _                                07
-  07                                        ▶
-  08   !   (pair) [Node RecordSet(M0)]      05
+  07       return
+  08   !   (pair)                           05          [Node RecordSet(M0 p)]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14   !   (object)                         12
@@ -54,54 +54,54 @@ Q:
   16  ──!  _                                14, 16
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                14, 16
+  03  └─!  _                                14, 16
        ●   [
-  14       (object)                         12
+  14   !   (object)                         12
        ○   [
-  03  ❮❮❮ 
-  16       _                                14, 16
+  03  ❮❮❮
+  16  ──!  _                                14, 16
        ●   object
-  14       (object)                         12
+  14   !   (object)                         12
        ●   object
-  12       _                                08, 10
+  12  └─!  _                                08, 10
        ●   {
-  08       (pair) [Node RecordSet(M0)]      05
+  08   !   (pair)                           05          [Node RecordSet(M0 p)]
        ○   {
-  12  ❮❮❮ 
-  10       _                                08, 10
+  12  ❮❮❮
+  10  ──!  _                                08, 10
        ●   pair
-  08       (pair) [Node RecordSet(M0)]      05
+  08   !   (pair)                           05          [Node RecordSet(M0 p)]
        ●   pair
-  05       _                                06
-  10  ❮❮❮ 
-  10       _                                08, 10
+  05  ─•┘² _                                06
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   }
-  08       (pair) [Node RecordSet(M0)]      05
+  08   !   (pair)                           05          [Node RecordSet(M0 p)]
        ○   }
-  10  ❮❮❮ 
-  10       _                                08, 10
-  16  ❮❮❮ 
-  16       _                                14, 16
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+  16  ❮❮❮
+  16  ──!  _                                14, 16
        ●   ,
-  14       (object)                         12
+  14   !   (object)                         12
        ○   ,
-  16  ❮❮❮ 
-  16       _                                14, 16
+  16  ❮❮❮
+  16  ──!  _                                14, 16
        ●   identifier
-  14       (object)                         12
+  14   !   (object)                         12
        ○   identifier
-  16  ❮❮❮ 
-  16       _                                14, 16
+  16  ❮❮❮
+  16  ──!  _                                14, 16
        ●   ]
-  14       (object)                         12
+  14   !   (object)                         12
        ○   ]
-  16  ❮❮❮ 
-  16       _                                14, 16
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+  16  ❮❮❮
+  16  ──!  _                                14, 16
+  02  ❮❮❮
+  01  ❮❮❮

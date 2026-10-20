@@ -44,33 +44,33 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       18, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M0)]        03
-  06  -ε-  [TextClose ArrayPush]            16, 20
-  08   !   (comment) [ScalarMark]           06
+  01  -ε-                                   18, 04      [ListOpen]
+  03       return
+  04  -ε-                                   03          [ListClose RecordSet(M0 comments)]
+  06  -ε-                                   16, 20      [TextClose ArrayPush]
+  08   !   (comment)                        06          [ScalarMark]
   10  ──!  _                                08, 10
   12   !   _                                08, 10
-  14  -ε-  [ScalarOpen]                     12
+  14  -ε-                                   12          [ScalarOpen]
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
-  20  ─‣┘  _ [ListClose RecordSet(M0)]      03
+  20  ─‣┘  _                                03          [ListClose RecordSet(M0 comments)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       18, 04
-  18       _                                14, 16
+  01  -ε-                                   18, 04      [ListOpen]
+  18  └─!  _                                14, 16
        ●   expression_statement
-  14  -ε-  [ScalarOpen]                     12
-  12       _                                08, 10
+  14  -ε-                                   12          [ScalarOpen]
+  12   !   _                                08, 10
        ●   expression_statement
-  08       (comment) [ScalarMark]           06
+  08   !   (comment)                        06          [ScalarMark]
        ○   expression_statement
-  12  ❮❮❮ 
-  10       _                                08, 10
-  18  ❮❮❮ 
-  16       _                                14, 16
-  01  ❮❮❮ 
-  04  -ε-  [ListClose RecordSet(M0)]        03
-  03   ◀   (Q)                              ◼
+  12  ❮❮❮
+  10  ──!  _                                08, 10
+  18  ❮❮❮
+  16  ──!  _                                14, 16
+  01  ❮❮❮
+  04  -ε-                                   03          [ListClose RecordSet(M0 comments)]
+  03   ◀   return                           ◼

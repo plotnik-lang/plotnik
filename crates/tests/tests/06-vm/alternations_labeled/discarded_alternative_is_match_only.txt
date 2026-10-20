@@ -40,16 +40,16 @@ Q:
   1  └─!  _                                 3, 6
   3   !   (expression_statement)            4
   4  ─‣┘  _                                 5
-  5                                         ▶
+  5       return
   6  ──!  _                                 3, 6
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       _                                 03, 06
+  1  └─!  _                                 3, 6
       ●   expression_statement
-  3       (expression_statement)            04
+  3   !   (expression_statement)            4
       ●   expression_statement
-  4       _                                 05
+  4  ─‣┘  _                                 5
       ●   program
-  5   ◀   (Q)                               ◼
+  5   ◀   return                            ◼

@@ -10,17 +10,17 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        19
-  03  ─‣┘  _ [ListClose RecordSet(funcs)]   01
-  05  -ε-  [ListClose RecordSet(funcs)]     01
-  07  -ε-  [RecordClose ArrayPush]          13, 03
-  08   !   (function_declaration) [RecordOpen]  10
+  03  ─‣┘  _                                01          [ListClose RecordSet(funcs)]
+  05  -ε-                                   01          [ListClose RecordSet(funcs)]
+  07  -ε-                                   13, 03      [RecordClose ArrayPush]
+  08   !   (function_declaration)           10          [RecordOpen]
   09  ─‣┘  _                                07
-  10  └‣─  name: (identifier) [Node RecordSet(name)]  09
+  10  └‣─  name: (identifier)               09          [Node RecordSet(name)]
   13  ──!  _                                08, 13
   14  └─!  _                                08, 13
-  19  -ε-  [ListOpen]                       14, 05
+  19  -ε-                                   14, 05      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -50,27 +50,27 @@ N1: S4 → T3  ; Q
 Q = 00 :: T3
 
 [spans]
-P0 def        0..79  source_id=0  T3
-P1 pattern    4..79  source_id=0
-P2 capture    71..77  source_id=0  T3.M1
-P3 quantifier 69..70  source_id=0
-P4 pattern    15..69  source_id=0
-P5 capture    60..65  source_id=0  T1.M0
-P6 grammar_field 41..45  source_id=0
-P7 pattern    47..59  source_id=0
+P0 def           0..79 src=0  T3
+P1 pattern       4..79 src=0
+P2 capture       71..77 src=0  T3.M1
+P3 quantifier    69..70 src=0
+P4 pattern       15..69 src=0
+P5 capture       60..65 src=0  T1.M0
+P6 grammar_field 41..45 src=0
+P7 pattern       47..59 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  -ε-  [ListOpen SpanStart#3]           20, 11
-  04  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  08
-  08  ─‣┘  _ [SpanEnd#4]                    14
-  10                                        ▶
-  11  -ε-  [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  14  -ε-  [RecordClose ArrayPush]          18, 24
-  16   !   (function_declaration) [RecordOpen SpanStartAt#4]  04
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  -ε-                                   20, 11      [ListOpen SpanStart(P3)]
+  04  └‣─  name: (identifier)               08          [SpanStart(P6) SpanStartAt(P7) SpanStart(P5) Node RecordSet(M0 name) SpanEnd(P5) SpanEnd(P7) SpanEnd(P6)]
+  08  ─‣┘  _                                14          [SpanEnd(P4)]
+  10       return
+  11  -ε-                                   10          [SpanEnd(P3) ListClose SpanStart(P2) RecordSet(M1 funcs) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  14  -ε-                                   18, 24      [RecordClose ArrayPush]
+  16   !   (function_declaration)           04          [RecordOpen SpanStartAt(P4)]
   18  ──!  _                                16, 18
   20  └─!  _                                16, 18
   22  ...
   23  ...
-  24  ─‣┘  _ [SpanEnd#3 ListClose SpanStart#2 RecordSet(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  24  ─‣┘  _                                10          [SpanEnd(P3) ListClose SpanStart(P2) RecordSet(M1 funcs) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]

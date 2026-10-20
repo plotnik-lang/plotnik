@@ -8,11 +8,11 @@ Q = 6
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (function_declaration) [Absent RecordSet(id) Node RecordSet(fn)]  4
+  1       return
+  2   !   (function_declaration)            4           [Absent RecordSet(id) Node RecordSet(fn)]
   3  ─‣┘  _                                 1
   4  └‣─  (program)                         3
-  5   !   (identifier) [Absent RecordSet(fn) Node RecordSet(id)]  1
+  5   !   (identifier)                      1           [Absent RecordSet(fn) Node RecordSet(id)]
   6   !   switch
             (function_declaration)          2
             (identifier)                    5
@@ -48,7 +48,7 @@ Q:
              (identifier)                   08
   01  └‣─  (program)                        02
   02  ─‣┘  _                                03
-  03                                        ▶
-  04   !   (function_declaration) [Absent RecordSet(M1) Node RecordSet(M0)]  01
+  03       return
+  04   !   (function_declaration)           01          [Absent RecordSet(M1 id) Node RecordSet(M0 fn)]
   07  ...
-  08   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  03
+  08   !   (identifier)                     03          [Absent RecordSet(M0 fn) Node RecordSet(M1 id)]

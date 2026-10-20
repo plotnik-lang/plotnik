@@ -43,43 +43,43 @@ Q = 05 :: T2
 [instructions]
 E:
   00   !   (expression_statement)           01
-  01  └‣─  (number) [Node RecordSet(M0)]    03
+  01  └‣─  (number)                         03          [Node RecordSet(M0 n)]
   03  ─‣┘  _                                04
-  04                                        ▶
+  04       return
 
 Q:
-  05   !   (program) [RecordOpen]           07
+  05   !   (program)                        07          [RecordOpen]
   07  └‣─  (E)                              00 : 08
-  08  -ε-  [RecordClose]                    10
-  10  ─‣┘  _ [RecordSet(M1)]                12
-  12                                        ▶
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘  _                                12          [RecordSet(M1 e)]
+  12       return
 --------------------- TRACE ----------------------
 Q:
-  05       (program) [RecordOpen]           07
+  05   !   (program)                        07          [RecordOpen]
        ●   program
-  07       (E)                              00 : 08
+  07  └‣─  (E)                              00 : 08
        ▶   (E)
 
 E:
-  00       (expression_statement)           01
+  00   !   (expression_statement)           01
        ●   expression_statement
-  01       (number) [Node RecordSet(M0)]    03
+  01  └‣─  (number)                         03          [Node RecordSet(M0 n)]
        ○   identifier
        ○   ;
-  07  ❮❮❮ 
+  07  ❮❮❮
        ▶   (E)
 
 E:
-  00       (expression_statement)           01
+  00   !   (expression_statement)           01
        ●   expression_statement
-  01       (number) [Node RecordSet(M0)]    03
+  01  └‣─  (number)                         03          [Node RecordSet(M0 n)]
        ●   number
-  03       _                                04
+  03  ─‣┘  _                                04
        ●   expression_statement
-  04   ◀   (E)                              
+  04   ◀   return                           08
 
 Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘  _                                12          [RecordSet(M1 e)]
        ●   program
-  12   ◀   (Q)                              ◼
+  12   ◀   return                           ◼

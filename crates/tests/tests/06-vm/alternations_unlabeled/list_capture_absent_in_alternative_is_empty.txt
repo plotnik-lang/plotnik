@@ -48,28 +48,28 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  └─!  _                                15, 19
-  03                                        ▶
-  04   !   (variable_declarator) [Node ArrayPush]  06, 10
+  03       return
+  04   !   (variable_declarator)            06, 10      [Node ArrayPush]
   06  ──!  _                                04, 06
-  08  └─!  _ [ListOpen]                     04, 06
-  10  ─‣┘  _ [ListClose RecordSet(M0)]      14
-  12   !   (lexical_declaration) [Absent RecordSet(M1)]  08
+  08  └─!  _                                04, 06      [ListOpen]
+  10  ─‣┘  _                                14          [ListClose RecordSet(M0 vs)]
+  12   !   (lexical_declaration)            08          [Absent RecordSet(M1 s)]
   14  ─‣┘  _                                03
   15   !   switch
              (lexical_declaration)          12
              (expression_statement)         16
-  16   !   (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  14
+  16   !   (expression_statement)           14          [ListOpen ListClose RecordSet(M0 vs) Node RecordSet(M1 s)]
   19  ──!  _                                15, 19
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                15, 19
+  01  └─!  _                                15, 19
        ●   expression_statement
-  15   !   switch                           
+  15   !   switch
        ●   expression_statement
-  16       (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  14
+  16   !   (expression_statement)           14          [ListOpen ListClose RecordSet(M0 vs) Node RecordSet(M1 s)]
        ●   expression_statement
-  14       _                                03
+  14  ─‣┘  _                                03
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

@@ -33,21 +33,21 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        10, 03
-  02                                        ▶
-  03  └•┘  _ [Absent RecordSet(M0)]         02
+  02       return
+  03  └•┘  _                                02          [Absent RecordSet(M0 b)]
   05  ─•┘  _                                02
-  06   !   (debugger_statement) [Node RecordSet(M0)]  05
+  06   !   (debugger_statement)             05          [Node RecordSet(M0 b)]
   08  ──!  _                                06, 08
   10  └─!  _                                06, 08
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        10, 03
+  00   !   (program)                        10, 03
        ●   program
-  10       _                                06, 08
+  10  └─!  _                                06, 08
        ●   expression_statement
-  06       (debugger_statement) [Node RecordSet(M0)]  05
+  06   !   (debugger_statement)             05          [Node RecordSet(M0 b)]
        ○   expression_statement
-  10  ❮❮❮ 
-  08       _                                06, 08
-  00  ❮❮❮ 
-  03       _ [Absent RecordSet(M0)]         02
+  10  ❮❮❮
+  08  ──!  _                                06, 08
+  00  ❮❮❮
+  03  └•┘  _                                02          [Absent RecordSet(M0 b)]

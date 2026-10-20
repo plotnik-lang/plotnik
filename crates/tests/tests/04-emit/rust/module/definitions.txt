@@ -518,7 +518,7 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   01                                        ▶
+            //   01       return
             S01_INNER => {
                 if eng.frames_empty() {
                     Flow::Accept
@@ -541,7 +541,7 @@ mod matcher {
                 }
                 Flow::Jump(S01_INNER)
             }
-            //   04  └‣─  (identifier) [Node RecordSet(id)]  03
+            //   04  └‣─  (identifier)                     03          [Node RecordSet(id)]
             S04_INNER => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -562,7 +562,7 @@ mod matcher {
                 }
                 finish_s04_inner(eng)
             }
-            //   06                                        ▶
+            //   06       return
             S06_Q => {
                 if eng.frames_empty() {
                     Flow::Accept
@@ -571,7 +571,7 @@ mod matcher {
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
-            //   07   !   (program) [SuppressBegin]        14
+            //   07   !   (program)                        14          [SuppressBegin]
             S07_Q => 'state: {
                 if !cand_s07_q(eng) {
                     break 'state Flow::Backtrack;
@@ -579,7 +579,7 @@ mod matcher {
                 eng.suppress_begin();
                 Flow::Jump(S14_Q)
             }
-            //   08  ─‣┘  _ [RecordSet(second)]            06
+            //   08  ─‣┘  _                                06          [RecordSet(second)]
             S08_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
@@ -587,7 +587,7 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(second)
                 Flow::Jump(S06_Q)
             }
-            //   10  -ε-  [RecordClose]                    08
+            //   10  -ε-                                   08          [RecordClose]
             S10_Q => {
                 eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
                 Flow::Jump(S08_Q)
@@ -612,7 +612,7 @@ mod matcher {
                 }
                 Flow::Jump(S02_INNER)
             }
-            //   13  -ε-  [SuppressEnd RecordOpen]         11
+            //   13  -ε-                                   11          [SuppressEnd RecordOpen]
             S13_Q => {
                 eng.suppress_end();
                 eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);

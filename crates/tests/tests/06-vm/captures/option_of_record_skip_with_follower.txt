@@ -49,28 +49,28 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        06, 08
-  02  └‣─  (identifier) [Node RecordSet(M0)]  04
+  02  └‣─  (identifier)                     04          [Node RecordSet(M0 id)]
   04  ─‣┘  _                                11
-  05                                        ▶
+  05       return
   06  └─!  _                                14, 16
-  08  └‣─  (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  18
-  11  ─‣─  (debugger_statement) [RecordClose RecordSet(M1) Node RecordSet(M2)]  18
-  14   !   (expression_statement) [RecordOpen]  02
+  08  └‣─  (debugger_statement)             18          [Absent RecordSet(M1 x) Node RecordSet(M2 d)]
+  11  ─‣─  (debugger_statement)             18          [RecordClose RecordSet(M1 x) Node RecordSet(M2 d)]
+  14   !   (expression_statement)           02          [RecordOpen]
   16  ──!  _                                14, 16
   18  ─‣┘  _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        06, 08
+  00   !   (program)                        06, 08
        ●   program
-  06       _                                14, 16
+  06  └─!  _                                14, 16
        ●   debugger_statement
-  14       (expression_statement) [RecordOpen]  02
+  14   !   (expression_statement)           02          [RecordOpen]
        ○   debugger_statement
-  06  ❮❮❮ 
-  16       _                                14, 16
-  00  ❮❮❮ 
-  08       (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  18
+  06  ❮❮❮
+  16  ──!  _                                14, 16
+  00  ❮❮❮
+  08  └‣─  (debugger_statement)             18          [Absent RecordSet(M1 x) Node RecordSet(M2 d)]
        ●   debugger_statement
-  18       _                                05
+  18  ─‣┘  _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

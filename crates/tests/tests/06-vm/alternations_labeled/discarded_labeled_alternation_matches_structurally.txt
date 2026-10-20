@@ -41,9 +41,9 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                09, 10
-  03  ─‣─  (debugger_statement) [Node RecordSet(M0)]  05
+  03  ─‣─  (debugger_statement)             05          [Node RecordSet(M0 d)]
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07   !   (expression_statement)           03
   08   !   (debugger_statement)             03
   09   !   switch
@@ -52,16 +52,16 @@ Q:
   10  ──!  _                                09, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                09, 10
+  01  └─!  _                                09, 10
        ●   expression_statement
-  09   !   switch                           
+  09   !   switch
        ●   expression_statement
-  07       (expression_statement)           03
+  07   !   (expression_statement)           03
        ●   expression_statement
-  03       (debugger_statement) [Node RecordSet(M0)]  05
+  03  ─‣─  (debugger_statement)             05          [Node RecordSet(M0 d)]
        ●   debugger_statement
-  05       _                                06
+  05  ─‣┘  _                                06
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

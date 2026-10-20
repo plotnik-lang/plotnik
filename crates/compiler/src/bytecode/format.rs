@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use super::Effect;
 use super::effects::EffectKind;
 use plotnik_runtime::Nav;
 
@@ -9,6 +8,7 @@ pub mod cols {
     pub const GAP: usize = 1;
     pub const SYMBOL: usize = 5;
     pub const TOTAL_WIDTH: usize = 44;
+    pub const EFFECTS: usize = 56;
 }
 
 #[derive(Clone, Debug)]
@@ -142,7 +142,27 @@ impl LineBuilder {
         Self { addr_width }
     }
 
-    pub fn instruction_prefix(&self, addr: u16, symbol: Symbol) -> String {
+    pub fn instruction(
+        &self,
+        addr: impl std::fmt::Display,
+        symbol: Symbol,
+        content: &str,
+        successors: &str,
+        effects: &[String],
+    ) -> String {
+        let prefix = self.instruction_prefix(addr, symbol);
+        let mut line = self.pad_successors(format!("{prefix}{content}"), successors);
+        if effects.is_empty() {
+            line.truncate(line.trim_end().len());
+            return line;
+        }
+
+        let padding = cols::EFFECTS.saturating_sub(display_width(&line)).max(2);
+        line.push_str(&format!("{:padding$}[{}]", "", effects.join(" ")));
+        line
+    }
+
+    pub fn instruction_prefix(&self, addr: impl std::fmt::Display, symbol: Symbol) -> String {
         format!(
             "{:indent$}{:0aw$} {} ",
             "",
@@ -151,6 +171,11 @@ impl LineBuilder {
             indent = cols::INDENT,
             aw = self.addr_width,
         )
+    }
+
+    pub fn switch_case(&self, kind: &str, target: &str) -> String {
+        let indent = cols::INDENT + self.addr_width + 2 * cols::GAP + cols::SYMBOL + 2;
+        self.pad_successors(format!("{:indent$}{kind}", ""), target)
     }
 
     pub fn pad_successors(&self, base: String, successors: &str) -> String {
@@ -180,29 +205,54 @@ fn display_width(s: &str) -> usize {
     width
 }
 
-pub fn format_effect(effect: &Effect) -> String {
-    match effect.kind {
+pub(crate) fn pattern_constraints(mut pattern: String, constraints: Vec<String>) -> String {
+    if constraints.is_empty() {
+        return pattern;
+    }
+
+    let parenthesized = pattern.starts_with('(') && pattern.ends_with(')');
+    if parenthesized {
+        pattern.pop();
+    }
+    pattern.push(' ');
+    pattern.push_str(&constraints.join(" "));
+    if parenthesized {
+        pattern.push(')');
+    }
+    pattern
+}
+
+pub(crate) fn return_content(port: plotnik_runtime::PortId) -> String {
+    if port.to_byte() == 0 {
+        return "return".to_string();
+    }
+
+    format!("return p{}", port.to_byte())
+}
+
+pub fn format_effect(kind: EffectKind, payload: impl std::fmt::Display) -> String {
+    match kind {
         EffectKind::Node => "Node".to_string(),
         EffectKind::ListOpen => "ListOpen".to_string(),
         EffectKind::ArrayPush => "ArrayPush".to_string(),
         EffectKind::ListClose => "ListClose".to_string(),
         EffectKind::RecordOpen => "RecordOpen".to_string(),
         EffectKind::RecordClose => "RecordClose".to_string(),
-        EffectKind::RecordSet => format!("RecordSet(M{})", effect.payload),
-        EffectKind::VariantOpen => format!("VariantOpen(M{})", effect.payload),
+        EffectKind::RecordSet => format!("RecordSet({payload})"),
+        EffectKind::VariantOpen => format!("VariantOpen({payload})"),
         EffectKind::VariantClose => "VariantClose".to_string(),
         EffectKind::Absent => "Absent".to_string(),
         EffectKind::SuppressBegin => "SuppressBegin".to_string(),
         EffectKind::SuppressEnd => "SuppressEnd".to_string(),
-        EffectKind::SpanStartAt => format!("SpanStartAt#{}", effect.payload),
-        EffectKind::SpanStart => format!("SpanStart#{}", effect.payload),
-        EffectKind::SpanEnd => format!("SpanEnd#{}", effect.payload),
+        EffectKind::SpanStartAt => format!("SpanStartAt({payload})"),
+        EffectKind::SpanStart => format!("SpanStart({payload})"),
+        EffectKind::SpanEnd => format!("SpanEnd({payload})"),
         EffectKind::ScalarOpen => "ScalarOpen".to_string(),
         EffectKind::ScalarMark => "ScalarMark".to_string(),
         EffectKind::TextClose => "TextClose".to_string(),
-        EffectKind::BoolClose => format!("BoolClose({})", effect.payload),
+        EffectKind::BoolClose => format!("BoolClose({payload})"),
         EffectKind::NodeText => "NodeText".to_string(),
         EffectKind::NodeBool => "NodeBool".to_string(),
-        EffectKind::BoolValue => format!("BoolValue({})", effect.payload),
+        EffectKind::BoolValue => format!("BoolValue({payload})"),
     }
 }

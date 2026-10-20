@@ -53,43 +53,43 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        22, 16
-  02                                        ▶
-  03  └•┘  _ [ListClose RecordSet(M1)]      02
+  02       return
+  03  └•┘  _                                02          [ListClose RecordSet(M1 b)]
   05  ─•┘  _                                02
-  06  -ε-  [ListClose RecordSet(M1)]        05
-  08  └•─  (debugger_statement) [Node ArrayPush]  10, 06
-  10  ─•─  (debugger_statement) [Node ArrayPush]  10, 06
-  12  -ε-  [ListOpen]                       08, 03
-  14  -ε-  [ListOpen]                       10, 06
-  16  -ε-  [Absent RecordSet(M0)]           12
-  18   !   (lexical_declaration) [Node RecordSet(M0)]  14
+  06  -ε-                                   05          [ListClose RecordSet(M1 b)]
+  08  └•─  (debugger_statement)             10, 06      [Node ArrayPush]
+  10  ─•─  (debugger_statement)             10, 06      [Node ArrayPush]
+  12  -ε-                                   08, 03      [ListOpen]
+  14  -ε-                                   10, 06      [ListOpen]
+  16  -ε-                                   12          [Absent RecordSet(M0 a)]
+  18   !   (lexical_declaration)            14          [Node RecordSet(M0 a)]
   20  ──!  _                                18, 20
   22  └─!  _                                18, 20
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        22, 16
+  00   !   (program)                        22, 16
        ●   program
-  22       _                                18, 20
+  22  └─!  _                                18, 20
        ●   debugger_statement
-  18       (lexical_declaration) [Node RecordSet(M0)]  14
+  18   !   (lexical_declaration)            14          [Node RecordSet(M0 a)]
        ○   debugger_statement
-  22  ❮❮❮ 
-  20       _                                18, 20
+  22  ❮❮❮
+  20  ──!  _                                18, 20
        ●   debugger_statement
-  18       (lexical_declaration) [Node RecordSet(M0)]  14
+  18   !   (lexical_declaration)            14          [Node RecordSet(M0 a)]
        ○   debugger_statement
-  20  ❮❮❮ 
-  20       _                                18, 20
-  00  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M0)]           12
-  12  -ε-  [ListOpen]                       08, 03
-  08       (debugger_statement) [Node ArrayPush]  10, 06
+  20  ❮❮❮
+  20  ──!  _                                18, 20
+  00  ❮❮❮
+  16  -ε-                                   12          [Absent RecordSet(M0 a)]
+  12  -ε-                                   08, 03      [ListOpen]
+  08  └•─  (debugger_statement)             10, 06      [Node ArrayPush]
        ●   debugger_statement
-  10       (debugger_statement) [Node ArrayPush]  10, 06
+  10  ─•─  (debugger_statement)             10, 06      [Node ArrayPush]
        ●   debugger_statement
-  10       (debugger_statement) [Node ArrayPush]  10, 06
-  10  ❮❮❮ 
-  06  -ε-  [ListClose RecordSet(M1)]        05
-  05       _                                02
+  10  ─•─  (debugger_statement)             10, 06      [Node ArrayPush]
+  10  ❮❮❮
+  06  -ε-                                   05          [ListClose RecordSet(M1 b)]
+  05  ─•┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

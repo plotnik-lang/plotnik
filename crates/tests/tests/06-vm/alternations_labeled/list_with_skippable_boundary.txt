@@ -73,42 +73,42 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       16, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M1)]        03
-  06  -ε-  [RecordClose ArrayPush]          14, 18
+  01  -ε-                                   16, 04      [ListOpen]
+  03       return
+  04  -ε-                                   03          [ListClose RecordSet(M1 items)]
+  06  -ε-                                   14, 18      [RecordClose ArrayPush]
   08   !   (comment)                        06
   09  ──!  _                                08, 09
-  11   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  09, 06
+  11   !   (expression_statement)           09, 06      [RecordOpen Node RecordSet(M0 a)]
   14  ──!  _                                11, 14
   16  └─!  _                                11, 14
-  18  ─‣┘  _ [ListClose RecordSet(M1)]      03
+  18  ─‣┘  _                                03          [ListClose RecordSet(M1 items)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       16, 04
-  16       _                                11, 14
+  01  -ε-                                   16, 04      [ListOpen]
+  16  └─!  _                                11, 14
        ●   expression_statement
-  11       (expression_statement) [RecordOpen Node RecordSet(M0)]  09, 06
+  11   !   (expression_statement)           09, 06      [RecordOpen Node RecordSet(M0 a)]
        ●   expression_statement
-  09       _                                08, 09
+  09  ──!  _                                08, 09
        ●   expression_statement
-  08       (comment)                        06
+  08   !   (comment)                        06
        ○   expression_statement
-  09  ❮❮❮ 
-  09       _                                08, 09
-  11  ❮❮❮ 
-  06  -ε-  [RecordClose ArrayPush]          14, 18
-  14       _                                11, 14
+  09  ❮❮❮
+  09  ──!  _                                08, 09
+  11  ❮❮❮
+  06  -ε-                                   14, 18      [RecordClose ArrayPush]
+  14  ──!  _                                11, 14
        ●   expression_statement
-  11       (expression_statement) [RecordOpen Node RecordSet(M0)]  09, 06
+  11   !   (expression_statement)           09, 06      [RecordOpen Node RecordSet(M0 a)]
        ●   expression_statement
-  09       _                                08, 09
-  11  ❮❮❮ 
-  06  -ε-  [RecordClose ArrayPush]          14, 18
-  14       _                                11, 14
-  06  ❮❮❮ 
-  18       _ [ListClose RecordSet(M1)]      03
+  09  ──!  _                                08, 09
+  11  ❮❮❮
+  06  -ε-                                   14, 18      [RecordClose ArrayPush]
+  14  ──!  _                                11, 14
+  06  ❮❮❮
+  18  ─‣┘  _                                03          [ListClose RecordSet(M1 items)]
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

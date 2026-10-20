@@ -25,13 +25,13 @@ Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
   2  ─‣┘  _                                 3
-  3                                         ▶
+  3       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       _                                 03
+  2  ─‣┘  _                                 3
       ●   program
-  3   ◀   (Q)                               ◼
+  3   ◀   return                            ◼

@@ -13,23 +13,23 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        15
   03  ─‣┘  _                                01
   04  ─‣─  (expression_statement)           14
-  05  ─‣┘  _ [RecordClose RecordSet(second)]  03
-  08  -ε-  [Absent RecordSet(name) RecordClose RecordSet(second)]  03
-  09   !   (identifier) [Node RecordSet(name)]  05
+  05  ─‣┘  _                                03          [RecordClose RecordSet(second)]
+  08  -ε-                                   03          [Absent RecordSet(name) RecordClose RecordSet(second)]
+  09   !   (identifier)                     05          [Node RecordSet(name)]
   11  ──!  _                                09, 11
   12  └─!  _                                09, 11
-  14  -ε-  [RecordOpen]                     12, 08
+  14  -ε-                                   12, 08      [RecordOpen]
   15  └‣─  (expression_statement)           25
-  16  ─‣┘  _ [RecordClose RecordSet(first)]  04
-  19  -ε-  [Absent RecordSet(name) RecordClose RecordSet(first)]  04
-  20   !   (identifier) [Node RecordSet(name)]  16
+  16  ─‣┘  _                                04          [RecordClose RecordSet(first)]
+  19  -ε-                                   04          [Absent RecordSet(name) RecordClose RecordSet(first)]
+  20   !   (identifier)                     16          [Node RecordSet(name)]
   22  ──!  _                                20, 22
   23  └─!  _                                20, 22
-  25  -ε-  [RecordOpen]                     23, 19
+  25  -ε-                                   23, 19      [RecordOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -61,38 +61,38 @@ N1: S5 → T3  ; Q
 Q = 00 :: T3
 
 [spans]
-P00 def        0..31  source_id=0  T2
-P01 capture    26..31  source_id=0  T2.M0
-P02 quantifier 24..25  source_id=0
-P03 pattern    12..24  source_id=0
-P04 def        33..148  source_id=0  T3
-P05 pattern    37..148  source_id=0
-P06 sequence   48..146  source_id=0
-P07 pattern    54..95  source_id=0
-P08 capture    88..94  source_id=0  T3.M1
-P09 ref        76..87  source_id=0  T2
-P10 pattern    100..142  source_id=0
-P11 capture    134..141  source_id=0  T3.M2
-P12 ref        122..133  source_id=0  T2
+P00 def        0..31 src=0  T2
+P01 capture    26..31 src=0  T2.M0
+P02 quantifier 24..25 src=0
+P03 pattern    12..24 src=0
+P04 def        33..148 src=0  T3
+P05 pattern    37..148 src=0
+P06 sequence   48..146 src=0
+P07 pattern    54..95 src=0
+P08 capture    88..94 src=0  T3.M1
+P09 ref        76..87 src=0  T2
+P10 pattern    100..142 src=0
+P11 capture    134..141 src=0  T3.M2
+P12 ref        122..133 src=0  T2
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#4 SpanStartAt#5]  02
-  02  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 RecordOpen SpanStart#0]  05
-  05  -ε-  [SpanStart#2]                    46, 40
+  00   !   (program)                        02          [SpanStart(P4) SpanStartAt(P5)]
+  02  └‣─  (expression_statement)           05          [SpanStart(P6) SpanStartAt(P7) SpanStart(P9) RecordOpen SpanStart(P0)]
+  05  -ε-                                   46, 40      [SpanStart(P2)]
   07  ...
-  08   !   (identifier) [SpanStartAt#3 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  12
-  12  ─‣┘  _ [RecordClose SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  37
+  08   !   (identifier)                     12          [SpanStartAt(P3) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P3) SpanEnd(P2) SpanEnd(P0)]
+  12  ─‣┘  _                                37          [RecordClose SpanStart(P11) RecordSet(M2 second) SpanEnd(P11) SpanEnd(P12)]
   15  ...
-  16   !   (identifier) [SpanStartAt#3 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  20
-  20  ─‣┘  _ [RecordClose SpanStart#8 RecordSet(M1) SpanEnd#8 SpanEnd#9]  34
-  23                                        ▶
-  24  -ε-  [SpanStart#1 Absent RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 RecordClose SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  37
+  16   !   (identifier)                     20          [SpanStartAt(P3) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P3) SpanEnd(P2) SpanEnd(P0)]
+  20  ─‣┘  _                                34          [RecordClose SpanStart(P8) RecordSet(M1 first) SpanEnd(P8) SpanEnd(P9)]
+  23       return
+  24  -ε-                                   37          [SpanStart(P1) Absent RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0) RecordClose SpanStart(P11) RecordSet(M2 second) SpanEnd(P11) SpanEnd(P12)]
   28  ──!  _                                08, 28
   30  └─!  _                                08, 28
-  32  -ε-  [SpanStart#2]                    30, 24
-  34  ─‣─  (expression_statement) [SpanEnd#7 SpanStartAt#10 SpanStart#12 RecordOpen SpanStart#0]  32
-  37  ─‣┘  _ [SpanEnd#10 SpanEnd#6 SpanEnd#5 SpanEnd#4]  23
-  40  -ε-  [SpanStart#1 Absent RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 RecordClose SpanStart#8 RecordSet(M1) SpanEnd#8 SpanEnd#9]  34
+  32  -ε-                                   30, 24      [SpanStart(P2)]
+  34  ─‣─  (expression_statement)           32          [SpanEnd(P7) SpanStartAt(P10) SpanStart(P12) RecordOpen SpanStart(P0)]
+  37  ─‣┘  _                                23          [SpanEnd(P10) SpanEnd(P6) SpanEnd(P5) SpanEnd(P4)]
+  40  -ε-                                   34          [SpanStart(P1) Absent RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0) RecordClose SpanStart(P8) RecordSet(M1 first) SpanEnd(P8) SpanEnd(P9)]
   44  ──!  _                                16, 44
   46  └─!  _                                16, 44

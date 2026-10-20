@@ -34,31 +34,31 @@ Q:
   02  └─!  _                                08, 10
   04  !─┘  _                                05
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08   !   (identifier) == "a"              04
+  08   !   (identifier == "a")              04
   10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                08, 10
+  02  └─!  _                                08, 10
        ●   identifier
-  08       (identifier) == "a"              04
+  08   !   (identifier == "a")              04
        ●   identifier
-  04       _                                05
-  02  ❮❮❮ 
-  10       _                                08, 10
+  04  !─┘  _                                05
+  02  ❮❮❮
+  10  ──!  _                                08, 10
        ●   comment
-  08       (identifier) == "a"              04
+  08   !   (identifier == "a")              04
        ○   comment
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   ;
-  08       (identifier) == "a"              04
+  08   !   (identifier == "a")              04
        ○   ;
-  10  ❮❮❮ 
-  10       _                                08, 10
-  01  ❮❮❮ 
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+  01  ❮❮❮

@@ -45,26 +45,26 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └─!  _                                10, 11
-  04                                        ▶
-  05   !   (function_declaration) [Node RecordSet(M0)] == "x"  07
+  04       return
+  05   !   (function_declaration == "x")    07          [Node RecordSet(M0 value)]
   07  ─‣┘² _                                04
-  08   !   (identifier) [Node RecordSet(M0)] == "x"  07
+  08   !   (identifier == "x")              07          [Node RecordSet(M0 value)]
   10   !   switch
              (function_declaration)         05
              (identifier)                   08
   11  ──!  _                                10, 11
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                10, 11
+  02  └─!  _                                10, 11
        ●   identifier
-  10   !   switch                           
+  10   !   switch
        ●   identifier
-  08       (identifier) [Node RecordSet(M0)] == "x"  07
+  08   !   (identifier == "x")              07          [Node RecordSet(M0 value)]
        ●   identifier
-  07       _                                04
+  07  ─‣┘² _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

@@ -55,33 +55,33 @@ Q:
   02  └─!  _                                10, 14, 16
   04  ─‣┘  _                                05
   05  ─‣┘² _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08  └‣─  left: (identifier) [Node RecordSet(M0)] == "target"  04
-  10   !   (binary_expression) [Absent RecordSet(M1)]  08
-  12  └‣─  right: (identifier) [Node RecordSet(M1)] == "target"  04
-  14   !   (binary_expression) [Absent RecordSet(M0)]  12
+  08  └‣─  left: (identifier == "target")   04          [Node RecordSet(M0 left)]
+  10   !   (binary_expression)              08          [Absent RecordSet(M1 right)]
+  12  └‣─  right: (identifier == "target")  04          [Node RecordSet(M1 right)]
+  14   !   (binary_expression)              12          [Absent RecordSet(M0 left)]
   16  ──!  _                                10, 14, 16
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                10, 14, 16
+  02  └─!  _                                10, 14, 16
        ●   binary_expression
-  10       (binary_expression) [Absent RecordSet(M1)]  08
+  10   !   (binary_expression)              08          [Absent RecordSet(M1 right)]
        ●   binary_expression
-  08       left: (identifier) [Node RecordSet(M0)] == "target"  04
+  08  └‣─  left: (identifier == "target")   04          [Node RecordSet(M0 left)]
        ○   +
-  02  ❮❮❮ 
-  14       (binary_expression) [Absent RecordSet(M0)]  12
+  02  ❮❮❮
+  14   !   (binary_expression)              12          [Absent RecordSet(M0 left)]
        ●   binary_expression
-  12       right: (identifier) [Node RecordSet(M1)] == "target"  04
+  12  └‣─  right: (identifier == "target")  04          [Node RecordSet(M1 right)]
        ○   +
        ●   identifier
-  04       _                                05
+  04  ─‣┘  _                                05
        ●   binary_expression
-  05       _                                06
+  05  ─‣┘² _                                06
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

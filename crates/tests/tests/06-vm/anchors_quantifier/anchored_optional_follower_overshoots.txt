@@ -46,47 +46,47 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        26, 20
-  02  └‣─  (identifier) == "foo"            04
+  02  └‣─  (identifier == "foo")            04
   04  ─‣┘  _                                05
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08  └•─  (expression_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  02
-  11  ─•─  (expression_statement) [Node RecordSet(M2)]  02
-  13  └•─  (debugger_statement) [Node RecordSet(M1)]  11
+  08  └•─  (expression_statement)           02          [Absent RecordSet(M1 b) Node RecordSet(M2 c)]
+  11  ─•─  (expression_statement)           02          [Node RecordSet(M2 c)]
+  13  └•─  (debugger_statement)             11          [Node RecordSet(M1 b)]
   15  ...
-  16  -ε-  [Absent RecordSet(M1)]           11
-  18  ─•─  (debugger_statement) [Node RecordSet(M1)]  11
-  20  -ε-  [Absent RecordSet(M0)]           13, 08
-  22   !   (lexical_declaration) [Node RecordSet(M0)]  18, 16
+  16  -ε-                                   11          [Absent RecordSet(M1 b)]
+  18  ─•─  (debugger_statement)             11          [Node RecordSet(M1 b)]
+  20  -ε-                                   13, 08      [Absent RecordSet(M0 a)]
+  22   !   (lexical_declaration)            18, 16      [Node RecordSet(M0 a)]
   24  ──!  _                                22, 24
   26  └─!  _                                22, 24
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        26, 20
+  00   !   (program)                        26, 20
        ●   program
-  26       _                                22, 24
+  26  └─!  _                                22, 24
        ●   expression_statement
-  22       (lexical_declaration) [Node RecordSet(M0)]  18, 16
+  22   !   (lexical_declaration)            18, 16      [Node RecordSet(M0 a)]
        ○   expression_statement
-  26  ❮❮❮ 
-  24       _                                22, 24
+  26  ❮❮❮
+  24  ──!  _                                22, 24
        ●   debugger_statement
-  22       (lexical_declaration) [Node RecordSet(M0)]  18, 16
+  22   !   (lexical_declaration)            18, 16      [Node RecordSet(M0 a)]
        ○   debugger_statement
-  24  ❮❮❮ 
-  24       _                                22, 24
+  24  ❮❮❮
+  24  ──!  _                                22, 24
        ●   expression_statement
-  22       (lexical_declaration) [Node RecordSet(M0)]  18, 16
+  22   !   (lexical_declaration)            18, 16      [Node RecordSet(M0 a)]
        ○   expression_statement
-  24  ❮❮❮ 
-  24       _                                22, 24
-  00  ❮❮❮ 
-  20  -ε-  [Absent RecordSet(M0)]           13, 08
-  13       (debugger_statement) [Node RecordSet(M1)]  11
+  24  ❮❮❮
+  24  ──!  _                                22, 24
+  00  ❮❮❮
+  20  -ε-                                   13, 08      [Absent RecordSet(M0 a)]
+  13  └•─  (debugger_statement)             11          [Node RecordSet(M1 b)]
        ○   expression_statement
-  20  ❮❮❮ 
-  08       (expression_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  02
+  20  ❮❮❮
+  08  └•─  (expression_statement)           02          [Absent RecordSet(M1 b) Node RecordSet(M2 c)]
        ●   expression_statement
-  02       (identifier) == "foo"            04
+  02  └‣─  (identifier == "foo")            04
        ○   ;

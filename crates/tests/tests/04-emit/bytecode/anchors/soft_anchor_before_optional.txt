@@ -23,7 +23,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (list)                            7, 5
   4  ─‣┘  _                                 1
   5  └•─  (id)                              4
@@ -50,7 +50,7 @@ Q = 0 :: T0
 [instructions]
 Q:
   0   !   (list)                            5, 3
-  2                                         ▶
+  2       return
   3  └•─  (id)                              6
   4  ─‣─  (id)                              6
   5  └◦─  ";"                               4

@@ -55,30 +55,30 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (binary_expression)              10, 12
-  04                                        ▶
-  05  ─•─  (identifier) [RecordSet(M2)]     07
+  04       return
+  05  ─•─  (identifier)                     07          [RecordSet(M2 t)]
   07  ─‣┘³ _                                04
-  08  ─◦─  (identifier) [RecordSet(M2)]     07
-  10  └‣─  (number) [VariantOpen(M0) VariantClose]  05
-  12  └‣─  "+" [VariantOpen(M1) VariantClose]  08
+  08  ─◦─  (identifier)                     07          [RecordSet(M2 t)]
+  10  └‣─  (number)                         05          [VariantOpen(M0 A) VariantClose]
+  12  └‣─  "+"                              08          [VariantOpen(M1 B) VariantClose]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (binary_expression)              10, 12
+  02  └‣─  (binary_expression)              10, 12
        ●   binary_expression
-  10       (number) [VariantOpen(M0) VariantClose]  05
+  10  └‣─  (number)                         05          [VariantOpen(M0 A) VariantClose]
        ○   identifier
        ○   +
        ○   identifier
-  02  ❮❮❮ 
-  12       "+" [VariantOpen(M1) VariantClose]  08
+  02  ❮❮❮
+  12  └‣─  "+"                              08          [VariantOpen(M1 B) VariantClose]
        ○   identifier
        ●   +
-  08       (identifier) [RecordSet(M2)]     07
+  08  ─◦─  (identifier)                     07          [RecordSet(M2 t)]
        ●   identifier
-  07       _                                04
+  07  ─‣┘³ _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

@@ -47,8 +47,8 @@ Q:
   03  └─!  _                                15, 20
   05  ─•┘³ _                                06
   06  ─‣┘² _                                07
-  07                                        ▶
-  08   !   (number) [Node RecordSet(M0)]    05
+  07       return
+  08   !   (number)                         05          [Node RecordSet(M0 n)]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14   !   (array)                          12
@@ -58,70 +58,70 @@ Q:
   20  ──!  _                                15, 20
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                15, 20
+  03  └─!  _                                15, 20
        ●   [
-  15       (array)                          18
+  15   !   (array)                          18
        ○   [
-  03  ❮❮❮ 
-  20       _                                15, 20
+  03  ❮❮❮
+  20  ──!  _                                15, 20
        ●   array
-  15       (array)                          18
+  15   !   (array)                          18
        ●   array
-  18       _                                14, 16
+  18  └─!  _                                14, 16
        ●   [
-  14       (array)                          12
+  14   !   (array)                          12
        ○   [
-  18  ❮❮❮ 
-  16       _                                14, 16
+  18  ❮❮❮
+  16  ──!  _                                14, 16
        ●   array
-  14       (array)                          12
+  14   !   (array)                          12
        ●   array
-  12       _                                08, 10
+  12  └─!  _                                08, 10
        ●   [
-  08       (number) [Node RecordSet(M0)]    05
+  08   !   (number)                         05          [Node RecordSet(M0 n)]
        ○   [
-  12  ❮❮❮ 
-  10       _                                08, 10
+  12  ❮❮❮
+  10  ──!  _                                08, 10
        ●   number
-  08       (number) [Node RecordSet(M0)]    05
+  08   !   (number)                         05          [Node RecordSet(M0 n)]
        ●   number
-  05       _                                06
-  10  ❮❮❮ 
-  10       _                                08, 10
+  05  ─•┘³ _                                06
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   ]
-  08       (number) [Node RecordSet(M0)]    05
+  08   !   (number)                         05          [Node RecordSet(M0 n)]
        ○   ]
-  10  ❮❮❮ 
-  10       _                                08, 10
-  16  ❮❮❮ 
-  16       _                                14, 16
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+  16  ❮❮❮
+  16  ──!  _                                14, 16
        ●   ]
-  14       (array)                          12
+  14   !   (array)                          12
        ○   ]
-  16  ❮❮❮ 
-  16       _                                14, 16
-  20  ❮❮❮ 
-  20       _                                15, 20
+  16  ❮❮❮
+  16  ──!  _                                14, 16
+  20  ❮❮❮
+  20  ──!  _                                15, 20
        ●   ,
-  15       (array)                          18
+  15   !   (array)                          18
        ○   ,
-  20  ❮❮❮ 
-  20       _                                15, 20
+  20  ❮❮❮
+  20  ──!  _                                15, 20
        ●   identifier
-  15       (array)                          18
+  15   !   (array)                          18
        ○   identifier
-  20  ❮❮❮ 
-  20       _                                15, 20
+  20  ❮❮❮
+  20  ──!  _                                15, 20
        ●   ]
-  15       (array)                          18
+  15   !   (array)                          18
        ○   ]
-  20  ❮❮❮ 
-  20       _                                15, 20
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+  20  ❮❮❮
+  20  ──!  _                                15, 20
+  02  ❮❮❮
+  01  ❮❮❮

@@ -13,7 +13,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (MISSING name)                    1
 -------------------- BYTECODE --------------------
 [strings]
@@ -34,4 +34,4 @@ Q = 0 :: T0
 [instructions]
 Q:
   0   !   (MISSING name)                    2
-  2                                         ▶
+  2       return

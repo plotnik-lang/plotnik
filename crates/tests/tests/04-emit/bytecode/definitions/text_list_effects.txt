@@ -9,15 +9,15 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        17
-  03  ─‣┘  _ [RecordSet(comments)]          01
-  06  -ε-  [ListClose]                      03
-  07  -ε-  [ListClose RecordSet(comments)]  01
-  09   !   (comment) [NodeText ArrayPush]   11, 06
+  03  ─‣┘  _                                01          [RecordSet(comments)]
+  06  -ε-                                   03          [ListClose]
+  07  -ε-                                   01          [ListClose RecordSet(comments)]
+  09   !   (comment)                        11, 06      [NodeText ArrayPush]
   11  ──!  _                                09, 11
   12  └─!  _                                09, 11
-  17  -ε-  [ListOpen]                       12, 07
+  17  -ε-                                   12, 07      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -47,11 +47,11 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       14, 08
-  03  -ε-  [ListClose]                      05
-  05  ─‣┘  _ [RecordSet(M0)]                07
-  07                                        ▶
-  08  -ε-  [ListClose RecordSet(M0)]        07
-  10   !   (comment) [NodeText ArrayPush]   12, 03
+  01  -ε-                                   14, 08      [ListOpen]
+  03  -ε-                                   05          [ListClose]
+  05  ─‣┘  _                                07          [RecordSet(M0 comments)]
+  07       return
+  08  -ε-                                   07          [ListClose RecordSet(M0 comments)]
+  10   !   (comment)                        12, 03      [NodeText ArrayPush]
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12

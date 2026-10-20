@@ -40,21 +40,21 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
-  2  └‣─  (identifier) [Node RecordSet(M0)] == "b"  4
+  2  └‣─  (identifier == "b")               4           [Node RecordSet(M0 id)]
   4  ─‣┘² _                                 5
-  5                                         ▶
+  5       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)] == "b"  04
+  2  └‣─  (identifier == "b")               4           [Node RecordSet(M0 id)]
       ○   ;
-  1  ❮❮❮ 
+  1  ❮❮❮
       ●   expression_statement
-  2       (identifier) [Node RecordSet(M0)] == "b"  04
+  2  └‣─  (identifier == "b")               4           [Node RecordSet(M0 id)]
       ●   identifier
-  4       _                                 05
+  4  ─‣┘² _                                 5
       ●   program
-  5   ◀   (Q)                               ◼
+  5   ◀   return                            ◼

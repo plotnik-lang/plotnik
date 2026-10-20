@@ -53,18 +53,18 @@ Q = 0 :: T2
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (lexical_declaration) [RecordOpen Node RecordSet(M0)]  3
-  3  ─‣─  (expression_statement) [Node RecordSet(M1)]  5
-  5  ─‣┘  _ [RecordClose RecordSet(M2)]     7
-  7                                         ▶
+  1  └‣─  (lexical_declaration)             3           [RecordOpen Node RecordSet(M0 a)]
+  3  ─‣─  (expression_statement)            5           [Node RecordSet(M1 b)]
+  5  ─‣┘  _                                 7           [RecordClose RecordSet(M2 pair)]
+  7       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (lexical_declaration) [RecordOpen Node RecordSet(M0)]  03
+  1  └‣─  (lexical_declaration)             3           [RecordOpen Node RecordSet(M0 a)]
       ●   lexical_declaration
-  3       (expression_statement) [Node RecordSet(M1)]  05
+  3  ─‣─  (expression_statement)            5           [Node RecordSet(M1 b)]
       ●   expression_statement
-  5       _ [RecordClose RecordSet(M2)]     07
+  5  ─‣┘  _                                 7           [RecordClose RecordSet(M2 pair)]
       ●   program
-  7   ◀   (Q)                               ◼
+  7   ◀   return                            ◼

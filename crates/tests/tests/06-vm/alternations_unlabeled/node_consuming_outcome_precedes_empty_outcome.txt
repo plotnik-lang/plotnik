@@ -47,40 +47,40 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           18, 10
-  03                                        ▶
-  04   !   (number) [Node RecordSet(M0)]    20
+  03       return
+  04   !   (number)                         20          [Node RecordSet(M0 b)]
   06  ──!  _                                04, 06
-  08   !   _ [Absent RecordSet(M1)]         04, 06
-  10  -ε-  [Absent RecordSet(M1) Absent RecordSet(M0)]  21
-  13   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  20
+  08   !   _                                04, 06      [Absent RecordSet(M1 a)]
+  10  -ε-                                   21          [Absent RecordSet(M1 a) Absent RecordSet(M0 b)]
+  13   !   (identifier)                     20          [Absent RecordSet(M0 b) Node RecordSet(M1 a)]
   16  ──!  _                                08, 13, 16
   18  └─!  _                                08, 13, 16
   20  ─‣┘  _                                21
   21  ─‣┘  _                                03
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           18, 10
+  01  └‣─  (expression_statement)           18, 10
        ●   expression_statement
-  18       _                                08, 13, 16
+  18  └─!  _                                08, 13, 16
        ●   identifier
-  08       _ [Absent RecordSet(M1)]         04, 06
+  08   !   _                                04, 06      [Absent RecordSet(M1 a)]
        ●   identifier
-  04       (number) [Node RecordSet(M0)]    20
+  04   !   (number)                         20          [Node RecordSet(M0 b)]
        ○   identifier
-  08  ❮❮❮ 
-  06       _                                04, 06
+  08  ❮❮❮
+  06  ──!  _                                04, 06
        ●   ;
-  04       (number) [Node RecordSet(M0)]    20
+  04   !   (number)                         20          [Node RecordSet(M0 b)]
        ○   ;
-  06  ❮❮❮ 
-  06       _                                04, 06
-  18  ❮❮❮ 
-  13       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  20
+  06  ❮❮❮
+  06  ──!  _                                04, 06
+  18  ❮❮❮
+  13   !   (identifier)                     20          [Absent RecordSet(M0 b) Node RecordSet(M1 a)]
        ●   identifier
-  20       _                                21
+  20  ─‣┘  _                                21
        ●   expression_statement
-  21       _                                03
+  21  ─‣┘  _                                03
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

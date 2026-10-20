@@ -54,27 +54,27 @@ Q = 00 :: T6
 [instructions]
 Q:
   00   !   (program)                        32, 12, 26
-  02                                        ▶
-  03   !   (comment) [Node RecordSet(M0) RecordClose RecordSet(M2)]  15
+  02       return
+  03   !   (comment)                        15          [Node RecordSet(M0 comment) RecordClose RecordSet(M2 left)]
   06  ──!  _                                03, 06
-  08   !   _ [RecordOpen]                   03, 06
-  10  -ε-  [Absent RecordSet(M3)]           08
-  12  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  02
+  08   !   _                                03, 06      [RecordOpen]
+  10  -ε-                                   08          [Absent RecordSet(M3 right)]
+  12  -ε-                                   02          [Absent RecordSet(M3 right) RecordOpen Absent RecordSet(M0 comment) RecordClose RecordSet(M2 left)]
   15  ─‣┘  _                                02
-  16   !   (identifier) [Node RecordSet(M1) RecordClose RecordSet(M3)]  15
+  16   !   (identifier)                     15          [Node RecordSet(M1 identifier) RecordClose RecordSet(M3 right)]
   19  ──!  _                                16, 19
-  21   !   _ [RecordOpen]                   16, 19
+  21   !   _                                16, 19      [RecordOpen]
   23  ...
-  24  -ε-  [Absent RecordSet(M2)]           21
-  26  -ε-  [Absent RecordSet(M2) RecordOpen Absent RecordSet(M1) RecordClose RecordSet(M3)]  02
+  24  -ε-                                   21          [Absent RecordSet(M2 left)]
+  26  -ε-                                   02          [Absent RecordSet(M2 left) RecordOpen Absent RecordSet(M1 identifier) RecordClose RecordSet(M3 right)]
   29  ──!  _                                10, 24, 29
   31  ...
   32  └─!  _                                10, 24, 29
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        32, 12, 26
+  00   !   (program)                        32, 12, 26
        ●   program
-  32       _                                10, 24, 29
-  00  ❮❮❮ 
-  12  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  02
-  02   ◀   (Q)                              ◼
+  32  └─!  _                                10, 24, 29
+  00  ❮❮❮
+  12  -ε-                                   02          [Absent RecordSet(M3 right) RecordOpen Absent RecordSet(M0 comment) RecordClose RecordSet(M2 left)]
+  02   ◀   return                           ◼

@@ -48,9 +48,9 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (binary_expression)              03
   03  └─!  _                                10, 11
-  05                                        ▶
-  06   !   (number) [Node RecordSet(M0)]    13
-  08   !   "+" [Node RecordSet(M0)]         13
+  05       return
+  06   !   (number)                         13          [Node RecordSet(M0 v)]
+  08   !   "+"                              13          [Node RecordSet(M0 v)]
   10   !   switch
              (number)                       06
              "+"                            08
@@ -58,23 +58,23 @@ Q:
   13  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (binary_expression)              03
+  02  └‣─  (binary_expression)              03
        ●   binary_expression
-  03       _                                10, 11
+  03  └─!  _                                10, 11
        ●   identifier
-  10   !   switch                           
+  10   !   switch
        ○   identifier
-  03  ❮❮❮ 
-  11       _                                10, 11
+  03  ❮❮❮
+  11  ──!  _                                10, 11
        ●   +
-  10   !   switch                           
+  10   !   switch
        ●   +
-  08       "+" [Node RecordSet(M0)]         13
+  08   !   "+"                              13          [Node RecordSet(M0 v)]
        ●   +
-  13       _                                05
+  13  ─‣┘³ _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

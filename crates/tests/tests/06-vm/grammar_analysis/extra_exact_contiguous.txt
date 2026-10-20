@@ -42,19 +42,19 @@ Q:
   0   !   (program)                         1
   1  └─!  (comment)                         2
   2  ─‣─  (lexical_declaration)             3
-  3  ─‣─  (expression_statement) [Node RecordSet(M0)]  5
+  3  ─‣─  (expression_statement)            5           [Node RecordSet(M0 statement)]
   5  ─‣┘  _                                 6
-  6                                         ▶
+  6       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (comment)                         02
+  1  └─!  (comment)                         2
       ●   comment
-  2       (lexical_declaration)             03
+  2  ─‣─  (lexical_declaration)             3
       ●   lexical_declaration
-  3       (expression_statement) [Node RecordSet(M0)]  05
+  3  ─‣─  (expression_statement)            5           [Node RecordSet(M0 statement)]
       ●   expression_statement
-  5       _                                 06
+  5  ─‣┘  _                                 6
       ●   program
-  6   ◀   (Q)                               ◼
+  6   ◀   return                            ◼

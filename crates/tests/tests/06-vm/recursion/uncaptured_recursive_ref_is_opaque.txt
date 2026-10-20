@@ -54,57 +54,57 @@ Nested:
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement)           06          [RecordOpen]
   06  └‣─  (Nested)                         00 : 08
   07  ─‣┘  _                                13
-  08  -ε-  [RecordClose]                    10
-  10  ─‣┘² _ [RecordSet(M1)]                12
-  12                                        ▶
-  13                                        ▶
-  14   !   (identifier) [Node RecordSet(M0)]  07
-  16  -ε-  [SuppressEnd]                    07
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘² _                                12          [RecordSet(M1 c)]
+  12       return
+  13       return
+  14   !   (identifier)                     07          [Node RecordSet(M0 name)]
+  16  -ε-                                   07          [SuppressEnd]
   18   !   (Nested)                         00 : 16
-  19  -ε-  [Absent RecordSet(M0) SuppressBegin]  18
+  19  -ε-                                   18          [Absent RecordSet(M0 name) SuppressBegin]
 --------------------- TRACE ----------------------
 Q:
-  03       (program)                        04
+  03   !   (program)                        04
        ●   program
-  04       (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement)           06          [RecordOpen]
        ●   expression_statement
-  06       (Nested)                         00 : 08
+  06  └‣─  (Nested)                         00 : 08
        ▶   (Nested)
 
 Nested:
-  00       (call_expression)                01
+  00   !   (call_expression)                01
        ●   call_expression
-  01       function: _                      14, 19
+  01  └‣─  function: _                      14, 19
        ●   call_expression
-  14       (identifier) [Node RecordSet(M0)]  07
+  14   !   (identifier)                     07          [Node RecordSet(M0 name)]
        ○   call_expression
-  01  ❮❮❮ 
-  19  -ε-  [Absent RecordSet(M0) SuppressBegin]  18
-  18       (Nested)                         00 : 16
+  01  ❮❮❮
+  19  -ε-                                   18          [Absent RecordSet(M0 name) SuppressBegin]
+  18   !   (Nested)                         00 : 16
        ▶   (Nested)
 
 Nested:
-  00       (call_expression)                01
+  00   !   (call_expression)                01
        ●   call_expression
-  01       function: _                      14, 19
+  01  └‣─  function: _                      14, 19
        ●   identifier
-  14       (identifier) [Node RecordSet(M0)]  07
+  14   !   (identifier)                     07          [Node RecordSet(M0 name)]
        ●   identifier
-  07       _                                13
+  07  ─‣┘  _                                13
        ●   call_expression
-  13   ◀   (Nested)                         
+  13   ◀   return                           16
 
 Nested:
-  16  -ε-  [SuppressEnd]                    07
-  07       _                                13
+  16  -ε-                                   07          [SuppressEnd]
+  07  ─‣┘  _                                13
        ●   call_expression
-  13   ◀   (Nested)                         
+  13   ◀   return                           08
 
 Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘² _                                12          [RecordSet(M1 c)]
        ●   program
-  12   ◀   (Q)                              ◼
+  12   ◀   return                           ◼

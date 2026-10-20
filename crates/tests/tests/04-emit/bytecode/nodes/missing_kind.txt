@@ -5,8 +5,8 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (MISSING identifier) [Node RecordSet(m)]  1
+  1       return
+  2   !   (MISSING identifier)              1           [Node RecordSet(m)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -29,5 +29,5 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (MISSING identifier) [Node RecordSet(M0)]  2
-  2                                         ▶
+  0   !   (MISSING identifier)              2           [Node RecordSet(M0 m)]
+  2       return

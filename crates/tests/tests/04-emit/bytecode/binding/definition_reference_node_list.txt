@@ -10,17 +10,17 @@ Q    = 05
 
 [transitions]
 Func:
-  01                                        ▶
+  01       return
   02   !   (function_declaration)           01
 
 Q:
-  04                                        ▶
+  04       return
   05   !   (program)                        13
-  06  ─‣┘  _ [ListClose RecordSet(funcs)]   04
-  09  -ε-  [Node ArrayPush]                 12, 06
+  06  ─‣┘  _                                04          [ListClose RecordSet(funcs)]
+  09  -ε-                                   12, 06      [Node ArrayPush]
   10   !   (Func)                           02 : 09
   12  ──!  _                                10, 12
-  13  └─!  _ [ListOpen]                     10, 12
+  13  └─!  _                                10, 12      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -49,13 +49,13 @@ Q    = 02 :: T3
 [instructions]
 Func:
   00   !   (function_declaration)           01
-  01                                        ▶
+  01       return
 
 Q:
   02   !   (program)                        03
-  03  └─!  _ [ListOpen]                     08, 09
-  05                                        ▶
-  06  -ε-  [Node ArrayPush]                 09, 11
+  03  └─!  _                                08, 09      [ListOpen]
+  05       return
+  06  -ε-                                   09, 11      [Node ArrayPush]
   08   !   (Func)                           00 : 06
   09  ──!  _                                08, 09
-  11  ─‣┘  _ [ListClose RecordSet(M0)]      05
+  11  ─‣┘  _                                05          [ListClose RecordSet(M0 funcs)]

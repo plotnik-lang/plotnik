@@ -40,25 +40,25 @@ M3: S4 → T2  ; Number: T2
 <expression>:
   00  -ε-                                   09, 14
   02  ─‣┘  _                                03
-  03  ─‣┘  _ [VariantClose]                 05
-  05                                        ▶
-  06  └‣─  (identifier) [NodeText RecordSet(M0)]  02
+  03  ─‣┘  _                                05          [VariantClose]
+  05       return
+  06  └‣─  (identifier)                     02          [NodeText RecordSet(M0 text)]
   08  └‣─  (expression_statement)           06
-  09   !   (program) [VariantOpen(M2)]      08
-  11  └‣─  (number) [NodeText RecordSet(M1)]  02
+  09   !   (program)                        08          [VariantOpen(M2 Name)]
+  11  └‣─  (number)                         02          [NodeText RecordSet(M1 number)]
   13  └‣─  (expression_statement)           11
-  14   !   (program) [VariantOpen(M3)]      13
+  14   !   (program)                        13          [VariantOpen(M3 Number)]
 --------------------- TRACE ----------------------
 <expression>:
   00  -ε-                                   09, 14
-  09       (program) [VariantOpen(M2)]      08
+  09   !   (program)                        08          [VariantOpen(M2 Name)]
        ●   program
-  08       (expression_statement)           06
+  08  └‣─  (expression_statement)           06
        ●   expression_statement
-  06       (identifier) [NodeText RecordSet(M0)]  02
+  06  └‣─  (identifier)                     02          [NodeText RecordSet(M0 text)]
        ●   identifier
-  02       _                                03
+  02  ─‣┘  _                                03
        ●   expression_statement
-  03       _ [VariantClose]                 05
+  03  ─‣┘  _                                05          [VariantClose]
        ●   program
-  05   ◀   (<expression>)                   ◼
+  05   ◀   return                           ◼

@@ -46,27 +46,27 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _ [ListOpen]                     14, 16
-  03  └‣─  (identifier) [Node RecordSet(M0)]  05
-  05  ─‣┘  _ [RecordClose RecordSet(M1)]    08
-  07                                        ▶
-  08  -ε-  [RecordClose ArrayPush]          16, 18
-  10   !   (expression_statement) [RecordOpen]  03
+  01  └─!  _                                14, 16      [ListOpen]
+  03  └‣─  (identifier)                     05          [Node RecordSet(M0 id)]
+  05  ─‣┘  _                                08          [RecordClose RecordSet(M1 x)]
+  07       return
+  08  -ε-                                   16, 18      [RecordClose ArrayPush]
+  10   !   (expression_statement)           03          [RecordOpen]
   12  ──!  _                                10, 12
-  14   !   _ [RecordOpen]                   10, 12
+  14   !   _                                10, 12      [RecordOpen]
   16  ──!  _                                14, 16
-  18  ─‣┘  _ [ListClose RecordSet(M2)]      07
+  18  ─‣┘  _                                07          [ListClose RecordSet(M2 xs)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _ [ListOpen]                     14, 16
+  01  └─!  _                                14, 16      [ListOpen]
        ●   debugger_statement
-  14       _ [RecordOpen]                   10, 12
+  14   !   _                                10, 12      [RecordOpen]
        ●   debugger_statement
-  10       (expression_statement) [RecordOpen]  03
+  10   !   (expression_statement)           03          [RecordOpen]
        ○   debugger_statement
-  14  ❮❮❮ 
-  12       _                                10, 12
-  01  ❮❮❮ 
-  16       _                                14, 16
+  14  ❮❮❮
+  12  ──!  _                                10, 12
+  01  ❮❮❮
+  16  ──!  _                                14, 16

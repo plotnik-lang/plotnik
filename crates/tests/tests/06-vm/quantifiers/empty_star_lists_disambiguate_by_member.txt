@@ -43,45 +43,45 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       32, 26
-  03  -ε-  [ListClose RecordSet(M1)]        05
+  01  -ε-                                   32, 26      [ListOpen]
+  03  -ε-                                   05          [ListClose RecordSet(M1 stmts)]
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08  -ε-  [ListClose RecordSet(M1)]        06
-  10   !   (expression_statement) [Node ArrayPush]  12, 03
+  08  -ε-                                   06          [ListClose RecordSet(M1 stmts)]
+  10   !   (expression_statement)           12, 03      [Node ArrayPush]
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  -ε-  [ListOpen]                       14, 08
-  18   !   (expression_statement) [Node ArrayPush]  20, 03
+  16  -ε-                                   14, 08      [ListOpen]
+  18   !   (expression_statement)           20, 03      [Node ArrayPush]
   20  ──!  _                                18, 20
-  22  -ε-  [ListOpen]                       20, 03
-  24  -ε-  [ListClose RecordSet(M0)]        22
-  26  -ε-  [ListClose RecordSet(M0)]        16
-  28   !   (function_declaration) [Node ArrayPush]  30, 24
+  22  -ε-                                   20, 03      [ListOpen]
+  24  -ε-                                   22          [ListClose RecordSet(M0 funcs)]
+  26  -ε-                                   16          [ListClose RecordSet(M0 funcs)]
+  28   !   (function_declaration)           30, 24      [Node ArrayPush]
   30  ──!  _                                28, 30
   32  └─!  _                                28, 30
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       32, 26
-  32       _                                28, 30
+  01  -ε-                                   32, 26      [ListOpen]
+  32  └─!  _                                28, 30
        ●   expression_statement
-  28       (function_declaration) [Node ArrayPush]  30, 24
+  28   !   (function_declaration)           30, 24      [Node ArrayPush]
        ○   expression_statement
-  32  ❮❮❮ 
-  30       _                                28, 30
-  01  ❮❮❮ 
-  26  -ε-  [ListClose RecordSet(M0)]        16
-  16  -ε-  [ListOpen]                       14, 08
-  14       _                                10, 12
+  32  ❮❮❮
+  30  ──!  _                                28, 30
+  01  ❮❮❮
+  26  -ε-                                   16          [ListClose RecordSet(M0 funcs)]
+  16  -ε-                                   14, 08      [ListOpen]
+  14  └─!  _                                10, 12
        ●   expression_statement
-  10       (expression_statement) [Node ArrayPush]  12, 03
+  10   !   (expression_statement)           12, 03      [Node ArrayPush]
        ●   expression_statement
-  12       _                                10, 12
-  10  ❮❮❮ 
-  03  -ε-  [ListClose RecordSet(M1)]        05
-  05       _                                06
+  12  ──!  _                                10, 12
+  10  ❮❮❮
+  03  -ε-                                   05          [ListClose RecordSet(M1 stmts)]
+  05  ─‣┘  _                                06
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

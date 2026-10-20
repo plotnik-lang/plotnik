@@ -47,50 +47,50 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        22, 29
-  02  └‣─  (identifier) == "foo"            04
+  02  └‣─  (identifier == "foo")            04
   04  ─‣┘  _                                05
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08  └─!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
-  11  ─•─  (expression_statement) [Node RecordSet(M2)]  02
-  13  -ε-  [ListClose RecordSet(M1)]        11
+  08  └─!  (expression_statement)           02          [ListClose RecordSet(M1 b) Node RecordSet(M2 c)]
+  11  ─•─  (expression_statement)           02          [Node RecordSet(M2 c)]
+  13  -ε-                                   11          [ListClose RecordSet(M1 b)]
   15  ...
-  16  └─!  (debugger_statement) [Node ArrayPush]  18, 13
-  18  ──!  (debugger_statement) [Node ArrayPush]  18, 13
-  20  -ε-  [ListOpen]                       16, 08
+  16  └─!  (debugger_statement)             18, 13      [Node ArrayPush]
+  18  ──!  (debugger_statement)             18, 13      [Node ArrayPush]
+  20  -ε-                                   16, 08      [ListOpen]
   22  └─!  _                                32, 34
-  24  ──!  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
-  27  -ε-  [ListOpen]                       18, 24
-  29  -ε-  [Absent RecordSet(M0)]           20
+  24  ──!  (expression_statement)           02          [ListClose RecordSet(M1 b) Node RecordSet(M2 c)]
+  27  -ε-                                   18, 24      [ListOpen]
+  29  -ε-                                   20          [Absent RecordSet(M0 a)]
   31  ...
-  32   !   (lexical_declaration) [Node RecordSet(M0)]  27
+  32   !   (lexical_declaration)            27          [Node RecordSet(M0 a)]
   34  ──!  _                                32, 34
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        22, 29
+  00   !   (program)                        22, 29
        ●   program
-  22       _                                32, 34
+  22  └─!  _                                32, 34
        ●   comment
-  32       (lexical_declaration) [Node RecordSet(M0)]  27
+  32   !   (lexical_declaration)            27          [Node RecordSet(M0 a)]
        ○   comment
-  22  ❮❮❮ 
-  34       _                                32, 34
+  22  ❮❮❮
+  34  ──!  _                                32, 34
        ●   debugger_statement
-  32       (lexical_declaration) [Node RecordSet(M0)]  27
+  32   !   (lexical_declaration)            27          [Node RecordSet(M0 a)]
        ○   debugger_statement
-  34  ❮❮❮ 
-  34       _                                32, 34
+  34  ❮❮❮
+  34  ──!  _                                32, 34
        ●   expression_statement
-  32       (lexical_declaration) [Node RecordSet(M0)]  27
+  32   !   (lexical_declaration)            27          [Node RecordSet(M0 a)]
        ○   expression_statement
-  34  ❮❮❮ 
-  34       _                                32, 34
-  00  ❮❮❮ 
-  29  -ε-  [Absent RecordSet(M0)]           20
-  20  -ε-  [ListOpen]                       16, 08
-  16       (debugger_statement) [Node ArrayPush]  18, 13
+  34  ❮❮❮
+  34  ──!  _                                32, 34
+  00  ❮❮❮
+  29  -ε-                                   20          [Absent RecordSet(M0 a)]
+  20  -ε-                                   16, 08      [ListOpen]
+  16  └─!  (debugger_statement)             18, 13      [Node ArrayPush]
        ○   comment
-  20  ❮❮❮ 
-  08       (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
+  20  ❮❮❮
+  08  └─!  (expression_statement)           02          [ListClose RecordSet(M1 b) Node RecordSet(M2 c)]
        ○   comment

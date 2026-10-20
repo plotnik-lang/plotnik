@@ -12,17 +12,17 @@ Test  = 05
 
 [transitions]
 Comma:
-  01                                        ▶
+  01       return
   02   !   ","                              01
 
 Test:
-  04                                        ▶
+  04       return
   05   !   (array)                          14
   06  ─‣┘  _                                04
-  07  ─◦─  (string) [Node RecordSet(next)]  06
+  07  ─◦─  (string)                         06          [Node RecordSet(next)]
 
 Comma (consuming, routed Down):
-  09                                        ▶
+  09       return
   10   !   ","                              09
   12  ──!  _                                10, 12
   13  └─!  _                                10, 12
@@ -57,15 +57,15 @@ Test  = 02 :: T2
 [instructions]
 Comma:
   00   !   ","                              01
-  01                                        ▶
+  01       return
 
 Test:
   02   !   (array)                          03
   03       (@12)                            12 : 04
-  04  ─◦─  (string) [Node RecordSet(M0)]    06
+  04  ─◦─  (string)                         06          [Node RecordSet(M0 next)]
   06  ─‣┘  _                                07
-  07                                        ▶
-  08                                        ▶
+  07       return
+  08       return
   09   !   ","                              08
   10  ──!  _                                09, 10
   12  └─!  _                                09, 10

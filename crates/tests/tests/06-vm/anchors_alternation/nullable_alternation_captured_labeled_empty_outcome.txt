@@ -75,64 +75,64 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
   03  └─!  _                                14, 34
-  05                                        ▶
+  05       return
   06  ─‣┘³ _                                05
   07  ...
-  08  ─‣─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
-  11  ─•─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
+  08  ─‣─  (identifier == "b")              06          [RecordSet(M4 choice) Node RecordSet(M5 b)]
+  11  ─•─  (identifier == "b")              06          [RecordSet(M4 choice) Node RecordSet(M5 b)]
   14   !   "["                              32, 26
-  16  ─◦─  (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
-  19   !   (identifier) [Node RecordSet(M0) VariantClose] == "a"  11
+  16  ─◦─  (identifier == "b")              06          [RecordSet(M4 choice) Node RecordSet(M5 b)]
+  19   !   (identifier == "a")              11          [Node RecordSet(M0 a) VariantClose]
   22  ──!  _                                19, 22
-  24   !   _ [VariantOpen(M2)]              19, 22
-  26  -ε-  [VariantOpen(M2) Absent RecordSet(M0) VariantClose]  16
-  29   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose] == "x"  08
+  24   !   _                                19, 22      [VariantOpen(M2 Left)]
+  26  -ε-                                   16          [VariantOpen(M2 Left) Absent RecordSet(M0 a) VariantClose]
+  29   !   (identifier == "x")              08          [VariantOpen(M3 X) Node RecordSet(M1 x) VariantClose]
   32  ──!  _                                24, 29, 32
   34  ──!  _                                14, 34
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                14, 34
+  03  └─!  _                                14, 34
        ●   [
-  14       "["                              32, 26
+  14   !   "["                              32, 26
        ●   [
-  32       _                                24, 29, 32
+  32  ──!  _                                24, 29, 32
        ●   identifier
-  24       _ [VariantOpen(M2)]              19, 22
+  24   !   _                                19, 22      [VariantOpen(M2 Left)]
        ●   identifier
-  19       (identifier) [Node RecordSet(M0) VariantClose] == "a"  11
-  24  ❮❮❮ 
-  22       _                                19, 22
+  19   !   (identifier == "a")              11          [Node RecordSet(M0 a) VariantClose]
+  24  ❮❮❮
+  22  ──!  _                                19, 22
        ●   ]
-  19       (identifier) [Node RecordSet(M0) VariantClose] == "a"  11
+  19   !   (identifier == "a")              11          [Node RecordSet(M0 a) VariantClose]
        ○   ]
-  22  ❮❮❮ 
-  22       _                                19, 22
-  32  ❮❮❮ 
-  29       (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose] == "x"  08
-  32  ❮❮❮ 
-  32       _                                24, 29, 32
+  22  ❮❮❮
+  22  ──!  _                                19, 22
+  32  ❮❮❮
+  29   !   (identifier == "x")              08          [VariantOpen(M3 X) Node RecordSet(M1 x) VariantClose]
+  32  ❮❮❮
+  32  ──!  _                                24, 29, 32
        ●   ]
-  24       _ [VariantOpen(M2)]              19, 22
+  24   !   _                                19, 22      [VariantOpen(M2 Left)]
        ●   ]
-  19       (identifier) [Node RecordSet(M0) VariantClose] == "a"  11
+  19   !   (identifier == "a")              11          [Node RecordSet(M0 a) VariantClose]
        ○   ]
-  24  ❮❮❮ 
-  22       _                                19, 22
-  32  ❮❮❮ 
-  29       (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose] == "x"  08
+  24  ❮❮❮
+  22  ──!  _                                19, 22
+  32  ❮❮❮
+  29   !   (identifier == "x")              08          [VariantOpen(M3 X) Node RecordSet(M1 x) VariantClose]
        ○   ]
-  32  ❮❮❮ 
-  32       _                                24, 29, 32
-  14  ❮❮❮ 
-  26  -ε-  [VariantOpen(M2) Absent RecordSet(M0) VariantClose]  16
-  16       (identifier) [RecordSet(M4) Node RecordSet(M5)] == "b"  06
+  32  ❮❮❮
+  32  ──!  _                                24, 29, 32
+  14  ❮❮❮
+  26  -ε-                                   16          [VariantOpen(M2 Left) Absent RecordSet(M0 a) VariantClose]
+  16  ─◦─  (identifier == "b")              06          [RecordSet(M4 choice) Node RecordSet(M5 b)]
        ●   identifier
-  06       _                                05
+  06  ─‣┘³ _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

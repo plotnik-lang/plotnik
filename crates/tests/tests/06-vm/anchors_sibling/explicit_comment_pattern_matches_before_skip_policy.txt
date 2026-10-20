@@ -49,22 +49,22 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                08, 10
-  03  ─•─  (function_declaration) [Node RecordSet(M1)]  05
+  03  ─•─  (function_declaration)           05          [Node RecordSet(M1 fn)]
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08   !   (comment) [Node RecordSet(M0)]   03
+  08   !   (comment)                        03          [Node RecordSet(M0 doc)]
   10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                08, 10
+  01  └─!  _                                08, 10
        ●   comment
-  08       (comment) [Node RecordSet(M0)]   03
+  08   !   (comment)                        03          [Node RecordSet(M0 doc)]
        ●   comment
-  03       (function_declaration) [Node RecordSet(M1)]  05
+  03  ─•─  (function_declaration)           05          [Node RecordSet(M1 fn)]
        ●   function_declaration
-  05       _                                06
+  05  ─‣┘  _                                06
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

@@ -39,20 +39,20 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        14, 08
-  02                                        ▶
+  02       return
   03   !   (expression_statement)           16
   04  ──!  _                                03, 04
-  06   !   _ [Absent RecordSet(M0)]         03, 04
-  08  -ε-  [Absent RecordSet(M0)]           02
-  10   !   (debugger_statement) [Node RecordSet(M0)]  16
+  06   !   _                                03, 04      [Absent RecordSet(M0 d)]
+  08  -ε-                                   02          [Absent RecordSet(M0 d)]
+  10   !   (debugger_statement)             16          [Node RecordSet(M0 d)]
   12  ──!  _                                06, 10, 12
   14  └─!  _                                06, 10, 12
   16  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        14, 08
+  00   !   (program)                        14, 08
        ●   program
-  14       _                                06, 10, 12
-  00  ❮❮❮ 
-  08  -ε-  [Absent RecordSet(M0)]           02
-  02   ◀   (Q)                              ◼
+  14  └─!  _                                06, 10, 12
+  00  ❮❮❮
+  08  -ε-                                   02          [Absent RecordSet(M0 d)]
+  02   ◀   return                           ◼

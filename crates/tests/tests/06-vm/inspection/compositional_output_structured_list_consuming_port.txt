@@ -268,107 +268,107 @@ N1: S06 → T4  ; Q
 Q = 00 :: T4
 
 [spans]
-P00 def        0..199  source_id=0  T4
-P01 pattern    4..199  source_id=0
-P02 pattern    15..197  source_id=0
-P03 pattern    41..193  source_id=0
-P04 pattern    54..57  source_id=0
-P05 capture    149..158  source_id=0  T4.M2
-P06 quantifier 147..148  source_id=0
-P07 sequence   64..147  source_id=0
-P08 capture    95..97  source_id=0  T2.M0
-P09 quantifier 93..94  source_id=0
-P10 pattern    74..93  source_id=0
-P11 capture    137..139  source_id=0  T2.M1
-P12 quantifier 135..136  source_id=0
-P13 pattern    116..135  source_id=0
-P14 capture    185..187  source_id=0  T4.M3
-P15 pattern    165..184  source_id=0
+P00 def        0..199 src=0  T4
+P01 pattern    4..199 src=0
+P02 pattern    15..197 src=0
+P03 pattern    41..193 src=0
+P04 pattern    54..57 src=0
+P05 capture    149..158 src=0  T4.M2
+P06 quantifier 147..148 src=0
+P07 sequence   64..147 src=0
+P08 capture    95..97 src=0  T2.M0
+P09 quantifier 93..94 src=0
+P10 pattern    74..93 src=0
+P11 capture    137..139 src=0  T2.M1
+P12 quantifier 135..136 src=0
+P13 pattern    116..135 src=0
+P14 capture    185..187 src=0  T4.M3
+P15 pattern    165..184 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStartAt#2]  04
-  04  └‣─  (array) [SpanStartAt#3]          06
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
+  04  └‣─  (array)                          06          [SpanStartAt(P3)]
   06  └─!  _                                54, 76
   08  ─‣┘  _                                09
-  09  ─‣┘  _ [SpanEnd#3]                    11
-  11  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
-  13                                        ▶
+  09  ─‣┘  _                                11          [SpanEnd(P3)]
+  11  ─‣┘  _                                13          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  13       return
   14  ...
   15  ...
-  16  ─‣─  (identifier) [SpanEnd#6 ListClose SpanStart#5 RecordSet(M2) SpanEnd#5 SpanStartAt#15 SpanStart#14 Node RecordSet(M3) SpanEnd#14 SpanEnd#15] == "b"  08
+  16  ─‣─  (identifier == "b")              08          [SpanEnd(P6) ListClose SpanStart(P5) RecordSet(M2 prefixes) SpanEnd(P5) SpanStartAt(P15) SpanStart(P14) Node RecordSet(M3 b) SpanEnd(P14) SpanEnd(P15)]
   22  ──!  _                                70, 22
-  24  ─•─  (identifier) [SpanEnd#6 ListClose SpanStart#5 RecordSet(M2) SpanEnd#5 SpanStartAt#15 SpanStart#14 Node RecordSet(M3) SpanEnd#14 SpanEnd#15] == "b"  08
-  30  -ε-  [RecordClose ArrayPush]          22, 16
-  32  -ε-  [RecordClose ArrayPush]          45, 24
-  34   !   (identifier) [SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
+  24  ─•─  (identifier == "b")              08          [SpanEnd(P6) ListClose SpanStart(P5) RecordSet(M2 prefixes) SpanEnd(P5) SpanStartAt(P15) SpanStart(P14) Node RecordSet(M3 b) SpanEnd(P14) SpanEnd(P15)]
+  30  -ε-                                   22, 16      [RecordClose ArrayPush]
+  32  -ε-                                   45, 24      [RecordClose ArrayPush]
+  34   !   (identifier == "x")              30          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12)]
   38  ──!  _                                34, 38
-  40   !   _ [SpanStart#12]                 34, 38
-  42  -ε-  [SpanStart#11 Absent RecordSet(M1) SpanEnd#11 SpanEnd#12]  32
-  45  -ε-  [RecordOpen]                     88
+  40   !   _                                34, 38      [SpanStart(P12)]
+  42  -ε-                                   32          [SpanStart(P11) Absent RecordSet(M1 x) SpanEnd(P11) SpanEnd(P12)]
+  45  -ε-                                   88          [RecordOpen]
   47  ...
-  48  ─•─  (identifier) [SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
-  52  -ε-  [SpanStart#12]                   48, 42
-  54   !   "[" [SpanStartAt#4 SpanEnd#4]    90
-  56  -ε-  [SpanStart#8 Absent RecordSet(M0) SpanEnd#8 SpanEnd#9]  40
-  59   !   (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
+  48  ─•─  (identifier == "x")              30          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12)]
+  52  -ε-                                   48, 42      [SpanStart(P12)]
+  54   !   "["                              90          [SpanStartAt(P4) SpanEnd(P4)]
+  56  -ε-                                   40          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
+  59   !   (identifier == "a")              52          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
   63  ...
   64  ──!  _                                59, 64
   66   !   _                                59, 64
-  68  -ε-  [SpanStart#9]                    66, 56
-  70  -ε-  [RecordOpen]                     68
-  72  ─•─  (identifier) [SpanStart#12 SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
+  68  -ε-                                   66, 56      [SpanStart(P9)]
+  70  -ε-                                   68          [RecordOpen]
+  72  ─•─  (identifier == "x")              30          [SpanStart(P12) SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12)]
   76  ──!  _                                54, 76
   78  ...
   79  ...
-  80  -ε-  [SpanStart#8 Absent RecordSet(M0) SpanEnd#8 SpanEnd#9]  72
-  83  ─•─  (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
+  80  -ε-                                   72          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
+  83  ─•─  (identifier == "a")              52          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
   87  ...
-  88  -ε-  [SpanStart#9]                    83, 80
-  90  ──!  _ [ListOpen SpanStart#6]         70, 22
+  88  -ε-                                   83, 80      [SpanStart(P9)]
+  90  ──!  _                                70, 22      [ListOpen SpanStart(P6)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
        ●   program
-  02       (expression_statement) [SpanStartAt#2]  04
+  02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
        ●   expression_statement
-  04       (array) [SpanStartAt#3]          06
+  04  └‣─  (array)                          06          [SpanStartAt(P3)]
        ●   array
-  06       _                                54, 76
+  06  └─!  _                                54, 76
        ●   [
-  54       "[" [SpanStartAt#4 SpanEnd#4]    90
+  54   !   "["                              90          [SpanStartAt(P4) SpanEnd(P4)]
        ●   [
-  90       _ [ListOpen SpanStart#6]         70, 22
+  90  ──!  _                                70, 22      [ListOpen SpanStart(P6)]
        ●   identifier
-  70  -ε-  [RecordOpen]                     68
-  68  -ε-  [SpanStart#9]                    66, 56
-  66       _                                59, 64
+  70  -ε-                                   68          [RecordOpen]
+  68  -ε-                                   66, 56      [SpanStart(P9)]
+  66   !   _                                59, 64
        ●   identifier
-  59       (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
+  59   !   (identifier == "a")              52          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
        ●   identifier
-  52  -ε-  [SpanStart#12]                   48, 42
-  48       (identifier) [SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
+  52  -ε-                                   48, 42      [SpanStart(P12)]
+  48  ─•─  (identifier == "x")              30          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12)]
        ○   ,
-  52  ❮❮❮ 
-  42  -ε-  [SpanStart#11 Absent RecordSet(M1) SpanEnd#11 SpanEnd#12]  32
-  32  -ε-  [RecordClose ArrayPush]          45, 24
-  45  -ε-  [RecordOpen]                     88
-  88  -ε-  [SpanStart#9]                    83, 80
-  83       (identifier) [SpanStartAt#10 SpanStart#8 Node RecordSet(M0) SpanEnd#8 SpanEnd#10 SpanEnd#9] == "a"  52
+  52  ❮❮❮
+  42  -ε-                                   32          [SpanStart(P11) Absent RecordSet(M1 x) SpanEnd(P11) SpanEnd(P12)]
+  32  -ε-                                   45, 24      [RecordClose ArrayPush]
+  45  -ε-                                   88          [RecordOpen]
+  88  -ε-                                   83, 80      [SpanStart(P9)]
+  83  ─•─  (identifier == "a")              52          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
        ○   ,
-  88  ❮❮❮ 
-  80  -ε-  [SpanStart#8 Absent RecordSet(M0) SpanEnd#8 SpanEnd#9]  72
-  72       (identifier) [SpanStart#12 SpanStartAt#13 SpanStart#11 Node RecordSet(M1) SpanEnd#11 SpanEnd#13 SpanEnd#12] == "x"  30
+  88  ❮❮❮
+  80  -ε-                                   72          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
+  72  ─•─  (identifier == "x")              30          [SpanStart(P12) SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12)]
        ○   ,
-  32  ❮❮❮ 
-  24       (identifier) [SpanEnd#6 ListClose SpanStart#5 RecordSet(M2) SpanEnd#5 SpanStartAt#15 SpanStart#14 Node RecordSet(M3) SpanEnd#14 SpanEnd#15] == "b"  08
+  32  ❮❮❮
+  24  ─•─  (identifier == "b")              08          [SpanEnd(P6) ListClose SpanStart(P5) RecordSet(M2 prefixes) SpanEnd(P5) SpanStartAt(P15) SpanStart(P14) Node RecordSet(M3 b) SpanEnd(P14) SpanEnd(P15)]
        ○   ,
        ●   identifier
-  08       _                                09
+  08  ─‣┘  _                                09
        ●   array
-  09       _ [SpanEnd#3]                    11
+  09  ─‣┘  _                                11          [SpanEnd(P3)]
        ●   expression_statement
-  11       _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
+  11  ─‣┘  _                                13          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
        ●   program
-  13   ◀   (Q)                              ◼
+  13   ◀   return                           ◼

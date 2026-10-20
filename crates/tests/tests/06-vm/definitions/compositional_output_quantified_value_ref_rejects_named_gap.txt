@@ -62,401 +62,401 @@ Q:
   001  └‣─  (expression_statement)          002
   002  └‣─  (array)                         003
   003  └─!  _                               103, 006
-  005                                       ▶
+  005       return
   006  ──!  _                               103, 006
-  008  ─‣─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  095
-  011  ─•─  (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  095
-  014                                       ▶
-  015                                       ▶ p1
-  016  -ε-  [ListClose]                     014
-  018  -ε-  [ListClose]                     015
-  020  -ε-  [RecordClose ArrayPush]         053, 016
-  022  -ε-  [RecordClose ArrayPush]         046, 018
-  024                                       ▶
-  025                                       ▶ p1
-  026   !   (identifier) [Node RecordSet(M1)] == "x"  024
+  008  ─‣─  (identifier == "b")             095         [RecordSet(M2 items) Node RecordSet(M3 b)]
+  011  ─•─  (identifier == "b")             095         [RecordSet(M2 items) Node RecordSet(M3 b)]
+  014       return
+  015       return p1
+  016  -ε-                                  014         [ListClose]
+  018  -ε-                                  015         [ListClose]
+  020  -ε-                                  053, 016    [RecordClose ArrayPush]
+  022  -ε-                                  046, 018    [RecordClose ArrayPush]
+  024       return
+  025       return p1
+  026   !   (identifier == "x")             024         [Node RecordSet(M1 x)]
   028  ──!  _                               026, 028
-  030   !   _ [Absent RecordSet(M0)]        026, 028
-  032  -ε-  [Absent RecordSet(M1)]          025
-  034  ─•─  (identifier) [Node RecordSet(M1)] == "x"  024
-  036   !   (identifier) [Node RecordSet(M0)] == "a"  034, 032
+  030   !   _                               026, 028    [Absent RecordSet(M0 a)]
+  032  -ε-                                  025         [Absent RecordSet(M1 x)]
+  034  ─•─  (identifier == "x")             024         [Node RecordSet(M1 x)]
+  036   !   (identifier == "a")             034, 032    [Node RecordSet(M0 a)]
   039  ...
   040  ──!  _                               036, 040
   042   !   _                               036, 040
   044  -ε-                                  042, 030
-  046  -ε-  [RecordOpen]                    069
+  046  -ε-                                  069         [RecordOpen]
   048       (@044)                          044 : 020 / 022
-  051  -ε-  [RecordOpen]                    048
+  051  -ε-                                  048         [RecordOpen]
   053  ──!  _                               051, 053
-  055                                       ▶
-  056                                       ▶ p1
-  057  -ε-  [Absent RecordSet(M1)]          056
-  059  ─•─  (identifier) [Node RecordSet(M1)] == "x"  055
-  061  ─•─  (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  055
-  064  ─•─  (identifier) [Node RecordSet(M0)] == "a"  059, 057
+  055       return
+  056       return p1
+  057  -ε-                                  056         [Absent RecordSet(M1 x)]
+  059  ─•─  (identifier == "x")             055         [Node RecordSet(M1 x)]
+  061  ─•─  (identifier == "x")             055         [Absent RecordSet(M0 a) Node RecordSet(M1 x)]
+  064  ─•─  (identifier == "a")             059, 057    [Node RecordSet(M0 a)]
   067  -ε-                                  064, 061
   069       (@067)                          067 : 020 / 022
-  072                                       ▶
-  073                                       ▶ p1
-  074  -ε-  [Absent RecordSet(M1)]          073
-  076  ─•─  (identifier) [Node RecordSet(M1)] == "x"  072
+  072       return
+  073       return p1
+  074  -ε-                                  073         [Absent RecordSet(M1 x)]
+  076  ─•─  (identifier == "x")             072         [Node RecordSet(M1 x)]
   078  ...
   079  ...
-  080   !   (identifier) [Node RecordSet(M1)] == "x"  072
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
   082  ──!  _                               080, 082
-  084   !   _ [Absent RecordSet(M0)]        080, 082
+  084   !   _                               080, 082    [Absent RecordSet(M0 a)]
   086  ...
   087  ...
-  088   !   (identifier) [Node RecordSet(M0)] == "a"  076, 074
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
   091  ──!  _                               088, 091
   093   !   _                               088, 091
   095  ─‣┘³ _                               005
   096  -ε-                                  093, 084
   098       (@096)                          096 : 020 / 022
-  101  -ε-  [RecordOpen]                    098
+  101  -ε-                                  098         [RecordOpen]
   103   !   "["                             108
   104  ──!  _                               101, 104
-  106  ──!  _ [ListOpen]                    101, 104
+  106  ──!  _                               101, 104    [ListOpen]
   108       (@106)                          106 : 008 / 011
 --------------------- TRACE ----------------------
 Q:
-  000       (program)                       01
+  000   !   (program)                       001
         ●   program
-  001       (expression_statement)          02
+  001  └‣─  (expression_statement)          002
         ●   expression_statement
-  002       (array)                         03
+  002  └‣─  (array)                         003
         ●   array
-  003       _                               103, 06
+  003  └─!  _                               103, 006
         ●   [
-  103       "["                             108
+  103   !   "["                             108
         ●   [
-  108       (@106)                          106 : 08 / 11
+  108       (@106)                          106 : 008 / 011
         ▶   (@106)
 
 @106:
-  106       _ [ListOpen]                    101, 104
+  106  ──!  _                               101, 104    [ListOpen]
         ●   identifier
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
+  101  -ε-                                  098         [RecordOpen]
+  098       (@096)                          096 : 020 / 022
         ▶   (@096)
 
 @096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
+  096  -ε-                                  093, 084
+  093   !   _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ●   identifier
-  076       (identifier) [Node RecordSet(M1)] == "x"  72
+  076  ─•─  (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ,
-  088  ❮❮❮ 
-  074  -ε-  [Absent RecordSet(M1)]          73
-  073   ◀   (@096)                          p1
+  088  ❮❮❮
+  074  -ε-                                  073         [Absent RecordSet(M1 x)]
+  073   ◀   return p1                       022
 
 @106:
-  022  -ε-  [RecordClose ArrayPush]         46, 18
-  046  -ε-  [RecordOpen]                    69
-  069       (@067)                          67 : 20 / 22
+  022  -ε-                                  046, 018    [RecordClose ArrayPush]
+  046  -ε-                                  069         [RecordOpen]
+  069       (@067)                          067 : 020 / 022
         ▶   (@067)
 
 @067:
-  067  -ε-                                  64, 61
-  064       (identifier) [Node RecordSet(M0)] == "a"  59, 57
+  067  -ε-                                  064, 061
+  064  ─•─  (identifier == "a")             059, 057    [Node RecordSet(M0 a)]
         ○   ,
-  067  ❮❮❮ 
-  061       (identifier) [Absent RecordSet(M0) Node RecordSet(M1)] == "x"  55
+  067  ❮❮❮
+  061  ─•─  (identifier == "x")             055         [Absent RecordSet(M0 a) Node RecordSet(M1 x)]
         ○   ,
-  022  ❮❮❮ 
-  018  -ε-  [ListClose]                     15
-  015   ◀   (@106)                          p1
+  022  ❮❮❮
+  018  -ε-                                  015         [ListClose]
+  015   ◀   return p1                       011
 
 Q:
-  011       (identifier) [RecordSet(M2) Node RecordSet(M3)] == "b"  95
+  011  ─•─  (identifier == "b")             095         [RecordSet(M2 items) Node RecordSet(M3 b)]
         ○   ,
-  093  ❮❮❮ 
-  091       _                               88, 91
+  093  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
+  091  ❮❮❮
+  091  ──!  _                               088, 091
+  096  ❮❮❮
+  084   !   _                               080, 082    [Absent RecordSet(M0 a)]
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  084  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  084  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  106  ❮❮❮ 
-  104       _                               101, 104
+  082  ❮❮❮
+  082  ──!  _                               080, 082
+  106  ❮❮❮
+  104  ──!  _                               101, 104
         ●   ,
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
+  101  -ε-                                  098         [RecordOpen]
+  098       (@096)                          096 : 020 / 022
         ▶   (@096)
 
 @096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
+  096  -ε-                                  093, 084
+  093   !   _                               088, 091
         ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ,
-  093  ❮❮❮ 
-  091       _                               88, 91
+  093  ❮❮❮
+  091  ──!  _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
+  091  ❮❮❮
+  091  ──!  _                               088, 091
+  096  ❮❮❮
+  084   !   _                               080, 082    [Absent RecordSet(M0 a)]
         ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ,
-  084  ❮❮❮ 
-  082       _                               80, 82
+  084  ❮❮❮
+  082  ──!  _                               080, 082
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
+  082  ❮❮❮
+  082  ──!  _                               080, 082
+  104  ❮❮❮
+  104  ──!  _                               101, 104
         ●   identifier
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
+  101  -ε-                                  098         [RecordOpen]
+  098       (@096)                          096 : 020 / 022
         ▶   (@096)
 
 @096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
+  096  -ε-                                  093, 084
+  093   !   _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  093  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  093  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ,
-  091  ❮❮❮ 
-  091       _                               88, 91
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
+  091  ❮❮❮
+  091  ──!  _                               088, 091
+  096  ❮❮❮
+  084   !   _                               080, 082    [Absent RecordSet(M0 a)]
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  084  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  084  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ,
-  082  ❮❮❮ 
-  082       _                               80, 82
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
+  082  ❮❮❮
+  082  ──!  _                               080, 082
+  104  ❮❮❮
+  104  ──!  _                               101, 104
         ●   ,
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
+  101  -ε-                                  098         [RecordOpen]
+  098       (@096)                          096 : 020 / 022
         ▶   (@096)
 
 @096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
+  096  -ε-                                  093, 084
+  093   !   _                               088, 091
         ●   ,
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ,
-  093  ❮❮❮ 
-  091       _                               88, 91
+  093  ❮❮❮
+  091  ──!  _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  091  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  091  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
+  091  ❮❮❮
+  091  ──!  _                               088, 091
+  096  ❮❮❮
+  084   !   _                               080, 082    [Absent RecordSet(M0 a)]
         ●   ,
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ,
-  084  ❮❮❮ 
-  082       _                               80, 82
+  084  ❮❮❮
+  082  ──!  _                               080, 082
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  082  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  082  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
+  082  ❮❮❮
+  082  ──!  _                               080, 082
+  104  ❮❮❮
+  104  ──!  _                               101, 104
         ●   identifier
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
+  101  -ε-                                  098         [RecordOpen]
+  098       (@096)                          096 : 020 / 022
         ▶   (@096)
 
 @096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
+  096  -ε-                                  093, 084
+  093   !   _                               088, 091
         ●   identifier
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
-  093  ❮❮❮ 
-  091       _                               88, 91
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
+  093  ❮❮❮
+  091  ──!  _                               088, 091
         ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ]
-  091  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
+  091  ❮❮❮
+  091  ──!  _                               088, 091
+  096  ❮❮❮
+  084   !   _                               080, 082    [Absent RecordSet(M0 a)]
         ●   identifier
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
-  084  ❮❮❮ 
-  082       _                               80, 82
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
+  084  ❮❮❮
+  082  ──!  _                               080, 082
         ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ]
-  082  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
+  082  ❮❮❮
+  082  ──!  _                               080, 082
+  104  ❮❮❮
+  104  ──!  _                               101, 104
         ●   ]
-  101  -ε-  [RecordOpen]                    98
-  098       (@096)                          96 : 20 / 22
+  101  -ε-                                  098         [RecordOpen]
+  098       (@096)                          096 : 020 / 022
         ▶   (@096)
 
 @096:
-  096  -ε-                                  93, 84
-  093       _                               88, 91
+  096  -ε-                                  093, 084
+  093   !   _                               088, 091
         ●   ]
-  088       (identifier) [Node RecordSet(M0)] == "a"  76, 74
+  088   !   (identifier == "a")             076, 074    [Node RecordSet(M0 a)]
         ○   ]
-  093  ❮❮❮ 
-  091       _                               88, 91
-  096  ❮❮❮ 
-  084       _ [Absent RecordSet(M0)]        80, 82
+  093  ❮❮❮
+  091  ──!  _                               088, 091
+  096  ❮❮❮
+  084   !   _                               080, 082    [Absent RecordSet(M0 a)]
         ●   ]
-  080       (identifier) [Node RecordSet(M1)] == "x"  72
+  080   !   (identifier == "x")             072         [Node RecordSet(M1 x)]
         ○   ]
-  084  ❮❮❮ 
-  082       _                               80, 82
-  104  ❮❮❮ 
-  104       _                               101, 104
-  003  ❮❮❮ 
-  006       _                               103, 06
+  084  ❮❮❮
+  082  ──!  _                               080, 082
+  104  ❮❮❮
+  104  ──!  _                               101, 104
+  003  ❮❮❮
+  006  ──!  _                               103, 006
         ●   identifier
-  103       "["                             108
+  103   !   "["                             108
         ○   identifier
-  006  ❮❮❮ 
-  006       _                               103, 06
+  006  ❮❮❮
+  006  ──!  _                               103, 006
         ●   ,
-  103       "["                             108
+  103   !   "["                             108
         ○   ,
-  006  ❮❮❮ 
-  006       _                               103, 06
+  006  ❮❮❮
+  006  ──!  _                               103, 006
         ●   identifier
-  103       "["                             108
+  103   !   "["                             108
         ○   identifier
-  006  ❮❮❮ 
-  006       _                               103, 06
+  006  ❮❮❮
+  006  ──!  _                               103, 006
         ●   ,
-  103       "["                             108
+  103   !   "["                             108
         ○   ,
-  006  ❮❮❮ 
-  006       _                               103, 06
+  006  ❮❮❮
+  006  ──!  _                               103, 006
         ●   identifier
-  103       "["                             108
+  103   !   "["                             108
         ○   identifier
-  006  ❮❮❮ 
-  006       _                               103, 06
+  006  ❮❮❮
+  006  ──!  _                               103, 006
         ●   ]
-  103       "["                             108
+  103   !   "["                             108
         ○   ]
-  006  ❮❮❮ 
-  006       _                               103, 06
-  002  ❮❮❮ 
-  001  ❮❮❮ 
+  006  ❮❮❮
+  006  ──!  _                               103, 006
+  002  ❮❮❮
+  001  ❮❮❮

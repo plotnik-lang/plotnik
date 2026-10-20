@@ -106,41 +106,41 @@ N0: S2 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P0 def        0..61  source_id=0  T2
-P1 pattern    4..61  source_id=0
-P2 capture    45..51  source_id=0  T2.M0
-P3 capture_type 52..59  source_id=0  T0
-P4 sequence   15..44  source_id=0
-P5 capture    32..40  source_id=0
-P6 quantifier 30..31  source_id=0
-P7 pattern    21..30  source_id=0
+P0 def          0..61 src=0  T2
+P1 pattern      4..61 src=0
+P2 capture      45..51 src=0  T2.M0
+P3 capture_type 52..59 src=0  T0
+P4 sequence     15..44 src=0
+P5 capture      32..40 src=0
+P6 quantifier   30..31 src=0
+P7 pattern      21..30 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  02
-  02  -ε-  [ScalarOpen SpanStart#4]         04
-  04  -ε-  [SpanStart#6]                    21, 14
-  06  -ε-  [TextClose RecordSet(M0) SpanEnd#2]  08
-  08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
-  10                                        ▶
-  11  -ε-  [TextClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
-  16   !   (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1) SpanStart(P2)]
+  02  -ε-                                   04          [ScalarOpen SpanStart(P4)]
+  04  -ε-                                   21, 14      [SpanStart(P6)]
+  06  -ε-                                   08          [TextClose RecordSet(M0 value) SpanEnd(P2)]
+  08  ─‣┘  _                                10          [SpanEnd(P1) SpanEnd(P0)]
+  10       return
+  11  -ε-                                   10          [TextClose RecordSet(M0 value) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  14  -ε-                                   11          [SpanEnd(P6) SpanEnd(P4)]
+  16   !   (comment)                        06          [SpanStartAt(P7) ScalarMark SpanEnd(P7) SpanEnd(P6) SpanEnd(P4)]
   19  ──!  _                                16, 19
   21  └─!  _                                16, 19
 --------------------- TRACE ----------------------
 Q:
-  00       (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  02
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1) SpanStart(P2)]
        ●   program
-  02  -ε-  [ScalarOpen SpanStart#4]         04
-  04  -ε-  [SpanStart#6]                    21, 14
-  21       _                                16, 19
+  02  -ε-                                   04          [ScalarOpen SpanStart(P4)]
+  04  -ε-                                   21, 14      [SpanStart(P6)]
+  21  └─!  _                                16, 19
        ●   expression_statement
-  16       (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
+  16   !   (comment)                        06          [SpanStartAt(P7) ScalarMark SpanEnd(P7) SpanEnd(P6) SpanEnd(P4)]
        ○   expression_statement
-  21  ❮❮❮ 
-  19       _                                16, 19
-  04  ❮❮❮ 
-  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
-  11  -ε-  [TextClose RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  10   ◀   (Q)                              ◼
+  21  ❮❮❮
+  19  ──!  _                                16, 19
+  04  ❮❮❮
+  14  -ε-                                   11          [SpanEnd(P6) SpanEnd(P4)]
+  11  -ε-                                   10          [TextClose RecordSet(M0 value) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  10   ◀   return                           ◼

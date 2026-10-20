@@ -2,7 +2,7 @@ use serde::Serialize;
 use tree_sitter::Node;
 
 use crate::bytecode::{CodeAddr, EffectKind, Instruction, Module, ModuleRenderContext, Nav};
-use crate::core::NodeFieldId;
+use crate::core::{Colors, NodeFieldId};
 
 use super::trace::Tracer;
 use plotnik_runtime::JournalEvent;
@@ -73,7 +73,7 @@ pub struct TraceRecorder {
 impl TraceRecorder {
     pub fn new(module: &Module, max_records: usize) -> Self {
         Self {
-            render: ModuleRenderContext::new(module),
+            render: ModuleRenderContext::new(module, Colors::OFF),
             records: Vec::new(),
             span_stack: Vec::new(),
             shadow: Vec::new(),
@@ -130,77 +130,6 @@ impl TraceRecorder {
             .expect("match journal length fits in u32");
     }
 
-    fn member_name(&self, idx: u16) -> &str {
-        self.render
-            .member_name(idx)
-            .expect("effect member index names a type member")
-    }
-
-    fn format_journal_event(&self, event: &JournalEvent<'_>) -> String {
-        match event {
-            JournalEvent::Node(_) => "Node".to_string(),
-            JournalEvent::ListOpen => "ListOpen".to_string(),
-            JournalEvent::ArrayPush => "ArrayPush".to_string(),
-            JournalEvent::ListClose => "ListClose".to_string(),
-            JournalEvent::RecordOpen => "RecordOpen".to_string(),
-            JournalEvent::RecordClose => "RecordClose".to_string(),
-            JournalEvent::RecordSet(idx) => {
-                format!("RecordSet \"{}\"", self.member_name(*idx))
-            }
-            JournalEvent::VariantOpen(idx) => {
-                format!("VariantOpen \"{}\"", self.member_name(*idx))
-            }
-            JournalEvent::VariantClose => "VariantClose".to_string(),
-            JournalEvent::Absent => "Absent".to_string(),
-            JournalEvent::ScalarOpen => "ScalarOpen".to_string(),
-            JournalEvent::ScalarMark(_) => "ScalarMark".to_string(),
-            JournalEvent::TextClose => "TextClose".to_string(),
-            JournalEvent::BoolClose(value) => format!("BoolClose({value})"),
-            JournalEvent::NodeText(_) => "NodeText".to_string(),
-            JournalEvent::NodeBool(_) => "NodeBool".to_string(),
-            JournalEvent::BoolValue(value) => format!("BoolValue({value})"),
-            JournalEvent::SpanStart { id, node } => {
-                if node.is_some() {
-                    format!("SpanStartAt#{id}")
-                } else {
-                    format!("SpanStart#{id}")
-                }
-            }
-            JournalEvent::SpanEnd(id) => format!("SpanEnd#{id}"),
-        }
-    }
-
-    fn format_opcode(&self, opcode: EffectKind, payload: usize) -> String {
-        match opcode {
-            EffectKind::Node => "Node".to_string(),
-            EffectKind::ListOpen => "ListOpen".to_string(),
-            EffectKind::ArrayPush => "ArrayPush".to_string(),
-            EffectKind::ListClose => "ListClose".to_string(),
-            EffectKind::RecordOpen => "RecordOpen".to_string(),
-            EffectKind::RecordClose => "RecordClose".to_string(),
-            EffectKind::RecordSet => {
-                format!("RecordSet \"{}\"", self.member_name(payload as u16))
-            }
-            EffectKind::VariantOpen => {
-                format!("VariantOpen \"{}\"", self.member_name(payload as u16))
-            }
-            EffectKind::VariantClose => "VariantClose".to_string(),
-            EffectKind::Absent => "Absent".to_string(),
-            EffectKind::SuppressBegin => "SuppressBegin".to_string(),
-            EffectKind::SuppressEnd => "SuppressEnd".to_string(),
-            EffectKind::SpanStartAt => format!("SpanStartAt#{payload}"),
-            EffectKind::SpanStart => format!("SpanStart#{payload}"),
-            EffectKind::SpanEnd => format!("SpanEnd#{payload}"),
-            EffectKind::ScalarOpen => "ScalarOpen".to_string(),
-            EffectKind::ScalarMark => "ScalarMark".to_string(),
-            EffectKind::TextClose => "TextClose".to_string(),
-            EffectKind::BoolClose => format!("BoolClose({})", payload != 0),
-            EffectKind::NodeText => "NodeText".to_string(),
-            EffectKind::NodeBool => "NodeBool".to_string(),
-            EffectKind::BoolValue => format!("BoolValue({})", payload != 0),
-        }
-    }
-
     fn event_node(event: &JournalEvent<'_>) -> Option<TraceNode> {
         match event {
             JournalEvent::Node(node) => Some(trace_node(*node)),
@@ -254,7 +183,7 @@ impl Tracer for TraceRecorder {
 
     fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
         let event_name = if self.keeps_records() {
-            self.format_journal_event(event)
+            self.render.format_journal_event(event)
         } else {
             String::new()
         };
@@ -282,7 +211,7 @@ impl Tracer for TraceRecorder {
 
     fn trace_effect_suppressed(&mut self, opcode: EffectKind, payload: usize) {
         let effect = if self.keeps_records() {
-            self.format_opcode(opcode, payload)
+            self.render.format_effect(opcode, payload)
         } else {
             String::new()
         };
@@ -291,7 +220,7 @@ impl Tracer for TraceRecorder {
 
     fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool) {
         let effect = if self.keeps_records() {
-            self.format_opcode(opcode, 0)
+            self.render.format_effect(opcode, 0)
         } else {
             String::new()
         };
@@ -312,7 +241,7 @@ impl Tracer for TraceRecorder {
         );
     }
 
-    fn trace_return(&mut self, _port: plotnik_runtime::PortId) {
+    fn trace_return(&mut self, _port: plotnik_runtime::PortId, _target: Option<CodeAddr>) {
         self.add_record(TraceEvent::Return, None);
     }
 

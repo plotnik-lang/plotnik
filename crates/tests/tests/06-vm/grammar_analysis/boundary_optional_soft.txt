@@ -46,25 +46,25 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          07, 05
-  04                                        ▶
-  05  └•─  (identifier) [Node RecordSet(M0)]  10
+  04       return
+  05  └•─  (identifier)                     10          [Node RecordSet(M0 id)]
   07  └◦─  ";"                              08
-  08  ─‣─  (identifier) [Node RecordSet(M0)]  10
+  08  ─‣─  (identifier)                     10          [Node RecordSet(M0 id)]
   10  ─‣┘³ _                                04
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          07, 05
+  02  └‣─  (array)                          07, 05
        ●   array
-  07       ";"                              08
+  07  └◦─  ";"                              08
        ○   [
-  02  ❮❮❮ 
-  05       (identifier) [Node RecordSet(M0)]  10
+  02  ❮❮❮
+  05  └•─  (identifier)                     10          [Node RecordSet(M0 id)]
        ○   [
        ●   identifier
-  10       _                                04
+  10  ─‣┘³ _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

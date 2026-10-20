@@ -37,13 +37,13 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        24, 18, 10, 03
-  02                                        ▶
-  03  -ε-  [Absent RecordSet(M0)]           02
-  05   !   (debugger_statement) [Node RecordSet(M0)]  07
+  02       return
+  03  -ε-                                   02          [Absent RecordSet(M0 d)]
+  05   !   (debugger_statement)             07          [Node RecordSet(M0 d)]
   07  ─‣┘  _                                02
   08  ──!  _                                05, 08
   10  └─!  _                                05, 08
-  12  -ε-  [Absent RecordSet(M0)]           07
+  12  -ε-                                   07          [Absent RecordSet(M0 d)]
   14   !   (empty_statement)                08, 12
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
@@ -52,13 +52,13 @@ Q:
   24  └─!  _                                20, 22
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        24, 18, 10, 03
+  00   !   (program)                        24, 18, 10, 03
        ●   program
-  24       _                                20, 22
-  00  ❮❮❮ 
-  18       _                                14, 16
-  00  ❮❮❮ 
-  10       _                                05, 08
-  00  ❮❮❮ 
-  03  -ε-  [Absent RecordSet(M0)]           02
-  02   ◀   (Q)                              ◼
+  24  └─!  _                                20, 22
+  00  ❮❮❮
+  18  └─!  _                                14, 16
+  00  ❮❮❮
+  10  └─!  _                                05, 08
+  00  ❮❮❮
+  03  -ε-                                   02          [Absent RecordSet(M0 d)]
+  02   ◀   return                           ◼

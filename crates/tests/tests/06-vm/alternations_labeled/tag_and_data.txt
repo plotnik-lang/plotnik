@@ -62,26 +62,26 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └─!  _                                11, 12
-  04                                        ▶
-  05   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
-  08   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  14
+  04       return
+  05   !   (identifier)                     14          [VariantOpen(M2 A) Node RecordSet(M0 a) VariantClose]
+  08   !   (number)                         14          [VariantOpen(M3 B) Node RecordSet(M1 b) VariantClose]
   11   !   switch
              (identifier)                   05
              (number)                       08
   12  ──!  _                                11, 12
-  14  ─‣┘² _ [RecordSet(M4)]                04
+  14  ─‣┘² _                                04          [RecordSet(M4 e)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                11, 12
+  02  └─!  _                                11, 12
        ●   identifier
-  11   !   switch                           
+  11   !   switch
        ●   identifier
-  05       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
+  05   !   (identifier)                     14          [VariantOpen(M2 A) Node RecordSet(M0 a) VariantClose]
        ●   identifier
-  14       _ [RecordSet(M4)]                04
+  14  ─‣┘² _                                04          [RecordSet(M4 e)]
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

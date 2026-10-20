@@ -11,11 +11,11 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (array)                          20, 04
   03  ─‣┘  _                                01
-  04  └‣─  (string) [Node RecordSet(s)]     03
-  05  ─‣─  (string) [Node RecordSet(s)]     03
+  04  └‣─  (string)                         03          [Node RecordSet(s)]
+  05  ─‣─  (string)                         03          [Node RecordSet(s)]
   06   !   (identifier)                     05
   08  ──!  _                                06, 08
   09   !   _                                06, 08
@@ -48,9 +48,9 @@ Q = 00 :: T1
 [instructions]
 Q:
   00   !   (array)                          16, 03
-  02                                        ▶
-  03  └‣─  (string) [Node RecordSet(M0)]    15
-  05  ─‣─  (string) [Node RecordSet(M0)]    15
+  02       return
+  03  └‣─  (string)                         15          [Node RecordSet(M0 s)]
+  05  ─‣─  (string)                         15          [Node RecordSet(M0 s)]
   07   !   (identifier)                     05
   08  ──!  _                                07, 08
   10   !   _                                07, 08

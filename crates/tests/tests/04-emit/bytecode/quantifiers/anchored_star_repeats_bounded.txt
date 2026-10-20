@@ -8,13 +8,13 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (array)                          12
-  04  ─‣┘  _ [ListClose RecordSet(ids)]     01
-  05  └•┘  _ [ListClose RecordSet(ids)]     01
-  09  └•─  (identifier) [Node ArrayPush]    10, 04
-  10  ─•─  (identifier) [Node ArrayPush]    10, 04
-  12  -ε-  [ListOpen]                       09, 05
+  04  ─‣┘  _                                01          [ListClose RecordSet(ids)]
+  05  └•┘  _                                01          [ListClose RecordSet(ids)]
+  09  └•─  (identifier)                     10, 04      [Node ArrayPush]
+  10  ─•─  (identifier)                     10, 04      [Node ArrayPush]
+  12  -ε-                                   09, 05      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -40,9 +40,9 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (array)                          01
-  01  -ε-  [ListOpen]                       06, 04
-  03                                        ▶
-  04  └•┘  _ [ListClose RecordSet(M0)]      03
-  06  └•─  (identifier) [Node ArrayPush]    08, 10
-  08  ─•─  (identifier) [Node ArrayPush]    08, 10
-  10  ─‣┘  _ [ListClose RecordSet(M0)]      03
+  01  -ε-                                   06, 04      [ListOpen]
+  03       return
+  04  └•┘  _                                03          [ListClose RecordSet(M0 ids)]
+  06  └•─  (identifier)                     08, 10      [Node ArrayPush]
+  08  ─•─  (identifier)                     08, 10      [Node ArrayPush]
+  10  ─‣┘  _                                03          [ListClose RecordSet(M0 ids)]

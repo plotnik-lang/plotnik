@@ -7,10 +7,10 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (function_declaration)            4
   3  ─‣┘  _                                 1
-  4  └‣─  name: (identifier) [Node RecordSet(name)]  3
+  4  └‣─  name: (identifier)                3           [Node RecordSet(name)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -35,6 +35,6 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (function_declaration)            1
-  1  └‣─  name: (identifier) [Node RecordSet(M0)]  3
+  1  └‣─  name: (identifier)                3           [Node RecordSet(M0 name)]
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

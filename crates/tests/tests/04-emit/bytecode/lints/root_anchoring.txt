@@ -23,20 +23,20 @@ Q    = 05
 
 [transitions]
 Leaf:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(id)]  01
+  01       return
+  02   !   (identifier)                     01          [Node RecordSet(id)]
 
 Q:
-  04                                        ▶
+  04       return
   05   !   (program)                        07
-  07  └‣─  (expression_statement) [RecordOpen]  11
-  08  ─‣┘² _ [RecordSet(leaf)]              04
-  10  -ε-  [RecordClose]                    08
+  07  └‣─  (expression_statement)           11          [RecordOpen]
+  08  ─‣┘² _                                04          [RecordSet(leaf)]
+  10  -ε-                                   08          [RecordClose]
   11  └‣─  (Leaf)                           02 : 10
 
 Bad:
-  14                                        ▶
-  15   !   (identifier) [Node RecordSet(bad)]  14
+  14       return
+  15   !   (identifier)                     14          [Node RecordSet(bad)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -73,18 +73,18 @@ Q    = 03 :: T2
 
 [instructions]
 Leaf:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [Node RecordSet(M0 id)]
+  02       return
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement)           06          [RecordOpen]
   06  └‣─  (Leaf)                           00 : 08
   07  ...
-  08  -ε-  [RecordClose]                    10
-  10  ─‣┘² _ [RecordSet(M1)]                12
-  12                                        ▶
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘² _                                12          [RecordSet(M1 leaf)]
+  12       return
 
 Bad:
-  13   !   (identifier) [Node RecordSet(M2)]  15
-  15                                        ▶
+  13   !   (identifier)                     15          [Node RecordSet(M2 bad)]
+  15       return

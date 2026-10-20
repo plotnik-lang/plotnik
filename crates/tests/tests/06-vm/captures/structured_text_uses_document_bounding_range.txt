@@ -49,29 +49,29 @@ Q = 00 :: T1
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ScalarOpen]                     03
-  03  └‣─  (comment) [ScalarMark]           05
-  05  ─‣─  (expression_statement) [ScalarMark]  08
+  01  -ε-                                   03          [ScalarOpen]
+  03  └‣─  (comment)                        05          [ScalarMark]
+  05  ─‣─  (expression_statement)           08          [ScalarMark]
   07  ...
-  08  └‣─  (identifier) [ScalarMark]        10
+  08  └‣─  (identifier)                     10          [ScalarMark]
   10  ─‣┘  _                                11
-  11  -ε-  [TextClose RecordSet(M0)]        13
+  11  -ε-                                   13          [TextClose RecordSet(M0 chunk)]
   13  ─‣┘  _                                14
-  14                                        ▶
+  14       return
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ScalarOpen]                     03
-  03       (comment) [ScalarMark]           05
+  01  -ε-                                   03          [ScalarOpen]
+  03  └‣─  (comment)                        05          [ScalarMark]
        ●   comment
-  05       (expression_statement) [ScalarMark]  08
+  05  ─‣─  (expression_statement)           08          [ScalarMark]
        ●   expression_statement
-  08       (identifier) [ScalarMark]        10
+  08  └‣─  (identifier)                     10          [ScalarMark]
        ●   identifier
-  10       _                                11
+  10  ─‣┘  _                                11
        ●   expression_statement
-  11  -ε-  [TextClose RecordSet(M0)]        13
-  13       _                                14
+  11  -ε-                                   13          [TextClose RecordSet(M0 chunk)]
+  13  ─‣┘  _                                14
        ●   program
-  14   ◀   (Q)                              ◼
+  14   ◀   return                           ◼

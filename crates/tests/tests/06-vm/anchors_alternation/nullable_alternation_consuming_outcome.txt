@@ -55,39 +55,39 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
   03  └─!  _                                22, 24
-  05                                        ▶
-  06  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  26
-  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  26
-  10  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  26
-  12   !   (identifier) == "a"              08
+  05       return
+  06  ─‣─  (identifier == "b")              26          [Node RecordSet(M0 b)]
+  08  ─•─  (identifier == "b")              26          [Node RecordSet(M0 b)]
+  10  ─◦─  (identifier == "b")              26          [Node RecordSet(M0 b)]
+  12   !   (identifier == "a")              08
   14  ──!  _                                12, 14
   16   !   _                                12, 14
-  18   !   (identifier) == "x"              06
+  18   !   (identifier == "x")              06
   20  ──!  _                                16, 18, 20
   22   !   "["                              20, 10
   24  ──!  _                                22, 24
   26  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                22, 24
+  03  └─!  _                                22, 24
        ●   [
-  22       "["                              20, 10
+  22   !   "["                              20, 10
        ●   [
-  20       _                                16, 18, 20
+  20  ──!  _                                16, 18, 20
        ●   identifier
-  16       _                                12, 14
+  16   !   _                                12, 14
        ●   identifier
-  12       (identifier) == "a"              08
+  12   !   (identifier == "a")              08
        ●   identifier
-  08       (identifier) [Node RecordSet(M0)] == "b"  26
+  08  ─•─  (identifier == "b")              26          [Node RecordSet(M0 b)]
        ○   ,
        ●   identifier
-  26       _                                05
+  26  ─‣┘³ _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

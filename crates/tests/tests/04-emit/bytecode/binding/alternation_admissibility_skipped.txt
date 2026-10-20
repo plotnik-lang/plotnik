@@ -10,11 +10,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (function_declaration)            7
   3  ─‣┘  _                                 1
-  4   !   (statement_block) [Absent RecordSet(b) Node RecordSet(a)]  3
-  5   !   (class_declaration) [Absent RecordSet(a) Node RecordSet(b)]  3
+  4   !   (statement_block)                 3           [Absent RecordSet(b) Node RecordSet(a)]
+  5   !   (class_declaration)               3           [Absent RecordSet(a) Node RecordSet(b)]
   6   !   switch
             (statement_block)               4
             (class_declaration)             5
@@ -52,7 +52,7 @@ Q:
   02   !   switch
              (statement_block)              04
              (class_declaration)            08
-  03                                        ▶
-  04   !   (statement_block) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  03       return
+  04   !   (statement_block)                07          [Absent RecordSet(M1 b) Node RecordSet(M0 a)]
   07  ─‣┘  _                                03
-  08   !   (class_declaration) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  08   !   (class_declaration)              07          [Absent RecordSet(M0 a) Node RecordSet(M1 b)]

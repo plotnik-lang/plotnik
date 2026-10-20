@@ -21,7 +21,7 @@ Q = 6
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (param)                           4
   3  ─‣┘  _                                 1
   4  └‣─  (num)                             3
@@ -54,6 +54,6 @@ Q:
             (id)                            5
   1  └‣─  (num)                             2
   2  ─‣┘  _                                 3
-  3                                         ▶
+  3       return
   4   !   (param)                           1
   5   !   (id)                              3

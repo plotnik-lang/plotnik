@@ -43,21 +43,21 @@ Q:
   1  └‣─  (expression_statement)            2
   2  └‣─  (identifier)                      3
   3  ─‣┘  _                                 4
-  4  ─‣─  (debugger_statement) [Node RecordSet(M0)]  6
+  4  ─‣─  (debugger_statement)              6           [Node RecordSet(M0 d)]
   6  ─‣┘  _                                 7
-  7                                         ▶
+  7       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       (identifier)                      03
+  2  └‣─  (identifier)                      3
       ●   identifier
-  3       _                                 04
+  3  ─‣┘  _                                 4
       ●   expression_statement
-  4       (debugger_statement) [Node RecordSet(M0)]  06
+  4  ─‣─  (debugger_statement)              6           [Node RecordSet(M0 d)]
       ●   debugger_statement
-  6       _                                 07
+  6  ─‣┘  _                                 7
       ●   program
-  7   ◀   (Q)                               ◼
+  7   ◀   return                            ◼

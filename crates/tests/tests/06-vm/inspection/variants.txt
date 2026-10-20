@@ -204,60 +204,60 @@ Expr = 00 :: T3
 Q    = 03 :: T4
 
 [spans]
-P00 def        0..54  source_id=0  T3
-P01 labeled_alternation 7..54  source_id=0
-P02 alternative 11..31  source_id=0  T3.M2
-P03 capture    28..31  source_id=0  T1.M0
-P04 pattern    15..27  source_id=0
-P05 alternative 34..52  source_id=0  T3.M3
-P06 capture    48..52  source_id=0  T2.M1
-P07 pattern    39..47  source_id=0
-P08 def        56..108  source_id=0  T4
-P09 pattern    60..108  source_id=0
-P10 pattern    71..106  source_id=0
-P11 capture    100..105  source_id=0  T4.M4
-P12 ref        93..99  source_id=0  T3
+P00 def                 0..54 src=0  T3
+P01 labeled_alternation 7..54 src=0
+P02 alternative         11..31 src=0  T3.M2
+P03 capture             28..31 src=0  T1.M0
+P04 pattern             15..27 src=0
+P05 alternative         34..52 src=0  T3.M3
+P06 capture             48..52 src=0  T2.M1
+P07 pattern             39..47 src=0
+P08 def                 56..108 src=0  T4
+P09 pattern             60..108 src=0
+P10 pattern             71..106 src=0
+P11 capture             100..105 src=0  T4.M4
+P12 ref                 93..99 src=0  T3
 
 [instructions]
 Expr:
-  00  -ε-  [SpanStart#0]                    02
+  00  -ε-                                   02          [SpanStart(P0)]
   02   !   switch
              (identifier)                   16
              (number)                       24
 
 Q:
-  03   !   (program) [SpanStart#8 SpanStartAt#9]  05
-  05  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  07
+  03   !   (program)                        05          [SpanStart(P8) SpanStartAt(P9)]
+  05  └‣─  (expression_statement)           07          [SpanStartAt(P10) SpanStart(P12)]
   07  └‣─  (Expr)                           00 : 08
-  08  ─‣┘  _ [SpanStart#11 RecordSet(M4) SpanEnd#11 SpanEnd#12]  11
-  11  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  13
-  13                                        ▶
-  14                                        ▶
+  08  ─‣┘  _                                11          [SpanStart(P11) RecordSet(M4 expr) SpanEnd(P11) SpanEnd(P12)]
+  11  ─‣┘  _                                13          [SpanEnd(P10) SpanEnd(P9) SpanEnd(P8)]
+  13       return
+  14       return
   15  ...
-  16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  16   !   (identifier)                     14          [SpanStart(P1) SpanStart(P2) VariantOpen(M2 Id) SpanStartAt(P4) SpanStart(P3) Node RecordSet(M0 id) SpanEnd(P3) SpanEnd(P4) VariantClose SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
   22  ...
   23  ...
-  24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
+  24   !   (number)                         14          [SpanStart(P1) SpanStart(P5) VariantOpen(M3 Num) SpanStartAt(P7) SpanStart(P6) Node RecordSet(M1 num) SpanEnd(P6) SpanEnd(P7) VariantClose SpanEnd(P5) SpanEnd(P1) SpanEnd(P0)]
 --------------------- TRACE ----------------------
 Q:
-  03       (program) [SpanStart#8 SpanStartAt#9]  05
+  03   !   (program)                        05          [SpanStart(P8) SpanStartAt(P9)]
        ●   program
-  05       (expression_statement) [SpanStartAt#10 SpanStart#12]  07
+  05  └‣─  (expression_statement)           07          [SpanStartAt(P10) SpanStart(P12)]
        ●   expression_statement
-  07       (Expr)                           00 : 08
+  07  └‣─  (Expr)                           00 : 08
        ▶   (Expr)
 
 Expr:
-  00  -ε-  [SpanStart#0]                    02
-  02   !   switch                           
+  00  -ε-                                   02          [SpanStart(P0)]
+  02   !   switch
        ●   number
-  24       (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
+  24   !   (number)                         14          [SpanStart(P1) SpanStart(P5) VariantOpen(M3 Num) SpanStartAt(P7) SpanStart(P6) Node RecordSet(M1 num) SpanEnd(P6) SpanEnd(P7) VariantClose SpanEnd(P5) SpanEnd(P1) SpanEnd(P0)]
        ●   number
-  14   ◀   (Expr)                           
+  14   ◀   return                           08
 
 Q:
-  08       _ [SpanStart#11 RecordSet(M4) SpanEnd#11 SpanEnd#12]  11
+  08  ─‣┘  _                                11          [SpanStart(P11) RecordSet(M4 expr) SpanEnd(P11) SpanEnd(P12)]
        ●   expression_statement
-  11       _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  13
+  11  ─‣┘  _                                13          [SpanEnd(P10) SpanEnd(P9) SpanEnd(P8)]
        ●   program
-  13   ◀   (Q)                              ◼
+  13   ◀   return                           ◼

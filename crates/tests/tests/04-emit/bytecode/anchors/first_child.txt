@@ -14,7 +14,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (list)                            5
   4  ─‣┘  _                                 1
   5  └•─  (id)                              4
@@ -40,4 +40,4 @@ Q:
   0   !   (list)                            1
   1  └•─  (id)                              2
   2  ─‣┘  _                                 3
-  3                                         ▶
+  3       return

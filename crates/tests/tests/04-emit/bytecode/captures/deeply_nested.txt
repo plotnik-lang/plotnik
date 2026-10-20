@@ -11,12 +11,12 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (array) [Node RecordSet(a)]       4
-  4  └‣─  (array) [Node RecordSet(b)]       6
-  6  └‣─  (array) [Node RecordSet(c)]       8
+  1       return
+  2   !   (array)                           4           [Node RecordSet(a)]
+  4  └‣─  (array)                           6           [Node RecordSet(b)]
+  6  └‣─  (array)                           8           [Node RecordSet(c)]
   7  ─‣┘³ _                                 1
-  8  └‣─  (identifier) [Node RecordSet(d)]  7
+  8  └‣─  (identifier)                      7           [Node RecordSet(d)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -46,9 +46,9 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (array) [Node RecordSet(M0)]      2
-  2  └‣─  (array) [Node RecordSet(M1)]      4
-  4  └‣─  (array) [Node RecordSet(M2)]      6
-  6  └‣─  (identifier) [Node RecordSet(M3)]  8
+  0   !   (array)                           2           [Node RecordSet(M0 a)]
+  2  └‣─  (array)                           4           [Node RecordSet(M1 b)]
+  4  └‣─  (array)                           6           [Node RecordSet(M2 c)]
+  6  └‣─  (identifier)                      8           [Node RecordSet(M3 d)]
   8  ─‣┘³ _                                 9
-  9                                         ▶
+  9       return

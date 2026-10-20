@@ -50,11 +50,11 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └─!  _                                11, 12
-  04  └‣─  function: (identifier) [Node RecordSet(M0)] == "wanted"  06
+  04  └‣─  function: (identifier == "wanted")  06       [Node RecordSet(M0 v)]
   06  ─‣┘  _                                14
-  07                                        ▶
+  07       return
   08   !   (call_expression)                04
-  09   !   (number) [Node RecordSet(M0)] == "42"  14
+  09   !   (number == "42")                 14          [Node RecordSet(M0 v)]
   11   !   switch
              (call_expression)              08
              (number)                       09
@@ -62,64 +62,64 @@ Q:
   14  ─‣┘² _                                07
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                11, 12
+  02  └─!  _                                11, 12
        ●   false
-  11   !   switch                           
+  11   !   switch
        ○   false
-  02  ❮❮❮ 
-  12       _                                11, 12
+  02  ❮❮❮
+  12  ──!  _                                11, 12
        ●   ;
-  11   !   switch                           
+  11   !   switch
        ○   ;
-  12  ❮❮❮ 
-  12       _                                11, 12
-  01  ❮❮❮ 
+  12  ❮❮❮
+  12  ──!  _                                11, 12
+  01  ❮❮❮
        ●   expression_statement
-  02       _                                11, 12
+  02  └─!  _                                11, 12
        ●   call_expression
-  11   !   switch                           
+  11   !   switch
        ●   call_expression
-  08       (call_expression)                04
+  08   !   (call_expression)                04
        ●   call_expression
-  04       function: (identifier) [Node RecordSet(M0)] == "wanted"  06
+  04  └‣─  function: (identifier == "wanted")  06       [Node RecordSet(M0 v)]
        ○   arguments
-  02  ❮❮❮ 
-  12       _                                11, 12
+  02  ❮❮❮
+  12  ──!  _                                11, 12
        ●   ;
-  11   !   switch                           
+  11   !   switch
        ○   ;
-  12  ❮❮❮ 
-  12       _                                11, 12
-  01  ❮❮❮ 
+  12  ❮❮❮
+  12  ──!  _                                11, 12
+  01  ❮❮❮
        ●   expression_statement
-  02       _                                11, 12
+  02  └─!  _                                11, 12
        ●   number
-  11   !   switch                           
+  11   !   switch
        ●   number
-  09       (number) [Node RecordSet(M0)] == "42"  14
-  02  ❮❮❮ 
-  12       _                                11, 12
+  09   !   (number == "42")                 14          [Node RecordSet(M0 v)]
+  02  ❮❮❮
+  12  ──!  _                                11, 12
        ●   ;
-  11   !   switch                           
+  11   !   switch
        ○   ;
-  12  ❮❮❮ 
-  12       _                                11, 12
-  01  ❮❮❮ 
+  12  ❮❮❮
+  12  ──!  _                                11, 12
+  01  ❮❮❮
        ●   expression_statement
-  02       _                                11, 12
+  02  └─!  _                                11, 12
        ●   call_expression
-  11   !   switch                           
+  11   !   switch
        ●   call_expression
-  08       (call_expression)                04
+  08   !   (call_expression)                04
        ●   call_expression
-  04       function: (identifier) [Node RecordSet(M0)] == "wanted"  06
+  04  └‣─  function: (identifier == "wanted")  06       [Node RecordSet(M0 v)]
        ●   identifier
-  06       _                                14
+  06  ─‣┘  _                                14
        ●   call_expression
-  14       _                                07
+  14  ─‣┘² _                                07
        ●   program
-  07   ◀   (Q)                              ◼
+  07   ◀   return                           ◼

@@ -11,20 +11,20 @@ Odd  = 07
 
 [transitions]
 Even:
-  01                                        ▶
-  02   !   (number) [Absent RecordSet(next) Node RecordSet(leaf)]  01
-  03   !   (array) [Absent RecordSet(leaf) RecordOpen]  15
-  04  ─‣┘  _ [RecordSet(next)]              01
+  01       return
+  02   !   (number)                         01          [Absent RecordSet(next) Node RecordSet(leaf)]
+  03   !   (array)                          15          [Absent RecordSet(leaf) RecordOpen]
+  04  ─‣┘  _                                01          [RecordSet(next)]
 
 Odd:
-  06                                        ▶
-  07   !   (array) [RecordOpen]             11
-  08  ─‣┘  _ [RecordSet(next)]              06
-  10  -ε-  [RecordClose]                    08
+  06       return
+  07   !   (array)                          11          [RecordOpen]
+  08  ─‣┘  _                                06          [RecordSet(next)]
+  10  -ε-                                   08          [RecordClose]
   11  └‣─  (Even)                           17 : 10
 
 Even:
-  14  -ε-  [RecordClose]                    04
+  14  -ε-                                   04          [RecordClose]
   15  └‣─  (Odd)                            07 : 14
   17   !   switch
              (number)                       02
@@ -66,14 +66,14 @@ Even:
              (number)                       16
 
 Odd:
-  01   !   (array) [RecordOpen]             03
+  01   !   (array)                          03          [RecordOpen]
   03  └‣─  (Even)                           00 : 04
-  04  -ε-  [RecordClose]                    06
-  06  ─‣┘  _ [RecordSet(M0)]                08
-  08                                        ▶
-  09  -ε-  [RecordClose]                    11
-  11  ─‣┘  _ [RecordSet(M2)]                13
-  13                                        ▶
-  14   !   (array) [Absent RecordSet(M1) RecordOpen]  19
-  16   !   (number) [Absent RecordSet(M2) Node RecordSet(M1)]  13
+  04  -ε-                                   06          [RecordClose]
+  06  ─‣┘  _                                08          [RecordSet(M0 next)]
+  08       return
+  09  -ε-                                   11          [RecordClose]
+  11  ─‣┘  _                                13          [RecordSet(M2 next)]
+  13       return
+  14   !   (array)                          19          [Absent RecordSet(M1 leaf) RecordOpen]
+  16   !   (number)                         13          [Absent RecordSet(M2 next) Node RecordSet(M1 leaf)]
   19  └‣─  (Odd)                            01 : 09

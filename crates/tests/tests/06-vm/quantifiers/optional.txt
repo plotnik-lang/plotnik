@@ -45,23 +45,23 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        12, 03
-  02                                        ▶
-  03  └‣─  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
-  06  ─‣─  (debugger_statement) [Node RecordSet(M1)]  14
-  08   !   (lexical_declaration) [Node RecordSet(M0)]  06
+  02       return
+  03  └‣─  (debugger_statement)             14          [Absent RecordSet(M0 decl) Node RecordSet(M1 d)]
+  06  ─‣─  (debugger_statement)             14          [Node RecordSet(M1 d)]
+  08   !   (lexical_declaration)            06          [Node RecordSet(M0 decl)]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        12, 03
+  00   !   (program)                        12, 03
        ●   program
-  12       _                                08, 10
+  12  └─!  _                                08, 10
        ●   lexical_declaration
-  08       (lexical_declaration) [Node RecordSet(M0)]  06
+  08   !   (lexical_declaration)            06          [Node RecordSet(M0 decl)]
        ●   lexical_declaration
-  06       (debugger_statement) [Node RecordSet(M1)]  14
+  06  ─‣─  (debugger_statement)             14          [Node RecordSet(M1 d)]
        ●   debugger_statement
-  14       _                                02
+  14  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

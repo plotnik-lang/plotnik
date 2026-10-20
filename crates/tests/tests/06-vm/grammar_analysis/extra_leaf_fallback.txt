@@ -40,19 +40,19 @@ Q:
   0  -ε-                                    7, 8
   2  └!┘  _                                 3
   3  ─‣┘  _                                 4
-  4                                         ▶
-  5  └‣─  (comment) [Node RecordSet(M0)]    2
+  4       return
+  5  └‣─  (comment)                         2           [Node RecordSet(M0 comment)]
   7   !   (program)                         5
-  8   !   (program) [Absent RecordSet(M0)]  4
+  8   !   (program)                         4           [Absent RecordSet(M0 comment)]
 --------------------- TRACE ----------------------
 Q:
-  0  -ε-                                    07, 08
-  7       (program)                         05
+  0  -ε-                                    7, 8
+  7   !   (program)                         5
       ●   program
-  5       (comment) [Node RecordSet(M0)]    02
+  5  └‣─  (comment)                         2           [Node RecordSet(M0 comment)]
       ●   comment
-  2       _                                 03
+  2  └!┘  _                                 3
       ●   comment
-  3       _                                 04
+  3  ─‣┘  _                                 4
       ●   program
-  4   ◀   (Q)                               ◼
+  4   ◀   return                            ◼

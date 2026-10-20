@@ -45,25 +45,25 @@ Q     = 05 :: T2
 [instructions]
 Other:
   00   !   (program)                        01
-  01  └‣─  (function_declaration) [Node RecordSet(M0)]  03
+  01  └‣─  (function_declaration)           03          [Node RecordSet(M0 fn)]
   03  ─‣┘  _                                04
-  04                                        ▶
+  04       return
 
 Q:
   05   !   (program)                        06
   06  └‣─  (expression_statement)           08
   07  ...
-  08  └‣─  (identifier) [Node RecordSet(M1)]  10
+  08  └‣─  (identifier)                     10          [Node RecordSet(M1 name)]
   10  ─‣┘² _                                11
-  11                                        ▶
+  11       return
 --------------------- TRACE ----------------------
 Q:
-  05       (program)                        06
+  05   !   (program)                        06
        ●   program
-  06       (expression_statement)           08
+  06  └‣─  (expression_statement)           08
        ●   expression_statement
-  08       (identifier) [Node RecordSet(M1)]  10
+  08  └‣─  (identifier)                     10          [Node RecordSet(M1 name)]
        ●   identifier
-  10       _                                11
+  10  ─‣┘² _                                11
        ●   program
-  11   ◀   (Q)                              ◼
+  11   ◀   return                           ◼

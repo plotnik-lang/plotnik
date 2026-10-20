@@ -8,11 +8,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (program)                         4
   4  └‣─  (expression_statement)            6
   5  ─‣┘² _                                 1
-  6  └‣─  (identifier) [Node RecordSet(id)]  5
+  6  └‣─  (identifier)                      5           [Node RecordSet(id)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -36,17 +36,17 @@ N0: S2 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..56  source_id=0  T1
-P1 pattern    4..56  source_id=0
-P2 pattern    15..54  source_id=0
-P3 capture    50..53  source_id=0  T1.M0
-P4 pattern    37..49  source_id=0
+P0 def     0..56 src=0  T1
+P1 pattern 4..56 src=0
+P2 pattern 15..54 src=0
+P3 capture 50..53 src=0  T1.M0
+P4 pattern 37..49 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStartAt#2]  04
-  04  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4]  07
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
+  04  └‣─  (identifier)                     07          [SpanStartAt(P4) SpanStart(P3) Node RecordSet(M0 id) SpanEnd(P3) SpanEnd(P4)]
   07  ─‣┘  _                                08
-  08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  10                                        ▶
+  08  ─‣┘  _                                10          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  10       return

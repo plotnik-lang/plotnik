@@ -66,27 +66,27 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (identifier) [RecordOpen Node RecordSet(M0)]  04
-  04  ─‣┘  _ [RecordClose RecordSet(M2)]    06
+  02  └‣─  (identifier)                     04          [RecordOpen Node RecordSet(M0 v)]
+  04  ─‣┘  _                                06          [RecordClose RecordSet(M2 a)]
   06  ─‣─  (expression_statement)           08
   07  ...
-  08  └‣─  (identifier) [RecordOpen Node RecordSet(M1)]  10
-  10  ─‣┘² _ [RecordClose RecordSet(M3)]    12
-  12                                        ▶
+  08  └‣─  (identifier)                     10          [RecordOpen Node RecordSet(M1 v)]
+  10  ─‣┘² _                                12          [RecordClose RecordSet(M3 b)]
+  12       return
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (identifier) [RecordOpen Node RecordSet(M0)]  04
+  02  └‣─  (identifier)                     04          [RecordOpen Node RecordSet(M0 v)]
        ●   identifier
-  04       _ [RecordClose RecordSet(M2)]    06
+  04  ─‣┘  _                                06          [RecordClose RecordSet(M2 a)]
        ●   expression_statement
-  06       (expression_statement)           08
+  06  ─‣─  (expression_statement)           08
        ●   expression_statement
-  08       (identifier) [RecordOpen Node RecordSet(M1)]  10
+  08  └‣─  (identifier)                     10          [RecordOpen Node RecordSet(M1 v)]
        ●   identifier
-  10       _ [RecordClose RecordSet(M3)]    12
+  10  ─‣┘² _                                12          [RecordClose RecordSet(M3 b)]
        ●   program
-  12   ◀   (Q)                              ◼
+  12   ◀   return                           ◼

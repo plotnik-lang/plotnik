@@ -505,7 +505,7 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   01                                        ▶
+            //   01       return
             S01_ERR => Flow::Accept,
             //   02   !   (program)                        04
             S02_ERR => 'state: {
@@ -521,7 +521,7 @@ mod matcher {
                 }
                 Flow::Jump(S01_ERR)
             }
-            //   04  └‣─  (ERROR) [Node RecordSet(err)]    03
+            //   04  └‣─  (ERROR)                          03          [Node RecordSet(err)]
             S04_ERR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -542,7 +542,7 @@ mod matcher {
                 }
                 finish_s04_err(eng)
             }
-            //   06                                        ▶
+            //   06       return
             S06_Q => Flow::Accept,
             //   07   !   (program)                        09
             S07_Q => 'state: {
@@ -594,7 +594,7 @@ mod matcher {
                 }
                 Flow::Jump(S06_Q)
             }
-            //   13  └‣─  (MISSING "}") [Node RecordSet(gap)]  12
+            //   13  └‣─  (MISSING "}")                    12          [Node RecordSet(gap)]
             S13_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;

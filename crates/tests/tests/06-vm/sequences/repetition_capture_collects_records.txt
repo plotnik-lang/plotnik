@@ -73,50 +73,50 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       18, 08
-  03  └‣─  name: (identifier) [Node RecordSet(M1)]  05
+  01  -ε-                                   18, 08      [ListOpen]
+  03  └‣─  name: (identifier)               05          [Node RecordSet(M1 n)]
   05  ─‣┘² _                                10
-  06                                        ▶
+  06       return
   07  ...
-  08  -ε-  [ListClose RecordSet(M2)]        06
-  10  -ε-  [RecordClose ArrayPush]          16, 20
+  08  -ε-                                   06          [ListClose RecordSet(M2 rows)]
+  10  -ε-                                   16, 20      [RecordClose ArrayPush]
   12  └‣─  (variable_declarator)            03
-  13   !   (lexical_declaration) [RecordOpen Node RecordSet(M0)]  12
+  13   !   (lexical_declaration)            12          [RecordOpen Node RecordSet(M0 decl)]
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  ─‣┘  _ [ListClose RecordSet(M2)]      06
+  20  ─‣┘  _                                06          [ListClose RecordSet(M2 rows)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       18, 08
-  18       _                                13, 16
+  01  -ε-                                   18, 08      [ListOpen]
+  18  └─!  _                                13, 16
        ●   lexical_declaration
-  13       (lexical_declaration) [RecordOpen Node RecordSet(M0)]  12
+  13   !   (lexical_declaration)            12          [RecordOpen Node RecordSet(M0 decl)]
        ●   lexical_declaration
-  12       (variable_declarator)            03
+  12  └‣─  (variable_declarator)            03
        ○   let
        ●   variable_declarator
-  03       name: (identifier) [Node RecordSet(M1)]  05
+  03  └‣─  name: (identifier)               05          [Node RecordSet(M1 n)]
        ●   identifier
-  05       _                                10
+  05  ─‣┘² _                                10
        ●   lexical_declaration
-  10  -ε-  [RecordClose ArrayPush]          16, 20
-  16       _                                13, 16
+  10  -ε-                                   16, 20      [RecordClose ArrayPush]
+  16  ──!  _                                13, 16
        ●   lexical_declaration
-  13       (lexical_declaration) [RecordOpen Node RecordSet(M0)]  12
+  13   !   (lexical_declaration)            12          [RecordOpen Node RecordSet(M0 decl)]
        ●   lexical_declaration
-  12       (variable_declarator)            03
+  12  └‣─  (variable_declarator)            03
        ○   let
        ●   variable_declarator
-  03       name: (identifier) [Node RecordSet(M1)]  05
+  03  └‣─  name: (identifier)               05          [Node RecordSet(M1 n)]
        ●   identifier
-  05       _                                10
+  05  ─‣┘² _                                10
        ●   lexical_declaration
-  10  -ε-  [RecordClose ArrayPush]          16, 20
-  16       _                                13, 16
-  10  ❮❮❮ 
-  20       _ [ListClose RecordSet(M2)]      06
+  10  -ε-                                   16, 20      [RecordClose ArrayPush]
+  16  ──!  _                                13, 16
+  10  ❮❮❮
+  20  ─‣┘  _                                06          [ListClose RecordSet(M2 rows)]
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

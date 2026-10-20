@@ -51,39 +51,39 @@ Q     = 03 :: T4
 
 [instructions]
 Inner:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
+  02       return
 
 Q:
   03   !   (program)                        04
   04  └‣─  (expression_statement)           05
   05  └─!  _                                14, 16
   07  ...
-  08  -ε-  [SuppressEnd VariantClose]       10
-  10  ─‣┘² _ [RecordSet(M2)]                12
-  12                                        ▶
+  08  -ε-                                   10          [SuppressEnd VariantClose]
+  10  ─‣┘² _                                12          [RecordSet(M2 v)]
+  12       return
   13   !   (Inner)                          00 : 08
-  14  -ε-  [VariantOpen(M1) SuppressBegin]  13
+  14  -ε-                                   13          [VariantOpen(M1 Call) SuppressBegin]
   16  ──!  _                                14, 16
 --------------------- TRACE ----------------------
 Q:
-  03       (program)                        04
+  03   !   (program)                        04
        ●   program
-  04       (expression_statement)           05
+  04  └‣─  (expression_statement)           05
        ●   expression_statement
-  05       _                                14, 16
+  05  └─!  _                                14, 16
        ●   identifier
-  14  -ε-  [VariantOpen(M1) SuppressBegin]  13
-  13       (Inner)                          00 : 08
+  14  -ε-                                   13          [VariantOpen(M1 Call) SuppressBegin]
+  13   !   (Inner)                          00 : 08
        ▶   (Inner)
 
 Inner:
-  00       (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
        ●   identifier
-  02   ◀   (Inner)                          
+  02   ◀   return                           08
 
 Q:
-  08  -ε-  [SuppressEnd VariantClose]       10
-  10       _ [RecordSet(M2)]                12
+  08  -ε-                                   10          [SuppressEnd VariantClose]
+  10  ─‣┘² _                                12          [RecordSet(M2 v)]
        ●   program
-  12   ◀   (Q)                              ◼
+  12   ◀   return                           ◼

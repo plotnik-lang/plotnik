@@ -44,28 +44,28 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        14, 10
-  02   !   (identifier) [Node RecordSet(M0)]  04
+  02   !   (identifier)                     04          [Node RecordSet(M0 id)]
   04  ─‣┘  _                                05
-  05                                        ▶
+  05       return
   06  ──!  _                                02, 06
   08   !   _                                02, 06
-  10  -ε-  [Absent RecordSet(M0)]           05
+  10  -ε-                                   05          [Absent RecordSet(M0 id)]
   12  ──!  _                                08, 12
   14  └─!  _                                08, 12
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        14, 10
+  00   !   (program)                        14, 10
        ●   program
-  14       _                                08, 12
+  14  └─!  _                                08, 12
        ●   lexical_declaration
-  08       _                                02, 06
+  08   !   _                                02, 06
        ●   lexical_declaration
-  02       (identifier) [Node RecordSet(M0)]  04
+  02   !   (identifier)                     04          [Node RecordSet(M0 id)]
        ○   lexical_declaration
-  08  ❮❮❮ 
-  06       _                                02, 06
-  14  ❮❮❮ 
-  12       _                                08, 12
-  00  ❮❮❮ 
-  10  -ε-  [Absent RecordSet(M0)]           05
-  05   ◀   (Q)                              ◼
+  08  ❮❮❮
+  06  ──!  _                                02, 06
+  14  ❮❮❮
+  12  ──!  _                                08, 12
+  00  ❮❮❮
+  10  -ε-                                   05          [Absent RecordSet(M0 id)]
+  05   ◀   return                           ◼

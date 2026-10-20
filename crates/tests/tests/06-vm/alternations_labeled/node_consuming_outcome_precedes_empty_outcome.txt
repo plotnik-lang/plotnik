@@ -58,30 +58,30 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        18, 10
-  02                                        ▶
-  03   !   (identifier) [Node RecordSet(M0) VariantClose RecordSet(M4)]  20
+  02       return
+  03   !   (identifier)                     20          [Node RecordSet(M0 id) VariantClose RecordSet(M4 x)]
   06  ──!  _                                03, 06
-  08   !   _ [VariantOpen(M2)]              03, 06
-  10  -ε-  [VariantOpen(M2) Absent RecordSet(M0) VariantClose RecordSet(M4)]  02
-  13   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  20
+  08   !   _                                03, 06      [VariantOpen(M2 A)]
+  10  -ε-                                   02          [VariantOpen(M2 A) Absent RecordSet(M0 id) VariantClose RecordSet(M4 x)]
+  13   !   (debugger_statement)             20          [VariantOpen(M3 B) Node RecordSet(M1 d) VariantClose RecordSet(M4 x)]
   16  ──!  _                                08, 13, 16
   18  └─!  _                                08, 13, 16
   20  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        18, 10
+  00   !   (program)                        18, 10
        ●   program
-  18       _                                08, 13, 16
+  18  └─!  _                                08, 13, 16
        ●   debugger_statement
-  08       _ [VariantOpen(M2)]              03, 06
+  08   !   _                                03, 06      [VariantOpen(M2 A)]
        ●   debugger_statement
-  03       (identifier) [Node RecordSet(M0) VariantClose RecordSet(M4)]  20
+  03   !   (identifier)                     20          [Node RecordSet(M0 id) VariantClose RecordSet(M4 x)]
        ○   debugger_statement
-  08  ❮❮❮ 
-  06       _                                03, 06
-  18  ❮❮❮ 
-  13       (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  20
+  08  ❮❮❮
+  06  ──!  _                                03, 06
+  18  ❮❮❮
+  13   !   (debugger_statement)             20          [VariantOpen(M3 B) Node RecordSet(M1 d) VariantClose RecordSet(M4 x)]
        ●   debugger_statement
-  20       _                                02
+  20  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

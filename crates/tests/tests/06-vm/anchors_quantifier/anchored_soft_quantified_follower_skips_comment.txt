@@ -61,59 +61,59 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        30, 24
-  02  └‣─  (identifier) == "foo"            04
+  02  └‣─  (identifier == "foo")            04
   04  ─‣┘  _                                05
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08  └•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  02
-  11  ─•─  (expression_statement) [Node RecordSet(M2)]  02
-  13  -ε-  [ListClose RecordSet(M1)]        11
+  08  └•─  (expression_statement)           02          [ListClose RecordSet(M1 b) Node RecordSet(M2 c)]
+  11  ─•─  (expression_statement)           02          [Node RecordSet(M2 c)]
+  13  -ε-                                   11          [ListClose RecordSet(M1 b)]
   15  ...
-  16  └•─  (debugger_statement) [Node ArrayPush]  18, 13
-  18  ─•─  (debugger_statement) [Node ArrayPush]  18, 13
-  20  -ε-  [ListOpen]                       16, 08
-  22  -ε-  [ListOpen]                       18, 13
-  24  -ε-  [Absent RecordSet(M0)]           20
-  26   !   (lexical_declaration) [Node RecordSet(M0)]  22
+  16  └•─  (debugger_statement)             18, 13      [Node ArrayPush]
+  18  ─•─  (debugger_statement)             18, 13      [Node ArrayPush]
+  20  -ε-                                   16, 08      [ListOpen]
+  22  -ε-                                   18, 13      [ListOpen]
+  24  -ε-                                   20          [Absent RecordSet(M0 a)]
+  26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
   28  ──!  _                                26, 28
   30  └─!  _                                26, 28
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        30, 24
+  00   !   (program)                        30, 24
        ●   program
-  30       _                                26, 28
+  30  └─!  _                                26, 28
        ●   comment
-  26       (lexical_declaration) [Node RecordSet(M0)]  22
+  26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
        ○   comment
-  30  ❮❮❮ 
-  28       _                                26, 28
+  30  ❮❮❮
+  28  ──!  _                                26, 28
        ●   debugger_statement
-  26       (lexical_declaration) [Node RecordSet(M0)]  22
+  26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
        ○   debugger_statement
-  28  ❮❮❮ 
-  28       _                                26, 28
+  28  ❮❮❮
+  28  ──!  _                                26, 28
        ●   expression_statement
-  26       (lexical_declaration) [Node RecordSet(M0)]  22
+  26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
        ○   expression_statement
-  28  ❮❮❮ 
-  28       _                                26, 28
-  00  ❮❮❮ 
-  24  -ε-  [Absent RecordSet(M0)]           20
-  20  -ε-  [ListOpen]                       16, 08
-  16       (debugger_statement) [Node ArrayPush]  18, 13
+  28  ❮❮❮
+  28  ──!  _                                26, 28
+  00  ❮❮❮
+  24  -ε-                                   20          [Absent RecordSet(M0 a)]
+  20  -ε-                                   16, 08      [ListOpen]
+  16  └•─  (debugger_statement)             18, 13      [Node ArrayPush]
        ○   comment
        ●   debugger_statement
-  18       (debugger_statement) [Node ArrayPush]  18, 13
+  18  ─•─  (debugger_statement)             18, 13      [Node ArrayPush]
        ○   expression_statement
-  16  ❮❮❮ 
-  13  -ε-  [ListClose RecordSet(M1)]        11
-  11       (expression_statement) [Node RecordSet(M2)]  02
+  16  ❮❮❮
+  13  -ε-                                   11          [ListClose RecordSet(M1 b)]
+  11  ─•─  (expression_statement)           02          [Node RecordSet(M2 c)]
        ●   expression_statement
-  02       (identifier) == "foo"            04
+  02  └‣─  (identifier == "foo")            04
        ●   identifier
-  04       _                                05
+  04  ─‣┘  _                                05
        ●   expression_statement
-  05       _                                06
+  05  ─‣┘  _                                06
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

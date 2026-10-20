@@ -19,22 +19,22 @@ TrailingSkip = 13
 
 [transitions]
 LeadingSkip:
-  01                                        ▶
+  01       return
   02   !   (program)                        09, 04
   03  ─‣┘  _                                01
-  04  └‣─  (function_declaration) [Node RecordSet(fn)]  03
-  05  ─‣─  (function_declaration) [Node RecordSet(fn)]  03
+  04  └‣─  (function_declaration)           03          [Node RecordSet(fn)]
+  05  ─‣─  (function_declaration)           03          [Node RecordSet(fn)]
   06   !   (expression_statement)           05
   08  ──!  _                                06, 08
   09  └─!  _                                06, 08
 
 TrailingSkip:
-  12                                        ▶
+  12       return
   13   !   (program)                        20
   14  ─‣┘  _                                12
   15   !   (expression_statement)           14
   17  ──!  _                                15, 17
-  20  └‣─  (function_declaration) [Node RecordSet(fn)]  17, 14
+  20  └‣─  (function_declaration)           17, 14      [Node RecordSet(fn)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -63,40 +63,40 @@ LeadingSkip  = 00 :: T1
 TrailingSkip = 04 :: T2
 
 [spans]
-P00 def        0..91  source_id=0  T1
-P01 pattern    14..91  source_id=0
-P02 sequence   25..89  source_id=0
-P03 quantifier 53..54  source_id=0
-P04 pattern    31..53  source_id=0
-P05 capture    82..85  source_id=0  T1.M0
-P06 pattern    59..81  source_id=0
-P07 def        93..185  source_id=0  T2
-P08 pattern    108..185  source_id=0
-P09 sequence   119..183  source_id=0
-P10 capture    148..151  source_id=0  T2.M1
-P11 pattern    125..147  source_id=0
-P12 quantifier 178..179  source_id=0
-P13 pattern    156..178  source_id=0
+P00 def        0..91 src=0  T1
+P01 pattern    14..91 src=0
+P02 sequence   25..89 src=0
+P03 quantifier 53..54 src=0
+P04 pattern    31..53 src=0
+P05 capture    82..85 src=0  T1.M0
+P06 pattern    59..81 src=0
+P07 def        93..185 src=0  T2
+P08 pattern    108..185 src=0
+P09 sequence   119..183 src=0
+P10 capture    148..151 src=0  T2.M1
+P11 pattern    125..147 src=0
+P12 quantifier 178..179 src=0
+P13 pattern    156..178 src=0
 
 [instructions]
 LeadingSkip:
-  00   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  02
-  02  -ε-  [SpanStart#3]                    26, 16
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1) SpanStart(P2)]
+  02  -ε-                                   26, 16      [SpanStart(P3)]
 
 TrailingSkip:
-  04   !   (program) [SpanStart#7 SpanStartAt#8]  08
-  06  -ε-  [SpanEnd#12]                     34
-  08  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node RecordSet(M1) SpanEnd#10 SpanEnd#11]  11
-  11  -ε-  [SpanStart#12]                   14, 06
-  13                                        ▶
+  04   !   (program)                        08          [SpanStart(P7) SpanStartAt(P8)]
+  06  -ε-                                   34          [SpanEnd(P12)]
+  08  └‣─  (function_declaration)           11          [SpanStart(P9) SpanStartAt(P11) SpanStart(P10) Node RecordSet(M1 fn) SpanEnd(P10) SpanEnd(P11)]
+  11  -ε-                                   14, 06      [SpanStart(P12)]
+  13       return
   14  ──!  _                                32, 14
-  16  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#6]  28
-  19  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#6]  28
-  22   !   (expression_statement) [SpanStartAt#4 SpanEnd#4]  19
+  16  └‣─  (function_declaration)           28          [SpanEnd(P3) SpanStartAt(P6) SpanStart(P5) Node RecordSet(M0 fn) SpanEnd(P5) SpanEnd(P6)]
+  19  ─‣─  (function_declaration)           28          [SpanEnd(P3) SpanStartAt(P6) SpanStart(P5) Node RecordSet(M0 fn) SpanEnd(P5) SpanEnd(P6)]
+  22   !   (expression_statement)           19          [SpanStartAt(P4) SpanEnd(P4)]
   24  ──!  _                                22, 24
   26  └─!  _                                22, 24
-  28  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
-  30                                        ▶
+  28  ─‣┘  _                                13          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  30       return
   31  ...
-  32   !   (expression_statement) [SpanStartAt#13 SpanEnd#13 SpanEnd#12]  34
-  34  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  30
+  32   !   (expression_statement)           34          [SpanStartAt(P13) SpanEnd(P13) SpanEnd(P12)]
+  34  ─‣┘  _                                30          [SpanEnd(P9) SpanEnd(P8) SpanEnd(P7)]

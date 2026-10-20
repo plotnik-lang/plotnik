@@ -51,8 +51,8 @@ Q:
   03  └─!  _                                14, 16
   05  ─•┘² _                                06
   06  ─‣┘² _                                07
-  07                                        ▶
-  08   !   (pair) [Node RecordSet(M0)]      05
+  07       return
+  08   !   (pair)                           05          [Node RecordSet(M0 p)]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14   !   (object)                         12
@@ -60,32 +60,32 @@ Q:
   16  ──!  _                                14, 16
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                14, 16
+  03  └─!  _                                14, 16
        ●   [
-  14       (object)                         12
+  14   !   (object)                         12
        ○   [
-  03  ❮❮❮ 
-  16       _                                14, 16
+  03  ❮❮❮
+  16  ──!  _                                14, 16
        ●   object
-  14       (object)                         12
+  14   !   (object)                         12
        ●   object
-  12       _                                08, 10
+  12  └─!  _                                08, 10
        ●   {
-  08       (pair) [Node RecordSet(M0)]      05
+  08   !   (pair)                           05          [Node RecordSet(M0 p)]
        ○   {
-  12  ❮❮❮ 
-  10       _                                08, 10
+  12  ❮❮❮
+  10  ──!  _                                08, 10
        ●   pair
-  08       (pair) [Node RecordSet(M0)]      05
+  08   !   (pair)                           05          [Node RecordSet(M0 p)]
        ●   pair
-  05       _                                06
+  05  ─•┘² _                                06
        ●   array
-  06       _                                07
+  06  ─‣┘² _                                07
        ●   program
-  07   ◀   (Q)                              ◼
+  07   ◀   return                           ◼

@@ -7,10 +7,10 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (pair)                            4
   3  ─‣┘  _                                 1
-  4  └‣─  key: (_) [Node RecordSet(key)]    3
+  4  └‣─  key: (_)                          3           [Node RecordSet(key)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -34,6 +34,6 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (pair)                            1
-  1  └‣─  key: (_) [Node RecordSet(M0)]     3
+  1  └‣─  key: (_)                          3           [Node RecordSet(M0 key)]
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

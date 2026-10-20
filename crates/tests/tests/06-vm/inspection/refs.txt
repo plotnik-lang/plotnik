@@ -121,44 +121,44 @@ Name = 00 :: T2
 Q    = 05 :: T0
 
 [spans]
-P0 def        0..25  source_id=0  T2
-P1 capture    20..25  source_id=0  T2.M0
-P2 pattern    7..19  source_id=0
-P3 def        26..69  source_id=0
-P4 pattern    30..69  source_id=0
-P5 pattern    39..68  source_id=0
-P6 ref        61..67  source_id=0  T2
+P0 def     0..25 src=0  T2
+P1 capture 20..25 src=0  T2.M0
+P2 pattern 7..19 src=0
+P3 def     26..69 src=0
+P4 pattern 30..69 src=0
+P5 pattern 39..68 src=0
+P6 ref     61..67 src=0  T2
 
 [instructions]
 Name:
-  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
-  04                                        ▶
+  00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
+  04       return
 
 Q:
-  05   !   (program) [SpanStart#3 SpanStartAt#4]  08
+  05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
   07  ...
-  08  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  10
+  08  └‣─  (expression_statement)           10          [SpanStartAt(P5) SpanStart(P6) SuppressBegin]
   10  └‣─  (Name)                           00 : 11
-  11  ─‣┘  _ [SuppressEnd SpanEnd#6]        13
-  13  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
-  15                                        ▶
+  11  ─‣┘  _                                13          [SuppressEnd SpanEnd(P6)]
+  13  ─‣┘  _                                15          [SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
+  15       return
 --------------------- TRACE ----------------------
 Q:
-  05       (program) [SpanStart#3 SpanStartAt#4]  08
+  05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
        ●   program
-  08       (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  10
+  08  └‣─  (expression_statement)           10          [SpanStartAt(P5) SpanStart(P6) SuppressBegin]
        ●   expression_statement
-  10       (Name)                           00 : 11
+  10  └‣─  (Name)                           00 : 11
        ▶   (Name)
 
 Name:
-  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
        ●   identifier
-  04   ◀   (Name)                           
+  04   ◀   return                           11
 
 Q:
-  11       _ [SuppressEnd SpanEnd#6]        13
+  11  ─‣┘  _                                13          [SuppressEnd SpanEnd(P6)]
        ●   expression_statement
-  13       _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
+  13  ─‣┘  _                                15          [SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
        ●   program
-  15   ◀   (Q)                              ◼
+  15   ◀   return                           ◼

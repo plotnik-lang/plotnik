@@ -25,27 +25,27 @@ Value = 04
 
 [transitions]
 Value:
-  01                                        ▶
-  02   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  01
-  03   !   (number) [VariantOpen(Num) Node RecordSet(num) VariantClose]  01
+  01       return
+  02   !   (identifier)                     01          [VariantOpen(Id) Node RecordSet(id) VariantClose]
+  03   !   (number)                         01          [VariantOpen(Num) Node RecordSet(num) VariantClose]
   04   !   switch
              (identifier)                   02
              (number)                       03
 
 Q:
-  06                                        ▶
+  06       return
   07   !   (program)                        37, 09
   08  ─‣┘  _                                06
-  09  └‣─  (lexical_declaration) [Node RecordSet(decl)]  11
+  09  └‣─  (lexical_declaration)            11          [Node RecordSet(decl)]
   11  └‣─  (variable_declarator)            20
   12  ─‣┘² _                                08
-  13  -ε-  [SuppressEnd]                    12
+  13  -ε-                                   12          [SuppressEnd]
   14   !   (Value)                          04 : 13
-  16  -ε-  [Absent RecordSet(str) SuppressBegin]  14
-  17   !   (string) [Node RecordSet(str)]   12
+  16  -ε-                                   14          [Absent RecordSet(str) SuppressBegin]
+  17   !   (string)                         12          [Node RecordSet(str)]
   19  ─‣─  value: _                         16, 17
-  20  └‣─  name: (identifier) [Node RecordSet(name)]  19
-  21  ─‣─  (lexical_declaration) [Node RecordSet(decl)]  11
+  20  └‣─  name: (identifier)               19          [Node RecordSet(name)]
+  21  ─‣─  (lexical_declaration)            11          [Node RecordSet(decl)]
   34   !   (expression_statement)           36, 21
   36  ──!  _                                34, 36
   37  └─!  _                                34, 36
@@ -99,62 +99,62 @@ Q     = 03 :: T6
 Value = 00 :: T3
 
 [spans]
-P00 def        0..55  source_id=0  T3
-P01 labeled_alternation 8..55  source_id=0
-P02 alternative 12..32  source_id=0  T3.M2
-P03 capture    29..32  source_id=0  T1.M0
-P04 pattern    16..28  source_id=0
-P05 alternative 35..53  source_id=0  T3.M3
-P06 capture    49..53  source_id=0  T2.M1
-P07 pattern    40..48  source_id=0
-P08 def        57..292  source_id=0  T6
-P09 pattern    61..292  source_id=0
-P10 sequence   72..290  source_id=0
-P11 quantifier 100..101  source_id=0
-P12 pattern    78..100  source_id=0
-P13 capture    281..286  source_id=0  T6.M4
-P14 pattern    109..280  source_id=0
-P15 pattern    136..274  source_id=0
-P16 capture    184..189  source_id=0  T6.M5
-P17 capture_type 190..197  source_id=0  T4
-P18 grammar_field 165..169  source_id=0
-P19 pattern    171..183  source_id=0
-P20 grammar_field 206..211  source_id=0
-P21 unlabeled_alternation 213..266  source_id=0
-P22 alternative 225..232  source_id=0
-P23 ref        225..232  source_id=0  T3
-P24 alternative 243..256  source_id=0
-P25 capture    252..256  source_id=0  T6.M6
-P26 pattern    243..251  source_id=0
+P00 def                   0..55 src=0  T3
+P01 labeled_alternation   8..55 src=0
+P02 alternative           12..32 src=0  T3.M2
+P03 capture               29..32 src=0  T1.M0
+P04 pattern               16..28 src=0
+P05 alternative           35..53 src=0  T3.M3
+P06 capture               49..53 src=0  T2.M1
+P07 pattern               40..48 src=0
+P08 def                   57..292 src=0  T6
+P09 pattern               61..292 src=0
+P10 sequence              72..290 src=0
+P11 quantifier            100..101 src=0
+P12 pattern               78..100 src=0
+P13 capture               281..286 src=0  T6.M4
+P14 pattern               109..280 src=0
+P15 pattern               136..274 src=0
+P16 capture               184..189 src=0  T6.M5
+P17 capture_type          190..197 src=0  T4
+P18 grammar_field         165..169 src=0
+P19 pattern               171..183 src=0
+P20 grammar_field         206..211 src=0
+P21 unlabeled_alternation 213..266 src=0
+P22 alternative           225..232 src=0
+P23 ref                   225..232 src=0  T3
+P24 alternative           243..256 src=0
+P25 capture               252..256 src=0  T6.M6
+P26 pattern               243..251 src=0
 
 [instructions]
 Value:
-  00  -ε-  [SpanStart#0]                    02
+  00  -ε-                                   02          [SpanStart(P0)]
   02   !   switch
              (identifier)                   16
              (number)                       24
 
 Q:
-  03   !   (program) [SpanStart#8 SpanStartAt#9 SpanStart#10]  05
-  05  -ε-  [SpanStart#11]                   22, 13
+  03   !   (program)                        05          [SpanStart(P8) SpanStartAt(P9) SpanStart(P10)]
+  05  -ε-                                   22, 13      [SpanStart(P11)]
   07  ─‣┘  _                                08
-  08  ─‣┘  _ [SpanEnd#15 SpanEnd#14]        10
-  10  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  30
-  12                                        ▶
-  13  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
-  16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
+  08  ─‣┘  _                                10          [SpanEnd(P15) SpanEnd(P14)]
+  10  ─‣┘  _                                30          [SpanEnd(P10) SpanEnd(P9) SpanEnd(P8)]
+  12       return
+  13  └‣─  (lexical_declaration)            52          [SpanEnd(P11) SpanStartAt(P14) SpanStart(P13) Node RecordSet(M4 decl) SpanEnd(P13)]
+  16   !   (identifier)                     12          [SpanStart(P1) SpanStart(P2) VariantOpen(M2 Id) SpanStartAt(P4) SpanStart(P3) Node RecordSet(M0 id) SpanEnd(P3) SpanEnd(P4) VariantClose SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
   22  └─!  _                                59, 54
-  24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  12
-  30                                        ▶
+  24   !   (number)                         12          [SpanStart(P1) SpanStart(P5) VariantOpen(M3 Num) SpanStartAt(P7) SpanStart(P6) Node RecordSet(M1 num) SpanEnd(P6) SpanEnd(P7) VariantClose SpanEnd(P5) SpanEnd(P1) SpanEnd(P0)]
+  30       return
   31  ...
-  32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21 SpanEnd#20]  07
+  32  -ε-                                   07          [SuppressEnd SpanEnd(P23) SpanEnd(P22) SpanEnd(P21) SpanEnd(P20)]
   35   !   (Value)                          00 : 32
-  36  -ε-  [SpanStart#20 SpanStart#21 SpanStart#22 Absent RecordSet(M6) SpanStart#23 SuppressBegin]  35
+  36  -ε-                                   35          [SpanStart(P20) SpanStart(P21) SpanStart(P22) Absent RecordSet(M6 str) SpanStart(P23) SuppressBegin]
   39  ...
-  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node RecordSet(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  07
+  40   !   (string)                         07          [SpanStart(P20) SpanStart(P21) SpanStart(P24) SpanStartAt(P26) SpanStart(P25) Node RecordSet(M6 str) SpanEnd(P25) SpanEnd(P26) SpanEnd(P24) SpanEnd(P21) SpanEnd(P20)]
   46  ─‣─  value: _                         36, 40
-  48  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 Node RecordSet(M5) SpanEnd#16 SpanEnd#19 SpanEnd#18]  46
-  52  └‣─  (variable_declarator) [SpanStartAt#15]  48
+  48  └‣─  name: (identifier)               46          [SpanStart(P18) SpanStartAt(P19) SpanStart(P16) Node RecordSet(M5 name) SpanEnd(P16) SpanEnd(P19) SpanEnd(P18)]
+  52  └‣─  (variable_declarator)            48          [SpanStartAt(P15)]
   54  ──!  _                                59, 54
-  56  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
-  59   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  54, 56
+  56  ─‣─  (lexical_declaration)            52          [SpanEnd(P11) SpanStartAt(P14) SpanStart(P13) Node RecordSet(M4 decl) SpanEnd(P13)]
+  59   !   (expression_statement)           54, 56      [SpanStartAt(P12) SpanEnd(P12)]

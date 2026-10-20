@@ -105,31 +105,31 @@ N0: S2 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..73  source_id=0  T1
-P1 pattern    4..73  source_id=0
-P2 pattern    15..71  source_id=0
-P3 capture    54..59  source_id=0  T1.M0
-P4 capture_type 60..67  source_id=0  T0
-P5 pattern    41..53  source_id=0
+P0 def          0..73 src=0  T1
+P1 pattern      4..73 src=0
+P2 pattern      15..71 src=0
+P3 capture      54..59 src=0  T1.M0
+P4 capture_type 60..67 src=0  T0
+P5 pattern      41..53 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStartAt#2]  04
-  04  └‣─  (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  07
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
+  04  └‣─  (identifier)                     07          [SpanStart(P3) SpanStartAt(P5) NodeText RecordSet(M0 name) SpanEnd(P5) SpanEnd(P3)]
   07  ─‣┘  _                                08
-  08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  10                                        ▶
+  08  ─‣┘  _                                10          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  10       return
 --------------------- TRACE ----------------------
 Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
        ●   program
-  02       (expression_statement) [SpanStartAt#2]  04
+  02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
        ●   expression_statement
-  04       (identifier) [SpanStart#3 SpanStartAt#5 NodeText RecordSet(M0) SpanEnd#5 SpanEnd#3]  07
+  04  └‣─  (identifier)                     07          [SpanStart(P3) SpanStartAt(P5) NodeText RecordSet(M0 name) SpanEnd(P5) SpanEnd(P3)]
        ●   identifier
-  07       _                                08
+  07  ─‣┘  _                                08
        ●   expression_statement
-  08       _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  08  ─‣┘  _                                10          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
        ●   program
-  10   ◀   (Q)                              ◼
+  10   ◀   return                           ◼

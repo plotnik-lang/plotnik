@@ -8,11 +8,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (binary_expression)               5
   3  ─‣┘  _                                 1
-  4  ─‣─  right: (identifier) [Node RecordSet(r)] =~ /foo/  3
-  5  └‣─  left: (identifier) [Node RecordSet(l)] =~ /foo/  4
+  4  ─‣─  right: (identifier =~ /foo/)      3           [Node RecordSet(r)]
+  5  └‣─  left: (identifier =~ /foo/)       4           [Node RecordSet(l)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -45,7 +45,7 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (binary_expression)               1
-  1  └‣─  left: (identifier) [Node RecordSet(M0)] =~ /foo/  3
-  3  ─‣─  right: (identifier) [Node RecordSet(M1)] =~ /foo/  5
+  1  └‣─  left: (identifier =~ /foo/)       3           [Node RecordSet(M0 l)]
+  3  ─‣─  right: (identifier =~ /foo/)      5           [Node RecordSet(M1 r)]
   5  ─‣┘  _                                 6
-  6                                         ▶
+  6       return

@@ -71,133 +71,133 @@ Arr:
 
 Q:
   05   !   (program)                        06
-  06  └‣─  (expression_statement) [RecordOpen]  08
+  06  └‣─  (expression_statement)           08          [RecordOpen]
   08  └‣─  (Arr)                            03 : 09
-  09  -ε-  [RecordClose]                    11
-  11  ─‣┘² _ [RecordSet(M2)]                13
-  13                                        ▶
-  14  -ε-  [RecordClose]                    16
-  16  ─‣┘  _ [RecordSet(M0)]                26
-  18  -ε-  [RecordClose]                    20
-  20  ─‣┘  _ [RecordSet(M1)]                23
-  22                                        ▶
+  09  -ε-                                   11          [RecordClose]
+  11  ─‣┘² _                                13          [RecordSet(M2 top)]
+  13       return
+  14  -ε-                                   16          [RecordClose]
+  16  ─‣┘  _                                26          [RecordSet(M0 obj)]
+  18  -ε-                                   20          [RecordClose]
+  20  ─‣┘  _                                23          [RecordSet(M1 arr)]
+  22       return
   23  ─‣┘  _                                22
-  24  -ε-  [Absent RecordSet(M1)]           23
-  26                                        ▶
-  27  -ε-  [Absent RecordSet(M0)]           26
+  24  -ε-                                   23          [Absent RecordSet(M1 arr)]
+  26       return
+  27  -ε-                                   26          [Absent RecordSet(M0 obj)]
   29   !   (Obj)                            00 : 14
-  30  -ε-  [RecordOpen]                     29
+  30  -ε-                                   29          [RecordOpen]
   32  ──!  _                                30, 32
   34  └─!  _                                30, 32
   36   !   value: (Arr)                     03 : 18
-  37  -ε-  [RecordOpen]                     36
+  37  -ε-                                   36          [RecordOpen]
   39  ...
   40  ──!  _                                37, 40
   42  └─!  _                                37, 40
 --------------------- TRACE ----------------------
 Q:
-  05       (program)                        06
+  05   !   (program)                        06
        ●   program
-  06       (expression_statement) [RecordOpen]  08
+  06  └‣─  (expression_statement)           08          [RecordOpen]
        ●   expression_statement
-  08       (Arr)                            03 : 09
+  08  └‣─  (Arr)                            03 : 09
        ▶   (Arr)
 
 Arr:
-  03       (array)                          34, 27
+  03   !   (array)                          34, 27
        ●   array
-  34       _                                30, 32
+  34  └─!  _                                30, 32
        ●   [
-  30  -ε-  [RecordOpen]                     29
-  29       (Obj)                            00 : 14
+  30  -ε-                                   29          [RecordOpen]
+  29   !   (Obj)                            00 : 14
        ▶   (Obj)
 
 Obj:
-  00       (object)                         01
+  00   !   (object)                         01
        ○   [
-  34  ❮❮❮ 
-  32       _                                30, 32
+  34  ❮❮❮
+  32  ──!  _                                30, 32
        ●   object
-  30  -ε-  [RecordOpen]                     29
-  29       (Obj)                            00 : 14
+  30  -ε-                                   29          [RecordOpen]
+  29   !   (Obj)                            00 : 14
        ▶   (Obj)
 
 Obj:
-  00       (object)                         01
+  00   !   (object)                         01
        ●   object
-  01       (pair)                           42, 24
+  01  └‣─  (pair)                           42, 24
        ○   {
        ●   pair
-  42       _                                37, 40
+  42  └─!  _                                37, 40
        ●   property_identifier
-  37  -ε-  [RecordOpen]                     36
-  36       (Arr)                            03 : 18
-  42  ❮❮❮ 
-  40       _                                37, 40
+  37  -ε-                                   36          [RecordOpen]
+  36   !   value: (Arr)                     03 : 18
+  42  ❮❮❮
+  40  ──!  _                                37, 40
        ●   :
-  37  -ε-  [RecordOpen]                     36
-  36       (Arr)                            03 : 18
-  40  ❮❮❮ 
-  40       _                                37, 40
+  37  -ε-                                   36          [RecordOpen]
+  36   !   value: (Arr)                     03 : 18
+  40  ❮❮❮
+  40  ──!  _                                37, 40
        ●   array
-  37  -ε-  [RecordOpen]                     36
-  36       (Arr)                            03 : 18
+  37  -ε-                                   36          [RecordOpen]
+  36   !   value: (Arr)                     03 : 18
        ▶   (Arr)
 
 Arr:
-  03       (array)                          34, 27
+  03   !   (array)                          34, 27
        ●   array
-  34       _                                30, 32
+  34  └─!  _                                30, 32
        ●   [
-  30  -ε-  [RecordOpen]                     29
-  29       (Obj)                            00 : 14
+  30  -ε-                                   29          [RecordOpen]
+  29   !   (Obj)                            00 : 14
        ▶   (Obj)
 
 Obj:
-  00       (object)                         01
+  00   !   (object)                         01
        ○   [
-  34  ❮❮❮ 
-  32       _                                30, 32
+  34  ❮❮❮
+  32  ──!  _                                30, 32
        ●   number
-  30  -ε-  [RecordOpen]                     29
-  29       (Obj)                            00 : 14
+  30  -ε-                                   29          [RecordOpen]
+  29   !   (Obj)                            00 : 14
        ▶   (Obj)
 
 Obj:
-  00       (object)                         01
+  00   !   (object)                         01
        ○   number
-  32  ❮❮❮ 
-  32       _                                30, 32
+  32  ❮❮❮
+  32  ──!  _                                30, 32
        ●   ]
-  30  -ε-  [RecordOpen]                     29
-  29       (Obj)                            00 : 14
+  30  -ε-                                   29          [RecordOpen]
+  29   !   (Obj)                            00 : 14
        ▶   (Obj)
 
 Obj:
-  00       (object)                         01
+  00   !   (object)                         01
        ○   ]
-  32  ❮❮❮ 
-  32       _                                30, 32
-  03  ❮❮❮ 
-  27  -ε-  [Absent RecordSet(M0)]           26
-  26   ◀   (Arr)                            
+  32  ❮❮❮
+  32  ──!  _                                30, 32
+  03  ❮❮❮
+  27  -ε-                                   26          [Absent RecordSet(M0 obj)]
+  26   ◀   return                           18
 
 Obj:
-  18  -ε-  [RecordClose]                    20
-  20       _ [RecordSet(M1)]                23
+  18  -ε-                                   20          [RecordClose]
+  20  ─‣┘  _                                23          [RecordSet(M1 arr)]
        ●   pair
-  23       _                                22
+  23  ─‣┘  _                                22
        ●   object
-  22   ◀   (Obj)                            
+  22   ◀   return                           14
 
 Arr:
-  14  -ε-  [RecordClose]                    16
-  16       _ [RecordSet(M0)]                26
+  14  -ε-                                   16          [RecordClose]
+  16  ─‣┘  _                                26          [RecordSet(M0 obj)]
        ●   array
-  26   ◀   (Arr)                            
+  26   ◀   return                           09
 
 Q:
-  09  -ε-  [RecordClose]                    11
-  11       _ [RecordSet(M2)]                13
+  09  -ε-                                   11          [RecordClose]
+  11  ─‣┘² _                                13          [RecordSet(M2 top)]
        ●   program
-  13   ◀   (Q)                              ◼
+  13   ◀   return                           ◼

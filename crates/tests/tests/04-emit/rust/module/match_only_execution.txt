@@ -318,7 +318,7 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   1                                         ▶
+            //   1       return
             S1_PROBE => Flow::Accept,
             //   2   !   (program)                         1
             S2_PROBE => 'state: {

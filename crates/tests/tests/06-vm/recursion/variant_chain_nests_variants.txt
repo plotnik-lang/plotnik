@@ -81,56 +81,56 @@ Q:
   01   !   (program)                        02
   02  └‣─  (expression_statement)           03
   03  └‣─  (Chain)                          00 : 04
-  04  ─‣┘² _ [RecordSet(M4)]                06
-  06                                        ▶
+  04  ─‣┘² _                                06          [RecordSet(M4 top)]
+  06       return
   07  └‣─  function: (Chain)                00 : 08
-  08  ─‣┘  _ [RecordSet(M1) VariantClose]   10
-  10                                        ▶
-  11   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  10
-  14   !   (call_expression) [VariantOpen(M3)]  07
+  08  ─‣┘  _                                10          [RecordSet(M1 inner) VariantClose]
+  10       return
+  11   !   (identifier)                     10          [VariantOpen(M2 Base) Node RecordSet(M0 name) VariantClose]
+  14   !   (call_expression)                07          [VariantOpen(M3 Step)]
 --------------------- TRACE ----------------------
 Q:
-  01       (program)                        02
+  01   !   (program)                        02
        ●   program
-  02       (expression_statement)           03
+  02  └‣─  (expression_statement)           03
        ●   expression_statement
-  03       (Chain)                          00 : 04
+  03  └‣─  (Chain)                          00 : 04
        ▶   (Chain)
 
 Chain:
-  00   !   switch                           
+  00   !   switch
        ●   call_expression
-  14       (call_expression) [VariantOpen(M3)]  07
+  14   !   (call_expression)                07          [VariantOpen(M3 Step)]
        ●   call_expression
-  07       (Chain)                          00 : 08
+  07  └‣─  function: (Chain)                00 : 08
        ▶   (Chain)
 
 Chain:
-  00   !   switch                           
+  00   !   switch
        ●   call_expression
-  14       (call_expression) [VariantOpen(M3)]  07
+  14   !   (call_expression)                07          [VariantOpen(M3 Step)]
        ●   call_expression
-  07       (Chain)                          00 : 08
+  07  └‣─  function: (Chain)                00 : 08
        ▶   (Chain)
 
 Chain:
-  00   !   switch                           
+  00   !   switch
        ●   identifier
-  11       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  10
+  11   !   (identifier)                     10          [VariantOpen(M2 Base) Node RecordSet(M0 name) VariantClose]
        ●   identifier
-  10   ◀   (Chain)                          
+  10   ◀   return                           08
 
 Chain:
-  08       _ [RecordSet(M1) VariantClose]   10
+  08  ─‣┘  _                                10          [RecordSet(M1 inner) VariantClose]
        ●   call_expression
-  10   ◀   (Chain)                          
+  10   ◀   return                           08
 
 Chain:
-  08       _ [RecordSet(M1) VariantClose]   10
+  08  ─‣┘  _                                10          [RecordSet(M1 inner) VariantClose]
        ●   call_expression
-  10   ◀   (Chain)                          
+  10   ◀   return                           04
 
 Q:
-  04       _ [RecordSet(M4)]                06
+  04  ─‣┘² _                                06          [RecordSet(M4 top)]
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

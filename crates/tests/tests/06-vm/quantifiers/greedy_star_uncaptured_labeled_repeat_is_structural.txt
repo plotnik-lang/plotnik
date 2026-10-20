@@ -40,7 +40,7 @@ Q = 00 :: T0
 [instructions]
 Q:
   00   !   (program)                        10, 02
-  02                                        ▶
+  02       return
   03   !   (expression_statement)           08, 12
   05   !   (lexical_declaration)            08, 12
   07   !   switch
@@ -51,22 +51,22 @@ Q:
   12  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        10, 02
+  00   !   (program)                        10, 02
        ●   program
-  10       _                                07, 08
+  10  └─!  _                                07, 08
        ●   expression_statement
-  07   !   switch                           
+  07   !   switch
        ●   expression_statement
-  03       (expression_statement)           08, 12
+  03   !   (expression_statement)           08, 12
        ●   expression_statement
-  08       _                                07, 08
+  08  ──!  _                                07, 08
        ●   lexical_declaration
-  07   !   switch                           
+  07   !   switch
        ●   lexical_declaration
-  05       (lexical_declaration)            08, 12
+  05   !   (lexical_declaration)            08, 12
        ●   lexical_declaration
-  08       _                                07, 08
-  05  ❮❮❮ 
-  12       _                                02
+  08  ──!  _                                07, 08
+  05  ❮❮❮
+  12  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

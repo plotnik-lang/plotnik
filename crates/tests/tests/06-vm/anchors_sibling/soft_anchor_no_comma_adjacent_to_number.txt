@@ -41,48 +41,48 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
   03  └─!  _                                09, 10
-  05  ─◦─  (number) [Node RecordSet(M0)]    07
+  05  ─◦─  (number)                         07          [Node RecordSet(M0 n)]
   07  ─‣┘³ _                                08
-  08                                        ▶
+  08       return
   09   !   ","                              05
   10  ──!  _                                09, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                09, 10
+  03  └─!  _                                09, 10
        ●   [
-  09       ","                              05
+  09   !   ","                              05
        ○   [
-  03  ❮❮❮ 
-  10       _                                09, 10
+  03  ❮❮❮
+  10  ──!  _                                09, 10
        ●   number
-  09       ","                              05
+  09   !   ","                              05
        ○   number
-  10  ❮❮❮ 
-  10       _                                09, 10
+  10  ❮❮❮
+  10  ──!  _                                09, 10
        ●   ,
-  09       ","                              05
+  09   !   ","                              05
        ●   ,
-  05       (number) [Node RecordSet(M0)]    07
+  05  ─◦─  (number)                         07          [Node RecordSet(M0 n)]
        ○   ,
-  10  ❮❮❮ 
-  10       _                                09, 10
+  10  ❮❮❮
+  10  ──!  _                                09, 10
        ●   ,
-  09       ","                              05
+  09   !   ","                              05
        ●   ,
-  05       (number) [Node RecordSet(M0)]    07
+  05  ─◦─  (number)                         07          [Node RecordSet(M0 n)]
        ○   ]
-  10  ❮❮❮ 
-  10       _                                09, 10
+  10  ❮❮❮
+  10  ──!  _                                09, 10
        ●   ]
-  09       ","                              05
+  09   !   ","                              05
        ○   ]
-  10  ❮❮❮ 
-  10       _                                09, 10
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+  10  ❮❮❮
+  10  ──!  _                                09, 10
+  02  ❮❮❮
+  01  ❮❮❮

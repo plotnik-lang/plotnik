@@ -30,10 +30,10 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (program) [Node RecordSet(M0)]    2
-  2                                         ▶
+  0   !   (program)                         2           [Node RecordSet(M0 p)]
+  2       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program) [Node RecordSet(M0)]    02
+  0   !   (program)                         2           [Node RecordSet(M0 p)]
       ●   program
-  2   ◀   (Q)                               ◼
+  2   ◀   return                            ◼

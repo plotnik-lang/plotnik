@@ -41,9 +41,9 @@ Q = 00 :: T1
 [instructions]
 Q:
   00   !   (program)                        16, 10, 03
-  02                                        ▶
-  03  └‣─  (debugger_statement) [Node RecordSet(M0)]  18
-  05  ─‣─  (debugger_statement) [Node RecordSet(M0)]  18
+  02       return
+  03  └‣─  (debugger_statement)             18          [Node RecordSet(M0 d)]
+  05  ─‣─  (debugger_statement)             18          [Node RecordSet(M0 d)]
   07   !   (empty_statement)                05
   08  ──!  _                                07, 08
   10  └─!  _                                07, 08
@@ -53,26 +53,26 @@ Q:
   18  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        16, 10, 03
+  00   !   (program)                        16, 10, 03
        ●   program
-  16       _                                12, 14
+  16  └─!  _                                12, 14
        ●   empty_statement
-  12       (expression_statement)           08, 05
+  12   !   (expression_statement)           08, 05
        ○   empty_statement
-  16  ❮❮❮ 
-  14       _                                12, 14
+  16  ❮❮❮
+  14  ──!  _                                12, 14
        ●   debugger_statement
-  12       (expression_statement)           08, 05
+  12   !   (expression_statement)           08, 05
        ○   debugger_statement
-  14  ❮❮❮ 
-  14       _                                12, 14
-  00  ❮❮❮ 
-  10       _                                07, 08
+  14  ❮❮❮
+  14  ──!  _                                12, 14
+  00  ❮❮❮
+  10  └─!  _                                07, 08
        ●   empty_statement
-  07       (empty_statement)                05
+  07   !   (empty_statement)                05
        ●   empty_statement
-  05       (debugger_statement) [Node RecordSet(M0)]  18
+  05  ─‣─  (debugger_statement)             18          [Node RecordSet(M0 d)]
        ●   debugger_statement
-  18       _                                02
+  18  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

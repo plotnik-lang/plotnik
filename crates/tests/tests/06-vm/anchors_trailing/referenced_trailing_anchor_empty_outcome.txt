@@ -54,12 +54,12 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
   03  └─!  _                                21, 22
-  05                                        ▶
-  06  ─•─  (identifier) [Node RecordSet(M0)] == "b"  24
-  08  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  24
-  10                                        ▶
-  11                                        ▶ p1
-  12   !   (identifier) == "a"              10
+  05       return
+  06  ─•─  (identifier == "b")              24          [Node RecordSet(M0 b)]
+  08  ─◦─  (identifier == "b")              24          [Node RecordSet(M0 b)]
+  10       return
+  11       return p1
+  12   !   (identifier == "a")              10
   14  ──!  _                                12, 14
   16  -ε-                                   14, 11
   18       (@16)                            16 : 06 / 08
@@ -68,37 +68,37 @@ Q:
   24  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                21, 22
+  03  └─!  _                                21, 22
        ●   [
-  21       "["                              18
+  21   !   "["                              18
        ●   [
   18       (@16)                            16 : 06 / 08
        ▶   (@16)
 
 @16:
   16  -ε-                                   14, 11
-  14       _                                12, 14
+  14  ──!  _                                12, 14
        ●   identifier
-  12       (identifier) == "a"              10
-  14  ❮❮❮ 
-  14       _                                12, 14
+  12   !   (identifier == "a")              10
+  14  ❮❮❮
+  14  ──!  _                                12, 14
        ●   ]
-  12       (identifier) == "a"              10
+  12   !   (identifier == "a")              10
        ○   ]
-  14  ❮❮❮ 
-  14       _                                12, 14
-  16  ❮❮❮ 
-  11   ◀   (@16)                            p1
+  14  ❮❮❮
+  14  ──!  _                                12, 14
+  16  ❮❮❮
+  11   ◀   return p1                        08
 
 Q:
-  08       (identifier) [Node RecordSet(M0)] == "b"  24
+  08  ─◦─  (identifier == "b")              24          [Node RecordSet(M0 b)]
        ●   identifier
-  24       _                                05
+  24  ─‣┘³ _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

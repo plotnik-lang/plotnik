@@ -85,34 +85,34 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
   03  └‣─  "["                              18
-  04                                        ▶
-  05  ─‣─  (identifier) [Node RecordSet(M1) VariantClose] == "b"  20
-  08  ─•─  (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  05
-  11  ─‣─  (identifier) [Node RecordSet(M2) VariantClose] == "b"  20
-  14  ─◦─  "," [VariantOpen(M5) Node RecordSet(M3)]  11
-  16   !   (identifier) == "p"              08, 14
+  04       return
+  05  ─‣─  (identifier == "b")              20          [Node RecordSet(M1 b) VariantClose]
+  08  ─•─  (identifier == "a")              05          [VariantOpen(M4 Named) Node RecordSet(M0 a)]
+  11  ─‣─  (identifier == "b")              20          [Node RecordSet(M2 b) VariantClose]
+  14  ─◦─  ","                              11          [VariantOpen(M5 Anon) Node RecordSet(M3 comma)]
+  16   !   (identifier == "p")              08, 14
   18  ──!  _                                16, 18
-  20  ─‣┘³ _ [RecordSet(M6)]                04
+  20  ─‣┘³ _                                04          [RecordSet(M6 choice)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       "["                              18
+  03  └‣─  "["                              18
        ●   [
-  18       _                                16, 18
+  18  ──!  _                                16, 18
        ●   identifier
-  16       (identifier) == "p"              08, 14
+  16   !   (identifier == "p")              08, 14
        ●   identifier
-  08       (identifier) [VariantOpen(M4) Node RecordSet(M0)] == "a"  05
+  08  ─•─  (identifier == "a")              05          [VariantOpen(M4 Named) Node RecordSet(M0 a)]
        ○   ,
        ●   identifier
-  05       (identifier) [Node RecordSet(M1) VariantClose] == "b"  20
+  05  ─‣─  (identifier == "b")              20          [Node RecordSet(M1 b) VariantClose]
        ○   ,
        ●   identifier
-  20       _ [RecordSet(M6)]                04
+  20  ─‣┘³ _                                04          [RecordSet(M6 choice)]
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

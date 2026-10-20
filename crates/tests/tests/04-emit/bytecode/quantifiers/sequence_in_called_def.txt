@@ -12,16 +12,16 @@ Q    = 05
 
 [transitions]
 Item:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  01       return
+  02   !   (identifier)                     01          [Node RecordSet(name)]
 
 Q:
-  04                                        ▶
+  04       return
   05   !   (array)                          13, 04
   06  ─‣┘  _                                04
-  08  -ε-  [SuppressEnd]                    12, 06
+  08  -ε-                                   12, 06      [SuppressEnd]
   09   !   (Item)                           02 : 08
-  10  -ε-  [SuppressBegin]                  09
+  10  -ε-                                   09          [SuppressBegin]
   12  ──!  _                                10, 12
   13  └─!  _                                10, 12
 -------------------- BYTECODE --------------------
@@ -61,15 +61,15 @@ Q    = 03 :: T0
 
 [instructions]
 Item:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
+  02       return
 
 Q:
   03   !   (array)                          13, 05
-  05                                        ▶
-  06  -ε-  [SuppressEnd]                    11, 15
+  05       return
+  06  -ε-                                   11, 15      [SuppressEnd]
   08   !   (Item)                           00 : 06
-  09  -ε-  [SuppressBegin]                  08
+  09  -ε-                                   08          [SuppressBegin]
   11  ──!  _                                09, 11
   13  └─!  _                                09, 11
   15  ─‣┘  _                                05

@@ -48,37 +48,37 @@ Q     = 03 :: T3
 
 [instructions]
 Name:
-  00   !   (identifier) [NodeText RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [NodeText RecordSet(M0 text)]
+  02       return
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement)           06          [RecordOpen]
   06  └‣─  (Name)                           00 : 08
   07  ...
-  08  -ε-  [RecordClose]                    10
-  10  ─‣┘² _ [RecordSet(M1)]                12
-  12                                        ▶
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘² _                                12          [RecordSet(M1 name)]
+  12       return
 
 Other:
   13   !   (program)                        14
-  14                                        ▶
+  14       return
 --------------------- TRACE ----------------------
 Q:
-  03       (program)                        04
+  03   !   (program)                        04
        ●   program
-  04       (expression_statement) [RecordOpen]  06
+  04  └‣─  (expression_statement)           06          [RecordOpen]
        ●   expression_statement
-  06       (Name)                           00 : 08
+  06  └‣─  (Name)                           00 : 08
        ▶   (Name)
 
 Name:
-  00       (identifier) [NodeText RecordSet(M0)]  02
+  00   !   (identifier)                     02          [NodeText RecordSet(M0 text)]
        ●   identifier
-  02   ◀   (Name)                           
+  02   ◀   return                           08
 
 Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘² _                                12          [RecordSet(M1 name)]
        ●   program
-  12   ◀   (Q)                              ◼
+  12   ◀   return                           ◼

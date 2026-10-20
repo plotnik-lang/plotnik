@@ -37,31 +37,31 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                08, 10
-  03  ──!  (expression_statement) [Node RecordSet(M1)]  05
+  03  ──!  (expression_statement)           05          [Node RecordSet(M1 b)]
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08   !   (lexical_declaration) [Node RecordSet(M0)]  03
+  08   !   (lexical_declaration)            03          [Node RecordSet(M0 a)]
   10  ──!  _                                08, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                08, 10
+  01  └─!  _                                08, 10
        ●   lexical_declaration
-  08       (lexical_declaration) [Node RecordSet(M0)]  03
+  08   !   (lexical_declaration)            03          [Node RecordSet(M0 a)]
        ●   lexical_declaration
-  03       (expression_statement) [Node RecordSet(M1)]  05
+  03  ──!  (expression_statement)           05          [Node RecordSet(M1 b)]
        ○   comment
-  01  ❮❮❮ 
-  10       _                                08, 10
+  01  ❮❮❮
+  10  ──!  _                                08, 10
        ●   comment
-  08       (lexical_declaration) [Node RecordSet(M0)]  03
+  08   !   (lexical_declaration)            03          [Node RecordSet(M0 a)]
        ○   comment
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   expression_statement
-  08       (lexical_declaration) [Node RecordSet(M0)]  03
+  08   !   (lexical_declaration)            03          [Node RecordSet(M0 a)]
        ○   expression_statement
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10

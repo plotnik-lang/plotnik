@@ -70,7 +70,7 @@ x
       "ip": 0,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#0"
+        "event": "SpanStart(P0)"
       },
       "query_span_id": 0,
       "node": null,
@@ -80,7 +80,7 @@ x
       "ip": 0,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStartAt#1"
+        "event": "SpanStartAt(P1)"
       },
       "query_span_id": 1,
       "node": {
@@ -138,7 +138,7 @@ x
       "ip": 2,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStartAt#2"
+        "event": "SpanStartAt(P2)"
       },
       "query_span_id": 2,
       "node": {
@@ -220,17 +220,17 @@ N0: S3 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..70  source_id=0  T1
-P1 pattern    4..70  source_id=0
-P2 pattern    15..68  source_id=0
-P3 capture    61..64  source_id=0  T1.M0
-P4 pattern    41..60  source_id=0
+P0 def     0..70 src=0  T1
+P1 pattern 4..70 src=0
+P2 pattern 15..68 src=0
+P3 capture 61..64 src=0  T1.M0
+P4 pattern 41..60 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStartAt#2]  04
-  04  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4] == "y"  07
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
+  04  └‣─  (identifier == "y")              07          [SpanStartAt(P4) SpanStart(P3) Node RecordSet(M0 id) SpanEnd(P3) SpanEnd(P4)]
   07  ─‣┘  _                                08
-  08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
-  10                                        ▶
+  08  ─‣┘  _                                10          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  10       return

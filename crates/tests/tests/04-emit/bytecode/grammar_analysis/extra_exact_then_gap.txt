@@ -22,7 +22,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (pair)                            6
   4  ─‣┘  _                                 1
   5  ─‣─  (num)                             4
@@ -51,4 +51,4 @@ Q:
   1  └─!  (comment)                         2
   2  ─‣─  (num)                             3
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

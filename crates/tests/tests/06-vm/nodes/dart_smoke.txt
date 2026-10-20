@@ -44,20 +44,20 @@ Q:
   0   !   (source_file)                     1
   1  └‣─  (function_declaration)            2
   2  └‣─  signature: (function_signature)   3
-  3  └‣─  name: (identifier) [Node RecordSet(M0)]  5
+  3  └‣─  name: (identifier)                5           [Node RecordSet(M0 name)]
   5  ─‣┘³ _                                 6
-  6                                         ▶
+  6       return
 --------------------- TRACE ----------------------
 Q:
-  0       (source_file)                     01
+  0   !   (source_file)                     1
       ●   source_file
-  1       (function_declaration)            02
+  1  └‣─  (function_declaration)            2
       ●   function_declaration
-  2       signature: (function_signature)   03
+  2  └‣─  signature: (function_signature)   3
       ●   function_signature
-  3       name: (identifier) [Node RecordSet(M0)]  05
+  3  └‣─  name: (identifier)                5           [Node RecordSet(M0 name)]
       ○   type
       ●   identifier
-  5       _                                 06
+  5  ─‣┘³ _                                 6
       ●   source_file
-  6   ◀   (Q)                               ◼
+  6   ◀   return                            ◼

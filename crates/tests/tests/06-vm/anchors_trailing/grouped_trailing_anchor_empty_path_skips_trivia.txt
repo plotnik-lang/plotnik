@@ -37,40 +37,40 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          12, 05
-  04                                        ▶
+  04       return
   05  └•┘  _                                07
   06  ─•┘  _                                07
   07  ─‣┘² _                                04
-  08   !   (identifier) == "a"              06
+  08   !   (identifier == "a")              06
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          12, 05
+  02  └‣─  (array)                          12, 05
        ●   array
-  12       _                                08, 10
+  12  └─!  _                                08, 10
        ●   [
-  08       (identifier) == "a"              06
+  08   !   (identifier == "a")              06
        ○   [
-  12  ❮❮❮ 
-  10       _                                08, 10
+  12  ❮❮❮
+  10  ──!  _                                08, 10
        ●   comment
-  08       (identifier) == "a"              06
+  08   !   (identifier == "a")              06
        ○   comment
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   ]
-  08       (identifier) == "a"              06
+  08   !   (identifier == "a")              06
        ○   ]
-  10  ❮❮❮ 
-  10       _                                08, 10
-  02  ❮❮❮ 
-  05       _                                07
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+  02  ❮❮❮
+  05  └•┘  _                                07
        ●   array
-  07       _                                04
+  07  ─‣┘² _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

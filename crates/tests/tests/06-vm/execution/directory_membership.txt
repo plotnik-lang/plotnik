@@ -53,40 +53,40 @@ Saved        = 03 :: T0
 
 [instructions]
 Name:
-  00   !   (identifier) [NodeText RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [NodeText RecordSet(M0 text)]
+  02       return
 
 Saved:
   03   !   (program)                        04
-  04                                        ▶
+  04       return
 
 Additional:
   05   !   (number)                         06
-  06                                        ▶
+  06       return
 
 <expression>:
   07   !   (program)                        08
-  08  └‣─  (expression_statement) [RecordOpen]  10
+  08  └‣─  (expression_statement)           10          [RecordOpen]
   10  └‣─  (Name)                           00 : 11
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘² _ [RecordSet(M1)]                15
-  15                                        ▶
+  11  -ε-                                   13          [RecordClose]
+  13  ─‣┘² _                                15          [RecordSet(M1 name)]
+  15       return
 --------------------- TRACE ----------------------
 <expression>:
-  07       (program)                        08
+  07   !   (program)                        08
        ●   program
-  08       (expression_statement) [RecordOpen]  10
+  08  └‣─  (expression_statement)           10          [RecordOpen]
        ●   expression_statement
-  10       (Name)                           00 : 11
+  10  └‣─  (Name)                           00 : 11
        ▶   (Name)
 
 Name:
-  00       (identifier) [NodeText RecordSet(M0)]  02
+  00   !   (identifier)                     02          [NodeText RecordSet(M0 text)]
        ●   identifier
-  02   ◀   (Name)                           
+  02   ◀   return                           11
 
 <expression>:
-  11  -ε-  [RecordClose]                    13
-  13       _ [RecordSet(M1)]                15
+  11  -ε-                                   13          [RecordClose]
+  13  ─‣┘² _                                15          [RecordSet(M1 name)]
        ●   program
-  15   ◀   (<expression>)                   ◼
+  15   ◀   return                           ◼

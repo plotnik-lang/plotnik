@@ -13,21 +13,21 @@ Rec = 10
 
 [transitions]
 Rec:
-  01                                        ▶
-  02   !   (program) [VariantOpen(A)]       05
-  04  ─‣┘  _ [VariantClose]                 01
+  01       return
+  02   !   (program)                        05          [VariantOpen(A)]
+  04  ─‣┘  _                                01          [VariantClose]
   05  └‣─  (expression_statement)           08
-  06  ─‣┘  _ [RecordSet(inner)]             04
+  06  ─‣┘  _                                04          [RecordSet(inner)]
   08  └‣─  (Rec)                            10 : 06
-  09   !   (identifier) [VariantOpen(B) Node RecordSet(id) VariantClose]  01
+  09   !   (identifier)                     01          [VariantOpen(B) Node RecordSet(id) VariantClose]
   10   !   switch
              (program)                      02
              (identifier)                   09
 
 Q:
-  11  -ε-  [SuppressBegin]                  14
-  12                                        ▶
-  13  -ε-  [SuppressEnd]                    12
+  11  -ε-                                   14          [SuppressBegin]
+  12       return
+  13  -ε-                                   12          [SuppressEnd]
   14   !   (Rec)                            10 : 13
 -------------------- BYTECODE --------------------
 [strings]
@@ -69,14 +69,14 @@ Rec:
              (identifier)                   16
 
 Q:
-  01  -ε-  [SuppressBegin]                  03
+  01  -ε-                                   03          [SuppressBegin]
   03   !   (Rec)                            00 : 04
-  04  -ε-  [SuppressEnd]                    06
-  06                                        ▶
+  04  -ε-                                   06          [SuppressEnd]
+  06       return
   07  └‣─  (Rec)                            00 : 08
-  08  ─‣┘  _ [RecordSet(M0)]                10
-  10  ─‣┘  _ [VariantClose]                 12
-  12                                        ▶
+  08  ─‣┘  _                                10          [RecordSet(M0 inner)]
+  10  ─‣┘  _                                12          [VariantClose]
+  12       return
   13  └‣─  (expression_statement)           07
-  14   !   (program) [VariantOpen(M2)]      13
-  16   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
+  14   !   (program)                        13          [VariantOpen(M2 A)]
+  16   !   (identifier)                     12          [VariantOpen(M3 B) Node RecordSet(M1 id) VariantClose]

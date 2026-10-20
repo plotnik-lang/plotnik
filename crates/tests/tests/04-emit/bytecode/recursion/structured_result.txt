@@ -18,23 +18,23 @@ Test = 14
 
 [transitions]
 Expr:
-  01                                        ▶
-  02   !   (number) [VariantOpen(Lit) Node RecordSet(value) VariantClose]  01
-  03   !   (call_expression) [VariantOpen(Nested)]  10
-  05  ─‣┘  _ [VariantClose]                 01
+  01       return
+  02   !   (number)                         01          [VariantOpen(Lit) Node RecordSet(value) VariantClose]
+  03   !   (call_expression)                10          [VariantOpen(Nested)]
+  05  ─‣┘  _                                01          [VariantClose]
   06  ─‣─  arguments: (arguments)           09
-  07  ─‣┘  _ [RecordSet(inner)]             05
+  07  ─‣┘  _                                05          [RecordSet(inner)]
   09  └‣─  (Expr)                           11 : 07
-  10  └‣─  function: (identifier) [Node RecordSet(fn)]  06
+  10  └‣─  function: (identifier)           06          [Node RecordSet(fn)]
   11   !   switch
              (number)                       02
              (call_expression)              03
 
 Test:
-  13                                        ▶
+  13       return
   14   !   (program)                        16
   16  └‣─  (expression_statement)           19
-  17  ─‣┘² _ [RecordSet(expr)]              13
+  17  ─‣┘² _                                13          [RecordSet(expr)]
   19  └‣─  (Expr)                           11 : 17
 -------------------- BYTECODE --------------------
 [strings]
@@ -88,13 +88,13 @@ Test:
   01   !   (program)                        02
   02  └‣─  (expression_statement)           03
   03  └‣─  (Expr)                           00 : 04
-  04  ─‣┘² _ [RecordSet(M5)]                06
-  06                                        ▶
+  04  ─‣┘² _                                06          [RecordSet(M5 expr)]
+  06       return
   07  └‣─  (Expr)                           00 : 08
-  08  ─‣┘  _ [RecordSet(M2)]                10
-  10  ─‣┘  _ [VariantClose]                 12
-  12                                        ▶
-  13   !   (number) [VariantOpen(M3) Node RecordSet(M0) VariantClose]  12
+  08  ─‣┘  _                                10          [RecordSet(M2 inner)]
+  10  ─‣┘  _                                12          [VariantClose]
+  12       return
+  13   !   (number)                         12          [VariantOpen(M3 Lit) Node RecordSet(M0 value) VariantClose]
   16  ─‣─  arguments: (arguments)           07
-  17  └‣─  function: (identifier) [Node RecordSet(M1)]  16
-  19   !   (call_expression) [VariantOpen(M4)]  17
+  17  └‣─  function: (identifier)           16          [Node RecordSet(M1 fn)]
+  19   !   (call_expression)                17          [VariantOpen(M4 Nested)]

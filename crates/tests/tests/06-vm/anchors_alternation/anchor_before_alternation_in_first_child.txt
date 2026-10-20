@@ -48,23 +48,23 @@ Q:
   1  └‣─  (expression_statement)            2
   2  └‣─  (call_expression)                 3
   3  └‣─  arguments: (arguments)            4
-  4  └•─  (identifier) [Node RecordSet(M0)]  6
+  4  └•─  (identifier)                      6           [Node RecordSet(M0 arg)]
   6  ─‣┘⁴ _                                 7
-  7                                         ▶
+  7       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       (call_expression)                 03
+  2  └‣─  (call_expression)                 3
       ●   call_expression
-  3       arguments: (arguments)            04
+  3  └‣─  arguments: (arguments)            4
       ○   identifier
       ●   arguments
-  4       (identifier) [Node RecordSet(M0)]  06
+  4  └•─  (identifier)                      6           [Node RecordSet(M0 arg)]
       ○   (
       ●   identifier
-  6       _                                 07
+  6  ─‣┘⁴ _                                 7
       ●   program
-  7   ◀   (Q)                               ◼
+  7   ◀   return                            ◼

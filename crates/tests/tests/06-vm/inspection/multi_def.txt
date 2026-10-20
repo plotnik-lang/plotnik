@@ -269,69 +269,69 @@ Name = 00 :: T1
 Q    = 05 :: T2
 
 [spans]
-P00 def        0..25  source_id=0  T1
-P01 capture    20..25  source_id=0  T1.M0
-P02 pattern    7..19  source_id=0
-P03 def        27..132  source_id=0  T2
-P04 pattern    31..132  source_id=0
-P05 sequence   42..130  source_id=0
-P06 pattern    48..84  source_id=0
-P07 capture    77..83  source_id=0  T2.M1
-P08 ref        70..76  source_id=0  T1
-P09 pattern    89..126  source_id=0
-P10 capture    118..125  source_id=0  T2.M2
-P11 ref        111..117  source_id=0  T1
+P00 def      0..25 src=0  T1
+P01 capture  20..25 src=0  T1.M0
+P02 pattern  7..19 src=0
+P03 def      27..132 src=0  T2
+P04 pattern  31..132 src=0
+P05 sequence 42..130 src=0
+P06 pattern  48..84 src=0
+P07 capture  77..83 src=0  T2.M1
+P08 ref      70..76 src=0  T1
+P09 pattern  89..126 src=0
+P10 capture  118..125 src=0  T2.M2
+P11 ref      111..117 src=0  T1
 
 [instructions]
 Name:
-  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
-  04                                        ▶
+  00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
+  04       return
 
 Q:
-  05   !   (program) [SpanStart#3 SpanStartAt#4]  08
+  05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
   07  ...
-  08  └‣─  (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  11
+  08  └‣─  (expression_statement)           11          [SpanStart(P5) SpanStartAt(P6) SpanStart(P8) RecordOpen]
   11  └‣─  (Name)                           00 : 12
-  12  -ε-  [RecordClose]                    16
-  14  -ε-  [RecordClose]                    24
-  16  ─‣┘  _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  19
-  19  ─‣─  (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  22
+  12  -ε-                                   16          [RecordClose]
+  14  -ε-                                   24          [RecordClose]
+  16  ─‣┘  _                                19          [SpanStart(P7) RecordSet(M1 first) SpanEnd(P7) SpanEnd(P8)]
+  19  ─‣─  (expression_statement)           22          [SpanEnd(P6) SpanStartAt(P9) SpanStart(P11) RecordOpen]
   22  └‣─  (Name)                           00 : 14
-  23                                        ▶
-  24  ─‣┘  _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  27
-  27  ─‣┘  _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  23
+  23       return
+  24  ─‣┘  _                                27          [SpanStart(P10) RecordSet(M2 second) SpanEnd(P10) SpanEnd(P11)]
+  27  ─‣┘  _                                23          [SpanEnd(P9) SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
 --------------------- TRACE ----------------------
 Q:
-  05       (program) [SpanStart#3 SpanStartAt#4]  08
+  05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
        ●   program
-  08       (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 RecordOpen]  11
+  08  └‣─  (expression_statement)           11          [SpanStart(P5) SpanStartAt(P6) SpanStart(P8) RecordOpen]
        ●   expression_statement
-  11       (Name)                           00 : 12
+  11  └‣─  (Name)                           00 : 12
        ▶   (Name)
 
 Name:
-  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
        ●   identifier
-  04   ◀   (Name)                           
+  04   ◀   return                           12
 
 Q:
-  12  -ε-  [RecordClose]                    16
-  16       _ [SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#8]  19
+  12  -ε-                                   16          [RecordClose]
+  16  ─‣┘  _                                19          [SpanStart(P7) RecordSet(M1 first) SpanEnd(P7) SpanEnd(P8)]
        ●   expression_statement
-  19       (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 RecordOpen]  22
+  19  ─‣─  (expression_statement)           22          [SpanEnd(P6) SpanStartAt(P9) SpanStart(P11) RecordOpen]
        ●   expression_statement
-  22       (Name)                           00 : 14
+  22  └‣─  (Name)                           00 : 14
        ▶   (Name)
 
 Name:
-  00       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
+  00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
        ●   identifier
-  04   ◀   (Name)                           
+  04   ◀   return                           14
 
 Q:
-  14  -ε-  [RecordClose]                    24
-  24       _ [SpanStart#10 RecordSet(M2) SpanEnd#10 SpanEnd#11]  27
+  14  -ε-                                   24          [RecordClose]
+  24  ─‣┘  _                                27          [SpanStart(P10) RecordSet(M2 second) SpanEnd(P10) SpanEnd(P11)]
        ●   expression_statement
-  27       _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  23
+  27  ─‣┘  _                                23          [SpanEnd(P9) SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
        ●   program
-  23   ◀   (Q)                              ◼
+  23   ◀   return                           ◼

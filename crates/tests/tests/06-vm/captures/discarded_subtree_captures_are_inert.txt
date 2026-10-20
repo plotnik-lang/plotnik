@@ -41,24 +41,24 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (identifier) [Node RecordSet(M0)]  04
+  02  └‣─  (identifier)                     04          [Node RecordSet(M0 x)]
   04  ─‣┘  _                                08, 10
-  06                                        ▶
+  06       return
   07   !   (debugger_statement)             10
   08  ──!  _                                07, 08
   10  ─‣┘  _                                06
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (identifier) [Node RecordSet(M0)]  04
+  02  └‣─  (identifier)                     04          [Node RecordSet(M0 x)]
        ●   identifier
-  04       _                                08, 10
+  04  ─‣┘  _                                08, 10
        ●   expression_statement
-  08       _                                07, 08
-  04  ❮❮❮ 
-  10       _                                06
+  08  ──!  _                                07, 08
+  04  ❮❮❮
+  10  ─‣┘  _                                06
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

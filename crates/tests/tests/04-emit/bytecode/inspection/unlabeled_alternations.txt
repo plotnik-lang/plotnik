@@ -14,17 +14,17 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        04
   03  ─‣┘  _                                01
   04  └‣─  (expression_statement)           23, 19
   05  ─‣┘  _                                03
-  06   !   (identifier) [Absent RecordSet(num) Node RecordSet(id)]  05
-  07   !   (number) [Absent RecordSet(id) Node RecordSet(num)]  05
+  06   !   (identifier)                     05          [Absent RecordSet(num) Node RecordSet(id)]
+  07   !   (number)                         05          [Absent RecordSet(id) Node RecordSet(num)]
   08   !   (string)                         05
   10  ──!  _                                08, 10
-  11   !   _ [Absent RecordSet(id) Absent RecordSet(num)]  08, 10
-  19  -ε-  [Absent RecordSet(id) Absent RecordSet(num)]  03
+  11   !   _                                08, 10      [Absent RecordSet(id) Absent RecordSet(num)]
+  19  -ε-                                   03          [Absent RecordSet(id) Absent RecordSet(num)]
   22  ──!  _                                06, 07, 11, 22
   23  └─!  _                                06, 07, 11, 22
 -------------------- BYTECODE --------------------
@@ -55,37 +55,37 @@ N0: S3 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P00 def        0..113  source_id=0  T2
-P01 pattern    4..113  source_id=0
-P02 pattern    15..111  source_id=0
-P03 unlabeled_alternation 41..107  source_id=0
-P04 alternative 49..65  source_id=0
-P05 capture    62..65  source_id=0  T2.M0
-P06 pattern    49..61  source_id=0
-P07 alternative 72..85  source_id=0
-P08 capture    81..85  source_id=0  T2.M1
-P09 pattern    72..80  source_id=0
-P10 alternative 92..101  source_id=0
-P11 quantifier 100..101  source_id=0
-P12 pattern    92..100  source_id=0
+P00 def                   0..113 src=0  T2
+P01 pattern               4..113 src=0
+P02 pattern               15..111 src=0
+P03 unlabeled_alternation 41..107 src=0
+P04 alternative           49..65 src=0
+P05 capture               62..65 src=0  T2.M0
+P06 pattern               49..61 src=0
+P07 alternative           72..85 src=0
+P08 capture               81..85 src=0  T2.M1
+P09 pattern               72..80 src=0
+P10 alternative           92..101 src=0
+P11 quantifier            100..101 src=0
+P12 pattern               92..100 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStartAt#2]  22, 35
-  04                                        ▶
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  └‣─  (expression_statement)           22, 35      [SpanStartAt(P2)]
+  04       return
   05  ─‣┘  _                                06
-  06  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  04
-  08   !   (identifier) [SpanStart#3 SpanStart#4 Absent RecordSet(M1) SpanStartAt#6 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#6 SpanEnd#4 SpanEnd#3]  05
+  06  ─‣┘  _                                04          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  08   !   (identifier)                     05          [SpanStart(P3) SpanStart(P4) Absent RecordSet(M1 num) SpanStartAt(P6) SpanStart(P5) Node RecordSet(M0 id) SpanEnd(P5) SpanEnd(P6) SpanEnd(P4) SpanEnd(P3)]
   14  ...
   15  ...
-  16   !   (number) [SpanStart#3 SpanStart#7 Absent RecordSet(M0) SpanStartAt#9 SpanStart#8 Node RecordSet(M1) SpanEnd#8 SpanEnd#9 SpanEnd#7 SpanEnd#3]  05
+  16   !   (number)                         05          [SpanStart(P3) SpanStart(P7) Absent RecordSet(M0 id) SpanStartAt(P9) SpanStart(P8) Node RecordSet(M1 num) SpanEnd(P8) SpanEnd(P9) SpanEnd(P7) SpanEnd(P3)]
   22  └─!  _                                08, 16, 32, 40
-  24   !   (string) [SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#10 SpanEnd#3]  05
+  24   !   (string)                         05          [SpanStartAt(P12) SpanEnd(P12) SpanEnd(P11) SpanEnd(P10) SpanEnd(P3)]
   27  ──!  _                                24, 27
-  29   !   _ [SpanStart#11]                 24, 27
+  29   !   _                                24, 27      [SpanStart(P11)]
   31  ...
-  32  -ε-  [SpanStart#3 SpanStart#10 Absent RecordSet(M0) Absent RecordSet(M1)]  29
-  35  -ε-  [SpanStart#3 SpanStart#10 Absent RecordSet(M0) Absent RecordSet(M1) SpanStart#11 SpanEnd#11 SpanEnd#10 SpanEnd#3]  06
+  32  -ε-                                   29          [SpanStart(P3) SpanStart(P10) Absent RecordSet(M0 id) Absent RecordSet(M1 num)]
+  35  -ε-                                   06          [SpanStart(P3) SpanStart(P10) Absent RecordSet(M0 id) Absent RecordSet(M1 num) SpanStart(P11) SpanEnd(P11) SpanEnd(P10) SpanEnd(P3)]
   39  ...
   40  ──!  _                                08, 16, 32, 40

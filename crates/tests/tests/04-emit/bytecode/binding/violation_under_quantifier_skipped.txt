@@ -9,17 +9,17 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        18
-  03  ─‣┘  _ [ListClose RecordSet(x)]       01
-  05  -ε-  [ListClose RecordSet(x)]         01
-  07   !   (function_declaration) [Node]    10
-  08  -ε-  [ArrayPush]                      12, 03
+  03  ─‣┘  _                                01          [ListClose RecordSet(x)]
+  05  -ε-                                   01          [ListClose RecordSet(x)]
+  07   !   (function_declaration)           10          [Node]
+  08  -ε-                                   12, 03      [ArrayPush]
   09  ─‣┘  _                                08
   10  └‣─  (class_declaration)              09
   12  ──!  _                                07, 12
   13  └─!  _                                07, 12
-  18  -ε-  [ListOpen]                       13, 05
+  18  -ε-                                   13, 05      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -46,13 +46,13 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       14, 06
+  01  -ε-                                   14, 06      [ListOpen]
   03  └‣─  (class_declaration)              04
   04  ─‣┘  _                                08
-  05                                        ▶
-  06  -ε-  [ListClose RecordSet(M0)]        05
-  08  -ε-  [ArrayPush]                      12, 16
-  10   !   (function_declaration) [Node]    03
+  05       return
+  06  -ε-                                   05          [ListClose RecordSet(M0 x)]
+  08  -ε-                                   12, 16      [ArrayPush]
+  10   !   (function_declaration)           03          [Node]
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  ─‣┘  _ [ListClose RecordSet(M0)]      05
+  16  ─‣┘  _                                05          [ListClose RecordSet(M0 x)]

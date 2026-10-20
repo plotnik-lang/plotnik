@@ -47,37 +47,37 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       13, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M0)]        03
-  06   !   (lexical_declaration) [Node ArrayPush]  11, 16
-  08   !   (expression_statement) [Node ArrayPush]  11, 16
+  01  -ε-                                   13, 04      [ListOpen]
+  03       return
+  04  -ε-                                   03          [ListClose RecordSet(M0 all)]
+  06   !   (lexical_declaration)            11, 16      [Node ArrayPush]
+  08   !   (expression_statement)           11, 16      [Node ArrayPush]
   10   !   switch
              (lexical_declaration)          06
              (expression_statement)         08
   11  ──!  _                                10, 11
   13  └─!  _                                10, 11
   15  ...
-  16  ─‣┘  _ [ListClose RecordSet(M0)]      03
+  16  ─‣┘  _                                03          [ListClose RecordSet(M0 all)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       13, 04
-  13       _                                10, 11
+  01  -ε-                                   13, 04      [ListOpen]
+  13  └─!  _                                10, 11
        ●   lexical_declaration
-  10   !   switch                           
+  10   !   switch
        ●   lexical_declaration
-  06       (lexical_declaration) [Node ArrayPush]  11, 16
+  06   !   (lexical_declaration)            11, 16      [Node ArrayPush]
        ●   lexical_declaration
-  11       _                                10, 11
+  11  ──!  _                                10, 11
        ●   expression_statement
-  10   !   switch                           
+  10   !   switch
        ●   expression_statement
-  08       (expression_statement) [Node ArrayPush]  11, 16
+  08   !   (expression_statement)           11, 16      [Node ArrayPush]
        ●   expression_statement
-  11       _                                10, 11
-  08  ❮❮❮ 
-  16       _ [ListClose RecordSet(M0)]      03
+  11  ──!  _                                10, 11
+  08  ❮❮❮
+  16  ─‣┘  _                                03          [ListClose RecordSet(M0 all)]
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

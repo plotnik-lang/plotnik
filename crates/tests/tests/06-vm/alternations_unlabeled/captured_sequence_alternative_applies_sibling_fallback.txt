@@ -60,27 +60,27 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _ [RecordOpen]                   11, 12
-  03                                        ▶
-  04   !   (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  14
+  01  └─!  _                                11, 12      [RecordOpen]
+  03       return
+  04   !   (expression_statement)           14          [Absent RecordSet(M2 b) RecordOpen Node RecordSet(M0 a) RecordClose RecordSet(M1 grp)]
   07  -ε-                                   04
-  08   !   (comment) [Absent RecordSet(M1) Node RecordSet(M2)]  14
+  08   !   (comment)                        14          [Absent RecordSet(M1 grp) Node RecordSet(M2 b)]
   11   !   switch
              (expression_statement)         07
              (comment)                      08
   12  ──!  _                                11, 12
-  14  ─‣┘  _ [RecordClose RecordSet(M3)]    03
+  14  ─‣┘  _                                03          [RecordClose RecordSet(M3 w)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _ [RecordOpen]                   11, 12
+  01  └─!  _                                11, 12      [RecordOpen]
        ●   expression_statement
-  11   !   switch                           
+  11   !   switch
        ●   expression_statement
   07  -ε-                                   04
-  04       (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  14
+  04   !   (expression_statement)           14          [Absent RecordSet(M2 b) RecordOpen Node RecordSet(M0 a) RecordClose RecordSet(M1 grp)]
        ●   expression_statement
-  14       _ [RecordClose RecordSet(M3)]    03
+  14  ─‣┘  _                                03          [RecordClose RecordSet(M3 w)]
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

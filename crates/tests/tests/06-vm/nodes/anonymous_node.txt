@@ -41,20 +41,20 @@ Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
   2  └‣─  (binary_expression)               3
-  3  └‣─  "+" [Node RecordSet(M0)]          5
+  3  └‣─  "+"                               5           [Node RecordSet(M0 op)]
   5  ─‣┘³ _                                 6
-  6                                         ▶
+  6       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       (binary_expression)               03
+  2  └‣─  (binary_expression)               3
       ●   binary_expression
-  3       "+" [Node RecordSet(M0)]          05
+  3  └‣─  "+"                               5           [Node RecordSet(M0 op)]
       ○   identifier
       ●   +
-  5       _                                 06
+  5  ─‣┘³ _                                 6
       ●   program
-  6   ◀   (Q)                               ◼
+  6   ◀   return                            ◼

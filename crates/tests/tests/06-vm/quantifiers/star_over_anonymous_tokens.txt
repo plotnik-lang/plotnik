@@ -51,60 +51,60 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  -ε-  [ListOpen]                       12, 06
-  05                                        ▶
-  06  -ε-  [ListClose RecordSet(M0)]        16
-  08   !   "," [Node ArrayPush]             10, 14
+  03  -ε-                                   12, 06      [ListOpen]
+  05       return
+  06  -ε-                                   16          [ListClose RecordSet(M0 commas)]
+  08   !   ","                              10, 14      [Node ArrayPush]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
-  14  ─‣┘  _ [ListClose RecordSet(M0)]      16
+  14  ─‣┘  _                                16          [ListClose RecordSet(M0 commas)]
   16  ─‣┘² _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03  -ε-  [ListOpen]                       12, 06
-  12       _                                08, 10
+  03  -ε-                                   12, 06      [ListOpen]
+  12  └─!  _                                08, 10
        ●   [
-  08       "," [Node ArrayPush]             10, 14
+  08   !   ","                              10, 14      [Node ArrayPush]
        ○   [
-  12  ❮❮❮ 
-  10       _                                08, 10
+  12  ❮❮❮
+  10  ──!  _                                08, 10
        ●   number
-  08       "," [Node ArrayPush]             10, 14
+  08   !   ","                              10, 14      [Node ArrayPush]
        ○   number
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   ,
-  08       "," [Node ArrayPush]             10, 14
+  08   !   ","                              10, 14      [Node ArrayPush]
        ●   ,
-  10       _                                08, 10
+  10  ──!  _                                08, 10
        ●   number
-  08       "," [Node ArrayPush]             10, 14
+  08   !   ","                              10, 14      [Node ArrayPush]
        ○   number
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   ,
-  08       "," [Node ArrayPush]             10, 14
+  08   !   ","                              10, 14      [Node ArrayPush]
        ●   ,
-  10       _                                08, 10
+  10  ──!  _                                08, 10
        ●   number
-  08       "," [Node ArrayPush]             10, 14
+  08   !   ","                              10, 14      [Node ArrayPush]
        ○   number
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   ]
-  08       "," [Node ArrayPush]             10, 14
+  08   !   ","                              10, 14      [Node ArrayPush]
        ○   ]
-  10  ❮❮❮ 
-  10       _                                08, 10
-  08  ❮❮❮ 
-  14       _ [ListClose RecordSet(M0)]      16
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+  08  ❮❮❮
+  14  ─‣┘  _                                16          [ListClose RecordSet(M0 commas)]
        ●   array
-  16       _                                05
+  16  ─‣┘² _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

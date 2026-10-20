@@ -26,11 +26,11 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └‣─  (expression_statement) [Node RecordSet(M0)]  3
+  1  └‣─  (expression_statement)            3           [Node RecordSet(M0 e)]
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement) [Node RecordSet(M0)]  03
+  1  └‣─  (expression_statement)            3           [Node RecordSet(M0 e)]

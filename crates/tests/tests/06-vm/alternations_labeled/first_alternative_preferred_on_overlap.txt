@@ -48,22 +48,22 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └─!  _                                05, 08, 10
-  04                                        ▶
-  05   !   (_) [VariantOpen(M0) VariantClose]  12
+  04       return
+  05   !   (_)                              12          [VariantOpen(M0 A) VariantClose]
   07  ...
-  08   !   (identifier) [VariantOpen(M1) VariantClose]  12
+  08   !   (identifier)                     12          [VariantOpen(M1 B) VariantClose]
   10  ──!  _                                05, 08, 10
-  12  ─‣┘² _ [RecordSet(M2)]                04
+  12  ─‣┘² _                                04          [RecordSet(M2 v)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                05, 08, 10
+  02  └─!  _                                05, 08, 10
        ●   identifier
-  05       (_) [VariantOpen(M0) VariantClose]  12
+  05   !   (_)                              12          [VariantOpen(M0 A) VariantClose]
        ●   identifier
-  12       _ [RecordSet(M2)]                04
+  12  ─‣┘² _                                04          [RecordSet(M2 v)]
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

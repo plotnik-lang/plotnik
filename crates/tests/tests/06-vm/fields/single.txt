@@ -44,20 +44,20 @@ Q:
   0   !   (program)                         1
   1  └‣─  (lexical_declaration)             2
   2  └‣─  (variable_declarator)             3
-  3  └‣─  name: (identifier) [Node RecordSet(M0)]  5
+  3  └‣─  name: (identifier)                5           [Node RecordSet(M0 n)]
   5  ─‣┘³ _                                 6
-  6                                         ▶
+  6       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (lexical_declaration)             02
+  1  └‣─  (lexical_declaration)             2
       ●   lexical_declaration
-  2       (variable_declarator)             03
+  2  └‣─  (variable_declarator)             3
       ○   let
       ●   variable_declarator
-  3       name: (identifier) [Node RecordSet(M0)]  05
+  3  └‣─  name: (identifier)                5           [Node RecordSet(M0 n)]
       ●   identifier
-  5       _                                 06
+  5  ─‣┘³ _                                 6
       ●   program
-  6   ◀   (Q)                               ◼
+  6   ◀   return                            ◼

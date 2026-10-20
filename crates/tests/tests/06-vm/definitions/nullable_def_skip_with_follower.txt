@@ -42,19 +42,19 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        03, 10
-  02                                        ▶
-  03  └‣─  (debugger_statement) [Node RecordSet(M0)]  12
-  05  ─‣─  (debugger_statement) [Node RecordSet(M0)]  12
+  02       return
+  03  └‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
+  05  ─‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
   07   !   (expression_statement)           05
   08  ──!  _                                07, 08
   10  └─!  _                                07, 08
   12  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        03, 10
+  00   !   (program)                        03, 10
        ●   program
-  03       (debugger_statement) [Node RecordSet(M0)]  12
+  03  └‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
        ●   debugger_statement
-  12       _                                02
+  12  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

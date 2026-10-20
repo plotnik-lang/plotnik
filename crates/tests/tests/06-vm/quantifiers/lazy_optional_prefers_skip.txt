@@ -40,19 +40,19 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        03, 12
-  02                                        ▶
-  03  └‣─  (expression_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
-  06  ─‣─  (expression_statement) [Node RecordSet(M1)]  14
-  08   !   (expression_statement) [Node RecordSet(M0)]  06
+  02       return
+  03  └‣─  (expression_statement)           14          [Absent RecordSet(M0 e) Node RecordSet(M1 f)]
+  06  ─‣─  (expression_statement)           14          [Node RecordSet(M1 f)]
+  08   !   (expression_statement)           06          [Node RecordSet(M0 e)]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        03, 12
+  00   !   (program)                        03, 12
        ●   program
-  03       (expression_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
+  03  └‣─  (expression_statement)           14          [Absent RecordSet(M0 e) Node RecordSet(M1 f)]
        ●   expression_statement
-  14       _                                02
+  14  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

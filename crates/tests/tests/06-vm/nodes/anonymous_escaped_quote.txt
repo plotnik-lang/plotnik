@@ -46,25 +46,25 @@ Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
   2  └‣─  (string)                          3
-  3  └‣─  """                               4
-  4  ─‣─  (string_fragment) [Node RecordSet(M0)]  6
-  6  ─‣─  """                               7
+  3  └‣─  "\""                              4
+  4  ─‣─  (string_fragment)                 6           [Node RecordSet(M0 s)]
+  6  ─‣─  "\""                              7
   7  ─‣┘³ _                                 8
-  8                                         ▶
+  8       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       (string)                          03
+  2  └‣─  (string)                          3
       ●   string
-  3       """                               04
+  3  └‣─  "\""                              4
       ●   "
-  4       (string_fragment) [Node RecordSet(M0)]  06
+  4  ─‣─  (string_fragment)                 6           [Node RecordSet(M0 s)]
       ●   string_fragment
-  6       """                               07
+  6  ─‣─  "\""                              7
       ●   "
-  7       _                                 08
+  7  ─‣┘³ _                                 8
       ●   program
-  8   ◀   (Q)                               ◼
+  8   ◀   return                            ◼

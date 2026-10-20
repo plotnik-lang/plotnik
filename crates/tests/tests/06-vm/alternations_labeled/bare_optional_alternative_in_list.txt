@@ -55,39 +55,39 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       16, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M2)]        03
-  06  -ε-  [VariantClose ArrayPush]         14, 18
-  08   !   (comment) [Node RecordSet(M0)]   06
+  01  -ε-                                   16, 04      [ListOpen]
+  03       return
+  04  -ε-                                   03          [ListClose RecordSet(M2 items)]
+  06  -ε-                                   14, 18      [VariantClose ArrayPush]
+  08   !   (comment)                        06          [Node RecordSet(M0 c)]
   10  ──!  _                                08, 10
-  12   !   _ [VariantOpen(M1)]              08, 10
+  12   !   _                                08, 10      [VariantOpen(M1 A)]
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
-  18  ─‣┘  _ [ListClose RecordSet(M2)]      03
+  18  ─‣┘  _                                03          [ListClose RecordSet(M2 items)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       16, 04
-  16       _                                12, 14
+  01  -ε-                                   16, 04      [ListOpen]
+  16  └─!  _                                12, 14
        ●   comment
-  12       _ [VariantOpen(M1)]              08, 10
+  12   !   _                                08, 10      [VariantOpen(M1 A)]
        ●   comment
-  08       (comment) [Node RecordSet(M0)]   06
+  08   !   (comment)                        06          [Node RecordSet(M0 c)]
        ●   comment
-  06  -ε-  [VariantClose ArrayPush]         14, 18
-  14       _                                12, 14
+  06  -ε-                                   14, 18      [VariantClose ArrayPush]
+  14  ──!  _                                12, 14
        ●   expression_statement
-  12       _ [VariantOpen(M1)]              08, 10
+  12   !   _                                08, 10      [VariantOpen(M1 A)]
        ●   expression_statement
-  08       (comment) [Node RecordSet(M0)]   06
+  08   !   (comment)                        06          [Node RecordSet(M0 c)]
        ○   expression_statement
-  12  ❮❮❮ 
-  10       _                                08, 10
-  14  ❮❮❮ 
-  14       _                                12, 14
-  06  ❮❮❮ 
-  18       _ [ListClose RecordSet(M2)]      03
+  12  ❮❮❮
+  10  ──!  _                                08, 10
+  14  ❮❮❮
+  14  ──!  _                                12, 14
+  06  ❮❮❮
+  18  ─‣┘  _                                03          [ListClose RecordSet(M2 items)]
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

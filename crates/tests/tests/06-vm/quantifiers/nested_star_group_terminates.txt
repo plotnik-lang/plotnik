@@ -39,9 +39,9 @@ Q = 00 :: T1
 [instructions]
 Q:
   00   !   (program)                        16, 03
-  02                                        ▶
-  03  └‣─  (debugger_statement) [Node RecordSet(M0)]  07
-  05  ─‣─  (debugger_statement) [Node RecordSet(M0)]  07
+  02       return
+  03  └‣─  (debugger_statement)             07          [Node RecordSet(M0 d)]
+  05  ─‣─  (debugger_statement)             07          [Node RecordSet(M0 d)]
   07  ─‣┘  _                                02
   08   !   (expression_statement)           10, 14, 05
   10  ──!  _                                08, 10
@@ -50,34 +50,34 @@ Q:
   16  └─!  _                                12, 14
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        16, 03
+  00   !   (program)                        16, 03
        ●   program
-  16       _                                12, 14
+  16  └─!  _                                12, 14
        ●   expression_statement
-  12       _                                08, 10
+  12   !   _                                08, 10
        ●   expression_statement
-  08       (expression_statement)           10, 14, 05
+  08   !   (expression_statement)           10, 14, 05
        ●   expression_statement
-  10       _                                08, 10
+  10  ──!  _                                08, 10
        ●   debugger_statement
-  08       (expression_statement)           10, 14, 05
+  08   !   (expression_statement)           10, 14, 05
        ○   debugger_statement
-  10  ❮❮❮ 
-  10       _                                08, 10
-  08  ❮❮❮ 
-  14       _                                12, 14
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+  08  ❮❮❮
+  14  ──!  _                                12, 14
        ●   debugger_statement
-  12       _                                08, 10
+  12   !   _                                08, 10
        ●   debugger_statement
-  08       (expression_statement)           10, 14, 05
+  08   !   (expression_statement)           10, 14, 05
        ○   debugger_statement
-  12  ❮❮❮ 
-  10       _                                08, 10
-  14  ❮❮❮ 
-  14       _                                12, 14
-  08  ❮❮❮ 
-  05       (debugger_statement) [Node RecordSet(M0)]  07
+  12  ❮❮❮
+  10  ──!  _                                08, 10
+  14  ❮❮❮
+  14  ──!  _                                12, 14
+  08  ❮❮❮
+  05  ─‣─  (debugger_statement)             07          [Node RecordSet(M0 d)]
        ●   debugger_statement
-  07       _                                02
+  07  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

@@ -10,11 +10,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (array)                           9, 4
   3  ─‣┘  _                                 1
-  4  └‣─  (number) [Node RecordSet(n)]      3
-  5  ─‣─  (number) [Node RecordSet(n)]      3
+  4  └‣─  (number)                          3           [Node RecordSet(n)]
+  5  ─‣─  (number)                          3           [Node RecordSet(n)]
   6   !   (identifier)                      5
   8  ──!  _                                 6, 8
   9  └─!  _                                 6, 8
@@ -46,9 +46,9 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (array)                          10, 03
-  02                                        ▶
-  03  └‣─  (number) [Node RecordSet(M0)]    12
-  05  ─‣─  (number) [Node RecordSet(M0)]    12
+  02       return
+  03  └‣─  (number)                         12          [Node RecordSet(M0 n)]
+  05  ─‣─  (number)                         12          [Node RecordSet(M0 n)]
   07   !   (identifier)                     05
   08  ──!  _                                07, 08
   10  └─!  _                                07, 08

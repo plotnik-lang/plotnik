@@ -210,129 +210,129 @@ Choice:
 
 Q:
   001   !   (program)                       002
-  002  -ε-  [ListOpen]                      114, 105
-  004  -ε-  [RecordClose]                   006
-  006  ─‣┘  _ [RecordSet(M1)]               107
-  008                                       ▶
-  009   !   (identifier) [Node RecordSet(M0)]  008
-  011   !   (arguments) [Node RecordSet(M0)]  008
-  013   !   (array) [Node RecordSet(M0)]    008
+  002  -ε-                                  114, 105    [ListOpen]
+  004  -ε-                                  006         [RecordClose]
+  006  ─‣┘  _                               107         [RecordSet(M1 value)]
+  008       return
+  009   !   (identifier)                    008         [Node RecordSet(M0 node)]
+  011   !   (arguments)                     008         [Node RecordSet(M0 node)]
+  013   !   (array)                         008         [Node RecordSet(M0 node)]
   015  ...
-  016   !   (array_pattern) [Node RecordSet(M0)]  008
-  018   !   (arrow_function) [Node RecordSet(M0)]  008
-  020   !   (assignment_expression) [Node RecordSet(M0)]  008
-  022   !   (assignment_pattern) [Node RecordSet(M0)]  008
-  024   !   (augmented_assignment_expression) [Node RecordSet(M0)]  008
-  026   !   (await_expression) [Node RecordSet(M0)]  008
-  028   !   (binary_expression) [Node RecordSet(M0)]  008
-  030   !   (break_statement) [Node RecordSet(M0)]  008
-  032   !   (call_expression) [Node RecordSet(M0)]  008
-  034   !   (catch_clause) [Node RecordSet(M0)]  008
-  036   !   (class) [Node RecordSet(M0)]    008
-  038   !   (class_body) [Node RecordSet(M0)]  008
-  040   !   (class_declaration) [Node RecordSet(M0)]  008
-  042   !   (class_heritage) [Node RecordSet(M0)]  008
-  044   !   (class_static_block) [Node RecordSet(M0)]  008
-  046   !   (computed_property_name) [Node RecordSet(M0)]  008
-  048   !   (continue_statement) [Node RecordSet(M0)]  008
-  050   !   (debugger_statement) [Node RecordSet(M0)]  008
-  052   !   (decorator) [Node RecordSet(M0)]  008
-  054   !   (do_statement) [Node RecordSet(M0)]  008
-  056   !   (else_clause) [Node RecordSet(M0)]  008
-  058   !   (empty_statement) [Node RecordSet(M0)]  008
-  060   !   (export_clause) [Node RecordSet(M0)]  008
-  062   !   (export_specifier) [Node RecordSet(M0)]  008
-  064   !   (export_statement) [Node RecordSet(M0)]  008
-  066   !   (expression_statement) [Node RecordSet(M0)]  008
-  068   !   (field_definition) [Node RecordSet(M0)]  008
-  070   !   (finally_clause) [Node RecordSet(M0)]  008
-  072   !   (for_in_statement) [Node RecordSet(M0)]  008
-  074   !   (for_statement) [Node RecordSet(M0)]  008
-  076   !   (formal_parameters) [Node RecordSet(M0)]  008
-  078   !   (function_declaration) [Node RecordSet(M0)]  008
-  080   !   (function_expression) [Node RecordSet(M0)]  008
-  082   !   (generator_function) [Node RecordSet(M0)]  008
-  084   !   (generator_function_declaration) [Node RecordSet(M0)]  008
-  086   !   (if_statement) [Node RecordSet(M0)]  008
-  088   !   (import) [Node RecordSet(M0)]   008
-  090   !   (import_attribute) [Node RecordSet(M0)]  008
-  092   !   (import_clause) [Node RecordSet(M0)]  008
-  094   !   (import_specifier) [Node RecordSet(M0)]  008
-  096   !   (import_statement) [Node RecordSet(M0)]  008
-  098   !   (jsx_attribute) [Node RecordSet(M0)]  008
-  100   !   (jsx_closing_element) [Node RecordSet(M0)]  008
-  102   !   (number) [Node RecordSet(M0)]   008
-  104                                       ▶
-  105  -ε-  [ListClose RecordSet(M2)]       104
-  107  -ε-  [RecordClose ArrayPush]         112, 116
+  016   !   (array_pattern)                 008         [Node RecordSet(M0 node)]
+  018   !   (arrow_function)                008         [Node RecordSet(M0 node)]
+  020   !   (assignment_expression)         008         [Node RecordSet(M0 node)]
+  022   !   (assignment_pattern)            008         [Node RecordSet(M0 node)]
+  024   !   (augmented_assignment_expression)  008      [Node RecordSet(M0 node)]
+  026   !   (await_expression)              008         [Node RecordSet(M0 node)]
+  028   !   (binary_expression)             008         [Node RecordSet(M0 node)]
+  030   !   (break_statement)               008         [Node RecordSet(M0 node)]
+  032   !   (call_expression)               008         [Node RecordSet(M0 node)]
+  034   !   (catch_clause)                  008         [Node RecordSet(M0 node)]
+  036   !   (class)                         008         [Node RecordSet(M0 node)]
+  038   !   (class_body)                    008         [Node RecordSet(M0 node)]
+  040   !   (class_declaration)             008         [Node RecordSet(M0 node)]
+  042   !   (class_heritage)                008         [Node RecordSet(M0 node)]
+  044   !   (class_static_block)            008         [Node RecordSet(M0 node)]
+  046   !   (computed_property_name)        008         [Node RecordSet(M0 node)]
+  048   !   (continue_statement)            008         [Node RecordSet(M0 node)]
+  050   !   (debugger_statement)            008         [Node RecordSet(M0 node)]
+  052   !   (decorator)                     008         [Node RecordSet(M0 node)]
+  054   !   (do_statement)                  008         [Node RecordSet(M0 node)]
+  056   !   (else_clause)                   008         [Node RecordSet(M0 node)]
+  058   !   (empty_statement)               008         [Node RecordSet(M0 node)]
+  060   !   (export_clause)                 008         [Node RecordSet(M0 node)]
+  062   !   (export_specifier)              008         [Node RecordSet(M0 node)]
+  064   !   (export_statement)              008         [Node RecordSet(M0 node)]
+  066   !   (expression_statement)          008         [Node RecordSet(M0 node)]
+  068   !   (field_definition)              008         [Node RecordSet(M0 node)]
+  070   !   (finally_clause)                008         [Node RecordSet(M0 node)]
+  072   !   (for_in_statement)              008         [Node RecordSet(M0 node)]
+  074   !   (for_statement)                 008         [Node RecordSet(M0 node)]
+  076   !   (formal_parameters)             008         [Node RecordSet(M0 node)]
+  078   !   (function_declaration)          008         [Node RecordSet(M0 node)]
+  080   !   (function_expression)           008         [Node RecordSet(M0 node)]
+  082   !   (generator_function)            008         [Node RecordSet(M0 node)]
+  084   !   (generator_function_declaration)  008       [Node RecordSet(M0 node)]
+  086   !   (if_statement)                  008         [Node RecordSet(M0 node)]
+  088   !   (import)                        008         [Node RecordSet(M0 node)]
+  090   !   (import_attribute)              008         [Node RecordSet(M0 node)]
+  092   !   (import_clause)                 008         [Node RecordSet(M0 node)]
+  094   !   (import_specifier)              008         [Node RecordSet(M0 node)]
+  096   !   (import_statement)              008         [Node RecordSet(M0 node)]
+  098   !   (jsx_attribute)                 008         [Node RecordSet(M0 node)]
+  100   !   (jsx_closing_element)           008         [Node RecordSet(M0 node)]
+  102   !   (number)                        008         [Node RecordSet(M0 node)]
+  104       return
+  105  -ε-                                  104         [ListClose RecordSet(M2 items)]
+  107  -ε-                                  112, 116    [RecordClose ArrayPush]
   109  └‣─  (Choice)                        000 : 004
-  110   !   (expression_statement) [RecordOpen RecordOpen]  109
+  110   !   (expression_statement)          109         [RecordOpen RecordOpen]
   112  ──!  _                               110, 112
   114  └─!  _                               110, 112
-  116  ─‣┘  _ [ListClose RecordSet(M2)]     104
+  116  ─‣┘  _                               104         [ListClose RecordSet(M2 items)]
 --------------------- TRACE ----------------------
 Q:
-  001       (program)                       02
+  001   !   (program)                       002
         ●   program
-  002  -ε-  [ListOpen]                      114, 105
-  114       _                               110, 112
+  002  -ε-                                  114, 105    [ListOpen]
+  114  └─!  _                               110, 112
         ●   expression_statement
-  110       (expression_statement) [RecordOpen RecordOpen]  109
+  110   !   (expression_statement)          109         [RecordOpen RecordOpen]
         ●   expression_statement
-  109       (Choice)                        00 : 04
+  109  └‣─  (Choice)                        000 : 004
         ▶   (Choice)
 
 Choice:
-  000   !   switch                          
+  000   !   switch
         ○   string
-  109  ❮❮❮ 
+  109  ❮❮❮
         ▶   (Choice)
 
 Choice:
-  000   !   switch                          
+  000   !   switch
         ○   ;
-  109  ❮❮❮ 
-  114  ❮❮❮ 
-  112       _                               110, 112
+  109  ❮❮❮
+  114  ❮❮❮
+  112  ──!  _                               110, 112
         ●   expression_statement
-  110       (expression_statement) [RecordOpen RecordOpen]  109
+  110   !   (expression_statement)          109         [RecordOpen RecordOpen]
         ●   expression_statement
-  109       (Choice)                        00 : 04
+  109  └‣─  (Choice)                        000 : 004
         ▶   (Choice)
 
 Choice:
-  000   !   switch                          
+  000   !   switch
         ●   number
-  102       (number) [Node RecordSet(M0)]   08
+  102   !   (number)                        008         [Node RecordSet(M0 node)]
         ●   number
-  008   ◀   (Choice)                        
+  008   ◀   return                          004
 
 Q:
-  004  -ε-  [RecordClose]                   06
-  006       _ [RecordSet(M1)]               107
+  004  -ε-                                  006         [RecordClose]
+  006  ─‣┘  _                               107         [RecordSet(M1 value)]
         ●   expression_statement
-  107  -ε-  [RecordClose ArrayPush]         112, 116
-  112       _                               110, 112
+  107  -ε-                                  112, 116    [RecordClose ArrayPush]
+  112  ──!  _                               110, 112
         ●   expression_statement
-  110       (expression_statement) [RecordOpen RecordOpen]  109
+  110   !   (expression_statement)          109         [RecordOpen RecordOpen]
         ●   expression_statement
-  109       (Choice)                        00 : 04
+  109  └‣─  (Choice)                        000 : 004
         ▶   (Choice)
 
 Choice:
-  000   !   switch                          
+  000   !   switch
         ●   identifier
-  009       (identifier) [Node RecordSet(M0)]  08
+  009   !   (identifier)                    008         [Node RecordSet(M0 node)]
         ●   identifier
-  008   ◀   (Choice)                        
+  008   ◀   return                          004
 
 Q:
-  004  -ε-  [RecordClose]                   06
-  006       _ [RecordSet(M1)]               107
+  004  -ε-                                  006         [RecordClose]
+  006  ─‣┘  _                               107         [RecordSet(M1 value)]
         ●   expression_statement
-  107  -ε-  [RecordClose ArrayPush]         112, 116
-  112       _                               110, 112
-  107  ❮❮❮ 
-  116       _ [ListClose RecordSet(M2)]     104
+  107  -ε-                                  112, 116    [RecordClose ArrayPush]
+  112  ──!  _                               110, 112
+  107  ❮❮❮
+  116  ─‣┘  _                               104         [ListClose RecordSet(M2 items)]
         ●   program
-  104   ◀   (Q)                             ◼
+  104   ◀   return                          ◼

@@ -57,52 +57,52 @@ Q      = 05 :: T2
 [instructions]
 Member:
   00   !   (method_definition)              01
-  01  └‣─  name: (property_identifier) [Node RecordSet(M0)] == "b"  03
+  01  └‣─  name: (property_identifier == "b")  03       [Node RecordSet(M0 name)]
   03  ─‣┘  _                                04
-  04                                        ▶
+  04       return
 
 Q:
   05   !   (program)                        06
   06  └‣─  (class_declaration)              08
   07  ...
-  08  └‣─  body: (class_body) [RecordOpen]  10
+  08  └‣─  body: (class_body)               10          [RecordOpen]
   10  └‣─  member: (Member)                 00 : 11
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘³ _ [RecordSet(M1)]                15
-  15                                        ▶
+  11  -ε-                                   13          [RecordClose]
+  13  ─‣┘³ _                                15          [RecordSet(M1 m)]
+  15       return
 --------------------- TRACE ----------------------
 Q:
-  05       (program)                        06
+  05   !   (program)                        06
        ●   program
-  06       (class_declaration)              08
+  06  └‣─  (class_declaration)              08
        ●   class_declaration
-  08       body: (class_body) [RecordOpen]  10
+  08  └‣─  body: (class_body)               10          [RecordOpen]
        ○   class
        ○   identifier
        ●   class_body
-  10       (Member)                         00 : 11
+  10  └‣─  member: (Member)                 00 : 11
        ▶   (Member)
 
 Member:
-  00       (method_definition)              01
+  00   !   (method_definition)              01
        ●   method_definition
-  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  03
+  01  └‣─  name: (property_identifier == "b")  03       [Node RecordSet(M0 name)]
        ○   formal_parameters
        ○   statement_block
-  10  ❮❮❮ 
+  10  ❮❮❮
        ▶   (Member)
 
 Member:
-  00       (method_definition)              01
+  00   !   (method_definition)              01
        ●   method_definition
-  01       name: (property_identifier) [Node RecordSet(M0)] == "b"  03
+  01  └‣─  name: (property_identifier == "b")  03       [Node RecordSet(M0 name)]
        ●   property_identifier
-  03       _                                04
+  03  ─‣┘  _                                04
        ●   method_definition
-  04   ◀   (Member)                         
+  04   ◀   return                           11
 
 Q:
-  11  -ε-  [RecordClose]                    13
-  13       _ [RecordSet(M1)]                15
+  11  -ε-                                   13          [RecordClose]
+  13  ─‣┘³ _                                15          [RecordSet(M1 m)]
        ●   program
-  15   ◀   (Q)                              ◼
+  15   ◀   return                           ◼

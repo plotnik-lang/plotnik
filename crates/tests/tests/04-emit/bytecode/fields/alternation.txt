@@ -10,11 +10,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (call_expression)                 7
   3  ─‣┘  _                                 1
-  4   !   (identifier) [Absent RecordSet(num) Node RecordSet(fn)]  3
-  5   !   (number) [Absent RecordSet(fn) Node RecordSet(num)]  3
+  4   !   (identifier)                      3           [Absent RecordSet(num) Node RecordSet(fn)]
+  5   !   (number)                          3           [Absent RecordSet(fn) Node RecordSet(num)]
   6   !   switch
             (identifier)                    4
             (number)                        5
@@ -52,7 +52,7 @@ Q:
   02   !   switch
              (identifier)                   04
              (number)                       08
-  03                                        ▶
-  04   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  03       return
+  04   !   (identifier)                     07          [Absent RecordSet(M1 num) Node RecordSet(M0 fn)]
   07  ─‣┘  _                                03
-  08   !   (number) [Absent RecordSet(M0) Node RecordSet(M1)]  07
+  08   !   (number)                         07          [Absent RecordSet(M0 fn) Node RecordSet(M1 num)]

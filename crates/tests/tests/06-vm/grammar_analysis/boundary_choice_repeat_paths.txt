@@ -69,12 +69,12 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
-  03  -ε-  [ListOpen]                       16, 17, 18
+  03  -ε-                                   16, 17, 18  [ListOpen]
   05  !─┘  _                                06
   06  ─‣┘² _                                07
-  07                                        ▶
-  08  -ε-  [ListClose RecordSet(M0)]        05
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
+  07       return
+  08  -ε-                                   05          [ListClose RecordSet(M0 parts)]
+  10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
   13  ─‣─  "["                              10
   14  ─‣─  (identifier)                     10
   15  ─‣─  "]"                              10
@@ -83,58 +83,58 @@ Q:
   18  └─!  "]"                              10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03  -ε-  [ListOpen]                       16, 17, 18
-  16       "["                              10
+  03  -ε-                                   16, 17, 18  [ListOpen]
+  16  └─!  "["                              10
        ●   [
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
+  10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
+  13  ─‣─  "["                              10
        ○   identifier
        ○   ,
        ○   number
        ○   ,
        ○   identifier
        ○   ]
-  10  ❮❮❮ 
-  14       (identifier)                     10
+  10  ❮❮❮
+  14  ─‣─  (identifier)                     10
        ●   identifier
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
+  10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
+  13  ─‣─  "["                              10
        ○   ,
        ○   number
        ○   ,
        ○   identifier
        ○   ]
-  10  ❮❮❮ 
-  14       (identifier)                     10
+  10  ❮❮❮
+  14  ─‣─  (identifier)                     10
        ○   ,
        ○   number
        ○   ,
        ●   identifier
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
+  10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
+  13  ─‣─  "["                              10
        ○   ]
-  10  ❮❮❮ 
-  14       (identifier)                     10
+  10  ❮❮❮
+  14  ─‣─  (identifier)                     10
        ○   ]
-  10  ❮❮❮ 
-  15       "]"                              10
+  10  ❮❮❮
+  15  ─‣─  "]"                              10
        ●   ]
-  10  -ε-  [Node ArrayPush]                 13, 14, 15, 08
-  13       "["                              10
-  10  ❮❮❮ 
-  14       (identifier)                     10
-  10  ❮❮❮ 
-  15       "]"                              10
-  10  ❮❮❮ 
-  08  -ε-  [ListClose RecordSet(M0)]        05
-  05       _                                06
+  10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
+  13  ─‣─  "["                              10
+  10  ❮❮❮
+  14  ─‣─  (identifier)                     10
+  10  ❮❮❮
+  15  ─‣─  "]"                              10
+  10  ❮❮❮
+  08  -ε-                                   05          [ListClose RecordSet(M0 parts)]
+  05  !─┘  _                                06
        ●   array
-  06       _                                07
+  06  ─‣┘² _                                07
        ●   program
-  07   ◀   (Q)                              ◼
+  07   ◀   return                           ◼

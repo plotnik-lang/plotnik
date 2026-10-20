@@ -47,30 +47,30 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        18, 12
-  02   !   (identifier) [Node RecordSet(M0)]  04
-  04  ─‣┘  _ [VariantClose RecordSet(M2)]   06
-  06                                        ▶
+  02   !   (identifier)                     04          [Node RecordSet(M0 id)]
+  04  ─‣┘  _                                06          [VariantClose RecordSet(M2 x)]
+  06       return
   07  ...
   08  ──!  _                                02, 08
-  10   !   _ [VariantOpen(M1)]              02, 08
-  12  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  06
+  10   !   _                                02, 08      [VariantOpen(M1 A)]
+  12  -ε-                                   06          [VariantOpen(M1 A) Absent RecordSet(M0 id) VariantClose RecordSet(M2 x)]
   15  ...
   16  ──!  _                                10, 16
   18  └─!  _                                10, 16
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        18, 12
+  00   !   (program)                        18, 12
        ●   program
-  18       _                                10, 16
+  18  └─!  _                                10, 16
        ●   lexical_declaration
-  10       _ [VariantOpen(M1)]              02, 08
+  10   !   _                                02, 08      [VariantOpen(M1 A)]
        ●   lexical_declaration
-  02       (identifier) [Node RecordSet(M0)]  04
+  02   !   (identifier)                     04          [Node RecordSet(M0 id)]
        ○   lexical_declaration
-  10  ❮❮❮ 
-  08       _                                02, 08
-  18  ❮❮❮ 
-  16       _                                10, 16
-  00  ❮❮❮ 
-  12  -ε-  [VariantOpen(M1) Absent RecordSet(M0) VariantClose RecordSet(M2)]  06
-  06   ◀   (Q)                              ◼
+  10  ❮❮❮
+  08  ──!  _                                02, 08
+  18  ❮❮❮
+  16  ──!  _                                10, 16
+  00  ❮❮❮
+  12  -ε-                                   06          [VariantOpen(M1 A) Absent RecordSet(M0 id) VariantClose RecordSet(M2 x)]
+  06   ◀   return                           ◼

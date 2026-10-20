@@ -47,28 +47,28 @@ Q = 00 :: T2
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           14, 16
-  03                                        ▶
-  04   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  21
+  03       return
+  04   !   (identifier)                     21          [Absent RecordSet(M1 b) Node RecordSet(M0 a)]
   07  ─‣┘  _                                03
-  08   !   (number) [Node RecordSet(M1)]    21
+  08   !   (number)                         21          [Node RecordSet(M1 b)]
   10  ──!  _                                08, 10
-  12   !   _ [Absent RecordSet(M0)]         08, 10
+  12   !   _                                08, 10      [Absent RecordSet(M0 a)]
   14  └─!  _                                04, 12, 19
-  16  -ε-  [Absent RecordSet(M0) Absent RecordSet(M1)]  07
+  16  -ε-                                   07          [Absent RecordSet(M0 a) Absent RecordSet(M1 b)]
   19  ──!  _                                04, 12, 19
   21  ─‣┘  _                                07
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           14, 16
+  01  └‣─  (expression_statement)           14, 16
        ●   expression_statement
-  14       _                                04, 12, 19
+  14  └─!  _                                04, 12, 19
        ●   identifier
-  04       (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  21
+  04   !   (identifier)                     21          [Absent RecordSet(M1 b) Node RecordSet(M0 a)]
        ●   identifier
-  21       _                                07
+  21  ─‣┘  _                                07
        ●   expression_statement
-  07       _                                03
+  07  ─‣┘  _                                03
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

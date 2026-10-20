@@ -9,11 +9,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (type_alias_declaration)          5
   3  ─‣┘  _                                 1
-  4  ─‣─  value: (predefined_type) [Node RecordSet(value)]  3
-  5  └‣─  name: (type_identifier) [Node RecordSet(name)]  4
+  4  ─‣─  value: (predefined_type)          3           [Node RecordSet(value)]
+  5  └‣─  name: (type_identifier)           4           [Node RecordSet(name)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -41,7 +41,7 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (type_alias_declaration)          1
-  1  └‣─  name: (type_identifier) [Node RecordSet(M0)]  3
-  3  ─‣─  value: (predefined_type) [Node RecordSet(M1)]  5
+  1  └‣─  name: (type_identifier)           3           [Node RecordSet(M0 name)]
+  3  ─‣─  value: (predefined_type)          5           [Node RecordSet(M1 value)]
   5  ─‣┘  _                                 6
-  6                                         ▶
+  6       return

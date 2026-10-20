@@ -50,31 +50,31 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (call_expression)                03
   03  └‣─  function: _                      12, 14
-  05  ─•─  arguments: (arguments) [Node RecordSet(M0)]  07
+  05  ─•─  arguments: (arguments)           07          [Node RecordSet(M0 args)]
   07  ─‣┘³ _                                08
-  08                                        ▶
+  08       return
   09   !   optional_chain: (optional_chain)  05
   10  ──!  _                                09, 10
   12   !   (identifier)                     10, 05
   14  ─‣─  function: _                      12, 14
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (call_expression)                03
+  02  └‣─  (call_expression)                03
        ●   call_expression
-  03       function: _                      12, 14
+  03  └‣─  function: _                      12, 14
        ●   identifier
-  12       (identifier)                     10, 05
+  12   !   (identifier)                     10, 05
        ●   identifier
-  10       _                                09, 10
+  10  ──!  _                                09, 10
        ●   optional_chain
-  09       optional_chain: (optional_chain)  05
+  09   !   optional_chain: (optional_chain)  05
        ●   optional_chain
-  05       arguments: (arguments) [Node RecordSet(M0)]  07
+  05  ─•─  arguments: (arguments)           07          [Node RecordSet(M0 args)]
        ●   arguments
-  07       _                                08
+  07  ─‣┘³ _                                08
        ●   program
-  08   ◀   (Q)                              ◼
+  08   ◀   return                           ◼

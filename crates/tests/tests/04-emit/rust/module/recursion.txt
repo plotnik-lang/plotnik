@@ -567,7 +567,7 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   01                                        ▶
+            //   01       return
             S01_EXPR => {
                 if eng.frames_empty() {
                     Flow::Accept
@@ -576,7 +576,7 @@ mod matcher {
                     Flow::Jump(call_return(call_site, rt::PortId::from_raw(0)))
                 }
             }
-            //   02   !   (parenthesized_expression) [VariantOpen(Paren)]  06
+            //   02   !   (parenthesized_expression)       06          [VariantOpen(Paren)]
             S02_EXPR => 'state: {
                 if !cand_s02_expr(eng) {
                     break 'state Flow::Backtrack;
@@ -584,7 +584,7 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::VariantOpen(2)); // VariantOpen(Paren)
                 Flow::Jump(S06_EXPR)
             }
-            //   04  ─‣┘  _ [RecordSet(inner) VariantClose]  01
+            //   04  ─‣┘  _                                01          [RecordSet(inner) VariantClose]
             S04_EXPR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
@@ -613,7 +613,7 @@ mod matcher {
                 }
                 Flow::Jump(S08_EXPR)
             }
-            //   07   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  01
+            //   07   !   (identifier)                     01          [VariantOpen(Id) Node RecordSet(id) VariantClose]
             S07_EXPR => 'state: {
                 if !cand_s07_expr(eng) {
                     break 'state Flow::Backtrack;
@@ -632,7 +632,7 @@ mod matcher {
                 1 => Flow::Jump(S07_EXPR),   // (identifier)
                 _ => Flow::Backtrack,
             },
-            //   10                                        ▶
+            //   10       return
             S10_Q => {
                 if eng.frames_empty() {
                     Flow::Accept
@@ -666,7 +666,7 @@ mod matcher {
                 }
                 finish_s13_q(eng)
             }
-            //   14  ─‣┘² _ [RecordSet(expr)]              10
+            //   14  ─‣┘² _                                10          [RecordSet(expr)]
             S14_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() {
                     break 'state Flow::Backtrack;

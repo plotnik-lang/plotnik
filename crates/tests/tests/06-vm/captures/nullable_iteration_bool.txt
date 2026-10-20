@@ -44,27 +44,27 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        12, 14
   02   !   (comment)                        03
-  03  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   05
-  05                                        ▶
+  03  ─‣┘  _                                05          [BoolValue(1) RecordSet(M0 present)]
+  05       return
   06  ──!  _                                02, 06
   08   !   _                                02, 06
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
-  14  -ε-  [BoolValue(0) RecordSet(M0)]     05
+  14  -ε-                                   05          [BoolValue(0) RecordSet(M0 present)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        12, 14
+  00   !   (program)                        12, 14
        ●   program
-  12       _                                08, 10
+  12  └─!  _                                08, 10
        ●   expression_statement
-  08       _                                02, 06
+  08   !   _                                02, 06
        ●   expression_statement
-  02       (comment)                        03
+  02   !   (comment)                        03
        ○   expression_statement
-  08  ❮❮❮ 
-  06       _                                02, 06
-  12  ❮❮❮ 
-  10       _                                08, 10
-  00  ❮❮❮ 
-  14  -ε-  [BoolValue(0) RecordSet(M0)]     05
-  05   ◀   (Q)                              ◼
+  08  ❮❮❮
+  06  ──!  _                                02, 06
+  12  ❮❮❮
+  10  ──!  _                                08, 10
+  00  ❮❮❮
+  14  -ε-                                   05          [BoolValue(0) RecordSet(M0 present)]
+  05   ◀   return                           ◼

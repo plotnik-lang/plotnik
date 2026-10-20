@@ -18,12 +18,12 @@ Result construction uses two kinds of state. The pending value is a completed va
 
 For example, suppose the cursor is on an identifier whose text is `"alpha"`, and member 7 describes a text field named `name`. These effects build a one-field record:
 
-| Effect         | Open record         | Pending value       |
-| -------------- | ------------------- | ------------------- |
-| `RecordOpen`   | `{}`                | Empty               |
-| `NodeText`     | `{}`                | `"alpha"`           |
-| `RecordSet(7)` | `{ name: "alpha" }` | Empty               |
-| `RecordClose`  | None                | `{ name: "alpha" }` |
+| Effect               | Open record         | Pending value       |
+| -------------------- | ------------------- | ------------------- |
+| `RecordOpen`         | `{}`                | Empty               |
+| `NodeText`           | `{}`                | `"alpha"`           |
+| `RecordSet(M7 name)` | `{ name: "alpha" }` | Empty               |
+| `RecordClose`        | None                | `{ name: "alpha" }` |
 
 `NodeText` produces a value. `RecordSet` attaches that value and clears pending, making room for another field. `RecordClose` then produces the finished record. The distinction between empty pending and an absent value matters: `Absent` also produces a value that can be attached, such as an absent list item or record field. Even absence has to wait its turn.
 
@@ -45,11 +45,11 @@ These inspection brackets nest independently of value frames. A span can surroun
 
 ```text
 value frames                 inspection brackets
-RecordOpen                   SpanStart(2)
-| ScalarOpen                 | SpanStartAt(3)
+RecordOpen                   SpanStart(P2)
+| ScalarOpen                 | SpanStartAt(P3)
 | | ScalarMark               | |
-| TextClose                  | SpanEnd(3)
-| RecordSet(7)               SpanEnd(2)
+| TextClose                  | SpanEnd(P3)
+| RecordSet(M7 name)          SpanEnd(P2)
 RecordClose
 ```
 

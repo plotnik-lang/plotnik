@@ -39,22 +39,22 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        14, 16
-  02                                        ▶
-  03  -ε-  [ListClose RecordSet(M0)]        07
-  05   !   (identifier) [Node ArrayPush]    08, 03
+  02       return
+  03  -ε-                                   07          [ListClose RecordSet(M0 ids)]
+  05   !   (identifier)                     08, 03      [Node ArrayPush]
   07  ─‣┘  _                                02
   08  ──!  _                                05, 08
-  10   !   _ [ListOpen]                     05, 08
-  12  -ε-  [Absent RecordSet(M1)]           10
+  10   !   _                                05, 08      [ListOpen]
+  12  -ε-                                   10          [Absent RecordSet(M1 d)]
   14  └─!  _                                12, 19, 22
-  16  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  02
-  19   !   (debugger_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  16  -ε-                                   02          [Absent RecordSet(M1 d) ListOpen ListClose RecordSet(M0 ids)]
+  19   !   (debugger_statement)             07          [ListOpen ListClose RecordSet(M0 ids) Node RecordSet(M1 d)]
   22  ──!  _                                12, 19, 22
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        14, 16
+  00   !   (program)                        14, 16
        ●   program
-  14       _                                12, 19, 22
-  00  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  02
-  02   ◀   (Q)                              ◼
+  14  └─!  _                                12, 19, 22
+  00  ❮❮❮
+  16  -ε-                                   02          [Absent RecordSet(M1 d) ListOpen ListClose RecordSet(M0 ids)]
+  02   ◀   return                           ◼

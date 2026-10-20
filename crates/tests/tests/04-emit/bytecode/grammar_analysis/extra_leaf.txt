@@ -22,25 +22,25 @@ Wildcard  = 17
 
 [transitions]
 Leaf:
-  01                                        ▶
+  01       return
   02   !   (comment)                        03
   03  └!┘  _                                01
 
 Direct:
-  05                                        ▶
+  05       return
   06   !   (file)                           08
   07  ─‣┘  _                                05
   08  └‣─  (comment)                        09
   09  └!┘  _                                07
 
 Reference:
-  11                                        ▶
+  11       return
   12   !   (file)                           14
   13  ─‣┘  _                                11
   14  └‣─  (Leaf)                           02 : 13
 
 Wildcard:
-  16                                        ▶
+  16       return
   17   !   (file)                           20
   18  ─‣┘  _                                16
   19  ─‣─  (id)                             18
@@ -74,20 +74,20 @@ Wildcard  = 12 :: T0
 Leaf:
   00   !   (comment)                        01
   01  └!┘  _                                02
-  02                                        ▶
+  02       return
 
 Direct:
   03   !   (file)                           04
   04  └‣─  (comment)                        05
   05  └!┘  _                                06
   06  ─‣┘  _                                07
-  07                                        ▶
+  07       return
 
 Reference:
   08   !   (file)                           09
   09  └‣─  (Leaf)                           00 : 10
   10  ─‣┘  _                                11
-  11                                        ▶
+  11       return
 
 Wildcard:
   12   !   (file)                           13
@@ -95,4 +95,4 @@ Wildcard:
   14  └!┘  _                                15
   15  ─‣─  (id)                             16
   16  ─‣┘  _                                17
-  17                                        ▶
+  17       return

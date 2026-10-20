@@ -8,16 +8,16 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
-  02   !   (program) [SuppressBegin]        17
-  03  ─‣┘  _ [SuppressEnd]                  01
+  01       return
+  02   !   (program)                        17          [SuppressBegin]
+  03  ─‣┘  _                                01          [SuppressEnd]
 
 Used:
-  05                                        ▶
-  06  -ε-  [ListClose]                      05
-  08   !   (comment) [Node ArrayPush]       10, 06
+  05       return
+  06  -ε-                                   05          [ListClose]
+  08   !   (comment)                        10, 06      [Node ArrayPush]
   10  ──!  _                                08, 10
-  11   !   _ [ListOpen]                     08, 10
+  11   !   _                                08, 10      [ListOpen]
 
 Q:
   17  └‣─  (Used)                           11 : 03
@@ -44,13 +44,13 @@ Q = 00 :: T0
 
 [instructions]
 Q:
-  00   !   (program) [SuppressBegin]        02
+  00   !   (program)                        02          [SuppressBegin]
   02  └‣─  (@14)                            14 : 03
-  03  ─‣┘  _ [SuppressEnd]                  05
-  05                                        ▶
-  06                                        ▶
+  03  ─‣┘  _                                05          [SuppressEnd]
+  05       return
+  06       return
   07  ...
-  08  -ε-  [ListClose]                      06
-  10   !   (comment) [Node ArrayPush]       12, 08
+  08  -ε-                                   06          [ListClose]
+  10   !   (comment)                        12, 08      [Node ArrayPush]
   12  ──!  _                                10, 12
-  14   !   _ [ListOpen]                     10, 12
+  14   !   _                                10, 12      [ListOpen]

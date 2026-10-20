@@ -21,11 +21,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (pair)                            5
   3  ─‣┘  _                                 1
-  4  ─‣─  value: (_) [Node RecordSet(value)]  3
-  5  └‣─  key: (_) [Node RecordSet(key)]    4
+  4  ─‣─  value: (_)                        3           [Node RecordSet(value)]
+  5  └‣─  key: (_)                          4           [Node RecordSet(key)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -51,7 +51,7 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (pair)                            1
-  1  └‣─  key: (_) [Node RecordSet(M0)]     3
-  3  ─‣─  value: (_) [Node RecordSet(M1)]   5
+  1  └‣─  key: (_)                          3           [Node RecordSet(M0 key)]
+  3  ─‣─  value: (_)                        5           [Node RecordSet(M1 value)]
   5  ─‣┘  _                                 6
-  6                                         ▶
+  6       return

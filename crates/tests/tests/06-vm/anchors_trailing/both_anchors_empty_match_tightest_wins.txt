@@ -34,18 +34,18 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       08, 04
-  03                                        ▶
-  04  └!┘  _ [ListClose RecordSet(M0)]      03
-  06  !─┘  _ [ListClose RecordSet(M0)]      03
-  08  └•─  (debugger_statement) [Node ArrayPush]  10, 06
-  10  ─•─  (debugger_statement) [Node ArrayPush]  10, 06
+  01  -ε-                                   08, 04      [ListOpen]
+  03       return
+  04  └!┘  _                                03          [ListClose RecordSet(M0 b)]
+  06  !─┘  _                                03          [ListClose RecordSet(M0 b)]
+  08  └•─  (debugger_statement)             10, 06      [Node ArrayPush]
+  10  ─•─  (debugger_statement)             10, 06      [Node ArrayPush]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       08, 04
-  08       (debugger_statement) [Node ArrayPush]  10, 06
+  01  -ε-                                   08, 04      [ListOpen]
+  08  └•─  (debugger_statement)             10, 06      [Node ArrayPush]
        ○   comment
-  01  ❮❮❮ 
-  04       _ [ListClose RecordSet(M0)]      03
+  01  ❮❮❮
+  04  └!┘  _                                03          [ListClose RecordSet(M0 b)]

@@ -7,11 +7,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (function_declaration)            8, 4
   3  ─‣┘  _                                 1
-  4  -ε-  [Absent RecordSet(dec)]           1
-  5   !   (decorator) [Node RecordSet(dec)]  3
+  4  -ε-                                    1           [Absent RecordSet(dec)]
+  5   !   (decorator)                       3           [Node RecordSet(dec)]
   7  ──!  _                                 5, 7
   8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
@@ -39,9 +39,9 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (function_declaration)           10, 06
-  02   !   (decorator) [Node RecordSet(M0)]  04
+  02   !   (decorator)                      04          [Node RecordSet(M0 dec)]
   04  ─‣┘  _                                05
-  05                                        ▶
-  06  -ε-  [Absent RecordSet(M0)]           05
+  05       return
+  06  -ε-                                   05          [Absent RecordSet(M0 dec)]
   08  ──!  _                                02, 08
   10  └─!  _                                02, 08

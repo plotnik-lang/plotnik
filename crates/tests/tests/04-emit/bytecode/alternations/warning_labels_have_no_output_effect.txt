@@ -21,7 +21,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (expression_statement)            9
   3  ─‣┘  _                                 1
   4   !   (identifier)                      3
@@ -53,7 +53,7 @@ Q = 0 :: T0
 Q:
   0   !   (expression_statement)            1
   1  └─!  _                                 6, 8
-  3                                         ▶
+  3       return
   4   !   (identifier)                      7
   5   !   (number)                          7
   6   !   switch

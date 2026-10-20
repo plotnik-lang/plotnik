@@ -13,22 +13,22 @@ Name     = 02
 
 [transitions]
 Name:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  01       return
+  02   !   (identifier)                     01          [Node RecordSet(name)]
 
 Bare:
-  04                                        ▶
+  04       return
   05   !   (program)                        07
-  07  └‣─  (expression_statement) [SuppressBegin]  10
-  08  ─‣┘² _ [SuppressEnd]                  04
+  07  └‣─  (expression_statement)           10          [SuppressBegin]
+  08  ─‣┘² _                                04          [SuppressEnd]
   10  └‣─  (Name)                           02 : 08
 
 Captured:
-  13                                        ▶
+  13       return
   14   !   (program)                        16
-  16  └‣─  (expression_statement) [RecordOpen]  20
-  17  ─‣┘² _ [RecordSet(item)]              13
-  19  -ε-  [RecordClose]                    17
+  16  └‣─  (expression_statement)           20          [RecordOpen]
+  17  ─‣┘² _                                13          [RecordSet(item)]
+  19  -ε-                                   17          [RecordClose]
   20  └‣─  (Name)                           02 : 19
 -------------------- BYTECODE --------------------
 [strings]
@@ -62,39 +62,39 @@ Captured = 16 :: T3
 Name     = 00 :: T2
 
 [spans]
-P00 def        0..25  source_id=0  T2
-P01 capture    20..25  source_id=0  T2.M0
-P02 pattern    7..19  source_id=0
-P03 def        26..72  source_id=0
-P04 pattern    33..72  source_id=0
-P05 pattern    42..71  source_id=0
-P06 ref        64..70  source_id=0  T2
-P07 def        74..133  source_id=0  T3
-P08 pattern    85..133  source_id=0
-P09 pattern    96..131  source_id=0
-P10 capture    125..130  source_id=0  T3.M1
-P11 ref        118..124  source_id=0  T2
+P00 def     0..25 src=0  T2
+P01 capture 20..25 src=0  T2.M0
+P02 pattern 7..19 src=0
+P03 def     26..72 src=0
+P04 pattern 33..72 src=0
+P05 pattern 42..71 src=0
+P06 ref     64..70 src=0  T2
+P07 def     74..133 src=0  T3
+P08 pattern 85..133 src=0
+P09 pattern 96..131 src=0
+P10 capture 125..130 src=0  T3.M1
+P11 ref     118..124 src=0  T2
 
 [instructions]
 Name:
-  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
-  04                                        ▶
+  00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
+  04       return
 
 Bare:
-  05   !   (program) [SpanStart#3 SpanStartAt#4]  08
+  05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
   07  ...
-  08  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  10
+  08  └‣─  (expression_statement)           10          [SpanStartAt(P5) SpanStart(P6) SuppressBegin]
   10  └‣─  (Name)                           00 : 11
-  11  ─‣┘  _ [SuppressEnd SpanEnd#6]        13
-  13  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
-  15                                        ▶
+  11  ─‣┘  _                                13          [SuppressEnd SpanEnd(P6)]
+  13  ─‣┘  _                                15          [SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
+  15       return
 
 Captured:
-  16   !   (program) [SpanStart#7 SpanStartAt#8]  18
-  18  └‣─  (expression_statement) [SpanStartAt#9 SpanStart#11 RecordOpen]  20
+  16   !   (program)                        18          [SpanStart(P7) SpanStartAt(P8)]
+  18  └‣─  (expression_statement)           20          [SpanStartAt(P9) SpanStart(P11) RecordOpen]
   20  └‣─  (Name)                           00 : 21
-  21  -ε-  [RecordClose]                    24
+  21  -ε-                                   24          [RecordClose]
   23  ...
-  24  ─‣┘  _ [SpanStart#10 RecordSet(M1) SpanEnd#10 SpanEnd#11]  27
-  27  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  29
-  29                                        ▶
+  24  ─‣┘  _                                27          [SpanStart(P10) RecordSet(M1 item) SpanEnd(P10) SpanEnd(P11)]
+  27  ─‣┘  _                                29          [SpanEnd(P9) SpanEnd(P8) SpanEnd(P7)]
+  29       return

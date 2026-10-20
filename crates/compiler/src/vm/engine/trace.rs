@@ -3,9 +3,8 @@ use std::io::{self, Write as _};
 use tree_sitter::Node;
 
 use crate::bytecode::{
-    BYTECODE_WORD_SIZE, CodeAddr, EffectKind, Instruction, LineBuilder, Match, Module,
-    ModuleRenderContext, Nav, SECTION_ALIGN, Symbol, cols, nav_symbol, trace, truncate_text,
-    width_for_count,
+    BYTECODE_WORD_SIZE, CodeAddr, EffectKind, Instruction, Module, ModuleRenderContext, Nav,
+    SECTION_ALIGN, Symbol, cols, nav_symbol, return_content, trace, truncate_text,
 };
 use crate::core::{Colors, NodeFieldId};
 
@@ -76,8 +75,8 @@ pub trait Tracer {
     /// Called when entering a definition via Call.
     fn trace_call(&mut self, target_ip: CodeAddr);
 
-    /// Called when returning from a definition.
-    fn trace_return(&mut self, port: PortId);
+    /// Called when returning to a continuation, or with no target when the entrypoint returns.
+    fn trace_return(&mut self, port: PortId, target: Option<CodeAddr>);
 
     /// Called when a checkpoint is created.
     fn trace_checkpoint_created(&mut self, ip: CodeAddr);
@@ -136,7 +135,7 @@ impl Tracer for NoopTracer {
     fn trace_call(&mut self, _target_ip: CodeAddr) {}
 
     #[inline(always)]
-    fn trace_return(&mut self, _port: PortId) {}
+    fn trace_return(&mut self, _port: PortId, _target: Option<CodeAddr>) {}
 
     #[inline(always)]
     fn trace_checkpoint_created(&mut self, _ip: CodeAddr) {}
@@ -152,12 +151,10 @@ pub struct PrintTracer<'s> {
     pub(crate) source: &'s [u8],
     pub(crate) verbosity: Verbosity,
     pub(crate) lines: Vec<String>,
-    pub(crate) builder: LineBuilder,
     pub(crate) render: ModuleRenderContext,
     pub(crate) checkpoints: Vec<TraceCheckpoint>,
     pub(crate) call_stack: Vec<String>,
     pub(crate) deferred_return_ip: Option<CodeAddr>,
-    pub(crate) addr_width: usize,
     pub(crate) colors: Colors,
     pub(crate) prev_ip: Option<CodeAddr>,
 }
@@ -190,102 +187,16 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
     }
 
     pub fn build(self) -> PrintTracer<'s> {
-        let header = self.module.header();
-        let addr_width = width_for_count(header.instruction_word_count as usize);
-
         PrintTracer {
             source: self.source.as_bytes(),
             verbosity: self.verbosity,
             lines: Vec::new(),
-            builder: LineBuilder::new(addr_width),
-            render: ModuleRenderContext::new(self.module),
+            render: ModuleRenderContext::new(self.module, self.colors),
             checkpoints: Vec::new(),
             call_stack: Vec::new(),
             deferred_return_ip: None,
-            addr_width,
             colors: self.colors,
             prev_ip: None,
-        }
-    }
-}
-
-enum TraceEffect {
-    Node,
-    ListOpen,
-    ArrayPush,
-    ListClose,
-    RecordOpen,
-    RecordClose,
-    RecordSet(u16),
-    VariantOpen(u16),
-    VariantClose,
-    Absent,
-    SpanStartAt(u16),
-    SpanStart(u16),
-    SpanEnd(u16),
-    ScalarOpen,
-    ScalarMark,
-    TextClose,
-    BoolClose(bool),
-    NodeText,
-    NodeBool,
-    BoolValue(bool),
-}
-
-impl TraceEffect {
-    fn from_journal(event: &JournalEvent<'_>) -> Self {
-        match event {
-            JournalEvent::Node(_) => Self::Node,
-            JournalEvent::ListOpen => Self::ListOpen,
-            JournalEvent::ArrayPush => Self::ArrayPush,
-            JournalEvent::ListClose => Self::ListClose,
-            JournalEvent::RecordOpen => Self::RecordOpen,
-            JournalEvent::RecordClose => Self::RecordClose,
-            JournalEvent::RecordSet(idx) => Self::RecordSet(*idx),
-            JournalEvent::VariantOpen(idx) => Self::VariantOpen(*idx),
-            JournalEvent::VariantClose => Self::VariantClose,
-            JournalEvent::Absent => Self::Absent,
-            JournalEvent::SpanStart { id, node } => {
-                if node.is_some() {
-                    Self::SpanStartAt(*id)
-                } else {
-                    Self::SpanStart(*id)
-                }
-            }
-            JournalEvent::SpanEnd(id) => Self::SpanEnd(*id),
-            JournalEvent::ScalarOpen => Self::ScalarOpen,
-            JournalEvent::ScalarMark(_) => Self::ScalarMark,
-            JournalEvent::TextClose => Self::TextClose,
-            JournalEvent::BoolClose(value) => Self::BoolClose(*value),
-            JournalEvent::NodeText(_) => Self::NodeText,
-            JournalEvent::NodeBool(_) => Self::NodeBool,
-            JournalEvent::BoolValue(value) => Self::BoolValue(*value),
-        }
-    }
-
-    fn from_opcode(opcode: EffectKind, payload: usize) -> Self {
-        match opcode {
-            EffectKind::Node => Self::Node,
-            EffectKind::ListOpen => Self::ListOpen,
-            EffectKind::ArrayPush => Self::ArrayPush,
-            EffectKind::ListClose => Self::ListClose,
-            EffectKind::RecordOpen => Self::RecordOpen,
-            EffectKind::RecordClose => Self::RecordClose,
-            EffectKind::RecordSet => Self::RecordSet(payload as u16),
-            EffectKind::VariantOpen => Self::VariantOpen(payload as u16),
-            EffectKind::VariantClose => Self::VariantClose,
-            EffectKind::Absent => Self::Absent,
-            EffectKind::SpanStartAt => Self::SpanStartAt(payload as u16),
-            EffectKind::SpanStart => Self::SpanStart(payload as u16),
-            EffectKind::SpanEnd => Self::SpanEnd(payload as u16),
-            EffectKind::ScalarOpen => Self::ScalarOpen,
-            EffectKind::ScalarMark => Self::ScalarMark,
-            EffectKind::TextClose => Self::TextClose,
-            EffectKind::BoolClose => Self::BoolClose(payload != 0),
-            EffectKind::NodeText => Self::NodeText,
-            EffectKind::NodeBool => Self::NodeBool,
-            EffectKind::BoolValue => Self::BoolValue(payload != 0),
-            EffectKind::SuppressBegin | EffectKind::SuppressEnd => unreachable!(),
         }
     }
 }
@@ -297,22 +208,6 @@ impl<'s> PrintTracer<'s> {
 
     fn node_field_name(&self, id: NodeFieldId) -> &str {
         self.render.node_field_name(id).unwrap_or("?")
-    }
-
-    fn member_name(&self, idx: u16) -> &str {
-        self.render.member_name(idx).unwrap_or_else(|| {
-            panic!(
-                "execution trace encountered effect member index {idx}, but the bytecode type \
-                     table has no member at that index"
-            )
-        })
-    }
-
-    fn def_ref_name(&self, ip: CodeAddr) -> String {
-        self.render
-            .entrypoint_name(ip.get())
-            .map(str::to_string)
-            .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.addr_width))
     }
 
     fn format_kind_simple(&self, kind: &str, is_named: bool) -> String {
@@ -339,33 +234,6 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
-    fn format_effect(&self, effect: TraceEffect) -> String {
-        match effect {
-            TraceEffect::Node => "Node".to_string(),
-            TraceEffect::ListOpen => "ListOpen".to_string(),
-            TraceEffect::ArrayPush => "ArrayPush".to_string(),
-            TraceEffect::ListClose => "ListClose".to_string(),
-            TraceEffect::RecordOpen => "RecordOpen".to_string(),
-            TraceEffect::RecordClose => "RecordClose".to_string(),
-            TraceEffect::RecordSet(idx) => {
-                format!("RecordSet \"{}\"", self.member_name(idx))
-            }
-            TraceEffect::VariantOpen(idx) => format!("VariantOpen \"{}\"", self.member_name(idx)),
-            TraceEffect::VariantClose => "VariantClose".to_string(),
-            TraceEffect::Absent => "Absent".to_string(),
-            TraceEffect::SpanStartAt(id) => format!("SpanStartAt#{id}"),
-            TraceEffect::SpanStart(id) => format!("SpanStart#{id}"),
-            TraceEffect::SpanEnd(id) => format!("SpanEnd#{id}"),
-            TraceEffect::ScalarOpen => "ScalarOpen".to_string(),
-            TraceEffect::ScalarMark => "ScalarMark".to_string(),
-            TraceEffect::TextClose => "TextClose".to_string(),
-            TraceEffect::BoolClose(value) => format!("BoolClose({value})"),
-            TraceEffect::NodeText => "NodeText".to_string(),
-            TraceEffect::NodeBool => "NodeBool".to_string(),
-            TraceEffect::BoolValue(value) => format!("BoolValue({value})"),
-        }
-    }
-
     fn trace_match_result(&mut self, symbol: Symbol, node: Node<'_>) {
         let kind = node.kind();
         let content = if self.verbosity == Verbosity::Default {
@@ -375,10 +243,6 @@ impl<'s> PrintTracer<'s> {
             self.format_kind_with_text(kind, text, node.is_named())
         };
         self.add_subline(symbol, &content);
-    }
-
-    fn format_match_content(&self, m: &Match<'_>) -> String {
-        self.render.trace_match_content(m)
     }
 
     pub fn print(&self) -> io::Result<()> {
@@ -396,15 +260,15 @@ impl<'s> PrintTracer<'s> {
     }
 
     fn add_instruction(&mut self, ip: CodeAddr, symbol: Symbol, content: &str, successors: &str) {
-        let prefix = format!("  {:0aw$} {} ", ip, symbol.format(), aw = self.addr_width);
         let line = self
+            .render
             .builder
-            .pad_successors(format!("{prefix}{content}"), successors);
+            .instruction(ip.get(), symbol, content, successors, &[]);
         self.lines.push(line);
     }
 
     fn add_subline(&mut self, symbol: Symbol, content: &str) {
-        let addr_area = cols::INDENT + self.addr_width + cols::GAP;
+        let addr_area = cols::INDENT + self.render.addr_width + cols::GAP;
         let prefix = format!("{:addr_area$}{} ", "", symbol.format());
         self.lines.push(format!("{prefix}{content}"));
     }
@@ -462,35 +326,12 @@ impl Tracer for PrintTracer<'_> {
     fn trace_instruction(&mut self, ip: CodeAddr, instr: &Instruction<'_>) {
         self.check_cache_line_boundary(ip);
 
-        match instr {
-            Instruction::Switch { .. } => {
-                self.add_instruction(ip, nav_symbol(Nav::StayExact), "switch", "");
-            }
-            Instruction::Match(m) => {
-                let symbol = if m.is_epsilon() {
-                    Symbol::EPSILON
-                } else {
-                    Symbol::EMPTY
-                };
-                let content = self.format_match_content(m);
-                let successors = format_match_successors(m);
-                self.add_instruction(ip, symbol, &content, &successors);
-            }
-            Instruction::Call(c) => {
-                let name = self.def_ref_name(c.target);
-                let content = self.format_def_ref(&name);
-                let returns = c
-                    .returns()
-                    .map(|addr| format!("{:02}", u16::from(addr)))
-                    .collect::<Vec<_>>()
-                    .join(" / ");
-                let successors = format!("{:02} : {returns}", u16::from(c.target));
-                self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
-            }
-            Instruction::Return(_) => {
-                self.deferred_return_ip = Some(ip);
-            }
+        if let Instruction::Return(_) = instr {
+            self.deferred_return_ip = Some(ip);
+            return;
         }
+
+        self.lines.push(self.render.instruction_line(ip, instr));
     }
 
     fn trace_nav(&mut self, nav: Nav, node: Node<'_>) {
@@ -565,7 +406,7 @@ impl Tracer for PrintTracer<'_> {
             return;
         }
 
-        let effect_str = self.format_effect(TraceEffect::from_journal(event));
+        let effect_str = self.render.format_journal_event(event);
         self.add_subline(trace::EFFECT, &effect_str);
     }
 
@@ -574,7 +415,7 @@ impl Tracer for PrintTracer<'_> {
             return;
         }
 
-        let effect_str = self.format_effect(TraceEffect::from_opcode(opcode, payload));
+        let effect_str = self.render.format_effect(opcode, payload);
         self.add_subline(trace::EFFECT_SUPPRESSED, &effect_str);
     }
 
@@ -583,46 +424,34 @@ impl Tracer for PrintTracer<'_> {
             return;
         }
 
-        let name = match opcode {
-            EffectKind::SuppressBegin => "SuppressBegin",
-            EffectKind::SuppressEnd => "SuppressEnd",
-            _ => unreachable!(),
-        };
+        let name = self.render.format_effect(opcode, 0);
         let symbol = if suppressed {
             trace::EFFECT_SUPPRESSED
         } else {
             trace::EFFECT
         };
-        self.add_subline(symbol, name);
+        self.add_subline(symbol, &name);
     }
 
     fn trace_call(&mut self, target_ip: CodeAddr) {
-        let name = self.def_ref_name(target_ip);
+        let name = self.render.def_ref_name(target_ip);
         self.add_subline(trace::CALL, &self.format_def_ref(&name));
         self.push_def_header(&name);
         self.call_stack.push(name);
     }
 
-    fn trace_return(&mut self, port: PortId) {
+    fn trace_return(&mut self, port: PortId, target: Option<CodeAddr>) {
         let ip = self
             .deferred_return_ip
             .take()
             .expect("trace_return without trace_instruction");
-        let name = self
-            .call_stack
+        self.call_stack
             .pop()
             .expect("trace_return requires balanced call stack");
-        let content = self.format_def_ref(&name);
-        let is_top_level = self.call_stack.is_empty();
-        let successor = match (is_top_level, port.to_byte()) {
-            (true, 0) => "◼".to_string(),
-            (false, 0) => String::new(),
-            (false, port) => format!("p{port}"),
-            (true, _) => {
-                unreachable!("entrypoints return only through port zero")
-            }
-        };
-        self.add_instruction(ip, trace::RETURN, &content, &successor);
+        let successor = target
+            .map(|addr| format!("{:0w$}", addr, w = self.render.addr_width))
+            .unwrap_or_else(|| "◼".to_string());
+        self.add_instruction(ip, trace::RETURN, &return_content(port), &successor);
         if let Some(caller) = self.call_stack.last().cloned() {
             self.push_def_header(&caller);
         }
@@ -651,9 +480,9 @@ impl Tracer for PrintTracer<'_> {
             "  {:0aw$} {}",
             checkpoint.ip,
             trace::BACKTRACK.format(),
-            aw = self.addr_width
+            aw = self.render.addr_width
         );
-        self.lines.push(line);
+        self.lines.push(line.trim_end().to_string());
     }
 
     fn trace_execution_started(&mut self, target_ip: CodeAddr) {
@@ -661,7 +490,7 @@ impl Tracer for PrintTracer<'_> {
         self.call_stack.clear();
         self.deferred_return_ip = None;
         self.prev_ip = None;
-        let name = self.def_ref_name(target_ip);
+        let name = self.render.def_ref_name(target_ip);
         self.push_def_header(&name);
         self.call_stack.push(name);
     }
@@ -671,18 +500,4 @@ impl Tracer for PrintTracer<'_> {
 pub(crate) struct TraceCheckpoint {
     ip: CodeAddr,
     call_stack: Vec<String>,
-}
-
-fn format_match_successors(m: &Match<'_>) -> String {
-    if m.is_terminal() {
-        "◼".to_string()
-    } else if m.succ_count() == 1 {
-        format!("{:02}", u16::from(m.successor(0)))
-    } else {
-        let succs: Vec<_> = m
-            .successors()
-            .map(|s| format!("{:02}", u16::from(s)))
-            .collect();
-        succs.join(", ")
-    }
 }

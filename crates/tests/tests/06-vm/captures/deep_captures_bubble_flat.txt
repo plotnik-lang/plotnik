@@ -53,30 +53,30 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (function_declaration)            2
-  2  └‣─  name: (identifier) [Node RecordSet(M0)]  4
+  2  └‣─  name: (identifier)                4           [Node RecordSet(M0 name)]
   4  ─‣─  body: (statement_block)           5
   5  └‣─  (return_statement)                6
-  6  └‣─  (number) [Node RecordSet(M1)]     8
+  6  └‣─  (number)                          8           [Node RecordSet(M1 retval)]
   8  ─‣┘⁴ _                                 9
-  9                                         ▶
+  9       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (function_declaration)            02
+  1  └‣─  (function_declaration)            2
       ●   function_declaration
-  2       name: (identifier) [Node RecordSet(M0)]  04
+  2  └‣─  name: (identifier)                4           [Node RecordSet(M0 name)]
       ○   function
       ●   identifier
-  4       body: (statement_block)           05
+  4  ─‣─  body: (statement_block)           5
       ○   formal_parameters
       ●   statement_block
-  5       (return_statement)                06
+  5  └‣─  (return_statement)                6
       ○   {
       ●   return_statement
-  6       (number) [Node RecordSet(M1)]     08
+  6  └‣─  (number)                          8           [Node RecordSet(M1 retval)]
       ○   return
       ●   number
-  8       _                                 09
+  8  ─‣┘⁴ _                                 9
       ●   program
-  9   ◀   (Q)                               ◼
+  9   ◀   return                            ◼

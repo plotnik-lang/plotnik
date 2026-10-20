@@ -5,8 +5,8 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (statement_block) [Node RecordSet(block)]  4
+  1       return
+  2   !   (statement_block)                 4           [Node RecordSet(block)]
   3  ─‣┘  _                                 1
   4  └‣─  (function_declaration)            3
 -------------------- BYTECODE --------------------
@@ -32,7 +32,7 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (statement_block) [Node RecordSet(M0)]  2
+  0   !   (statement_block)                 2           [Node RecordSet(M0 block)]
   2  └‣─  (function_declaration)            3
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

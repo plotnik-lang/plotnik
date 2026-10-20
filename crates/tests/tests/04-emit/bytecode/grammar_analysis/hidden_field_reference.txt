@@ -26,17 +26,17 @@ Param = 10
 
 [transitions]
 Name:
-  01                                        ▶
+  01       return
   02   !   (id)                             01
 
 Func:
-  04                                        ▶
+  04       return
   05   !   (func)                           07
   06  ─‣┘  _                                04
   07  └‣─  name: (Name)                     02 : 06
 
 Param:
-  09                                        ▶
+  09       return
   10   !   (param)                          12
   11  ─‣┘  _                                09
   12  └‣─  value: (Name)                    02 : 11
@@ -67,16 +67,16 @@ Param = 6 :: T0
 [instructions]
 Name:
   0   !   (id)                              1
-  1                                         ▶
+  1       return
 
 Func:
   2   !   (func)                            3
   3  └‣─  name: (Name)                      0 : 4
   4  ─‣┘  _                                 5
-  5                                         ▶
+  5       return
 
 Param:
   6   !   (param)                           7
   7  └‣─  value: (Name)                     0 : 8
   8  ─‣┘  _                                 9
-  9                                         ▶
+  9       return

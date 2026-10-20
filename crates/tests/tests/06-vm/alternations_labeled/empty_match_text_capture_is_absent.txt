@@ -54,24 +54,24 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ScalarOpen]                     20, 08
-  03  -ε-  [TextClose RecordSet(M0)]        05
+  01  -ε-                                   20, 08      [ScalarOpen]
+  03  -ε-                                   05          [TextClose RecordSet(M0 value)]
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08  -ε-  [TextClose RecordSet(M0)]        06
-  10   !   (comment) [ScalarMark]           03
+  08  -ε-                                   06          [TextClose RecordSet(M0 value)]
+  10   !   (comment)                        03          [ScalarMark]
   12  ──!  _                                10, 12
   14   !   _                                10, 12
-  16   !   (expression_statement) [ScalarMark]  03
+  16   !   (expression_statement)           03          [ScalarMark]
   18  ──!  _                                14, 16, 18
   20  └─!  _                                14, 16, 18
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ScalarOpen]                     20, 08
-  20       _                                14, 16, 18
-  01  ❮❮❮ 
-  08  -ε-  [TextClose RecordSet(M0)]        06
-  06   ◀   (Q)                              ◼
+  01  -ε-                                   20, 08      [ScalarOpen]
+  20  └─!  _                                14, 16, 18
+  01  ❮❮❮
+  08  -ε-                                   06          [TextClose RecordSet(M0 value)]
+  06   ◀   return                           ◼

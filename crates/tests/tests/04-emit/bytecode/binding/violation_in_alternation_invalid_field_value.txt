@@ -20,7 +20,7 @@ Q = 6
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (decl)                            4
   3  ─‣┘  _                                 1
   4  └‣─  name: (num)                       3
@@ -54,6 +54,6 @@ Q:
             (id)                            5
   1  └‣─  name: (num)                       2
   2  ─‣┘  _                                 3
-  3                                         ▶
+  3       return
   4   !   (decl)                            1
   5   !   (id)                              3

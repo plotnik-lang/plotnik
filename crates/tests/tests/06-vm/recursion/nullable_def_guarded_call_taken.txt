@@ -47,13 +47,13 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        27, 03
-  02                                        ▶
-  03  └‣─  (expression_statement) [Node RecordSet(M0)]  29
-  05  ─‣─  (expression_statement) [Node RecordSet(M0)]  29
+  02       return
+  03  └‣─  (expression_statement)           29          [Node RecordSet(M0 e)]
+  05  ─‣─  (expression_statement)           29          [Node RecordSet(M0 e)]
   07  └•─  (debugger_statement)             23
   08  ─‣─  (debugger_statement)             23
-  09                                        ▶
-  10                                        ▶ p1
+  09       return
+  10       return p1
   11  └•─  (debugger_statement)             16
   12  ─‣─  (debugger_statement)             16
   13       (@18)                            18 : 12 / 11
@@ -68,18 +68,18 @@ Q:
   29  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        27, 03
+  00   !   (program)                        27, 03
        ●   program
-  27       _                                24, 25
+  27  └─!  _                                24, 25
        ●   statement_block
-  24       (statement_block)                20
+  24   !   (statement_block)                20
        ●   statement_block
   20       (@18)                            18 : 08 / 07
        ▶   (@18)
 
 @18:
   18  -ε-                                   17, 10
-  17       (statement_block)                13
+  17  └•─  (statement_block)                13
        ○   {
        ●   statement_block
   13       (@18)                            18 : 12 / 11
@@ -87,27 +87,27 @@ Q:
 
 @18:
   18  -ε-                                   17, 10
-  17       (statement_block)                13
+  17  └•─  (statement_block)                13
        ○   {
        ○   debugger_statement
-  18  ❮❮❮ 
-  10   ◀   (@18)                            p1
+  18  ❮❮❮
+  10   ◀   return p1                        11
 
 @18:
-  11       (debugger_statement)             16
+  11  └•─  (debugger_statement)             16
        ○   {
        ●   debugger_statement
-  16       _                                09
+  16  ─‣┘  _                                09
        ●   statement_block
-  09   ◀   (@18)                            
+  09   ◀   return                           08
 
 Q:
-  08       (debugger_statement)             23
+  08  ─‣─  (debugger_statement)             23
        ●   debugger_statement
-  23       _                                05
+  23  ─‣┘  _                                05
        ●   statement_block
-  05       (expression_statement) [Node RecordSet(M0)]  29
+  05  ─‣─  (expression_statement)           29          [Node RecordSet(M0 e)]
        ●   expression_statement
-  29       _                                02
+  29  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

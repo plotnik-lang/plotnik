@@ -14,11 +14,11 @@ Q    = 5
 
 [transitions]
 Name:
-  1                                         ▶
+  1       return
   2   !   (id)                              1
 
 Q:
-  4                                         ▶
+  4       return
   5   !   (param)                           7
   6  ─‣┘  _                                 4
   7  └‣─  name: (Name)                      2 : 6
@@ -45,10 +45,10 @@ Q    = 2 :: T0
 [instructions]
 Name:
   0   !   (id)                              1
-  1                                         ▶
+  1       return
 
 Q:
   2   !   (param)                           3
   3  └‣─  name: (Name)                      0 : 4
   4  ─‣┘  _                                 5
-  5                                         ▶
+  5       return

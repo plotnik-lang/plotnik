@@ -16,7 +16,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (file)                            4
   4  └‣─  (comment)                         6
   5  ─‣┘² _                                 1
@@ -45,4 +45,4 @@ Q:
   1  └‣─  (comment)                         2
   2  └‣─  (id)                              3
   3  ─‣┘² _                                 4
-  4                                         ▶
+  4       return

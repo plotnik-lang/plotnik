@@ -48,33 +48,33 @@ Q    = 03 :: T2
 
 [instructions]
 Name:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [Node RecordSet(M0 text)]
+  02       return
 
 Q:
   03   !   (program)                        04
-  04  └‣─  (function_declaration) [RecordOpen]  06
+  04  └‣─  (function_declaration)           06          [RecordOpen]
   06  └‣─  name: (Name)                     00 : 08
   07  ...
-  08  -ε-  [RecordClose]                    10
-  10  ─‣┘² _ [RecordSet(M1)]                12
-  12                                        ▶
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘² _                                12          [RecordSet(M1 fn)]
+  12       return
 --------------------- TRACE ----------------------
 Q:
-  03       (program)                        04
+  03   !   (program)                        04
        ●   program
-  04       (function_declaration) [RecordOpen]  06
+  04  └‣─  (function_declaration)           06          [RecordOpen]
        ●   function_declaration
-  06       (Name)                           00 : 08
+  06  └‣─  name: (Name)                     00 : 08
        ▶   (Name)
 
 Name:
-  00       (identifier) [Node RecordSet(M0)]  02
+  00   !   (identifier)                     02          [Node RecordSet(M0 text)]
        ●   identifier
-  02   ◀   (Name)                           
+  02   ◀   return                           08
 
 Q:
-  08  -ε-  [RecordClose]                    10
-  10       _ [RecordSet(M1)]                12
+  08  -ε-                                   10          [RecordClose]
+  10  ─‣┘² _                                12          [RecordSet(M1 fn)]
        ●   program
-  12   ◀   (Q)                              ◼
+  12   ◀   return                           ◼

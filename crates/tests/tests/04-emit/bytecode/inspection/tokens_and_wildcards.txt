@@ -18,7 +18,7 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        04
   04  └‣─  (expression_statement)           16
   05  ─‣┘² _                                01
@@ -52,34 +52,34 @@ T0 = <NoValue>
 Q = 00 :: T0
 
 [spans]
-P00 def        0..150  source_id=0
-P01 pattern    4..150  source_id=0
-P02 pattern    15..148  source_id=0
-P03 unlabeled_alternation 41..144  source_id=0
-P04 alternative 49..120  source_id=0
-P05 pattern    49..120  source_id=0
-P06 pattern    76..88  source_id=0
-P07 pattern    97..100  source_id=0
-P08 pattern    109..112  source_id=0
-P09 alternative 127..130  source_id=0
-P10 pattern    127..130  source_id=0
-P11 alternative 137..138  source_id=0
-P12 pattern    137..138  source_id=0
+P00 def                   0..150 src=0
+P01 pattern               4..150 src=0
+P02 pattern               15..148 src=0
+P03 unlabeled_alternation 41..144 src=0
+P04 alternative           49..120 src=0
+P05 pattern               49..120 src=0
+P06 pattern               76..88 src=0
+P07 pattern               97..100 src=0
+P08 pattern               109..112 src=0
+P09 alternative           127..130 src=0
+P10 pattern               127..130 src=0
+P11 alternative           137..138 src=0
+P12 pattern               137..138 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStartAt#2]  04
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
   04  └─!  _                                18, 20, 24, 27
-  06  ─‣─  (_) [SpanStartAt#8 SpanEnd#8]    08
-  08  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  10
+  06  ─‣─  (_)                              08          [SpanStartAt(P8) SpanEnd(P8)]
+  08  ─‣┘  _                                10          [SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
   10  ─‣┘  _                                11
-  11  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
-  13                                        ▶
-  14  ─‣─  "+" [SpanStartAt#7 SpanEnd#7]    06
-  16  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  14
-  18   !   (binary_expression) [SpanStart#3 SpanStart#4 SpanStartAt#5]  16
-  20   !   (_) [SpanStart#3 SpanStart#9 SpanStartAt#10 SpanEnd#10 SpanEnd#9 SpanEnd#3]  10
+  11  ─‣┘  _                                13          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  13       return
+  14  ─‣─  "+"                              06          [SpanStartAt(P7) SpanEnd(P7)]
+  16  └‣─  (identifier)                     14          [SpanStartAt(P6) SpanEnd(P6)]
+  18   !   (binary_expression)              16          [SpanStart(P3) SpanStart(P4) SpanStartAt(P5)]
+  20   !   (_)                              10          [SpanStart(P3) SpanStart(P9) SpanStartAt(P10) SpanEnd(P10) SpanEnd(P9) SpanEnd(P3)]
   23  ...
-  24   !   _ [SpanStart#3 SpanStart#11 SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#3]  10
+  24   !   _                                10          [SpanStart(P3) SpanStart(P11) SpanStartAt(P12) SpanEnd(P12) SpanEnd(P11) SpanEnd(P3)]
   27  ──!  _                                18, 20, 24, 27

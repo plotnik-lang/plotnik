@@ -27,8 +27,8 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   -alias (import)                   4
+  1       return
+  2   !   (import -alias)                   4
   3  ─‣┘  _                                 1
   4  └‣─  name: (id)                        3
 -------------------- BYTECODE --------------------
@@ -52,7 +52,7 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0   !   -alias (import)                   2
+  0   !   (import -alias)                   2
   2  └‣─  name: (id)                        3
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

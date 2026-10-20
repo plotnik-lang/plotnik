@@ -53,11 +53,11 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          20, 05
-  04                                        ▶
-  05  └‣─  (number) [Absent RecordSet(M0) Node RecordSet(M1)]  22
-  08  ─‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  22
-  10  -ε-  [Absent]                         08
-  12   !   (identifier) [Node]              08
+  04       return
+  05  └‣─  (number)                         22          [Absent RecordSet(M0 x) Node RecordSet(M1 n)]
+  08  ─‣─  (number)                         22          [RecordSet(M0 x) Node RecordSet(M1 n)]
+  10  -ε-                                   08          [Absent]
+  12   !   (identifier)                     08          [Node]
   14  ──!  _                                12, 14
   16   !   _                                12, 14
   18  ──!  _                                16, 10, 18
@@ -65,34 +65,34 @@ Q:
   22  ─‣┘³ _                                04
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          20, 05
+  02  └‣─  (array)                          20, 05
        ●   array
-  20       _                                16, 10, 18
+  20  └─!  _                                16, 10, 18
        ●   [
-  16       _                                12, 14
+  16   !   _                                12, 14
        ●   [
-  12       (identifier) [Node]              08
+  12   !   (identifier)                     08          [Node]
        ○   [
-  16  ❮❮❮ 
-  14       _                                12, 14
+  16  ❮❮❮
+  14  ──!  _                                12, 14
        ●   number
-  12       (identifier) [Node]              08
+  12   !   (identifier)                     08          [Node]
        ○   number
-  14  ❮❮❮ 
-  14       _                                12, 14
+  14  ❮❮❮
+  14  ──!  _                                12, 14
        ●   ]
-  12       (identifier) [Node]              08
+  12   !   (identifier)                     08          [Node]
        ○   ]
-  14  ❮❮❮ 
-  14       _                                12, 14
-  20  ❮❮❮ 
-  10  -ε-  [Absent]                         08
-  08       (number) [RecordSet(M0) Node RecordSet(M1)]  22
+  14  ❮❮❮
+  14  ──!  _                                12, 14
+  20  ❮❮❮
+  10  -ε-                                   08          [Absent]
+  08  ─‣─  (number)                         22          [RecordSet(M0 x) Node RecordSet(M1 n)]
        ●   number
-  22       _                                04
+  22  ─‣┘³ _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

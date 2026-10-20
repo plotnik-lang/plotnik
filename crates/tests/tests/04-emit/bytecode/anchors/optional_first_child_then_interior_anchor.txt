@@ -11,12 +11,12 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        10, 04
   03  ─‣┘  _                                01
-  04  └•─  (debugger_statement) [Absent RecordSet(a) Node RecordSet(b)]  03
-  05  ─•─  (debugger_statement) [Node RecordSet(b)]  03
-  07   !   (lexical_declaration) [Node RecordSet(a)]  05
+  04  └•─  (debugger_statement)             03          [Absent RecordSet(a) Node RecordSet(b)]
+  05  ─•─  (debugger_statement)             03          [Node RecordSet(b)]
+  07   !   (lexical_declaration)            05          [Node RecordSet(a)]
   09  ──!  _                                07, 09
   10  └─!  _                                07, 09
 -------------------- BYTECODE --------------------
@@ -47,10 +47,10 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        12, 03
-  02                                        ▶
-  03  └•─  (debugger_statement) [Absent RecordSet(M0) Node RecordSet(M1)]  14
-  06  ─•─  (debugger_statement) [Node RecordSet(M1)]  14
-  08   !   (lexical_declaration) [Node RecordSet(M0)]  06
+  02       return
+  03  └•─  (debugger_statement)             14          [Absent RecordSet(M0 a) Node RecordSet(M1 b)]
+  06  ─•─  (debugger_statement)             14          [Node RecordSet(M1 b)]
+  08   !   (lexical_declaration)            06          [Node RecordSet(M0 a)]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  ─‣┘  _                                02

@@ -25,9 +25,9 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (identifier) [Node RecordSet(M0)]  2
-  2                                         ▶
+  0   !   (identifier)                      2           [Node RecordSet(M0 id)]
+  2       return
 --------------------- TRACE ----------------------
 Q:
-  0       (identifier) [Node RecordSet(M0)]  02
+  0   !   (identifier)                      2           [Node RecordSet(M0 id)]
       ○   program

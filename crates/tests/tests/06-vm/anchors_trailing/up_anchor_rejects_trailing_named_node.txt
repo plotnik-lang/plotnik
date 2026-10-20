@@ -29,33 +29,33 @@ Q = 00 :: T0
 Q:
   00   !   (program)                        01
   01  └─!  _                                08, 09
-  03  └‣─  (identifier) == "a"              05
+  03  └‣─  (identifier == "a")              05
   05  ─‣┘  _                                07
-  06                                        ▶
+  06       return
   07  ─•┘  _                                06
   08   !   (expression_statement)           03
   09  ──!  _                                08, 09
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                08, 09
+  01  └─!  _                                08, 09
        ●   expression_statement
-  08       (expression_statement)           03
+  08   !   (expression_statement)           03
        ●   expression_statement
-  03       (identifier) == "a"              05
+  03  └‣─  (identifier == "a")              05
        ●   identifier
-  05       _                                07
+  05  ─‣┘  _                                07
        ●   expression_statement
-  07       _                                06
-  03  ❮❮❮ 
+  07  ─•┘  _                                06
+  03  ❮❮❮
        ○   ;
-  01  ❮❮❮ 
-  09       _                                08, 09
+  01  ❮❮❮
+  09  ──!  _                                08, 09
        ●   expression_statement
-  08       (expression_statement)           03
+  08   !   (expression_statement)           03
        ●   expression_statement
-  03       (identifier) == "a"              05
+  03  └‣─  (identifier == "a")              05
        ○   ;
-  09  ❮❮❮ 
-  09       _                                08, 09
+  09  ❮❮❮
+  09  ──!  _                                08, 09

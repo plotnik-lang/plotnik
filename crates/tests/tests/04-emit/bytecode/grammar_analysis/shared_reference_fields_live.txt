@@ -27,7 +27,7 @@ Value = 04
 
 [transitions]
 Value:
-  01                                        ▶
+  01       return
   02   !   (id)                             01
   03   !   (num)                            01
   04   !   switch
@@ -35,7 +35,7 @@ Value:
              (num)                          03
 
 Q:
-  06                                        ▶
+  06       return
   07   !   (assign)                         10
   08  ─‣┘  _                                06
   09  ─‣─  value: (Value)                   04 : 08
@@ -73,7 +73,7 @@ Q:
   2  └‣─  name: (Value)                     0 : 3
   3  ─‣─  value: (Value)                    0 : 4
   4  ─‣┘  _                                 5
-  5                                         ▶
-  6                                         ▶
+  5       return
+  6       return
   7   !   (id)                              6
   8   !   (num)                             6

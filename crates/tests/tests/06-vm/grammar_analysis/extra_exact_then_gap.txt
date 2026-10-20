@@ -39,18 +39,18 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └─!  (comment)                         2
-  2  ─‣─  (expression_statement) [Node RecordSet(M0)]  4
+  2  ─‣─  (expression_statement)            4           [Node RecordSet(M0 statement)]
   4  ─‣┘  _                                 5
-  5                                         ▶
+  5       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (comment)                         02
+  1  └─!  (comment)                         2
       ●   comment
-  2       (expression_statement) [Node RecordSet(M0)]  04
+  2  ─‣─  (expression_statement)            4           [Node RecordSet(M0 statement)]
       ○   lexical_declaration
       ●   expression_statement
-  4       _                                 05
+  4  ─‣┘  _                                 5
       ●   program
-  5   ◀   (Q)                               ◼
+  5   ◀   return                            ◼

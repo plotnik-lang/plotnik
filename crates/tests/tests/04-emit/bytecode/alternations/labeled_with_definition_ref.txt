@@ -11,16 +11,16 @@ Q     = 03
 
 [transitions]
 Inner:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  01       return
+  02   !   (identifier)                     01          [Node RecordSet(name)]
 
 Q:
   03  -ε-                                   09, 10
-  04                                        ▶
-  06  -ε-  [SuppressEnd VariantClose RecordSet(item)]  04
+  04       return
+  06  -ε-                                   04          [SuppressEnd VariantClose RecordSet(item)]
   07   !   (Inner)                          02 : 06
-  09  -ε-  [VariantOpen(A) SuppressBegin]   07
-  10   !   (number) [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]  04
+  09  -ε-                                   07          [VariantOpen(A) SuppressBegin]
+  10   !   (number)                         04          [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -61,13 +61,13 @@ Q     = 03 :: T5
 
 [instructions]
 Inner:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
+  02       return
 
 Q:
   03  -ε-                                   09, 11
-  05                                        ▶
-  06  -ε-  [SuppressEnd VariantClose RecordSet(M4)]  05
+  05       return
+  06  -ε-                                   05          [SuppressEnd VariantClose RecordSet(M4 item)]
   08   !   (Inner)                          00 : 06
-  09  -ε-  [VariantOpen(M2) SuppressBegin]  08
-  11   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  05
+  09  -ε-                                   08          [VariantOpen(M2 A) SuppressBegin]
+  11   !   (number)                         05          [VariantOpen(M3 B) Node RecordSet(M1 b) VariantClose RecordSet(M4 item)]

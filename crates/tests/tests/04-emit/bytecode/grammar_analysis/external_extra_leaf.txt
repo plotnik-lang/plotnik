@@ -19,12 +19,12 @@ Q    = 6
 
 [transitions]
 Leaf:
-  1                                         ▶
+  1       return
   2   !   (comment)                         3
   3  └!┘  _                                 1
 
 Q:
-  5                                         ▶
+  5       return
   6   !   (file)                            9
   7  ─‣┘  _                                 5
   8  ─‣─  (id)                              7
@@ -53,11 +53,11 @@ Q    = 3 :: T0
 Leaf:
   0   !   (comment)                         1
   1  └!┘  _                                 2
-  2                                         ▶
+  2       return
 
 Q:
   3   !   (file)                            4
   4  └‣─  (Leaf)                            0 : 5
   5  ─‣─  (id)                              6
   6  ─‣┘  _                                 7
-  7                                         ▶
+  7       return

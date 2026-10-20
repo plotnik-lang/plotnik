@@ -32,22 +32,22 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        10, 06
-  02   !   (identifier) [Node RecordSet(M0)]  04
+  02   !   (identifier)                     04          [Node RecordSet(M0 id)]
   04  ─‣┘  _                                05
-  05                                        ▶
-  06  -ε-  [Absent RecordSet(M0)]           05
+  05       return
+  06  -ε-                                   05          [Absent RecordSet(M0 id)]
   08  ──!  _                                02, 08
   10  └─!  _                                02, 08
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        10, 06
+  00   !   (program)                        10, 06
        ●   program
-  10       _                                02, 08
+  10  └─!  _                                02, 08
        ●   expression_statement
-  02       (identifier) [Node RecordSet(M0)]  04
+  02   !   (identifier)                     04          [Node RecordSet(M0 id)]
        ○   expression_statement
-  10  ❮❮❮ 
-  08       _                                02, 08
-  00  ❮❮❮ 
-  06  -ε-  [Absent RecordSet(M0)]           05
-  05   ◀   (Q)                              ◼
+  10  ❮❮❮
+  08  ──!  _                                02, 08
+  00  ❮❮❮
+  06  -ε-                                   05          [Absent RecordSet(M0 id)]
+  05   ◀   return                           ◼

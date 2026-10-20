@@ -8,9 +8,9 @@ Q = 4
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (identifier) [Absent RecordSet(str) Node RecordSet(id)]  1
-  3   !   (string) [Absent RecordSet(id) Node RecordSet(str)]  1
+  1       return
+  2   !   (identifier)                      1           [Absent RecordSet(str) Node RecordSet(id)]
+  3   !   (string)                          1           [Absent RecordSet(id) Node RecordSet(str)]
   4   !   switch
             (identifier)                    2
             (string)                        3
@@ -43,6 +43,6 @@ Q:
   0   !   switch
             (identifier)                    2
             (string)                        5
-  1                                         ▶
-  2   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  1
-  5   !   (string) [Absent RecordSet(M0) Node RecordSet(M1)]  1
+  1       return
+  2   !   (identifier)                      1           [Absent RecordSet(M1 str) Node RecordSet(M0 id)]
+  5   !   (string)                          1           [Absent RecordSet(M0 id) Node RecordSet(M1 str)]

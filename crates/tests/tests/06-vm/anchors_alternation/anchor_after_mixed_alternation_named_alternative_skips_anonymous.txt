@@ -57,26 +57,26 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (binary_expression)              10, 12
-  04                                        ▶
-  05  ─•─  (identifier) [Node RecordSet(M1)]  07
+  04       return
+  05  ─•─  (identifier)                     07          [Node RecordSet(M1 right)]
   07  ─‣┘³ _                                04
-  08  ─◦─  (identifier) [Node RecordSet(M1)]  07
-  10  └‣─  (identifier) [Node RecordSet(M0)]  05
-  12  └‣─  ";" [Absent RecordSet(M0)]       08
+  08  ─◦─  (identifier)                     07          [Node RecordSet(M1 right)]
+  10  └‣─  (identifier)                     05          [Node RecordSet(M0 left)]
+  12  └‣─  ";"                              08          [Absent RecordSet(M0 left)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (binary_expression)              10, 12
+  02  └‣─  (binary_expression)              10, 12
        ●   binary_expression
-  10       (identifier) [Node RecordSet(M0)]  05
+  10  └‣─  (identifier)                     05          [Node RecordSet(M0 left)]
        ●   identifier
-  05       (identifier) [Node RecordSet(M1)]  07
+  05  ─•─  (identifier)                     07          [Node RecordSet(M1 right)]
        ○   +
        ○   comment
        ●   identifier
-  07       _                                04
+  07  ─‣┘³ _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

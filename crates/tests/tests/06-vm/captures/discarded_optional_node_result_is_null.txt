@@ -27,18 +27,18 @@ Q:
   0   !   (program)                         8, 4
   2   !   (expression_statement)            3
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return
   5  ──!  _                                 2, 5
   7  ...
   8  └─!  _                                 2, 5
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         08, 04
+  0   !   (program)                         8, 4
       ●   program
-  8       _                                 02, 05
+  8  └─!  _                                 2, 5
       ●   expression_statement
-  2       (expression_statement)            03
+  2   !   (expression_statement)            3
       ●   expression_statement
-  3       _                                 04
+  3  ─‣┘  _                                 4
       ●   program
-  4   ◀   (Q)                               ◼
+  4   ◀   return                            ◼

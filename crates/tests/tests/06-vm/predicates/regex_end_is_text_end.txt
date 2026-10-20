@@ -42,21 +42,21 @@ Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
   2  └‣─  (template_string)                 3
-  3  └‣─  (string_fragment) [Node RecordSet(M0)] =~ /c$/  5
+  3  └‣─  (string_fragment =~ /c$/)         5           [Node RecordSet(M0 text)]
   5  ─‣┘³ _                                 6
-  6                                         ▶
+  6       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       (template_string)                 03
+  2  └‣─  (template_string)                 3
       ●   template_string
-  3       (string_fragment) [Node RecordSet(M0)] =~ /c$/  05
+  3  └‣─  (string_fragment =~ /c$/)         5           [Node RecordSet(M0 text)]
       ○   `
       ○   template_substitution
       ○   `
-  2  ❮❮❮ 
+  2  ❮❮❮
       ○   ;
-  1  ❮❮❮ 
+  1  ❮❮❮

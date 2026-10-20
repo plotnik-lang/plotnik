@@ -10,11 +10,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (pair)                            8
-  3  ─‣┘  _ [RecordSet(kind)]               1
-  5   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  3
-  6   !   (number) [VariantOpen(B) VariantClose]  3
+  3  ─‣┘  _                                 1           [RecordSet(kind)]
+  5   !   (identifier)                      3           [VariantOpen(A) Node RecordSet(a) VariantClose]
+  6   !   (number)                          3           [VariantOpen(B) VariantClose]
   7   !   switch
             (identifier)                    5
             (number)                        6
@@ -60,8 +60,8 @@ Q:
   02   !   switch
              (identifier)                   04
              (number)                       08
-  03                                        ▶
-  04   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  10
+  03       return
+  04   !   (identifier)                     10          [VariantOpen(M1 A) Node RecordSet(M0 a) VariantClose]
   07  ...
-  08   !   (number) [VariantOpen(M2) VariantClose]  10
-  10  ─‣┘  _ [RecordSet(M3)]                03
+  08   !   (number)                         10          [VariantOpen(M2 B) VariantClose]
+  10  ─‣┘  _                                03          [RecordSet(M3 kind)]

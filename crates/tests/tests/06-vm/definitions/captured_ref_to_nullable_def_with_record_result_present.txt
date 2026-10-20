@@ -64,32 +64,32 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [RecordOpen]                     20, 14
-  03  └‣─  (identifier) [Node RecordSet(M0)]  05
-  05  ─‣┘  _ [RecordClose RecordSet(M1)]    11
-  07                                        ▶
-  08  └‣─  (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  22
-  11  ─‣─  (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  22
-  14  -ε-  [Absent RecordSet(M1)]           08
-  16   !   (expression_statement) [RecordOpen]  03
+  01  -ε-                                   20, 14      [RecordOpen]
+  03  └‣─  (identifier)                     05          [Node RecordSet(M0 id)]
+  05  ─‣┘  _                                11          [RecordClose RecordSet(M1 x)]
+  07       return
+  08  └‣─  (debugger_statement)             22          [RecordClose RecordSet(M2 a) Node RecordSet(M3 d)]
+  11  ─‣─  (debugger_statement)             22          [RecordClose RecordSet(M2 a) Node RecordSet(M3 d)]
+  14  -ε-                                   08          [Absent RecordSet(M1 x)]
+  16   !   (expression_statement)           03          [RecordOpen]
   18  ──!  _                                16, 18
   20  └─!  _                                16, 18
   22  ─‣┘  _                                07
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [RecordOpen]                     20, 14
-  20       _                                16, 18
+  01  -ε-                                   20, 14      [RecordOpen]
+  20  └─!  _                                16, 18
        ●   expression_statement
-  16       (expression_statement) [RecordOpen]  03
+  16   !   (expression_statement)           03          [RecordOpen]
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)]  05
+  03  └‣─  (identifier)                     05          [Node RecordSet(M0 id)]
        ●   identifier
-  05       _ [RecordClose RecordSet(M1)]    11
+  05  ─‣┘  _                                11          [RecordClose RecordSet(M1 x)]
        ●   expression_statement
-  11       (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  22
+  11  ─‣─  (debugger_statement)             22          [RecordClose RecordSet(M2 a) Node RecordSet(M3 d)]
        ●   debugger_statement
-  22       _                                07
+  22  ─‣┘  _                                07
        ●   program
-  07   ◀   (Q)                              ◼
+  07   ◀   return                           ◼

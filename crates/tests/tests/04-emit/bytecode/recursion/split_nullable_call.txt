@@ -18,25 +18,25 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (program)                        39, 01, 53
   03  ─‣┘  _                                01
 
 Body:
   04  -ε-                                   31, 32
-  05                                        ▶
+  05       return
 
 B (split, routed Next):
   06  -ε-                                   13, 08, 27
-  07                                        ▶
-  08                                        ▶ p1
-  09  -ε-  [SuppressEnd]                    07
+  07       return
+  08       return p1
+  09  -ε-                                   07          [SuppressEnd]
   10   !   (Body)                           04 : 09
-  11  -ε-  [SuppressBegin]                  10
+  11  -ε-                                   10          [SuppressBegin]
   13  ──!  _                                11, 13
-  23  -ε-  [SuppressEnd]                    13, 07
+  23  -ε-                                   13, 07      [SuppressEnd]
   24   !   (Body)                           04 : 23
-  25  -ε-  [SuppressBegin]                  24
+  25  -ε-                                   24          [SuppressBegin]
   27  ──!  _                                25, 27
 
 Body:
@@ -45,14 +45,14 @@ Body:
   32   !   (comment)                        05
 
 Q:
-  34  -ε-  [SuppressEnd]                    03
+  34  -ε-                                   03          [SuppressEnd]
   35   !   (Body)                           04 : 34
-  36  -ε-  [SuppressBegin]                  35
+  36  -ε-                                   35          [SuppressBegin]
   38  ──!  _                                36, 38
   39  └─!  _                                36, 38
-  48  -ε-  [SuppressEnd]                    38, 03
+  48  -ε-                                   38, 03      [SuppressEnd]
   49   !   (Body)                           04 : 48
-  50  -ε-  [SuppressBegin]                  49
+  50  -ε-                                   49          [SuppressBegin]
   52  ──!  _                                50, 52
   53  └─!  _                                50, 52
 -------------------- BYTECODE --------------------
@@ -82,17 +82,17 @@ Q = 00 :: T0
 [instructions]
 Q:
   00   !   (program)                        40, 02, 22
-  02                                        ▶
-  03                                        ▶
-  04                                        ▶
-  05                                        ▶ p1
-  06  -ε-  [SuppressEnd]                    04
+  02       return
+  03       return
+  04       return
+  05       return p1
+  06  -ε-                                   04          [SuppressEnd]
   08   !   (@29)                            29 : 06
-  09  -ε-  [SuppressBegin]                  08
+  09  -ε-                                   08          [SuppressBegin]
   11  ──!  _                                09, 11
-  13  -ε-  [SuppressEnd]                    11, 04
+  13  -ε-                                   11, 04      [SuppressEnd]
   15   !   (@29)                            29 : 13
-  16  -ε-  [SuppressBegin]                  15
+  16  -ε-                                   15          [SuppressBegin]
   18  ──!  _                                16, 18
   20  -ε-                                   11, 05, 18
   22  └─!  _                                45, 48
@@ -101,14 +101,14 @@ Q:
   28   !   (comment)                        03
   29  -ε-                                   27, 28
   31  ...
-  32  -ε-  [SuppressEnd]                    39
+  32  -ε-                                   39          [SuppressEnd]
   34   !   (@29)                            29 : 32
-  35  -ε-  [SuppressBegin]                  34
+  35  -ε-                                   34          [SuppressBegin]
   37  ──!  _                                35, 37
   39  ─‣┘  _                                02
   40  └─!  _                                35, 37
-  42  -ε-  [SuppressEnd]                    37, 39
+  42  -ε-                                   37, 39      [SuppressEnd]
   44   !   (@29)                            29 : 42
-  45  -ε-  [SuppressBegin]                  44
+  45  -ε-                                   44          [SuppressBegin]
   47  ...
   48  ──!  _                                45, 48

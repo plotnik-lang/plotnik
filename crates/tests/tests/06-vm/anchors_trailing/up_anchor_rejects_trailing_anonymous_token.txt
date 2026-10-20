@@ -30,25 +30,25 @@ Q:
   2  └─!  _                                 7, 8
   4  ─◦┘  _                                 5
   5  ─‣┘  _                                 6
-  6                                         ▶
+  6       return
   7   !   "debugger"                        4
   8  ──!  _                                 7, 8
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (debugger_statement)              02
+  1  └‣─  (debugger_statement)              2
       ●   debugger_statement
-  2       _                                 07, 08
+  2  └─!  _                                 7, 8
       ●   debugger
-  7       "debugger"                        04
+  7   !   "debugger"                        4
       ●   debugger
-  4       _                                 05
-  2  ❮❮❮ 
-  8       _                                 07, 08
+  4  ─◦┘  _                                 5
+  2  ❮❮❮
+  8  ──!  _                                 7, 8
       ●   ;
-  7       "debugger"                        04
+  7   !   "debugger"                        4
       ○   ;
-  8  ❮❮❮ 
-  8       _                                 07, 08
-  1  ❮❮❮ 
+  8  ❮❮❮
+  8  ──!  _                                 7, 8
+  1  ❮❮❮

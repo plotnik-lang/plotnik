@@ -59,49 +59,49 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       16, 08
-  03  └‣─  (identifier) [Node RecordSet(M0)] =~ /^x/  05
+  01  -ε-                                   16, 08      [ListOpen]
+  03  └‣─  (identifier =~ /^x/)             05          [Node RecordSet(M0 id)]
   05  ─‣┘  _                                10
-  06                                        ▶
+  06       return
   07  ...
-  08  -ε-  [ListClose RecordSet(M1)]        06
-  10  -ε-  [RecordClose ArrayPush]          14, 18
-  12   !   (expression_statement) [RecordOpen]  03
+  08  -ε-                                   06          [ListClose RecordSet(M1 rows)]
+  10  -ε-                                   14, 18      [RecordClose ArrayPush]
+  12   !   (expression_statement)           03          [RecordOpen]
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
-  18  ─‣┘  _ [ListClose RecordSet(M1)]      06
+  18  ─‣┘  _                                06          [ListClose RecordSet(M1 rows)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       16, 08
-  16       _                                12, 14
+  01  -ε-                                   16, 08      [ListOpen]
+  16  └─!  _                                12, 14
        ●   expression_statement
-  12       (expression_statement) [RecordOpen]  03
+  12   !   (expression_statement)           03          [RecordOpen]
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /^x/  05
+  03  └‣─  (identifier =~ /^x/)             05          [Node RecordSet(M0 id)]
        ●   identifier
-  05       _                                10
+  05  ─‣┘  _                                10
        ●   expression_statement
-  10  -ε-  [RecordClose ArrayPush]          14, 18
-  14       _                                12, 14
+  10  -ε-                                   14, 18      [RecordClose ArrayPush]
+  14  ──!  _                                12, 14
        ●   expression_statement
-  12       (expression_statement) [RecordOpen]  03
+  12   !   (expression_statement)           03          [RecordOpen]
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /^x/  05
+  03  └‣─  (identifier =~ /^x/)             05          [Node RecordSet(M0 id)]
        ○   ;
-  14  ❮❮❮ 
-  14       _                                12, 14
+  14  ❮❮❮
+  14  ──!  _                                12, 14
        ●   expression_statement
-  12       (expression_statement) [RecordOpen]  03
+  12   !   (expression_statement)           03          [RecordOpen]
        ●   expression_statement
-  03       (identifier) [Node RecordSet(M0)] =~ /^x/  05
+  03  └‣─  (identifier =~ /^x/)             05          [Node RecordSet(M0 id)]
        ●   identifier
-  05       _                                10
+  05  ─‣┘  _                                10
        ●   expression_statement
-  10  -ε-  [RecordClose ArrayPush]          14, 18
-  14       _                                12, 14
-  10  ❮❮❮ 
-  18       _ [ListClose RecordSet(M1)]      06
+  10  -ε-                                   14, 18      [RecordClose ArrayPush]
+  14  ──!  _                                12, 14
+  10  ❮❮❮
+  18  ─‣┘  _                                06          [ListClose RecordSet(M1 rows)]
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

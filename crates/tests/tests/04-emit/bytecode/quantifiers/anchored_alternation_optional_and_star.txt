@@ -24,7 +24,7 @@ Star     = 14
 
 [transitions]
 Optional:
-  01                                        ▶
+  01       return
   02   !   (array)                          10, 01
   03  ─‣┘  _                                01
   04  ─•┘  _                                01
@@ -37,7 +37,7 @@ Optional:
   10  └─!  _                                07, 09
 
 Star:
-  13                                        ▶
+  13       return
   14   !   (array)                          33, 13
   15  ─‣┘  _                                13
   16  ─•┘  _                                13
@@ -78,7 +78,7 @@ Star:
   02   !   (array)                          28, 14
   04   !   (number)                         05
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ─•┘  _                                06
   08   !   (identifier)                     07
   09   !   switch
@@ -86,7 +86,7 @@ Star:
              (identifier)                   08
   10  ──!  _                                09, 10
   12  └─!  _                                09, 10
-  14                                        ▶
+  14       return
   15  ─•┘  _                                14
   16   !   (identifier)                     24, 26, 15
   18   !   (number)                         21, 23

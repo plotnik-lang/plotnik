@@ -11,11 +11,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (program)                         8
   3  ─‣┘  _                                 1
-  4  ─•─  (function_declaration) [Node RecordSet(f)]  3
-  5   !   (comment) [Node RecordSet(c)]     4
+  4  ─•─  (function_declaration)            3           [Node RecordSet(f)]
+  5   !   (comment)                         4           [Node RecordSet(c)]
   7  ──!  _                                 5, 7
   8  └─!  _                                 5, 7
 -------------------- BYTECODE --------------------
@@ -46,9 +46,9 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                08, 10
-  03  ─•─  (function_declaration) [Node RecordSet(M1)]  05
+  03  ─•─  (function_declaration)           05          [Node RecordSet(M1 f)]
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08   !   (comment) [Node RecordSet(M0)]   03
+  08   !   (comment)                        03          [Node RecordSet(M0 c)]
   10  ──!  _                                08, 10

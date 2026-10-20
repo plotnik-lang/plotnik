@@ -11,14 +11,14 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (program)                         7
   4  ─‣─  (expression_statement)            6
   5  ─‣┘² _                                 1
-  6  └‣─  (number) [Node RecordSet(b)]      5
+  6  └‣─  (number)                          5           [Node RecordSet(b)]
   7  └‣─  (expression_statement)            9
   8  ─‣┘  _                                 4
-  9  └‣─  (identifier) [Node RecordSet(a)]  8
+  9  └‣─  (identifier)                      8           [Node RecordSet(a)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -45,26 +45,26 @@ N0: S3 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..104  source_id=0  T1
-P1 pattern    4..104  source_id=0
-P2 sequence   15..102  source_id=0
-P3 pattern    21..59  source_id=0
-P4 capture    56..58  source_id=0  T1.M0
-P5 pattern    43..55  source_id=0
-P6 pattern    64..98  source_id=0
-P7 capture    95..97  source_id=0  T1.M1
-P8 pattern    86..94  source_id=0
+P0 def      0..104 src=0  T1
+P1 pattern  4..104 src=0
+P2 sequence 15..102 src=0
+P3 pattern  21..59 src=0
+P4 capture  56..58 src=0  T1.M0
+P5 pattern  43..55 src=0
+P6 pattern  64..98 src=0
+P7 capture  95..97 src=0  T1.M1
+P8 pattern  86..94 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  └‣─  (expression_statement) [SpanStart#2 SpanStartAt#3]  04
-  04  └‣─  (identifier) [SpanStartAt#5 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#5]  07
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  └‣─  (expression_statement)           04          [SpanStart(P2) SpanStartAt(P3)]
+  04  └‣─  (identifier)                     07          [SpanStartAt(P5) SpanStart(P4) Node RecordSet(M0 a) SpanEnd(P4) SpanEnd(P5)]
   07  ─‣┘  _                                08
-  08  ─‣─  (expression_statement) [SpanEnd#3 SpanStartAt#6]  10
-  10  └‣─  (number) [SpanStartAt#8 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#8]  13
+  08  ─‣─  (expression_statement)           10          [SpanEnd(P3) SpanStartAt(P6)]
+  10  └‣─  (number)                         13          [SpanStartAt(P8) SpanStart(P7) Node RecordSet(M1 b) SpanEnd(P7) SpanEnd(P8)]
   13  ─‣┘  _                                16
   14  ...
   15  ...
-  16  ─‣┘  _ [SpanEnd#6 SpanEnd#2 SpanEnd#1 SpanEnd#0]  19
-  19                                        ▶
+  16  ─‣┘  _                                19          [SpanEnd(P6) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
+  19       return

@@ -11,7 +11,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (args)                            4
   3  ─‣┘  _                                 1
   4  └‣─  (id)                              3
@@ -37,4 +37,4 @@ Q:
   0   !   (args)                            1
   1  └‣─  (id)                              2
   2  ─‣┘  _                                 3
-  3                                         ▶
+  3       return

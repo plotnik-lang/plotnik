@@ -44,26 +44,26 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        10, 03
-  02                                        ▶
-  03  └‣─  (debugger_statement) [Node RecordSet(M0)]  12
-  05  ─‣─  (debugger_statement) [Node RecordSet(M0)]  12
+  02       return
+  03  └‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
+  05  ─‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
   07   !   (expression_statement)           05
   08  ──!  _                                07, 08
   10  └─!  _                                07, 08
   12  ─‣┘  _                                02
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        10, 03
+  00   !   (program)                        10, 03
        ●   program
-  10       _                                07, 08
+  10  └─!  _                                07, 08
        ●   debugger_statement
-  07       (expression_statement)           05
+  07   !   (expression_statement)           05
        ○   debugger_statement
-  10  ❮❮❮ 
-  08       _                                07, 08
-  00  ❮❮❮ 
-  03       (debugger_statement) [Node RecordSet(M0)]  12
+  10  ❮❮❮
+  08  ──!  _                                07, 08
+  00  ❮❮❮
+  03  └‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
        ●   debugger_statement
-  12       _                                02
+  12  ─‣┘  _                                02
        ●   program
-  02   ◀   (Q)                              ◼
+  02   ◀   return                           ◼

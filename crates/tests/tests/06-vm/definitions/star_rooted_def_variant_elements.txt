@@ -98,112 +98,112 @@ Q:
   01   !   (program)                        02
   02  └‣─  (expression_statement)           03
   03  └‣─  (array)                          04
-  04  -ε-  [ListOpen]                       27, 20
-  06  -ε-  [ListClose]                      08
-  08  ─‣┘  _ [RecordSet(M4)]                14
-  10                                        ▶
-  11   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  10
+  04  -ε-                                   27, 20      [ListOpen]
+  06  -ε-                                   08          [ListClose]
+  08  ─‣┘  _                                14          [RecordSet(M4 items)]
+  10       return
+  11   !   (identifier)                     10          [VariantOpen(M2 Id) Node RecordSet(M0 id) VariantClose]
   14  ─‣┘² _                                19
   15  ...
-  16   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  10
-  19                                        ▶
-  20  -ε-  [ListClose RecordSet(M4)]        14
-  22  -ε-  [ArrayPush]                      25, 06
+  16   !   (number)                         10          [VariantOpen(M3 Num) Node RecordSet(M1 num) VariantClose]
+  19       return
+  20  -ε-                                   14          [ListClose RecordSet(M4 items)]
+  22  -ε-                                   25, 06      [ArrayPush]
   24   !   (Entry)                          00 : 22
   25  ──!  _                                24, 25
   27  └─!  _                                24, 25
 --------------------- TRACE ----------------------
 Q:
-  01       (program)                        02
+  01   !   (program)                        02
        ●   program
-  02       (expression_statement)           03
+  02  └‣─  (expression_statement)           03
        ●   expression_statement
-  03       (array)                          04
+  03  └‣─  (array)                          04
        ●   array
-  04  -ε-  [ListOpen]                       27, 20
-  27       _                                24, 25
+  04  -ε-                                   27, 20      [ListOpen]
+  27  └─!  _                                24, 25
        ●   [
-  24       (Entry)                          00 : 22
+  24   !   (Entry)                          00 : 22
        ▶   (Entry)
 
 Entry:
-  00   !   switch                           
+  00   !   switch
        ○   [
-  27  ❮❮❮ 
-  25       _                                24, 25
+  27  ❮❮❮
+  25  ──!  _                                24, 25
        ●   identifier
-  24       (Entry)                          00 : 22
+  24   !   (Entry)                          00 : 22
        ▶   (Entry)
 
 Entry:
-  00   !   switch                           
+  00   !   switch
        ●   identifier
-  11       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  10
+  11   !   (identifier)                     10          [VariantOpen(M2 Id) Node RecordSet(M0 id) VariantClose]
        ●   identifier
-  10   ◀   (Entry)                          
+  10   ◀   return                           22
 
 Q:
-  22  -ε-  [ArrayPush]                      25, 06
-  25       _                                24, 25
+  22  -ε-                                   25, 06      [ArrayPush]
+  25  ──!  _                                24, 25
        ●   ,
-  24       (Entry)                          00 : 22
+  24   !   (Entry)                          00 : 22
        ▶   (Entry)
 
 Entry:
-  00   !   switch                           
+  00   !   switch
        ○   ,
-  25  ❮❮❮ 
-  25       _                                24, 25
+  25  ❮❮❮
+  25  ──!  _                                24, 25
        ●   number
-  24       (Entry)                          00 : 22
+  24   !   (Entry)                          00 : 22
        ▶   (Entry)
 
 Entry:
-  00   !   switch                           
+  00   !   switch
        ●   number
-  16       (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  10
+  16   !   (number)                         10          [VariantOpen(M3 Num) Node RecordSet(M1 num) VariantClose]
        ●   number
-  10   ◀   (Entry)                          
+  10   ◀   return                           22
 
 Q:
-  22  -ε-  [ArrayPush]                      25, 06
-  25       _                                24, 25
+  22  -ε-                                   25, 06      [ArrayPush]
+  25  ──!  _                                24, 25
        ●   ,
-  24       (Entry)                          00 : 22
+  24   !   (Entry)                          00 : 22
        ▶   (Entry)
 
 Entry:
-  00   !   switch                           
+  00   !   switch
        ○   ,
-  25  ❮❮❮ 
-  25       _                                24, 25
+  25  ❮❮❮
+  25  ──!  _                                24, 25
        ●   identifier
-  24       (Entry)                          00 : 22
+  24   !   (Entry)                          00 : 22
        ▶   (Entry)
 
 Entry:
-  00   !   switch                           
+  00   !   switch
        ●   identifier
-  11       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  10
+  11   !   (identifier)                     10          [VariantOpen(M2 Id) Node RecordSet(M0 id) VariantClose]
        ●   identifier
-  10   ◀   (Entry)                          
+  10   ◀   return                           22
 
 Q:
-  22  -ε-  [ArrayPush]                      25, 06
-  25       _                                24, 25
+  22  -ε-                                   25, 06      [ArrayPush]
+  25  ──!  _                                24, 25
        ●   ]
-  24       (Entry)                          00 : 22
+  24   !   (Entry)                          00 : 22
        ▶   (Entry)
 
 Entry:
-  00   !   switch                           
+  00   !   switch
        ○   ]
-  25  ❮❮❮ 
-  25       _                                24, 25
-  22  ❮❮❮ 
-  06  -ε-  [ListClose]                      08
-  08       _ [RecordSet(M4)]                14
+  25  ❮❮❮
+  25  ──!  _                                24, 25
+  22  ❮❮❮
+  06  -ε-                                   08          [ListClose]
+  08  ─‣┘  _                                14          [RecordSet(M4 items)]
        ●   array
-  14       _                                19
+  14  ─‣┘² _                                19
        ●   program
-  19   ◀   (Q)                              ◼
+  19   ◀   return                           ◼

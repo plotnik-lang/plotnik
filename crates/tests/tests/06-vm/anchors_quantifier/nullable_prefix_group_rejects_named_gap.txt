@@ -47,73 +47,73 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          03
   03  └─!  _                                20, 22
-  05                                        ▶
-  06  ─‣─  (identifier) [Node RecordSet(M0)] == "b"  24
-  08  ─•─  (identifier) [Node RecordSet(M0)] == "b"  24
-  10  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  24
-  12  ─•─  (identifier) == "x"              06
-  14  ─◦─  (identifier) == "x"              06
-  16   !   (identifier) == "a"              12, 08
+  05       return
+  06  ─‣─  (identifier == "b")              24          [Node RecordSet(M0 b)]
+  08  ─•─  (identifier == "b")              24          [Node RecordSet(M0 b)]
+  10  ─◦─  (identifier == "b")              24          [Node RecordSet(M0 b)]
+  12  ─•─  (identifier == "x")              06
+  14  ─◦─  (identifier == "x")              06
+  16   !   (identifier == "a")              12, 08
   18  ──!  _                                16, 18
   20   !   "["                              18, 14, 10
   22  ──!  _                                20, 22
   24  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          03
+  02  └‣─  (array)                          03
        ●   array
-  03       _                                20, 22
+  03  └─!  _                                20, 22
        ●   [
-  20       "["                              18, 14, 10
+  20   !   "["                              18, 14, 10
        ●   [
-  18       _                                16, 18
+  18  ──!  _                                16, 18
        ●   identifier
-  16       (identifier) == "a"              12, 08
-  18  ❮❮❮ 
-  18       _                                16, 18
+  16   !   (identifier == "a")              12, 08
+  18  ❮❮❮
+  18  ──!  _                                16, 18
        ●   ,
-  16       (identifier) == "a"              12, 08
+  16   !   (identifier == "a")              12, 08
        ○   ,
-  18  ❮❮❮ 
-  18       _                                16, 18
+  18  ❮❮❮
+  18  ──!  _                                16, 18
        ●   identifier
-  16       (identifier) == "a"              12, 08
-  18  ❮❮❮ 
-  18       _                                16, 18
+  16   !   (identifier == "a")              12, 08
+  18  ❮❮❮
+  18  ──!  _                                16, 18
        ●   ]
-  16       (identifier) == "a"              12, 08
+  16   !   (identifier == "a")              12, 08
        ○   ]
-  18  ❮❮❮ 
-  18       _                                16, 18
-  20  ❮❮❮ 
-  14       (identifier) == "x"              06
-  20  ❮❮❮ 
-  10       (identifier) [Node RecordSet(M0)] == "b"  24
-  03  ❮❮❮ 
-  22       _                                20, 22
+  18  ❮❮❮
+  18  ──!  _                                16, 18
+  20  ❮❮❮
+  14  ─◦─  (identifier == "x")              06
+  20  ❮❮❮
+  10  ─◦─  (identifier == "b")              24          [Node RecordSet(M0 b)]
+  03  ❮❮❮
+  22  ──!  _                                20, 22
        ●   identifier
-  20       "["                              18, 14, 10
+  20   !   "["                              18, 14, 10
        ○   identifier
-  22  ❮❮❮ 
-  22       _                                20, 22
+  22  ❮❮❮
+  22  ──!  _                                20, 22
        ●   ,
-  20       "["                              18, 14, 10
+  20   !   "["                              18, 14, 10
        ○   ,
-  22  ❮❮❮ 
-  22       _                                20, 22
+  22  ❮❮❮
+  22  ──!  _                                20, 22
        ●   identifier
-  20       "["                              18, 14, 10
+  20   !   "["                              18, 14, 10
        ○   identifier
-  22  ❮❮❮ 
-  22       _                                20, 22
+  22  ❮❮❮
+  22  ──!  _                                20, 22
        ●   ]
-  20       "["                              18, 14, 10
+  20   !   "["                              18, 14, 10
        ○   ]
-  22  ❮❮❮ 
-  22       _                                20, 22
-  02  ❮❮❮ 
-  01  ❮❮❮ 
+  22  ❮❮❮
+  22  ──!  _                                20, 22
+  02  ❮❮❮
+  01  ❮❮❮

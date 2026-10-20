@@ -46,10 +46,10 @@ Q:
   01  └─!  _                                07, 16
   03  !─┘  _                                04
   04  ─‣┘  _                                06
-  05                                        ▶
+  05       return
   06  !─┘  _                                05
   07   !   (expression_statement)           14
-  08   !   (identifier) [Node RecordSet(M0)]  03
+  08   !   (identifier)                     03          [Node RecordSet(M0 x)]
   10  ──!  _                                08, 10
   12  └─!  _                                08, 10
   14  └‣─  (binary_expression)              12
@@ -57,41 +57,41 @@ Q:
   16  ──!  _                                07, 16
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                07, 16
+  01  └─!  _                                07, 16
        ●   expression_statement
-  07       (expression_statement)           14
+  07   !   (expression_statement)           14
        ●   expression_statement
-  14       (binary_expression)              12
+  14  └‣─  (binary_expression)              12
        ○   identifier
        ○   ;
-  01  ❮❮❮ 
-  16       _                                07, 16
+  01  ❮❮❮
+  16  ──!  _                                07, 16
        ●   expression_statement
-  07       (expression_statement)           14
+  07   !   (expression_statement)           14
        ●   expression_statement
-  14       (binary_expression)              12
+  14  └‣─  (binary_expression)              12
        ●   binary_expression
-  12       _                                08, 10
+  12  └─!  _                                08, 10
        ●   identifier
-  08       (identifier) [Node RecordSet(M0)]  03
+  08   !   (identifier)                     03          [Node RecordSet(M0 x)]
        ●   identifier
-  03       _                                04
-  12  ❮❮❮ 
-  10       _                                08, 10
+  03  !─┘  _                                04
+  12  ❮❮❮
+  10  ──!  _                                08, 10
        ●   +
-  08       (identifier) [Node RecordSet(M0)]  03
+  08   !   (identifier)                     03          [Node RecordSet(M0 x)]
        ○   +
-  10  ❮❮❮ 
-  10       _                                08, 10
+  10  ❮❮❮
+  10  ──!  _                                08, 10
        ●   identifier
-  08       (identifier) [Node RecordSet(M0)]  03
+  08   !   (identifier)                     03          [Node RecordSet(M0 x)]
        ●   identifier
-  03       _                                04
+  03  !─┘  _                                04
        ●   binary_expression
-  04       _                                06
+  04  ─‣┘  _                                06
        ●   expression_statement
-  06       _                                05
+  06  !─┘  _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼

@@ -3,14 +3,14 @@ use std::fmt::Write as _;
 
 use crate::core::Colors;
 
-use super::format::{LineBuilder, Symbol, cols, nav_symbol, width_for_count};
+use super::format::{Symbol, nav_symbol, width_for_count};
 use super::ids::TypeId;
-use super::instructions::{CodeAddr, SuccessorAddr};
+use super::instructions::CodeAddr;
 use super::module::{Instruction, Module, SwitchEntriesView};
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
-use super::{Call, CallOwnership, Match, Return, SPAN_NO_BINDING, SwitchEntry};
+use super::{SPAN_NO_BINDING, SwitchEntry};
 use plotnik_runtime::Nav;
 
 /// Generate a human-readable dump of a compiler-produced bytecode module.
@@ -37,7 +37,6 @@ struct DumpContext {
     type_width: usize,
     member_width: usize,
     name_width: usize,
-    addr_width: usize,
     colors: Colors,
 }
 
@@ -65,22 +64,16 @@ impl DumpContext {
         let type_width = width_for_count(type_count);
         let member_width = width_for_count(types.members_count());
         let name_width = width_for_count(types.names_count());
-        let addr_width = width_for_count(header.instruction_word_count as usize);
 
         Self {
             addr_labels,
-            render: ModuleRenderContext::new(module),
+            render: ModuleRenderContext::new(module, colors),
             str_width,
             type_width,
             member_width,
             name_width,
-            addr_width,
             colors,
         }
-    }
-
-    fn label_for(&self, addr: CodeAddr) -> Option<&str> {
-        self.addr_labels.get(&addr).map(|s| s.as_str())
     }
 }
 
@@ -278,7 +271,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let strings = module.strings();
     let entrypoints = module.entrypoints();
-    let stw = ctx.addr_width;
+    let stw = ctx.render.addr_width;
     let tw = ctx.type_width;
 
     writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).expect("writing to a String is infallible");
@@ -321,6 +314,11 @@ fn dump_spans(out: &mut String, module: &Module, ctx: &DumpContext) {
     let pw = width_for_count(spans.len());
     let tw = ctx.type_width;
     let mw = ctx.member_width;
+    let kind_width = spans
+        .iter()
+        .map(|span| span.kind.name().len())
+        .max()
+        .expect("spans is nonempty");
 
     writeln!(out, "{}[spans]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for (i, span) in spans.iter().enumerate() {
@@ -333,7 +331,7 @@ fn dump_spans(out: &mut String, module: &Module, ctx: &DumpContext) {
         };
         writeln!(
             out,
-            "P{i:0pw$} {:<10} {}..{}  source_id={}{}",
+            "P{i:0pw$} {:<kind_width$} {}..{} src={}{}",
             span.kind.name(),
             span.start,
             span.end,
@@ -362,11 +360,7 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let header = module.header();
     let total_words = header.instruction_word_count as usize;
-    let fmt = DumpFormatter {
-        ctx,
-        module,
-        addr_width: ctx.addr_width,
-    };
+    let fmt = DumpFormatter { ctx, module };
 
     writeln!(out, "{}[instructions]{}", c.blue, c.reset)
         .expect("writing to a String is infallible");
@@ -409,7 +403,6 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
 struct DumpFormatter<'a> {
     ctx: &'a DumpContext,
     module: &'a Module,
-    addr_width: usize,
 }
 
 fn instruction_word_count(instr: &Instruction) -> u16 {
@@ -428,7 +421,9 @@ fn instruction_word_count(instr: &Instruction) -> u16 {
 
 impl DumpFormatter<'_> {
     fn padding_word(&self, addr: CodeAddr) -> String {
-        LineBuilder::new(self.addr_width)
+        self.ctx
+            .render
+            .builder
             .instruction_prefix(addr.get(), Symbol::PADDING)
             .trim_end()
             .to_string()
@@ -437,24 +432,24 @@ impl DumpFormatter<'_> {
     fn instruction(&self, addr: CodeAddr, instr: &Instruction) -> String {
         match instr {
             Instruction::Switch { entries, .. } => self.format_switch(addr, *entries),
-            Instruction::Match(m) => self.format_match(addr, m),
-            Instruction::Call(c) => self.format_call(addr, c),
-            Instruction::Return(r) => self.format_return(addr, r),
+            _ => self.ctx.render.instruction_line(addr, instr),
         }
     }
 
     fn format_switch(&self, addr: CodeAddr, entries: SwitchEntriesView<'_>) -> String {
-        let builder = LineBuilder::new(self.addr_width);
-        let prefix = builder.instruction_prefix(addr.get(), nav_symbol(Nav::StayExact));
-        let mut result = format!("{prefix}switch");
-        let indent = cols::INDENT + self.addr_width + 2 * cols::GAP + cols::SYMBOL + 2;
+        let builder = &self.ctx.render.builder;
+        let mut result =
+            builder.instruction(addr.get(), nav_symbol(Nav::StayExact), "switch", "", &[]);
         let mut cases = entries.iter().collect::<Vec<_>>();
         cases.sort_by_key(|entry| entry.target);
 
         for entry in cases {
             let kind = self.ctx.render.dump_node_kind(self.switch_node_kind(entry));
-            let target = self.format_addr(entry.target);
-            let row = builder.pad_successors(format!("{:indent$}{kind}", ""), &target);
+            let target = self
+                .ctx
+                .render
+                .format_addr(CodeAddr::from(u16::from(entry.target)));
+            let row = builder.switch_case(&kind, &target);
             result.push('\n');
             result.push_str(&row);
         }
@@ -484,96 +479,6 @@ impl DumpFormatter<'_> {
                 successors.next().is_none(),
                 "switch prefix has one successor"
             );
-        }
-    }
-
-    fn format_match(&self, addr: CodeAddr, m: &Match) -> String {
-        let builder = LineBuilder::new(self.addr_width);
-        let symbol = nav_symbol(m.nav);
-        let prefix = format!("  {:0aw$} {} ", addr, symbol.format(), aw = self.addr_width);
-
-        let content = self.format_match_content(m);
-        let successors = self.format_match_successors(m);
-
-        let base = format!("{prefix}{content}");
-        builder.pad_successors(base, &successors)
-    }
-
-    fn format_match_content(&self, m: &Match) -> String {
-        self.ctx.render.dump_match_content(m)
-    }
-
-    fn format_match_successors(&self, m: &Match) -> String {
-        if m.is_terminal() {
-            "◼".to_string()
-        } else {
-            m.successors()
-                .map(|s| self.format_addr(s))
-                .collect::<Vec<_>>()
-                .join(", ")
-        }
-    }
-
-    fn format_call(&self, addr: CodeAddr, call: &Call) -> String {
-        let c = &self.ctx.colors;
-        let builder = LineBuilder::new(self.addr_width);
-        let symbol = match call.ownership {
-            CallOwnership::Caller => nav_symbol(call.nav),
-            CallOwnership::Callee => Symbol::EMPTY,
-        };
-        let prefix = format!("  {:0aw$} {} ", addr, symbol.format(), aw = self.addr_width);
-
-        let field_part = if let Some(field_id) = call.node_field {
-            let name = self.ctx.render.dump_node_field_name(field_id);
-            format!("{name}: ")
-        } else {
-            String::new()
-        };
-
-        let target_name = self
-            .ctx
-            .label_for(call.target)
-            .map(String::from)
-            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
-        let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
-        let returns = call
-            .returns()
-            .map(|addr| format!("{:0w$}", u16::from(addr), w = self.addr_width))
-            .collect::<Vec<_>>()
-            .join(" / ");
-        let successors = format!(
-            "{:0w$} : {returns}",
-            u16::from(call.target),
-            w = self.addr_width
-        );
-
-        let base = format!("{prefix}{content}");
-        builder.pad_successors(base, &successors)
-    }
-
-    fn format_return(&self, addr: CodeAddr, return_: &Return) -> String {
-        let builder = LineBuilder::new(self.addr_width);
-        let prefix = format!(
-            "  {:0sw$} {} ",
-            addr,
-            Symbol::EMPTY.format(),
-            sw = self.addr_width
-        );
-        let port = return_.port.to_byte();
-        let successor = if port == 0 {
-            "▶".to_string()
-        } else {
-            format!("▶ p{port}")
-        };
-        builder.pad_successors(prefix, &successor)
-    }
-
-    fn format_addr(&self, addr: SuccessorAddr) -> String {
-        let c = &self.ctx.colors;
-        if let Some(label) = self.ctx.label_for(CodeAddr::from(u16::from(addr))) {
-            format!("▶({}{}{})", c.blue, label, c.reset)
-        } else {
-            format!("{:0w$}", u16::from(addr), w = self.addr_width)
         }
     }
 }

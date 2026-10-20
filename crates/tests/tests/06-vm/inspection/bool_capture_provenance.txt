@@ -89,34 +89,34 @@ N0: S2 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..57  source_id=0  T1
-P1 pattern    4..57  source_id=0
-P2 capture    39..47  source_id=0  T1.M0
-P3 capture_type 48..55  source_id=0  T0
-P4 quantifier 37..38  source_id=0
-P5 pattern    15..37  source_id=0
+P0 def          0..57 src=0  T1
+P1 pattern      4..57 src=0
+P2 capture      39..47 src=0  T1.M0
+P3 capture_type 48..55 src=0  T0
+P4 quantifier   37..38 src=0
+P5 pattern      15..37 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  -ε-  [SpanStart#2]                    13, 16
-  04   !   (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  08
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  -ε-                                   13, 16      [SpanStart(P2)]
+  04   !   (expression_statement)           08          [SpanStartAt(P5) NodeBool RecordSet(M0 present) SpanEnd(P5) SpanEnd(P2)]
   07  ...
-  08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
-  10                                        ▶
+  08  ─‣┘  _                                10          [SpanEnd(P1) SpanEnd(P0)]
+  10       return
   11  ──!  _                                04, 11
   13  └─!  _                                04, 11
   15  ...
-  16  -ε-  [BoolValue(0) RecordSet(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  16  -ε-                                   10          [BoolValue(0) RecordSet(M0 present) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
        ●   program
-  02  -ε-  [SpanStart#2]                    13, 16
-  13       _                                04, 11
+  02  -ε-                                   13, 16      [SpanStart(P2)]
+  13  └─!  _                                04, 11
        ●   expression_statement
-  04       (expression_statement) [SpanStartAt#5 NodeBool RecordSet(M0) SpanEnd#5 SpanEnd#2]  08
+  04   !   (expression_statement)           08          [SpanStartAt(P5) NodeBool RecordSet(M0 present) SpanEnd(P5) SpanEnd(P2)]
        ●   expression_statement
-  08       _ [SpanEnd#1 SpanEnd#0]          10
+  08  ─‣┘  _                                10          [SpanEnd(P1) SpanEnd(P0)]
        ●   program
-  10   ◀   (Q)                              ◼
+  10   ◀   return                           ◼

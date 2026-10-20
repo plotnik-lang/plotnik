@@ -43,33 +43,33 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ListOpen]                       10, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M0)]        03
-  06   !   (lexical_declaration) [Node ArrayPush]  08, 12
+  01  -ε-                                   10, 04      [ListOpen]
+  03       return
+  04  -ε-                                   03          [ListClose RecordSet(M0 decls)]
+  06   !   (lexical_declaration)            08, 12      [Node ArrayPush]
   08  ──!  _                                06, 08
   10  └─!  _                                06, 08
-  12  ─‣┘  _ [ListClose RecordSet(M0)]      03
+  12  ─‣┘  _                                03          [ListClose RecordSet(M0 decls)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ListOpen]                       10, 04
-  10       _                                06, 08
+  01  -ε-                                   10, 04      [ListOpen]
+  10  └─!  _                                06, 08
        ●   lexical_declaration
-  06       (lexical_declaration) [Node ArrayPush]  08, 12
+  06   !   (lexical_declaration)            08, 12      [Node ArrayPush]
        ●   lexical_declaration
-  08       _                                06, 08
+  08  ──!  _                                06, 08
        ●   expression_statement
-  06       (lexical_declaration) [Node ArrayPush]  08, 12
+  06   !   (lexical_declaration)            08, 12      [Node ArrayPush]
        ○   expression_statement
-  08  ❮❮❮ 
-  08       _                                06, 08
+  08  ❮❮❮
+  08  ──!  _                                06, 08
        ●   lexical_declaration
-  06       (lexical_declaration) [Node ArrayPush]  08, 12
+  06   !   (lexical_declaration)            08, 12      [Node ArrayPush]
        ●   lexical_declaration
-  08       _                                06, 08
-  06  ❮❮❮ 
-  12       _ [ListClose RecordSet(M0)]      03
+  08  ──!  _                                06, 08
+  06  ❮❮❮
+  12  ─‣┘  _                                03          [ListClose RecordSet(M0 decls)]
        ●   program
-  03   ◀   (Q)                              ◼
+  03   ◀   return                           ◼

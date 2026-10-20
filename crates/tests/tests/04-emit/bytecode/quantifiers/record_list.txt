@@ -10,16 +10,16 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (array)                          18
-  03  ─‣┘  _ [ListClose RecordSet(items)]   01
-  05  -ε-  [ListClose RecordSet(items)]     01
-  07  -ε-  [RecordClose ArrayPush]          12, 03
-  08  ─‣─  (number) [Node RecordSet(b)]     07
-  09   !   (identifier) [RecordOpen Node RecordSet(a)]  08
+  03  ─‣┘  _                                01          [ListClose RecordSet(items)]
+  05  -ε-                                   01          [ListClose RecordSet(items)]
+  07  -ε-                                   12, 03      [RecordClose ArrayPush]
+  08  ─‣─  (number)                         07          [Node RecordSet(b)]
+  09   !   (identifier)                     08          [RecordOpen Node RecordSet(a)]
   12  ──!  _                                09, 12
   13  └─!  _                                09, 12
-  18  -ε-  [ListOpen]                       13, 05
+  18  -ε-                                   13, 05      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -53,12 +53,12 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (array)                          01
-  01  -ε-  [ListOpen]                       14, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M2)]        03
-  06  -ε-  [RecordClose ArrayPush]          12, 16
-  08  ─‣─  (number) [Node RecordSet(M1)]    06
-  10   !   (identifier) [RecordOpen Node RecordSet(M0)]  08
+  01  -ε-                                   14, 04      [ListOpen]
+  03       return
+  04  -ε-                                   03          [ListClose RecordSet(M2 items)]
+  06  -ε-                                   12, 16      [RecordClose ArrayPush]
+  08  ─‣─  (number)                         06          [Node RecordSet(M1 b)]
+  10   !   (identifier)                     08          [RecordOpen Node RecordSet(M0 a)]
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  ─‣┘  _ [ListClose RecordSet(M2)]      03
+  16  ─‣┘  _                                03          [ListClose RecordSet(M2 items)]

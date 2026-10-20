@@ -50,59 +50,59 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          14, 05
-  04                                        ▶
-  05  └‣─  (number) [Node RecordSet(M0)]    07
+  04       return
+  05  └‣─  (number)                         07          [Node RecordSet(M0 n)]
   07  ─‣┘³ _                                04
-  08  ─‣─  (number) [Node RecordSet(M0)]    07
+  08  ─‣─  (number)                         07          [Node RecordSet(M0 n)]
   10   !   (identifier)                     12, 08
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          14, 05
+  02  └‣─  (array)                          14, 05
        ●   array
-  14       _                                10, 12
+  14  └─!  _                                10, 12
        ●   [
-  10       (identifier)                     12, 08
+  10   !   (identifier)                     12, 08
        ○   [
-  14  ❮❮❮ 
-  12       _                                10, 12
+  14  ❮❮❮
+  12  ──!  _                                10, 12
        ●   identifier
-  10       (identifier)                     12, 08
+  10   !   (identifier)                     12, 08
        ●   identifier
-  12       _                                10, 12
+  12  ──!  _                                10, 12
        ●   ,
-  10       (identifier)                     12, 08
+  10   !   (identifier)                     12, 08
        ○   ,
-  12  ❮❮❮ 
-  12       _                                10, 12
+  12  ❮❮❮
+  12  ──!  _                                10, 12
        ●   identifier
-  10       (identifier)                     12, 08
+  10   !   (identifier)                     12, 08
        ●   identifier
-  12       _                                10, 12
+  12  ──!  _                                10, 12
        ●   ,
-  10       (identifier)                     12, 08
+  10   !   (identifier)                     12, 08
        ○   ,
-  12  ❮❮❮ 
-  12       _                                10, 12
+  12  ❮❮❮
+  12  ──!  _                                10, 12
        ●   number
-  10       (identifier)                     12, 08
+  10   !   (identifier)                     12, 08
        ○   number
-  12  ❮❮❮ 
-  12       _                                10, 12
+  12  ❮❮❮
+  12  ──!  _                                10, 12
        ●   ]
-  10       (identifier)                     12, 08
+  10   !   (identifier)                     12, 08
        ○   ]
-  12  ❮❮❮ 
-  12       _                                10, 12
-  10  ❮❮❮ 
-  08       (number) [Node RecordSet(M0)]    07
+  12  ❮❮❮
+  12  ──!  _                                10, 12
+  10  ❮❮❮
+  08  ─‣─  (number)                         07          [Node RecordSet(M0 n)]
        ○   ,
        ●   number
-  07       _                                04
+  07  ─‣┘³ _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

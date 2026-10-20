@@ -5,8 +5,8 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (identifier) [Node RecordSet(id)] $= "foo"  1
+  1       return
+  2   !   (identifier $= "foo")             1           [Node RecordSet(id)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -30,5 +30,5 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (identifier) [Node RecordSet(M0)] $= "foo"  2
-  2                                         ▶
+  0   !   (identifier $= "foo")             2           [Node RecordSet(M0 id)]
+  2       return

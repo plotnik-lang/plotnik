@@ -31,16 +31,16 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (expression_statement)            2
-  2  └‣─  (number) [Node RecordSet(M0)]     4
+  2  └‣─  (number)                          4           [Node RecordSet(M0 n)]
   4  ─‣┘² _                                 5
-  5                                         ▶
+  5       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (expression_statement)            02
+  1  └‣─  (expression_statement)            2
       ●   expression_statement
-  2       (number) [Node RecordSet(M0)]     04
+  2  └‣─  (number)                          4           [Node RecordSet(M0 n)]
       ○   identifier
       ○   ;
-  1  ❮❮❮ 
+  1  ❮❮❮

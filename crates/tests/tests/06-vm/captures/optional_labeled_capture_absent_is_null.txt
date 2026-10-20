@@ -42,22 +42,22 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (program)                        12, 08
-  02   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  05
-  05  ─‣┘  _ [RecordSet(M2)]                07
-  07                                        ▶
-  08  -ε-  [Absent RecordSet(M2)]           07
+  02   !   (identifier)                     05          [VariantOpen(M1 A) Node RecordSet(M0 a) VariantClose]
+  05  ─‣┘  _                                07          [RecordSet(M2 e)]
+  07       return
+  08  -ε-                                   07          [Absent RecordSet(M2 e)]
   10  ──!  _                                02, 10
   12  └─!  _                                02, 10
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        12, 08
+  00   !   (program)                        12, 08
        ●   program
-  12       _                                02, 10
+  12  └─!  _                                02, 10
        ●   lexical_declaration
-  02       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  05
+  02   !   (identifier)                     05          [VariantOpen(M1 A) Node RecordSet(M0 a) VariantClose]
        ○   lexical_declaration
-  12  ❮❮❮ 
-  10       _                                02, 10
-  00  ❮❮❮ 
-  08  -ε-  [Absent RecordSet(M2)]           07
-  07   ◀   (Q)                              ◼
+  12  ❮❮❮
+  10  ──!  _                                02, 10
+  00  ❮❮❮
+  08  -ε-                                   07          [Absent RecordSet(M2 e)]
+  07   ◀   return                           ◼

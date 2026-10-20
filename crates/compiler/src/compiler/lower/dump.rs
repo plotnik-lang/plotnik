@@ -1,6 +1,9 @@
 use std::fmt::Write as _;
 
-use crate::bytecode::{EffectKind, LineBuilder, Nav, Symbol, cols, nav_symbol, width_for_count};
+use crate::bytecode::{
+    EffectKind, LineBuilder, Nav, Symbol, format_effect, nav_symbol, pattern_constraints,
+    return_content, width_for_count,
+};
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
@@ -196,15 +199,6 @@ impl NfaDumper<'_> {
         format!("{} ({})", self.def_name(def_id), modes.join(", "))
     }
 
-    fn prefix(&self, label: Label, symbol: Symbol) -> String {
-        format!(
-            "  {:0w$} {} ",
-            label.0,
-            symbol.format(),
-            w = self.label_width
-        )
-    }
-
     pub(crate) fn switch_cases(&self, switch: &SwitchIR) -> Vec<(NodeKindId, Label, String)> {
         let mut cases = switch
             .cases()
@@ -230,13 +224,17 @@ impl NfaDumper<'_> {
 
     fn format_switch(&self, switch: &SwitchIR) -> String {
         let builder = LineBuilder::new(self.label_width);
-        let prefix = self.prefix(switch.label, nav_symbol(Nav::StayExact));
-        let mut result = format!("{prefix}switch");
-        let indent = cols::INDENT + self.label_width + 2 * cols::GAP + cols::SYMBOL + 2;
+        let mut result = builder.instruction(
+            switch.label.0,
+            nav_symbol(Nav::StayExact),
+            "switch",
+            "",
+            &[],
+        );
 
         for (_, target, kind) in self.switch_cases(switch) {
             let target = format!("{:0w$}", target.0, w = self.label_width);
-            let row = builder.pad_successors(format!("{:indent$}{kind}", ""), &target);
+            let row = builder.switch_case(&kind, &target);
             result.push('\n');
             result.push_str(&row);
         }
@@ -245,7 +243,6 @@ impl NfaDumper<'_> {
     }
 
     fn format_match(&self, m: &MatchIR) -> String {
-        let prefix = self.prefix(m.label, nav_symbol(m.nav));
         let content = self.match_content(m);
         let successors = if m.successors.is_empty() {
             "◼".to_string()
@@ -257,42 +254,42 @@ impl NfaDumper<'_> {
                 .join(", ")
         };
 
-        LineBuilder::new(self.label_width).pad_successors(format!("{prefix}{content}"), &successors)
+        let effects = m
+            .effects
+            .iter()
+            .map(|effect| self.effect(effect))
+            .collect::<Vec<_>>();
+        LineBuilder::new(self.label_width).instruction(
+            m.label.0,
+            nav_symbol(m.nav),
+            &content,
+            &successors,
+            &effects,
+        )
     }
 
     fn match_content(&self, m: &MatchIR) -> String {
-        let mut parts = Vec::new();
-
-        if !m.is_epsilon() {
-            for field_id in &m.neg_fields {
-                parts.push(format!("-{}", self.field_name(*field_id)));
-            }
-
-            let node_part = self.node_pattern(m);
-            if !node_part.is_empty() {
-                parts.push(node_part);
-            }
+        if m.is_epsilon() {
+            return String::new();
         }
 
-        let effects: Vec<_> = m.effects.iter().map(|e| self.effect(e)).collect();
-        if !effects.is_empty() {
-            parts.push(format!("[{}]", effects.join(" ")));
-        }
+        self.node_pattern(m)
+    }
 
-        if !m.is_epsilon()
-            && let Some(predicate) = &m.predicate
-        {
+    pub(crate) fn node_pattern(&self, m: &MatchIR) -> String {
+        let mut constraints = m
+            .neg_fields
+            .iter()
+            .map(|id| format!("-{}", self.field_name(*id)))
+            .collect::<Vec<_>>();
+        if let Some(predicate) = &m.predicate {
             let value = match &predicate.value {
                 PredicateValueIR::String(s) => format!("{s:?}"),
                 PredicateValueIR::Regex(s) => format!("/{s}/"),
             };
-            parts.push(format!("{} {}", predicate.op.as_str(), value));
+            constraints.push(format!("{} {}", predicate.op.as_str(), value));
         }
 
-        parts.join(" ")
-    }
-
-    pub(crate) fn node_pattern(&self, m: &MatchIR) -> String {
         let mut result = String::new();
 
         if let Some(field_id) = m.node_field {
@@ -300,12 +297,12 @@ impl NfaDumper<'_> {
             result.push_str(": ");
         }
 
-        if m.missing {
-            result.push_str(&self.missing_pattern(m.node_kind));
-            return result;
-        }
-
-        result.push_str(&self.node_kind_pattern(m.node_kind));
+        let pattern = if m.missing {
+            self.missing_pattern(m.node_kind)
+        } else {
+            self.node_kind_pattern(m.node_kind)
+        };
+        result.push_str(&pattern_constraints(pattern, constraints));
         result
     }
 
@@ -315,35 +312,19 @@ impl NfaDumper<'_> {
             NodeKindConstraint::Named(None) => "(_)".to_string(),
             NodeKindConstraint::Named(Some(id)) => format!("({})", self.kind_name(id)),
             NodeKindConstraint::Anonymous(None) => "\"_\"".to_string(),
-            NodeKindConstraint::Anonymous(Some(id)) => format!("\"{}\"", self.kind_name(id)),
+            NodeKindConstraint::Anonymous(Some(id)) => format!("{:?}", self.kind_name(id)),
         }
     }
 
     pub(crate) fn effect(&self, e: &EffectIR) -> String {
-        match e.kind() {
-            EffectKind::Node => "Node".to_string(),
-            EffectKind::ListOpen => "ListOpen".to_string(),
-            EffectKind::ArrayPush => "ArrayPush".to_string(),
-            EffectKind::ListClose => "ListClose".to_string(),
-            EffectKind::RecordOpen => "RecordOpen".to_string(),
-            EffectKind::RecordClose => "RecordClose".to_string(),
-            EffectKind::VariantClose => "VariantClose".to_string(),
-            EffectKind::Absent => "Absent".to_string(),
-            EffectKind::SuppressBegin => "SuppressBegin".to_string(),
-            EffectKind::SuppressEnd => "SuppressEnd".to_string(),
-            EffectKind::RecordSet => format!("RecordSet({})", self.member_name(e.payload())),
-            EffectKind::VariantOpen => format!("VariantOpen({})", self.member_name(e.payload())),
-            EffectKind::SpanStartAt => format!("SpanStartAt#{}", literal(e.payload())),
-            EffectKind::SpanStart => format!("SpanStart#{}", literal(e.payload())),
-            EffectKind::SpanEnd => format!("SpanEnd#{}", literal(e.payload())),
-            EffectKind::ScalarOpen => "ScalarOpen".to_string(),
-            EffectKind::ScalarMark => "ScalarMark".to_string(),
-            EffectKind::TextClose => "TextClose".to_string(),
-            EffectKind::BoolClose => format!("BoolClose({})", literal(e.payload())),
-            EffectKind::NodeText => "NodeText".to_string(),
-            EffectKind::NodeBool => "NodeBool".to_string(),
-            EffectKind::BoolValue => format!("BoolValue({})", literal(e.payload())),
-        }
+        let operand = match e.kind() {
+            EffectKind::RecordSet | EffectKind::VariantOpen => self.member_name(e.payload()),
+            EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd => {
+                format!("P{}", literal(e.payload()))
+            }
+            _ => literal(e.payload()).to_string(),
+        };
+        format_effect(e.kind(), operand)
     }
 
     fn member_name(&self, payload: &EffectArg) -> String {
@@ -360,7 +341,7 @@ impl NfaDumper<'_> {
             NodeKindConstraint::Any => "(MISSING)".to_string(),
             NodeKindConstraint::Named(Some(id)) => format!("(MISSING {})", self.kind_name(id)),
             NodeKindConstraint::Anonymous(Some(id)) => {
-                format!("(MISSING \"{}\")", self.kind_name(id))
+                format!("(MISSING {:?})", self.kind_name(id))
             }
             NodeKindConstraint::Named(None) | NodeKindConstraint::Anonymous(None) => {
                 unreachable!("MISSING resolves to a concrete kind or Any")
@@ -391,8 +372,6 @@ impl NfaDumper<'_> {
             CallEntry::CallerOwned { nav, .. } => nav_symbol(nav),
             CallEntry::CalleeOwned { .. } => Symbol::EMPTY,
         };
-        let prefix = self.prefix(call.label, symbol);
-
         let field_part = match call.field() {
             Some(field_id) => format!("{}: ", self.field_name(field_id)),
             None => String::new(),
@@ -411,7 +390,13 @@ impl NfaDumper<'_> {
             .join(" / ");
         let successors = format!("{:0w$} : {returns}", call.target.0, w = self.label_width);
 
-        LineBuilder::new(self.label_width).pad_successors(format!("{prefix}{content}"), &successors)
+        LineBuilder::new(self.label_width).instruction(
+            call.label.0,
+            symbol,
+            &content,
+            &successors,
+            &[],
+        )
     }
 
     fn callee_name(&self, target: Label) -> String {
@@ -423,14 +408,13 @@ impl NfaDumper<'_> {
     }
 
     fn format_return(&self, return_: &crate::compiler::lower::ir::ReturnIR) -> String {
-        let prefix = self.prefix(return_.label, Symbol::EMPTY);
-        let port = return_.port.to_byte();
-        let successor = if port == 0 {
-            "▶".to_string()
-        } else {
-            format!("▶ p{port}")
-        };
-        LineBuilder::new(self.label_width).pad_successors(prefix, &successor)
+        LineBuilder::new(self.label_width).instruction(
+            return_.label.0,
+            Symbol::EMPTY,
+            &return_content(return_.port),
+            "",
+            &[],
+        )
     }
 }
 

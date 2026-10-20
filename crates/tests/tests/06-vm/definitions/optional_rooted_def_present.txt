@@ -57,34 +57,34 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (array)                          16, 10
-  04                                        ▶
-  05  └‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  07
+  04       return
+  05  └‣─  (number)                         07          [RecordSet(M0 first) Node RecordSet(M1 n)]
   07  ─‣┘³ _                                04
-  08  ─‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  07
-  10  -ε-  [Absent]                         05
-  12   !   (identifier) [Node]              08
+  08  ─‣─  (number)                         07          [RecordSet(M0 first) Node RecordSet(M1 n)]
+  10  -ε-                                   05          [Absent]
+  12   !   (identifier)                     08          [Node]
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array)                          16, 10
+  02  └‣─  (array)                          16, 10
        ●   array
-  16       _                                12, 14
+  16  └─!  _                                12, 14
        ●   [
-  12       (identifier) [Node]              08
+  12   !   (identifier)                     08          [Node]
        ○   [
-  16  ❮❮❮ 
-  14       _                                12, 14
+  16  ❮❮❮
+  14  ──!  _                                12, 14
        ●   identifier
-  12       (identifier) [Node]              08
+  12   !   (identifier)                     08          [Node]
        ●   identifier
-  08       (number) [RecordSet(M0) Node RecordSet(M1)]  07
+  08  ─‣─  (number)                         07          [RecordSet(M0 first) Node RecordSet(M1 n)]
        ○   ,
        ●   number
-  07       _                                04
+  07  ─‣┘³ _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

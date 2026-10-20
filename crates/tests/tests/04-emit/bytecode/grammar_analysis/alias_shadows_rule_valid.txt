@@ -30,18 +30,18 @@ Token   = 02
 
 [transitions]
 Token:
-  01                                        ▶
+  01       return
   02   !   (group)                          03
   03  └!┘  _                                01
 
 Body:
-  05                                        ▶
+  05       return
   06   !   (term)                           08
   07  ─‣┘  _                                05
   08  └‣─  (num)                            07
 
 Missing:
-  10                                        ▶
+  10       return
   11   !   (MISSING group)                  10
 -------------------- BYTECODE --------------------
 [strings]
@@ -69,15 +69,15 @@ Token   = 00 :: T0
 Token:
   00   !   (group)                          01
   01  └!┘  _                                02
-  02                                        ▶
+  02       return
 
 Body:
   03   !   (term)                           04
   04  └‣─  (num)                            05
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
 
 Missing:
   08   !   (MISSING group)                  10
-  10                                        ▶
+  10       return

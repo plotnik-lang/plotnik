@@ -8,10 +8,10 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (statement_block)                 5
   4  ─‣┘  _                                 1
-  5  └◦─  "{" [Node RecordSet(op)]          4
+  5  └◦─  "{"                               4           [Node RecordSet(op)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -36,6 +36,6 @@ Q = 0 :: T1
 [instructions]
 Q:
   0   !   (statement_block)                 1
-  1  └◦─  "{" [Node RecordSet(M0)]          3
+  1  └◦─  "{"                               3           [Node RecordSet(M0 op)]
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

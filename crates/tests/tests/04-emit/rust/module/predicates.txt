@@ -353,7 +353,7 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, source: &str, ip: u16) -> Flow {
         match ip {
-            //   1                                         ▶
+            //   1       return
             S1_Q => Flow::Accept,
             //   2   !   (program)                         4
             S2_Q => 'state: {
@@ -387,7 +387,7 @@ mod matcher {
                 }
                 Flow::Jump(S1_Q)
             }
-            //   6  └‣─  (identifier) [Node RecordSet(id)] == "foo"  5
+            //   6  └‣─  (identifier == "foo")             5           [Node RecordSet(id)]
             S6_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -431,7 +431,7 @@ mod matcher {
         true
     }
 
-    /// `S6_Q` candidate: `(identifier)`.
+    /// `S6_Q` candidate: `(identifier == "foo")`.
     #[inline]
     fn cand_s6_q(eng: &rt::Engine<'_>, source: &str) -> bool {
         let node = eng.node();

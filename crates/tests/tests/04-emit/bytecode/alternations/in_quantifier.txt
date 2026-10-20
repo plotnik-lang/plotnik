@@ -12,20 +12,20 @@ Q = 02
 
 [transitions]
 Q:
-  01                                        ▶
+  01       return
   02   !   (object)                         20
-  03  ─‣┘  _ [ListClose RecordSet(items)]   01
-  05  -ε-  [ListClose RecordSet(items)]     01
-  07  -ε-  [RecordClose ArrayPush]          14, 03
-  09   !   (pair) [VariantOpen(A) Node RecordSet(a) VariantClose RecordSet(item)]  07
-  10   !   (shorthand_property_identifier) [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]  07
+  03  ─‣┘  _                                01          [ListClose RecordSet(items)]
+  05  -ε-                                   01          [ListClose RecordSet(items)]
+  07  -ε-                                   14, 03      [RecordClose ArrayPush]
+  09   !   (pair)                           07          [VariantOpen(A) Node RecordSet(a) VariantClose RecordSet(item)]
+  10   !   (shorthand_property_identifier)  07          [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]
   11   !   switch
              (pair)                         09
              (shorthand_property_identifier)  10
-  12  -ε-  [RecordOpen]                     11
+  12  -ε-                                   11          [RecordOpen]
   14  ──!  _                                12, 14
   15  └─!  _                                12, 14
-  20  -ε-  [ListOpen]                       15, 05
+  20  -ε-                                   15, 05      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -70,17 +70,17 @@ Q = 00 :: T6
 [instructions]
 Q:
   00   !   (object)                         01
-  01  -ε-  [ListOpen]                       20, 04
-  03                                        ▶
-  04  -ε-  [ListClose RecordSet(M5)]        03
-  06  -ε-  [RecordClose ArrayPush]          18, 22
-  08   !   (pair) [VariantOpen(M2) Node RecordSet(M0) VariantClose RecordSet(M4)]  06
-  11   !   (shorthand_property_identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  06
+  01  -ε-                                   20, 04      [ListOpen]
+  03       return
+  04  -ε-                                   03          [ListClose RecordSet(M5 items)]
+  06  -ε-                                   18, 22      [RecordClose ArrayPush]
+  08   !   (pair)                           06          [VariantOpen(M2 A) Node RecordSet(M0 a) VariantClose RecordSet(M4 item)]
+  11   !   (shorthand_property_identifier)  06          [VariantOpen(M3 B) Node RecordSet(M1 b) VariantClose RecordSet(M4 item)]
   14   !   switch
              (pair)                         08
              (shorthand_property_identifier)  11
   15  ...
-  16  -ε-  [RecordOpen]                     14
+  16  -ε-                                   14          [RecordOpen]
   18  ──!  _                                16, 18
   20  └─!  _                                16, 18
-  22  ─‣┘  _ [ListClose RecordSet(M5)]      03
+  22  ─‣┘  _                                03          [ListClose RecordSet(M5 items)]

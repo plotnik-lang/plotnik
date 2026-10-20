@@ -53,26 +53,26 @@ Q:
   01  └‣─  (expression_statement)           02
   02  └‣─  (binary_expression)              03
   03  └─!  _                                09, 11
-  05  ─•─  (identifier) [Node RecordSet(M1)]  07
+  05  ─•─  (identifier)                     07          [Node RecordSet(M1 right)]
   07  ─‣┘³ _                                08
-  08                                        ▶
-  09   !   (identifier) [Node RecordSet(M0)]  05
+  08       return
+  09   !   (identifier)                     05          [Node RecordSet(M0 left)]
   11  ──!  _                                09, 11
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (binary_expression)              03
+  02  └‣─  (binary_expression)              03
        ●   binary_expression
-  03       _                                09, 11
+  03  └─!  _                                09, 11
        ●   identifier
-  09       (identifier) [Node RecordSet(M0)]  05
+  09   !   (identifier)                     05          [Node RecordSet(M0 left)]
        ●   identifier
-  05       (identifier) [Node RecordSet(M1)]  07
+  05  ─•─  (identifier)                     07          [Node RecordSet(M1 right)]
        ○   +
        ●   identifier
-  07       _                                08
+  07  ─‣┘³ _                                08
        ●   program
-  08   ◀   (Q)                              ◼
+  08   ◀   return                           ◼

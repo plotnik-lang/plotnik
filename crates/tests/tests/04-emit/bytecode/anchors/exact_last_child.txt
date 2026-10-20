@@ -5,7 +5,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (binary_expression)               9
   5  !─┘  _                                 1
   6   !   (identifier)                      5
@@ -32,7 +32,7 @@ Q = 0 :: T0
 Q:
   0   !   (binary_expression)               1
   1  └─!  _                                 5, 6
-  3                                         ▶
+  3       return
   4  !─┘  _                                 3
   5   !   (identifier)                      4
   6  ──!  _                                 5, 6

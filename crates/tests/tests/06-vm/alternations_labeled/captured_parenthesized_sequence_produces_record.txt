@@ -75,18 +75,18 @@ Q = 0 :: T2
 Q:
   0   !   (program)                         1
   1  └─!  _                                 3, 8
-  3   !   (expression_statement) [RecordOpen Node RecordSet(M0)]  5
-  5  ─‣┘  _ [RecordClose RecordSet(M1)]     7
-  7                                         ▶
+  3   !   (expression_statement)            5           [RecordOpen Node RecordSet(M0 a)]
+  5  ─‣┘  _                                 7           [RecordClose RecordSet(M1 x)]
+  7       return
   8  ──!  _                                 3, 8
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       _                                 03, 08
+  1  └─!  _                                 3, 8
       ●   expression_statement
-  3       (expression_statement) [RecordOpen Node RecordSet(M0)]  05
+  3   !   (expression_statement)            5           [RecordOpen Node RecordSet(M0 a)]
       ●   expression_statement
-  5       _ [RecordClose RecordSet(M1)]     07
+  5  ─‣┘  _                                 7           [RecordClose RecordSet(M1 x)]
       ●   program
-  7   ◀   (Q)                               ◼
+  7   ◀   return                            ◼

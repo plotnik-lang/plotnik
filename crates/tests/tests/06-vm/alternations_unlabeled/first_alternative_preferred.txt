@@ -47,21 +47,21 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └─!  _                                05, 08, 11
-  04                                        ▶
-  05   !   (_) [Absent RecordSet(M1) Node RecordSet(M0)]  13
-  08   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  13
+  04       return
+  05   !   (_)                              13          [Absent RecordSet(M1 id) Node RecordSet(M0 any)]
+  08   !   (identifier)                     13          [Absent RecordSet(M0 any) Node RecordSet(M1 id)]
   11  ──!  _                                05, 08, 11
   13  ─‣┘² _                                04
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                05, 08, 11
+  02  └─!  _                                05, 08, 11
        ●   identifier
-  05       (_) [Absent RecordSet(M1) Node RecordSet(M0)]  13
+  05   !   (_)                              13          [Absent RecordSet(M1 id) Node RecordSet(M0 any)]
        ●   identifier
-  13       _                                04
+  13  ─‣┘² _                                04
        ●   program
-  04   ◀   (Q)                              ◼
+  04   ◀   return                           ◼

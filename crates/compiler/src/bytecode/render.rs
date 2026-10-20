@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 
-use crate::core::{NodeFieldId, NodeKindId};
+use crate::core::{Colors, NodeFieldId, NodeKindId};
 
-use super::format::format_effect;
-use super::instructions::Match;
+use super::format::{format_effect, pattern_constraints, return_content, width_for_count};
 use super::module::Module;
 use super::node_kind_constraint::NodeKindConstraint;
+use super::{
+    CallOwnership, CodeAddr, EffectKind, Instruction, LineBuilder, Match, Nav, Symbol, nav_symbol,
+};
+#[cfg(feature = "vm")]
+use plotnik_runtime::JournalEvent;
 
 pub(crate) struct ModuleRenderContext {
     node_kind_names: BTreeMap<NodeKindId, String>,
@@ -14,10 +18,13 @@ pub(crate) struct ModuleRenderContext {
     all_strings: Vec<String>,
     regex_patterns: Vec<String>,
     entrypoint_by_ip: BTreeMap<u16, String>,
+    pub(crate) builder: LineBuilder,
+    pub(crate) addr_width: usize,
+    colors: Colors,
 }
 
 impl ModuleRenderContext {
-    pub(crate) fn new(module: &Module) -> Self {
+    pub(crate) fn new(module: &Module, colors: Colors) -> Self {
         let header = module.header();
         let strings = module.strings();
         let regexes = module.regexes();
@@ -60,6 +67,7 @@ impl ModuleRenderContext {
             entrypoint_by_ip.insert(u16::from(e.target()), name.to_string());
         }
 
+        let addr_width = width_for_count(header.instruction_word_count as usize);
         Self {
             node_kind_names,
             node_field_names,
@@ -67,6 +75,9 @@ impl ModuleRenderContext {
             all_strings,
             regex_patterns,
             entrypoint_by_ip,
+            builder: LineBuilder::new(addr_width),
+            addr_width,
+            colors,
         }
     }
 
@@ -97,101 +108,129 @@ impl ModuleRenderContext {
     pub(crate) fn dump_node_field_name(&self, id: NodeFieldId) -> String {
         self.node_field_name(id)
             .map(String::from)
-            .unwrap_or_else(|| MissingSymbolPolicy::Dump.format("field", id))
+            .unwrap_or_else(|| format!("field#{id}"))
     }
 
-    pub(crate) fn dump_match_content(&self, m: &Match<'_>) -> String {
-        MatchRenderer::new(self, MissingSymbolPolicy::Dump).format_match_content(m)
-    }
-
-    pub(crate) fn dump_node_kind(&self, kind: NodeKindConstraint) -> String {
-        MatchRenderer::new(self, MissingSymbolPolicy::Dump).format_node_kind(kind)
-    }
-
-    pub(crate) fn trace_match_content(&self, m: &Match<'_>) -> String {
-        MatchRenderer::new(self, MissingSymbolPolicy::Trace).format_match_content(m)
-    }
-}
-
-struct MatchRenderer<'a> {
-    context: &'a ModuleRenderContext,
-    missing_symbols: MissingSymbolPolicy,
-}
-
-impl<'a> MatchRenderer<'a> {
-    fn new(context: &'a ModuleRenderContext, missing_symbols: MissingSymbolPolicy) -> Self {
-        Self {
-            context,
-            missing_symbols,
+    pub(crate) fn format_addr(&self, addr: CodeAddr) -> String {
+        if let Some(name) = self.entrypoint_name(addr.get()) {
+            return format!("▶({}{}{})", self.colors.blue, name, self.colors.reset);
         }
+
+        format!("{:0w$}", addr, w = self.addr_width)
+    }
+
+    pub(crate) fn def_ref_name(&self, ip: CodeAddr) -> String {
+        self.entrypoint_name(ip.get())
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.addr_width))
+    }
+
+    fn successors(&self, instruction: &Instruction<'_>) -> String {
+        match instruction {
+            Instruction::Match(m) if m.is_terminal() => "◼".to_string(),
+            Instruction::Match(m) => m
+                .successors()
+                .map(|addr| self.format_addr(CodeAddr::from(u16::from(addr))))
+                .collect::<Vec<_>>()
+                .join(", "),
+            Instruction::Call(call) => {
+                let returns = call
+                    .returns()
+                    .map(|addr| format!("{:0w$}", u16::from(addr), w = self.addr_width))
+                    .collect::<Vec<_>>()
+                    .join(" / ");
+                format!("{:0w$} : {returns}", call.target, w = self.addr_width)
+            }
+            Instruction::Switch { .. } | Instruction::Return(_) => String::new(),
+        }
+    }
+
+    pub(crate) fn instruction_line(&self, addr: CodeAddr, instruction: &Instruction<'_>) -> String {
+        let (symbol, content, effects) = match instruction {
+            Instruction::Match(m) => (
+                nav_symbol(m.nav),
+                self.format_match_content(m),
+                m.effects()
+                    .map(|effect| self.format_effect(effect.kind, effect.payload))
+                    .collect::<Vec<_>>(),
+            ),
+            Instruction::Call(call) => {
+                let symbol = match call.ownership {
+                    CallOwnership::Caller => nav_symbol(call.nav),
+                    CallOwnership::Callee => Symbol::EMPTY,
+                };
+                let field = call
+                    .node_field
+                    .map(|id| format!("{}: ", self.dump_node_field_name(id)))
+                    .unwrap_or_default();
+                let name = self.def_ref_name(call.target);
+                (
+                    symbol,
+                    format!("{field}({}{}{})", self.colors.blue, name, self.colors.reset),
+                    Vec::new(),
+                )
+            }
+            Instruction::Return(return_) => {
+                (Symbol::EMPTY, return_content(return_.port), Vec::new())
+            }
+            Instruction::Switch { .. } => {
+                (nav_symbol(Nav::StayExact), "switch".to_string(), Vec::new())
+            }
+        };
+        let successors = self.successors(instruction);
+        self.builder
+            .instruction(addr.get(), symbol, &content, &successors, &effects)
     }
 
     fn format_match_content(&self, m: &Match<'_>) -> String {
-        let mut parts = Vec::new();
-
-        if !m.is_epsilon() {
-            for field_id in m.neg_fields() {
-                let name = self.format_node_field_name(field_id);
-                parts.push(format!("-{name}"));
-            }
-
-            let node_part = self.format_node_pattern(m);
-            if !node_part.is_empty() {
-                parts.push(node_part);
-            }
+        if m.is_epsilon() {
+            return String::new();
         }
 
-        let effects: Vec<_> = m.effects().map(|e| format_effect(&e)).collect();
-        if !effects.is_empty() {
-            parts.push(format!("[{}]", effects.join(" ")));
-        }
+        let mut constraints = m
+            .neg_fields()
+            .map(|id| format!("-{}", self.dump_node_field_name(id)))
+            .collect::<Vec<_>>();
 
-        if !m.is_epsilon()
-            && let Some(predicate) = m.predicate()
-        {
+        if let Some(predicate) = m.predicate() {
             let op = predicate.op;
             let value = if op.is_regex_op() {
-                let pattern = self.context.regex_pattern(predicate.value_ref as usize);
+                let pattern = self.regex_pattern(predicate.value_ref as usize);
                 format!("/{}/", pattern)
             } else {
-                let s = self.context.string(predicate.value_ref as usize);
+                let s = self.string(predicate.value_ref as usize);
                 format!("{:?}", s)
             };
-            parts.push(format!("{} {}", op.as_str(), value));
+            constraints.push(format!("{} {}", op.as_str(), value));
         }
 
-        parts.join(" ")
-    }
-
-    fn format_node_pattern(&self, m: &Match<'_>) -> String {
         let mut result = String::new();
-
         if let Some(field_id) = m.node_field {
-            result.push_str(&self.format_node_field_name(field_id));
+            result.push_str(&self.dump_node_field_name(field_id));
             result.push_str(": ");
         }
 
-        if m.missing() {
-            result.push_str(&self.format_missing(m.node_kind));
-            return result;
-        }
-
-        result.push_str(&self.format_node_kind(m.node_kind));
+        let pattern = if m.missing() {
+            self.format_missing(m.node_kind)
+        } else {
+            self.dump_node_kind(m.node_kind)
+        };
+        result.push_str(&pattern_constraints(pattern, constraints));
         result
     }
 
-    fn format_node_kind(&self, kind: NodeKindConstraint) -> String {
+    pub(crate) fn dump_node_kind(&self, kind: NodeKindConstraint) -> String {
         match kind {
             NodeKindConstraint::Any => "_".to_string(),
             NodeKindConstraint::Named(None) => "(_)".to_string(),
             NodeKindConstraint::Named(Some(id)) => {
-                let name = self.format_node_kind_name(id, "node");
+                let name = self.format_node_kind_name(id);
                 format!("({name})")
             }
             NodeKindConstraint::Anonymous(None) => "\"_\"".to_string(),
             NodeKindConstraint::Anonymous(Some(id)) => {
-                let name = self.format_node_kind_name(id, "anon");
-                format!("\"{name}\"")
+                let name = self.format_node_kind_name(id);
+                format!("{name:?}")
             }
         }
     }
@@ -200,10 +239,10 @@ impl<'a> MatchRenderer<'a> {
         match kind {
             NodeKindConstraint::Any => "(MISSING)".to_string(),
             NodeKindConstraint::Named(Some(id)) => {
-                format!("(MISSING {})", self.format_node_kind_name(id, "node"))
+                format!("(MISSING {})", self.format_node_kind_name(id))
             }
             NodeKindConstraint::Anonymous(Some(id)) => {
-                format!("(MISSING \"{}\")", self.format_node_kind_name(id, "anon"))
+                format!("(MISSING {:?})", self.format_node_kind_name(id))
             }
             NodeKindConstraint::Named(None) | NodeKindConstraint::Anonymous(None) => {
                 unreachable!("MISSING resolves to a concrete kind or Any")
@@ -211,35 +250,57 @@ impl<'a> MatchRenderer<'a> {
         }
     }
 
-    fn format_node_kind_name(&self, id: NodeKindId, dump_prefix: &str) -> String {
+    fn format_node_kind_name(&self, id: NodeKindId) -> String {
         if id == NodeKindId::ERROR {
             return "ERROR".to_string();
         }
-        match self.context.node_kind_name(id) {
+        match self.node_kind_name(id) {
             Some(name) => name.to_string(),
-            None => self.missing_symbols.format(dump_prefix, id),
+            None => format!("node#{id}"),
         }
     }
 
-    fn format_node_field_name(&self, id: NodeFieldId) -> String {
-        match self.context.node_field_name(id) {
-            Some(name) => name.to_string(),
-            None => self.missing_symbols.format("field", id),
-        }
+    pub(crate) fn format_effect(&self, kind: EffectKind, payload: usize) -> String {
+        let operand = match kind {
+            EffectKind::RecordSet | EffectKind::VariantOpen => format!(
+                "M{payload} {}",
+                self.member_name(payload as u16)
+                    .expect("effect member index names a type member")
+            ),
+            EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd => {
+                format!("P{payload}")
+            }
+            _ => payload.to_string(),
+        };
+        format_effect(kind, operand)
     }
-}
 
-#[derive(Clone, Copy)]
-enum MissingSymbolPolicy {
-    Dump,
-    Trace,
-}
-
-impl MissingSymbolPolicy {
-    fn format(self, prefix: &str, id: impl std::fmt::Display) -> String {
-        match self {
-            Self::Dump => format!("{prefix}#{id}"),
-            Self::Trace => "?".to_string(),
-        }
+    #[cfg(feature = "vm")]
+    pub(crate) fn format_journal_event(&self, event: &JournalEvent<'_>) -> String {
+        let (kind, payload) = match event {
+            JournalEvent::Node(_) => (EffectKind::Node, 0),
+            JournalEvent::ListOpen => (EffectKind::ListOpen, 0),
+            JournalEvent::ArrayPush => (EffectKind::ArrayPush, 0),
+            JournalEvent::ListClose => (EffectKind::ListClose, 0),
+            JournalEvent::RecordOpen => (EffectKind::RecordOpen, 0),
+            JournalEvent::RecordClose => (EffectKind::RecordClose, 0),
+            JournalEvent::RecordSet(id) => (EffectKind::RecordSet, *id as usize),
+            JournalEvent::VariantOpen(id) => (EffectKind::VariantOpen, *id as usize),
+            JournalEvent::VariantClose => (EffectKind::VariantClose, 0),
+            JournalEvent::Absent => (EffectKind::Absent, 0),
+            JournalEvent::SpanStart { id, node: Some(_) } => {
+                (EffectKind::SpanStartAt, *id as usize)
+            }
+            JournalEvent::SpanStart { id, node: None } => (EffectKind::SpanStart, *id as usize),
+            JournalEvent::SpanEnd(id) => (EffectKind::SpanEnd, *id as usize),
+            JournalEvent::ScalarOpen => (EffectKind::ScalarOpen, 0),
+            JournalEvent::ScalarMark(_) => (EffectKind::ScalarMark, 0),
+            JournalEvent::TextClose => (EffectKind::TextClose, 0),
+            JournalEvent::BoolClose(value) => (EffectKind::BoolClose, usize::from(*value)),
+            JournalEvent::NodeText(_) => (EffectKind::NodeText, 0),
+            JournalEvent::NodeBool(_) => (EffectKind::NodeBool, 0),
+            JournalEvent::BoolValue(value) => (EffectKind::BoolValue, usize::from(*value)),
+        };
+        self.format_effect(kind, payload)
     }
 }

@@ -86,7 +86,7 @@ x
       "ip": 0,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#0"
+        "event": "SpanStart(P0)"
       },
       "query_span_id": 0,
       "node": null,
@@ -96,7 +96,7 @@ x
       "ip": 0,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStartAt#1"
+        "event": "SpanStartAt(P1)"
       },
       "query_span_id": 1,
       "node": {
@@ -198,7 +198,7 @@ x
       "ip": 20,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#3"
+        "event": "SpanStart(P3)"
       },
       "query_span_id": 3,
       "node": null,
@@ -208,7 +208,7 @@ x
       "ip": 20,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#4"
+        "event": "SpanStart(P4)"
       },
       "query_span_id": 4,
       "node": null,
@@ -218,7 +218,7 @@ x
       "ip": 20,
       "event": {
         "kind": "journal_event",
-        "event": "VariantOpen \"Bad\""
+        "event": "VariantOpen(M2 Bad)"
       },
       "query_span_id": 4,
       "node": null,
@@ -228,7 +228,7 @@ x
       "ip": 20,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStartAt#5"
+        "event": "SpanStartAt(P5)"
       },
       "query_span_id": 5,
       "node": {
@@ -322,7 +322,7 @@ x
       "ip": 24,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#3"
+        "event": "SpanStart(P3)"
       },
       "query_span_id": 3,
       "node": null,
@@ -332,7 +332,7 @@ x
       "ip": 24,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#8"
+        "event": "SpanStart(P8)"
       },
       "query_span_id": 8,
       "node": null,
@@ -342,7 +342,7 @@ x
       "ip": 24,
       "event": {
         "kind": "journal_event",
-        "event": "VariantOpen \"Good\""
+        "event": "VariantOpen(M3 Good)"
       },
       "query_span_id": 8,
       "node": null,
@@ -352,7 +352,7 @@ x
       "ip": 24,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStartAt#9"
+        "event": "SpanStartAt(P9)"
       },
       "query_span_id": 9,
       "node": {
@@ -410,7 +410,7 @@ x
       "ip": 11,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStartAt#11"
+        "event": "SpanStartAt(P11)"
       },
       "query_span_id": 11,
       "node": {
@@ -424,7 +424,7 @@ x
       "ip": 11,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#10"
+        "event": "SpanStart(P10)"
       },
       "query_span_id": 10,
       "node": null,
@@ -448,7 +448,7 @@ x
       "ip": 11,
       "event": {
         "kind": "journal_event",
-        "event": "RecordSet \"good\""
+        "event": "RecordSet(M1 good)"
       },
       "query_span_id": 10,
       "node": null,
@@ -458,7 +458,7 @@ x
       "ip": 11,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#10"
+        "event": "SpanEnd(P10)"
       },
       "query_span_id": 10,
       "node": null,
@@ -468,7 +468,7 @@ x
       "ip": 11,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#11"
+        "event": "SpanEnd(P11)"
       },
       "query_span_id": 11,
       "node": null,
@@ -513,7 +513,7 @@ x
       "ip": 16,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#9"
+        "event": "SpanEnd(P9)"
       },
       "query_span_id": 9,
       "node": null,
@@ -533,7 +533,7 @@ x
       "ip": 16,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#8"
+        "event": "SpanEnd(P8)"
       },
       "query_span_id": 8,
       "node": null,
@@ -543,7 +543,7 @@ x
       "ip": 16,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#3"
+        "event": "SpanEnd(P3)"
       },
       "query_span_id": 3,
       "node": null,
@@ -588,7 +588,7 @@ x
       "ip": 27,
       "event": {
         "kind": "journal_event",
-        "event": "SpanStart#2"
+        "event": "SpanStart(P2)"
       },
       "query_span_id": 2,
       "node": null,
@@ -598,7 +598,7 @@ x
       "ip": 27,
       "event": {
         "kind": "journal_event",
-        "event": "RecordSet \"expr\""
+        "event": "RecordSet(M4 expr)"
       },
       "query_span_id": 2,
       "node": null,
@@ -608,7 +608,7 @@ x
       "ip": 27,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#2"
+        "event": "SpanEnd(P2)"
       },
       "query_span_id": 2,
       "node": null,
@@ -618,7 +618,7 @@ x
       "ip": 27,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#1"
+        "event": "SpanEnd(P1)"
       },
       "query_span_id": 1,
       "node": null,
@@ -628,7 +628,7 @@ x
       "ip": 27,
       "event": {
         "kind": "journal_event",
-        "event": "SpanEnd#0"
+        "event": "SpanEnd(P0)"
       },
       "query_span_id": 0,
       "node": null,
@@ -702,31 +702,31 @@ N1: S08 → T4  ; Q
 Q = 00 :: T4
 
 [spans]
-P00 def        0..162  source_id=0  T4
-P01 pattern    4..162  source_id=0
-P02 capture    155..160  source_id=0  T4.M4
-P03 labeled_alternation 15..154  source_id=0
-P04 alternative 21..87  source_id=0  T3.M2
-P05 pattern    26..87  source_id=0
-P06 capture    77..81  source_id=0  T1.M0
-P07 pattern    54..76  source_id=0
-P08 alternative 92..150  source_id=0  T3.M3
-P09 pattern    98..150  source_id=0
-P10 capture    139..144  source_id=0  T2.M1
-P11 pattern    126..138  source_id=0
+P00 def                 0..162 src=0  T4
+P01 pattern             4..162 src=0
+P02 capture             155..160 src=0  T4.M4
+P03 labeled_alternation 15..154 src=0
+P04 alternative         21..87 src=0  T3.M2
+P05 pattern             26..87 src=0
+P06 capture             77..81 src=0  T1.M0
+P07 pattern             54..76 src=0
+P08 alternative         92..150 src=0  T3.M3
+P09 pattern             98..150 src=0
+P10 capture             139..144 src=0  T2.M1
+P11 pattern             126..138 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
   02  └─!  _                                20, 24, 14
-  04  └‣─  (identifier) [SpanStartAt#7 SpanStart#6 Node RecordSet(M0) SpanEnd#6 SpanEnd#7] == "nope"  08
+  04  └‣─  (identifier == "nope")           08          [SpanStartAt(P7) SpanStart(P6) Node RecordSet(M0 bad) SpanEnd(P6) SpanEnd(P7)]
   07  ...
-  08  ─‣┘  _ [SpanEnd#5 VariantClose SpanEnd#4 SpanEnd#3]  27
-  11  └‣─  (identifier) [SpanStartAt#11 SpanStart#10 Node RecordSet(M1) SpanEnd#10 SpanEnd#11]  16
+  08  ─‣┘  _                                27          [SpanEnd(P5) VariantClose SpanEnd(P4) SpanEnd(P3)]
+  11  └‣─  (identifier)                     16          [SpanStartAt(P11) SpanStart(P10) Node RecordSet(M1 good) SpanEnd(P10) SpanEnd(P11)]
   14  ──!  _                                20, 24, 14
-  16  ─‣┘  _ [SpanEnd#9 VariantClose SpanEnd#8 SpanEnd#3]  27
-  19                                        ▶
-  20   !   (expression_statement) [SpanStart#3 SpanStart#4 VariantOpen(M2) SpanStartAt#5]  04
+  16  ─‣┘  _                                27          [SpanEnd(P9) VariantClose SpanEnd(P8) SpanEnd(P3)]
+  19       return
+  20   !   (expression_statement)           04          [SpanStart(P3) SpanStart(P4) VariantOpen(M2 Bad) SpanStartAt(P5)]
   23  ...
-  24   !   (expression_statement) [SpanStart#3 SpanStart#8 VariantOpen(M3) SpanStartAt#9]  11
-  27  ─‣┘  _ [SpanStart#2 RecordSet(M4) SpanEnd#2 SpanEnd#1 SpanEnd#0]  19
+  24   !   (expression_statement)           11          [SpanStart(P3) SpanStart(P8) VariantOpen(M3 Good) SpanStartAt(P9)]
+  27  ─‣┘  _                                19          [SpanStart(P2) RecordSet(M4 expr) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]

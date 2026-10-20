@@ -43,32 +43,32 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           12, 08
-  03   !   (identifier) [RecordOpen Node RecordSet(M0)]  05
-  05  ─‣┘  _ [RecordClose RecordSet(M1)]    14
-  07                                        ▶
-  08  -ε-  [Absent RecordSet(M1)]           14
+  03   !   (identifier)                     05          [RecordOpen Node RecordSet(M0 id)]
+  05  ─‣┘  _                                14          [RecordClose RecordSet(M1 outer)]
+  07       return
+  08  -ε-                                   14          [Absent RecordSet(M1 outer)]
   10  ──!  _                                03, 10
   12  └─!  _                                03, 10
   14  ─‣┘  _                                07
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           12, 08
+  01  └‣─  (expression_statement)           12, 08
        ●   expression_statement
-  12       _                                03, 10
+  12  └─!  _                                03, 10
        ●   number
-  03       (identifier) [RecordOpen Node RecordSet(M0)]  05
+  03   !   (identifier)                     05          [RecordOpen Node RecordSet(M0 id)]
        ○   number
-  12  ❮❮❮ 
-  10       _                                03, 10
+  12  ❮❮❮
+  10  ──!  _                                03, 10
        ●   ;
-  03       (identifier) [RecordOpen Node RecordSet(M0)]  05
+  03   !   (identifier)                     05          [RecordOpen Node RecordSet(M0 id)]
        ○   ;
-  10  ❮❮❮ 
-  10       _                                03, 10
-  01  ❮❮❮ 
-  08  -ε-  [Absent RecordSet(M1)]           14
-  14       _                                07
+  10  ❮❮❮
+  10  ──!  _                                03, 10
+  01  ❮❮❮
+  08  -ε-                                   14          [Absent RecordSet(M1 outer)]
+  14  ─‣┘  _                                07
        ●   program
-  07   ◀   (Q)                              ◼
+  07   ◀   return                           ◼

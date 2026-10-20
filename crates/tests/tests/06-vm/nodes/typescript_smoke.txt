@@ -55,28 +55,28 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └‣─  (interface_declaration)           2
-  2  └‣─  name: (type_identifier) [Node RecordSet(M0)]  4
+  2  └‣─  name: (type_identifier)           4           [Node RecordSet(M0 name)]
   4  ─‣─  body: (interface_body)            5
   5  └‣─  (property_signature)              6
-  6  └‣─  name: (property_identifier) [Node RecordSet(M1)]  8
+  6  └‣─  name: (property_identifier)       8           [Node RecordSet(M1 prop)]
   8  ─‣┘⁴ _                                 9
-  9                                         ▶
+  9       return
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       (interface_declaration)           02
+  1  └‣─  (interface_declaration)           2
       ●   interface_declaration
-  2       name: (type_identifier) [Node RecordSet(M0)]  04
+  2  └‣─  name: (type_identifier)           4           [Node RecordSet(M0 name)]
       ○   interface
       ●   type_identifier
-  4       body: (interface_body)            05
+  4  ─‣─  body: (interface_body)            5
       ●   interface_body
-  5       (property_signature)              06
+  5  └‣─  (property_signature)              6
       ○   {
       ●   property_signature
-  6       name: (property_identifier) [Node RecordSet(M1)]  08
+  6  └‣─  name: (property_identifier)       8           [Node RecordSet(M1 prop)]
       ●   property_identifier
-  8       _                                 09
+  8  ─‣┘⁴ _                                 9
       ●   program
-  9   ◀   (Q)                               ◼
+  9   ◀   return                            ◼

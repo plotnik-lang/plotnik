@@ -7,8 +7,8 @@ Q = 3
 
 [transitions]
 Q:
-  1                                         ▶
-  3   !   (identifier) [RecordOpen Node RecordSet(fn) RecordClose RecordSet(outer)]  1
+  1       return
+  3   !   (identifier)                      1           [RecordOpen Node RecordSet(fn) RecordClose RecordSet(outer)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -36,5 +36,5 @@ Q = 0 :: T2
 
 [instructions]
 Q:
-  0   !   (identifier) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  3
-  3                                         ▶
+  0   !   (identifier)                      3           [RecordOpen Node RecordSet(M0 fn) RecordClose RecordSet(M1 outer)]
+  3       return

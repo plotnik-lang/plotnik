@@ -30,54 +30,54 @@ Some  = 28
 
 [transitions]
 Maybe:
-  01                                        ▶
+  01       return
   02   !   (program)                        08, 04
   03  ─‣┘  _                                01
-  04  -ε-  [Absent RecordSet(stmt)]         01
-  05   !   (expression_statement) [Node RecordSet(stmt)]  03
+  04  -ε-                                   01          [Absent RecordSet(stmt)]
+  05   !   (expression_statement)           03          [Node RecordSet(stmt)]
   07  ──!  _                                05, 07
   08  └─!  _                                05, 07
 
 Many:
-  11                                        ▶
+  11       return
   12   !   (program)                        25
-  13  ─‣┘  _ [ListClose RecordSet(stmts)]   11
-  15  -ε-  [ListClose RecordSet(stmts)]     11
-  17   !   (expression_statement) [Node ArrayPush]  19, 13
+  13  ─‣┘  _                                11          [ListClose RecordSet(stmts)]
+  15  -ε-                                   11          [ListClose RecordSet(stmts)]
+  17   !   (expression_statement)           19, 13      [Node ArrayPush]
   19  ──!  _                                17, 19
   20  └─!  _                                17, 19
-  25  -ε-  [ListOpen]                       20, 15
+  25  -ε-                                   20, 15      [ListOpen]
 
 Some:
-  27                                        ▶
+  27       return
   28   !   (program)                        35
-  29  ─‣┘  _ [ListClose RecordSet(stmts)]   27
-  32   !   (expression_statement) [Node ArrayPush]  34, 29
+  29  ─‣┘  _                                27          [ListClose RecordSet(stmts)]
+  32   !   (expression_statement)           34, 29      [Node ArrayPush]
   34  ──!  _                                32, 34
-  35  └─!  _ [ListOpen]                     32, 34
+  35  └─!  _                                32, 34      [ListOpen]
 
 Lazy:
-  41                                        ▶
+  41       return
   42   !   (program)                        55
-  43  ─‣┘  _ [ListClose RecordSet(stmts)]   41
-  45  -ε-  [ListClose RecordSet(stmts)]     41
-  47   !   (expression_statement) [Node ArrayPush]  43, 49
+  43  ─‣┘  _                                41          [ListClose RecordSet(stmts)]
+  45  -ε-                                   41          [ListClose RecordSet(stmts)]
+  47   !   (expression_statement)           43, 49      [Node ArrayPush]
   49  ──!  _                                47, 49
   50  └─!  _                                47, 49
-  55  -ε-  [ListOpen]                       45, 50
+  55  -ε-                                   45, 50      [ListOpen]
 
 Funcs:
-  57                                        ▶
+  57       return
   58   !   (program)                        75
-  59  ─‣┘  _ [ListClose RecordSet(funcs)]   57
-  61  -ε-  [ListClose RecordSet(funcs)]     57
-  63  -ε-  [RecordClose ArrayPush]          69, 59
-  64   !   (function_declaration) [RecordOpen]  66
+  59  ─‣┘  _                                57          [ListClose RecordSet(funcs)]
+  61  -ε-                                   57          [ListClose RecordSet(funcs)]
+  63  -ε-                                   69, 59      [RecordClose ArrayPush]
+  64   !   (function_declaration)           66          [RecordOpen]
   65  ─‣┘  _                                63
-  66  └‣─  name: (identifier) [Node RecordSet(name)]  65
+  66  └‣─  name: (identifier)               65          [Node RecordSet(name)]
   69  ──!  _                                64, 69
   70  └─!  _                                64, 69
-  75  -ε-  [ListOpen]                       70, 61
+  75  -ε-                                   70, 61      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -133,87 +133,87 @@ Maybe = 00 :: T02
 Some  = 08 :: T06
 
 [spans]
-P00 def        0..50  source_id=0  T02
-P01 pattern    8..50  source_id=0
-P02 capture    43..48  source_id=0  T02.M0
-P03 quantifier 41..42  source_id=0
-P04 pattern    19..41  source_id=0
-P05 def        52..102  source_id=0  T04
-P06 pattern    59..102  source_id=0
-P07 capture    94..100  source_id=0  T04.M1
-P08 quantifier 92..93  source_id=0
-P09 pattern    70..92  source_id=0
-P10 def        104..154  source_id=0  T06
-P11 pattern    111..154  source_id=0
-P12 capture    146..152  source_id=0  T06.M2
-P13 quantifier 144..145  source_id=0
-P14 pattern    122..144  source_id=0
-P15 def        156..207  source_id=0  T07
-P16 pattern    163..207  source_id=0
-P17 capture    199..205  source_id=0  T07.M3
-P18 quantifier 196..198  source_id=0
-P19 pattern    174..196  source_id=0
-P20 def        209..292  source_id=0  T10
-P21 pattern    217..292  source_id=0
-P22 capture    284..290  source_id=0  T10.M5
-P23 quantifier 282..283  source_id=0
-P24 pattern    228..282  source_id=0
-P25 capture    273..278  source_id=0  T08.M4
-P26 grammar_field 254..258  source_id=0
-P27 pattern    260..272  source_id=0
+P00 def           0..50 src=0  T02
+P01 pattern       8..50 src=0
+P02 capture       43..48 src=0  T02.M0
+P03 quantifier    41..42 src=0
+P04 pattern       19..41 src=0
+P05 def           52..102 src=0  T04
+P06 pattern       59..102 src=0
+P07 capture       94..100 src=0  T04.M1
+P08 quantifier    92..93 src=0
+P09 pattern       70..92 src=0
+P10 def           104..154 src=0  T06
+P11 pattern       111..154 src=0
+P12 capture       146..152 src=0  T06.M2
+P13 quantifier    144..145 src=0
+P14 pattern       122..144 src=0
+P15 def           156..207 src=0  T07
+P16 pattern       163..207 src=0
+P17 capture       199..205 src=0  T07.M3
+P18 quantifier    196..198 src=0
+P19 pattern       174..196 src=0
+P20 def           209..292 src=0  T10
+P21 pattern       217..292 src=0
+P22 capture       284..290 src=0  T10.M5
+P23 quantifier    282..283 src=0
+P24 pattern       228..282 src=0
+P25 capture       273..278 src=0  T08.M4
+P26 grammar_field 254..258 src=0
+P27 pattern       260..272 src=0
 
 [instructions]
 Maybe:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  -ε-  [SpanStart#3]                    37, 32
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  -ε-                                   37, 32      [SpanStart(P3)]
 
 Many:
-  04   !   (program) [SpanStart#5 SpanStartAt#6]  06
-  06  -ε-  [ListOpen SpanStart#8]           50, 41
+  04   !   (program)                        06          [SpanStart(P5) SpanStartAt(P6)]
+  06  -ε-                                   50, 41      [ListOpen SpanStart(P8)]
 
 Some:
-  08   !   (program) [SpanStart#10 SpanStartAt#11]  10
-  10  └─!  _ [ListOpen SpanStart#13]        56, 59
+  08   !   (program)                        10          [SpanStart(P10) SpanStartAt(P11)]
+  10  └─!  _                                56, 59      [ListOpen SpanStart(P13)]
 
 Lazy:
-  12   !   (program) [SpanStart#15 SpanStartAt#16]  14
-  14  -ε-  [ListOpen SpanStart#18]          65, 74
+  12   !   (program)                        14          [SpanStart(P15) SpanStartAt(P16)]
+  14  -ε-                                   65, 74      [ListOpen SpanStart(P18)]
 
 Funcs:
-  16   !   (program) [SpanStart#20 SpanStartAt#21]  18
-  18  -ε-  [ListOpen SpanStart#23]          90, 80
-  20   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  24
-  23                                        ▶
-  24  ─‣┘  _ [SpanEnd#3 SpanEnd#1 SpanEnd#0]  23
-  26  └‣─  name: (identifier) [SpanStart#26 SpanStartAt#27 SpanStart#25 Node RecordSet(M4) SpanEnd#25 SpanEnd#27 SpanEnd#26]  30
-  30  ─‣┘  _ [SpanEnd#24]                   83
-  32  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2 SpanEnd#3 SpanEnd#1 SpanEnd#0]  23
+  16   !   (program)                        18          [SpanStart(P20) SpanStartAt(P21)]
+  18  -ε-                                   90, 80      [ListOpen SpanStart(P23)]
+  20   !   (expression_statement)           24          [SpanStartAt(P4) SpanStart(P2) Node RecordSet(M0 stmt) SpanEnd(P2) SpanEnd(P4)]
+  23       return
+  24  ─‣┘  _                                23          [SpanEnd(P3) SpanEnd(P1) SpanEnd(P0)]
+  26  └‣─  name: (identifier)               30          [SpanStart(P26) SpanStartAt(P27) SpanStart(P25) Node RecordSet(M4 name) SpanEnd(P25) SpanEnd(P27) SpanEnd(P26)]
+  30  ─‣┘  _                                83          [SpanEnd(P24)]
+  32  -ε-                                   23          [SpanStart(P2) Absent RecordSet(M0 stmt) SpanEnd(P2) SpanEnd(P3) SpanEnd(P1) SpanEnd(P0)]
   35  ──!  _                                20, 35
   37  └─!  _                                20, 35
   39  ...
-  40                                        ▶
-  41  -ε-  [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  40
-  44   !   (expression_statement) [SpanStartAt#9 Node ArrayPush SpanEnd#9]  48, 52
+  40       return
+  41  -ε-                                   40          [SpanEnd(P8) ListClose SpanStart(P7) RecordSet(M1 stmts) SpanEnd(P7) SpanEnd(P6) SpanEnd(P5)]
+  44   !   (expression_statement)           48, 52      [SpanStartAt(P9) Node ArrayPush SpanEnd(P9)]
   47  ...
   48  ──!  _                                44, 48
   50  └─!  _                                44, 48
-  52  ─‣┘  _ [SpanEnd#8 ListClose SpanStart#7 RecordSet(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  40
-  55                                        ▶
-  56   !   (expression_statement) [SpanStartAt#14 Node ArrayPush SpanEnd#14]  59, 61
+  52  ─‣┘  _                                40          [SpanEnd(P8) ListClose SpanStart(P7) RecordSet(M1 stmts) SpanEnd(P7) SpanEnd(P6) SpanEnd(P5)]
+  55       return
+  56   !   (expression_statement)           59, 61      [SpanStartAt(P14) Node ArrayPush SpanEnd(P14)]
   59  ──!  _                                56, 59
-  61  ─‣┘  _ [SpanEnd#13 ListClose SpanStart#12 RecordSet(M2) SpanEnd#12 SpanEnd#11 SpanEnd#10]  55
-  64                                        ▶
-  65  -ε-  [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  64
-  68   !   (expression_statement) [SpanStartAt#19 Node ArrayPush SpanEnd#19]  76, 72
+  61  ─‣┘  _                                55          [SpanEnd(P13) ListClose SpanStart(P12) RecordSet(M2 stmts) SpanEnd(P12) SpanEnd(P11) SpanEnd(P10)]
+  64       return
+  65  -ε-                                   64          [SpanEnd(P18) ListClose SpanStart(P17) RecordSet(M3 stmts) SpanEnd(P17) SpanEnd(P16) SpanEnd(P15)]
+  68   !   (expression_statement)           76, 72      [SpanStartAt(P19) Node ArrayPush SpanEnd(P19)]
   71  ...
   72  ──!  _                                68, 72
   74  └─!  _                                68, 72
-  76  ─‣┘  _ [SpanEnd#18 ListClose SpanStart#17 RecordSet(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  64
-  79                                        ▶
-  80  -ε-  [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  79
-  83  -ε-  [RecordClose ArrayPush]          88, 92
-  85   !   (function_declaration) [RecordOpen SpanStartAt#24]  26
+  76  ─‣┘  _                                64          [SpanEnd(P18) ListClose SpanStart(P17) RecordSet(M3 stmts) SpanEnd(P17) SpanEnd(P16) SpanEnd(P15)]
+  79       return
+  80  -ε-                                   79          [SpanEnd(P23) ListClose SpanStart(P22) RecordSet(M5 funcs) SpanEnd(P22) SpanEnd(P21) SpanEnd(P20)]
+  83  -ε-                                   88, 92      [RecordClose ArrayPush]
+  85   !   (function_declaration)           26          [RecordOpen SpanStartAt(P24)]
   87  ...
   88  ──!  _                                85, 88
   90  └─!  _                                85, 88
-  92  ─‣┘  _ [SpanEnd#23 ListClose SpanStart#22 RecordSet(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  79
+  92  ─‣┘  _                                79          [SpanEnd(P23) ListClose SpanStart(P22) RecordSet(M5 funcs) SpanEnd(P22) SpanEnd(P21) SpanEnd(P20)]

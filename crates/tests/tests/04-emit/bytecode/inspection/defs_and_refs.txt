@@ -11,15 +11,15 @@ Q     = 05
 
 [transitions]
 Ident:
-  01                                        ▶
-  02   !   (identifier) [Node RecordSet(name)]  01
+  01       return
+  02   !   (identifier)                     01          [Node RecordSet(name)]
 
 Q:
-  04                                        ▶
+  04       return
   05   !   (program)                        07
-  07  └‣─  (expression_statement) [RecordOpen]  11
-  08  ─‣┘² _ [RecordSet(item)]              04
-  10  -ε-  [RecordClose]                    08
+  07  └‣─  (expression_statement)           11          [RecordOpen]
+  08  ─‣┘² _                                04          [RecordSet(item)]
+  10  -ε-                                   08          [RecordClose]
   11  └‣─  (Ident)                          02 : 10
 -------------------- BYTECODE --------------------
 [strings]
@@ -50,26 +50,26 @@ Ident = 00 :: T1
 Q     = 05 :: T2
 
 [spans]
-P0 def        0..26  source_id=0  T1
-P1 capture    21..26  source_id=0  T1.M0
-P2 pattern    8..20  source_id=0
-P3 def        28..81  source_id=0  T2
-P4 pattern    32..81  source_id=0
-P5 pattern    43..79  source_id=0
-P6 capture    73..78  source_id=0  T2.M1
-P7 ref        65..72  source_id=0  T1
+P0 def     0..26 src=0  T1
+P1 capture 21..26 src=0  T1.M0
+P2 pattern 8..20 src=0
+P3 def     28..81 src=0  T2
+P4 pattern 32..81 src=0
+P5 pattern 43..79 src=0
+P6 capture 73..78 src=0  T2.M1
+P7 ref     65..72 src=0  T1
 
 [instructions]
 Ident:
-  00   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  04
-  04                                        ▶
+  00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
+  04       return
 
 Q:
-  05   !   (program) [SpanStart#3 SpanStartAt#4]  08
+  05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
   07  ...
-  08  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#7 RecordOpen]  10
+  08  └‣─  (expression_statement)           10          [SpanStartAt(P5) SpanStart(P7) RecordOpen]
   10  └‣─  (Ident)                          00 : 11
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘  _ [SpanStart#6 RecordSet(M1) SpanEnd#6 SpanEnd#7]  16
-  16  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  18
-  18                                        ▶
+  11  -ε-                                   13          [RecordClose]
+  13  ─‣┘  _                                16          [SpanStart(P6) RecordSet(M1 item) SpanEnd(P6) SpanEnd(P7)]
+  16  ─‣┘  _                                18          [SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
+  18       return

@@ -10,7 +10,7 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (array)                           5
   3  ─‣┘  _                                 1
   4  ─‣─  (number)                          3
@@ -39,4 +39,4 @@ Q:
   1  └‣─  (identifier)                      2
   2  ─‣─  (number)                          3
   3  ─‣┘  _                                 4
-  4                                         ▶
+  4       return

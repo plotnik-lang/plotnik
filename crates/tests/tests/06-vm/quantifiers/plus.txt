@@ -43,25 +43,25 @@ Q = 0 :: T2
 [instructions]
 Q:
   0   !   (program)                         1
-  1  └─!  _ [ListOpen]                      4, 6
-  3                                         ▶
-  4   !   (expression_statement) [Node ArrayPush]  6, 8
+  1  └─!  _                                 4, 6        [ListOpen]
+  3       return
+  4   !   (expression_statement)            6, 8        [Node ArrayPush]
   6  ──!  _                                 4, 6
-  8  ─‣┘  _ [ListClose RecordSet(M0)]       3
+  8  ─‣┘  _                                 3           [ListClose RecordSet(M0 stmts)]
 --------------------- TRACE ----------------------
 Q:
-  0       (program)                         01
+  0   !   (program)                         1
       ●   program
-  1       _ [ListOpen]                      04, 06
+  1  └─!  _                                 4, 6        [ListOpen]
       ●   expression_statement
-  4       (expression_statement) [Node ArrayPush]  06, 08
+  4   !   (expression_statement)            6, 8        [Node ArrayPush]
       ●   expression_statement
-  6       _                                 04, 06
+  6  ──!  _                                 4, 6
       ●   expression_statement
-  4       (expression_statement) [Node ArrayPush]  06, 08
+  4   !   (expression_statement)            6, 8        [Node ArrayPush]
       ●   expression_statement
-  6       _                                 04, 06
-  4  ❮❮❮ 
-  8       _ [ListClose RecordSet(M0)]       03
+  6  ──!  _                                 4, 6
+  4  ❮❮❮
+  8  ─‣┘  _                                 3           [ListClose RecordSet(M0 stmts)]
       ●   program
-  3   ◀   (Q)                               ◼
+  3   ◀   return                            ◼

@@ -75,52 +75,52 @@ Q = 00 :: T3
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └‣─  (array) [ListOpen]               04
-  04  └•─  (identifier) [RecordOpen Node RecordSet(M0)]  15
+  02  └‣─  (array)                          04          [ListOpen]
+  04  └•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
   06  !─┘  _                                07
   07  ─‣┘² _                                08
-  08                                        ▶
+  08       return
   09   !   "]"                              06
   10  ──!  _                                09, 10
-  12  ─‣─  (identifier) [ListClose RecordSet(M1) Node RecordSet(M2)]  10
+  12  ─‣─  (identifier)                     10          [ListClose RecordSet(M1 pairs) Node RecordSet(M2 last)]
   15  ─‣─  ","                              16
-  16  -ε-  [RecordClose ArrayPush]          18, 12
-  18  ─•─  (identifier) [RecordOpen Node RecordSet(M0)]  15
+  16  -ε-                                   18, 12      [RecordClose ArrayPush]
+  18  ─•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (array) [ListOpen]               04
+  02  └‣─  (array)                          04          [ListOpen]
        ●   array
-  04       (identifier) [RecordOpen Node RecordSet(M0)]  15
+  04  └•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
        ○   [
        ●   identifier
-  15       ","                              16
+  15  ─‣─  ","                              16
        ●   ,
-  16  -ε-  [RecordClose ArrayPush]          18, 12
-  18       (identifier) [RecordOpen Node RecordSet(M0)]  15
+  16  -ε-                                   18, 12      [RecordClose ArrayPush]
+  18  ─•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
        ○   ,
        ●   identifier
-  15       ","                              16
+  15  ─‣─  ","                              16
        ●   ,
-  16  -ε-  [RecordClose ArrayPush]          18, 12
-  18       (identifier) [RecordOpen Node RecordSet(M0)]  15
+  16  -ε-                                   18, 12      [RecordClose ArrayPush]
+  18  ─•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
        ○   ,
        ●   identifier
-  15       ","                              16
+  15  ─‣─  ","                              16
        ○   ]
-  16  ❮❮❮ 
-  12       (identifier) [ListClose RecordSet(M1) Node RecordSet(M2)]  10
+  16  ❮❮❮
+  12  ─‣─  (identifier)                     10          [ListClose RecordSet(M1 pairs) Node RecordSet(M2 last)]
        ○   ,
        ●   identifier
-  10       _                                09, 10
+  10  ──!  _                                09, 10
        ●   ]
-  09       "]"                              06
+  09   !   "]"                              06
        ●   ]
-  06       _                                07
+  06  !─┘  _                                07
        ●   array
-  07       _                                08
+  07  ─‣┘² _                                08
        ●   program
-  08   ◀   (Q)                              ◼
+  08   ◀   return                           ◼

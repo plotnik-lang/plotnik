@@ -8,9 +8,9 @@ Q = 4
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  1
-  3   !   (number) [VariantOpen(B) Node RecordSet(b) VariantClose]  1
+  1       return
+  2   !   (identifier)                      1           [VariantOpen(A) Node RecordSet(a) VariantClose]
+  3   !   (number)                          1           [VariantOpen(B) Node RecordSet(b) VariantClose]
   4   !   switch
             (identifier)                    2
             (number)                        3
@@ -48,6 +48,6 @@ Q:
   0   !   switch
             (identifier)                    2
             (number)                        5
-  1                                         ▶
-  2   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  1
-  5   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  1
+  1       return
+  2   !   (identifier)                      1           [VariantOpen(M2 A) Node RecordSet(M0 a) VariantClose]
+  5   !   (number)                          1           [VariantOpen(M3 B) Node RecordSet(M1 b) VariantClose]

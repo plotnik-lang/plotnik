@@ -153,51 +153,51 @@ N0: S3 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P0 def        0..103  source_id=0  T2
-P1 pattern    4..103  source_id=0
-P2 capture    39..44  source_id=0  T2.M0
-P3 quantifier 37..38  source_id=0
-P4 pattern    15..37  source_id=0
-P5 pattern    47..101  source_id=0
-P6 capture    92..97  source_id=0  T2.M1
-P7 grammar_field 73..77  source_id=0
-P8 pattern    79..91  source_id=0
+P0 def           0..103 src=0  T2
+P1 pattern       4..103 src=0
+P2 capture       39..44 src=0  T2.M0
+P3 quantifier    37..38 src=0
+P4 pattern       15..37 src=0
+P5 pattern       47..101 src=0
+P6 capture       92..97 src=0  T2.M1
+P7 grammar_field 73..77 src=0
+P8 pattern       79..91 src=0
 
 [instructions]
 Q:
-  00   !   (program) [SpanStart#0 SpanStartAt#1]  02
-  02  -ε-  [SpanStart#3]                    26, 18
-  04  └‣─  name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  08
-  08  ─‣┘  _ [SpanEnd#5]                    10
-  10  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          12
-  12                                        ▶
-  13  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  04
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
+  02  -ε-                                   26, 18      [SpanStart(P3)]
+  04  └‣─  name: (identifier)               08          [SpanStart(P7) SpanStartAt(P8) SpanStart(P6) Node RecordSet(M1 name) SpanEnd(P6) SpanEnd(P8) SpanEnd(P7)]
+  08  ─‣┘  _                                10          [SpanEnd(P5)]
+  10  ─‣┘  _                                12          [SpanEnd(P1) SpanEnd(P0)]
+  12       return
+  13  └‣─  (function_declaration)           04          [SpanEnd(P3) SpanStartAt(P5)]
   15  ...
-  16  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  04
-  18  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2]  13
-  21   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  16
+  16  ─‣─  (function_declaration)           04          [SpanEnd(P3) SpanStartAt(P5)]
+  18  -ε-                                   13          [SpanStart(P2) Absent RecordSet(M0 stmt) SpanEnd(P2)]
+  21   !   (expression_statement)           16          [SpanStartAt(P4) SpanStart(P2) Node RecordSet(M0 stmt) SpanEnd(P2) SpanEnd(P4)]
   24  ──!  _                                21, 24
   26  └─!  _                                21, 24
 --------------------- TRACE ----------------------
 Q:
-  00       (program) [SpanStart#0 SpanStartAt#1]  02
+  00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
        ●   program
-  02  -ε-  [SpanStart#3]                    26, 18
-  26       _                                21, 24
+  02  -ε-                                   26, 18      [SpanStart(P3)]
+  26  └─!  _                                21, 24
        ●   function_declaration
-  21       (expression_statement) [SpanStartAt#4 SpanStart#2 Node RecordSet(M0) SpanEnd#2 SpanEnd#4]  16
+  21   !   (expression_statement)           16          [SpanStartAt(P4) SpanStart(P2) Node RecordSet(M0 stmt) SpanEnd(P2) SpanEnd(P4)]
        ○   function_declaration
-  26  ❮❮❮ 
-  24       _                                21, 24
-  02  ❮❮❮ 
-  18  -ε-  [SpanStart#2 Absent RecordSet(M0) SpanEnd#2]  13
-  13       (function_declaration) [SpanEnd#3 SpanStartAt#5]  04
+  26  ❮❮❮
+  24  ──!  _                                21, 24
+  02  ❮❮❮
+  18  -ε-                                   13          [SpanStart(P2) Absent RecordSet(M0 stmt) SpanEnd(P2)]
+  13  └‣─  (function_declaration)           04          [SpanEnd(P3) SpanStartAt(P5)]
        ●   function_declaration
-  04       name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  08
+  04  └‣─  name: (identifier)               08          [SpanStart(P7) SpanStartAt(P8) SpanStart(P6) Node RecordSet(M1 name) SpanEnd(P6) SpanEnd(P8) SpanEnd(P7)]
        ○   function
        ●   identifier
-  08       _ [SpanEnd#5]                    10
+  08  ─‣┘  _                                10          [SpanEnd(P5)]
        ●   function_declaration
-  10       _ [SpanEnd#1 SpanEnd#0]          12
+  10  ─‣┘  _                                12          [SpanEnd(P1) SpanEnd(P0)]
        ●   program
-  12   ◀   (Q)                              ◼
+  12   ◀   return                           ◼

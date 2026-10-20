@@ -52,32 +52,32 @@ Q = 00 :: T4
 Q:
   00   !   (program)                        01
   01  └─!  _                                10, 13, 16
-  03  ─‣┘  _ [VariantClose]                 05
-  05  ─‣┘  _ [RecordSet(M3)]                07
-  07                                        ▶
-  08  └‣─  (identifier) [Node RecordSet(M0)]  03
-  10   !   (expression_statement) [VariantOpen(M1)]  08
+  03  ─‣┘  _                                05          [VariantClose]
+  05  ─‣┘  _                                07          [RecordSet(M3 item)]
+  07       return
+  08  └‣─  (identifier)                     03          [Node RecordSet(M0 x)]
+  10   !   (expression_statement)           08          [VariantOpen(M1 A)]
   12  └‣─  (string)                         03
-  13   !   (expression_statement) [VariantOpen(M2)]  12
+  13   !   (expression_statement)           12          [VariantOpen(M2 B)]
   15  ...
   16  ──!  _                                10, 13, 16
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                10, 13, 16
+  01  └─!  _                                10, 13, 16
        ●   expression_statement
-  10       (expression_statement) [VariantOpen(M1)]  08
+  10   !   (expression_statement)           08          [VariantOpen(M1 A)]
        ●   expression_statement
-  08       (identifier) [Node RecordSet(M0)]  03
+  08  └‣─  (identifier)                     03          [Node RecordSet(M0 x)]
        ○   string
-  01  ❮❮❮ 
-  13       (expression_statement) [VariantOpen(M2)]  12
+  01  ❮❮❮
+  13   !   (expression_statement)           12          [VariantOpen(M2 B)]
        ●   expression_statement
-  12       (string)                         03
+  12  └‣─  (string)                         03
        ●   string
-  03       _ [VariantClose]                 05
+  03  ─‣┘  _                                05          [VariantClose]
        ●   expression_statement
-  05       _ [RecordSet(M3)]                07
+  05  ─‣┘  _                                07          [RecordSet(M3 item)]
        ●   program
-  07   ◀   (Q)                              ◼
+  07   ◀   return                           ◼

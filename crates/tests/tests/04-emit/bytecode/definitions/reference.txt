@@ -7,14 +7,14 @@ Q     = 5
 
 [transitions]
 Inner:
-  1                                         ▶
-  2   !   (identifier) [Node RecordSet(name)]  1
+  1       return
+  2   !   (identifier)                      1           [Node RecordSet(name)]
 
 Q:
-  4                                         ▶
-  5   !   (expression_statement) [RecordOpen]  9
-  6  ─‣┘  _ [RecordSet(item)]               4
-  8  -ε-  [RecordClose]                     6
+  4       return
+  5   !   (expression_statement)            9           [RecordOpen]
+  6  ─‣┘  _                                 4           [RecordSet(item)]
+  8  -ε-                                    6           [RecordClose]
   9  └‣─  (Inner)                           2 : 8
 -------------------- BYTECODE --------------------
 [strings]
@@ -45,12 +45,12 @@ Q     = 03 :: T2
 
 [instructions]
 Inner:
-  00   !   (identifier) [Node RecordSet(M0)]  02
-  02                                        ▶
+  00   !   (identifier)                     02          [Node RecordSet(M0 name)]
+  02       return
 
 Q:
-  03   !   (expression_statement) [RecordOpen]  05
+  03   !   (expression_statement)           05          [RecordOpen]
   05  └‣─  (Inner)                          00 : 06
-  06  -ε-  [RecordClose]                    08
-  08  ─‣┘  _ [RecordSet(M1)]                10
-  10                                        ▶
+  06  -ε-                                   08          [RecordClose]
+  08  ─‣┘  _                                10          [RecordSet(M1 item)]
+  10       return

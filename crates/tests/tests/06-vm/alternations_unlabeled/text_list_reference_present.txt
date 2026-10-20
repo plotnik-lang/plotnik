@@ -85,17 +85,17 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └─!  _                                63, 64
-  04  -ε-  [ListClose]                      06
-  06  ─‣┘  _ [RecordSet(M1)]                48
+  04  -ε-                                   06          [ListClose]
+  06  ─‣┘  _                                48          [RecordSet(M1 nullable)]
   08  └‣─  (@58)                            58 : 09
-  09  ─‣┘  _ [RecordSet(M0)]                55
-  11                                        ▶
-  12   !   (identifier) [NodeText ArrayPush]  14, 18
+  09  ─‣┘  _                                55          [RecordSet(M0 nonempty)]
+  11       return
+  12   !   (identifier)                     14, 18      [NodeText ArrayPush]
   14  ──!  _                                12, 14
-  16  └─!  _ [ListOpen]                     12, 14
-  18  ─‣┘  _ [ListClose RecordSet(M2)]      28
+  16  └─!  _                                12, 14      [ListOpen]
+  18  ─‣┘  _                                28          [ListClose RecordSet(M2 direct)]
   20   !   (array)                          16
-  21   !   (number) [ListOpen ListClose RecordSet(M2)]  28
+  21   !   (number)                         28          [ListOpen ListClose RecordSet(M2 direct)]
   23   !   switch
              (array)                        20
              (number)                       21
@@ -103,13 +103,13 @@ Q:
   26  └─!  _                                23, 24
   28  ─‣┘² _                                11
   29  ─‣─  (expression_statement)           26
-  30  -ε-  [ListClose RecordSet(M1)]        48
-  32   !   (identifier) [NodeText ArrayPush]  34, 04
+  30  -ε-                                   48          [ListClose RecordSet(M1 nullable)]
+  32   !   (identifier)                     34, 04      [NodeText ArrayPush]
   34  ──!  _                                32, 34
   36  └─!  _                                32, 34
-  38  -ε-  [ListOpen]                       36, 30
+  38  -ε-                                   36, 30      [ListOpen]
   40   !   (array)                          38
-  41   !   (number) [Absent RecordSet(M1)]  48
+  41   !   (number)                         48          [Absent RecordSet(M1 nullable)]
   43   !   switch
              (array)                        40
              (number)                       41
@@ -117,126 +117,126 @@ Q:
   46  └─!  _                                43, 44
   48  ─‣┘  _                                29
   49  ─‣─  (expression_statement)           46
-  50                                        ▶
-  51  -ε-  [ListClose]                      50
-  53   !   (identifier) [NodeText ArrayPush]  56, 51
+  50       return
+  51  -ε-                                   50          [ListClose]
+  53   !   (identifier)                     56, 51      [NodeText ArrayPush]
   55  ─‣┘  _                                49
   56  ──!  _                                53, 56
-  58   !   _ [ListOpen]                     53, 56
+  58   !   _                                53, 56      [ListOpen]
   60   !   (array)                          08
-  61   !   (number) [Absent RecordSet(M0)]  55
+  61   !   (number)                         55          [Absent RecordSet(M0 nonempty)]
   63   !   switch
              (array)                        60
              (number)                       61
   64  ──!  _                                63, 64
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       _                                63, 64
+  02  └─!  _                                63, 64
        ●   array
-  63   !   switch                           
+  63   !   switch
        ●   array
-  60       (array)                          08
+  60   !   (array)                          08
        ●   array
-  08       (@58)                            58 : 09
+  08  └‣─  (@58)                            58 : 09
        ▶   (@58)
 
 @58:
-  58       _ [ListOpen]                     53, 56
+  58   !   _                                53, 56      [ListOpen]
        ●   [
-  53       (identifier) [NodeText ArrayPush]  56, 51
+  53   !   (identifier)                     56, 51      [NodeText ArrayPush]
        ○   [
-  58  ❮❮❮ 
-  56       _                                53, 56
+  58  ❮❮❮
+  56  ──!  _                                53, 56
        ●   identifier
-  53       (identifier) [NodeText ArrayPush]  56, 51
+  53   !   (identifier)                     56, 51      [NodeText ArrayPush]
        ●   identifier
-  56       _                                53, 56
+  56  ──!  _                                53, 56
        ●   ,
-  53       (identifier) [NodeText ArrayPush]  56, 51
+  53   !   (identifier)                     56, 51      [NodeText ArrayPush]
        ○   ,
-  56  ❮❮❮ 
-  56       _                                53, 56
+  56  ❮❮❮
+  56  ──!  _                                53, 56
        ●   identifier
-  53       (identifier) [NodeText ArrayPush]  56, 51
+  53   !   (identifier)                     56, 51      [NodeText ArrayPush]
        ●   identifier
-  56       _                                53, 56
+  56  ──!  _                                53, 56
        ●   ]
-  53       (identifier) [NodeText ArrayPush]  56, 51
+  53   !   (identifier)                     56, 51      [NodeText ArrayPush]
        ○   ]
-  56  ❮❮❮ 
-  56       _                                53, 56
-  53  ❮❮❮ 
-  51  -ε-  [ListClose]                      50
-  50   ◀   (@58)                            
+  56  ❮❮❮
+  56  ──!  _                                53, 56
+  53  ❮❮❮
+  51  -ε-                                   50          [ListClose]
+  50   ◀   return                           09
 
 Q:
-  09       _ [RecordSet(M0)]                55
+  09  ─‣┘  _                                55          [RecordSet(M0 nonempty)]
        ●   array
-  55       _                                49
+  55  ─‣┘  _                                49
        ●   expression_statement
-  49       (expression_statement)           46
+  49  ─‣─  (expression_statement)           46
        ●   expression_statement
-  46       _                                43, 44
+  46  └─!  _                                43, 44
        ●   array
-  43   !   switch                           
+  43   !   switch
        ●   array
-  40       (array)                          38
+  40   !   (array)                          38
        ●   array
-  38  -ε-  [ListOpen]                       36, 30
-  36       _                                32, 34
+  38  -ε-                                   36, 30      [ListOpen]
+  36  └─!  _                                32, 34
        ●   [
-  32       (identifier) [NodeText ArrayPush]  34, 04
+  32   !   (identifier)                     34, 04      [NodeText ArrayPush]
        ○   [
-  36  ❮❮❮ 
-  34       _                                32, 34
+  36  ❮❮❮
+  34  ──!  _                                32, 34
        ●   ]
-  32       (identifier) [NodeText ArrayPush]  34, 04
+  32   !   (identifier)                     34, 04      [NodeText ArrayPush]
        ○   ]
-  34  ❮❮❮ 
-  34       _                                32, 34
-  38  ❮❮❮ 
-  30  -ε-  [ListClose RecordSet(M1)]        48
-  48       _                                29
+  34  ❮❮❮
+  34  ──!  _                                32, 34
+  38  ❮❮❮
+  30  -ε-                                   48          [ListClose RecordSet(M1 nullable)]
+  48  ─‣┘  _                                29
        ●   expression_statement
-  29       (expression_statement)           26
+  29  ─‣─  (expression_statement)           26
        ●   expression_statement
-  26       _                                23, 24
+  26  └─!  _                                23, 24
        ●   array
-  23   !   switch                           
+  23   !   switch
        ●   array
-  20       (array)                          16
+  20   !   (array)                          16
        ●   array
-  16       _ [ListOpen]                     12, 14
+  16  └─!  _                                12, 14      [ListOpen]
        ●   [
-  12       (identifier) [NodeText ArrayPush]  14, 18
+  12   !   (identifier)                     14, 18      [NodeText ArrayPush]
        ○   [
-  16  ❮❮❮ 
-  14       _                                12, 14
+  16  ❮❮❮
+  14  ──!  _                                12, 14
        ●   identifier
-  12       (identifier) [NodeText ArrayPush]  14, 18
+  12   !   (identifier)                     14, 18      [NodeText ArrayPush]
        ●   identifier
-  14       _                                12, 14
+  14  ──!  _                                12, 14
        ●   ,
-  12       (identifier) [NodeText ArrayPush]  14, 18
+  12   !   (identifier)                     14, 18      [NodeText ArrayPush]
        ○   ,
-  14  ❮❮❮ 
-  14       _                                12, 14
+  14  ❮❮❮
+  14  ──!  _                                12, 14
        ●   identifier
-  12       (identifier) [NodeText ArrayPush]  14, 18
+  12   !   (identifier)                     14, 18      [NodeText ArrayPush]
        ●   identifier
-  14       _                                12, 14
+  14  ──!  _                                12, 14
        ●   ]
-  12       (identifier) [NodeText ArrayPush]  14, 18
+  12   !   (identifier)                     14, 18      [NodeText ArrayPush]
        ○   ]
-  14  ❮❮❮ 
-  14       _                                12, 14
-  12  ❮❮❮ 
-  18       _ [ListClose RecordSet(M2)]      28
+  14  ❮❮❮
+  14  ──!  _                                12, 14
+  12  ❮❮❮
+  18  ─‣┘  _                                28          [ListClose RecordSet(M2 direct)]
        ●   array
-  28       _                                11
+  28  ─‣┘² _                                11
        ●   program
-  11   ◀   (Q)                              ◼
+  11   ◀   return                           ◼

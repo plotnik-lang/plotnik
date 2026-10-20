@@ -42,31 +42,31 @@ Q    = 3 :: T2
 Leaf:
   0   !   (identifier)                      1
   1  └!┘  _                                 2
-  2                                         ▶
+  2       return
 
 Q:
   3   !   (program)                         4
-  4  └‣─  (expression_statement) [Node RecordSet(M0)]  6
+  4  └‣─  (expression_statement)            6           [Node RecordSet(M0 expression)]
   6  └‣─  (Leaf)                            0 : 7
   7  ─‣┘² _                                 8
-  8                                         ▶
+  8       return
 --------------------- TRACE ----------------------
 Q:
-  3       (program)                         04
+  3   !   (program)                         4
       ●   program
-  4       (expression_statement) [Node RecordSet(M0)]  06
+  4  └‣─  (expression_statement)            6           [Node RecordSet(M0 expression)]
       ●   expression_statement
-  6       (Leaf)                            00 : 07
+  6  └‣─  (Leaf)                            0 : 7
       ▶   (Leaf)
 
 Leaf:
-  0       (identifier)                      01
+  0   !   (identifier)                      1
       ●   identifier
-  1       _                                 02
+  1  └!┘  _                                 2
       ●   identifier
-  2   ◀   (Leaf)                            
+  2   ◀   return                            7
 
 Q:
-  7       _                                 08
+  7  ─‣┘² _                                 8
       ●   program
-  8   ◀   (Q)                               ◼
+  8   ◀   return                            ◼

@@ -58,25 +58,25 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └─!  _                                10, 12
-  03  ─•─  (debugger_statement) [Node RecordSet(M2)]  05
+  03  ─•─  (debugger_statement)             05          [Node RecordSet(M2 c)]
   05  ─‣┘  _                                06
-  06                                        ▶
+  06       return
   07  ...
-  08  ─•─  (empty_statement) [Node RecordSet(M1)]  03
-  10   !   (lexical_declaration) [Node RecordSet(M0)]  08
+  08  ─•─  (empty_statement)                03          [Node RecordSet(M1 b)]
+  10   !   (lexical_declaration)            08          [Node RecordSet(M0 a)]
   12  ──!  _                                10, 12
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       _                                10, 12
+  01  └─!  _                                10, 12
        ●   lexical_declaration
-  10       (lexical_declaration) [Node RecordSet(M0)]  08
+  10   !   (lexical_declaration)            08          [Node RecordSet(M0 a)]
        ●   lexical_declaration
-  08       (empty_statement) [Node RecordSet(M1)]  03
+  08  ─•─  (empty_statement)                03          [Node RecordSet(M1 b)]
        ●   empty_statement
-  03       (debugger_statement) [Node RecordSet(M2)]  05
+  03  ─•─  (debugger_statement)             05          [Node RecordSet(M2 c)]
        ●   debugger_statement
-  05       _                                06
+  05  ─‣┘  _                                06
        ●   program
-  06   ◀   (Q)                              ◼
+  06   ◀   return                           ◼

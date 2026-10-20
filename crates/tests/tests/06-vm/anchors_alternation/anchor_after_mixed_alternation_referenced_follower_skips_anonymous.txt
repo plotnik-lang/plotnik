@@ -60,51 +60,51 @@ Q = 03 :: T2
 
 [instructions]
 B:
-  00   !   (identifier) [Node RecordSet(M0)] == "b"  02
-  02                                        ▶
+  00   !   (identifier == "b")              02          [Node RecordSet(M0 self)]
+  02       return
 
 Q:
   03   !   (program)                        04
   04  └‣─  (expression_statement)           05
   05  └‣─  (call_expression)                06
   06  └‣─  arguments: (arguments)           20, 22
-  08  -ε-  [RecordClose RecordSet(M1)]      10
+  08  -ε-                                   10          [RecordClose RecordSet(M1 b)]
   10  ─‣┘⁴ _                                11
-  11                                        ▶
-  12                                        ▶
-  13  ─•─  (identifier) [Node RecordSet(M0)] == "b"  12
+  11       return
+  12       return
+  13  ─•─  (identifier == "b")              12          [Node RecordSet(M0 self)]
   15       (@13)                            13 : 08
-  16                                        ▶
-  17  ─◦─  (identifier) [Node RecordSet(M0)] == "b"  16
+  16       return
+  17  ─◦─  (identifier == "b")              16          [Node RecordSet(M0 self)]
   19       (@17)                            17 : 08
-  20  └‣─  (identifier) [RecordOpen] == "a"  15
-  22  └‣─  ";" [RecordOpen]                 19
+  20  └‣─  (identifier == "a")              15          [RecordOpen]
+  22  └‣─  ";"                              19          [RecordOpen]
 --------------------- TRACE ----------------------
 Q:
-  03       (program)                        04
+  03   !   (program)                        04
        ●   program
-  04       (expression_statement)           05
+  04  └‣─  (expression_statement)           05
        ●   expression_statement
-  05       (call_expression)                06
+  05  └‣─  (call_expression)                06
        ●   call_expression
-  06       arguments: (arguments)           20, 22
+  06  └‣─  arguments: (arguments)           20, 22
        ○   identifier
        ●   arguments
-  20       (identifier) [RecordOpen] == "a"  15
+  20  └‣─  (identifier == "a")              15          [RecordOpen]
        ○   (
        ●   identifier
   15       (@13)                            13 : 08
        ▶   (@13)
 
 @13:
-  13       (identifier) [Node RecordSet(M0)] == "b"  12
+  13  ─•─  (identifier == "b")              12          [Node RecordSet(M0 self)]
        ○   ,
        ○   comment
        ●   identifier
-  12   ◀   (@13)                            
+  12   ◀   return                           08
 
 Q:
-  08  -ε-  [RecordClose RecordSet(M1)]      10
-  10       _                                11
+  08  -ε-                                   10          [RecordClose RecordSet(M1 b)]
+  10  ─‣┘⁴ _                                11
        ●   program
-  11   ◀   (Q)                              ◼
+  11   ◀   return                           ◼

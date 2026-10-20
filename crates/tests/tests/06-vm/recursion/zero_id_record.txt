@@ -41,59 +41,59 @@ A:
   00   !   (_)                              24, 16
 
 Q:
-  02   !   (_) [RecordOpen]                 04
+  02   !   (_)                              04          [RecordOpen]
   04  └‣─  (A)                              00 : 05
-  05  -ε-  [RecordClose]                    08
+  05  -ε-                                   08          [RecordClose]
   07  ...
-  08  ─‣┘  _ [RecordSet(M0)]                10
-  10                                        ▶
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘  _ [RecordSet(M1)]                15
-  15                                        ▶
-  16  -ε-  [Absent RecordSet(M1)]           15
+  08  ─‣┘  _                                10          [RecordSet(M0 a)]
+  10       return
+  11  -ε-                                   13          [RecordClose]
+  13  ─‣┘  _                                15          [RecordSet(M1 b)]
+  15       return
+  16  -ε-                                   15          [Absent RecordSet(M1 b)]
   18   !   (Q)                              02 : 11
-  19  -ε-  [RecordOpen]                     18
+  19  -ε-                                   18          [RecordOpen]
   21  ──!  _                                19, 21
   23  ...
   24  └─!  _                                19, 21
 --------------------- TRACE ----------------------
 Q:
-  02       (_) [RecordOpen]                 04
+  02   !   (_)                              04          [RecordOpen]
        ●   program
-  04       (A)                              00 : 05
+  04  └‣─  (A)                              00 : 05
        ▶   (A)
 
 A:
-  00       (_)                              24, 16
+  00   !   (_)                              24, 16
        ●   expression_statement
-  24       _                                19, 21
+  24  └─!  _                                19, 21
        ●   number
-  19  -ε-  [RecordOpen]                     18
-  18       (Q)                              02 : 11
+  19  -ε-                                   18          [RecordOpen]
+  18   !   (Q)                              02 : 11
        ▶   (Q)
 
 Q:
-  02       (_) [RecordOpen]                 04
+  02   !   (_)                              04          [RecordOpen]
        ●   number
-  04       (A)                              00 : 05
-  24  ❮❮❮ 
-  21       _                                19, 21
+  04  └‣─  (A)                              00 : 05
+  24  ❮❮❮
+  21  ──!  _                                19, 21
        ●   ;
-  19  -ε-  [RecordOpen]                     18
-  18       (Q)                              02 : 11
+  19  -ε-                                   18          [RecordOpen]
+  18   !   (Q)                              02 : 11
        ▶   (Q)
 
 Q:
-  02       (_) [RecordOpen]                 04
+  02   !   (_)                              04          [RecordOpen]
        ○   ;
-  21  ❮❮❮ 
-  21       _                                19, 21
-  00  ❮❮❮ 
-  16  -ε-  [Absent RecordSet(M1)]           15
-  15   ◀   (A)                              
+  21  ❮❮❮
+  21  ──!  _                                19, 21
+  00  ❮❮❮
+  16  -ε-                                   15          [Absent RecordSet(M1 b)]
+  15   ◀   return                           05
 
 Q:
-  05  -ε-  [RecordClose]                    08
-  08       _ [RecordSet(M0)]                10
+  05  -ε-                                   08          [RecordClose]
+  08  ─‣┘  _                                10          [RecordSet(M0 a)]
        ●   program
-  10   ◀   (Q)                              ◼
+  10   ◀   return                           ◼

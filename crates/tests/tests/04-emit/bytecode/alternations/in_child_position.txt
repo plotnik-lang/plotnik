@@ -7,10 +7,10 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
+  1       return
   2   !   (program)                         7
   3  ─‣┘  _                                 1
-  4   !   (expression_statement) [Node RecordSet(expr)]  3
+  4   !   (expression_statement)            3           [Node RecordSet(expr)]
   6  ──!  _                                 4, 6
   7  └─!  _                                 4, 6
 -------------------- BYTECODE --------------------
@@ -38,8 +38,8 @@ Q = 0 :: T1
 Q:
   0   !   (program)                         1
   1  └─!  _                                 3, 8
-  3   !   (expression_statement) [Node RecordSet(M0)]  5
+  3   !   (expression_statement)            5           [Node RecordSet(M0 expr)]
   5  ─‣┘  _                                 6
-  6                                         ▶
+  6       return
   7  ...
   8  ──!  _                                 3, 8

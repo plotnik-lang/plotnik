@@ -99,198 +99,198 @@ Q = 00 :: T8
 [instructions]
 Q:
   00   !   (program)                        01
-  01  -ε-  [ScalarOpen]                     03
+  01  -ε-                                   03          [ScalarOpen]
   03       (@80)                            80 : 22 / 24
-  06  -ε-  [TextClose RecordSet(M7)]        08
+  06  -ε-                                   08          [TextClose RecordSet(M7 rest)]
   08  ─‣┘  _                                09
-  09                                        ▶
-  10  └─!  (comment) [ScalarMark] == "//b"  06
-  12  └─!  (comment) [ScalarMark] == "//stop"  06
-  14  -ε-  [ScalarOpen]                     10, 12
-  16  ──!  (comment) [ScalarMark] == "//b"  06
-  18  ──!  (comment) [ScalarMark] == "//stop"  06
-  20  -ε-  [ScalarOpen]                     16, 18
-  22  -ε-  [TextClose RecordSet(M6)]        20
-  24  -ε-  [TextClose RecordSet(M6)]        14
-  26                                        ▶
-  27                                        ▶ p1
-  28                                        ▶
-  29                                        ▶
-  30                                        ▶ p1
+  09       return
+  10  └─!  (comment == "//b")               06          [ScalarMark]
+  12  └─!  (comment == "//stop")            06          [ScalarMark]
+  14  -ε-                                   10, 12      [ScalarOpen]
+  16  ──!  (comment == "//b")               06          [ScalarMark]
+  18  ──!  (comment == "//stop")            06          [ScalarMark]
+  20  -ε-                                   16, 18      [ScalarOpen]
+  22  -ε-                                   20          [TextClose RecordSet(M6 x)]
+  24  -ε-                                   14          [TextClose RecordSet(M6 x)]
+  26       return
+  27       return p1
+  28       return
+  29       return
+  30       return p1
   31  ...
-  32  -ε-  [SuppressEnd]                    29
+  32  -ε-                                   29          [SuppressEnd]
   34   !   (@58)                            58 : 32
-  35  -ε-  [SuppressBegin]                  34
+  35  -ε-                                   34          [SuppressBegin]
   37  ──!  _                                35, 37
   39  ...
-  40  -ε-  [SuppressEnd]                    37, 29
+  40  -ε-                                   37, 29      [SuppressEnd]
   42   !   (@58)                            58 : 40
-  43  -ε-  [SuppressBegin]                  42
+  43  -ε-                                   42          [SuppressBegin]
   45  ──!  _                                43, 45
   47  ...
   48  -ε-                                   37, 30, 45
   50       (@48)                            48 : 28 / 28
-  53   !   (comment) [ScalarMark]           50
+  53   !   (comment)                        50          [ScalarMark]
   55  ...
-  56   !   (comment) [ScalarMark]           28
+  56   !   (comment)                        28          [ScalarMark]
   58  -ε-                                   53, 56
-  60  -ε-  [SuppressEnd]                    26
+  60  -ε-                                   26          [SuppressEnd]
   62   !   (@58)                            58 : 60
   63  ...
-  64  -ε-  [SuppressBegin]                  62
+  64  -ε-                                   62          [SuppressBegin]
   66  ──!  _                                64, 66
   68  └─!  _                                64, 66
-  70  -ε-  [SuppressEnd]                    66, 26
+  70  -ε-                                   66, 26      [SuppressEnd]
   72   !   (@58)                            58 : 70
-  73  -ε-  [SuppressBegin]                  72
+  73  -ε-                                   72          [SuppressBegin]
   75  ──!  _                                73, 75
   77  └─!  _                                73, 75
   79  ...
   80  -ε-                                   68, 27, 77
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01  -ε-  [ScalarOpen]                     03
+  01  -ε-                                   03          [ScalarOpen]
   03       (@80)                            80 : 22 / 24
        ▶   (@80)
 
 @80:
   80  -ε-                                   68, 27, 77
-  68       _                                64, 66
+  68  └─!  _                                64, 66
        ●   comment
-  64  -ε-  [SuppressBegin]                  62
-  62       (@58)                            58 : 60
+  64  -ε-                                   62          [SuppressBegin]
+  62   !   (@58)                            58 : 60
        ▶   (@58)
 
 @58:
   58  -ε-                                   53, 56
-  53       (comment) [ScalarMark]           50
+  53   !   (comment)                        50          [ScalarMark]
        ●   comment
   50       (@48)                            48 : 28 / 28
        ▶   (@48)
 
 @48:
   48  -ε-                                   37, 30, 45
-  37       _                                35, 37
+  37  ──!  _                                35, 37
        ●   comment
-  35  -ε-  [SuppressBegin]                  34
-  34       (@58)                            58 : 32
+  35  -ε-                                   34          [SuppressBegin]
+  34   !   (@58)                            58 : 32
        ▶   (@58)
 
 @58:
   58  -ε-                                   53, 56
-  53       (comment) [ScalarMark]           50
+  53   !   (comment)                        50          [ScalarMark]
        ●   comment
   50       (@48)                            48 : 28 / 28
        ▶   (@48)
 
 @48:
   48  -ε-                                   37, 30, 45
-  37       _                                35, 37
+  37  ──!  _                                35, 37
        ●   comment
-  35  -ε-  [SuppressBegin]                  34
-  34       (@58)                            58 : 32
+  35  -ε-                                   34          [SuppressBegin]
+  34   !   (@58)                            58 : 32
        ▶   (@58)
 
 @58:
   58  -ε-                                   53, 56
-  53       (comment) [ScalarMark]           50
+  53   !   (comment)                        50          [ScalarMark]
        ●   comment
   50       (@48)                            48 : 28 / 28
        ▶   (@48)
 
 @48:
   48  -ε-                                   37, 30, 45
-  37       _                                35, 37
-  48  ❮❮❮ 
-  30   ◀   (@48)                            p1
+  37  ──!  _                                35, 37
+  48  ❮❮❮
+  30   ◀   return p1                        28
 
 @58:
-  28   ◀   (@58)                            
+  28   ◀   return                           32
 
 @48:
-  32  -ε-  [SuppressEnd]                    29
-  29   ◀   (@48)                            
+  32  -ε-                                   29          [SuppressEnd]
+  29   ◀   return                           28
 
 @58:
-  28   ◀   (@58)                            
+  28   ◀   return                           32
 
 @48:
-  32  -ε-  [SuppressEnd]                    29
-  29   ◀   (@48)                            
+  32  -ε-                                   29          [SuppressEnd]
+  29   ◀   return                           28
 
 @58:
-  28   ◀   (@58)                            
+  28   ◀   return                           60
 
 @80:
-  60  -ε-  [SuppressEnd]                    26
-  26   ◀   (@80)                            
+  60  -ε-                                   26          [SuppressEnd]
+  26   ◀   return                           22
 
 Q:
-  22  -ε-  [TextClose RecordSet(M6)]        20
-  20  -ε-  [ScalarOpen]                     16, 18
-  16       (comment) [ScalarMark] == "//b"  06
-  20  ❮❮❮ 
-  18       (comment) [ScalarMark] == "//stop"  06
-  48  ❮❮❮ 
-  45       _                                43, 45
-  58  ❮❮❮ 
-  56       (comment) [ScalarMark]           28
+  22  -ε-                                   20          [TextClose RecordSet(M6 x)]
+  20  -ε-                                   16, 18      [ScalarOpen]
+  16  ──!  (comment == "//b")               06          [ScalarMark]
+  20  ❮❮❮
+  18  ──!  (comment == "//stop")            06          [ScalarMark]
+  48  ❮❮❮
+  45  ──!  _                                43, 45
+  58  ❮❮❮
+  56   !   (comment)                        28          [ScalarMark]
        ●   comment
-  28   ◀   (@58)                            
+  28   ◀   return                           32
 
 @48:
-  32  -ε-  [SuppressEnd]                    29
-  29   ◀   (@48)                            
+  32  -ε-                                   29          [SuppressEnd]
+  29   ◀   return                           28
 
 @58:
-  28   ◀   (@58)                            
+  28   ◀   return                           32
 
 @48:
-  32  -ε-  [SuppressEnd]                    29
-  29   ◀   (@48)                            
+  32  -ε-                                   29          [SuppressEnd]
+  29   ◀   return                           28
 
 @58:
-  28   ◀   (@58)                            
+  28   ◀   return                           60
 
 @80:
-  60  -ε-  [SuppressEnd]                    26
-  26   ◀   (@80)                            
+  60  -ε-                                   26          [SuppressEnd]
+  26   ◀   return                           22
 
 Q:
-  22  -ε-  [TextClose RecordSet(M6)]        20
-  20  -ε-  [ScalarOpen]                     16, 18
-  16       (comment) [ScalarMark] == "//b"  06
-  20  ❮❮❮ 
-  18       (comment) [ScalarMark] == "//stop"  06
-  37  ❮❮❮ 
-  37       _                                35, 37
-  48  ❮❮❮ 
-  30   ◀   (@48)                            p1
+  22  -ε-                                   20          [TextClose RecordSet(M6 x)]
+  20  -ε-                                   16, 18      [ScalarOpen]
+  16  ──!  (comment == "//b")               06          [ScalarMark]
+  20  ❮❮❮
+  18  ──!  (comment == "//stop")            06          [ScalarMark]
+  37  ❮❮❮
+  37  ──!  _                                35, 37
+  48  ❮❮❮
+  30   ◀   return p1                        28
 
 @58:
-  28   ◀   (@58)                            
+  28   ◀   return                           32
 
 @48:
-  32  -ε-  [SuppressEnd]                    29
-  29   ◀   (@48)                            
+  32  -ε-                                   29          [SuppressEnd]
+  29   ◀   return                           28
 
 @58:
-  28   ◀   (@58)                            
+  28   ◀   return                           60
 
 @80:
-  60  -ε-  [SuppressEnd]                    26
-  26   ◀   (@80)                            
+  60  -ε-                                   26          [SuppressEnd]
+  26   ◀   return                           22
 
 Q:
-  22  -ε-  [TextClose RecordSet(M6)]        20
-  20  -ε-  [ScalarOpen]                     16, 18
-  16       (comment) [ScalarMark] == "//b"  06
-  20  ❮❮❮ 
-  18       (comment) [ScalarMark] == "//stop"  06
+  22  -ε-                                   20          [TextClose RecordSet(M6 x)]
+  20  -ε-                                   16, 18      [ScalarOpen]
+  16  ──!  (comment == "//b")               06          [ScalarMark]
+  20  ❮❮❮
+  18  ──!  (comment == "//stop")            06          [ScalarMark]
        ●   comment
-  06  -ε-  [TextClose RecordSet(M7)]        08
-  08       _                                09
+  06  -ε-                                   08          [TextClose RecordSet(M7 rest)]
+  08  ─‣┘  _                                09
        ●   program
-  09   ◀   (Q)                              ◼
+  09   ◀   return                           ◼

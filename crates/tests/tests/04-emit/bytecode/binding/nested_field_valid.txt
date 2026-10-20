@@ -9,11 +9,11 @@ Q = 2
 
 [transitions]
 Q:
-  1                                         ▶
-  2   !   (function_declaration) [Node RecordSet(fn)]  4
-  4  └‣─  body: (statement_block) [Node RecordSet(body)]  6
+  1       return
+  2   !   (function_declaration)            4           [Node RecordSet(fn)]
+  4  └‣─  body: (statement_block)           6           [Node RecordSet(body)]
   5  ─‣┘² _                                 1
-  6  └‣─  (return_statement) [Node RecordSet(ret)]  5
+  6  └‣─  (return_statement)                5           [Node RecordSet(ret)]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -42,8 +42,8 @@ Q = 0 :: T1
 
 [instructions]
 Q:
-  0   !   (function_declaration) [Node RecordSet(M0)]  2
-  2  └‣─  body: (statement_block) [Node RecordSet(M1)]  4
-  4  └‣─  (return_statement) [Node RecordSet(M2)]  6
+  0   !   (function_declaration)            2           [Node RecordSet(M0 fn)]
+  2  └‣─  body: (statement_block)           4           [Node RecordSet(M1 body)]
+  4  └‣─  (return_statement)                6           [Node RecordSet(M2 ret)]
   6  ─‣┘² _                                 7
-  7                                         ▶
+  7       return

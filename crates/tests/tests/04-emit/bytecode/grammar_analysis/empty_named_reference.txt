@@ -11,12 +11,12 @@ Q    = 6
 
 [transitions]
 Leaf:
-  1                                         ▶
+  1       return
   2   !   (id)                              3
   3  └!┘  _                                 1
 
 Q:
-  5                                         ▶
+  5       return
   6   !   (expr)                            8
   7  ─‣┘  _                                 5
   8  └‣─  (Leaf)                            2 : 7
@@ -43,10 +43,10 @@ Q    = 3 :: T0
 Leaf:
   0   !   (id)                              1
   1  └!┘  _                                 2
-  2                                         ▶
+  2       return
 
 Q:
   3   !   (expr)                            4
   4  └‣─  (Leaf)                            0 : 5
   5  ─‣┘  _                                 6
-  6                                         ▶
+  6       return

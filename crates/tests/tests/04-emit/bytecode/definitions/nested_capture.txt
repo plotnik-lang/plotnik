@@ -12,23 +12,23 @@ Outer = 07
 
 [transitions]
 Inner:
-  01                                        ▶
+  01       return
   02   !   (call_expression)                04
   03  ─‣┘  _                                01
-  04  └‣─  (identifier) [Node RecordSet(name)]  03
+  04  └‣─  (identifier)                     03          [Node RecordSet(name)]
 
 Outer:
-  06                                        ▶
+  06       return
   07   !   (array)                          25
-  08  ─‣┘  _ [ListClose RecordSet(items)]   06
-  10  -ε-  [ListClose RecordSet(items)]     06
-  12  -ε-  [RecordClose ArrayPush]          19, 08
-  14  -ε-  [RecordClose RecordSet(item)]    12
+  08  ─‣┘  _                                06          [ListClose RecordSet(items)]
+  10  -ε-                                   06          [ListClose RecordSet(items)]
+  12  -ε-                                   19, 08      [RecordClose ArrayPush]
+  14  -ε-                                   12          [RecordClose RecordSet(item)]
   15   !   (Inner)                          02 : 14
-  17  -ε-  [RecordOpen RecordOpen]          15
+  17  -ε-                                   15          [RecordOpen RecordOpen]
   19  ──!  _                                17, 19
   20  └─!  _                                17, 19
-  25  -ε-  [ListOpen]                       20, 10
+  25  -ε-                                   20, 10      [ListOpen]
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -66,19 +66,19 @@ Outer = 05 :: T4
 [instructions]
 Inner:
   00   !   (call_expression)                01
-  01  └‣─  (identifier) [Node RecordSet(M0)]  03
+  01  └‣─  (identifier)                     03          [Node RecordSet(M0 name)]
   03  ─‣┘  _                                04
-  04                                        ▶
+  04       return
 
 Outer:
   05   !   (array)                          06
-  06  -ε-  [ListOpen]                       20, 09
-  08                                        ▶
-  09  -ε-  [ListClose RecordSet(M2)]        08
-  11  -ε-  [RecordClose ArrayPush]          18, 22
-  13  -ε-  [RecordClose RecordSet(M1)]      11
+  06  -ε-                                   20, 09      [ListOpen]
+  08       return
+  09  -ε-                                   08          [ListClose RecordSet(M2 items)]
+  11  -ε-                                   18, 22      [RecordClose ArrayPush]
+  13  -ε-                                   11          [RecordClose RecordSet(M1 item)]
   15   !   (Inner)                          00 : 13
-  16  -ε-  [RecordOpen RecordOpen]          15
+  16  -ε-                                   15          [RecordOpen RecordOpen]
   18  ──!  _                                16, 18
   20  └─!  _                                16, 18
-  22  ─‣┘  _ [ListClose RecordSet(M2)]      08
+  22  ─‣┘  _                                08          [ListClose RecordSet(M2 items)]

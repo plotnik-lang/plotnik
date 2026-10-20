@@ -58,27 +58,27 @@ Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
   02  └‣─  (binary_expression)              03
-  03  -ε-  [RecordOpen]                     10, 12
-  05                                        ▶
-  06  ─•─  (identifier) [RecordClose RecordSet(M1)]  14
-  08  ─◦─  (identifier) [RecordClose RecordSet(M1)]  14
-  10  └‣─  (number) [Node RecordSet(M0)]    06
-  12  └‣─  "+" [Absent RecordSet(M0)]       08
+  03  -ε-                                   10, 12      [RecordOpen]
+  05       return
+  06  ─•─  (identifier)                     14          [RecordClose RecordSet(M1 t)]
+  08  ─◦─  (identifier)                     14          [RecordClose RecordSet(M1 t)]
+  10  └‣─  (number)                         06          [Node RecordSet(M0 n)]
+  12  └‣─  "+"                              08          [Absent RecordSet(M0 n)]
   14  ─‣┘³ _                                05
 --------------------- TRACE ----------------------
 Q:
-  00       (program)                        01
+  00   !   (program)                        01
        ●   program
-  01       (expression_statement)           02
+  01  └‣─  (expression_statement)           02
        ●   expression_statement
-  02       (binary_expression)              03
+  02  └‣─  (binary_expression)              03
        ●   binary_expression
-  03  -ε-  [RecordOpen]                     10, 12
-  10       (number) [Node RecordSet(M0)]    06
+  03  -ε-                                   10, 12      [RecordOpen]
+  10  └‣─  (number)                         06          [Node RecordSet(M0 n)]
        ●   number
-  06       (identifier) [RecordClose RecordSet(M1)]  14
+  06  ─•─  (identifier)                     14          [RecordClose RecordSet(M1 t)]
        ○   *
        ●   identifier
-  14       _                                05
+  14  ─‣┘³ _                                05
        ●   program
-  05   ◀   (Q)                              ◼
+  05   ◀   return                           ◼
