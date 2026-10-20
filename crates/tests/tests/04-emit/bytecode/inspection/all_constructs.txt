@@ -21,14 +21,16 @@ Q = (program
 ---------------------- NFA -----------------------
 [entrypoints]
 Q     = 07
-Value = 00
+Value = 04
 
 [transitions]
 Value:
-  00  -ε-                                   02, 03
   01                                        ▶
   02   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  01
   03   !   (number) [VariantOpen(Num) Node RecordSet(num) VariantClose]  01
+  04   !   switch
+             (identifier)                   02
+             (number)                       03
 
 Q:
   06                                        ▶
@@ -38,7 +40,7 @@ Q:
   11  └‣─  (variable_declarator)            20
   12  ─‣┘² _                                08
   13  -ε-  [SuppressEnd]                    12
-  14   !   (Value)                          00 : 13
+  14   !   (Value)                          04 : 13
   16  -ε-  [Absent RecordSet(str) SuppressBegin]  14
   17   !   (string) [Node RecordSet(str)]   12
   19  ─‣─  value: _                         16, 17
@@ -93,7 +95,7 @@ N1: S09 → T4  ; Name
 N2: S10 → T6  ; Q
 
 [entrypoints]
-Q     = 02 :: T6
+Q     = 03 :: T6
 Value = 00 :: T3
 
 [spans]
@@ -127,27 +129,29 @@ P26 pattern    243..251  source_id=0
 
 [instructions]
 Value:
-  00  -ε-  [SpanStart#0]                    16, 24
+  00  -ε-  [SpanStart#0]                    02
+  02   !   switch
+             (identifier)                   16
+             (number)                       24
 
 Q:
-  02   !   (program) [SpanStart#8 SpanStartAt#9 SpanStart#10]  04
-  04  -ε-  [SpanStart#11]                   22, 13
-  06  ─‣┘  _                                08
-  07                                        ▶
+  03   !   (program) [SpanStart#8 SpanStartAt#9 SpanStart#10]  05
+  05  -ε-  [SpanStart#11]                   22, 13
+  07  ─‣┘  _                                08
   08  ─‣┘  _ [SpanEnd#15 SpanEnd#14]        10
-  10  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  07
+  10  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  30
   12                                        ▶
   13  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node RecordSet(M4) SpanEnd#13]  52
   16   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
   22  └─!  _                                59, 54
   24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  12
-  30  ...
+  30                                        ▶
   31  ...
-  32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21 SpanEnd#20]  06
+  32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21 SpanEnd#20]  07
   35   !   (Value)                          00 : 32
   36  -ε-  [SpanStart#20 SpanStart#21 SpanStart#22 Absent RecordSet(M6) SpanStart#23 SuppressBegin]  35
   39  ...
-  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node RecordSet(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  06
+  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node RecordSet(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  07
   46  ─‣─  value: _                         36, 40
   48  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 Node RecordSet(M5) SpanEnd#16 SpanEnd#19 SpanEnd#18]  46
   52  └‣─  (variable_declarator) [SpanStartAt#15]  48

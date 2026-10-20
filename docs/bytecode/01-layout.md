@@ -70,7 +70,8 @@ Bytecode integers are little-endian. The embedded [regex automata](06-tables.md#
 | 38          | `u16`    | `entrypoints_count`      |
 | 40          | `u16`    | `instruction_word_count` |
 | 42          | `u16`    | `spans_count`            |
-| 44          | 20 bytes | Reserved                 |
+| 44          | `u32`    | `switch_tables_size`     |
+| 48          | 16 bytes | Reserved                 |
 
 `magic` identifies the format with ASCII `PTKQ`, bytes `50 54 4B 51`. `version` and all reserved bytes are zero. `checksum` stores the [body checksum](#checksum).
 
@@ -78,7 +79,7 @@ Bytecode integers are little-endian. The embedded [regex automata](06-tables.md#
 
 ### Section layout
 
-`StringBlob` begins immediately after the header, at byte 64. The remaining sections follow in the order below. Blob sizes count bytes, table counts count records, and `instruction_word_count` counts eight-byte words. An instruction can occupy more than one word.
+`StringBlob` begins immediately after the header, at byte 64. The remaining sections follow in the order below. Size fields count bytes, table counts count records, and `instruction_word_count` counts eight-byte words. An instruction can occupy more than one word.
 
 | Section        | Header field             | Bytes per unit |
 | -------------- | ------------------------ | -------------- |
@@ -93,9 +94,10 @@ Bytecode integers are little-endian. The embedded [regex automata](06-tables.md#
 | [TypeNames]    | `type_names_count`       | 4              |
 | [Entrypoints]  | `entrypoints_count`      | 8              |
 | [Instructions] | `instruction_word_count` | 8              |
+| [SwitchTables] | `switch_tables_size`     | 1              |
 | [Spans]        | `spans_count`            | 16             |
 
-For each section, the header's count and the unit size above determine its data length. `StringTable` and `RegexTable` also contain a final sentinel record, outside the count, that marks the end of their blob. The sentinel has the same size as an ordinary record but no entry ID.
+For each section, the header's size or count and the unit size above determine its data length. `StringTable` and `RegexTable` also contain a final sentinel record, outside the count, that marks the end of their blob. The sentinel has the same size as an ordinary record but no entry ID.
 
 For example, with `str_table_count` set to 3, `StringTable` occupies 16 bytes: three counted records and a sentinel. Entry 0 is one of the counted records. The offsets below are relative to the table's start.
 
@@ -132,6 +134,7 @@ The loader copies the bytes into immutable storage whose starting address is a m
 [TypeNames]: 03-types.md
 [Entrypoints]: 02-instructions.md#entrypoints
 [Instructions]: 02-instructions.md
+[SwitchTables]: 02-instructions.md#switch
 [Spans]: 05-spans.md
 
 ### Padding and size
@@ -174,12 +177,13 @@ The computed CRC must equal `checksum`. A mismatch is an error.
 
 ### Offsets and references
 
-Bytecode and blob offsets both count bytes, but start from different places:
+These offsets count bytes from different origins:
 
-| Offset   | Width | Measured from                        |
-| -------- | ----- | ------------------------------------ |
-| Bytecode | `u32` | First header byte                    |
-| Blob     | `u32` | Start of `StringBlob` or `RegexBlob` |
+| Offset       | Width | Measured from                        |
+| ------------ | ----- | ------------------------------------ |
+| Bytecode     | `u32` | First header byte                    |
+| Blob         | `u32` | Start of `StringBlob` or `RegexBlob` |
+| Switch table | `u32` | Start of `SwitchTables`              |
 
 Code addresses count eight-byte words from the start of `Instructions`. They use `u16` and must point to an instruction's first word. Whether zero is a usable address depends on the [instruction operand](02-instructions.md#addresses-and-instruction-boundaries).
 

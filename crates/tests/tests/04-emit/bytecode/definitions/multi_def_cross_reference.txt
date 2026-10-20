@@ -12,7 +12,7 @@ Assignment = (assignment_expression
 ---------------------- NFA -----------------------
 [entrypoints]
 Assignment = 10
-Expression = 03
+Expression = 07
 Ident      = 02
 
 [transitions]
@@ -21,16 +21,18 @@ Ident:
   02   !   (identifier) [Node RecordSet(name)]  01
 
 Expression:
-  03  -ε-                                   05, 06
   04                                        ▶
   05   !   (number) [VariantOpen(Literal) Node RecordSet(value) VariantClose]  04
   06   !   (identifier) [VariantOpen(Variable) Node RecordSet(name) VariantClose]  04
+  07   !   switch
+             (number)                       05
+             (identifier)                   06
 
 Assignment:
   09                                        ▶
   10   !   (assignment_expression)          14
   11  ─‣┘  _ [RecordSet(value)]             09
-  13  ─‣─  right: (Expression)              03 : 11
+  13  ─‣─  right: (Expression)              07 : 11
   14  └‣─  left: (identifier) [Node RecordSet(target)]  13
 -------------------- BYTECODE --------------------
 [strings]
@@ -72,7 +74,7 @@ N1: S07 → T4  ; Expression
 N2: S08 → T5  ; Assignment
 
 [entrypoints]
-Assignment = 05 :: T5
+Assignment = 04 :: T5
 Expression = 03 :: T4
 Ident      = 00 :: T1
 
@@ -82,14 +84,17 @@ Ident:
   02                                        ▶
 
 Expression:
-  03  -ε-                                   13, 16
+  03   !   switch
+             (number)                       12
+             (identifier)                   16
 
 Assignment:
-  05   !   (assignment_expression)          06
-  06  └‣─  left: (identifier) [Node RecordSet(M6)]  08
-  08  ─‣─  right: (Expression)              03 : 09
-  09  ─‣┘  _ [RecordSet(M5)]                11
+  04   !   (assignment_expression)          05
+  05  └‣─  left: (identifier) [Node RecordSet(M6)]  07
+  07  ─‣─  right: (Expression)              03 : 08
+  08  ─‣┘  _ [RecordSet(M5)]                10
+  10                                        ▶
   11                                        ▶
-  12                                        ▶
-  13   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12
-  16   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose]  12
+  12   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  11
+  15  ...
+  16   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose]  11

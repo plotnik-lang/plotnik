@@ -3,17 +3,17 @@ use std::fmt::Write as _;
 
 use crate::core::Colors;
 
-use super::format::{LineBuilder, Symbol, nav_symbol, width_for_count};
+use super::format::{LineBuilder, Symbol, cols, nav_symbol, width_for_count};
 use super::ids::TypeId;
 use super::instructions::{CodeAddr, SuccessorAddr};
-use super::module::{Instruction, Module};
+use super::module::{Instruction, Module, SwitchEntriesView};
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
-use super::{Call, CallOwnership, Match, Return, SPAN_NO_BINDING};
+use super::{Call, CallOwnership, Match, Return, SPAN_NO_BINDING, SwitchEntry};
 use plotnik_runtime::Nav;
 
-/// Generate a human-readable dump of the bytecode module.
+/// Generate a human-readable dump of a compiler-produced bytecode module.
 pub fn dump(module: &Module, colors: Colors) -> String {
     let mut out = String::new();
     let ctx = DumpContext::new(module, colors);
@@ -364,6 +364,7 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let total_words = header.instruction_word_count as usize;
     let fmt = DumpFormatter {
         ctx,
+        module,
         addr_width: ctx.addr_width,
     };
 
@@ -407,6 +408,7 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
 
 struct DumpFormatter<'a> {
     ctx: &'a DumpContext,
+    module: &'a Module,
     addr_width: usize,
 }
 
@@ -420,7 +422,7 @@ fn instruction_word_count(instr: &Instruction) -> u16 {
                 3
             }
         }
-        Instruction::Return(_) => 1,
+        Instruction::Return(_) | Instruction::Switch { .. } => 1,
     }
 }
 
@@ -434,9 +436,54 @@ impl DumpFormatter<'_> {
 
     fn instruction(&self, addr: CodeAddr, instr: &Instruction) -> String {
         match instr {
+            Instruction::Switch { entries, .. } => self.format_switch(addr, *entries),
             Instruction::Match(m) => self.format_match(addr, m),
             Instruction::Call(c) => self.format_call(addr, c),
             Instruction::Return(r) => self.format_return(addr, r),
+        }
+    }
+
+    fn format_switch(&self, addr: CodeAddr, entries: SwitchEntriesView<'_>) -> String {
+        let builder = LineBuilder::new(self.addr_width);
+        let prefix = builder.instruction_prefix(addr.get(), nav_symbol(Nav::StayExact));
+        let mut result = format!("{prefix}switch");
+        let indent = cols::INDENT + self.addr_width + 2 * cols::GAP + cols::SYMBOL + 2;
+        let mut cases = entries.iter().collect::<Vec<_>>();
+        cases.sort_by_key(|entry| entry.target);
+
+        for entry in cases {
+            let kind = self.ctx.render.dump_node_kind(self.switch_node_kind(entry));
+            let target = self.format_addr(entry.target);
+            let row = builder.pad_successors(format!("{:indent$}{kind}", ""), &target);
+            result.push('\n');
+            result.push_str(&row);
+        }
+
+        result
+    }
+
+    fn switch_node_kind(&self, entry: SwitchEntry) -> NodeKindConstraint {
+        let mut addr = CodeAddr::from(u16::from(entry.target));
+        loop {
+            let Instruction::Match(m) = self.module.decode_instruction(addr) else {
+                unreachable!(
+                    "switch branches begin with a concrete match through epsilon prefixes"
+                );
+            };
+
+            if !m.is_epsilon() {
+                assert_eq!(m.node_kind.kind_id(), Some(entry.kind));
+                return m.node_kind;
+            }
+
+            let mut successors = m.successors();
+            addr = CodeAddr::from(u16::from(
+                successors.next().expect("switch prefix has a successor"),
+            ));
+            assert!(
+                successors.next().is_none(),
+                "switch prefix has one successor"
+            );
         }
     }
 

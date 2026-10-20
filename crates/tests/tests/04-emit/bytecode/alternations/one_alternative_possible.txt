@@ -4,16 +4,18 @@ Q = [
 ]
 ---------------------- NFA -----------------------
 [entrypoints]
-Q = 0
+Q = 6
 
 [transitions]
 Q:
-  0  -ε-                                    2, 5
   1                                         ▶
   2   !   (function_declaration) [Absent RecordSet(id) Node RecordSet(fn)]  4
   3  ─‣┘  _                                 1
   4  └‣─  (program)                         3
   5   !   (identifier) [Absent RecordSet(fn) Node RecordSet(id)]  1
+  6   !   switch
+            (function_declaration)          2
+            (identifier)                    5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -41,9 +43,12 @@ Q = 00 :: T2
 
 [instructions]
 Q:
-  00  -ε-                                   05, 08
-  02  └‣─  (program)                        03
-  03  ─‣┘  _                                04
-  04                                        ▶
-  05   !   (function_declaration) [Absent RecordSet(M1) Node RecordSet(M0)]  02
-  08   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  04
+  00   !   switch
+             (function_declaration)         04
+             (identifier)                   08
+  01  └‣─  (program)                        02
+  02  ─‣┘  _                                03
+  03                                        ▶
+  04   !   (function_declaration) [Absent RecordSet(M1) Node RecordSet(M0)]  01
+  07  ...
+  08   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  03

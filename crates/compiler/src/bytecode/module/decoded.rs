@@ -1,19 +1,26 @@
 use crate::bytecode::{
     BYTECODE_WORD_SIZE, CallOwnership, CodeAddr, Effect, Nav, NodeKindConstraint, PredicateOp,
-    SuccessorAddr,
+    SuccessorAddr, SwitchEntry,
 };
 use crate::core::NodeFieldId;
 use plotnik_runtime::PortId;
 
 use super::super::instructions::header_byte;
-use super::Instruction;
+use super::{Instruction, Module};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum DecodedInstr {
+    Switch(DecodedSwitch),
     Match(DecodedMatch),
     Call(DecodedCall),
     Return(PortId),
     Interior,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DecodedSwitch {
+    base: u32,
+    len: u16,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -66,9 +73,14 @@ pub(crate) struct DecodedProgram {
     effects: Vec<Effect>,
     neg_fields: Vec<NodeFieldId>,
     successors: Vec<SuccessorAddr>,
+    switch_entries: Vec<SwitchEntry>,
 }
 
 impl DecodedProgram {
+    pub(crate) fn switch_entries(&self, switch: &DecodedSwitch) -> &[SwitchEntry] {
+        &self.switch_entries[switch.base as usize..][..switch.len as usize]
+    }
+
     #[inline]
     pub(crate) fn instruction_at(&self, addr: CodeAddr) -> DecodedInstr {
         let instruction = self.words[u16::from(addr) as usize];
@@ -106,16 +118,27 @@ impl DecodedProgram {
     }
 }
 
-pub(crate) fn build(instructions: &[u8]) -> DecodedProgram {
+pub(crate) fn build(module: &Module) -> DecodedProgram {
+    let instructions = module.instructions_slice();
     let word_count = instructions.len() / BYTECODE_WORD_SIZE;
-    let mut program = DecodedProgram::default();
+    let mut program = DecodedProgram {
+        switch_entries: module.switch_tables().iter().collect(),
+        ..Default::default()
+    };
     program.words.reserve(word_count);
 
     let mut word_addr = 0usize;
     while word_addr < word_count {
         let bytes = &instructions[word_addr * BYTECODE_WORD_SIZE..];
         let opcode = header_byte::opcode(bytes[0]).expect("validated opcode");
-        match Instruction::from_bytes(bytes) {
+        match module.decode_instruction(CodeAddr::from(word_addr as u16)) {
+            Instruction::Switch { header, .. } => {
+                program.words.push(DecodedInstr::Switch(DecodedSwitch {
+                    base: header.table_offset / SwitchEntry::SIZE as u32,
+                    len: header.case_count,
+                }));
+                word_addr += 1;
+            }
             Instruction::Match(m) => {
                 let effects_base = pool_base(program.effects.len());
                 program.effects.extend(m.effects());

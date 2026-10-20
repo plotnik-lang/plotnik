@@ -51,6 +51,7 @@ pub(crate) struct StatePlan {
 
 #[derive(Clone, Debug)]
 pub(crate) enum StatePlanKind {
+    Switch(Vec<(NodeKindId, StateId, String)>),
     Epsilon {
         effects: Vec<EffectPlan>,
         flow: FlowPlan,
@@ -369,6 +370,13 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             }
         };
         let kind = match instruction {
+            InstructionIR::Switch(switch) => StatePlanKind::Switch(
+                self.dumper
+                    .switch_cases(switch)
+                    .into_iter()
+                    .map(|(kind, target, pattern)| (kind, resolve_state(self.ids, target), pattern))
+                    .collect(),
+            ),
             InstructionIR::Match(instruction) => self.match_state(instruction),
             InstructionIR::Call(instruction) => StatePlanKind::Call(self.call_state(instruction)),
             InstructionIR::Return(return_) => StatePlanKind::Return(return_.port),

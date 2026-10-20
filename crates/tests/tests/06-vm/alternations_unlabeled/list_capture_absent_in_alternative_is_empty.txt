@@ -47,7 +47,7 @@ Q = 00 :: T3
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _                                12, 16, 19
+  01  └─!  _                                15, 19
   03                                        ▶
   04   !   (variable_declarator) [Node ArrayPush]  06, 10
   06  ──!  _                                04, 06
@@ -55,18 +55,19 @@ Q:
   10  ─‣┘  _ [ListClose RecordSet(M0)]      14
   12   !   (lexical_declaration) [Absent RecordSet(M1)]  08
   14  ─‣┘  _                                03
-  15  ...
+  15   !   switch
+             (lexical_declaration)          12
+             (expression_statement)         16
   16   !   (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  14
-  19  ──!  _                                12, 16, 19
+  19  ──!  _                                15, 19
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
        ●   program
-  01       _                                12, 16, 19
+  01       _                                15, 19
        ●   expression_statement
-  12       (lexical_declaration) [Absent RecordSet(M1)]  08
-       ○   expression_statement
-  01  ❮❮❮ 
+  15   !   switch                           
+       ●   expression_statement
   16       (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  14
        ●   expression_statement
   14       _                                03

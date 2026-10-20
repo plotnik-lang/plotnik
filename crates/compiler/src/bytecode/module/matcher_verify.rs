@@ -116,6 +116,12 @@ pub(super) enum Instruction<A> {
     Return(Return),
 }
 
+impl<A> Instruction<A> {
+    pub(super) fn branch(successors: impl Into<Box<[A]>>) -> Self {
+        Self::Match(Match::new(Nav::Epsilon, Vec::new(), successors))
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Entry<A> {
     target: A,

@@ -21,24 +21,26 @@ Value = [
 ---------------------- NFA -----------------------
 [entrypoints]
 Q     = 07
-Value = 00
+Value = 04
 
 [transitions]
 Value:
-  00  -ε-                                   02, 03
   01                                        ▶
   02   !   (id)                             01
   03   !   (num)                            01
+  04   !   switch
+             (id)                           02
+             (num)                          03
 
 Q:
   06                                        ▶
   07   !   (block)                          12
   09  ─‣─  (ret)                            11
   10  ─‣┘² _                                06
-  11  └‣─  (Value)                          00 : 10
+  11  └‣─  (Value)                          04 : 10
   12  └‣─  (decl)                           14
   13  ─‣┘  _                                09
-  14  └‣─  (Value)                          00 : 13
+  14  └‣─  (Value)                          04 : 13
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -58,22 +60,24 @@ T0 = <NoValue>
 [type_names]
 
 [entrypoints]
-Q     = 02 :: T0
+Q     = 01 :: T0
 Value = 00 :: T0
 
 [instructions]
 Value:
-  00  -ε-                                   11, 12
+  00   !   switch
+             (id)                           10
+             (num)                          11
 
 Q:
-  02   !   (block)                          03
-  03  └‣─  (decl)                           04
-  04  └‣─  (Value)                          00 : 05
-  05  ─‣┘  _                                06
-  06  ─‣─  (ret)                            07
-  07  └‣─  (Value)                          00 : 08
-  08  ─‣┘² _                                09
+  01   !   (block)                          02
+  02  └‣─  (decl)                           03
+  03  └‣─  (Value)                          00 : 04
+  04  ─‣┘  _                                05
+  05  ─‣─  (ret)                            06
+  06  └‣─  (Value)                          00 : 07
+  07  ─‣┘² _                                08
+  08                                        ▶
   09                                        ▶
-  10                                        ▶
-  11   !   (id)                             10
-  12   !   (num)                            10
+  10   !   (id)                             09
+  11   !   (num)                            09

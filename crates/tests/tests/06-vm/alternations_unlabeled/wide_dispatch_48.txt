@@ -1,0 +1,342 @@
+Choice = [
+  (identifier)
+  (arguments)
+  (array)
+  (array_pattern)
+  (arrow_function)
+  (assignment_expression)
+  (assignment_pattern)
+  (augmented_assignment_expression)
+  (await_expression)
+  (binary_expression)
+  (break_statement)
+  (call_expression)
+  (catch_clause)
+  (class)
+  (class_body)
+  (class_declaration)
+  (class_heritage)
+  (class_static_block)
+  (computed_property_name)
+  (continue_statement)
+  (debugger_statement)
+  (decorator)
+  (do_statement)
+  (else_clause)
+  (empty_statement)
+  (export_clause)
+  (export_specifier)
+  (export_statement)
+  (expression_statement)
+  (field_definition)
+  (finally_clause)
+  (for_in_statement)
+  (for_statement)
+  (formal_parameters)
+  (function_declaration)
+  (function_expression)
+  (generator_function)
+  (generator_function_declaration)
+  (if_statement)
+  (import)
+  (import_attribute)
+  (import_clause)
+  (import_specifier)
+  (import_statement)
+  (jsx_attribute)
+  (jsx_closing_element)
+  (jsx_element)
+  (number)
+] @node
+
+Q = (program
+  (expression_statement
+    (Choice) @value
+  )* @items
+)
+--------------------- INPUT ----------------------
+"miss"; 42; x;
+--------------------- OUTPUT ---------------------
+{
+  "items": [
+    {
+      "value": {
+        "node": {
+          "kind": "number",
+          "span": [8, 10],
+          "text": "42"
+        }
+      }
+    },
+    {
+      "value": {
+        "node": {
+          "kind": "identifier",
+          "span": [12, 13],
+          "text": "x"
+        }
+      }
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "node"
+S02 "value"
+S03 "items"
+S04 "Choice"
+S05 "QItems"
+S06 "Q"
+S07 "identifier"
+S08 "arguments"
+S09 "array"
+S10 "array_pattern"
+S11 "arrow_function"
+S12 "assignment_expression"
+S13 "assignment_pattern"
+S14 "augmented_assignment_expression"
+S15 "await_expression"
+S16 "binary_expression"
+S17 "break_statement"
+S18 "call_expression"
+S19 "catch_clause"
+S20 "class"
+S21 "class_body"
+S22 "class_declaration"
+S23 "class_heritage"
+S24 "class_static_block"
+S25 "computed_property_name"
+S26 "continue_statement"
+S27 "debugger_statement"
+S28 "decorator"
+S29 "do_statement"
+S30 "else_clause"
+S31 "empty_statement"
+S32 "export_clause"
+S33 "export_specifier"
+S34 "export_statement"
+S35 "expression_statement"
+S36 "field_definition"
+S37 "finally_clause"
+S38 "for_in_statement"
+S39 "for_statement"
+S40 "formal_parameters"
+S41 "function_declaration"
+S42 "function_expression"
+S43 "generator_function"
+S44 "generator_function_declaration"
+S45 "if_statement"
+S46 "import"
+S47 "import_attribute"
+S48 "import_clause"
+S49 "import_specifier"
+S50 "import_statement"
+S51 "jsx_attribute"
+S52 "jsx_closing_element"
+S53 "jsx_element"
+S54 "number"
+S55 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { node }
+T2 = Record  M1:1  ; { value }
+T3 = ListZeroOrMore(T2)  ; QItems*
+T4 = Record  M2:1  ; { items }
+
+[type_members]
+M0: S01 → T0  ; node: <Node>
+M1: S02 → T1  ; value: Choice
+M2: S03 → T3  ; items: T3
+
+[type_names]
+N0: S04 → T1  ; Choice
+N1: S05 → T2  ; QItems
+N2: S06 → T4  ; Q
+
+[entrypoints]
+Choice = 000 :: T1
+Q      = 001 :: T4
+
+[instructions]
+Choice:
+  000   !   switch
+              (identifier)                  009
+              (arguments)                   011
+              (array)                       013
+              (array_pattern)               016
+              (arrow_function)              018
+              (assignment_expression)       020
+              (assignment_pattern)          022
+              (augmented_assignment_expression)  024
+              (await_expression)            026
+              (binary_expression)           028
+              (break_statement)             030
+              (call_expression)             032
+              (catch_clause)                034
+              (class)                       036
+              (class_body)                  038
+              (class_declaration)           040
+              (class_heritage)              042
+              (class_static_block)          044
+              (computed_property_name)      046
+              (continue_statement)          048
+              (debugger_statement)          050
+              (decorator)                   052
+              (do_statement)                054
+              (else_clause)                 056
+              (empty_statement)             058
+              (export_clause)               060
+              (export_specifier)            062
+              (export_statement)            064
+              (expression_statement)        066
+              (field_definition)            068
+              (finally_clause)              070
+              (for_in_statement)            072
+              (for_statement)               074
+              (formal_parameters)           076
+              (function_declaration)        078
+              (function_expression)         080
+              (generator_function)          082
+              (generator_function_declaration)  084
+              (if_statement)                086
+              (import)                      088
+              (import_attribute)            090
+              (import_clause)               092
+              (import_specifier)            094
+              (import_statement)            096
+              (jsx_attribute)               098
+              (jsx_closing_element)         100
+              (jsx_element)                 102
+              (number)                      104
+
+Q:
+  001   !   (program)                       002
+  002  -ε-  [ListOpen]                      116, 107
+  004  -ε-  [RecordClose]                   006
+  006  ─‣┘  _ [RecordSet(M1)]               109
+  008                                       ▶
+  009   !   (identifier) [Node RecordSet(M0)]  008
+  011   !   (arguments) [Node RecordSet(M0)]  008
+  013   !   (array) [Node RecordSet(M0)]    008
+  015  ...
+  016   !   (array_pattern) [Node RecordSet(M0)]  008
+  018   !   (arrow_function) [Node RecordSet(M0)]  008
+  020   !   (assignment_expression) [Node RecordSet(M0)]  008
+  022   !   (assignment_pattern) [Node RecordSet(M0)]  008
+  024   !   (augmented_assignment_expression) [Node RecordSet(M0)]  008
+  026   !   (await_expression) [Node RecordSet(M0)]  008
+  028   !   (binary_expression) [Node RecordSet(M0)]  008
+  030   !   (break_statement) [Node RecordSet(M0)]  008
+  032   !   (call_expression) [Node RecordSet(M0)]  008
+  034   !   (catch_clause) [Node RecordSet(M0)]  008
+  036   !   (class) [Node RecordSet(M0)]    008
+  038   !   (class_body) [Node RecordSet(M0)]  008
+  040   !   (class_declaration) [Node RecordSet(M0)]  008
+  042   !   (class_heritage) [Node RecordSet(M0)]  008
+  044   !   (class_static_block) [Node RecordSet(M0)]  008
+  046   !   (computed_property_name) [Node RecordSet(M0)]  008
+  048   !   (continue_statement) [Node RecordSet(M0)]  008
+  050   !   (debugger_statement) [Node RecordSet(M0)]  008
+  052   !   (decorator) [Node RecordSet(M0)]  008
+  054   !   (do_statement) [Node RecordSet(M0)]  008
+  056   !   (else_clause) [Node RecordSet(M0)]  008
+  058   !   (empty_statement) [Node RecordSet(M0)]  008
+  060   !   (export_clause) [Node RecordSet(M0)]  008
+  062   !   (export_specifier) [Node RecordSet(M0)]  008
+  064   !   (export_statement) [Node RecordSet(M0)]  008
+  066   !   (expression_statement) [Node RecordSet(M0)]  008
+  068   !   (field_definition) [Node RecordSet(M0)]  008
+  070   !   (finally_clause) [Node RecordSet(M0)]  008
+  072   !   (for_in_statement) [Node RecordSet(M0)]  008
+  074   !   (for_statement) [Node RecordSet(M0)]  008
+  076   !   (formal_parameters) [Node RecordSet(M0)]  008
+  078   !   (function_declaration) [Node RecordSet(M0)]  008
+  080   !   (function_expression) [Node RecordSet(M0)]  008
+  082   !   (generator_function) [Node RecordSet(M0)]  008
+  084   !   (generator_function_declaration) [Node RecordSet(M0)]  008
+  086   !   (if_statement) [Node RecordSet(M0)]  008
+  088   !   (import) [Node RecordSet(M0)]   008
+  090   !   (import_attribute) [Node RecordSet(M0)]  008
+  092   !   (import_clause) [Node RecordSet(M0)]  008
+  094   !   (import_specifier) [Node RecordSet(M0)]  008
+  096   !   (import_statement) [Node RecordSet(M0)]  008
+  098   !   (jsx_attribute) [Node RecordSet(M0)]  008
+  100   !   (jsx_closing_element) [Node RecordSet(M0)]  008
+  102   !   (jsx_element) [Node RecordSet(M0)]  008
+  104   !   (number) [Node RecordSet(M0)]   008
+  106                                       ▶
+  107  -ε-  [ListClose RecordSet(M2)]       106
+  109  -ε-  [RecordClose ArrayPush]         114, 118
+  111  └‣─  (Choice)                        000 : 004
+  112   !   (expression_statement) [RecordOpen RecordOpen]  111
+  114  ──!  _                               112, 114
+  116  └─!  _                               112, 114
+  118  ─‣┘  _ [ListClose RecordSet(M2)]     106
+--------------------- TRACE ----------------------
+Q:
+  001       (program)                       02
+        ●   program
+  002  -ε-  [ListOpen]                      116, 107
+  116       _                               112, 114
+        ●   expression_statement
+  112       (expression_statement) [RecordOpen RecordOpen]  111
+        ●   expression_statement
+  111       (Choice)                        00 : 04
+        ▶   (Choice)
+
+Choice:
+  000   !   switch                          
+        ○   string
+  111  ❮❮❮ 
+        ▶   (Choice)
+
+Choice:
+  000   !   switch                          
+        ○   ;
+  111  ❮❮❮ 
+  116  ❮❮❮ 
+  114       _                               112, 114
+        ●   expression_statement
+  112       (expression_statement) [RecordOpen RecordOpen]  111
+        ●   expression_statement
+  111       (Choice)                        00 : 04
+        ▶   (Choice)
+
+Choice:
+  000   !   switch                          
+        ●   number
+  104       (number) [Node RecordSet(M0)]   08
+        ●   number
+  008   ◀   (Choice)                        
+
+Q:
+  004  -ε-  [RecordClose]                   06
+  006       _ [RecordSet(M1)]               109
+        ●   expression_statement
+  109  -ε-  [RecordClose ArrayPush]         114, 118
+  114       _                               112, 114
+        ●   expression_statement
+  112       (expression_statement) [RecordOpen RecordOpen]  111
+        ●   expression_statement
+  111       (Choice)                        00 : 04
+        ▶   (Choice)
+
+Choice:
+  000   !   switch                          
+        ●   identifier
+  009       (identifier) [Node RecordSet(M0)]  08
+        ●   identifier
+  008   ◀   (Choice)                        
+
+Q:
+  004  -ε-  [RecordClose]                   06
+  006       _ [RecordSet(M1)]               109
+        ●   expression_statement
+  109  -ε-  [RecordClose ArrayPush]         114, 118
+  114       _                               112, 114
+  109  ❮❮❮ 
+  118       _ [ListClose RecordSet(M2)]     106
+        ●   program
+  106   ◀   (Q)                             ◼

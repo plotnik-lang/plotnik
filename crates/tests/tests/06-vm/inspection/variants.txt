@@ -201,7 +201,7 @@ N1: S07 → T4  ; Q
 
 [entrypoints]
 Expr = 00 :: T3
-Q    = 02 :: T4
+Q    = 03 :: T4
 
 [spans]
 P00 def        0..54  source_id=0  T3
@@ -220,13 +220,15 @@ P12 ref        93..99  source_id=0  T3
 
 [instructions]
 Expr:
-  00  -ε-  [SpanStart#0]                    16, 24
+  00  -ε-  [SpanStart#0]                    02
+  02   !   switch
+             (identifier)                   16
+             (number)                       24
 
 Q:
-  02   !   (program) [SpanStart#8 SpanStartAt#9]  04
-  04  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  06
-  06  └‣─  (Expr)                           00 : 08
-  07  ...
+  03   !   (program) [SpanStart#8 SpanStartAt#9]  05
+  05  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  07
+  07  └‣─  (Expr)                           00 : 08
   08  ─‣┘  _ [SpanStart#11 RecordSet(M4) SpanEnd#11 SpanEnd#12]  11
   11  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  13
   13                                        ▶
@@ -238,18 +240,17 @@ Q:
   24   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
 --------------------- TRACE ----------------------
 Q:
-  02       (program) [SpanStart#8 SpanStartAt#9]  04
+  03       (program) [SpanStart#8 SpanStartAt#9]  05
        ●   program
-  04       (expression_statement) [SpanStartAt#10 SpanStart#12]  06
+  05       (expression_statement) [SpanStartAt#10 SpanStart#12]  07
        ●   expression_statement
-  06       (Expr)                           00 : 08
+  07       (Expr)                           00 : 08
        ▶   (Expr)
 
 Expr:
-  00  -ε-  [SpanStart#0]                    16, 24
-  16       (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
-       ○   number
-  00  ❮❮❮ 
+  00  -ε-  [SpanStart#0]                    02
+  02   !   switch                           
+       ●   number
   24       (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node RecordSet(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
        ●   number
   14   ◀   (Expr)                           

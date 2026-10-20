@@ -23,21 +23,23 @@ Value = [
 ---------------------- NFA -----------------------
 [entrypoints]
 Q     = 07
-Value = 00
+Value = 04
 
 [transitions]
 Value:
-  00  -ε-                                   02, 03
   01                                        ▶
   02   !   (id)                             01
   03   !   (num)                            01
+  04   !   switch
+             (id)                           02
+             (num)                          03
 
 Q:
   06                                        ▶
   07   !   (assign)                         10
   08  ─‣┘  _                                06
-  09  ─‣─  value: (Value)                   00 : 08
-  10  └‣─  name: (Value)                    00 : 09
+  09  ─‣─  value: (Value)                   04 : 08
+  10  └‣─  name: (Value)                    04 : 09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -57,19 +59,21 @@ T0 = <NoValue>
 [type_names]
 
 [entrypoints]
-Q     = 2 :: T0
+Q     = 1 :: T0
 Value = 0 :: T0
 
 [instructions]
 Value:
-  0  -ε-                                    8, 9
+  0   !   switch
+            (id)                            7
+            (num)                           8
 
 Q:
-  2   !   (assign)                          3
-  3  └‣─  name: (Value)                     0 : 4
-  4  ─‣─  value: (Value)                    0 : 5
-  5  ─‣┘  _                                 6
+  1   !   (assign)                          2
+  2  └‣─  name: (Value)                     0 : 3
+  3  ─‣─  value: (Value)                    0 : 4
+  4  ─‣┘  _                                 5
+  5                                         ▶
   6                                         ▶
-  7                                         ▶
-  8   !   (id)                              7
-  9   !   (num)                             7
+  7   !   (id)                              6
+  8   !   (num)                             6

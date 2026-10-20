@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use crate::bytecode::{Nav, NodeKindConstraint};
-use crate::core::NodeFieldId;
+use crate::core::{NodeFieldId, NodeKindId};
 
 use crate::compiler::lower::ir::{
     CallEntry, EffectIR, InstructionIR, Label, MatchIR, NfaGraph, PredicateIR,
@@ -40,6 +40,7 @@ enum SuccKey {
 
 #[derive(PartialEq, Eq, Hash)]
 enum StateKey {
+    Switch(Vec<(NodeKindId, SuccKey)>),
     Match {
         nav: Nav,
         node_kind: NodeKindConstraint,
@@ -59,9 +60,18 @@ enum StateKey {
 
 impl StateKey {
     fn of(instr: &InstructionIR, norm: SuccNorm) -> Option<Self> {
+        let successor_key = |target| match norm {
+            SuccNorm::SelfLoop if target == instr.label() => SuccKey::SelfLoop,
+            _ => SuccKey::Other(target),
+        };
+
         match instr {
+            InstructionIR::Switch(s) => Some(Self::Switch(
+                s.cases()
+                    .map(|(kind, target)| (kind, successor_key(target)))
+                    .collect(),
+            )),
             InstructionIR::Match(MatchIR {
-                label,
                 nav,
                 node_kind,
                 node_field,
@@ -70,6 +80,7 @@ impl StateKey {
                 neg_fields,
                 predicate,
                 successors,
+                ..
             }) => Some(Self::Match {
                 nav: *nav,
                 node_kind: *node_kind,
@@ -78,24 +89,11 @@ impl StateKey {
                 effects: effects.clone(),
                 neg_fields: neg_fields.clone(),
                 predicate: predicate.clone(),
-                successors: successors
-                    .iter()
-                    .map(|&s| match norm {
-                        SuccNorm::SelfLoop if s == *label => SuccKey::SelfLoop,
-                        _ => SuccKey::Other(s),
-                    })
-                    .collect(),
+                successors: successors.iter().copied().map(successor_key).collect(),
             }),
             InstructionIR::Call(c) => Some(Self::Call {
                 entry: c.entry,
-                returns: c
-                    .returns
-                    .iter()
-                    .map(|&s| match norm {
-                        SuccNorm::SelfLoop if s == c.label => SuccKey::SelfLoop,
-                        _ => SuccKey::Other(s),
-                    })
-                    .collect(),
+                returns: c.returns.iter().copied().map(successor_key).collect(),
                 target: c.target,
             }),
             InstructionIR::Return(_) => None,
@@ -139,6 +137,7 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
 
     for instr in &mut nfa.instructions {
         match instr {
+            InstructionIR::Switch(s) => s.remap_targets(resolve),
             InstructionIR::Match(m) => {
                 for succ in &mut m.successors {
                     *succ = resolve(*succ);

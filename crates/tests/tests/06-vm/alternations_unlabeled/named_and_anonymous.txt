@@ -1,0 +1,80 @@
+Q = (program
+  (expression_statement
+    (binary_expression
+      [
+        (number)
+        "+"
+      ] @v
+    )
+  )
+)
+--------------------- INPUT ----------------------
+a + 1;
+--------------------- OUTPUT ---------------------
+{
+  "v": {
+    "kind": "+",
+    "span": [2, 3],
+    "text": "+"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "v"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "binary_expression"
+S6 "number"
+S7 "+"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { v }
+
+[type_members]
+M0: S1 → T0  ; v: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (binary_expression)              03
+  03  └─!  _                                10, 11
+  05                                        ▶
+  06   !   (number) [Node RecordSet(M0)]    13
+  08   !   "+" [Node RecordSet(M0)]         13
+  10   !   switch
+             (number)                       06
+             "+"                            08
+  11  ──!  _                                10, 11
+  13  ─‣┘³ _                                05
+--------------------- TRACE ----------------------
+Q:
+  00       (program)                        01
+       ●   program
+  01       (expression_statement)           02
+       ●   expression_statement
+  02       (binary_expression)              03
+       ●   binary_expression
+  03       _                                10, 11
+       ●   identifier
+  10   !   switch                           
+       ○   identifier
+  03  ❮❮❮ 
+  11       _                                10, 11
+       ●   +
+  10   !   switch                           
+       ●   +
+  08       "+" [Node RecordSet(M0)]         13
+       ●   +
+  13       _                                05
+       ●   program
+  05   ◀   (Q)                              ◼

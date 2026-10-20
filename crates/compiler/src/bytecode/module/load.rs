@@ -24,6 +24,8 @@ pub enum ModuleError {
     SizeMismatch { header: u32, actual: usize },
     #[error("malformed header: reserved bytes must be zero")]
     MalformedHeader,
+    #[error("malformed switch table")]
+    MalformedSwitchTable,
     #[error("section out of bounds: header counts exceed the {total}-byte buffer")]
     SectionOutOfBounds { total: u32 },
     #[error("non-zero section padding")]
@@ -138,13 +140,21 @@ impl Module {
         }
         #[cfg(not(debug_assertions))]
         let _ = is_start;
-        module.decoded = decoded::build(module.instructions_slice());
+        module.decoded = decoded::build(&module);
         Ok(module)
     }
 
     fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
-        if self.header._reserved != [0u8; 20] {
+        if self.header._reserved != [0u8; 16] {
             return Err(ModuleError::MalformedHeader);
+        }
+
+        if !self
+            .header
+            .switch_tables_size
+            .is_multiple_of(SwitchEntry::SIZE as u32)
+        {
+            return Err(ModuleError::MalformedSwitchTable);
         }
 
         let computed = crc32fast::hash(&self.storage[HEADER_SIZE..]);
@@ -509,6 +519,13 @@ impl Module {
         let mut is_start = vec![false; word_count as usize];
         let mut targets: Vec<CodeAddr> = Vec::new();
 
+        let switch_tables = self.switch_tables();
+        for &bytes in switch_tables.raw {
+            let entry =
+                SwitchEntry::try_from_bytes(bytes).ok_or(ModuleError::MalformedSwitchTable)?;
+            targets.push(CodeAddr::from(u16::from(entry.target)));
+        }
+
         let mut addr = CodeAddr::ZERO;
         while addr.get() < word_count {
             is_start[addr.as_usize()] = true;
@@ -526,6 +543,24 @@ impl Module {
                 return Err(ModuleError::MalformedInstructionStream);
             }
             match opcode {
+                Opcode::Switch => {
+                    if header & 0xf0 != 0 || read_u8(instr_off + 1)? != 0 {
+                        return Err(ModuleError::MalformedInstructionStream);
+                    }
+
+                    let switch = Switch::from_bytes(&storage[instr_off..instr_off + 8]);
+                    let table = switch_tables
+                        .get_run(&switch)
+                        .ok_or(ModuleError::MalformedInstructionStream)?;
+                    let mut previous = None;
+                    for entry in table.iter() {
+                        if previous.is_some_and(|prev| prev >= entry.kind) {
+                            return Err(ModuleError::MalformedSwitchTable);
+                        }
+
+                        previous = Some(entry.kind);
+                    }
+                }
                 Opcode::Return => {
                     if PortId::from_byte(read_u8(instr_off + 1)?).is_none() {
                         return Err(ModuleError::MalformedInstructionStream);

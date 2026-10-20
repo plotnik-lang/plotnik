@@ -15,7 +15,10 @@ Q:
   3  ─‣┘  _                                 1
   4   !   (statement_block) [Absent RecordSet(b) Node RecordSet(a)]  3
   5   !   (class_declaration) [Absent RecordSet(a) Node RecordSet(b)]  3
-  7  └‣─  body: _                           4, 5
+  6   !   switch
+            (statement_block)               4
+            (class_declaration)             5
+  7  └‣─  body: _                           6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -45,7 +48,10 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (function_declaration)           01
-  01  └‣─  body: _                          04, 08
+  01  └‣─  body: _                          02
+  02   !   switch
+             (statement_block)              04
+             (class_declaration)            08
   03                                        ▶
   04   !   (statement_block) [Absent RecordSet(M1) Node RecordSet(M0)]  07
   07  ─‣┘  _                                03

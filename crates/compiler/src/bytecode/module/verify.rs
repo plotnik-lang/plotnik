@@ -34,6 +34,15 @@ pub(crate) fn validate(module: &Module) -> Result<(), ModuleError> {
     let mut address = CodeAddr::ZERO;
     while address.get() < module.header().instruction_word_count {
         let (instruction, words) = match module.decode_instruction(address) {
+            Instruction::Switch { entries, .. } => (
+                VerifyInstruction::branch(
+                    entries
+                        .iter()
+                        .map(|entry| CodeAddr::from(u16::from(entry.target)))
+                        .collect::<Vec<_>>(),
+                ),
+                1,
+            ),
             Instruction::Match(matched) => {
                 let effects = matched
                     .effects()

@@ -6,7 +6,7 @@ use super::{
     STRING_TABLE_ENTRY_SIZE, VERSION,
 };
 
-pub(crate) const SECTION_COUNT: usize = 12;
+pub(crate) const SECTION_COUNT: usize = 13;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C, align(64))]
@@ -30,7 +30,8 @@ pub struct Header {
 
     pub spans_count: u16,
 
-    pub _reserved: [u8; 20],
+    pub switch_tables_size: u32,
+    pub _reserved: [u8; 16],
 }
 
 const _: () = assert!(std::mem::size_of::<Header>() == HEADER_SIZE);
@@ -54,7 +55,8 @@ impl Default for Header {
             entrypoints_count: 0,
             instruction_word_count: 0,
             spans_count: 0,
-            _reserved: [0; 20],
+            switch_tables_size: 0,
+            _reserved: [0; 16],
         }
     }
 }
@@ -72,6 +74,7 @@ pub struct SectionOffsets {
     pub(crate) type_names: u32,
     pub(crate) entrypoints: u32,
     pub(crate) instructions: u32,
+    pub(crate) switch_tables: u32,
     pub(crate) spans: u32,
 }
 
@@ -89,7 +92,8 @@ impl SectionOffsets {
             type_names: o[8],
             entrypoints: o[9],
             instructions: o[10],
-            spans: o[11],
+            switch_tables: o[11],
+            spans: o[12],
         }
     }
 
@@ -106,6 +110,7 @@ impl SectionOffsets {
             self.type_names,
             self.entrypoints,
             self.instructions,
+            self.switch_tables,
             self.spans,
         ]
     }
@@ -115,8 +120,8 @@ impl Header {
     pub fn from_bytes(bytes: &[u8]) -> Self {
         assert!(bytes.len() >= HEADER_SIZE, "header too short");
 
-        let mut reserved = [0u8; 20];
-        reserved.copy_from_slice(&bytes[44..HEADER_SIZE]);
+        let mut reserved = [0u8; 16];
+        reserved.copy_from_slice(&bytes[48..HEADER_SIZE]);
 
         Self {
             magic: [bytes[0], bytes[1], bytes[2], bytes[3]],
@@ -135,6 +140,9 @@ impl Header {
             entrypoints_count: u16::from_le_bytes([bytes[38], bytes[39]]),
             instruction_word_count: u16::from_le_bytes([bytes[40], bytes[41]]),
             spans_count: u16::from_le_bytes([bytes[42], bytes[43]]),
+            switch_tables_size: u32::from_le_bytes(
+                bytes[44..48].try_into().expect("switch tables size"),
+            ),
             _reserved: reserved,
         }
     }
@@ -157,7 +165,8 @@ impl Header {
         bytes[38..40].copy_from_slice(&self.entrypoints_count.to_le_bytes());
         bytes[40..42].copy_from_slice(&self.instruction_word_count.to_le_bytes());
         bytes[42..44].copy_from_slice(&self.spans_count.to_le_bytes());
-        bytes[44..HEADER_SIZE].copy_from_slice(&self._reserved);
+        bytes[44..48].copy_from_slice(&self.switch_tables_size.to_le_bytes());
+        bytes[48..HEADER_SIZE].copy_from_slice(&self._reserved);
         bytes
     }
 
@@ -182,6 +191,7 @@ impl Header {
             self.type_names_count as u64 * TypeNameEntry::SIZE as u64,
             self.entrypoints_count as u64 * Entrypoint::SIZE as u64,
             self.instruction_word_count as u64 * BYTECODE_WORD_SIZE as u64,
+            self.switch_tables_size as u64,
             self.spans_count as u64 * SPAN_ENTRY_SIZE as u64,
         ]
     }

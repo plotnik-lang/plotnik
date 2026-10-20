@@ -229,8 +229,9 @@ mod matcher {
     const S05_Q: u16 = 3;
     const S06_Q: u16 = 4;
     const S07_Q: u16 = 5;
-    const S10_Q: u16 = 6;
-    const S11_Q: u16 = 7;
+    const S08_Q: u16 = 6;
+    const S10_Q: u16 = 7;
+    const S11_Q: u16 = 8;
 
     /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
@@ -433,21 +434,29 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(num)
                 Flow::Jump(S05_Q)
             }
-            //   10  ──!  _                                06, 07, 10
+            //   08   !   switch
+            //              (identifier)                   06
+            //              (number)                       07
+            S08_Q => match eng.node().kind_id() {
+                1 => Flow::Jump(S06_Q),   // (identifier)
+                114 => Flow::Jump(S07_Q), // (number)
+                _ => Flow::Backtrack,
+            },
+            //   10  ──!  _                                08, 10
             S10_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_successors(&[S07_Q, S10_Q]);
-                Flow::Jump(S06_Q)
+                eng.push_successors(&[S10_Q]);
+                Flow::Jump(S08_Q)
             }
-            //   11  └─!  _                                06, 07, 10
+            //   11  └─!  _                                08, 10
             S11_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::DownExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_successors(&[S07_Q, S10_Q]);
-                Flow::Jump(S06_Q)
+                eng.push_successors(&[S10_Q]);
+                Flow::Jump(S08_Q)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
         }

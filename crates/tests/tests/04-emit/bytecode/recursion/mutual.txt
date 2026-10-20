@@ -6,12 +6,11 @@ Even = [
 ]
 ---------------------- NFA -----------------------
 [entrypoints]
-Even = 00
+Even = 17
 Odd  = 07
 
 [transitions]
 Even:
-  00  -ε-                                   02, 03
   01                                        ▶
   02   !   (number) [Absent RecordSet(next) Node RecordSet(leaf)]  01
   03   !   (array) [Absent RecordSet(leaf) RecordOpen]  15
@@ -22,11 +21,14 @@ Odd:
   07   !   (array) [RecordOpen]             11
   08  ─‣┘  _ [RecordSet(next)]              06
   10  -ε-  [RecordClose]                    08
-  11  └‣─  (Even)                           00 : 10
+  11  └‣─  (Even)                           17 : 10
 
 Even:
   14  -ε-  [RecordClose]                    04
   15  └‣─  (Odd)                            07 : 14
+  17   !   switch
+             (number)                       02
+             (array)                        03
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -55,22 +57,23 @@ N1: S4 → T2  ; Odd
 
 [entrypoints]
 Even = 00 :: T4
-Odd  = 02 :: T2
+Odd  = 01 :: T2
 
 [instructions]
 Even:
-  00  -ε-                                   16, 20
+  00   !   switch
+             (array)                        14
+             (number)                       16
 
 Odd:
-  02   !   (array) [RecordOpen]             04
-  04  └‣─  (Even)                           00 : 05
-  05  -ε-  [RecordClose]                    08
-  07  ...
-  08  ─‣┘  _ [RecordSet(M0)]                10
-  10                                        ▶
-  11  -ε-  [RecordClose]                    13
-  13  ─‣┘  _ [RecordSet(M2)]                15
-  15                                        ▶
-  16   !   (number) [Absent RecordSet(M2) Node RecordSet(M1)]  15
-  19  └‣─  (Odd)                            02 : 11
-  20   !   (array) [Absent RecordSet(M1) RecordOpen]  19
+  01   !   (array) [RecordOpen]             03
+  03  └‣─  (Even)                           00 : 04
+  04  -ε-  [RecordClose]                    06
+  06  ─‣┘  _ [RecordSet(M0)]                08
+  08                                        ▶
+  09  -ε-  [RecordClose]                    11
+  11  ─‣┘  _ [RecordSet(M2)]                13
+  13                                        ▶
+  14   !   (array) [Absent RecordSet(M1) RecordOpen]  19
+  16   !   (number) [Absent RecordSet(M2) Node RecordSet(M1)]  13
+  19  └‣─  (Odd)                            01 : 09

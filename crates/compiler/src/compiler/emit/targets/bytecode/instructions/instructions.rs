@@ -2,37 +2,40 @@ use std::collections::BTreeMap;
 
 use crate::bytecode::{
     BYTECODE_WORD_SIZE, Call, CallOwnership, CalleeContract, CodeAddr, Effect, MatchInstr,
-    MatchPredicate, Return, SuccessorAddr,
+    MatchPredicate, Return, SuccessorAddr, Switch, SwitchEntry,
 };
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{ConstantPool, EmitError};
 use crate::compiler::lower::ir::{
     CallIR, CalleeEntryContract, EffectArg, EffectIR, InstructionIR, Label, MatchIR, NfaGraph,
+    SwitchIR,
 };
 
 pub fn emit_instructions(
     nfa: &NfaGraph,
     layout: &LayoutMap,
     pool: ConstantPool<'_>,
-) -> Result<Vec<u8>, EmitError> {
+) -> Result<(Vec<u8>, Vec<u8>), EmitError> {
     let mut bytes = vec![0u8; layout.total_words() as usize * BYTECODE_WORD_SIZE];
+    let mut switch_tables = Vec::new();
 
     for instr in nfa.instructions() {
         let label = instr.label();
-        let Some(&code_addr) = layout.code_addrs().get(&label) else {
-            continue;
-        };
+        let code_addr = layout
+            .code_addrs()
+            .get(&label)
+            .copied()
+            .expect("layout contains every lowered instruction");
 
         let offset = u16::from(code_addr) as usize * BYTECODE_WORD_SIZE;
-        let resolved = resolve_instruction(instr, nfa, layout.code_addrs(), pool)?;
+        let resolved =
+            resolve_instruction(instr, nfa, layout.code_addrs(), pool, &mut switch_tables)?;
 
         let end = offset + resolved.len();
-        if end <= bytes.len() {
-            bytes[offset..end].copy_from_slice(&resolved);
-        }
+        bytes[offset..end].copy_from_slice(&resolved);
     }
 
-    Ok(bytes)
+    Ok((bytes, switch_tables))
 }
 
 fn resolve_instruction(
@@ -40,8 +43,10 @@ fn resolve_instruction(
     nfa: &NfaGraph,
     map: &BTreeMap<Label, CodeAddr>,
     pool: ConstantPool<'_>,
+    switch_tables: &mut Vec<u8>,
 ) -> Result<Vec<u8>, EmitError> {
     match instr {
+        InstructionIR::Switch(switch) => resolve_switch(switch, map, switch_tables),
         InstructionIR::Match(m) => resolve_match(m, map, pool),
         InstructionIR::Call(c) => Ok(resolve_call(c, nfa, map)),
         InstructionIR::Return(return_) => {
@@ -57,6 +62,37 @@ fn resolve_instruction(
                 .to_vec())
         }
     }
+}
+
+fn resolve_switch(
+    switch: &SwitchIR,
+    map: &BTreeMap<Label, CodeAddr>,
+    tables: &mut Vec<u8>,
+) -> Result<Vec<u8>, EmitError> {
+    let mut cases = switch.cases().collect::<Vec<_>>();
+    cases.sort_unstable_by_key(|case| case.0);
+
+    let size = tables.len() + cases.len() * SwitchEntry::SIZE;
+    if size > u32::MAX as usize {
+        return Err(EmitError::SectionTooLarge {
+            section: "switch tables",
+            size,
+        });
+    }
+
+    let instruction = Switch {
+        table_offset: tables.len() as u32,
+        case_count: u16::try_from(cases.len())
+            .expect("case count is bounded by the instruction address space"),
+    };
+
+    for (kind, target) in cases {
+        let target = SuccessorAddr::try_from(target.resolve(map))
+            .expect("switch successor address must be non-zero");
+        tables.extend_from_slice(&SwitchEntry { kind, target }.to_bytes());
+    }
+
+    Ok(instruction.to_bytes().to_vec())
 }
 
 fn resolve_match(

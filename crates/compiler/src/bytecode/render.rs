@@ -104,6 +104,10 @@ impl ModuleRenderContext {
         MatchRenderer::new(self, MissingSymbolPolicy::Dump).format_match_content(m)
     }
 
+    pub(crate) fn dump_node_kind(&self, kind: NodeKindConstraint) -> String {
+        MatchRenderer::new(self, MissingSymbolPolicy::Dump).format_node_kind(kind)
+    }
+
     pub(crate) fn trace_match_content(&self, m: &Match<'_>) -> String {
         MatchRenderer::new(self, MissingSymbolPolicy::Trace).format_match_content(m)
     }
@@ -172,31 +176,24 @@ impl<'a> MatchRenderer<'a> {
             return result;
         }
 
-        match m.node_kind {
-            NodeKindConstraint::Any => {
-                result.push('_');
-            }
-            NodeKindConstraint::Named(None) => {
-                result.push_str("(_)");
-            }
+        result.push_str(&self.format_node_kind(m.node_kind));
+        result
+    }
+
+    fn format_node_kind(&self, kind: NodeKindConstraint) -> String {
+        match kind {
+            NodeKindConstraint::Any => "_".to_string(),
+            NodeKindConstraint::Named(None) => "(_)".to_string(),
             NodeKindConstraint::Named(Some(id)) => {
                 let name = self.format_node_kind_name(id, "node");
-                result.push('(');
-                result.push_str(&name);
-                result.push(')');
+                format!("({name})")
             }
-            NodeKindConstraint::Anonymous(None) => {
-                result.push_str("\"_\"");
-            }
+            NodeKindConstraint::Anonymous(None) => "\"_\"".to_string(),
             NodeKindConstraint::Anonymous(Some(id)) => {
                 let name = self.format_node_kind_name(id, "anon");
-                result.push('"');
-                result.push_str(&name);
-                result.push('"');
+                format!("\"{name}\"")
             }
         }
-
-        result
     }
 
     fn format_missing(&self, kind: NodeKindConstraint) -> String {

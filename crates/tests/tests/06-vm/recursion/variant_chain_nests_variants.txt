@@ -69,70 +69,68 @@ N1: S07 → T4  ; Q
 
 [entrypoints]
 Chain = 00 :: T3
-Q     = 02 :: T4
+Q     = 01 :: T4
 
 [instructions]
 Chain:
-  00  -ε-                                   12, 16
+  00   !   switch
+             (identifier)                   11
+             (call_expression)              14
 
 Q:
-  02   !   (program)                        03
-  03  └‣─  (expression_statement)           04
-  04  └‣─  (Chain)                          00 : 05
-  05  ─‣┘² _ [RecordSet(M4)]                07
-  07                                        ▶
-  08  └‣─  function: (Chain)                00 : 09
-  09  ─‣┘  _ [RecordSet(M1) VariantClose]   11
-  11                                        ▶
-  12   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
-  15  ...
-  16   !   (call_expression) [VariantOpen(M3)]  08
+  01   !   (program)                        02
+  02  └‣─  (expression_statement)           03
+  03  └‣─  (Chain)                          00 : 04
+  04  ─‣┘² _ [RecordSet(M4)]                06
+  06                                        ▶
+  07  └‣─  function: (Chain)                00 : 08
+  08  ─‣┘  _ [RecordSet(M1) VariantClose]   10
+  10                                        ▶
+  11   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  10
+  14   !   (call_expression) [VariantOpen(M3)]  07
 --------------------- TRACE ----------------------
 Q:
-  02       (program)                        03
+  01       (program)                        02
        ●   program
-  03       (expression_statement)           04
+  02       (expression_statement)           03
        ●   expression_statement
-  04       (Chain)                          00 : 05
+  03       (Chain)                          00 : 04
        ▶   (Chain)
 
 Chain:
-  00  -ε-                                   12, 16
-  12       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
-       ○   call_expression
-  00  ❮❮❮ 
-  16       (call_expression) [VariantOpen(M3)]  08
+  00   !   switch                           
        ●   call_expression
-  08       (Chain)                          00 : 09
-       ▶   (Chain)
-
-Chain:
-  00  -ε-                                   12, 16
-  12       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
-       ○   call_expression
-  00  ❮❮❮ 
-  16       (call_expression) [VariantOpen(M3)]  08
+  14       (call_expression) [VariantOpen(M3)]  07
        ●   call_expression
-  08       (Chain)                          00 : 09
+  07       (Chain)                          00 : 08
        ▶   (Chain)
 
 Chain:
-  00  -ε-                                   12, 16
-  12       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  11
+  00   !   switch                           
+       ●   call_expression
+  14       (call_expression) [VariantOpen(M3)]  07
+       ●   call_expression
+  07       (Chain)                          00 : 08
+       ▶   (Chain)
+
+Chain:
+  00   !   switch                           
        ●   identifier
-  11   ◀   (Chain)                          
+  11       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  10
+       ●   identifier
+  10   ◀   (Chain)                          
 
 Chain:
-  09       _ [RecordSet(M1) VariantClose]   11
+  08       _ [RecordSet(M1) VariantClose]   10
        ●   call_expression
-  11   ◀   (Chain)                          
+  10   ◀   (Chain)                          
 
 Chain:
-  09       _ [RecordSet(M1) VariantClose]   11
+  08       _ [RecordSet(M1) VariantClose]   10
        ●   call_expression
-  11   ◀   (Chain)                          
+  10   ◀   (Chain)                          
 
 Q:
-  05       _ [RecordSet(M4)]                07
+  04       _ [RecordSet(M4)]                06
        ●   program
-  07   ◀   (Q)                              ◼
+  06   ◀   (Q)                              ◼

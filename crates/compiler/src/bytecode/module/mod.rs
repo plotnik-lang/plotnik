@@ -5,13 +5,13 @@ use crate::core::{NodeFieldId, NodeKindId};
 use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
-use super::instructions::{Call, Match, Opcode, Return, header_byte};
+use super::instructions::{Call, Match, Return, header_byte};
 use super::sections::{FieldEntry, NodeKindEntry, SYMBOL_NAME_ENTRY_SIZE};
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    BYTECODE_WORD_SIZE, CodeAddr, Entrypoint, EntrypointIdentity, REGEX_TABLE_ENTRY_SIZE,
-    SPAN_ENTRY_SIZE, STRING_TABLE_ENTRY_SIZE,
+    BYTECODE_WORD_SIZE, CodeAddr, Entrypoint, EntrypointIdentity, Opcode, REGEX_TABLE_ENTRY_SIZE,
+    SPAN_ENTRY_SIZE, STRING_TABLE_ENTRY_SIZE, Switch, SwitchEntry,
 };
 use plotnik_runtime::RegexDfas;
 
@@ -64,26 +64,13 @@ impl ByteStorage {
 
 #[derive(Clone, Copy, Debug)]
 pub enum Instruction<'a> {
+    Switch {
+        header: Switch,
+        entries: SwitchEntriesView<'a>,
+    },
     Match(Match<'a>),
     Call(Call),
     Return(Return),
-}
-
-impl<'a> Instruction<'a> {
-    #[inline]
-    pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        debug_assert!(bytes.len() >= BYTECODE_WORD_SIZE, "instruction too short");
-
-        let opcode = header_byte::opcode(bytes[0]).expect("invalid opcode");
-        match opcode {
-            Opcode::Call1 | Opcode::CallN => Self::Call(Call::from_bytes(bytes)),
-            Opcode::Return => {
-                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
-                Self::Return(Return::from_bytes(arr))
-            }
-            _ => Self::Match(Match::from_bytes(bytes)),
-        }
-    }
 }
 
 /// A compiled bytecode module.
@@ -128,7 +115,26 @@ impl Module {
     #[inline]
     pub(crate) fn decode_instruction(&self, addr: CodeAddr) -> Instruction<'_> {
         let offset = self.offsets.instructions as usize + addr.as_usize() * BYTECODE_WORD_SIZE;
-        Instruction::from_bytes(&self.storage[offset..])
+        let bytes = &self.storage[offset..];
+        let opcode = header_byte::opcode(bytes[0]).expect("validated opcode");
+        match opcode {
+            Opcode::Switch => {
+                let header = Switch::from_bytes(bytes);
+                let entries = self
+                    .switch_tables()
+                    .get_run(&header)
+                    .expect("validated switch run");
+                Instruction::Switch { header, entries }
+            }
+            Opcode::Call1 | Opcode::CallN => Instruction::Call(Call::from_bytes(bytes)),
+            Opcode::Return => {
+                let arr = bytes[..BYTECODE_WORD_SIZE]
+                    .try_into()
+                    .expect("slice is exactly one word");
+                Instruction::Return(Return::from_bytes(arr))
+            }
+            _ => Instruction::Match(Match::from_bytes(bytes)),
+        }
     }
 
     #[inline]
@@ -259,6 +265,14 @@ impl Module {
         &self.storage[offset..offset + (count + 1) * REGEX_TABLE_ENTRY_SIZE]
     }
 
+    pub(crate) fn switch_tables(&self) -> SwitchEntriesView<'_> {
+        let offset = self.offsets.switch_tables as usize;
+        let bytes = &self.storage[offset..offset + self.header.switch_tables_size as usize];
+        let (raw, remainder) = bytes.as_chunks::<{ SwitchEntry::SIZE }>();
+        assert!(remainder.is_empty(), "validated switch table size");
+        SwitchEntriesView { raw }
+    }
+
     fn instructions_slice(&self) -> &[u8] {
         let offset = self.offsets.instructions as usize;
         let len = self.header.instruction_word_count as usize * BYTECODE_WORD_SIZE;
@@ -269,6 +283,29 @@ impl Module {
         let offset = self.offsets.spans as usize;
         let len = self.header.spans_count as usize * SPAN_ENTRY_SIZE;
         &self.storage[offset..offset + len]
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SwitchEntriesView<'a> {
+    raw: &'a [[u8; SwitchEntry::SIZE]],
+}
+
+impl<'a> SwitchEntriesView<'a> {
+    pub(crate) fn iter(self) -> impl ExactSizeIterator<Item = SwitchEntry> + 'a {
+        self.raw.iter().copied().map(SwitchEntry::from_bytes)
+    }
+
+    fn get_run(self, switch: &Switch) -> Option<Self> {
+        if switch.case_count < 2 || !switch.table_offset.is_multiple_of(SwitchEntry::SIZE as u32) {
+            return None;
+        }
+
+        let start = switch.table_offset as usize / SwitchEntry::SIZE;
+        let end = start.checked_add(switch.case_count as usize)?;
+        Some(Self {
+            raw: self.raw.get(start..end)?,
+        })
     }
 }
 

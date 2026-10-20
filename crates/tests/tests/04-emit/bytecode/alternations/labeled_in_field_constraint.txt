@@ -15,7 +15,10 @@ Q:
   3  ─‣┘  _ [RecordSet(kind)]               1
   5   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  3
   6   !   (number) [VariantOpen(B) VariantClose]  3
-  8  └‣─  key: _                            5, 6
+  7   !   switch
+            (identifier)                    5
+            (number)                        6
+  8  └‣─  key: _                            7
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -53,7 +56,10 @@ Q = 00 :: T4
 [instructions]
 Q:
   00   !   (pair)                           01
-  01  └‣─  key: _                           04, 08
+  01  └‣─  key: _                           02
+  02   !   switch
+             (identifier)                   04
+             (number)                       08
   03                                        ▶
   04   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  10
   07  ...

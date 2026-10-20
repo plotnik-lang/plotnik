@@ -147,6 +147,7 @@ impl<'a> EmitPipeline<'a> {
         pool: ConstantPool<'_>,
         tables: &ModuleTables,
         instructions: &[u8],
+        switch_tables: &[u8],
     ) -> Result<Vec<u8>, EmitError> {
         let (str_blob, str_table) = pool.emit_strings()?;
         let (regex_blob, regex_table) = pool.emit_regexes()?;
@@ -170,6 +171,7 @@ impl<'a> EmitPipeline<'a> {
         writer.emit_section(&type_names_bytes);
         writer.emit_section(&entrypoints_bytes);
         writer.emit_section(instructions);
+        writer.emit_section(switch_tables);
         writer.emit_section(&spans_bytes);
 
         writer.finish_sections();
@@ -227,6 +229,8 @@ impl<'a> EmitPipeline<'a> {
         )?;
 
         let mut header = Header {
+            switch_tables_size: u32::try_from(switch_tables.len())
+                .expect("validated switch table section fits u32"),
             str_table_count,
             node_kinds_count,
             node_fields_count,

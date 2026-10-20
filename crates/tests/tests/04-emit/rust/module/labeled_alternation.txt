@@ -269,8 +269,9 @@ mod matcher {
     const S05_Q: u16 = 3;
     const S07_Q: u16 = 4;
     const S08_Q: u16 = 5;
-    const S11_Q: u16 = 6;
-    const S12_Q: u16 = 7;
+    const S09_Q: u16 = 6;
+    const S11_Q: u16 = 7;
+    const S12_Q: u16 = 8;
 
     /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
@@ -474,21 +475,29 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::VariantClose);
                 Flow::Jump(S05_Q)
             }
-            //   11  ──!  _                                07, 08, 11
+            //   09   !   switch
+            //              (identifier)                   07
+            //              (number)                       08
+            S09_Q => match eng.node().kind_id() {
+                1 => Flow::Jump(S07_Q),   // (identifier)
+                114 => Flow::Jump(S08_Q), // (number)
+                _ => Flow::Backtrack,
+            },
+            //   11  ──!  _                                09, 11
             S11_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_successors(&[S08_Q, S11_Q]);
-                Flow::Jump(S07_Q)
+                eng.push_successors(&[S11_Q]);
+                Flow::Jump(S09_Q)
             }
-            //   12  └─!  _                                07, 08, 11
+            //   12  └─!  _                                09, 11
             S12_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::DownExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_successors(&[S08_Q, S11_Q]);
-                Flow::Jump(S07_Q)
+                eng.push_successors(&[S11_Q]);
+                Flow::Jump(S09_Q)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
         }

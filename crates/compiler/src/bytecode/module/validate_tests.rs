@@ -1753,6 +1753,80 @@ fn module_with_instructions(instructions: &[u8], instruction_word_count: u16) ->
     bytes
 }
 
+#[test]
+fn malformed_switch_tables_are_rejected() {
+    let valid = emit_bytes("Q = [(identifier) (number) (string)] @v");
+    let module = Module::validate_and_load(&valid).unwrap();
+    let instruction = first_instr(&valid, |op| op == Opcode::Switch as u8);
+    let table = module.offsets().switch_tables as usize;
+    let size = module.header().switch_tables_size;
+    let first_kind = valid[table..table + 2].to_vec();
+    let first_entry = valid[table..table + 4].to_vec();
+    let second_entry = valid[table + 4..table + 8].to_vec();
+    let matched = first_instr(&valid, |op| op == Opcode::Match16 as u8);
+    let payload =
+        ((matched - module.offsets().instructions as usize) / BYTECODE_WORD_SIZE + 1) as u16;
+    let mutations = [
+        (vec![(44, (size - 1).to_le_bytes().to_vec())], true),
+        (vec![(table, second_entry), (table + 4, first_entry)], true),
+        (vec![(table + 4, first_kind)], true),
+        (vec![(instruction + 4, size.to_le_bytes().to_vec())], false),
+        (
+            vec![
+                (instruction + 2, 2u16.to_le_bytes().to_vec()),
+                (table + 8, vec![0, 0]),
+            ],
+            true,
+        ),
+        (
+            vec![
+                (instruction + 2, 2u16.to_le_bytes().to_vec()),
+                (table + 10, payload.to_le_bytes().to_vec()),
+            ],
+            false,
+        ),
+    ];
+
+    for (patches, malformed_table) in mutations {
+        let mut bytes = valid.clone();
+        for (offset, value) in patches {
+            bytes[offset..offset + value.len()].copy_from_slice(&value);
+        }
+        reseal(&mut bytes);
+
+        let error = Module::validate_and_load(&bytes).unwrap_err();
+
+        assert!(
+            matches!(
+                (malformed_table, &error),
+                (true, ModuleError::MalformedSwitchTable)
+                    | (false, ModuleError::MalformedInstructionStream)
+            ),
+            "unexpected rejection: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn switch_preserves_empty_paths_on_every_target() {
+    let mut bytes = emit_bytes("Q = [(identifier) (number)]");
+    let module = Module::validate_and_load(&bytes).unwrap();
+    let table = module.offsets().switch_tables as usize;
+    let returned = first_instr(&bytes, |op| op == Opcode::Return as u8);
+    let target = ((returned - module.offsets().instructions as usize) / BYTECODE_WORD_SIZE) as u16;
+    let boundary = module.offsets().entrypoints as usize + 6;
+    bytes[boundary..boundary + 2].copy_from_slice(&1u16.to_le_bytes());
+    bytes[table + 6..table + 8].copy_from_slice(&target.to_le_bytes());
+    reseal(&mut bytes);
+
+    let error = Module::validate_and_load(&bytes).unwrap_err();
+
+    assert!(
+        matches!(error, ModuleError::EmptyPathCursorRead(_)),
+        "{error:?}"
+    );
+}
+
 fn match_header(opcode: u8) -> u8 {
     opcode & 0xF
 }

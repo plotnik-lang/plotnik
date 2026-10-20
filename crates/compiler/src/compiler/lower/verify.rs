@@ -309,6 +309,11 @@ mod debug_impl {
             };
 
             match instr {
+                InstructionIR::Switch(_) => NodeContribution {
+                    see_through: true,
+                    ops: vec![],
+                    succs: instr.successors().to_vec(),
+                },
                 InstructionIR::Match(m) => {
                     if m.is_epsilon() && m.effects.is_empty() {
                         return NodeContribution {
@@ -686,6 +691,14 @@ mod debug_impl {
                 .ok_or_else(|| format!("{root:?}: dangling label {label:?}"))?;
 
             match instr {
+                InstructionIR::Switch(_) => {
+                    work.extend(
+                        instr
+                            .successors()
+                            .iter()
+                            .map(|&target| (target, empty_path)),
+                    );
+                }
                 InstructionIR::Match(m) => {
                     let after_nav_empty = empty_path && m.nav == Nav::Epsilon;
                     if after_nav_empty
@@ -760,6 +773,9 @@ mod debug_impl {
                 .ok_or_else(|| format!("{root:?}: dangling label {label:?}"))?;
 
             match instr {
+                InstructionIR::Switch(_) => {
+                    work.extend(instr.successors().iter().map(|&target| (target, net)));
+                }
                 InstructionIR::Match(m) => {
                     let next_net = net + m.nav.depth_delta();
                     if m.successors.is_empty() {

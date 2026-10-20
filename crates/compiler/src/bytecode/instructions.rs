@@ -1,6 +1,6 @@
 use std::num::NonZeroU16;
 
-use crate::core::{NodeFieldId, ZeroIdError};
+use crate::core::{NodeFieldId, NodeKindId, ZeroIdError};
 
 use super::PredicateOp;
 use super::constants::{
@@ -244,6 +244,7 @@ pub enum Opcode {
     Call1 = 0x6,
     CallN = 0x7,
     Return = 0x8,
+    Switch = 0x9,
 }
 
 impl Opcode {
@@ -258,6 +259,7 @@ impl Opcode {
             0x6 => Some(Self::Call1),
             0x7 => Some(Self::CallN),
             0x8 => Some(Self::Return),
+            0x9 => Some(Self::Switch),
             _ => None,
         }
     }
@@ -270,7 +272,7 @@ impl Opcode {
             Self::Match32 => 32,
             Self::Match48 => 48,
             Self::Match64 => 64,
-            Self::Call1 | Self::Return => BYTECODE_WORD_SIZE,
+            Self::Call1 | Self::Return | Self::Switch => BYTECODE_WORD_SIZE,
             Self::CallN => 3 * BYTECODE_WORD_SIZE,
         }
     }
@@ -300,6 +302,57 @@ impl Opcode {
 }
 
 const _: () = assert!(MAX_MATCH_PAYLOAD_SLOTS == Opcode::Match64.payload_slots());
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Switch {
+    pub(crate) table_offset: u32,
+    pub(crate) case_count: u16,
+}
+
+impl Switch {
+    pub(crate) fn to_bytes(self) -> [u8; 8] {
+        let mut bytes = [0; 8];
+        bytes[0] = Opcode::Switch as u8;
+        bytes[2..4].copy_from_slice(&self.case_count.to_le_bytes());
+        bytes[4..8].copy_from_slice(&self.table_offset.to_le_bytes());
+        bytes
+    }
+
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
+        Self {
+            case_count: u16::from_le_bytes(bytes[2..4].try_into().expect("case count")),
+            table_offset: u32::from_le_bytes(bytes[4..8].try_into().expect("table offset")),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SwitchEntry {
+    pub(crate) kind: NodeKindId,
+    pub(crate) target: SuccessorAddr,
+}
+
+impl SwitchEntry {
+    pub(crate) const SIZE: usize = 4;
+
+    pub(crate) fn to_bytes(self) -> [u8; Self::SIZE] {
+        let mut bytes = [0; Self::SIZE];
+        bytes[..2].copy_from_slice(&u16::from(self.kind).to_le_bytes());
+        bytes[2..4].copy_from_slice(&u16::from(self.target).to_le_bytes());
+        bytes
+    }
+
+    pub(crate) fn from_bytes(bytes: [u8; Self::SIZE]) -> Self {
+        Self::try_from_bytes(bytes).expect("validated switch entry")
+    }
+
+    pub(crate) fn try_from_bytes(bytes: [u8; Self::SIZE]) -> Option<Self> {
+        Some(Self {
+            kind: NodeKindId::try_from(u16::from_le_bytes([bytes[0], bytes[1]])).ok()?,
+            target: SuccessorAddr::try_from(u16::from_le_bytes([bytes[2], bytes[3]])).ok()?,
+        })
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Match<'a> {

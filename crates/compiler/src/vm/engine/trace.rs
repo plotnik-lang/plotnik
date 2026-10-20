@@ -463,6 +463,9 @@ impl Tracer for PrintTracer<'_> {
         self.check_cache_line_boundary(ip);
 
         match instr {
+            Instruction::Switch { .. } => {
+                self.add_instruction(ip, nav_symbol(Nav::StayExact), "switch", "");
+            }
             Instruction::Match(m) => {
                 let symbol = if m.is_epsilon() {
                     Symbol::EPSILON

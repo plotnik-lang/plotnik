@@ -9,6 +9,7 @@
     - [Accepted and emitted forms](#accepted-and-emitted-forms)
   - [Navigation](#navigation)
   - [Predicates](#predicates)
+  - [Switch](#switch)
   - [Calls and returns](#calls-and-returns)
     - [Call1](#call1)
     - [CallN](#calln)
@@ -64,6 +65,8 @@ A `Match` with `Down` navigation and an identifier constraint first selects `a`.
 
 A `Match` can also offer several successor instructions at one candidate. Their encoded order is their preference order. All successors at the current candidate take preference over retrying a later sibling. Only a complete successful path accepts, so an early local match does not commit its result. `Epsilon` connects paths without moving or testing the cursor, while still allowing effects.
 
+For alternatives with distinct concrete node kinds, such as `[(identifier) (number) (string)]`, the compiler can insert a `Switch` to select a branch by the current node's kind ID. This skips branches whose kinds cannot match. The selected branch still runs its original tests, including the named/anonymous check, and applies its effects.
+
 Calls share a reusable part of the graph, called a body. A body returns through numbered exits called ports. For each port, the call site supplies a continuation: the address at which its own execution resumes. The same body can therefore continue differently for different callers:
 
 ```text
@@ -108,10 +111,11 @@ bits     7..6       5..4       3..0
 | `0x6`  | `Call1`     | 8     | None          |
 | `0x7`  | `CallN`     | 24    | None          |
 | `0x8`  | `Return`    | 8     | None          |
+| `0x9`  | `Switch`    | 8     | None          |
 
 Payload capacities count `u16` slots in extended `Match` forms.
 
-Opcodes `0x9`–`0xf` are invalid.
+Opcodes `0xa`–`0xf` are invalid.
 
 ### Addresses and instruction boundaries
 
@@ -136,6 +140,7 @@ A `Match` with no successor is terminal. It can accept an entry-only branch alon
 | Entry target, call target   | Instruction address 0 | Instruction address |
 | `Match8.next`               | Terminal match        | Successor address   |
 | Extended `Match` successor  | Invalid               | Successor address   |
+| Switch table target         | Invalid               | Successor address   |
 | Used call continuation      | Invalid               | Successor address   |
 | Unused `CallN` continuation | Required              | Invalid             |
 
@@ -293,6 +298,25 @@ Equality compares the entire source slice to the referenced string. Prefix and s
 
 String operands are less than `str_table_count`, including the real reserved string at index zero. Regex operands are nonzero and less than `regex_table_count`. Matching searches the complete node slice as an unanchored haystack, subject to any anchors encoded by the [DFA](06-tables.md).
 
+### Switch
+
+`Switch` jumps to the target for the current node's kind ID, or backtracks if none matches. It does not check namedness, move the cursor, or apply effects. It saves no alternatives: later failure can retry outer choices or choices within the selected branch, but does not try other table entries.
+
+```text
+byte    0        1        2..3        4..7
+       +--------+--------+-----------+--------------+
+       | header | zero   | count     | table offset |
+       +--------+--------+-----------+--------------+
+```
+
+Header bits 4–7 and byte 1 are zero. `count` is a `u16` specifying at least two consecutive entries. The `u32` table offset counts bytes from the start of `SwitchTables` and is a multiple of four. The complete run must fit within `switch_tables_size`.
+
+`SwitchTables` consists of four-byte entries, so `switch_tables_size` must be a multiple of four. Each entry stores a `u16` kind ID at byte 0 and a `u16` target at byte 2.
+
+Kind IDs are `1`–`0xfffd` or `0xffff`. Targets are nonzero instruction addresses pointing to an instruction's first word. Every stored entry must have a valid kind and target, including entries not referenced by an instruction.
+
+Kind IDs are strictly increasing within each run. Runs may overlap or be shared.
+
 ### Calls and returns
 
 A call has one target and one to eight continuations. A return port is an integer local to that target, not a global address or a fixed category such as consuming versus empty. Ports are numbered consecutively from zero, one per continuation. Each port's consumed bit is at the same position in the consumed mask.
@@ -382,7 +406,7 @@ Readers validate the name and type references, target, boundary value, and effec
 
 ### Valid control flow
 
-A body begins at an entry target or call target, called its root. Its local paths follow `Match` successors and call continuations. A nested call's target starts a separate body. Calls to one root agree on ownership, arity, and consumed mask. Callee-owned calls also agree on navigation and field. Entry targets have the caller-owned contract, arity one, and consuming port zero.
+A body begins at an entry target or call target, called its root. Its local paths follow `Match` successors, switch table targets, and call continuations. A nested call's target starts a separate body. Calls to one root agree on ownership, arity, and consumed mask. Callee-owned calls also agree on navigation and field. Entry targets have the caller-owned contract, arity one, and consuming port zero.
 
 The `Return` instructions reachable within a body agree on the body's contract. Together they cover every declared port, with none missing and none outside the declared range. For a caller-owned root, the uniform contract is caller-owned `Stay` with field zero, regardless of the individual calls' own navigation and field. For a callee-owned root, `Return` metadata equals the navigation and field declared by the calls. Reachability for these checks follows all encoded alternatives, without using node or predicate conditions to discard paths.
 
@@ -415,7 +439,7 @@ A terminal `Match`'s depth after navigation equals the required exit depth for p
 
 #### Empty paths
 
-The reader tracks whether each local path has performed a match. Every body root begins empty, even though the cursor already points to a tree node. An `Epsilon` match or empty call port leaves this status unchanged. Any other `Match` or consuming call port makes it nonempty, including `Stay`, Childless, and `Up` matches.
+The reader tracks whether each local path has performed a match. Every body root begins empty, even though the cursor already points to a tree node. An `Epsilon` match, `Switch`, or empty call port leaves this status unchanged. Any other `Match` or consuming call port makes it nonempty, including `Stay`, Childless, and `Up` matches.
 
 [Effects that read the cursor](04-effects.md), such as capturing its node, are invalid while the path remains empty. This also holds under suppression, which temporarily disables result construction while matching continues. A `Node` entry boundary cannot accept through an empty path. A callee is checked from its own initially empty path even when its caller has already selected a node.
 

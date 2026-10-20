@@ -16,8 +16,11 @@ Q:
   04  -ε-  [Absent RecordSet(statement)]    01
   06   !   (expression_statement) [VariantOpen(Expression) Node RecordSet(expression) VariantClose]  03
   07   !   (debugger_statement) [VariantOpen(Debugger) Node RecordSet(debugger) VariantClose]  03
-  10  ──!  _                                06, 07, 10
-  11  └─!  _                                06, 07, 10
+  08   !   switch
+             (expression_statement)         06
+             (debugger_statement)           07
+  10  ──!  _                                08, 10
+  11  └─!  _                                08, 10
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -56,12 +59,14 @@ Q = 00 :: T5
 
 [instructions]
 Q:
-  00   !   (program)                        13, 03
+  00   !   (program)                        14, 03
   02                                        ▶
   03  -ε-  [Absent RecordSet(M4)]           02
   05   !   (expression_statement) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  16
   08   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  16
-  11  ──!  _                                05, 08, 11
-  13  └─!  _                                05, 08, 11
-  15  ...
+  11   !   switch
+             (expression_statement)         05
+             (debugger_statement)           08
+  12  ──!  _                                11, 12
+  14  └─!  _                                11, 12
   16  ─‣┘  _ [RecordSet(M4)]                02

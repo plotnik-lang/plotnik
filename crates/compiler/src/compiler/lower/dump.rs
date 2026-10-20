@@ -1,14 +1,14 @@
 use std::fmt::Write as _;
 
-use crate::bytecode::{EffectKind, LineBuilder, Nav, Symbol, nav_symbol, width_for_count};
+use crate::bytecode::{EffectKind, LineBuilder, Nav, Symbol, cols, nav_symbol, width_for_count};
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
     CallEntry, CallIR, DefOutputOrigin, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin,
-    MatchIR, NfaGraph, NodeKindConstraint, PredicateValueIR, SemanticNfa, SourceMode,
+    MatchIR, NfaGraph, NodeKindConstraint, PredicateValueIR, SemanticNfa, SourceMode, SwitchIR,
 };
-use crate::core::{Colors, NodeFieldId, NodeKindId};
+use crate::core::{Colors, NodeFieldId, NodeKind, NodeKindId};
 
 pub(crate) fn dump_nfa(
     nfa: &SemanticNfa,
@@ -57,6 +57,7 @@ impl<'a> NfaDumper<'a> {
 
     pub(crate) fn render_instruction(&self, instr: &InstructionIR) -> String {
         match instr {
+            InstructionIR::Switch(s) => self.format_switch(s),
             InstructionIR::Match(m) => self.format_match(m),
             InstructionIR::Call(call) => self.format_call(call),
             InstructionIR::Return(r) => self.format_return(r),
@@ -135,11 +136,7 @@ impl NfaDumper<'_> {
                 current = Some(origin);
             }
 
-            let line = match instr {
-                InstructionIR::Match(m) => self.format_match(m),
-                InstructionIR::Call(call) => self.format_call(call),
-                InstructionIR::Return(r) => self.format_return(r),
-            };
+            let line = self.render_instruction(instr);
             out.push_str(&line);
             out.push('\n');
         }
@@ -208,6 +205,45 @@ impl NfaDumper<'_> {
         )
     }
 
+    pub(crate) fn switch_cases(&self, switch: &SwitchIR) -> Vec<(NodeKindId, Label, String)> {
+        let mut cases = switch
+            .cases()
+            .map(|(kind, target)| {
+                let anonymous = self
+                    .artifacts
+                    .grammar
+                    .kind_entries()
+                    .any(|(node_kind, id)| {
+                        id == kind && matches!(node_kind, NodeKind::Anonymous(_))
+                    });
+                let constraint = if anonymous {
+                    NodeKindConstraint::Anonymous(Some(kind))
+                } else {
+                    NodeKindConstraint::Named(Some(kind))
+                };
+                (kind, target, self.node_kind_pattern(constraint))
+            })
+            .collect::<Vec<_>>();
+        cases.sort_by_key(|(_, target, _)| *target);
+        cases
+    }
+
+    fn format_switch(&self, switch: &SwitchIR) -> String {
+        let builder = LineBuilder::new(self.label_width);
+        let prefix = self.prefix(switch.label, nav_symbol(Nav::StayExact));
+        let mut result = format!("{prefix}switch");
+        let indent = cols::INDENT + self.label_width + 2 * cols::GAP + cols::SYMBOL + 2;
+
+        for (_, target, kind) in self.switch_cases(switch) {
+            let target = format!("{:0w$}", target.0, w = self.label_width);
+            let row = builder.pad_successors(format!("{:indent$}{kind}", ""), &target);
+            result.push('\n');
+            result.push_str(&row);
+        }
+
+        result
+    }
+
     fn format_match(&self, m: &MatchIR) -> String {
         let prefix = self.prefix(m.label, nav_symbol(m.nav));
         let content = self.match_content(m);
@@ -269,23 +305,18 @@ impl NfaDumper<'_> {
             return result;
         }
 
-        match m.node_kind {
-            NodeKindConstraint::Any => result.push('_'),
-            NodeKindConstraint::Named(None) => result.push_str("(_)"),
-            NodeKindConstraint::Named(Some(id)) => {
-                result.push('(');
-                result.push_str(&self.kind_name(id));
-                result.push(')');
-            }
-            NodeKindConstraint::Anonymous(None) => result.push_str("\"_\""),
-            NodeKindConstraint::Anonymous(Some(id)) => {
-                result.push('"');
-                result.push_str(&self.kind_name(id));
-                result.push('"');
-            }
-        }
-
+        result.push_str(&self.node_kind_pattern(m.node_kind));
         result
+    }
+
+    fn node_kind_pattern(&self, kind: NodeKindConstraint) -> String {
+        match kind {
+            NodeKindConstraint::Any => "_".to_string(),
+            NodeKindConstraint::Named(None) => "(_)".to_string(),
+            NodeKindConstraint::Named(Some(id)) => format!("({})", self.kind_name(id)),
+            NodeKindConstraint::Anonymous(None) => "\"_\"".to_string(),
+            NodeKindConstraint::Anonymous(Some(id)) => format!("\"{}\"", self.kind_name(id)),
+        }
     }
 
     pub(crate) fn effect(&self, e: &EffectIR) -> String {

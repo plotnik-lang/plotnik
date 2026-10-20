@@ -1,0 +1,125 @@
+Q = (program
+  (expression_statement
+    [
+      (call_expression
+        function: (identifier == "wanted") @v
+      )
+      (number == "42") @v
+    ]
+  )
+)
+--------------------- INPUT ----------------------
+false; wrong(); 7; wanted();
+--------------------- OUTPUT ---------------------
+{
+  "v": {
+    "kind": "identifier",
+    "span": [19, 25],
+    "text": "wanted"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "wanted"
+S02 "42"
+S03 "v"
+S04 "Q"
+S05 "program"
+S06 "expression_statement"
+S07 "call_expression"
+S08 "identifier"
+S09 "number"
+S10 "function"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { v }
+
+[type_members]
+M0: S03 → T0  ; v: <Node>
+
+[type_names]
+N0: S04 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └─!  _                                11, 12
+  04  └‣─  function: (identifier) [Node RecordSet(M0)] == "wanted"  06
+  06  ─‣┘  _                                14
+  07                                        ▶
+  08   !   (call_expression)                04
+  09   !   (number) [Node RecordSet(M0)] == "42"  14
+  11   !   switch
+             (call_expression)              08
+             (number)                       09
+  12  ──!  _                                11, 12
+  14  ─‣┘² _                                07
+--------------------- TRACE ----------------------
+Q:
+  00       (program)                        01
+       ●   program
+  01       (expression_statement)           02
+       ●   expression_statement
+  02       _                                11, 12
+       ●   false
+  11   !   switch                           
+       ○   false
+  02  ❮❮❮ 
+  12       _                                11, 12
+       ●   ;
+  11   !   switch                           
+       ○   ;
+  12  ❮❮❮ 
+  12       _                                11, 12
+  01  ❮❮❮ 
+       ●   expression_statement
+  02       _                                11, 12
+       ●   call_expression
+  11   !   switch                           
+       ●   call_expression
+  08       (call_expression)                04
+       ●   call_expression
+  04       function: (identifier) [Node RecordSet(M0)] == "wanted"  06
+       ○   arguments
+  02  ❮❮❮ 
+  12       _                                11, 12
+       ●   ;
+  11   !   switch                           
+       ○   ;
+  12  ❮❮❮ 
+  12       _                                11, 12
+  01  ❮❮❮ 
+       ●   expression_statement
+  02       _                                11, 12
+       ●   number
+  11   !   switch                           
+       ●   number
+  09       (number) [Node RecordSet(M0)] == "42"  14
+  02  ❮❮❮ 
+  12       _                                11, 12
+       ●   ;
+  11   !   switch                           
+       ○   ;
+  12  ❮❮❮ 
+  12       _                                11, 12
+  01  ❮❮❮ 
+       ●   expression_statement
+  02       _                                11, 12
+       ●   call_expression
+  11   !   switch                           
+       ●   call_expression
+  08       (call_expression)                04
+       ●   call_expression
+  04       function: (identifier) [Node RecordSet(M0)] == "wanted"  06
+       ●   identifier
+  06       _                                14
+       ●   call_expression
+  14       _                                07
+       ●   program
+  07   ◀   (Q)                              ◼

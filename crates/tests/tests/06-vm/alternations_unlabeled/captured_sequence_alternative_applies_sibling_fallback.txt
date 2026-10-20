@@ -60,21 +60,27 @@ Q = 00 :: T5
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _ [RecordOpen]                   04, 08, 11
+  01  └─!  _ [RecordOpen]                   11, 12
   03                                        ▶
-  04   !   (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  13
-  07  ...
-  08   !   (comment) [Absent RecordSet(M1) Node RecordSet(M2)]  13
-  11  ──!  _                                04, 08, 11
-  13  ─‣┘  _ [RecordClose RecordSet(M3)]    03
+  04   !   (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  14
+  07  -ε-                                   04
+  08   !   (comment) [Absent RecordSet(M1) Node RecordSet(M2)]  14
+  11   !   switch
+             (expression_statement)         07
+             (comment)                      08
+  12  ──!  _                                11, 12
+  14  ─‣┘  _ [RecordClose RecordSet(M3)]    03
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
        ●   program
-  01       _ [RecordOpen]                   04, 08, 11
+  01       _ [RecordOpen]                   11, 12
        ●   expression_statement
-  04       (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  13
+  11   !   switch                           
        ●   expression_statement
-  13       _ [RecordClose RecordSet(M3)]    03
+  07  -ε-                                   04
+  04       (expression_statement) [Absent RecordSet(M2) RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  14
+       ●   expression_statement
+  14       _ [RecordClose RecordSet(M3)]    03
        ●   program
   03   ◀   (Q)                              ◼

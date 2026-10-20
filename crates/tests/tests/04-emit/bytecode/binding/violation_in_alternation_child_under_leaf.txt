@@ -13,16 +13,18 @@ rules:
   num: {type: PATTERN, value: "[0-9]+"}
 ---------------------- NFA -----------------------
 [entrypoints]
-Q = 0
+Q = 6
 
 [transitions]
 Q:
-  0  -ε-                                    2, 5
   1                                         ▶
   2   !   (id)                              4
   3  ─‣┘  _                                 1
   4  └‣─  (num)                             3
   5   !   (num)                             1
+  6   !   switch
+            (id)                            2
+            (num)                           5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -42,9 +44,11 @@ Q = 0 :: T0
 
 [instructions]
 Q:
-  0  -ε-                                    5, 6
-  2  └‣─  (num)                             3
-  3  ─‣┘  _                                 4
-  4                                         ▶
-  5   !   (id)                              2
-  6   !   (num)                             4
+  0   !   switch
+            (id)                            4
+            (num)                           5
+  1  └‣─  (num)                             2
+  2  ─‣┘  _                                 3
+  3                                         ▶
+  4   !   (id)                              1
+  5   !   (num)                             3

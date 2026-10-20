@@ -523,6 +523,33 @@ impl<'a> Generator<'a> {
                 let _ = writeln!(out, "        // {}", line.trim_end());
             }
             match &state.kind {
+                StatePlanKind::Switch(cases) => {
+                    let _ = writeln!(
+                        out,
+                        "        {} => match eng.node().kind_id() {{",
+                        self.state(state.id).const_name
+                    );
+                    let arms = cases
+                        .iter()
+                        .map(|(kind, target, pattern)| {
+                            let arm = format!(
+                                "{} => Flow::Jump({}),",
+                                u16::from(*kind),
+                                self.state(*target).const_name
+                            );
+                            (arm, pattern)
+                        })
+                        .collect::<Vec<_>>();
+                    let width = arms
+                        .iter()
+                        .map(|(arm, _)| arm.len())
+                        .max()
+                        .expect("switch has cases");
+                    for (arm, pattern) in arms {
+                        let _ = writeln!(out, "            {arm:width$} // {pattern}");
+                    }
+                    out.push_str("            _ => Flow::Backtrack,\n        },\n");
+                }
                 StatePlanKind::Epsilon { effects, flow } => {
                     self.epsilon_arm(out, state, effects, flow);
                 }
@@ -565,6 +592,18 @@ impl<'a> Generator<'a> {
         flow: &FlowPlan,
     ) {
         let info = self.state(state.id);
+        if effects.is_empty()
+            && let FlowPlan::Jump(next) = flow
+        {
+            let _ = writeln!(
+                out,
+                "        {} => Flow::Jump({}),",
+                info.const_name,
+                self.state(*next).const_name
+            );
+            return;
+        }
+
         let _ = writeln!(out, "        {} => {{", info.const_name);
         self.effects_and_flow(out, effects, flow, "            ");
         out.push_str("        }\n");

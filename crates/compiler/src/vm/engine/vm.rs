@@ -17,6 +17,8 @@ use super::materializer::ValueMaterializer;
 use super::trace::{NoopTracer, Tracer};
 use super::value::{NodeValue, Value, node_text};
 
+const BINARY_SEARCH_MIN_CASES: usize = 48;
+
 /// Resource usage observed during one VM run.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct RunStats {
@@ -356,6 +358,31 @@ impl<'s, 't> VM<'s, 't> {
             }
 
             let result = match module.decoded().instruction_at(self.ip) {
+                DecodedInstr::Switch(switch) => {
+                    let node = self.engine.node();
+                    let kind = node.kind_id();
+                    let entries = module.decoded().switch_entries(&switch);
+                    let entry = if entries.len() >= BINARY_SEARCH_MIN_CASES {
+                        match entries.binary_search_by_key(&kind, |entry| u16::from(entry.kind)) {
+                            Ok(index) => Some(&entries[index]),
+                            Err(_) => None,
+                        }
+                    } else {
+                        entries.iter().find(|entry| u16::from(entry.kind) == kind)
+                    };
+                    if let Some(entry) = entry {
+                        if T::ENABLED {
+                            tracer.trace_match_success(node);
+                        }
+                        self.ip = CodeAddr::from(u16::from(entry.target));
+                        Ok(())
+                    } else {
+                        if T::ENABLED {
+                            tracer.trace_match_failure(node);
+                        }
+                        Err(self.backtrack(module, tracer))
+                    }
+                }
                 DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
                 DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
                 DecodedInstr::Return(port) => self.exec_return(port, module, tracer),

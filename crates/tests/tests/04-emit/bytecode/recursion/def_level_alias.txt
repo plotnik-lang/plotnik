@@ -9,24 +9,26 @@ Q = (Rec)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q   = 11
-Rec = 00
+Rec = 10
 
 [transitions]
 Rec:
-  00  -ε-                                   02, 09
   01                                        ▶
   02   !   (program) [VariantOpen(A)]       05
   04  ─‣┘  _ [VariantClose]                 01
   05  └‣─  (expression_statement)           08
   06  ─‣┘  _ [RecordSet(inner)]             04
-  08  └‣─  (Rec)                            00 : 06
+  08  └‣─  (Rec)                            10 : 06
   09   !   (identifier) [VariantOpen(B) Node RecordSet(id) VariantClose]  01
+  10   !   switch
+             (program)                      02
+             (identifier)                   09
 
 Q:
   11  -ε-  [SuppressBegin]                  14
   12                                        ▶
   13  -ε-  [SuppressEnd]                    12
-  14   !   (Rec)                            00 : 13
+  14   !   (Rec)                            10 : 13
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -57,23 +59,24 @@ M3: S4 → T3  ; B: T3
 N0: S5 → T4  ; Rec
 
 [entrypoints]
-Q   = 02 :: T0
+Q   = 01 :: T0
 Rec = 00 :: T4
 
 [instructions]
 Rec:
-  00  -ε-                                   16, 18
+  00   !   switch
+             (program)                      14
+             (identifier)                   16
 
 Q:
-  02  -ε-  [SuppressBegin]                  04
-  04   !   (Rec)                            00 : 05
-  05  -ε-  [SuppressEnd]                    07
-  07                                        ▶
-  08  └‣─  (Rec)                            00 : 09
-  09  ─‣┘  _ [RecordSet(M0)]                11
-  11  ─‣┘  _ [VariantClose]                 13
-  13                                        ▶
-  14  └‣─  (expression_statement)           08
-  15  ...
-  16   !   (program) [VariantOpen(M2)]      14
-  18   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  13
+  01  -ε-  [SuppressBegin]                  03
+  03   !   (Rec)                            00 : 04
+  04  -ε-  [SuppressEnd]                    06
+  06                                        ▶
+  07  └‣─  (Rec)                            00 : 08
+  08  ─‣┘  _ [RecordSet(M0)]                10
+  10  ─‣┘  _ [VariantClose]                 12
+  12                                        ▶
+  13  └‣─  (expression_statement)           07
+  14   !   (program) [VariantOpen(M2)]      13
+  16   !   (identifier) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  12

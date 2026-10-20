@@ -15,7 +15,10 @@ Q:
   3  ─‣┘  _                                 1
   4   !   (identifier) [Absent RecordSet(num) Node RecordSet(fn)]  3
   5   !   (number) [Absent RecordSet(fn) Node RecordSet(num)]  3
-  7  └‣─  function: _                       4, 5
+  6   !   switch
+            (identifier)                    4
+            (number)                        5
+  7  └‣─  function: _                       6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -45,7 +48,10 @@ Q = 00 :: T2
 [instructions]
 Q:
   00   !   (call_expression)                01
-  01  └‣─  function: _                      04, 08
+  01  └‣─  function: _                      02
+  02   !   switch
+             (identifier)                   04
+             (number)                       08
   03                                        ▶
   04   !   (identifier) [Absent RecordSet(M1) Node RecordSet(M0)]  07
   07  ─‣┘  _                                03

@@ -10,7 +10,7 @@ use crate::compiler::ids::{DefId, ResultMemberId, TypeId};
 use crate::compiler::lower::boundary::ExitSignature;
 use crate::compiler::lower::spans::SpanTable;
 use crate::compiler::lower::thompson::boundary::{EntryObligation, NavigationContract};
-use crate::core::NodeFieldId;
+use crate::core::{NodeFieldId, NodeKindId};
 
 pub use plotnik_runtime::PortId;
 
@@ -488,6 +488,7 @@ impl PredicateIR {
 #[derive(Clone, Debug)]
 pub enum InstructionIR {
     Match(MatchIR),
+    Switch(SwitchIR),
     Call(CallIR),
     Return(ReturnIR),
 }
@@ -497,6 +498,7 @@ impl InstructionIR {
     pub fn label(&self) -> Label {
         match self {
             Self::Match(m) => m.label,
+            Self::Switch(s) => s.label,
             Self::Call(c) => c.label,
             Self::Return(r) => r.label,
         }
@@ -505,6 +507,7 @@ impl InstructionIR {
     pub fn size(&self) -> usize {
         match self {
             Self::Match(m) => m.size(),
+            Self::Switch(_) => 8,
             Self::Call(call) => {
                 if call.returns.len() == 1 {
                     8
@@ -519,8 +522,37 @@ impl InstructionIR {
     pub fn successors(&self) -> &[Label] {
         match self {
             Self::Match(m) => &m.successors,
+            Self::Switch(s) => &s.targets,
             Self::Call(c) => c.return_labels(),
             Self::Return(_) => &[],
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SwitchIR {
+    pub label: Label,
+    kinds: Vec<NodeKindId>,
+    targets: Vec<Label>,
+}
+
+impl SwitchIR {
+    pub fn new(label: Label, cases: Vec<(NodeKindId, Label)>) -> Self {
+        let (kinds, targets) = cases.into_iter().unzip();
+        Self {
+            label,
+            kinds,
+            targets,
+        }
+    }
+
+    pub fn cases(&self) -> impl ExactSizeIterator<Item = (NodeKindId, Label)> + '_ {
+        self.kinds.iter().copied().zip(self.targets.iter().copied())
+    }
+
+    pub fn remap_targets(&mut self, resolve: impl Fn(Label) -> Label) {
+        for target in &mut self.targets {
+            *target = resolve(*target);
         }
     }
 }

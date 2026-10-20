@@ -43,23 +43,25 @@ Q = 00 :: T1
 Q:
   00   !   (program)                        01
   01  └‣─  (expression_statement)           02
-  02  └─!  _                                05, 08, 10
+  02  └─!  _                                10, 11
   04                                        ▶
   05   !   (identifier) [Node RecordSet(M0)]  07
   07  ─‣┘² _                                04
   08   !   (number) [Node RecordSet(M0)]    07
-  10  ──!  _                                05, 08, 10
+  10   !   switch
+             (identifier)                   05
+             (number)                       08
+  11  ──!  _                                10, 11
 --------------------- TRACE ----------------------
 Q:
   00       (program)                        01
        ●   program
   01       (expression_statement)           02
        ●   expression_statement
-  02       _                                05, 08, 10
+  02       _                                10, 11
        ●   number
-  05       (identifier) [Node RecordSet(M0)]  07
-       ○   number
-  02  ❮❮❮ 
+  10   !   switch                           
+       ●   number
   08       (number) [Node RecordSet(M0)]    07
        ●   number
   07       _                                04

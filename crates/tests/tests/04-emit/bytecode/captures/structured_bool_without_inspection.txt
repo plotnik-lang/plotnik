@@ -27,8 +27,11 @@ Q:
   03  ─‣┘  _                                01
   05   !   (expression_statement) [BoolValue(1) RecordSet(seen)]  03
   06   !   (comment) [BoolValue(0) RecordSet(seen)]  03
-  09  ──!  _                                05, 06, 09
-  10  └─!  _                                05, 06, 09
+  07   !   switch
+             (expression_statement)         05
+             (comment)                      06
+  09  ──!  _                                07, 09
+  10  └─!  _                                07, 09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -54,9 +57,12 @@ Q = 00 :: T1
 [instructions]
 Q:
   00   !   (program)                        01
-  01  └─!  _                                04, 06, 08
+  01  └─!  _                                08, 09
   03                                        ▶
-  04   !   (expression_statement) [BoolValue(1) RecordSet(M0)]  10
-  06   !   (comment) [BoolValue(0) RecordSet(M0)]  10
-  08  ──!  _                                04, 06, 08
-  10  ─‣┘  _                                03
+  04   !   (expression_statement) [BoolValue(1) RecordSet(M0)]  11
+  06   !   (comment) [BoolValue(0) RecordSet(M0)]  11
+  08   !   switch
+             (expression_statement)         04
+             (comment)                      06
+  09  ──!  _                                08, 09
+  11  ─‣┘  _                                03

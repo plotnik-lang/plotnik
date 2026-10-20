@@ -367,12 +367,12 @@ mod matcher {
 
     // Dense runtime state ids, in NFA label order.
     // Expr:
-    const S00_EXPR: u16 = 0;
-    const S01_EXPR: u16 = 1;
-    const S02_EXPR: u16 = 2;
-    const S04_EXPR: u16 = 3;
-    const S06_EXPR: u16 = 4;
-    const S07_EXPR: u16 = 5;
+    const S01_EXPR: u16 = 0;
+    const S02_EXPR: u16 = 1;
+    const S04_EXPR: u16 = 2;
+    const S06_EXPR: u16 = 3;
+    const S07_EXPR: u16 = 4;
+    const S08_EXPR: u16 = 5;
     // Q:
     const S10_Q: u16 = 6;
     const S11_Q: u16 = 7;
@@ -396,7 +396,7 @@ mod matcher {
     /// Match the `Expr` entrypoint against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn expr_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
-        let entry = S00_EXPR;
+        let entry = S08_EXPR;
         let boundary = EntryBoundary::new(false, false);
         let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
         outcome.expect("an unmetered run cannot exceed a limit")
@@ -411,7 +411,7 @@ mod matcher {
         run_at_node::<true, true>(
             eng,
             source,
-            S00_EXPR,
+            S08_EXPR,
             EntryBoundary::new(false, false),
             budget,
         )
@@ -567,11 +567,6 @@ mod matcher {
 
     fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   00  -ε-                                   02, 07
-            S00_EXPR => {
-                eng.push_successors(&[S07_EXPR]);
-                Flow::Jump(S02_EXPR)
-            }
             //   01                                        ▶
             S01_EXPR => {
                 if eng.frames_empty() {
@@ -598,7 +593,7 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::VariantClose);
                 Flow::Jump(S01_EXPR)
             }
-            //   06  └‣─  (Expr)                           00 : 04
+            //   06  └‣─  (Expr)                           08 : 04
             S06_EXPR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -607,7 +602,7 @@ mod matcher {
                     eng.checkpoint_state(),
                     S06_EXPR,
                     rt::CallResume {
-                        target: S00_EXPR,
+                        target: S08_EXPR,
                         call_site: S06_EXPR,
                         field: None,
                         policy: rt::SkipPolicy::Any,
@@ -616,7 +611,7 @@ mod matcher {
                 if let Err(error) = eng.enter_frame(S06_EXPR) {
                     return Flow::CallFrameError(error);
                 }
-                Flow::Jump(S00_EXPR)
+                Flow::Jump(S08_EXPR)
             }
             //   07   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  01
             S07_EXPR => 'state: {
@@ -629,6 +624,14 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::VariantClose);
                 Flow::Jump(S01_EXPR)
             }
+            //   08   !   switch
+            //              (parenthesized_expression)     02
+            //              (identifier)                   07
+            S08_EXPR => match eng.node().kind_id() {
+                178 => Flow::Jump(S02_EXPR), // (parenthesized_expression)
+                1 => Flow::Jump(S07_EXPR),   // (identifier)
+                _ => Flow::Backtrack,
+            },
             //   10                                        ▶
             S10_Q => {
                 if eng.frames_empty() {
@@ -671,7 +674,7 @@ mod matcher {
                 eng.emit_output_event(|_| rt::JournalEvent::RecordSet(4)); // RecordSet(expr)
                 Flow::Jump(S10_Q)
             }
-            //   16  └‣─  (Expr)                           00 : 14
+            //   16  └‣─  (Expr)                           08 : 14
             S16_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -680,7 +683,7 @@ mod matcher {
                     eng.checkpoint_state(),
                     S16_Q,
                     rt::CallResume {
-                        target: S00_EXPR,
+                        target: S08_EXPR,
                         call_site: S16_Q,
                         field: None,
                         policy: rt::SkipPolicy::Any,
@@ -689,7 +692,7 @@ mod matcher {
                 if let Err(error) = eng.enter_frame(S16_Q) {
                     return Flow::CallFrameError(error);
                 }
-                Flow::Jump(S00_EXPR)
+                Flow::Jump(S08_EXPR)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
         }
