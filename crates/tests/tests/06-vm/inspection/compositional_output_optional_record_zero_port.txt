@@ -233,281 +233,358 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
-       ●   program
+       ●   (program)
   02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
-       ●   expression_statement
+       ●   (expression_statement)
   04  └‣─  (array)                          06          [SpanStartAt(P3)]
-       ●   array
+       ●   (array)
   06  └─!  _                                53, 14
-       ●   [
+       ●   "["
   53   !   "["                              70          [SpanStartAt(P4) SpanEnd(P4)]
-       ●   [
+       ●   "["
   70  -ε-                                   68, 24      [SpanStart(P6)]
   68  ──!  _                                66, 68
-       ●   identifier
+       ●   (identifier)
   66  -ε-                                   64          [RecordOpen]
   64  -ε-                                   62, 50      [SpanStart(P9)]
   62   !   _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ●   identifier
+       ●   (identifier) "a"
   38  -ε-                                   32, 27      [SpanStart(P12)]
   32  ─•─  (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   38  ❮❮❮
   27  -ε-                                   20          [SpanStart(P11) Absent RecordSet(M1 x) SpanEnd(P11) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
   20  ─•─  (identifier == "b")              08          [SpanEnd(P6) SpanStartAt(P15) SpanStart(P14) Node RecordSet(M3 b) SpanEnd(P14) SpanEnd(P15)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   62  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ,
+       ●   ","
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "c"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ,
+       ●   ","
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "b"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ]
+       ●   "]"
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
+       ○   no candidate
   64  ❮❮❮
   50  -ε-                                   48          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
   48   !   _                                40, 46      [SpanStart(P12)]
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "a"
+       ○   no candidate
   48  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ,
+       ●   ","
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "c"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ,
+       ●   ","
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "b"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ]
+       ●   "]"
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
+       ○   no candidate
   68  ❮❮❮
   68  ──!  _                                66, 68
-       ●   ,
+       ●   ","
   66  -ε-                                   64          [RecordOpen]
   64  -ε-                                   62, 50      [SpanStart(P9)]
   62   !   _                                56, 60
-       ●   ,
+       ●   ","
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   62  ❮❮❮
   60  ──!  _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "c"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ,
+       ●   ","
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "b"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ]
+       ●   "]"
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
+       ○   no candidate
   64  ❮❮❮
   50  -ε-                                   48          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
   48   !   _                                40, 46      [SpanStart(P12)]
-       ●   ,
+       ●   ","
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   48  ❮❮❮
   46  ──!  _                                40, 46
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "c"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ,
+       ●   ","
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "b"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ]
+       ●   "]"
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
+       ○   no candidate
   68  ❮❮❮
   68  ──!  _                                66, 68
-       ●   identifier
+       ●   (identifier)
   66  -ε-                                   64          [RecordOpen]
   64  -ε-                                   62, 50      [SpanStart(P9)]
   62   !   _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "c"
+       ○   no candidate
   62  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ,
+       ●   ","
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "b"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ]
+       ●   "]"
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
+       ○   no candidate
   64  ❮❮❮
   50  -ε-                                   48          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
   48   !   _                                40, 46      [SpanStart(P12)]
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "c"
+       ○   no candidate
   48  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ,
+       ●   ","
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "b"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ]
+       ●   "]"
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
+       ○   no candidate
   68  ❮❮❮
   68  ──!  _                                66, 68
-       ●   ,
+       ●   ","
   66  -ε-                                   64          [RecordOpen]
   64  -ε-                                   62, 50      [SpanStart(P9)]
   62   !   _                                56, 60
-       ●   ,
+       ●   ","
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   62  ❮❮❮
   60  ──!  _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "b"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ]
+       ●   "]"
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
+       ○   no candidate
   64  ❮❮❮
   50  -ε-                                   48          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
   48   !   _                                40, 46      [SpanStart(P12)]
-       ●   ,
+       ●   ","
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   48  ❮❮❮
   46  ──!  _                                40, 46
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "b"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ]
+       ●   "]"
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
+       ○   no candidate
   68  ❮❮❮
   68  ──!  _                                66, 68
-       ●   identifier
+       ●   (identifier)
   66  -ε-                                   64          [RecordOpen]
   64  -ε-                                   62, 50      [SpanStart(P9)]
   62   !   _                                56, 60
-       ●   identifier
+       ●   (identifier)
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
+       ○   (identifier) "b"
+       ○   no candidate
   62  ❮❮❮
   60  ──!  _                                56, 60
-       ●   ]
+       ●   "]"
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   60  ❮❮❮
   60  ──!  _                                56, 60
+       ○   no candidate
   64  ❮❮❮
   50  -ε-                                   48          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
   48   !   _                                40, 46      [SpanStart(P12)]
-       ●   identifier
+       ●   (identifier)
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
+       ○   (identifier) "b"
+       ○   no candidate
   48  ❮❮❮
   46  ──!  _                                40, 46
-       ●   ]
+       ●   "]"
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   46  ❮❮❮
   46  ──!  _                                40, 46
+       ○   no candidate
   68  ❮❮❮
   68  ──!  _                                66, 68
-       ●   ]
+       ●   "]"
   66  -ε-                                   64          [RecordOpen]
   64  -ε-                                   62, 50      [SpanStart(P9)]
   62   !   _                                56, 60
-       ●   ]
+       ●   "]"
   56   !   (identifier == "a")              38          [SpanStartAt(P10) SpanStart(P8) Node RecordSet(M0 a) SpanEnd(P8) SpanEnd(P10) SpanEnd(P9)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   62  ❮❮❮
   60  ──!  _                                56, 60
+       ○   no candidate
   64  ❮❮❮
   50  -ε-                                   48          [SpanStart(P8) Absent RecordSet(M0 a) SpanEnd(P8) SpanEnd(P9)]
   48   !   _                                40, 46      [SpanStart(P12)]
-       ●   ]
+       ●   "]"
   40   !   (identifier == "x")              16          [SpanStartAt(P13) SpanStart(P11) Node RecordSet(M1 x) SpanEnd(P11) SpanEnd(P13) SpanEnd(P12) RecordClose SpanStart(P5) RecordSet(M2 prefix) SpanEnd(P5)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   48  ❮❮❮
   46  ──!  _                                40, 46
+       ○   no candidate
   68  ❮❮❮
   68  ──!  _                                66, 68
+       ○   no candidate
   70  ❮❮❮
   24  -ε-                                   16          [SpanStart(P5) Absent RecordSet(M2 prefix) SpanEnd(P5)]
   16  ─‣─  (identifier == "b")              08          [SpanEnd(P6) SpanStartAt(P15) SpanStart(P14) Node RecordSet(M3 b) SpanEnd(P14) SpanEnd(P15)]
-       ○   ,
-       ○   ,
-       ●   identifier
+       ○   (identifier) "a"
+       ○   ","
+       ○   (identifier) "c"
+       ○   ","
+       ●   (identifier) "b"
   08  ─‣┘  _                                09
-       ●   array
+       ●   (array)
   09  ─‣┘  _                                11          [SpanEnd(P3)]
-       ●   expression_statement
+       ●   (expression_statement)
   11  ─‣┘  _                                13          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
-       ●   program
+       ●   (program)
   13   ◀   return                           ◼

@@ -62,49 +62,55 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  -ε-                                   12, 06      [ListOpen]
   12  └─!  _                                08, 10
-       ●   [
+       ●   "["
   08   !   ","                              10, 14      [Node ArrayPush]
-       ○   [
+       ○   "["
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
-       ●   number
+       ●   (number)
   08   !   ","                              10, 14      [Node ArrayPush]
-       ○   number
+       ○   (number)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
-       ●   ,
+       ●   ","
   08   !   ","                              10, 14      [Node ArrayPush]
-       ●   ,
+       ●   ","
   10  ──!  _                                08, 10
-       ●   number
+       ●   (number)
   08   !   ","                              10, 14      [Node ArrayPush]
-       ○   number
+       ○   (number)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
-       ●   ,
+       ●   ","
   08   !   ","                              10, 14      [Node ArrayPush]
-       ●   ,
+       ●   ","
   10  ──!  _                                08, 10
-       ●   number
+       ●   (number)
   08   !   ","                              10, 14      [Node ArrayPush]
-       ○   number
+       ○   (number)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
-       ●   ]
+       ●   "]"
   08   !   ","                              10, 14      [Node ArrayPush]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   08  ❮❮❮
   14  ─‣┘  _                                16          [ListClose RecordSet(M0 commas)]
-       ●   array
+       ●   (array)
   16  ─‣┘² _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

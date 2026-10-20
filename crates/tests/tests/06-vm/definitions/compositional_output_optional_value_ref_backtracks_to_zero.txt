@@ -114,22 +114,22 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                07, 61
-       ●   [
+       ●   "["
   07   !   "["                              58
-       ●   [
+       ●   "["
   58       (@56)                            56 : 08 / 11 / 08
        ▶   (@56)
 
 @56:
   56  -ε-                                   51, 53
   51  ──!  _                                48, 51
-       ●   identifier
+       ●   (identifier)
   48       (@45)                            45 : 14 / 15
        ▶   (@45)
 
@@ -137,11 +137,13 @@ Q:
   45  -ε-                                   40, 42
   40  -ε-                                   37, 29      [VariantOpen(M3 Left)]
   37   !   _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier) "a"
   21  ─•─  (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   32  ❮❮❮
   19  -ε-                                   18          [Absent RecordSet(M1 z) VariantClose]
   18   ◀   return p1                        15
@@ -151,66 +153,88 @@ Q:
 
 Q:
   11  ─•─  (identifier == "b")              06          [RecordSet(M5 choice) Node RecordSet(M6 b)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   37  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ,
+       ●   ","
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "c"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ,
+       ●   ","
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   40  ❮❮❮
   29   !   _                                24, 27      [Absent RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "a"
+       ○   no candidate
   29  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ,
+       ●   ","
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "c"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ,
+       ●   ","
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "b"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ]
+       ●   "]"
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
+       ○   no candidate
   45  ❮❮❮
   42   !   (identifier == "x")              17          [VariantOpen(M4 X) Node RecordSet(M2 x) VariantClose]
+       ○   (identifier) "a"
+       ○   no candidate
   51  ❮❮❮
   51  ──!  _                                48, 51
-       ●   ,
+       ●   ","
   48       (@45)                            45 : 14 / 15
        ▶   (@45)
 
@@ -218,60 +242,77 @@ Q:
   45  -ε-                                   40, 42
   40  -ε-                                   37, 29      [VariantOpen(M3 Left)]
   37   !   _                                32, 35
-       ●   ,
+       ●   ","
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   37  ❮❮❮
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "c"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ,
+       ●   ","
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   40  ❮❮❮
   29   !   _                                24, 27      [Absent RecordSet(M0 a)]
-       ●   ,
+       ●   ","
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   29  ❮❮❮
   27  ──!  _                                24, 27
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "c"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ,
+       ●   ","
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "b"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ]
+       ●   "]"
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
+       ○   no candidate
   45  ❮❮❮
   42   !   (identifier == "x")              17          [VariantOpen(M4 X) Node RecordSet(M2 x) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   51  ❮❮❮
   51  ──!  _                                48, 51
-       ●   identifier
+       ●   (identifier)
   48       (@45)                            45 : 14 / 15
        ▶   (@45)
 
@@ -279,49 +320,65 @@ Q:
   45  -ε-                                   40, 42
   40  -ε-                                   37, 29      [VariantOpen(M3 Left)]
   37   !   _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "c"
+       ○   no candidate
   37  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ,
+       ●   ","
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   40  ❮❮❮
   29   !   _                                24, 27      [Absent RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "c"
+       ○   no candidate
   29  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ,
+       ●   ","
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "b"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ]
+       ●   "]"
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
+       ○   no candidate
   45  ❮❮❮
   42   !   (identifier == "x")              17          [VariantOpen(M4 X) Node RecordSet(M2 x) VariantClose]
+       ○   (identifier) "c"
+       ○   no candidate
   51  ❮❮❮
   51  ──!  _                                48, 51
-       ●   ,
+       ●   ","
   48       (@45)                            45 : 14 / 15
        ▶   (@45)
 
@@ -329,42 +386,53 @@ Q:
   45  -ε-                                   40, 42
   40  -ε-                                   37, 29      [VariantOpen(M3 Left)]
   37   !   _                                32, 35
-       ●   ,
+       ●   ","
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   37  ❮❮❮
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   40  ❮❮❮
   29   !   _                                24, 27      [Absent RecordSet(M0 a)]
-       ●   ,
+       ●   ","
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   29  ❮❮❮
   27  ──!  _                                24, 27
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "b"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ]
+       ●   "]"
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
+       ○   no candidate
   45  ❮❮❮
   42   !   (identifier == "x")              17          [VariantOpen(M4 X) Node RecordSet(M2 x) VariantClose]
-       ○   ,
+       ○   ","
+       ○   no candidate
   51  ❮❮❮
   51  ──!  _                                48, 51
-       ●   identifier
+       ●   (identifier)
   48       (@45)                            45 : 14 / 15
        ▶   (@45)
 
@@ -372,31 +440,41 @@ Q:
   45  -ε-                                   40, 42
   40  -ε-                                   37, 29      [VariantOpen(M3 Left)]
   37   !   _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   37  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   40  ❮❮❮
   29   !   _                                24, 27      [Absent RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
+       ○   (identifier) "b"
+       ○   no candidate
   29  ❮❮❮
   27  ──!  _                                24, 27
-       ●   ]
+       ●   "]"
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   27  ❮❮❮
   27  ──!  _                                24, 27
+       ○   no candidate
   45  ❮❮❮
   42   !   (identifier == "x")              17          [VariantOpen(M4 X) Node RecordSet(M2 x) VariantClose]
+       ○   (identifier) "b"
+       ○   no candidate
   51  ❮❮❮
   51  ──!  _                                48, 51
-       ●   ]
+       ●   "]"
   48       (@45)                            45 : 14 / 15
        ▶   (@45)
 
@@ -404,32 +482,40 @@ Q:
   45  -ε-                                   40, 42
   40  -ε-                                   37, 29      [VariantOpen(M3 Left)]
   37   !   _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              21, 19      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   37  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   40  ❮❮❮
   29   !   _                                24, 27      [Absent RecordSet(M0 a)]
-       ●   ]
+       ●   "]"
   24   !   (identifier == "z")              17          [Node RecordSet(M1 z) VariantClose]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   29  ❮❮❮
   27  ──!  _                                24, 27
+       ○   no candidate
   45  ❮❮❮
   42   !   (identifier == "x")              17          [VariantOpen(M4 X) Node RecordSet(M2 x) VariantClose]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   51  ❮❮❮
   51  ──!  _                                48, 51
+       ○   no candidate
   56  ❮❮❮
   53  -ε-                                   16          [Absent]
   16   ◀   return p2                        08
 
 Q:
   08  ─‣─  (identifier == "b")              06          [RecordSet(M5 choice) Node RecordSet(M6 b)]
-       ○   ,
-       ○   ,
-       ●   identifier
+       ○   (identifier) "a"
+       ○   ","
+       ○   (identifier) "c"
+       ○   ","
+       ●   (identifier) "b"
   06  ─‣┘³ _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

@@ -48,15 +48,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  └‣─  (template_string)                 3
-      ●   template_string
+      ●   (template_string)
   3  └‣─  (string_fragment =~ /c$/)         5           [Node RecordSet(M0 text)]
-      ○   `
-      ○   template_substitution
-      ○   `
+      ○   "`"
+      ○   (string_fragment) "abc\n"
+      ○   (template_substitution) "${x}"
+      ○   "`"
+      ○   no candidate
   2  ❮❮❮
-      ○   ;
+  2  └‣─  (template_string)                 3
+      ○   ";"
+      ○   no candidate
   1  ❮❮❮
+  1  └‣─  (expression_statement)            2
+      ○   no candidate

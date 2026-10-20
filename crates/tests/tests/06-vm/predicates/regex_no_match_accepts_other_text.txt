@@ -49,11 +49,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  └‣─  (identifier !~ /^foo/)            4           [Node RecordSet(M0 id)]
-      ●   identifier
+      ●   (identifier) "barfoo"
   4  ─‣┘² _                                 5
-      ●   program
+      ●   (program)
   5   ◀   return                            ◼

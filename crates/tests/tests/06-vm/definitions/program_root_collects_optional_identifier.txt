@@ -41,13 +41,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        10, 06
-       ●   program
+       ●   (program)
   10  └─!  _                                02, 08
-       ●   expression_statement
+       ●   (expression_statement)
   02   !   (identifier)                     04          [Node RecordSet(M0 id)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   10  ❮❮❮
   08  ──!  _                                02, 08
+       ○   no candidate
   00  ❮❮❮
   06  -ε-                                   05          [Absent RecordSet(M0 id)]
   05   ◀   return                           ◼

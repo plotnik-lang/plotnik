@@ -56,13 +56,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                08, 09
-       ●   debugger_statement
-  08   !   switch
-       ●   debugger_statement
+       ●   (debugger_statement)
+  08   ●   switch (debugger_statement)      04
   04   !   (debugger_statement)             11          [VariantOpen(M0 A) VariantClose]
-       ●   debugger_statement
+       ●   (debugger_statement)
   11  ─‣┘  _                                03          [RecordSet(M2 v)]
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

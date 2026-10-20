@@ -72,11 +72,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                03, 09
-       ●   expression_statement
+       ●   (expression_statement)
   03   !   (expression_statement)           06          [VariantOpen(M1 In) Node RecordSet(M0 a) VariantClose]
-       ●   expression_statement
+       ●   (expression_statement)
   06  ─‣┘  _                                08          [RecordSet(M2 y)]
-       ●   program
+       ●   (program)
   08   ◀   return                           ◼

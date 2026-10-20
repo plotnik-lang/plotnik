@@ -48,15 +48,23 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          10, 05
-       ●   array
+       ●   (array)
   10  └•─  (identifier == "a")              08
-       ○   [
+       ○   "["
+       ○   (identifier) "c"
+       ○   no candidate
   02  ❮❮❮
   05  └•─  (identifier == "b")              07          [Node RecordSet(M0 b)]
-       ○   [
+       ○   "["
+       ○   (identifier) "c"
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (array)                          10, 05
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

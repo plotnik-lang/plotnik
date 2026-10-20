@@ -55,53 +55,66 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                14, 16
-       ●   [
+       ●   "["
   14   !   (object)                         12
-       ○   [
+       ○   "["
+       ○   no candidate
   03  ❮❮❮
   16  ──!  _                                14, 16
-       ●   object
+       ●   (object)
   14   !   (object)                         12
-       ●   object
+       ●   (object)
   12  └─!  _                                08, 10
-       ●   {
+       ●   "{"
   08   !   (pair)                           05          [Node RecordSet(M0 p)]
-       ○   {
+       ○   "{"
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
-       ●   pair
+       ●   (pair)
   08   !   (pair)                           05          [Node RecordSet(M0 p)]
-       ●   pair
+       ●   (pair)
   05  ─•┘² _                                06
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
-       ●   }
+       ●   "}"
   08   !   (pair)                           05          [Node RecordSet(M0 p)]
-       ○   }
+       ○   "}"
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   16  ❮❮❮
   16  ──!  _                                14, 16
-       ●   ,
+       ●   ","
   14   !   (object)                         12
-       ○   ,
+       ○   ","
+       ○   no candidate
   16  ❮❮❮
   16  ──!  _                                14, 16
-       ●   identifier
+       ●   (identifier)
   14   !   (object)                         12
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   16  ❮❮❮
   16  ──!  _                                14, 16
-       ●   ]
+       ●   "]"
   14   !   (object)                         12
-       ○   ]
+       ○   "]"
+       ○   no candidate
   16  ❮❮❮
   16  ──!  _                                14, 16
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (array)                          03
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

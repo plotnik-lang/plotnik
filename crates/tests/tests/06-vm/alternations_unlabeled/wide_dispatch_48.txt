@@ -277,66 +277,70 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   001   !   (program)                       002
-        ●   program
+        ●   (program)
   002  -ε-                                  116, 107    [ListOpen]
   116  └─!  _                               112, 114
-        ●   expression_statement
+        ●   (expression_statement)
   112   !   (expression_statement)          111         [RecordOpen RecordOpen]
-        ●   expression_statement
+        ●   (expression_statement)
   111  └‣─  (Choice)                        000 : 004
+        ●   (string)
         ▶   (Choice)
 
 Choice:
-  000   !   switch
-        ○   string
+  000   ○   switch (string)
   111  ❮❮❮
+  111  └‣─  (Choice)                        000 : 004
+        ●   ";"
         ▶   (Choice)
 
 Choice:
-  000   !   switch
-        ○   ;
+  000   ○   switch ";"
   111  ❮❮❮
+  111  └‣─  (Choice)                        000 : 004
+        ○   no candidate
   116  ❮❮❮
   114  ──!  _                               112, 114
-        ●   expression_statement
+        ●   (expression_statement)
   112   !   (expression_statement)          111         [RecordOpen RecordOpen]
-        ●   expression_statement
+        ●   (expression_statement)
   111  └‣─  (Choice)                        000 : 004
+        ●   (number)
         ▶   (Choice)
 
 Choice:
-  000   !   switch
-        ●   number
+  000   ●   switch (number)                 104
   104   !   (number)                        008         [Node RecordSet(M0 node)]
-        ●   number
+        ●   (number)
   008   ◀   return                          004
 
 Q:
   004  -ε-                                  006         [RecordClose]
   006  ─‣┘  _                               109         [RecordSet(M1 value)]
-        ●   expression_statement
+        ●   (expression_statement)
   109  -ε-                                  114, 118    [RecordClose ArrayPush]
   114  ──!  _                               112, 114
-        ●   expression_statement
+        ●   (expression_statement)
   112   !   (expression_statement)          111         [RecordOpen RecordOpen]
-        ●   expression_statement
+        ●   (expression_statement)
   111  └‣─  (Choice)                        000 : 004
+        ●   (identifier)
         ▶   (Choice)
 
 Choice:
-  000   !   switch
-        ●   identifier
+  000   ●   switch (identifier)             009
   009   !   (identifier)                    008         [Node RecordSet(M0 node)]
-        ●   identifier
+        ●   (identifier)
   008   ◀   return                          004
 
 Q:
   004  -ε-                                  006         [RecordClose]
   006  ─‣┘  _                               109         [RecordSet(M1 value)]
-        ●   expression_statement
+        ●   (expression_statement)
   109  -ε-                                  114, 118    [RecordClose ArrayPush]
   114  ──!  _                               112, 114
+        ○   no candidate
   109  ❮❮❮
   118  ─‣┘  _                               106         [ListClose RecordSet(M2 items)]
-        ●   program
+        ●   (program)
   106   ◀   return                          ◼

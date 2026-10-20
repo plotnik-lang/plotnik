@@ -56,36 +56,41 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (if_statement)                   02
-       ●   if_statement
+       ●   (if_statement)
   02  └‣─  consequence: (statement_block)   03
-       ○   if
-       ○   parenthesized_expression
-       ●   statement_block
+       ○   "if"
+       ○   condition: (parenthesized_expression)
+       ●   consequence: (statement_block)
   03  └─!  _                                06, 08, 10
-       ●   {
+       ●   "{"
   06   !   (MISSING "}")                    12          [Node RecordSet(M0 m)]
-       ○   {
+       ○   "{"
+       ○   no candidate
   03  ❮❮❮
   08   !   "}"                              12          [Node RecordSet(M0 m)]
-       ○   {
+       ○   "{"
+       ○   no candidate
   03  ❮❮❮
   10  ──!  _                                06, 08, 10
-       ●   expression_statement
+       ●   (expression_statement)
   06   !   (MISSING "}")                    12          [Node RecordSet(M0 m)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   10  ❮❮❮
   08   !   "}"                              12          [Node RecordSet(M0 m)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                06, 08, 10
-       ●   }
+       ●   "}"
   06   !   (MISSING "}")                    12          [Node RecordSet(M0 m)]
-       ○   }
+       ○   "}"
+       ○   no candidate
   10  ❮❮❮
   08   !   "}"                              12          [Node RecordSet(M0 m)]
-       ●   }
+       ●   "}"
   12  ─‣┘³ _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

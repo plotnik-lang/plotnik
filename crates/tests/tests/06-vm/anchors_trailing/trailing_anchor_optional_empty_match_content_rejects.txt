@@ -42,12 +42,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        10, 03
-       ●   program
+       ●   (program)
   10  └─!  _                                06, 08
-       ●   expression_statement
+       ●   (expression_statement)
   06   !   (debugger_statement)             05          [Node RecordSet(M0 b)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   10  ❮❮❮
   08  ──!  _                                06, 08
+       ○   no candidate
   00  ❮❮❮
   03  └•┘  _                                02          [Absent RecordSet(M0 b)]
+       ○   no candidate

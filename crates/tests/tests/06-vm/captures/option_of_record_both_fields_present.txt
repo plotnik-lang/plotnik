@@ -65,13 +65,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        14, 08
-       ●   program
+       ●   (program)
   14  └─!  _                                10, 12
-       ●   expression_statement
+       ●   (expression_statement)
   10   !   (expression_statement)           02          [RecordOpen Node RecordSet(M0 a)]
-       ●   expression_statement
+       ●   (expression_statement)
   02  ─‣─  (debugger_statement)             04          [Node RecordSet(M1 b)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   04  ─‣┘  _                                06          [RecordClose RecordSet(M2 x)]
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

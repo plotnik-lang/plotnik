@@ -74,19 +74,20 @@ Additional:
 --------------------- TRACE ----------------------
 <expression>:
   07   !   (program)                        08
-       ●   program
+       ●   (program)
   08  └‣─  (expression_statement)           10          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   10  └‣─  (Name)                           00 : 11
+       ●   (identifier)
        ▶   (Name)
 
 Name:
   00   !   (identifier)                     02          [NodeText RecordSet(M0 text)]
-       ●   identifier
+       ●   (identifier)
   02   ◀   return                           11
 
 <expression>:
   11  -ε-                                   13          [RecordClose]
   13  ─‣┘² _                                15          [RecordSet(M1 name)]
-       ●   program
+       ●   (program)
   15   ◀   return                           ◼

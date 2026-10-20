@@ -50,14 +50,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (source_file)                     1
-      ●   source_file
+      ●   (source_file)
   1  └‣─  (function_declaration)            2
-      ●   function_declaration
+      ●   (function_declaration)
   2  └‣─  signature: (function_signature)   3
-      ●   function_signature
+      ●   signature: (function_signature)
   3  └‣─  name: (identifier)                5           [Node RecordSet(M0 name)]
-      ○   type
-      ●   identifier
+      ○   return_type: (type)
+      ●   name: (identifier)
   5  ─‣┘³ _                                 6
-      ●   source_file
+      ●   (source_file)
   6   ◀   return                            ◼

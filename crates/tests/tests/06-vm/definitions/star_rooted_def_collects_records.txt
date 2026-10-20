@@ -109,92 +109,101 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   07   !   (program)                        08
-       ●   program
+       ●   (program)
   08  └‣─  (expression_statement)           09
-       ●   expression_statement
+       ●   (expression_statement)
   09  └‣─  (parenthesized_expression)       10
-       ●   parenthesized_expression
+       ●   (parenthesized_expression)
   10  └‣─  (object)                         11
-       ○   (
-       ●   object
+       ○   "("
+       ●   (object)
   11  -ε-                                   32, 19      [ListOpen]
   32  └─!  _                                27, 29
-       ●   {
+       ●   "{"
   27  -ε-                                   26          [RecordOpen]
   26   !   (Row)                            00 : 24
+       ●   "{"
        ▶   (Row)
 
 Row:
   00   !   (pair)                           01
-       ○   {
+       ○   "{"
+       ○   no candidate
   32  ❮❮❮
   29  ──!  _                                27, 29
-       ●   pair
+       ●   (pair)
   27  -ε-                                   26          [RecordOpen]
   26   !   (Row)                            00 : 24
+       ●   (pair)
        ▶   (Row)
 
 Row:
   00   !   (pair)                           01
-       ●   pair
+       ●   (pair)
   01  └‣─  key: (_)                         03          [Node RecordSet(M0 key)]
-       ●   property_identifier
+       ●   key: (property_identifier)
   03  ─‣─  value: (_)                       05          [Node RecordSet(M1 val)]
-       ○   :
-       ●   number
+       ○   ":"
+       ●   value: (number)
   05  ─‣┘  _                                06
-       ●   pair
+       ●   (pair)
   06   ◀   return                           24
 
 Q:
   24  -ε-                                   21          [RecordClose]
   21  -ε-                                   29, 13      [ArrayPush]
   29  ──!  _                                27, 29
-       ●   ,
+       ●   ","
   27  -ε-                                   26          [RecordOpen]
   26   !   (Row)                            00 : 24
+       ●   ","
        ▶   (Row)
 
 Row:
   00   !   (pair)                           01
-       ○   ,
+       ○   ","
+       ○   no candidate
   29  ❮❮❮
   29  ──!  _                                27, 29
-       ●   pair
+       ●   (pair)
   27  -ε-                                   26          [RecordOpen]
   26   !   (Row)                            00 : 24
+       ●   (pair)
        ▶   (Row)
 
 Row:
   00   !   (pair)                           01
-       ●   pair
+       ●   (pair)
   01  └‣─  key: (_)                         03          [Node RecordSet(M0 key)]
-       ●   property_identifier
+       ●   key: (property_identifier)
   03  ─‣─  value: (_)                       05          [Node RecordSet(M1 val)]
-       ○   :
-       ●   number
+       ○   ":"
+       ●   value: (number)
   05  ─‣┘  _                                06
-       ●   pair
+       ●   (pair)
   06   ◀   return                           24
 
 Q:
   24  -ε-                                   21          [RecordClose]
   21  -ε-                                   29, 13      [ArrayPush]
   29  ──!  _                                27, 29
-       ●   }
+       ●   "}"
   27  -ε-                                   26          [RecordOpen]
   26   !   (Row)                            00 : 24
+       ●   "}"
        ▶   (Row)
 
 Row:
   00   !   (pair)                           01
-       ○   }
+       ○   "}"
+       ○   no candidate
   29  ❮❮❮
   29  ──!  _                                27, 29
+       ○   no candidate
   21  ❮❮❮
   13  -ε-                                   16          [ListClose]
   16  ─‣┘  _                                15          [RecordSet(M2 rows)]
-       ●   object
+       ●   (object)
   15  ─‣┘³ _                                18
-       ●   program
+       ●   (program)
   18   ◀   return                           ◼

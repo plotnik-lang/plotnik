@@ -68,26 +68,29 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   16, 04      [ListOpen]
   16  └─!  _                                12, 14
-       ●   comment
+       ●   (comment)
   12   !   _                                08, 10      [VariantOpen(M1 A)]
-       ●   comment
+       ●   (comment)
   08   !   (comment)                        06          [Node RecordSet(M0 c)]
-       ●   comment
+       ●   (comment)
   06  -ε-                                   14, 18      [VariantClose ArrayPush]
   14  ──!  _                                12, 14
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   _                                08, 10      [VariantOpen(M1 A)]
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (comment)                        06          [Node RecordSet(M0 c)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   14  ❮❮❮
   14  ──!  _                                12, 14
+       ○   no candidate
   06  ❮❮❮
   18  ─‣┘  _                                03          [ListClose RecordSet(M2 items)]
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

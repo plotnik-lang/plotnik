@@ -69,45 +69,46 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        27, 03
-       ●   program
+       ●   (program)
   27  └─!  _                                24, 25
-       ●   statement_block
+       ●   (statement_block)
   24   !   (statement_block)                20
-       ●   statement_block
+       ●   (statement_block)
   20       (@18)                            18 : 08 / 07
        ▶   (@18)
 
 @18:
   18  -ε-                                   17, 10
   17  └•─  (statement_block)                13
-       ○   {
-       ●   statement_block
+       ○   "{"
+       ●   (statement_block)
   13       (@18)                            18 : 12 / 11
        ▶   (@18)
 
 @18:
   18  -ε-                                   17, 10
   17  └•─  (statement_block)                13
-       ○   {
-       ○   debugger_statement
+       ○   "{"
+       ○   (debugger_statement)
+       ○   no candidate
   18  ❮❮❮
   10   ◀   return p1                        11
 
 @18:
   11  └•─  (debugger_statement)             16
-       ○   {
-       ●   debugger_statement
+       ○   "{"
+       ●   (debugger_statement)
   16  ─‣┘  _                                09
-       ●   statement_block
+       ●   (statement_block)
   09   ◀   return                           08
 
 Q:
   08  ─‣─  (debugger_statement)             23
-       ●   debugger_statement
+       ●   (debugger_statement)
   23  ─‣┘  _                                05
-       ●   statement_block
+       ●   (statement_block)
   05  ─‣─  (expression_statement)           29          [Node RecordSet(M0 e)]
-       ●   expression_statement
+       ●   (expression_statement)
   29  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

@@ -38,24 +38,30 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                08, 09
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (expression_statement)           03
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (identifier == "a")              05
-       ●   identifier
+       ●   (identifier) "a"
   05  ─‣┘  _                                07
-       ●   expression_statement
+       ●   (expression_statement)
   07  ─•┘  _                                06
+       ○   no candidate
   03  ❮❮❮
-       ○   ;
+  03  └‣─  (identifier == "a")              05
+       ○   ";"
+       ○   no candidate
   01  ❮❮❮
   09  ──!  _                                08, 09
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (expression_statement)           03
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (identifier == "a")              05
-       ○   ;
+       ○   (identifier) "b"
+       ○   ";"
+       ○   no candidate
   09  ❮❮❮
   09  ──!  _                                08, 09
+       ○   no candidate

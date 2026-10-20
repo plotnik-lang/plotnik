@@ -70,64 +70,69 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        30, 03
-       ●   program
+       ●   (program)
   30  └─!  _                                36, 38
-       ●   statement_block
+       ●   (statement_block)
   36   !   (statement_block)                32          [SuppressBegin]
-       ●   statement_block
+       ●   (statement_block)
   32       (@28)                            28 : 10 / 08
        ▶   (@28)
 
 @28:
   28  -ε-                                   26, 13
   26  └─!  _                                22, 24
-       ●   {
+       ●   "{"
   22   !   (statement_block)                18          [SuppressBegin]
-       ○   {
+       ○   "{"
+       ○   no candidate
   26  ❮❮❮
   24  ──!  _                                22, 24
-       ●   statement_block
+       ●   (statement_block)
   22   !   (statement_block)                18          [SuppressBegin]
-       ●   statement_block
+       ●   (statement_block)
   18       (@28)                            28 : 16 / 14
        ▶   (@28)
 
 @28:
   28  -ε-                                   26, 13
   26  └─!  _                                22, 24
-       ●   {
+       ●   "{"
   22   !   (statement_block)                18          [SuppressBegin]
-       ○   {
+       ○   "{"
+       ○   no candidate
   26  ❮❮❮
   24  ──!  _                                22, 24
-       ●   debugger_statement
+       ●   (debugger_statement)
   22   !   (statement_block)                18          [SuppressBegin]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   24  ❮❮❮
   24  ──!  _                                22, 24
-       ●   }
+       ●   "}"
   22   !   (statement_block)                18          [SuppressBegin]
-       ○   }
+       ○   "}"
+       ○   no candidate
   24  ❮❮❮
   24  ──!  _                                22, 24
+       ○   no candidate
   28  ❮❮❮
   13   ◀   return p1                        14
 
 @28:
   14  └‣─  (debugger_statement)             21          [SuppressEnd]
-       ○   {
-       ●   debugger_statement
+       ○   "{"
+       ●   (debugger_statement)
   21  ─‣┘  _                                12
-       ●   statement_block
+       ●   (statement_block)
   12   ◀   return                           10
 
 Q:
   10  ─‣─  (debugger_statement)             35          [SuppressEnd]
-       ●   debugger_statement
+       ●   (debugger_statement)
   35  ─‣┘  _                                05
-       ●   statement_block
+       ●   (statement_block)
   05  ─‣─  (expression_statement)           07          [Node RecordSet(M0 e)]
-       ●   expression_statement
+       ●   (expression_statement)
   07  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

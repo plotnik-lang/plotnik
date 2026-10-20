@@ -50,14 +50,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  └‣─  (binary_expression)               3
-      ●   binary_expression
+      ●   (binary_expression)
   3  └‣─  right: (identifier)               5           [Node RecordSet(M0 r)]
-      ○   +
-      ●   identifier
+      ○   left: (identifier)
+      ○   operator: "+"
+      ●   right: (identifier)
   5  ─‣┘³ _                                 6
-      ●   program
+      ●   (program)
   6   ◀   return                            ◼

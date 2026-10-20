@@ -50,14 +50,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (lexical_declaration)             2
-      ●   lexical_declaration
+      ●   (lexical_declaration)
   2  └‣─  (variable_declarator)             3
-      ○   let
-      ●   variable_declarator
+      ○   "let"
+      ●   (variable_declarator)
   3  └‣─  name: (identifier)                5           [Node RecordSet(M0 n)]
-      ●   identifier
+      ●   name: (identifier)
   5  ─‣┘³ _                                 6
-      ●   program
+      ●   (program)
   6   ◀   return                            ◼

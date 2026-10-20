@@ -66,17 +66,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (binary_expression)              10, 12
-       ●   binary_expression
+       ●   (binary_expression)
   10  └‣─  (identifier)                     05          [Node RecordSet(M0 left)]
-       ●   identifier
+       ●   (identifier)
   05  ─•─  (identifier)                     07          [Node RecordSet(M1 right)]
-       ○   +
-       ○   comment
-       ●   identifier
+       ○   "+"
+       ○   (comment)
+       ●   (identifier)
   07  ─‣┘³ _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

@@ -70,46 +70,56 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                22, 24
-       ●   [
+       ●   "["
   22   !   "["                              20, 10
-       ●   [
+       ●   "["
   20  ──!  _                                16, 18, 20
-       ●   identifier
+       ●   (identifier)
   16   !   _                                12, 14
-       ●   identifier
+       ●   (identifier)
   12   !   (identifier == "a")              08
+       ○   (identifier) "b"
+       ○   no candidate
   16  ❮❮❮
   14  ──!  _                                12, 14
-       ●   ]
+       ●   "]"
   12   !   (identifier == "a")              08
-       ○   ]
+       ○   "]"
+       ○   no candidate
   14  ❮❮❮
   14  ──!  _                                12, 14
+       ○   no candidate
   20  ❮❮❮
   18   !   (identifier == "x")              06
+       ○   (identifier) "b"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                16, 18, 20
-       ●   ]
+       ●   "]"
   16   !   _                                12, 14
-       ●   ]
+       ●   "]"
   12   !   (identifier == "a")              08
-       ○   ]
+       ○   "]"
+       ○   no candidate
   16  ❮❮❮
   14  ──!  _                                12, 14
+       ○   no candidate
   20  ❮❮❮
   18   !   (identifier == "x")              06
-       ○   ]
+       ○   "]"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                16, 18, 20
+       ○   no candidate
   22  ❮❮❮
   10  ─◦─  (identifier == "b")              26          [Node RecordSet(M0 b)]
-       ●   identifier
+       ●   (identifier) "b"
   26  ─‣┘³ _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

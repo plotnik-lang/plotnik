@@ -70,15 +70,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                15, 21
-       ●   identifier
-  15   !   switch
-       ●   identifier
+       ●   (identifier)
+  15   ●   switch (identifier)              18
   18   !   (identifier)                     07          [ListOpen ListClose RecordSet(M0 args) Node RecordSet(M1 id)]
-       ●   identifier
+       ●   (identifier)
   07  ─‣┘² _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

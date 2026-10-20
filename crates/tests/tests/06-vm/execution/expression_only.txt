@@ -52,13 +52,13 @@ M3: S4 → T2  ; Number: T2
 <expression>:
   00  -ε-                                   09, 14
   09   !   (program)                        08          [VariantOpen(M2 Name)]
-       ●   program
+       ●   (program)
   08  └‣─  (expression_statement)           06
-       ●   expression_statement
+       ●   (expression_statement)
   06  └‣─  (identifier)                     02          [NodeText RecordSet(M0 text)]
-       ●   identifier
+       ●   (identifier)
   02  ─‣┘  _                                03
-       ●   expression_statement
+       ●   (expression_statement)
   03  ─‣┘  _                                05          [VariantClose]
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

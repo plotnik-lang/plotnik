@@ -91,40 +91,46 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                14, 43
-       ●   [
+       ●   "["
   14   !   "["                              40          [RecordOpen]
-       ●   [
+       ●   "["
   40       (@37)                            37 : 08 / 11 / 16
        ▶   (@37)
 
 @37:
   37  -ε-                                   35, 30
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              24, 22      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              24, 22      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   37  ❮❮❮
   30  -ε-                                   28, 26      [Absent RecordSet(M0 a)]
   28  ─◦─  (identifier == "x")              19          [Node RecordSet(M1 x)]
+       ○   (identifier) "b"
+       ○   no candidate
   30  ❮❮❮
   26  -ε-                                   21          [Absent RecordSet(M1 x)]
   21   ◀   return p2                        16
 
 Q:
   16  ─◦─  (identifier == "b")              06          [RecordClose RecordSet(M2 prefix) Node RecordSet(M3 b)]
-       ●   identifier
+       ●   (identifier) "b"
   06  ─‣┘³ _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

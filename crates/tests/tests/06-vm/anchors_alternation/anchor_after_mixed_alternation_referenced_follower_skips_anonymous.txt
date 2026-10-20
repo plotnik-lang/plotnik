@@ -82,29 +82,29 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   03   !   (program)                        04
-       ●   program
+       ●   (program)
   04  └‣─  (expression_statement)           05
-       ●   expression_statement
+       ●   (expression_statement)
   05  └‣─  (call_expression)                06
-       ●   call_expression
+       ●   (call_expression)
   06  └‣─  arguments: (arguments)           20, 22
-       ○   identifier
-       ●   arguments
+       ○   function: (identifier)
+       ●   arguments: (arguments)
   20  └‣─  (identifier == "a")              15          [RecordOpen]
-       ○   (
-       ●   identifier
+       ○   "("
+       ●   (identifier) "a"
   15       (@13)                            13 : 08
        ▶   (@13)
 
 @13:
   13  ─•─  (identifier == "b")              12          [Node RecordSet(M0 self)]
-       ○   ,
-       ○   comment
-       ●   identifier
+       ○   ","
+       ○   (comment) "/* c */"
+       ●   (identifier) "b"
   12   ◀   return                           08
 
 Q:
   08  -ε-                                   10          [RecordClose RecordSet(M1 b)]
   10  ─‣┘⁴ _                                11
-       ●   program
+       ●   (program)
   11   ◀   return                           ◼

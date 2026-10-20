@@ -60,27 +60,30 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           18, 10
-       ●   expression_statement
+       ●   (expression_statement)
   18  └─!  _                                08, 13, 16
-       ●   identifier
+       ●   (identifier)
   08   !   _                                04, 06      [Absent RecordSet(M1 a)]
-       ●   identifier
+       ●   (identifier)
   04   !   (number)                         20          [Node RecordSet(M0 b)]
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   08  ❮❮❮
   06  ──!  _                                04, 06
-       ●   ;
+       ●   ";"
   04   !   (number)                         20          [Node RecordSet(M0 b)]
-       ○   ;
+       ○   ";"
+       ○   no candidate
   06  ❮❮❮
   06  ──!  _                                04, 06
+       ○   no candidate
   18  ❮❮❮
   13   !   (identifier)                     20          [Absent RecordSet(M0 b) Node RecordSet(M1 a)]
-       ●   identifier
+       ●   (identifier)
   20  ─‣┘  _                                21
-       ●   expression_statement
+       ●   (expression_statement)
   21  ─‣┘  _                                03
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

@@ -64,19 +64,19 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (interface_declaration)           2
-      ●   interface_declaration
+      ●   (interface_declaration)
   2  └‣─  name: (type_identifier)           4           [Node RecordSet(M0 name)]
-      ○   interface
-      ●   type_identifier
+      ○   "interface"
+      ●   name: (type_identifier)
   4  ─‣─  body: (interface_body)            5
-      ●   interface_body
+      ●   body: (interface_body)
   5  └‣─  (property_signature)              6
-      ○   {
-      ●   property_signature
+      ○   "{"
+      ●   (property_signature)
   6  └‣─  name: (property_identifier)       8           [Node RecordSet(M1 prop)]
-      ●   property_identifier
+      ●   name: (property_identifier)
   8  ─‣┘⁴ _                                 9
-      ●   program
+      ●   (program)
   9   ◀   return                            ◼

@@ -68,22 +68,23 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   03   !   (program)                        04
-       ●   program
+       ●   (program)
   04  └‣─  (expression_statement)           05
-       ●   expression_statement
+       ●   (expression_statement)
   05  └─!  _                                14, 16
-       ●   identifier
+       ●   (identifier)
   14  -ε-                                   13          [VariantOpen(M1 Call) SuppressBegin]
   13   !   (Inner)                          00 : 08
+       ●   (identifier)
        ▶   (Inner)
 
 Inner:
   00   !   (identifier)                     02          [Node RecordSet(M0 name)]
-       ●   identifier
+       ●   (identifier)
   02   ◀   return                           08
 
 Q:
   08  -ε-                                   10          [SuppressEnd VariantClose]
   10  ─‣┘² _                                12          [RecordSet(M2 v)]
-       ●   program
+       ●   (program)
   12   ◀   return                           ◼

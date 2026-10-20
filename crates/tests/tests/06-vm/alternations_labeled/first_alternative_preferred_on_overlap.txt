@@ -57,13 +57,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                05, 08, 10
-       ●   identifier
+       ●   (identifier)
   05   !   (_)                              12          [VariantOpen(M0 A) VariantClose]
-       ●   identifier
+       ●   (identifier)
   12  ─‣┘² _                                04          [RecordSet(M2 v)]
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

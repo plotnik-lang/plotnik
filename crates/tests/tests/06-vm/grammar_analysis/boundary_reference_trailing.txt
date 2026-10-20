@@ -64,43 +64,46 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          04          [RecordOpen]
-       ●   array
+       ●   (array)
   04       (@14)                            14 : 05
        ▶   (@14)
 
 @14:
   14  └─!  _                                10, 12
-       ●   [
+       ●   "["
   10   !   (identifier)                     09          [Node RecordSet(M0 last)]
-       ○   [
+       ○   "["
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
-       ●   identifier
+       ●   (identifier)
   10   !   (identifier)                     09          [Node RecordSet(M0 last)]
-       ●   identifier
+       ●   (identifier)
   09   ◀   return                           05
 
 Q:
   05  ─•┘  _                                07          [RecordClose RecordSet(M1 tail)]
+       ○   no candidate
   12  ❮❮❮
   12  ──!  _                                10, 12
-       ●   ,
+       ●   ","
   10   !   (identifier)                     09          [Node RecordSet(M0 last)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   12  ❮❮❮
   12  ──!  _                                10, 12
-       ●   identifier
+       ●   (identifier)
   10   !   (identifier)                     09          [Node RecordSet(M0 last)]
-       ●   identifier
+       ●   (identifier)
   09   ◀   return                           05
 
 Q:
   05  ─•┘  _                                07          [RecordClose RecordSet(M1 tail)]
-       ●   array
+       ●   (array)
   07  ─‣┘² _                                08
-       ●   program
+       ●   (program)
   08   ◀   return                           ◼

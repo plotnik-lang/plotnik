@@ -42,10 +42,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └•─  (debugger_statement)              3           [Node RecordSet(M0 d)]
-      ○   comment
-      ●   debugger_statement
+      ○   (comment)
+      ●   (debugger_statement)
   3  ─‣┘  _                                 4
-      ●   program
+      ●   (program)
   4   ◀   return                            ◼

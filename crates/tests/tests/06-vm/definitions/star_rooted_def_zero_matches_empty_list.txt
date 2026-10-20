@@ -55,30 +55,34 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  -ε-                                   18, 11      [ListOpen]
   18  └─!  _                                13, 16
-       ●   [
+       ●   "["
   13   !   (identifier)                     16, 05      [Node ArrayPush]
-       ○   [
+       ○   "["
+       ○   no candidate
   18  ❮❮❮
   16  ──!  _                                13, 16
-       ●   number
+       ●   (number)
   13   !   (identifier)                     16, 05      [Node ArrayPush]
-       ○   number
+       ○   (number)
+       ○   no candidate
   16  ❮❮❮
   16  ──!  _                                13, 16
-       ●   ]
+       ●   "]"
   13   !   (identifier)                     16, 05      [Node ArrayPush]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   16  ❮❮❮
   16  ──!  _                                13, 16
+       ○   no candidate
   03  ❮❮❮
   11  -ε-                                   07          [ListClose RecordSet(M0 ids)]
   07  ─‣┘² _                                10
-       ●   program
+       ●   (program)
   10   ◀   return                           ◼

@@ -303,35 +303,37 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
-       ●   program
+       ●   (program)
   08  └‣─  (expression_statement)           11          [SpanStart(P5) SpanStartAt(P6) SpanStart(P8) RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   11  └‣─  (Name)                           00 : 12
+       ●   (identifier)
        ▶   (Name)
 
 Name:
   00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
-       ●   identifier
+       ●   (identifier)
   04   ◀   return                           12
 
 Q:
   12  -ε-                                   16          [RecordClose]
   16  ─‣┘  _                                19          [SpanStart(P7) RecordSet(M1 first) SpanEnd(P7) SpanEnd(P8)]
-       ●   expression_statement
+       ●   (expression_statement)
   19  ─‣─  (expression_statement)           22          [SpanEnd(P6) SpanStartAt(P9) SpanStart(P11) RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   22  └‣─  (Name)                           00 : 14
+       ●   (identifier)
        ▶   (Name)
 
 Name:
   00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
-       ●   identifier
+       ●   (identifier)
   04   ◀   return                           14
 
 Q:
   14  -ε-                                   24          [RecordClose]
   24  ─‣┘  _                                27          [SpanStart(P10) RecordSet(M2 second) SpanEnd(P10) SpanEnd(P11)]
-       ●   expression_statement
+       ●   (expression_statement)
   27  ─‣┘  _                                23          [SpanEnd(P9) SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
-       ●   program
+       ●   (program)
   23   ◀   return                           ◼

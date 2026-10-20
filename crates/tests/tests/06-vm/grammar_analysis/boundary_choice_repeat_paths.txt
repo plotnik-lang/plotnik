@@ -84,57 +84,64 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  -ε-                                   16, 17, 18  [ListOpen]
   16  └─!  "["                              10
-       ●   [
+       ●   "["
   10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
   13  ─‣─  "["                              10
-       ○   identifier
-       ○   ,
-       ○   number
-       ○   ,
-       ○   identifier
-       ○   ]
+       ○   (identifier)
+       ○   ","
+       ○   (number)
+       ○   ","
+       ○   (identifier)
+       ○   "]"
+       ○   no candidate
   10  ❮❮❮
   14  ─‣─  (identifier)                     10
-       ●   identifier
+       ●   (identifier)
   10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
   13  ─‣─  "["                              10
-       ○   ,
-       ○   number
-       ○   ,
-       ○   identifier
-       ○   ]
+       ○   ","
+       ○   (number)
+       ○   ","
+       ○   (identifier)
+       ○   "]"
+       ○   no candidate
   10  ❮❮❮
   14  ─‣─  (identifier)                     10
-       ○   ,
-       ○   number
-       ○   ,
-       ●   identifier
+       ○   ","
+       ○   (number)
+       ○   ","
+       ●   (identifier)
   10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
   13  ─‣─  "["                              10
-       ○   ]
+       ○   "]"
+       ○   no candidate
   10  ❮❮❮
   14  ─‣─  (identifier)                     10
-       ○   ]
+       ○   "]"
+       ○   no candidate
   10  ❮❮❮
   15  ─‣─  "]"                              10
-       ●   ]
+       ●   "]"
   10  -ε-                                   13, 14, 15, 08  [Node ArrayPush]
   13  ─‣─  "["                              10
+       ○   no candidate
   10  ❮❮❮
   14  ─‣─  (identifier)                     10
+       ○   no candidate
   10  ❮❮❮
   15  ─‣─  "]"                              10
+       ○   no candidate
   10  ❮❮❮
   08  -ε-                                   05          [ListClose RecordSet(M0 parts)]
   05  !─┘  _                                06
-       ●   array
+       ●   (array)
   06  ─‣┘² _                                07
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

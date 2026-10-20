@@ -45,10 +45,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (lexical_declaration)             2
-      ●   lexical_declaration
+      ●   (lexical_declaration)
   2  └‣─  (variable_declarator -value)      4           [Node RecordSet(M0 declaration)]
-      ○   let
-      ○   ;
+      ○   "let"
+      ○   (variable_declarator value: _)
+      ○   ";"
+      ○   no candidate
   1  ❮❮❮
+  1  └‣─  (lexical_declaration)             2
+      ○   no candidate

@@ -74,20 +74,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                10, 14, 16
-       ●   expression_statement
+       ●   (expression_statement)
   10   !   (expression_statement)           08          [VariantOpen(M2 A)]
-       ●   expression_statement
+       ●   (expression_statement)
   08  └‣─  (identifier)                     03          [Node RecordSet(M0 x)]
-       ○   string
+       ○   (string)
+       ○   no candidate
   01  ❮❮❮
   14   !   (expression_statement)           12          [VariantOpen(M3 B)]
-       ●   expression_statement
+       ●   (expression_statement)
   12  └‣─  (string)                         03          [Node RecordSet(M1 y)]
-       ●   string
+       ●   (string)
   03  ─‣┘  _                                05          [VariantClose]
-       ●   expression_statement
+       ●   (expression_statement)
   05  ─‣┘  _                                07          [RecordSet(M4 item)]
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

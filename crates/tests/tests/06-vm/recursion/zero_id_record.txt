@@ -59,35 +59,41 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   02   !   (_)                              04          [RecordOpen]
-       ●   program
+       ●   (program)
   04  └‣─  (A)                              00 : 05
+       ●   (expression_statement)
        ▶   (A)
 
 A:
   00   !   (_)                              24, 16
-       ●   expression_statement
+       ●   (expression_statement)
   24  └─!  _                                19, 21
-       ●   number
+       ●   (number)
   19  -ε-                                   18          [RecordOpen]
   18   !   (Q)                              02 : 11
+       ●   (number)
        ▶   (Q)
 
 Q:
   02   !   (_)                              04          [RecordOpen]
-       ●   number
+       ●   (number)
   04  └‣─  (A)                              00 : 05
+       ○   no candidate
   24  ❮❮❮
   21  ──!  _                                19, 21
-       ●   ;
+       ●   ";"
   19  -ε-                                   18          [RecordOpen]
   18   !   (Q)                              02 : 11
+       ●   ";"
        ▶   (Q)
 
 Q:
   02   !   (_)                              04          [RecordOpen]
-       ○   ;
+       ○   ";"
+       ○   no candidate
   21  ❮❮❮
   21  ──!  _                                19, 21
+       ○   no candidate
   00  ❮❮❮
   16  -ε-                                   15          [Absent RecordSet(M1 b)]
   15   ◀   return                           05
@@ -95,5 +101,5 @@ Q:
 Q:
   05  -ε-                                   08          [RecordClose]
   08  ─‣┘  _                                10          [RecordSet(M0 a)]
-       ●   program
+       ●   (program)
   10   ◀   return                           ◼

@@ -69,67 +69,87 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                29, 30
-       ●   [
+       ●   "["
   29   !   "["                              26
-       ●   [
+       ●   "["
   26       (@24)                            24 : 06 / 08 / 10
        ▶   (@24)
 
 @24:
   24  -ε-                                   22, 18, 14
   22  ──!  _                                20, 22
-       ●   identifier
+       ●   (identifier)
   20   !   (identifier == "a")              16, 13
+       ○   (identifier) "c"
+       ○   no candidate
   22  ❮❮❮
   22  ──!  _                                20, 22
-       ●   ,
+       ●   ","
   20   !   (identifier == "a")              16, 13
-       ○   ,
+       ○   ","
+       ○   no candidate
   22  ❮❮❮
   22  ──!  _                                20, 22
-       ●   identifier
+       ●   (identifier)
   20   !   (identifier == "a")              16, 13
+       ○   (identifier) "b"
+       ○   no candidate
   22  ❮❮❮
   22  ──!  _                                20, 22
-       ●   ]
+       ●   "]"
   20   !   (identifier == "a")              16, 13
-       ○   ]
+       ○   "]"
+       ○   no candidate
   22  ❮❮❮
   22  ──!  _                                20, 22
+       ○   no candidate
   24  ❮❮❮
   18  ─◦─  (identifier == "x")              12
+       ○   (identifier) "c"
+       ○   no candidate
   24  ❮❮❮
   14   ◀   return p2                        10
 
 Q:
   10  ─◦─  (identifier == "b")              15          [Node RecordSet(M0 b)]
+       ○   (identifier) "c"
+       ○   no candidate
   03  ❮❮❮
   30  ──!  _                                29, 30
-       ●   identifier
+       ●   (identifier)
   29   !   "["                              26
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   30  ❮❮❮
   30  ──!  _                                29, 30
-       ●   ,
+       ●   ","
   29   !   "["                              26
-       ○   ,
+       ○   ","
+       ○   no candidate
   30  ❮❮❮
   30  ──!  _                                29, 30
-       ●   identifier
+       ●   (identifier)
   29   !   "["                              26
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   30  ❮❮❮
   30  ──!  _                                29, 30
-       ●   ]
+       ●   "]"
   29   !   "["                              26
-       ○   ]
+       ○   "]"
+       ○   no candidate
   30  ❮❮❮
   30  ──!  _                                29, 30
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (array)                          03
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

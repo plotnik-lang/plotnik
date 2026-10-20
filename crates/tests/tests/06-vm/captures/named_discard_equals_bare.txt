@@ -44,11 +44,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  ─‣─  (debugger_statement)              4           [Node RecordSet(M0 d)]
-      ●   debugger_statement
+      ●   (debugger_statement)
   4  ─‣┘  _                                 5
-      ●   program
+      ●   (program)
   5   ◀   return                            ◼

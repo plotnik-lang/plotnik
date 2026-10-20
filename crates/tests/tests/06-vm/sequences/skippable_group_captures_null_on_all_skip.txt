@@ -63,24 +63,28 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        22, 16
-       ●   program
+       ●   (program)
   22  └─!  _                                18, 20
-       ●   debugger_statement
+       ●   (debugger_statement)
   18   !   (expression_statement)           10, 14      [Node RecordSet(M0 e)]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   00  ❮❮❮
   16  -ε-                                   12, 03      [Absent RecordSet(M0 e)]
   12  └─!  _                                08, 10
-       ●   debugger_statement
+       ●   (debugger_statement)
   08   !   (empty_statement)                06          [Node RecordSet(M1 s)]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   16  ❮❮❮
   03  └‣─  (debugger_statement)             24          [Absent RecordSet(M1 s) Node RecordSet(M2 d)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   24  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

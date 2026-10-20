@@ -54,16 +54,18 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        10, 03
-       ●   program
+       ●   (program)
   10  └─!  _                                07, 08
-       ●   debugger_statement
+       ●   (debugger_statement)
   07   !   (expression_statement)           05
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   10  ❮❮❮
   08  ──!  _                                07, 08
+       ○   no candidate
   00  ❮❮❮
   03  └‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   12  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

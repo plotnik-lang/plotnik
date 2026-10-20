@@ -62,22 +62,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   13, 04      [ListOpen]
   13  └─!  _                                10, 11
-       ●   lexical_declaration
-  10   !   switch
-       ●   lexical_declaration
+       ●   (lexical_declaration)
+  10   ●   switch (lexical_declaration)     06
   06   !   (lexical_declaration)            11, 16      [Node ArrayPush]
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   11  ──!  _                                10, 11
-       ●   expression_statement
-  10   !   switch
-       ●   expression_statement
+       ●   (expression_statement)
+  10   ●   switch (expression_statement)    08
   08   !   (expression_statement)           11, 16      [Node ArrayPush]
-       ●   expression_statement
+       ●   (expression_statement)
   11  ──!  _                                10, 11
+       ○   no candidate
   08  ❮❮❮
   16  ─‣┘  _                                03          [ListClose RecordSet(M0 all)]
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

@@ -82,296 +82,386 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                07, 50
-       ●   [
+       ●   "["
   07   !   "["                              48
-       ●   [
+       ●   "["
   48  ──!  _                                36, 38      [ListOpen]
-       ●   identifier
+       ●   (identifier)
   36  -ε-                                   34, 22      [RecordOpen]
   34   !   _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier) "a"
   26  ─•─  (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   28  ❮❮❮
   24  -ε-                                   16          [Absent RecordSet(M1 x)]
   16  -ε-                                   46, 11      [RecordClose ArrayPush]
   46  -ε-                                   43, 40      [RecordOpen]
   43  ─•─  (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   46  ❮❮❮
   40  ─•─  (identifier == "x")              14          [Absent RecordSet(M0 a) Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   16  ❮❮❮
   11  ─•─  (identifier == "b")              06          [ListClose RecordSet(M2 prefixes) Node RecordSet(M3 b)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "c"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ]
+       ●   "]"
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
+       ○   no candidate
   36  ❮❮❮
   22   !   _                                18, 20      [Absent RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "a"
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ,
+       ●   ","
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "c"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ,
+       ●   ","
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "b"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ]
+       ●   "]"
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   48  ❮❮❮
   38  ──!  _                                36, 38
-       ●   ,
+       ●   ","
   36  -ε-                                   34, 22      [RecordOpen]
   34   !   _                                28, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "c"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ]
+       ●   "]"
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
+       ○   no candidate
   36  ❮❮❮
   22   !   _                                18, 20      [Absent RecordSet(M0 a)]
-       ●   ,
+       ●   ","
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "c"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ,
+       ●   ","
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "b"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ]
+       ●   "]"
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   38  ❮❮❮
   38  ──!  _                                36, 38
-       ●   identifier
+       ●   (identifier)
   36  -ε-                                   34, 22      [RecordOpen]
   34   !   _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "c"
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ]
+       ●   "]"
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
+       ○   no candidate
   36  ❮❮❮
   22   !   _                                18, 20      [Absent RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "c"
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ,
+       ●   ","
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "b"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ]
+       ●   "]"
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   38  ❮❮❮
   38  ──!  _                                36, 38
-       ●   ,
+       ●   ","
   36  -ε-                                   34, 22      [RecordOpen]
   34   !   _                                28, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ]
+       ●   "]"
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
+       ○   no candidate
   36  ❮❮❮
   22   !   _                                18, 20      [Absent RecordSet(M0 a)]
-       ●   ,
+       ●   ","
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "b"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ]
+       ●   "]"
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   38  ❮❮❮
   38  ──!  _                                36, 38
-       ●   identifier
+       ●   (identifier)
   36  -ε-                                   34, 22      [RecordOpen]
   34   !   _                                28, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                28, 32
-       ●   ]
+       ●   "]"
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 32
+       ○   no candidate
   36  ❮❮❮
   22   !   _                                18, 20      [Absent RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
+       ○   (identifier) "b"
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
-       ●   ]
+       ●   "]"
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   20  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   38  ❮❮❮
   38  ──!  _                                36, 38
-       ●   ]
+       ●   "]"
   36  -ε-                                   34, 22      [RecordOpen]
   34   !   _                                28, 32
-       ●   ]
+       ●   "]"
   28   !   (identifier == "a")              26, 24      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                28, 32
+       ○   no candidate
   36  ❮❮❮
   22   !   _                                18, 20      [Absent RecordSet(M0 a)]
-       ●   ]
+       ●   "]"
   18   !   (identifier == "x")              14          [Node RecordSet(M1 x)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   38  ❮❮❮
   38  ──!  _                                36, 38
+       ○   no candidate
   03  ❮❮❮
   50  ──!  _                                07, 50
-       ●   identifier
+       ●   (identifier)
   07   !   "["                              48
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   50  ❮❮❮
   50  ──!  _                                07, 50
-       ●   ,
+       ●   ","
   07   !   "["                              48
-       ○   ,
+       ○   ","
+       ○   no candidate
   50  ❮❮❮
   50  ──!  _                                07, 50
-       ●   identifier
+       ●   (identifier)
   07   !   "["                              48
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   50  ❮❮❮
   50  ──!  _                                07, 50
-       ●   ,
+       ●   ","
   07   !   "["                              48
-       ○   ,
+       ○   ","
+       ○   no candidate
   50  ❮❮❮
   50  ──!  _                                07, 50
-       ●   identifier
+       ●   (identifier)
   07   !   "["                              48
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   50  ❮❮❮
   50  ──!  _                                07, 50
-       ●   ]
+       ●   "]"
   07   !   "["                              48
-       ○   ]
+       ○   "]"
+       ○   no candidate
   50  ❮❮❮
   50  ──!  _                                07, 50
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (array)                          03
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

@@ -41,15 +41,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        18, 12, 06, 02
-       ●   program
+       ●   (program)
   18  └─!  _                                14, 16
-       ●   comment
+       ●   (comment)
   14   !   (comment)                        10, 04, 20
-       ●   comment
+       ●   (comment)
   10  ──!  _                                08, 10
+       ○   no candidate
   14  ❮❮❮
   04  ──!  _                                03, 04
+       ○   no candidate
   14  ❮❮❮
   20  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

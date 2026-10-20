@@ -45,11 +45,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └─!  _                                 3, 6
-      ●   expression_statement
+      ●   (expression_statement)
   3   !   (expression_statement)            4
-      ●   expression_statement
+      ●   (expression_statement)
   4  ─‣┘  _                                 5
-      ●   program
+      ●   (program)
   5   ◀   return                            ◼

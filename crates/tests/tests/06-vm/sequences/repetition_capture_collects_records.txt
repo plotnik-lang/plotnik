@@ -89,34 +89,35 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   18, 08      [ListOpen]
   18  └─!  _                                13, 16
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   13   !   (lexical_declaration)            12          [RecordOpen Node RecordSet(M0 decl)]
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   12  └‣─  (variable_declarator)            03
-       ○   let
-       ●   variable_declarator
+       ○   "let"
+       ●   (variable_declarator)
   03  └‣─  name: (identifier)               05          [Node RecordSet(M1 n)]
-       ●   identifier
+       ●   name: (identifier)
   05  ─‣┘² _                                10
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   10  -ε-                                   16, 20      [RecordClose ArrayPush]
   16  ──!  _                                13, 16
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   13   !   (lexical_declaration)            12          [RecordOpen Node RecordSet(M0 decl)]
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   12  └‣─  (variable_declarator)            03
-       ○   let
-       ●   variable_declarator
+       ○   "let"
+       ●   (variable_declarator)
   03  └‣─  name: (identifier)               05          [Node RecordSet(M1 n)]
-       ●   identifier
+       ●   name: (identifier)
   05  ─‣┘² _                                10
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   10  -ε-                                   16, 20      [RecordClose ArrayPush]
   16  ──!  _                                13, 16
+       ○   no candidate
   10  ❮❮❮
   20  ─‣┘  _                                06          [ListClose RecordSet(M2 rows)]
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

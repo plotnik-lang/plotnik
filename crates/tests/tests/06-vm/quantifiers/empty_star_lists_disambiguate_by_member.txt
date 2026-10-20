@@ -64,24 +64,27 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   32, 26      [ListOpen]
   32  └─!  _                                28, 30
-       ●   expression_statement
+       ●   (expression_statement)
   28   !   (function_declaration)           30, 24      [Node ArrayPush]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   32  ❮❮❮
   30  ──!  _                                28, 30
+       ○   no candidate
   01  ❮❮❮
   26  -ε-                                   16          [ListClose RecordSet(M0 funcs)]
   16  -ε-                                   14, 08      [ListOpen]
   14  └─!  _                                10, 12
-       ●   expression_statement
+       ●   (expression_statement)
   10   !   (expression_statement)           12, 03      [Node ArrayPush]
-       ●   expression_statement
+       ●   (expression_statement)
   12  ──!  _                                10, 12
+       ○   no candidate
   10  ❮❮❮
   03  -ε-                                   05          [ListClose RecordSet(M1 stmts)]
   05  ─‣┘  _                                06
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

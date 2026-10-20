@@ -145,20 +145,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   05   !   (program)                        08          [SpanStart(P3) SpanStartAt(P4)]
-       ●   program
+       ●   (program)
   08  └‣─  (expression_statement)           10          [SpanStartAt(P5) SpanStart(P6) SuppressBegin]
-       ●   expression_statement
+       ●   (expression_statement)
   10  └‣─  (Name)                           00 : 11
+       ●   (identifier)
        ▶   (Name)
 
 Name:
   00   !   (identifier)                     04          [SpanStart(P0) SpanStartAt(P2) SpanStart(P1) Node RecordSet(M0 name) SpanEnd(P1) SpanEnd(P2) SpanEnd(P0)]
-       ●   identifier
+       ●   (identifier)
   04   ◀   return                           11
 
 Q:
   11  ─‣┘  _                                13          [SuppressEnd SpanEnd(P6)]
-       ●   expression_statement
+       ●   (expression_statement)
   13  ─‣┘  _                                15          [SpanEnd(P5) SpanEnd(P4) SpanEnd(P3)]
-       ●   program
+       ●   (program)
   15   ◀   return                           ◼

@@ -276,6 +276,15 @@ x
     {
       "ip": 4,
       "event": {
+        "kind": "nav_fail"
+      },
+      "query_span_id": 5,
+      "node": null,
+      "journal_len": 7
+    },
+    {
+      "ip": 4,
+      "event": {
         "kind": "backtrack",
         "to_record": 11
       },

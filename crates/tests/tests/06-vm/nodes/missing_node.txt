@@ -50,17 +50,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (if_statement)                    2
-      ●   if_statement
+      ●   (if_statement)
   2  └‣─  consequence: (statement_block)    3
-      ○   if
-      ○   parenthesized_expression
-      ●   statement_block
+      ○   "if"
+      ○   condition: (parenthesized_expression)
+      ●   consequence: (statement_block)
   3  └‣─  (MISSING "}")                     5           [Node RecordSet(M0 m)]
-      ○   {
-      ○   expression_statement
-      ●   }
+      ○   "{"
+      ○   (expression_statement)
+      ●   "}"
   5  ─‣┘³ _                                 6
-      ●   program
+      ●   (program)
   6   ◀   return                            ◼

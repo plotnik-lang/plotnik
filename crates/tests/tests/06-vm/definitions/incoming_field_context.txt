@@ -119,27 +119,30 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (binary_expression)              04          [RecordOpen]
-       ●   binary_expression
+       ●   (binary_expression)
   04  └‣─  (@35)                            35 : 05
+       ●   (identifier)
        ▶   (@35)
 
 @35:
   35  -ε-                                   34          [RecordOpen]
   34   !   (@29)                            29 : 32
+       ●   (identifier)
        ▶   (@29)
 
 @29:
   29  -ε-                                   28          [RecordOpen]
   28   !   (@24)                            24 : 26
+       ●   (identifier)
        ▶   (@24)
 
 @24:
   24   !   left: (_)                        22          [Node RecordSet(M0 node)]
-       ●   identifier
+       ●   left: (identifier)
   22   ◀   return                           26
 
 @29:
@@ -153,28 +156,35 @@ Q:
 Q:
   05  -ε-                                   07          [RecordClose RecordSet(M4 left) RecordOpen]
   07  ─‣─  (@18)                            18 : 08
+       ●   "+"
        ▶   (@18)
 
 @18:
   18  -ε-                                   14, 16
   14   !   left: (_)                        13          [Node RecordSet(M3 node)]
-       ○   +
+       ○   operator: "+"
+       ○   no candidate
   18  ❮❮❮
   16   !   right: (_)                       13          [Node RecordSet(M3 node)]
-       ○   +
+       ○   operator: "+"
+       ○   no candidate
   07  ❮❮❮
+  07  ─‣─  (@18)                            18 : 08
+       ●   (number)
        ▶   (@18)
 
 @18:
   18  -ε-                                   14, 16
   14   !   left: (_)                        13          [Node RecordSet(M3 node)]
+       ○   right: (number)
+       ○   no candidate
   18  ❮❮❮
   16   !   right: (_)                       13          [Node RecordSet(M3 node)]
-       ●   number
+       ●   right: (number)
   13   ◀   return                           08
 
 Q:
   08  -ε-                                   10          [RecordClose]
   10  ─‣┘³ _                                12          [RecordSet(M5 right)]
-       ●   program
+       ●   (program)
   12   ◀   return                           ◼

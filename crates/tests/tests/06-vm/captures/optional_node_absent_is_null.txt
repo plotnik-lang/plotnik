@@ -51,16 +51,18 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        12, 03
-       ●   program
+       ●   (program)
   12  └─!  _                                08, 10
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (lexical_declaration)            06          [Node RecordSet(M0 decl)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   00  ❮❮❮
   03  └‣─  (expression_statement)           14          [Absent RecordSet(M0 decl) Node RecordSet(M1 stmt)]
-       ●   expression_statement
+       ●   (expression_statement)
   14  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

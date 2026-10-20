@@ -50,33 +50,42 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                09, 10
-       ●   [
+       ●   "["
   09   !   "["                              05
-       ●   [
+       ●   "["
   05  ──!  (identifier == "b")              07          [Node RecordSet(M0 b)]
-       ○   comment
+       ○   (comment) "/*comment*/"
+       ○   no candidate
   03  ❮❮❮
   10  ──!  _                                09, 10
-       ●   comment
+       ●   (comment)
   09   !   "["                              05
-       ○   comment
+       ○   (comment)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                09, 10
-       ●   identifier
+       ●   (identifier)
   09   !   "["                              05
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                09, 10
-       ●   ]
+       ●   "]"
   09   !   "["                              05
-       ○   ]
+       ○   "]"
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                09, 10
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (array)                          03
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

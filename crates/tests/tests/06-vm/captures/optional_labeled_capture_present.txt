@@ -65,15 +65,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           13, 09
-       ●   expression_statement
+       ●   (expression_statement)
   13  └─!  _                                03, 11
-       ●   identifier
+       ●   (identifier)
   03   !   (identifier)                     06          [VariantOpen(M1 A) Node RecordSet(M0 a) VariantClose]
-       ●   identifier
+       ●   (identifier)
   06  ─‣┘  _                                15          [RecordSet(M2 e)]
-       ●   expression_statement
+       ●   (expression_statement)
   15  ─‣┘  _                                08
-       ●   program
+       ●   (program)
   08   ◀   return                           ◼

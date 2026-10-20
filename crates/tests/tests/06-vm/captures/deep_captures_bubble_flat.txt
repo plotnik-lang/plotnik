@@ -62,21 +62,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (function_declaration)            2
-      ●   function_declaration
+      ●   (function_declaration)
   2  └‣─  name: (identifier)                4           [Node RecordSet(M0 name)]
-      ○   function
-      ●   identifier
+      ○   "function"
+      ●   name: (identifier)
   4  ─‣─  body: (statement_block)           5
-      ○   formal_parameters
-      ●   statement_block
+      ○   parameters: (formal_parameters)
+      ●   body: (statement_block)
   5  └‣─  (return_statement)                6
-      ○   {
-      ●   return_statement
+      ○   "{"
+      ●   (return_statement)
   6  └‣─  (number)                          8           [Node RecordSet(M1 retval)]
-      ○   return
-      ●   number
+      ○   "return"
+      ●   (number)
   8  ─‣┘⁴ _                                 9
-      ●   program
+      ●   (program)
   9   ◀   return                            ◼

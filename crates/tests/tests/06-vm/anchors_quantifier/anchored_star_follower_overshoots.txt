@@ -67,30 +67,37 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        30, 24
-       ●   program
+       ●   (program)
   30  └─!  _                                26, 28
-       ●   expression_statement
+       ●   (expression_statement)
   26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   30  ❮❮❮
   28  ──!  _                                26, 28
-       ●   debugger_statement
+       ●   (debugger_statement)
   26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   28  ❮❮❮
   28  ──!  _                                26, 28
-       ●   expression_statement
+       ●   (expression_statement)
   26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   28  ❮❮❮
   28  ──!  _                                26, 28
+       ○   no candidate
   00  ❮❮❮
   24  -ε-                                   20          [Absent RecordSet(M0 a)]
   20  -ε-                                   16, 08      [ListOpen]
   16  └•─  (debugger_statement)             18, 13      [Node ArrayPush]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   20  ❮❮❮
   08  └•─  (expression_statement)           02          [ListClose RecordSet(M1 b) Node RecordSet(M2 c)]
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (identifier == "foo")            04
-       ○   ;
+       ○   (identifier) "bar"
+       ○   ";"
+       ○   no candidate

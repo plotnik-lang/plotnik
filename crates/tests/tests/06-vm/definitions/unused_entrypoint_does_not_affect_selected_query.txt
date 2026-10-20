@@ -59,11 +59,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   05   !   (program)                        06
-       ●   program
+       ●   (program)
   06  └‣─  (expression_statement)           08
-       ●   expression_statement
+       ●   (expression_statement)
   08  └‣─  (identifier)                     10          [Node RecordSet(M1 name)]
-       ●   identifier
+       ●   (identifier)
   10  ─‣┘² _                                11
-       ●   program
+       ●   (program)
   11   ◀   return                           ◼

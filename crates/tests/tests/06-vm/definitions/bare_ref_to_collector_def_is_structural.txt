@@ -60,49 +60,55 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          14, 05
-       ●   array
+       ●   (array)
   14  └─!  _                                10, 12
-       ●   [
+       ●   "["
   10   !   (identifier)                     12, 08
-       ○   [
+       ○   "["
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
-       ●   identifier
+       ●   (identifier)
   10   !   (identifier)                     12, 08
-       ●   identifier
+       ●   (identifier)
   12  ──!  _                                10, 12
-       ●   ,
+       ●   ","
   10   !   (identifier)                     12, 08
-       ○   ,
+       ○   ","
+       ○   no candidate
   12  ❮❮❮
   12  ──!  _                                10, 12
-       ●   identifier
+       ●   (identifier)
   10   !   (identifier)                     12, 08
-       ●   identifier
+       ●   (identifier)
   12  ──!  _                                10, 12
-       ●   ,
+       ●   ","
   10   !   (identifier)                     12, 08
-       ○   ,
+       ○   ","
+       ○   no candidate
   12  ❮❮❮
   12  ──!  _                                10, 12
-       ●   number
+       ●   (number)
   10   !   (identifier)                     12, 08
-       ○   number
+       ○   (number)
+       ○   no candidate
   12  ❮❮❮
   12  ──!  _                                10, 12
-       ●   ]
+       ●   "]"
   10   !   (identifier)                     12, 08
-       ○   ]
+       ○   "]"
+       ○   no candidate
   12  ❮❮❮
   12  ──!  _                                10, 12
+       ○   no candidate
   10  ❮❮❮
   08  ─‣─  (number)                         07          [Node RecordSet(M0 n)]
-       ○   ,
-       ●   number
+       ○   ","
+       ●   (number)
   07  ─‣┘³ _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

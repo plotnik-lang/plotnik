@@ -54,13 +54,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        14, 08
-       ●   program
+       ●   (program)
   14  └─!  _                                10, 12
-       ●   class_declaration
+       ●   (class_declaration)
   10   !   (expression_statement)           02          [RecordOpen Node RecordSet(M0 a)]
-       ○   class_declaration
+       ○   (class_declaration)
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
+       ○   no candidate
   00  ❮❮❮
   08  -ε-                                   06          [Absent RecordSet(M2 x)]
   06   ◀   return                           ◼

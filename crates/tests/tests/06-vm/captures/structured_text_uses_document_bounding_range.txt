@@ -61,17 +61,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   03          [ScalarOpen]
   03  └‣─  (comment)                        05          [ScalarMark]
-       ●   comment
+       ●   (comment)
   05  ─‣─  (expression_statement)           08          [ScalarMark]
-       ●   expression_statement
+       ●   (expression_statement)
   08  └‣─  (identifier)                     10          [ScalarMark]
-       ●   identifier
+       ●   (identifier)
   10  ─‣┘  _                                11
-       ●   expression_statement
+       ●   (expression_statement)
   11  -ε-                                   13          [TextClose RecordSet(M0 chunk)]
   13  ─‣┘  _                                14
-       ●   program
+       ●   (program)
   14   ◀   return                           ◼

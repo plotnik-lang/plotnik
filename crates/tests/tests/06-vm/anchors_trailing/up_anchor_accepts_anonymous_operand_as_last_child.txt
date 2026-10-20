@@ -36,15 +36,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (debugger_statement)              2
-      ●   debugger_statement
+      ●   (debugger_statement)
   2  └─!  _                                 7, 8
-      ●   debugger
+      ●   "debugger"
   7   !   "debugger"                        4
-      ●   debugger
+      ●   "debugger"
   4  ─◦┘  _                                 5
-      ●   debugger_statement
+      ●   (debugger_statement)
   5  ─‣┘  _                                 6
-      ●   program
+      ●   (program)
   6   ◀   return                            ◼

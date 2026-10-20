@@ -79,34 +79,38 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   34, 28      [ListOpen]
   34  └─!  _                                30, 32
-       ●   expression_statement
+       ●   (expression_statement)
   30   !   (expression_statement)           32, 26      [Node ArrayPush]
-       ●   expression_statement
+       ●   (expression_statement)
   32  ──!  _                                30, 32
-       ●   expression_statement
+       ●   (expression_statement)
   30   !   (expression_statement)           32, 26      [Node ArrayPush]
-       ●   expression_statement
+       ●   (expression_statement)
   32  ──!  _                                30, 32
-       ●   debugger_statement
+       ●   (debugger_statement)
   30   !   (expression_statement)           32, 26      [Node ArrayPush]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                30, 32
+       ○   no candidate
   30  ❮❮❮
   26  -ε-                                   24          [ListClose RecordSet(M0 a)]
   24  -ε-                                   22, 08      [ListOpen]
   22  ──!  _                                20, 22
-       ●   debugger_statement
+       ●   (debugger_statement)
   20   !   (expression_statement)           22, 08      [Node ArrayPush]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   22  ❮❮❮
   22  ──!  _                                20, 22
+       ○   no candidate
   24  ❮❮❮
   08  ─‣─  (debugger_statement)             07          [ListClose RecordSet(M1 b) Node RecordSet(M2 d)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   07  ─‣┘  _                                03
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

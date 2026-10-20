@@ -49,15 +49,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  └‣─  (identifier)                      3
-      ●   identifier
+      ●   (identifier)
   3  ─‣┘  _                                 4
-      ●   expression_statement
+      ●   (expression_statement)
   4  ─‣─  (debugger_statement)              6           [Node RecordSet(M0 d)]
-      ●   debugger_statement
+      ●   (debugger_statement)
   6  ─‣┘  _                                 7
-      ●   program
+      ●   (program)
   7   ◀   return                            ◼

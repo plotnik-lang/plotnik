@@ -81,39 +81,44 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        30, 24
-       ●   program
+       ●   (program)
   30  └─!  _                                26, 28
-       ●   comment
+       ●   (comment)
   26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
-       ○   comment
+       ○   (comment)
+       ○   no candidate
   30  ❮❮❮
   28  ──!  _                                26, 28
-       ●   debugger_statement
+       ●   (debugger_statement)
   26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   28  ❮❮❮
   28  ──!  _                                26, 28
-       ●   expression_statement
+       ●   (expression_statement)
   26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   28  ❮❮❮
   28  ──!  _                                26, 28
+       ○   no candidate
   00  ❮❮❮
   24  -ε-                                   20          [Absent RecordSet(M0 a)]
   20  -ε-                                   16, 08      [ListOpen]
   16  └•─  (debugger_statement)             18, 13      [Node ArrayPush]
-       ○   comment
-       ●   debugger_statement
+       ○   (comment)
+       ●   (debugger_statement)
   18  ─•─  (debugger_statement)             18, 13      [Node ArrayPush]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   16  ❮❮❮
   13  -ε-                                   11          [ListClose RecordSet(M1 b)]
   11  ─•─  (expression_statement)           02          [Node RecordSet(M2 c)]
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (identifier == "foo")            04
-       ●   identifier
+       ●   (identifier) "foo"
   04  ─‣┘  _                                05
-       ●   expression_statement
+       ●   (expression_statement)
   05  ─‣┘  _                                06
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

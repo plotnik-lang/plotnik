@@ -64,29 +64,36 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        26, 20
-       ●   program
+       ●   (program)
   26  └─!  _                                22, 24
-       ●   expression_statement
+       ●   (expression_statement)
   22   !   (lexical_declaration)            18, 16      [Node RecordSet(M0 a)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   26  ❮❮❮
   24  ──!  _                                22, 24
-       ●   debugger_statement
+       ●   (debugger_statement)
   22   !   (lexical_declaration)            18, 16      [Node RecordSet(M0 a)]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   24  ❮❮❮
   24  ──!  _                                22, 24
-       ●   expression_statement
+       ●   (expression_statement)
   22   !   (lexical_declaration)            18, 16      [Node RecordSet(M0 a)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   24  ❮❮❮
   24  ──!  _                                22, 24
+       ○   no candidate
   00  ❮❮❮
   20  -ε-                                   13, 08      [Absent RecordSet(M0 a)]
   13  └•─  (debugger_statement)             11          [Node RecordSet(M1 b)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   20  ❮❮❮
   08  └•─  (expression_statement)           02          [Absent RecordSet(M1 b) Node RecordSet(M2 c)]
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (identifier == "foo")            04
-       ○   ;
+       ○   (identifier) "bar"
+       ○   ";"
+       ○   no candidate

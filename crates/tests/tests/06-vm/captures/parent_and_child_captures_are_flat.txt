@@ -52,12 +52,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (function_declaration)            3           [Node RecordSet(M0 fn)]
-      ●   function_declaration
+      ●   (function_declaration)
   3  └‣─  name: (identifier)                5           [Node RecordSet(M1 name)]
-      ○   function
-      ●   identifier
+      ○   "function"
+      ●   name: (identifier)
   5  ─‣┘² _                                 6
-      ●   program
+      ●   (program)
   6   ◀   return                            ◼

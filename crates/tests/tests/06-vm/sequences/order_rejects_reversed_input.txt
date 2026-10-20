@@ -42,9 +42,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (lexical_declaration)             3           [Node RecordSet(M0 a)]
-      ○   expression_statement
-      ●   lexical_declaration
+      ○   (expression_statement)
+      ●   (lexical_declaration)
   3  ─‣─  (expression_statement)            5           [Node RecordSet(M1 b)]
+      ○   no candidate
   1  ❮❮❮
+  1  └‣─  (lexical_declaration)             3           [Node RecordSet(M0 a)]
+      ○   no candidate

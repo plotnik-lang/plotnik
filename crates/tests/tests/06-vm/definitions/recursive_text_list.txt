@@ -101,29 +101,31 @@ Q:
 Q:
   03  -ε-                                   05          [RecordOpen]
   05   !   (A)                              00 : 06
+       ●   (program)
        ▶   (A)
 
 A:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   66, 14      [ListOpen]
   66  └─!  _                                61, 64
-       ●   comment
+       ●   (comment)
   61  -ε-                                   18, 59      [ScalarOpen]
   18   !   (comment)                        16          [ScalarMark]
-       ●   comment
+       ●   (comment)
   16  -ε-                                   64, 09      [TextClose ArrayPush]
   64  ──!  _                                61, 64
-       ●   comment
+       ●   (comment)
   61  -ε-                                   18, 59      [ScalarOpen]
   18   !   (comment)                        16          [ScalarMark]
-       ●   comment
+       ●   (comment)
   16  -ε-                                   64, 09      [TextClose ArrayPush]
   64  ──!  _                                61, 64
+       ○   no candidate
   16  ❮❮❮
   09  -ε-                                   11          [ListClose]
   11  ─‣┘  _                                13          [RecordSet(M0 comments)]
-       ●   program
+       ●   (program)
   13   ◀   return                           06
 
 Q:

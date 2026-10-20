@@ -68,17 +68,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (binary_expression)              03
-       ●   binary_expression
+       ●   (binary_expression)
   03  -ε-                                   10, 12      [RecordOpen]
   10  └‣─  (number)                         06          [Node RecordSet(M0 n)]
-       ●   number
+       ●   (number)
   06  ─•─  (identifier)                     14          [RecordClose RecordSet(M1 t)]
-       ○   *
-       ●   identifier
+       ○   "*"
+       ●   (identifier)
   14  ─‣┘³ _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

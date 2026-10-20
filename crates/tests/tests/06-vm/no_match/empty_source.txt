@@ -32,5 +32,6 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            3           [Node RecordSet(M0 e)]
+      ○   no candidate

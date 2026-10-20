@@ -90,26 +90,27 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        30, 24
-       ●   program
+       ●   (program)
   30  └─!  _                                26, 28
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   26   !   (lexical_declaration)            22          [Node RecordSet(M0 a)]
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   22  -ε-                                   18, 13      [ListOpen]
   18  ─•─  (debugger_statement)             18, 13      [Node ArrayPush]
-       ●   debugger_statement
+       ●   (debugger_statement)
   18  ─•─  (debugger_statement)             18, 13      [Node ArrayPush]
-       ●   debugger_statement
+       ●   (debugger_statement)
   18  ─•─  (debugger_statement)             18, 13      [Node ArrayPush]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   18  ❮❮❮
   13  -ε-                                   11          [ListClose RecordSet(M1 b)]
   11  ─•─  (expression_statement)           02          [Node RecordSet(M2 c)]
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (identifier == "foo")            04
-       ●   identifier
+       ●   (identifier) "foo"
   04  ─‣┘  _                                05
-       ●   expression_statement
+       ●   (expression_statement)
   05  ─‣┘  _                                06
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

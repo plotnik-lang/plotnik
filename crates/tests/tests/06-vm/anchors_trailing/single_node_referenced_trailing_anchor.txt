@@ -66,29 +66,29 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                15, 16
-       ●   [
+       ●   "["
   15   !   "["                              14
-       ●   [
+       ●   "["
   14       (@12)                            12 : 05
        ▶   (@12)
 
 @12:
   12  ──!  _                                10, 12
-       ●   identifier
+       ●   (identifier)
   10   !   (identifier == "a")              09
-       ●   identifier
+       ●   (identifier) "a"
   09   ◀   return                           05
 
 Q:
   05  ─•─  (identifier == "b")              07          [Node RecordSet(M0 b)]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier) "b"
   07  ─‣┘³ _                                08
-       ●   program
+       ●   (program)
   08   ◀   return                           ◼

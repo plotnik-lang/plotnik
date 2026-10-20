@@ -36,19 +36,24 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (debugger_statement)              2
-      ●   debugger_statement
+      ●   (debugger_statement)
   2  └─!  _                                 7, 8
-      ●   debugger
+      ●   "debugger"
   7   !   "debugger"                        4
-      ●   debugger
+      ●   "debugger"
   4  ─◦┘  _                                 5
+      ○   no candidate
   2  ❮❮❮
   8  ──!  _                                 7, 8
-      ●   ;
+      ●   ";"
   7   !   "debugger"                        4
-      ○   ;
+      ○   ";"
+      ○   no candidate
   8  ❮❮❮
   8  ──!  _                                 7, 8
+      ○   no candidate
   1  ❮❮❮
+  1  └‣─  (debugger_statement)              2
+      ○   no candidate

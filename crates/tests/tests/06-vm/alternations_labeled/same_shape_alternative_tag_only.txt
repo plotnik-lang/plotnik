@@ -64,20 +64,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                10, 13, 16
-       ●   expression_statement
+       ●   (expression_statement)
   10   !   (expression_statement)           08          [VariantOpen(M1 A)]
-       ●   expression_statement
+       ●   (expression_statement)
   08  └‣─  (identifier)                     03          [Node RecordSet(M0 x)]
-       ○   string
+       ○   (string)
+       ○   no candidate
   01  ❮❮❮
   13   !   (expression_statement)           12          [VariantOpen(M2 B)]
-       ●   expression_statement
+       ●   (expression_statement)
   12  └‣─  (string)                         03
-       ●   string
+       ●   (string)
   03  ─‣┘  _                                05          [VariantClose]
-       ●   expression_statement
+       ●   (expression_statement)
   05  ─‣┘  _                                07          [RecordSet(M3 item)]
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

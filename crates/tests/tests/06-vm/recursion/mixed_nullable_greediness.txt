@@ -150,7 +150,7 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   03          [ScalarOpen]
   03       (@80)                            80 : 22 / 24
        ▶   (@80)
@@ -158,51 +158,55 @@ Q:
 @80:
   80  -ε-                                   68, 27, 77
   68  └─!  _                                64, 66
-       ●   comment
+       ●   (comment)
   64  -ε-                                   62          [SuppressBegin]
   62   !   (@58)                            58 : 60
+       ●   (comment)
        ▶   (@58)
 
 @58:
   58  -ε-                                   53, 56
   53   !   (comment)                        50          [ScalarMark]
-       ●   comment
+       ●   (comment)
   50       (@48)                            48 : 28 / 28
        ▶   (@48)
 
 @48:
   48  -ε-                                   37, 30, 45
   37  ──!  _                                35, 37
-       ●   comment
+       ●   (comment)
   35  -ε-                                   34          [SuppressBegin]
   34   !   (@58)                            58 : 32
+       ●   (comment)
        ▶   (@58)
 
 @58:
   58  -ε-                                   53, 56
   53   !   (comment)                        50          [ScalarMark]
-       ●   comment
+       ●   (comment)
   50       (@48)                            48 : 28 / 28
        ▶   (@48)
 
 @48:
   48  -ε-                                   37, 30, 45
   37  ──!  _                                35, 37
-       ●   comment
+       ●   (comment)
   35  -ε-                                   34          [SuppressBegin]
   34   !   (@58)                            58 : 32
+       ●   (comment)
        ▶   (@58)
 
 @58:
   58  -ε-                                   53, 56
   53   !   (comment)                        50          [ScalarMark]
-       ●   comment
+       ●   (comment)
   50       (@48)                            48 : 28 / 28
        ▶   (@48)
 
 @48:
   48  -ε-                                   37, 30, 45
   37  ──!  _                                35, 37
+       ○   no candidate
   48  ❮❮❮
   30   ◀   return p1                        28
 
@@ -231,13 +235,16 @@ Q:
   22  -ε-                                   20          [TextClose RecordSet(M6 x)]
   20  -ε-                                   16, 18      [ScalarOpen]
   16  ──!  (comment == "//b")               06          [ScalarMark]
+       ○   no candidate
   20  ❮❮❮
   18  ──!  (comment == "//stop")            06          [ScalarMark]
+       ○   no candidate
   48  ❮❮❮
   45  ──!  _                                43, 45
+       ○   no candidate
   58  ❮❮❮
   56   !   (comment)                        28          [ScalarMark]
-       ●   comment
+       ●   (comment)
   28   ◀   return                           32
 
 @48:
@@ -262,10 +269,13 @@ Q:
   22  -ε-                                   20          [TextClose RecordSet(M6 x)]
   20  -ε-                                   16, 18      [ScalarOpen]
   16  ──!  (comment == "//b")               06          [ScalarMark]
+       ○   no candidate
   20  ❮❮❮
   18  ──!  (comment == "//stop")            06          [ScalarMark]
+       ○   no candidate
   37  ❮❮❮
   37  ──!  _                                35, 37
+       ○   no candidate
   48  ❮❮❮
   30   ◀   return p1                        28
 
@@ -287,10 +297,12 @@ Q:
   22  -ε-                                   20          [TextClose RecordSet(M6 x)]
   20  -ε-                                   16, 18      [ScalarOpen]
   16  ──!  (comment == "//b")               06          [ScalarMark]
+       ○   (comment) "//stop"
+       ○   no candidate
   20  ❮❮❮
   18  ──!  (comment == "//stop")            06          [ScalarMark]
-       ●   comment
+       ●   (comment) "//stop"
   06  -ε-                                   08          [TextClose RecordSet(M7 rest)]
   08  ─‣┘  _                                09
-       ●   program
+       ●   (program)
   09   ◀   return                           ◼

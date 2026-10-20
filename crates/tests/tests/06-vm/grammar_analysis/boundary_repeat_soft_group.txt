@@ -89,38 +89,39 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          04          [ListOpen]
-       ●   array
+       ●   (array)
   04  └•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
-       ○   [
-       ●   identifier
+       ○   "["
+       ●   (identifier)
   15  ─‣─  ","                              16
-       ●   ,
+       ●   ","
   16  -ε-                                   18, 12      [RecordClose ArrayPush]
   18  ─•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier)
   15  ─‣─  ","                              16
-       ●   ,
+       ●   ","
   16  -ε-                                   18, 12      [RecordClose ArrayPush]
   18  ─•─  (identifier)                     15          [RecordOpen Node RecordSet(M0 id)]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier)
   15  ─‣─  ","                              16
-       ○   ]
+       ○   "]"
+       ○   no candidate
   16  ❮❮❮
   12  ─‣─  (identifier)                     10          [ListClose RecordSet(M1 pairs) Node RecordSet(M2 last)]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier)
   10  ──!  _                                09, 10
-       ●   ]
+       ●   "]"
   09   !   "]"                              06
-       ●   ]
+       ●   "]"
   06  !─┘  _                                07
-       ●   array
+       ●   (array)
   07  ─‣┘² _                                08
-       ●   program
+       ●   (program)
   08   ◀   return                           ◼

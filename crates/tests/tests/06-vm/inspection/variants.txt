@@ -241,23 +241,23 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   03   !   (program)                        05          [SpanStart(P8) SpanStartAt(P9)]
-       ●   program
+       ●   (program)
   05  └‣─  (expression_statement)           07          [SpanStartAt(P10) SpanStart(P12)]
-       ●   expression_statement
+       ●   (expression_statement)
   07  └‣─  (Expr)                           00 : 08
+       ●   (number)
        ▶   (Expr)
 
 Expr:
   00  -ε-                                   02          [SpanStart(P0)]
-  02   !   switch
-       ●   number
+  02   ●   switch (number)                  24
   24   !   (number)                         14          [SpanStart(P1) SpanStart(P5) VariantOpen(M3 Num) SpanStartAt(P7) SpanStart(P6) Node RecordSet(M1 num) SpanEnd(P6) SpanEnd(P7) VariantClose SpanEnd(P5) SpanEnd(P1) SpanEnd(P0)]
-       ●   number
+       ●   (number)
   14   ◀   return                           08
 
 Q:
   08  ─‣┘  _                                11          [SpanStart(P11) RecordSet(M4 expr) SpanEnd(P11) SpanEnd(P12)]
-       ●   expression_statement
+       ●   (expression_statement)
   11  ─‣┘  _                                13          [SpanEnd(P10) SpanEnd(P9) SpanEnd(P8)]
-       ●   program
+       ●   (program)
   13   ◀   return                           ◼

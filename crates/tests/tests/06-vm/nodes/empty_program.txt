@@ -35,5 +35,5 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         2           [Node RecordSet(M0 p)]
-      ●   program
+      ●   (program)
   2   ◀   return                            ◼

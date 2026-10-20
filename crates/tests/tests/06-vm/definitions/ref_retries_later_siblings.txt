@@ -56,30 +56,34 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   05   !   (program)                        07          [RecordOpen]
-       ●   program
+       ●   (program)
   07  └‣─  (E)                              00 : 08
+       ●   (expression_statement)
        ▶   (E)
 
 E:
   00   !   (expression_statement)           01
-       ●   expression_statement
+       ●   (expression_statement)
   01  └‣─  (number)                         03          [Node RecordSet(M0 n)]
-       ○   identifier
-       ○   ;
+       ○   (identifier)
+       ○   ";"
+       ○   no candidate
   07  ❮❮❮
+  07  └‣─  (E)                              00 : 08
+       ●   (expression_statement)
        ▶   (E)
 
 E:
   00   !   (expression_statement)           01
-       ●   expression_statement
+       ●   (expression_statement)
   01  └‣─  (number)                         03          [Node RecordSet(M0 n)]
-       ●   number
+       ●   (number)
   03  ─‣┘  _                                04
-       ●   expression_statement
+       ●   (expression_statement)
   04   ◀   return                           08
 
 Q:
   08  -ε-                                   10          [RecordClose]
   10  ─‣┘  _                                12          [RecordSet(M1 e)]
-       ●   program
+       ●   (program)
   12   ◀   return                           ◼

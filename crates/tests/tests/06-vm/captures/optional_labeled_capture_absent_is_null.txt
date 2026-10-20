@@ -51,13 +51,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        12, 08
-       ●   program
+       ●   (program)
   12  └─!  _                                02, 10
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   02   !   (identifier)                     05          [VariantOpen(M1 A) Node RecordSet(M0 a) VariantClose]
-       ○   lexical_declaration
+       ○   (lexical_declaration)
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                02, 10
+       ○   no candidate
   00  ❮❮❮
   08  -ε-                                   07          [Absent RecordSet(M2 e)]
   07   ◀   return                           ◼

@@ -40,9 +40,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  └‣─  (identifier ^= "foo")             4           [Node RecordSet(M0 id)]
-      ○   ;
+      ○   (identifier) "barfoo"
+      ○   ";"
+      ○   no candidate
   1  ❮❮❮
+  1  └‣─  (expression_statement)            2
+      ○   no candidate

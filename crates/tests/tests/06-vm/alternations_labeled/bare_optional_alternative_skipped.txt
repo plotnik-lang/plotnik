@@ -55,17 +55,20 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        14, 10
-       ●   program
+       ●   (program)
   14  └─!  _                                08, 12
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   08   !   _                                02, 06
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   02   !   (identifier)                     04          [Node RecordSet(M0 id)]
-       ○   lexical_declaration
+       ○   (lexical_declaration)
+       ○   no candidate
   08  ❮❮❮
   06  ──!  _                                02, 06
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                08, 12
+       ○   no candidate
   00  ❮❮❮
   10  -ε-                                   05          [Absent RecordSet(M0 id)]
   05   ◀   return                           ◼

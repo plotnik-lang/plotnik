@@ -91,46 +91,46 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   01   !   (program)                        02
-       ●   program
+       ●   (program)
   02  └‣─  (expression_statement)           03
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (Chain)                          00 : 04
+       ●   (call_expression)
        ▶   (Chain)
 
 Chain:
-  00   !   switch
-       ●   call_expression
+  00   ●   switch (call_expression)         14
   14   !   (call_expression)                07          [VariantOpen(M3 Step)]
-       ●   call_expression
+       ●   (call_expression)
   07  └‣─  function: (Chain)                00 : 08
+       ●   function: (call_expression)
        ▶   (Chain)
 
 Chain:
-  00   !   switch
-       ●   call_expression
+  00   ●   switch (call_expression)         14
   14   !   (call_expression)                07          [VariantOpen(M3 Step)]
-       ●   call_expression
+       ●   (call_expression)
   07  └‣─  function: (Chain)                00 : 08
+       ●   function: (identifier)
        ▶   (Chain)
 
 Chain:
-  00   !   switch
-       ●   identifier
+  00   ●   switch (identifier)              11
   11   !   (identifier)                     10          [VariantOpen(M2 Base) Node RecordSet(M0 name) VariantClose]
-       ●   identifier
+       ●   (identifier)
   10   ◀   return                           08
 
 Chain:
   08  ─‣┘  _                                10          [RecordSet(M1 inner) VariantClose]
-       ●   call_expression
+       ●   (call_expression)
   10   ◀   return                           08
 
 Chain:
   08  ─‣┘  _                                10          [RecordSet(M1 inner) VariantClose]
-       ●   call_expression
+       ●   (call_expression)
   10   ◀   return                           04
 
 Q:
   04  ─‣┘² _                                06          [RecordSet(M4 top)]
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

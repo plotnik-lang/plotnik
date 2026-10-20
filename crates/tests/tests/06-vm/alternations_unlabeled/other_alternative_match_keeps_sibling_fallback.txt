@@ -60,20 +60,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           14, 16
-       ●   expression_statement
+       ●   (expression_statement)
   14  └─!  _                                04, 12, 19
-       ●   number
+       ●   (number)
   04   !   (identifier)                     21          [Absent RecordSet(M1 b) Node RecordSet(M0 a)]
-       ○   number
+       ○   (number)
+       ○   no candidate
   14  ❮❮❮
   12   !   _                                08, 10      [Absent RecordSet(M0 a)]
-       ●   number
+       ●   (number)
   08   !   (number)                         21          [Node RecordSet(M1 b)]
-       ●   number
+       ●   (number)
   21  ─‣┘  _                                07
-       ●   expression_statement
+       ●   (expression_statement)
   07  ─‣┘  _                                03
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

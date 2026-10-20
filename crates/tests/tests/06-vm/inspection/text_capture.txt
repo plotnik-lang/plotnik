@@ -123,13 +123,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
-       ●   program
+       ●   (program)
   02  └‣─  (expression_statement)           04          [SpanStartAt(P2)]
-       ●   expression_statement
+       ●   (expression_statement)
   04  └‣─  (identifier)                     07          [SpanStart(P3) SpanStartAt(P5) NodeText RecordSet(M0 name) SpanEnd(P5) SpanEnd(P3)]
-       ●   identifier
+       ●   (identifier)
   07  ─‣┘  _                                08
-       ●   expression_statement
+       ●   (expression_statement)
   08  ─‣┘  _                                10          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
-       ●   program
+       ●   (program)
   10   ◀   return                           ◼

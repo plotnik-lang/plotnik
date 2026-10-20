@@ -44,12 +44,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (comment)                         2
-      ●   comment
+      ●   (comment)
   2  ─‣─  (expression_statement)            4           [Node RecordSet(M0 statement)]
-      ○   lexical_declaration
-      ●   expression_statement
+      ○   (lexical_declaration)
+      ●   (expression_statement)
   4  ─‣┘  _                                 5
-      ●   program
+      ●   (program)
   5   ◀   return                            ◼

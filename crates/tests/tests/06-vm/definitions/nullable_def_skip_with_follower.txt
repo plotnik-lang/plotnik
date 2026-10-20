@@ -52,9 +52,9 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        03, 10
-       ●   program
+       ●   (program)
   03  └‣─  (debugger_statement)             12          [Node RecordSet(M0 d)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   12  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

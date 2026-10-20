@@ -42,14 +42,16 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   10, 04      [ListOpen]
   10  └─!  _                                06, 08
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   06   !   (expression_statement)           08, 12      [Node ArrayPush]
-       ○   lexical_declaration
+       ○   (lexical_declaration)
+       ○   no candidate
   10  ❮❮❮
   08  ──!  _                                06, 08
+       ○   no candidate
   01  ❮❮❮
   04  -ε-                                   03          [ListClose RecordSet(M0 stmts)]
   03   ◀   return                           ◼

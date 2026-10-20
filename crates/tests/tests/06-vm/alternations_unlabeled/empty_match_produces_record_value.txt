@@ -73,8 +73,9 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        32, 12, 26
-       ●   program
+       ●   (program)
   32  └─!  _                                10, 24, 29
+       ○   no candidate
   00  ❮❮❮
   12  -ε-                                   02          [Absent RecordSet(M3 right) RecordOpen Absent RecordSet(M0 comment) RecordClose RecordSet(M2 left)]
   02   ◀   return                           ◼

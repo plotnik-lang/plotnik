@@ -149,6 +149,15 @@ impl Tracer for TraceRecorder {
         self.add_record(TraceEvent::Instruction, None);
     }
 
+    fn trace_switch(&mut self, _ip: CodeAddr, node: Node<'_>, target: Option<CodeAddr>) {
+        let event = if target.is_some() {
+            TraceEvent::MatchOk
+        } else {
+            TraceEvent::MatchFail
+        };
+        self.add_record(event, Some(trace_node(node)));
+    }
+
     fn trace_nav(&mut self, _nav: Nav, node: Node<'_>) {
         self.add_record(TraceEvent::Nav, Some(trace_node(node)));
     }
@@ -157,11 +166,11 @@ impl Tracer for TraceRecorder {
         self.add_record(TraceEvent::NavFail, None);
     }
 
-    fn trace_match_success(&mut self, node: Node<'_>) {
+    fn trace_match_success(&mut self, node: Node<'_>, _field: Option<NodeFieldId>) {
         self.add_record(TraceEvent::MatchOk, Some(trace_node(node)));
     }
 
-    fn trace_match_failure(&mut self, node: Node<'_>) {
+    fn trace_match_failure(&mut self, node: Node<'_>, _field: Option<NodeFieldId>) {
         self.add_record(TraceEvent::MatchFail, Some(trace_node(node)));
     }
 
@@ -169,15 +178,20 @@ impl Tracer for TraceRecorder {
         self.add_record(TraceEvent::FieldOk, None);
     }
 
-    fn trace_field_failure(&mut self, node: Node<'_>) {
+    fn trace_field_failure(&mut self, node: Node<'_>, _field: Option<NodeFieldId>) {
         self.add_record(TraceEvent::FieldFail, Some(trace_node(node)));
     }
 
-    fn trace_predicate_failure(&mut self, node: Node<'_>) {
+    fn trace_predicate_failure(&mut self, node: Node<'_>, _field: Option<NodeFieldId>) {
         self.add_record(TraceEvent::PredicateFail, Some(trace_node(node)));
     }
 
-    fn trace_neg_field_failure(&mut self, node: Node<'_>, _field: NodeFieldId) {
+    fn trace_neg_field_failure(
+        &mut self,
+        node: Node<'_>,
+        _field: Option<NodeFieldId>,
+        _forbidden: NodeFieldId,
+    ) {
         self.add_record(TraceEvent::NegFieldFail, Some(trace_node(node)));
     }
 

@@ -79,43 +79,46 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   03   !   (program)                        04
-       ●   program
+       ●   (program)
   04  └‣─  (expression_statement)           06          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   06  └‣─  (Nested)                         00 : 08
+       ●   (call_expression)
        ▶   (Nested)
 
 Nested:
   00   !   (call_expression)                01
-       ●   call_expression
+       ●   (call_expression)
   01  └‣─  function: _                      16, 14
-       ●   call_expression
+       ●   function: (call_expression)
   16   !   (identifier)                     07          [Absent RecordSet(M1 inner) Node RecordSet(M0 name)]
-       ○   call_expression
+       ○   (call_expression)
+       ○   no candidate
   01  ❮❮❮
   14  -ε-                                   21          [Absent RecordSet(M0 name) RecordOpen]
   21   !   (Nested)                         00 : 19
+       ●   (call_expression)
        ▶   (Nested)
 
 Nested:
   00   !   (call_expression)                01
-       ●   call_expression
+       ●   (call_expression)
   01  └‣─  function: _                      16, 14
-       ●   identifier
+       ●   function: (identifier)
   16   !   (identifier)                     07          [Absent RecordSet(M1 inner) Node RecordSet(M0 name)]
-       ●   identifier
+       ●   (identifier)
   07  ─‣┘  _                                13
-       ●   call_expression
+       ●   (call_expression)
   13   ◀   return                           19
 
 Nested:
   19  -ε-                                   07          [RecordClose RecordSet(M1 inner)]
   07  ─‣┘  _                                13
-       ●   call_expression
+       ●   (call_expression)
   13   ◀   return                           08
 
 Q:
   08  -ε-                                   10          [RecordClose]
   10  ─‣┘² _                                12          [RecordSet(M2 top)]
-       ●   program
+       ●   (program)
   12   ◀   return                           ◼

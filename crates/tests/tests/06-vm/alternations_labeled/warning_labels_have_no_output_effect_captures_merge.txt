@@ -66,13 +66,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                11, 12
-       ●   expression_statement
-  11   !   switch
-       ●   expression_statement
+       ●   (expression_statement)
+  11   ●   switch (expression_statement)    04
   04   !   (expression_statement)           07          [Absent RecordSet(M1 d) Node RecordSet(M0 e)]
-       ●   expression_statement
+       ●   (expression_statement)
   07  ─‣┘  _                                03
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

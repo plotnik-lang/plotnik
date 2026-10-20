@@ -56,15 +56,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                10, 11
-       ●   identifier
-  10   !   switch
-       ●   identifier
+       ●   (identifier)
+  10   ●   switch (identifier)              08
   08   !   (identifier == "x")              07          [Node RecordSet(M0 value)]
-       ●   identifier
+       ●   (identifier) "x"
   07  ─‣┘² _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

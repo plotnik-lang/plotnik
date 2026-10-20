@@ -73,14 +73,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                11, 12      [RecordOpen]
-       ●   expression_statement
-  11   !   switch
-       ●   expression_statement
+       ●   (expression_statement)
+  11   ●   switch (expression_statement)    07
   07  -ε-                                   04
   04   !   (expression_statement)           14          [Absent RecordSet(M2 b) RecordOpen Node RecordSet(M0 a) RecordClose RecordSet(M1 grp)]
-       ●   expression_statement
+       ●   (expression_statement)
   14  ─‣┘  _                                03          [RecordClose RecordSet(M3 w)]
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

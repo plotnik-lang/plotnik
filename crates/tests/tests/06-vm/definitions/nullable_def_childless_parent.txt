@@ -36,7 +36,8 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         8, 4
-      ●   program
+      ●   (program)
   8  └─!  _                                 2, 5
+      ○   no candidate
   0  ❮❮❮
   4   ◀   return                            ◼

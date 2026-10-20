@@ -102,62 +102,70 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                31, 32
-       ●   [
+       ●   "["
   31   !   "["                              28
-       ●   [
+       ●   "["
   28       (@26)                            26 : 06 / 08
        ▶   (@26)
 
 @26:
   26  ──!  _                                14, 24, 26
-       ●   identifier
+       ●   (identifier)
   14   !   (identifier == "a")              12, 11
-       ●   identifier
+       ●   (identifier) "a"
   12  ─•─  (identifier == "x")              10
-       ○   ,
+       ○   ","
+       ○   (identifier) "a"
+       ○   no candidate
   14  ❮❮❮
   11   ◀   return p1                        08
 
 Q:
   08  ─•─  (identifier == "b")              34          [Node RecordSet(M7 b)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "a"
+       ○   no candidate
   26  ❮❮❮
   24   !   (identifier == "a")              22
-       ●   identifier
+       ●   (identifier) "a"
   22  ──!  _                                21, 22
-       ●   ,
+       ●   ","
   21   !   ","                              18
-       ●   ,
+       ●   ","
   18       (@26)                            26 : 16 / 16
        ▶   (@26)
 
 @26:
   26  ──!  _                                14, 24, 26
-       ●   identifier
+       ●   (identifier)
   14   !   (identifier == "a")              12, 11
-       ●   identifier
+       ●   (identifier) "a"
   12  ─•─  (identifier == "x")              10
-       ○   ,
+       ○   ","
+       ○   (identifier) "b"
+       ○   no candidate
   14  ❮❮❮
   11   ◀   return p1                        16
 
 @26:
   16  -ε-                                   12, 11
   12  ─•─  (identifier == "x")              10
-       ○   ,
+       ○   ","
+       ○   (identifier) "b"
+       ○   no candidate
   16  ❮❮❮
   11   ◀   return p1                        08
 
 Q:
   08  ─•─  (identifier == "b")              34          [Node RecordSet(M7 b)]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier) "b"
   34  ─‣┘³ _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

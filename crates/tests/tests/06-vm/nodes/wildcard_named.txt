@@ -46,14 +46,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  └‣─  (array)                           3
-      ●   array
+      ●   (array)
   3  └‣─  (_)                               5           [Node RecordSet(M0 first)]
-      ○   [
-      ●   identifier
+      ○   "["
+      ●   (identifier)
   5  ─‣┘³ _                                 6
-      ●   program
+      ●   (program)
   6   ◀   return                            ◼

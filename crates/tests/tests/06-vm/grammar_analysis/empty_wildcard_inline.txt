@@ -45,13 +45,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            3           [Node RecordSet(M0 expression)]
-      ●   expression_statement
+      ●   (expression_statement)
   3  └‣─  (_)                               4
-      ●   identifier
+      ●   (identifier)
   4  └!┘  _                                 5
-      ●   identifier
+      ●   (identifier)
   5  ─‣┘² _                                 6
-      ●   program
+      ●   (program)
   6   ◀   return                            ◼

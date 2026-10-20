@@ -4,7 +4,7 @@ use tree_sitter::Node;
 
 use crate::bytecode::{
     BYTECODE_WORD_SIZE, CodeAddr, EffectKind, Instruction, Module, ModuleRenderContext, Nav,
-    SECTION_ALIGN, Symbol, cols, nav_symbol, return_content, trace, truncate_text,
+    SECTION_ALIGN, Symbol, cols, pattern_constraints, return_content, trace, truncate_text,
 };
 use crate::core::{Colors, NodeFieldId};
 
@@ -15,12 +15,14 @@ use plotnik_runtime::{JournalEvent, PortId};
 /// Controls which sub-lines are shown and whether node text is included.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Verbosity {
-    /// Default: match, backtrack, call/return. Kind only, no text.
+    /// Default: instructions and candidates, with candidate text only for predicate tests.
     #[default]
     Default,
-    /// Verbose (-v): all sub-lines. Text on match/failure.
+    /// Verbose (-v): suppression sublines, cache-line separators, and truncated,
+    /// quoted, escaped text for named-node candidates.
     Verbose,
-    /// Very verbose (-vv): all sub-lines. Text on everything including nav.
+    /// Very verbose (-vv): all applied journal effects with runtime values where
+    /// available, and text without truncation.
     VeryVerbose,
 }
 
@@ -28,6 +30,7 @@ pub enum Verbosity {
 ///
 /// All methods receive raw data (IDs, nodes) that the VM already has.
 /// Formatting and name resolution happen in the tracer implementation.
+/// Candidate callbacks receive the cursor's actual field, not the requested field.
 pub trait Tracer {
     /// Compile-time switch: when `false`, the VM skips tracer calls entirely,
     /// including evaluation of their arguments (an eagerly-built `Node` costs a
@@ -38,29 +41,37 @@ pub trait Tracer {
     /// Called before executing an instruction.
     fn trace_instruction(&mut self, ip: CodeAddr, instr: &Instruction<'_>);
 
+    /// Called after a switch selects a target or finds no matching kind.
+    fn trace_switch(&mut self, ip: CodeAddr, node: Node<'_>, target: Option<CodeAddr>);
+
     /// Called after navigation succeeds.
     fn trace_nav(&mut self, nav: Nav, node: Node<'_>);
 
     /// Called when navigation fails (no child/sibling exists).
     fn trace_nav_failure(&mut self, nav: Nav);
 
-    /// Called after type check succeeds.
-    fn trace_match_success(&mut self, node: Node<'_>);
+    /// Called when a candidate passes all instruction constraints.
+    fn trace_match_success(&mut self, node: Node<'_>, field: Option<NodeFieldId>);
 
     /// Called after type check fails.
-    fn trace_match_failure(&mut self, node: Node<'_>);
+    fn trace_match_failure(&mut self, node: Node<'_>, field: Option<NodeFieldId>);
 
     /// Called after field check succeeds.
     fn trace_field_success(&mut self, field_id: NodeFieldId);
 
     /// Called after field check fails.
-    fn trace_field_failure(&mut self, node: Node<'_>);
+    fn trace_field_failure(&mut self, node: Node<'_>, field: Option<NodeFieldId>);
 
     /// Called when a candidate node fails the text predicate.
-    fn trace_predicate_failure(&mut self, node: Node<'_>);
+    fn trace_predicate_failure(&mut self, node: Node<'_>, field: Option<NodeFieldId>);
 
     /// Called when a candidate node fails a negated-field constraint.
-    fn trace_neg_field_failure(&mut self, node: Node<'_>, field: NodeFieldId);
+    fn trace_neg_field_failure(
+        &mut self,
+        node: Node<'_>,
+        field: Option<NodeFieldId>,
+        forbidden: NodeFieldId,
+    );
 
     /// Called after appending a journal event.
     fn trace_journal_event(&mut self, event: &JournalEvent<'_>);
@@ -99,28 +110,37 @@ impl Tracer for NoopTracer {
     fn trace_instruction(&mut self, _ip: CodeAddr, _instr: &Instruction<'_>) {}
 
     #[inline(always)]
+    fn trace_switch(&mut self, _ip: CodeAddr, _node: Node<'_>, _target: Option<CodeAddr>) {}
+
+    #[inline(always)]
     fn trace_nav(&mut self, _nav: Nav, _node: Node<'_>) {}
 
     #[inline(always)]
     fn trace_nav_failure(&mut self, _nav: Nav) {}
 
     #[inline(always)]
-    fn trace_match_success(&mut self, _node: Node<'_>) {}
+    fn trace_match_success(&mut self, _node: Node<'_>, _field: Option<NodeFieldId>) {}
 
     #[inline(always)]
-    fn trace_match_failure(&mut self, _node: Node<'_>) {}
+    fn trace_match_failure(&mut self, _node: Node<'_>, _field: Option<NodeFieldId>) {}
 
     #[inline(always)]
     fn trace_field_success(&mut self, _field_id: NodeFieldId) {}
 
     #[inline(always)]
-    fn trace_field_failure(&mut self, _node: Node<'_>) {}
+    fn trace_field_failure(&mut self, _node: Node<'_>, _field: Option<NodeFieldId>) {}
 
     #[inline(always)]
-    fn trace_predicate_failure(&mut self, _node: Node<'_>) {}
+    fn trace_predicate_failure(&mut self, _node: Node<'_>, _field: Option<NodeFieldId>) {}
 
     #[inline(always)]
-    fn trace_neg_field_failure(&mut self, _node: Node<'_>, _field: NodeFieldId) {}
+    fn trace_neg_field_failure(
+        &mut self,
+        _node: Node<'_>,
+        _field: Option<NodeFieldId>,
+        _forbidden: NodeFieldId,
+    ) {
+    }
 
     #[inline(always)]
     fn trace_journal_event(&mut self, _event: &JournalEvent<'_>) {}
@@ -157,6 +177,8 @@ pub struct PrintTracer<'s> {
     pub(crate) deferred_return_ip: Option<CodeAddr>,
     pub(crate) colors: Colors,
     pub(crate) prev_ip: Option<CodeAddr>,
+    tested_field: Option<NodeFieldId>,
+    tested_predicate: bool,
 }
 
 pub struct PrintTracerBuilder<'s, 'm> {
@@ -197,6 +219,8 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             deferred_return_ip: None,
             colors: self.colors,
             prev_ip: None,
+            tested_field: None,
+            tested_predicate: false,
         }
     }
 }
@@ -206,42 +230,61 @@ impl<'s> PrintTracer<'s> {
         PrintTracerBuilder::new(source, module)
     }
 
-    fn node_field_name(&self, id: NodeFieldId) -> &str {
-        self.render.node_field_name(id).unwrap_or("?")
-    }
-
-    fn format_kind_simple(&self, kind: &str, is_named: bool) -> String {
-        if is_named {
-            kind.to_string()
-        } else {
-            let c = &self.colors;
-            format!("{}{}{}{}", c.dim, c.green, kind, c.reset)
+    fn node_pattern(&self, node: Node<'_>) -> String {
+        if node.is_named() {
+            return format!("({})", node.kind());
         }
+
+        format!("{:?}", node.kind())
     }
 
-    fn format_kind_with_text(&self, kind: &str, text: &str, is_named: bool) -> String {
-        let c = &self.colors;
+    fn node_text(&self, node: Node<'_>) -> String {
+        format!(
+            "{:?}",
+            node.utf8_text(self.source)
+                .expect("node addresses UTF-8 source")
+        )
+    }
 
-        let available = cols::TOTAL_WIDTH - (cols::INDENT + cols::GAP + cols::SYMBOL + cols::GAP);
-
-        if is_named {
-            let text_budget = available.saturating_sub(kind.len() + 1).max(12);
-            let truncated = truncate_text(text, text_budget);
-            format!("{} {}{}{}{}", kind, c.dim, c.green, truncated, c.reset)
-        } else {
-            let truncated = truncate_text(text, available);
-            format!("{}{}{}{}", c.dim, c.green, truncated, c.reset)
+    fn trace_match_result(
+        &mut self,
+        symbol: Symbol,
+        node: Node<'_>,
+        field: Option<NodeFieldId>,
+        facts: Vec<String>,
+    ) {
+        let mut content = String::new();
+        if self.tested_field.is_some()
+            && let Some(field) = field
+        {
+            let language = node.language();
+            let name = language
+                .field_name_for_id(u16::from(field))
+                .expect("cursor field belongs to the node language");
+            content.push_str(name);
+            content.push_str(": ");
         }
-    }
-
-    fn trace_match_result(&mut self, symbol: Symbol, node: Node<'_>) {
-        let kind = node.kind();
-        let content = if self.verbosity == Verbosity::Default {
-            self.format_kind_simple(kind, node.is_named())
-        } else {
-            let text = node.utf8_text(self.source).unwrap_or("?");
-            self.format_kind_with_text(kind, text, node.is_named())
-        };
+        content.push_str(&pattern_constraints(self.node_pattern(node), facts));
+        if node.is_named() && (self.verbosity != Verbosity::Default || self.tested_predicate) {
+            let quoted = self.node_text(node);
+            let text = if self.verbosity == Verbosity::VeryVerbose {
+                quoted
+            } else {
+                let available =
+                    cols::TOTAL_WIDTH - (cols::INDENT + cols::GAP + cols::SYMBOL + cols::GAP);
+                let budget = available
+                    .saturating_sub(content.chars().count() + 1)
+                    .max(12);
+                format!(
+                    "\"{}\"",
+                    truncate_text(&quoted[1..quoted.len() - 1], budget - 2)
+                )
+            };
+            content.push_str(&format!(
+                " {}{}{}{}",
+                self.colors.dim, self.colors.green, text, self.colors.reset
+            ));
+        }
         self.add_subline(symbol, &content);
     }
 
@@ -324,89 +367,101 @@ impl<'s> PrintTracer<'s> {
 
 impl Tracer for PrintTracer<'_> {
     fn trace_instruction(&mut self, ip: CodeAddr, instr: &Instruction<'_>) {
-        self.check_cache_line_boundary(ip);
-
-        if let Instruction::Return(_) = instr {
-            self.deferred_return_ip = Some(ip);
-            return;
+        match instr {
+            Instruction::Switch { .. } => return,
+            Instruction::Match(m) => {
+                self.tested_field = m.node_field;
+                self.tested_predicate = m.predicate().is_some();
+            }
+            Instruction::Call(c) => {
+                self.tested_field = c.node_field;
+                self.tested_predicate = false;
+            }
+            Instruction::Return(_) => {
+                self.deferred_return_ip = Some(ip);
+                self.check_cache_line_boundary(ip);
+                return;
+            }
         }
-
+        self.check_cache_line_boundary(ip);
         self.lines.push(self.render.instruction_line(ip, instr));
     }
 
-    fn trace_nav(&mut self, nav: Nav, node: Node<'_>) {
-        if self.verbosity == Verbosity::Default {
-            return;
-        }
-
-        let kind = node.kind();
-        let symbol = nav_symbol(nav);
-
-        if self.verbosity == Verbosity::VeryVerbose {
-            let text = node.utf8_text(self.source).unwrap_or("?");
-            let content = self.format_kind_with_text(kind, text, node.is_named());
-            self.add_subline(symbol, &content);
+    fn trace_switch(&mut self, ip: CodeAddr, node: Node<'_>, target: Option<CodeAddr>) {
+        self.check_cache_line_boundary(ip);
+        let symbol = if target.is_some() {
+            trace::MATCH_SUCCESS
         } else {
-            let content = self.format_kind_simple(kind, node.is_named());
-            self.add_subline(symbol, &content);
-        }
-    }
-
-    fn trace_nav_failure(&mut self, nav: Nav) {
-        if self.verbosity == Verbosity::Default {
-            return;
-        }
-
-        let failed_nav = match nav {
-            Nav::Stay | Nav::StayExact | Nav::Epsilon => "·".to_string(),
-            _ => nav_symbol(nav).format().trim().to_string(),
+            trace::MATCH_FAILURE
         };
-
-        self.add_subline(trace::MATCH_FAILURE, &failed_nav);
+        let successors = target
+            .map(|addr| self.render.format_addr(addr))
+            .unwrap_or_default();
+        self.add_instruction(
+            ip,
+            symbol,
+            &format!("switch {}", self.node_pattern(node)),
+            &successors,
+        );
     }
 
-    fn trace_match_success(&mut self, node: Node<'_>) {
-        self.trace_match_result(trace::MATCH_SUCCESS, node);
+    fn trace_nav(&mut self, _nav: Nav, _node: Node<'_>) {}
+
+    fn trace_nav_failure(&mut self, _nav: Nav) {
+        self.add_subline(trace::MATCH_FAILURE, "no candidate");
     }
 
-    fn trace_match_failure(&mut self, node: Node<'_>) {
-        self.trace_match_result(trace::MATCH_FAILURE, node);
+    fn trace_match_success(&mut self, node: Node<'_>, field: Option<NodeFieldId>) {
+        self.trace_match_result(trace::MATCH_SUCCESS, node, field, Vec::new());
     }
 
-    fn trace_field_success(&mut self, field_id: NodeFieldId) {
-        if self.verbosity == Verbosity::Default {
-            return;
-        }
-
-        let name = self.node_field_name(field_id);
-        self.add_subline(trace::MATCH_SUCCESS, &format!("{}:", name));
+    fn trace_match_failure(&mut self, node: Node<'_>, field: Option<NodeFieldId>) {
+        self.trace_match_result(trace::MATCH_FAILURE, node, field, Vec::new());
     }
 
-    fn trace_field_failure(&mut self, _node: Node<'_>) {}
+    fn trace_field_success(&mut self, _field_id: NodeFieldId) {}
 
-    fn trace_predicate_failure(&mut self, _node: Node<'_>) {
-        if self.verbosity == Verbosity::Default {
-            return;
-        }
-
-        self.add_subline(trace::MATCH_FAILURE, "✗ predicate");
+    fn trace_field_failure(&mut self, node: Node<'_>, field: Option<NodeFieldId>) {
+        self.trace_match_result(trace::MATCH_FAILURE, node, field, Vec::new());
     }
 
-    fn trace_neg_field_failure(&mut self, _node: Node<'_>, field: NodeFieldId) {
-        if self.verbosity == Verbosity::Default {
-            return;
-        }
+    fn trace_predicate_failure(&mut self, node: Node<'_>, field: Option<NodeFieldId>) {
+        self.trace_match_result(trace::MATCH_FAILURE, node, field, Vec::new());
+    }
 
-        let name = self.node_field_name(field);
-        self.add_subline(trace::MATCH_FAILURE, &format!("✗ -{}", name));
+    fn trace_neg_field_failure(
+        &mut self,
+        node: Node<'_>,
+        field: Option<NodeFieldId>,
+        forbidden: NodeFieldId,
+    ) {
+        let fact = format!("{}: _", self.render.dump_node_field_name(forbidden));
+        self.trace_match_result(trace::MATCH_FAILURE, node, field, vec![fact]);
     }
 
     fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
-        if self.verbosity == Verbosity::Default {
+        if self.verbosity != Verbosity::VeryVerbose {
             return;
         }
 
-        let effect_str = self.render.format_journal_event(event);
+        let mut effect_str = self.render.format_journal_event(event);
+        match event {
+            JournalEvent::Node(node)
+            | JournalEvent::NodeText(node)
+            | JournalEvent::ScalarMark(node)
+            | JournalEvent::SpanStart {
+                node: Some(node), ..
+            } => {
+                effect_str.push_str(&format!(" {}", self.node_pattern(*node)));
+                if node.is_named() {
+                    effect_str.push_str(&format!(" {}", self.node_text(*node)));
+                }
+            }
+            JournalEvent::NodeBool(_) => effect_str.push_str(" true"),
+            JournalEvent::BoolClose(value) => effect_str = format!("BoolClose {value}"),
+            JournalEvent::BoolValue(value) => effect_str = format!("BoolValue {value}"),
+            _ => {}
+        }
         self.add_subline(trace::EFFECT, &effect_str);
     }
 

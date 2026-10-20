@@ -46,22 +46,26 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                08, 10
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   08   !   (lexical_declaration)            03          [Node RecordSet(M0 a)]
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   03  ──!  (expression_statement)           05          [Node RecordSet(M1 b)]
-       ○   comment
+       ○   (comment)
+       ○   no candidate
   01  ❮❮❮
   10  ──!  _                                08, 10
-       ●   comment
+       ●   (comment)
   08   !   (lexical_declaration)            03          [Node RecordSet(M0 a)]
-       ○   comment
+       ○   (comment)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (lexical_declaration)            03          [Node RecordSet(M0 a)]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate

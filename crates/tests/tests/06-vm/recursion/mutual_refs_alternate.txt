@@ -97,87 +97,101 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   05   !   (program)                        06
-       ●   program
+       ●   (program)
   06  └‣─  (expression_statement)           08          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   08  └‣─  (Arr)                            03 : 09
+       ●   (array)
        ▶   (Arr)
 
 Arr:
   03   !   (array)                          34, 27
-       ●   array
+       ●   (array)
   34  └─!  _                                30, 32
-       ●   [
+       ●   "["
   30  -ε-                                   29          [RecordOpen]
   29   !   (Obj)                            00 : 14
+       ●   "["
        ▶   (Obj)
 
 Obj:
   00   !   (object)                         01
-       ○   [
+       ○   "["
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                30, 32
-       ●   object
+       ●   (object)
   30  -ε-                                   29          [RecordOpen]
   29   !   (Obj)                            00 : 14
+       ●   (object)
        ▶   (Obj)
 
 Obj:
   00   !   (object)                         01
-       ●   object
+       ●   (object)
   01  └‣─  (pair)                           42, 24
-       ○   {
-       ●   pair
+       ○   "{"
+       ●   (pair)
   42  └─!  _                                37, 40
-       ●   property_identifier
+       ●   (property_identifier)
   37  -ε-                                   36          [RecordOpen]
   36   !   value: (Arr)                     03 : 18
+       ○   key: (property_identifier)
   42  ❮❮❮
   40  ──!  _                                37, 40
-       ●   :
+       ●   ":"
   37  -ε-                                   36          [RecordOpen]
   36   !   value: (Arr)                     03 : 18
+       ○   ":"
   40  ❮❮❮
   40  ──!  _                                37, 40
-       ●   array
+       ●   (array)
   37  -ε-                                   36          [RecordOpen]
   36   !   value: (Arr)                     03 : 18
+       ●   value: (array)
        ▶   (Arr)
 
 Arr:
   03   !   (array)                          34, 27
-       ●   array
+       ●   (array)
   34  └─!  _                                30, 32
-       ●   [
+       ●   "["
   30  -ε-                                   29          [RecordOpen]
   29   !   (Obj)                            00 : 14
+       ●   "["
        ▶   (Obj)
 
 Obj:
   00   !   (object)                         01
-       ○   [
+       ○   "["
+       ○   no candidate
   34  ❮❮❮
   32  ──!  _                                30, 32
-       ●   number
+       ●   (number)
   30  -ε-                                   29          [RecordOpen]
   29   !   (Obj)                            00 : 14
+       ●   (number)
        ▶   (Obj)
 
 Obj:
   00   !   (object)                         01
-       ○   number
+       ○   (number)
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                30, 32
-       ●   ]
+       ●   "]"
   30  -ε-                                   29          [RecordOpen]
   29   !   (Obj)                            00 : 14
+       ●   "]"
        ▶   (Obj)
 
 Obj:
   00   !   (object)                         01
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                30, 32
+       ○   no candidate
   03  ❮❮❮
   27  -ε-                                   26          [Absent RecordSet(M0 obj)]
   26   ◀   return                           18
@@ -185,19 +199,19 @@ Obj:
 Obj:
   18  -ε-                                   20          [RecordClose]
   20  ─‣┘  _                                23          [RecordSet(M1 arr)]
-       ●   pair
+       ●   (pair)
   23  ─‣┘  _                                22
-       ●   object
+       ●   (object)
   22   ◀   return                           14
 
 Arr:
   14  -ε-                                   16          [RecordClose]
   16  ─‣┘  _                                26          [RecordSet(M0 obj)]
-       ●   array
+       ●   (array)
   26   ◀   return                           09
 
 Q:
   09  -ε-                                   11          [RecordClose]
   11  ─‣┘² _                                13          [RecordSet(M2 top)]
-       ●   program
+       ●   (program)
   13   ◀   return                           ◼

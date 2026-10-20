@@ -72,18 +72,20 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   20, 14      [RecordOpen]
   20  └─!  _                                16, 18
-       ●   debugger_statement
+       ●   (debugger_statement)
   16   !   (expression_statement)           03          [RecordOpen]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   20  ❮❮❮
   18  ──!  _                                16, 18
+       ○   no candidate
   01  ❮❮❮
   14  -ε-                                   08          [Absent RecordSet(M1 x)]
   08  └‣─  (debugger_statement)             22          [RecordClose RecordSet(M2 a) Node RecordSet(M3 d)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   22  ─‣┘  _                                07
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

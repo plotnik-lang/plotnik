@@ -48,11 +48,11 @@ Q:
 Q:
   0  -ε-                                    7, 8
   7   !   (program)                         5
-      ●   program
+      ●   (program)
   5  └‣─  (comment)                         2           [Node RecordSet(M0 comment)]
-      ●   comment
+      ●   (comment)
   2  └!┘  _                                 3
-      ●   comment
+      ●   (comment)
   3  ─‣┘  _                                 4
-      ●   program
+      ●   (program)
   4   ◀   return                            ◼

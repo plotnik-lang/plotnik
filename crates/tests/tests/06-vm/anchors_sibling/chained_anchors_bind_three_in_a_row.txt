@@ -68,15 +68,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                10, 12
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   10   !   (lexical_declaration)            08          [Node RecordSet(M0 a)]
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   08  ─•─  (empty_statement)                03          [Node RecordSet(M1 b)]
-       ●   empty_statement
+       ●   (empty_statement)
   03  ─•─  (debugger_statement)             05          [Node RecordSet(M2 c)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   05  ─‣┘  _                                06
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

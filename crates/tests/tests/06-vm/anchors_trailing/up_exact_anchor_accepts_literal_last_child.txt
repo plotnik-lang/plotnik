@@ -41,15 +41,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                08, 10
-       ●   identifier
+       ●   (identifier)
   08   !   (identifier == "a")              04
-       ●   identifier
+       ●   (identifier) "a"
   04  !─┘  _                                05
-       ●   expression_statement
+       ●   (expression_statement)
   05  ─‣┘  _                                06
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

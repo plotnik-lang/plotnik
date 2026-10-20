@@ -179,22 +179,23 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
-       ●   program
+       ●   (program)
   02  -ε-                                   13, 05      [ListOpen SpanStart(P3)]
   13  └─!  _                                08, 11
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (expression_statement)           11, 16      [SpanStartAt(P4) Node ArrayPush SpanEnd(P4)]
-       ●   expression_statement
+       ●   (expression_statement)
   11  ──!  _                                08, 11
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (expression_statement)           11, 16      [SpanStartAt(P4) Node ArrayPush SpanEnd(P4)]
-       ●   expression_statement
+       ●   (expression_statement)
   11  ──!  _                                08, 11
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (expression_statement)           11, 16      [SpanStartAt(P4) Node ArrayPush SpanEnd(P4)]
-       ●   expression_statement
+       ●   (expression_statement)
   11  ──!  _                                08, 11
+       ○   no candidate
   08  ❮❮❮
   16  ─‣┘  _                                04          [SpanEnd(P3) ListClose SpanStart(P2) RecordSet(M0 stmts) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

@@ -51,9 +51,9 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        03, 10
-       ●   program
+       ●   (program)
   03  └‣─  (expression_statement)           12          [Node RecordSet(M0 e)]
-       ●   expression_statement
+       ●   (expression_statement)
   12  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

@@ -90,5 +90,5 @@ pub fn verbose_arg() -> Arg {
     Arg::new("verbose")
         .short('v')
         .action(ArgAction::Count)
-        .help("Verbosity level (-v for verbose, -vv for very verbose)")
+        .help("Trace detail (-v: named-node text and suppression, -vv: full text and applied effects)")
 }

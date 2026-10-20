@@ -54,41 +54,45 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   03   !   (program)                        06, 16
-       ●   program
+       ●   (program)
   06  └•─  (debugger_statement)             15
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   03  ❮❮❮
   16  └─!  _                                11, 13
-       ●   expression_statement
+       ●   (expression_statement)
   11  -ε-                                   10          [SuppressBegin]
   10   !   (A)                              00 : 08
+       ●   (expression_statement)
        ▶   (A)
 
 A:
   00   !   (expression_statement)           02          [VariantOpen(M0 X) VariantClose]
-       ●   expression_statement
+       ●   (expression_statement)
   02   ◀   return                           08
 
 Q:
   08  -ε-                                   07, 13      [SuppressEnd]
   07  ─•─  (debugger_statement)             15
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   08  ❮❮❮
   13  ──!  _                                11, 13
-       ●   expression_statement
+       ●   (expression_statement)
   11  -ε-                                   10          [SuppressBegin]
   10   !   (A)                              00 : 08
+       ●   (expression_statement)
        ▶   (A)
 
 A:
   00   !   (expression_statement)           02          [VariantOpen(M0 X) VariantClose]
-       ●   expression_statement
+       ●   (expression_statement)
   02   ◀   return                           08
 
 Q:
   08  -ε-                                   07, 13      [SuppressEnd]
   07  ─•─  (debugger_statement)             15
-       ●   debugger_statement
+       ●   (debugger_statement)
   15  ─‣┘  _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

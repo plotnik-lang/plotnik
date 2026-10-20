@@ -56,41 +56,49 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           14, 16
-       ●   expression_statement
+       ●   (expression_statement)
   14  └─!  _                                04, 12, 19
-       ●   string
+       ●   (string)
   04   !   (identifier)                     21          [Absent RecordSet(M1 b) Node RecordSet(M0 a)]
-       ○   string
+       ○   (string)
+       ○   no candidate
   14  ❮❮❮
   12   !   _                                08, 10      [Absent RecordSet(M0 a)]
-       ●   string
+       ●   (string)
   08   !   (number)                         21          [Node RecordSet(M1 b)]
-       ○   string
+       ○   (string)
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
-       ●   ;
+       ●   ";"
   08   !   (number)                         21          [Node RecordSet(M1 b)]
-       ○   ;
+       ○   ";"
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   14  ❮❮❮
   19  ──!  _                                04, 12, 19
-       ●   ;
+       ●   ";"
   04   !   (identifier)                     21          [Absent RecordSet(M1 b) Node RecordSet(M0 a)]
-       ○   ;
+       ○   ";"
+       ○   no candidate
   19  ❮❮❮
   12   !   _                                08, 10      [Absent RecordSet(M0 a)]
-       ●   ;
+       ●   ";"
   08   !   (number)                         21          [Node RecordSet(M1 b)]
-       ○   ;
+       ○   ";"
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   19  ❮❮❮
   19  ──!  _                                04, 12, 19
+       ○   no candidate
   01  ❮❮❮
   16  -ε-                                   07          [Absent RecordSet(M0 a) Absent RecordSet(M1 b)]
   07  ─‣┘  _                                03
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

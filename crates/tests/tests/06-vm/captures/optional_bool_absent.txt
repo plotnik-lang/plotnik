@@ -40,13 +40,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        08, 10
-       ●   program
+       ●   (program)
   08  └─!  _                                02, 06
-       ●   comment
+       ●   (comment)
   02   !   (expression_statement)           03
-       ○   comment
+       ○   (comment)
+       ○   no candidate
   08  ❮❮❮
   06  ──!  _                                02, 06
+       ○   no candidate
   00  ❮❮❮
   10  -ε-                                   05          [BoolValue(0) RecordSet(M0 has_statement)]
   05   ◀   return                           ◼

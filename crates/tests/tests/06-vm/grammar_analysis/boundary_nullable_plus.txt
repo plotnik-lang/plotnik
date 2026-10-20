@@ -74,46 +74,51 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                12, 14      [ListOpen]
-       ●   [
+       ●   "["
   12   !   _                                08, 10      [RecordOpen]
-       ●   [
+       ●   "["
   08   !   (identifier)                     06          [Node RecordSet(M0 id)]
-       ○   [
+       ○   "["
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
-       ●   identifier
+       ●   (identifier)
   08   !   (identifier)                     06          [Node RecordSet(M0 id)]
-       ●   identifier
+       ●   (identifier)
   06  -ε-                                   14, 16      [RecordClose ArrayPush]
   14  ──!  _                                12, 14
-       ●   ,
+       ●   ","
   12   !   _                                08, 10      [RecordOpen]
-       ●   ,
+       ●   ","
   08   !   (identifier)                     06          [Node RecordSet(M0 id)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
-       ●   identifier
+       ●   (identifier)
   08   !   (identifier)                     06          [Node RecordSet(M0 id)]
-       ●   identifier
+       ●   (identifier)
   06  -ε-                                   14, 16      [RecordClose ArrayPush]
   14  ──!  _                                12, 14
-       ●   ]
+       ●   "]"
   12   !   _                                08, 10      [RecordOpen]
-       ●   ]
+       ●   "]"
   08   !   (identifier)                     06          [Node RecordSet(M0 id)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   14  ❮❮❮
   14  ──!  _                                12, 14
+       ○   no candidate
   06  ❮❮❮
   16  ─‣┘³ _                                05          [ListClose RecordSet(M1 ids)]
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

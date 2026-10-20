@@ -50,9 +50,9 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        03, 12
-       ●   program
+       ●   (program)
   03  └‣─  (expression_statement)           14          [Absent RecordSet(M0 e) Node RecordSet(M1 f)]
-       ●   expression_statement
+       ●   (expression_statement)
   14  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

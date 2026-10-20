@@ -64,21 +64,22 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (binary_expression)              10, 12
-       ●   binary_expression
+       ●   (binary_expression)
   10  └‣─  (number)                         05          [VariantOpen(M0 A) VariantClose]
-       ○   identifier
-       ○   +
-       ○   identifier
+       ○   (identifier)
+       ○   "+"
+       ○   (identifier)
+       ○   no candidate
   02  ❮❮❮
   12  └‣─  "+"                              08          [VariantOpen(M1 B) VariantClose]
-       ○   identifier
-       ●   +
+       ○   (identifier)
+       ●   "+"
   08  ─◦─  (identifier)                     07          [RecordSet(M2 t)]
-       ●   identifier
+       ●   (identifier)
   07  ─‣┘³ _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

@@ -176,22 +176,24 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1) SpanStart(P2)]
-       ●   program
+       ●   (program)
   02  -ε-                                   22, 13      [SpanStart(P3)]
   22  └─!  _                                18, 20
-       ●   function_declaration
+       ●   (function_declaration)
   18   !   (expression_statement)           16          [SpanStartAt(P4) SpanEnd(P4)]
-       ○   function_declaration
+       ○   (function_declaration)
+       ○   no candidate
   22  ❮❮❮
   20  ──!  _                                18, 20
+       ○   no candidate
   02  ❮❮❮
   13  └‣─  (function_declaration)           04          [SpanEnd(P3) SpanStartAt(P5)]
-       ●   function_declaration
+       ●   (function_declaration)
   04  └‣─  name: (identifier)               08          [SpanStart(P7) SpanStartAt(P8) SpanStart(P6) Node RecordSet(M0 name) SpanEnd(P6) SpanEnd(P8) SpanEnd(P7)]
-       ○   function
-       ●   identifier
+       ○   "function"
+       ●   name: (identifier)
   08  ─‣┘  _                                10          [SpanEnd(P5)]
-       ●   function_declaration
+       ●   (function_declaration)
   10  ─‣┘  _                                12          [SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]
-       ●   program
+       ●   (program)
   12   ◀   return                           ◼

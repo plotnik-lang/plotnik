@@ -62,11 +62,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   20, 14, 08  [ScalarOpen]
   20  └─!  _                                16, 18
+       ○   no candidate
   01  ❮❮❮
   14  └─!  _                                10, 12
+       ○   no candidate
   01  ❮❮❮
   08  -ε-                                   06          [TextClose RecordSet(M0 span)]
   06   ◀   return                           ◼

@@ -82,11 +82,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └─!  _                                 3, 8
-      ●   expression_statement
+      ●   (expression_statement)
   3   !   (expression_statement)            5           [RecordOpen Node RecordSet(M0 a)]
-      ●   expression_statement
+      ●   (expression_statement)
   5  ─‣┘  _                                 7           [RecordClose RecordSet(M1 x)]
-      ●   program
+      ●   (program)
   7   ◀   return                            ◼

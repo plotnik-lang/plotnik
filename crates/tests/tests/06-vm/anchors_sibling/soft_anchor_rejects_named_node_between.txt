@@ -50,27 +50,35 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (binary_expression)              03
-       ●   binary_expression
+       ●   (binary_expression)
   03  └─!  _                                09, 11
-       ●   binary_expression
+       ●   (binary_expression)
   09   !   (identifier)                     05          [Node RecordSet(M0 left)]
-       ○   binary_expression
+       ○   (binary_expression)
+       ○   no candidate
   03  ❮❮❮
   11  ──!  _                                09, 11
-       ●   +
+       ●   "+"
   09   !   (identifier)                     05          [Node RecordSet(M0 left)]
-       ○   +
+       ○   "+"
+       ○   no candidate
   11  ❮❮❮
   11  ──!  _                                09, 11
-       ●   identifier
+       ●   (identifier)
   09   !   (identifier)                     05          [Node RecordSet(M0 left)]
-       ●   identifier
+       ●   (identifier)
   05  ─•─  (identifier)                     07          [Node RecordSet(M1 right)]
+       ○   no candidate
   11  ❮❮❮
   11  ──!  _                                09, 11
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (binary_expression)              03
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

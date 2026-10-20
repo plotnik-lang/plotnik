@@ -43,13 +43,16 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   12, 04      [ListOpen]
   12  └─!  _                                08, 10
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (debugger_statement)             10, 06      [Node ArrayPush]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   01  ❮❮❮
   04  └•┘  _                                03          [ListClose RecordSet(M0 b)]
+       ○   no candidate

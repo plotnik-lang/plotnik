@@ -55,12 +55,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   04, 16      [ListOpen]
   04  └‣─  (debugger_statement)             07          [ListClose RecordSet(M0 init) Node RecordSet(M1 d)]
-       ○   expression_statement
-       ○   expression_statement
-       ●   debugger_statement
+       ○   (expression_statement)
+       ○   (expression_statement)
+       ●   (debugger_statement)
   07  ─‣┘  _                                03
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

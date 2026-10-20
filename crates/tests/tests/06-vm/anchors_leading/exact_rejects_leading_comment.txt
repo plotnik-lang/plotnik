@@ -36,6 +36,7 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └─!  (debugger_statement)              3           [Node RecordSet(M0 d)]
-      ○   comment
+      ○   (comment)
+      ○   no candidate

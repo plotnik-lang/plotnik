@@ -520,80 +520,82 @@ Chain:
 --------------------- TRACE ----------------------
 <expression>:
   08   !   (program)                        10          [SpanStartAt(P17)]
-       ●   program
+       ●   (program)
   10  └‣─  (expression_statement)           12          [SpanStartAt(P18) RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   12       (@48)                            48 : 13
        ▶   (@48)
 
 @48:
   48  -ε-                                   44          [SpanStart(P0)]
   44  └•─  (identifier)                     43          [SpanStart(P2) SpanStartAt(P4) NodeText RecordSet(M0 text) SpanEnd(P4) SpanEnd(P2) SpanEnd(P0)]
-       ●   identifier
+       ●   (identifier)
   43   ◀   return                           13
 
 <expression>:
   13  ─•┘  _                                16          [RecordClose SpanStart(P19) RecordSet(M5 part) SpanEnd(P19)]
-       ●   expression_statement
+       ●   (expression_statement)
   16  ─‣─  (expression_statement)           18          [SpanEnd(P18) SpanStartAt(P21) SpanStart(P23)]
-       ●   expression_statement
+       ●   (expression_statement)
   18  └‣─  (Chain)                          04 : 19
+       ●   (parenthesized_expression)
        ▶   (Chain)
 
 Chain:
   04  -ε-                                   06          [SpanStart(P7)]
-  06   !   switch
-       ●   parenthesized_expression
+  06   ●   switch (parenthesized_expression)  40
   40   !   (parenthesized_expression)       24          [SpanStart(P8) SpanStart(P13) VariantOpen(M4 Rec) SpanStartAt(P14) SpanStart(P16)]
-       ●   parenthesized_expression
+       ●   (parenthesized_expression)
   24  └‣─  (Chain)                          04 : 25
+       ●   "("
        ▶   (Chain)
 
 Chain:
   04  -ε-                                   06          [SpanStart(P7)]
-  06   !   switch
-       ○   (
+  06   ○   switch "("
   24  ❮❮❮
+  24  └‣─  (Chain)                          04 : 25
+       ●   (parenthesized_expression)
        ▶   (Chain)
 
 Chain:
   04  -ε-                                   06          [SpanStart(P7)]
-  06   !   switch
-       ●   parenthesized_expression
+  06   ●   switch (parenthesized_expression)  40
   40   !   (parenthesized_expression)       24          [SpanStart(P8) SpanStart(P13) VariantOpen(M4 Rec) SpanStartAt(P14) SpanStart(P16)]
-       ●   parenthesized_expression
+       ●   (parenthesized_expression)
   24  └‣─  (Chain)                          04 : 25
+       ●   "("
        ▶   (Chain)
 
 Chain:
   04  -ε-                                   06          [SpanStart(P7)]
-  06   !   switch
-       ○   (
+  06   ○   switch "("
   24  ❮❮❮
+  24  └‣─  (Chain)                          04 : 25
+       ●   (identifier)
        ▶   (Chain)
 
 Chain:
   04  -ε-                                   06          [SpanStart(P7)]
-  06   !   switch
-       ●   identifier
+  06   ●   switch (identifier)              30
   30  -ε-                                   32
   32   !   (identifier)                     29          [SpanStart(P8) SpanStart(P9) VariantOpen(M3 Id) SpanStart(P10) SpanStartAt(P12) NodeText RecordSet(M1 text) SpanEnd(P12) SpanEnd(P10) VariantClose SpanEnd(P9) SpanEnd(P8) SpanEnd(P7)]
-       ●   identifier
+       ●   (identifier)
   29   ◀   return                           25
 
 Chain:
   25  ─‣┘  _                                29          [SpanStart(P15) RecordSet(M2 inner) SpanEnd(P15) SpanEnd(P16) SpanEnd(P14) VariantClose SpanEnd(P13) SpanEnd(P8) SpanEnd(P7)]
-       ●   parenthesized_expression
+       ●   (parenthesized_expression)
   29   ◀   return                           25
 
 Chain:
   25  ─‣┘  _                                29          [SpanStart(P15) RecordSet(M2 inner) SpanEnd(P15) SpanEnd(P16) SpanEnd(P14) VariantClose SpanEnd(P13) SpanEnd(P8) SpanEnd(P7)]
-       ●   parenthesized_expression
+       ●   (parenthesized_expression)
   29   ◀   return                           19
 
 <expression>:
   19  ─‣┘  _                                22          [SpanStart(P22) RecordSet(M6 value) SpanEnd(P22) SpanEnd(P23)]
-       ●   expression_statement
+       ●   (expression_statement)
   22  ─‣┘  _                                07          [SpanEnd(P21) SpanEnd(P17)]
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

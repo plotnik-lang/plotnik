@@ -58,13 +58,13 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                08, 10
-       ●   comment
+       ●   (comment)
   08   !   (comment)                        03          [Node RecordSet(M0 doc)]
-       ●   comment
+       ●   (comment)
   03  ─•─  (function_declaration)           05          [Node RecordSet(M1 fn)]
-       ●   function_declaration
+       ●   (function_declaration)
   05  ─‣┘  _                                06
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

@@ -126,35 +126,32 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                63, 64
-       ●   number
-  63   !   switch
-       ●   number
+       ●   (number)
+  63   ●   switch (number)                  61
   61   !   (number)                         55          [Absent RecordSet(M0 nonempty)]
-       ●   number
+       ●   (number)
   55  ─‣┘  _                                49
-       ●   expression_statement
+       ●   (expression_statement)
   49  ─‣─  (expression_statement)           46
-       ●   expression_statement
+       ●   (expression_statement)
   46  └─!  _                                43, 44
-       ●   number
-  43   !   switch
-       ●   number
+       ●   (number)
+  43   ●   switch (number)                  41
   41   !   (number)                         48          [Absent RecordSet(M1 nullable)]
-       ●   number
+       ●   (number)
   48  ─‣┘  _                                29
-       ●   expression_statement
+       ●   (expression_statement)
   29  ─‣─  (expression_statement)           26
-       ●   expression_statement
+       ●   (expression_statement)
   26  └─!  _                                23, 24
-       ●   number
-  23   !   switch
-       ●   number
+       ●   (number)
+  23   ●   switch (number)                  21
   21   !   (number)                         28          [ListOpen ListClose RecordSet(M2 direct)]
-       ●   number
+       ●   (number)
   28  ─‣┘² _                                11
-       ●   program
+       ●   (program)
   11   ◀   return                           ◼

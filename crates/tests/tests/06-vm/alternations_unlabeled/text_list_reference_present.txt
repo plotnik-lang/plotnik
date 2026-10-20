@@ -132,111 +132,120 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                63, 64
-       ●   array
-  63   !   switch
-       ●   array
+       ●   (array)
+  63   ●   switch (array)                   60
   60   !   (array)                          08
-       ●   array
+       ●   (array)
   08  └‣─  (@58)                            58 : 09
+       ●   "["
        ▶   (@58)
 
 @58:
   58   !   _                                53, 56      [ListOpen]
-       ●   [
+       ●   "["
   53   !   (identifier)                     56, 51      [NodeText ArrayPush]
-       ○   [
+       ○   "["
+       ○   no candidate
   58  ❮❮❮
   56  ──!  _                                53, 56
-       ●   identifier
+       ●   (identifier)
   53   !   (identifier)                     56, 51      [NodeText ArrayPush]
-       ●   identifier
+       ●   (identifier)
   56  ──!  _                                53, 56
-       ●   ,
+       ●   ","
   53   !   (identifier)                     56, 51      [NodeText ArrayPush]
-       ○   ,
+       ○   ","
+       ○   no candidate
   56  ❮❮❮
   56  ──!  _                                53, 56
-       ●   identifier
+       ●   (identifier)
   53   !   (identifier)                     56, 51      [NodeText ArrayPush]
-       ●   identifier
+       ●   (identifier)
   56  ──!  _                                53, 56
-       ●   ]
+       ●   "]"
   53   !   (identifier)                     56, 51      [NodeText ArrayPush]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   56  ❮❮❮
   56  ──!  _                                53, 56
+       ○   no candidate
   53  ❮❮❮
   51  -ε-                                   50          [ListClose]
   50   ◀   return                           09
 
 Q:
   09  ─‣┘  _                                55          [RecordSet(M0 nonempty)]
-       ●   array
+       ●   (array)
   55  ─‣┘  _                                49
-       ●   expression_statement
+       ●   (expression_statement)
   49  ─‣─  (expression_statement)           46
-       ●   expression_statement
+       ●   (expression_statement)
   46  └─!  _                                43, 44
-       ●   array
-  43   !   switch
-       ●   array
+       ●   (array)
+  43   ●   switch (array)                   40
   40   !   (array)                          38
-       ●   array
+       ●   (array)
   38  -ε-                                   36, 30      [ListOpen]
   36  └─!  _                                32, 34
-       ●   [
+       ●   "["
   32   !   (identifier)                     34, 04      [NodeText ArrayPush]
-       ○   [
+       ○   "["
+       ○   no candidate
   36  ❮❮❮
   34  ──!  _                                32, 34
-       ●   ]
+       ●   "]"
   32   !   (identifier)                     34, 04      [NodeText ArrayPush]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   34  ❮❮❮
   34  ──!  _                                32, 34
+       ○   no candidate
   38  ❮❮❮
   30  -ε-                                   48          [ListClose RecordSet(M1 nullable)]
   48  ─‣┘  _                                29
-       ●   expression_statement
+       ●   (expression_statement)
   29  ─‣─  (expression_statement)           26
-       ●   expression_statement
+       ●   (expression_statement)
   26  └─!  _                                23, 24
-       ●   array
-  23   !   switch
-       ●   array
+       ●   (array)
+  23   ●   switch (array)                   20
   20   !   (array)                          16
-       ●   array
+       ●   (array)
   16  └─!  _                                12, 14      [ListOpen]
-       ●   [
+       ●   "["
   12   !   (identifier)                     14, 18      [NodeText ArrayPush]
-       ○   [
+       ○   "["
+       ○   no candidate
   16  ❮❮❮
   14  ──!  _                                12, 14
-       ●   identifier
+       ●   (identifier)
   12   !   (identifier)                     14, 18      [NodeText ArrayPush]
-       ●   identifier
+       ●   (identifier)
   14  ──!  _                                12, 14
-       ●   ,
+       ●   ","
   12   !   (identifier)                     14, 18      [NodeText ArrayPush]
-       ○   ,
+       ○   ","
+       ○   no candidate
   14  ❮❮❮
   14  ──!  _                                12, 14
-       ●   identifier
+       ●   (identifier)
   12   !   (identifier)                     14, 18      [NodeText ArrayPush]
-       ●   identifier
+       ●   (identifier)
   14  ──!  _                                12, 14
-       ●   ]
+       ●   "]"
   12   !   (identifier)                     14, 18      [NodeText ArrayPush]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   14  ❮❮❮
   14  ──!  _                                12, 14
+       ○   no candidate
   12  ❮❮❮
   18  ─‣┘  _                                28          [ListClose RecordSet(M2 direct)]
-       ●   array
+       ●   (array)
   28  ─‣┘² _                                11
-       ●   program
+       ●   (program)
   11   ◀   return                           ◼

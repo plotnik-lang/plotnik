@@ -41,11 +41,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (comment)                         3           [Node RecordSet(M0 comment)]
-      ●   comment
+      ●   (comment)
   3  └!┘  _                                 4
-      ●   comment
+      ●   (comment)
   4  ─‣┘  _                                 5
-      ●   program
+      ●   (program)
   5   ◀   return                            ◼

@@ -56,19 +56,19 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (lexical_declaration)             2
-      ●   lexical_declaration
+      ●   (lexical_declaration)
   2  └‣─  (variable_declarator)             3
-      ○   const
-      ●   variable_declarator
+      ○   "const"
+      ●   (variable_declarator)
   3  └‣─  value: (template_string)          4
-      ○   identifier
-      ○   =
-      ●   template_string
+      ○   name: (identifier)
+      ○   "="
+      ●   value: (template_string)
   4  └‣─  (string_fragment == "a\nb")       6           [Node RecordSet(M0 frag)]
-      ○   `
-      ●   string_fragment
+      ○   "`"
+      ●   (string_fragment) "a\nb"
   6  ─‣┘⁴ _                                 7
-      ●   program
+      ●   (program)
   7   ◀   return                            ◼

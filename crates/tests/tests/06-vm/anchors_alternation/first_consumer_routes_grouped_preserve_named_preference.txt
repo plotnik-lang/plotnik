@@ -98,23 +98,23 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └‣─  "["                              18
-       ●   [
+       ●   "["
   18  ──!  _                                16, 18
-       ●   identifier
+       ●   (identifier)
   16   !   (identifier == "p")              08, 14
-       ●   identifier
+       ●   (identifier) "p"
   08  ─•─  (identifier == "a")              05          [VariantOpen(M4 Named) Node RecordSet(M0 a)]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier) "a"
   05  ─‣─  (identifier == "b")              20          [Node RecordSet(M1 b) VariantClose]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier) "b"
   20  ─‣┘³ _                                04          [RecordSet(M6 choice)]
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

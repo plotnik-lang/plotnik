@@ -67,25 +67,29 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        26, 18
-       ●   program
+       ●   (program)
   26  └─!  _                                16, 21, 24
-       ●   debugger_statement
+       ●   (debugger_statement)
   16  -ε-                                   14          [Absent RecordSet(M1 e)]
   14   !   _                                10, 12      [ListOpen]
-       ●   debugger_statement
+       ●   (debugger_statement)
   10   !   (identifier)                     12, 08      [Node ArrayPush]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
+       ○   no candidate
   26  ❮❮❮
   21   !   (empty_statement)                05          [ListOpen ListClose RecordSet(M0 ids) Node RecordSet(M1 e)]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   26  ❮❮❮
   24  ──!  _                                16, 21, 24
+       ○   no candidate
   00  ❮❮❮
   18  -ε-                                   03          [Absent RecordSet(M1 e) ListOpen ListClose RecordSet(M0 ids)]
   03  └‣─  (debugger_statement)             07          [Node RecordSet(M2 d)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   07  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

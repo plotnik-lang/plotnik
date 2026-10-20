@@ -65,8 +65,9 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        18, 10
-       ●   program
+       ●   (program)
   18  └─!  _                                08, 13, 16
+       ○   no candidate
   00  ❮❮❮
   10  -ε-                                   02          [VariantOpen(M2 A) Absent RecordSet(M0 id) VariantClose RecordSet(M4 x)]
   02   ◀   return                           ◼

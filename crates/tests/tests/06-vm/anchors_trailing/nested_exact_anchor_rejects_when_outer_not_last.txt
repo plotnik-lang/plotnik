@@ -52,44 +52,52 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                07, 16
-       ●   expression_statement
+       ●   (expression_statement)
   07   !   (expression_statement)           14
-       ●   expression_statement
+       ●   (expression_statement)
   14  └‣─  (binary_expression)              12
-       ●   binary_expression
+       ●   (binary_expression)
   12  └─!  _                                08, 10
-       ●   identifier
+       ●   (identifier)
   08   !   (identifier)                     03          [Node RecordSet(M0 x)]
-       ●   identifier
+       ●   (identifier)
   03  !─┘  _                                04
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
-       ●   +
+       ●   "+"
   08   !   (identifier)                     03          [Node RecordSet(M0 x)]
-       ○   +
+       ○   "+"
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
-       ●   identifier
+       ●   (identifier)
   08   !   (identifier)                     03          [Node RecordSet(M0 x)]
-       ●   identifier
+       ●   (identifier)
   03  !─┘  _                                04
-       ●   binary_expression
+       ●   (binary_expression)
   04  ─‣┘  _                                06
-       ●   expression_statement
+       ●   (expression_statement)
   06  !─┘  _                                05
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   14  ❮❮❮
-       ○   ;
+  14  └‣─  (binary_expression)              12
+       ○   ";"
+       ○   no candidate
   01  ❮❮❮
   16  ──!  _                                07, 16
-       ●   expression_statement
+       ●   (expression_statement)
   07   !   (expression_statement)           14
-       ●   expression_statement
+       ●   (expression_statement)
   14  └‣─  (binary_expression)              12
-       ○   identifier
-       ○   ;
+       ○   (identifier)
+       ○   ";"
+       ○   no candidate
   16  ❮❮❮
   16  ──!  _                                07, 16
+       ○   no candidate

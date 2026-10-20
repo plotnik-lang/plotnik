@@ -62,19 +62,21 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   03   !   (program)                        04
-       ●   program
+       ●   (program)
   04  └‣─  (function_declaration)           06          [RecordOpen]
-       ●   function_declaration
+       ●   (function_declaration)
   06  └‣─  name: (Name)                     00 : 08
+       ○   "function"
+       ●   name: (identifier)
        ▶   (Name)
 
 Name:
   00   !   (identifier)                     02          [Node RecordSet(M0 text)]
-       ●   identifier
+       ●   (identifier)
   02   ◀   return                           08
 
 Q:
   08  -ε-                                   10          [RecordClose]
   10  ─‣┘² _                                12          [RecordSet(M1 fn)]
-       ●   program
+       ●   (program)
   12   ◀   return                           ◼

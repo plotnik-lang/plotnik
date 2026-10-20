@@ -73,36 +73,43 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   05   !   (program)                        06
-       ●   program
+       ●   (program)
   06  └‣─  (class_declaration)              08
-       ●   class_declaration
+       ●   (class_declaration)
   08  └‣─  body: (class_body)               10          [RecordOpen]
-       ○   class
-       ○   identifier
-       ●   class_body
+       ○   "class"
+       ○   name: (identifier)
+       ●   body: (class_body)
   10  └‣─  member: (Member)                 00 : 11
+       ○   "{"
+       ●   member: (method_definition)
        ▶   (Member)
 
 Member:
   00   !   (method_definition)              01
-       ●   method_definition
+       ●   (method_definition)
   01  └‣─  name: (property_identifier == "b")  03       [Node RecordSet(M0 name)]
-       ○   formal_parameters
-       ○   statement_block
+       ○   name: (property_identifier) "a"
+       ○   parameters: (formal_parameters) "()"
+       ○   body: (statement_block) "{}"
+       ○   no candidate
   10  ❮❮❮
+  10  └‣─  member: (Member)                 00 : 11
+       ○   ";"
+       ●   member: (method_definition)
        ▶   (Member)
 
 Member:
   00   !   (method_definition)              01
-       ●   method_definition
+       ●   (method_definition)
   01  └‣─  name: (property_identifier == "b")  03       [Node RecordSet(M0 name)]
-       ●   property_identifier
+       ●   name: (property_identifier) "b"
   03  ─‣┘  _                                04
-       ●   method_definition
+       ●   (method_definition)
   04   ◀   return                           11
 
 Q:
   11  -ε-                                   13          [RecordClose]
   13  ─‣┘³ _                                15          [RecordSet(M1 m)]
-       ●   program
+       ●   (program)
   15   ◀   return                           ◼

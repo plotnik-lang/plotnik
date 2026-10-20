@@ -44,11 +44,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   06, 04      [ListOpen]
   06  └•─  (debugger_statement)             08, 10      [Node ArrayPush]
-       ○   comment
+       ○   (comment)
+       ○   no candidate
   01  ❮❮❮
   04  └•┘  _                                03          [ListClose RecordSet(M0 b)]
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼

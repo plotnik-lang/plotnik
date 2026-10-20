@@ -57,32 +57,45 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (call_expression)                03
-       ●   call_expression
+       ●   (call_expression)
   03  └‣─  arguments: (arguments)           10, 12
-       ○   identifier
-       ●   arguments
+       ○   function: (identifier)
+       ●   arguments: (arguments)
   10  └‣─  (identifier == "a")              06
-       ○   (
-       ●   identifier
+       ○   "("
+       ●   (identifier) "a"
   06  ─•─  (identifier == "b")              13          [Node RecordSet(M0 b)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   10  ❮❮❮
-       ○   ,
-       ○   ,
-       ○   )
+  10  └‣─  (identifier == "a")              06
+       ○   ","
+       ○   (identifier) "c"
+       ○   ","
+       ○   (identifier) "b"
+       ○   ")"
+       ○   no candidate
   03  ❮❮❮
   12  └‣─  ";"                              08
-       ○   (
-       ○   identifier
-       ○   ,
-       ○   identifier
-       ○   ,
-       ○   identifier
-       ○   )
+       ○   "("
+       ○   (identifier)
+       ○   ","
+       ○   (identifier)
+       ○   ","
+       ○   (identifier)
+       ○   ")"
+       ○   no candidate
   03  ❮❮❮
+  03  └‣─  arguments: (arguments)           10, 12
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (call_expression)                03
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

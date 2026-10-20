@@ -111,12 +111,12 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1)]
-       ●   program
+       ●   (program)
   02  -ε-                                   13, 16      [SpanStart(P2)]
   13  └─!  _                                04, 11
-       ●   expression_statement
+       ●   (expression_statement)
   04   !   (expression_statement)           08          [SpanStartAt(P5) NodeBool RecordSet(M0 present) SpanEnd(P5) SpanEnd(P2)]
-       ●   expression_statement
+       ●   (expression_statement)
   08  ─‣┘  _                                10          [SpanEnd(P1) SpanEnd(P0)]
-       ●   program
+       ●   (program)
   10   ◀   return                           ◼

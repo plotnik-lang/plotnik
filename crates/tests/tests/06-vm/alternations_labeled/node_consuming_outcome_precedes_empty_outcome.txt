@@ -70,18 +70,20 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        18, 10
-       ●   program
+       ●   (program)
   18  └─!  _                                08, 13, 16
-       ●   debugger_statement
+       ●   (debugger_statement)
   08   !   _                                03, 06      [VariantOpen(M2 A)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   03   !   (identifier)                     20          [Node RecordSet(M0 id) VariantClose RecordSet(M4 x)]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   08  ❮❮❮
   06  ──!  _                                03, 06
+       ○   no candidate
   18  ❮❮❮
   13   !   (debugger_statement)             20          [VariantOpen(M3 B) Node RecordSet(M1 d) VariantClose RecordSet(M4 x)]
-       ●   debugger_statement
+       ●   (debugger_statement)
   20  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

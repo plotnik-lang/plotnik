@@ -52,21 +52,20 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        10, 02
-       ●   program
+       ●   (program)
   10  └─!  _                                07, 08
-       ●   expression_statement
-  07   !   switch
-       ●   expression_statement
+       ●   (expression_statement)
+  07   ●   switch (expression_statement)    03
   03   !   (expression_statement)           08, 12
-       ●   expression_statement
+       ●   (expression_statement)
   08  ──!  _                                07, 08
-       ●   lexical_declaration
-  07   !   switch
-       ●   lexical_declaration
+       ●   (lexical_declaration)
+  07   ●   switch (lexical_declaration)     05
   05   !   (lexical_declaration)            08, 12
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   08  ──!  _                                07, 08
+       ○   no candidate
   05  ❮❮❮
   12  ─‣┘  _                                02
-       ●   program
+       ●   (program)
   02   ◀   return                           ◼

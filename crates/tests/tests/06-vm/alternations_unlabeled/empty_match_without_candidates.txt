@@ -53,8 +53,9 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        14, 16
-       ●   program
+       ●   (program)
   14  └─!  _                                12, 19, 22
+       ○   no candidate
   00  ❮❮❮
   16  -ε-                                   02          [Absent RecordSet(M1 d) ListOpen ListClose RecordSet(M0 ids)]
   02   ◀   return                           ◼

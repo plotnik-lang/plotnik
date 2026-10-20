@@ -30,4 +30,5 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (identifier)                      2           [Node RecordSet(M0 id)]
-      ○   program
+      ○   (program)
+      ○   no candidate

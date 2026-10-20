@@ -82,32 +82,33 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   20, 08      [ListOpen]
   20  └─!  _                                16, 18
-       ●   expression_statement
+       ●   (expression_statement)
   16   !   _                                12, 14      [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   (expression_statement)           03          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (identifier)                     05          [Node RecordSet(M0 id)]
-       ●   identifier
+       ●   (identifier)
   05  ─‣┘  _                                10          [RecordClose RecordSet(M1 x)]
-       ●   expression_statement
+       ●   (expression_statement)
   10  -ε-                                   18, 22      [RecordClose ArrayPush]
   18  ──!  _                                16, 18
-       ●   expression_statement
+       ●   (expression_statement)
   16   !   _                                12, 14      [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   (expression_statement)           03          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (identifier)                     05          [Node RecordSet(M0 id)]
-       ●   identifier
+       ●   (identifier)
   05  ─‣┘  _                                10          [RecordClose RecordSet(M1 x)]
-       ●   expression_statement
+       ●   (expression_statement)
   10  -ε-                                   18, 22      [RecordClose ArrayPush]
   18  ──!  _                                16, 18
+       ○   no candidate
   10  ❮❮❮
   22  ─‣┘  _                                07          [ListClose RecordSet(M2 xs)]
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

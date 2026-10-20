@@ -77,25 +77,28 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                16, 08, 18
-       ●   expression_statement
+       ●   (expression_statement)
   16   !   _                                12, 13
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   (comment)                        10
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   16  ❮❮❮
   13  ──!  _                                12, 13
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   (comment)                        10
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   13  ❮❮❮
   13  ──!  _                                12, 13
+       ○   no candidate
   01  ❮❮❮
   08   !   (expression_statement)           03          [Node RecordSet(M0 a)]
-       ●   expression_statement
+       ●   (expression_statement)
   03  ─‣─  (expression_statement)           05          [Node RecordSet(M1 b)]
-       ●   expression_statement
+       ●   (expression_statement)
   05  ─‣┘  _                                06
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

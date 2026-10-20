@@ -73,35 +73,38 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   16, 08      [ListOpen]
   16  └─!  _                                12, 14
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   (expression_statement)           03          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (identifier =~ /^x/)             05          [Node RecordSet(M0 id)]
-       ●   identifier
+       ●   (identifier) "x1"
   05  ─‣┘  _                                10
-       ●   expression_statement
+       ●   (expression_statement)
   10  -ε-                                   14, 18      [RecordClose ArrayPush]
   14  ──!  _                                12, 14
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   (expression_statement)           03          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (identifier =~ /^x/)             05          [Node RecordSet(M0 id)]
-       ○   ;
+       ○   (identifier) "ax"
+       ○   ";"
+       ○   no candidate
   14  ❮❮❮
   14  ──!  _                                12, 14
-       ●   expression_statement
+       ●   (expression_statement)
   12   !   (expression_statement)           03          [RecordOpen]
-       ●   expression_statement
+       ●   (expression_statement)
   03  └‣─  (identifier =~ /^x/)             05          [Node RecordSet(M0 id)]
-       ●   identifier
+       ●   (identifier) "x3"
   05  ─‣┘  _                                10
-       ●   expression_statement
+       ●   (expression_statement)
   10  -ε-                                   14, 18      [RecordClose ArrayPush]
   14  ──!  _                                12, 14
+       ○   no candidate
   10  ❮❮❮
   18  ─‣┘  _                                06          [ListClose RecordSet(M1 rows)]
-       ●   program
+       ●   (program)
   06   ◀   return                           ◼

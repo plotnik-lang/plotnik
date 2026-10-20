@@ -63,63 +63,66 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                11, 12
-       ●   false
-  11   !   switch
-       ○   false
+       ●   (false)
+  11   ○   switch (false)
   02  ❮❮❮
   12  ──!  _                                11, 12
-       ●   ;
-  11   !   switch
-       ○   ;
+       ●   ";"
+  11   ○   switch ";"
   12  ❮❮❮
   12  ──!  _                                11, 12
+       ○   no candidate
   01  ❮❮❮
-       ●   expression_statement
+  01  └‣─  (expression_statement)           02
+       ●   (expression_statement)
   02  └─!  _                                11, 12
-       ●   call_expression
-  11   !   switch
-       ●   call_expression
+       ●   (call_expression)
+  11   ●   switch (call_expression)         08
   08   !   (call_expression)                04
-       ●   call_expression
+       ●   (call_expression)
   04  └‣─  function: (identifier == "wanted")  06       [Node RecordSet(M0 v)]
-       ○   arguments
+       ○   function: (identifier) "wrong"
+       ○   arguments: (arguments) "()"
+       ○   no candidate
   02  ❮❮❮
   12  ──!  _                                11, 12
-       ●   ;
-  11   !   switch
-       ○   ;
+       ●   ";"
+  11   ○   switch ";"
   12  ❮❮❮
   12  ──!  _                                11, 12
+       ○   no candidate
   01  ❮❮❮
-       ●   expression_statement
+  01  └‣─  (expression_statement)           02
+       ●   (expression_statement)
   02  └─!  _                                11, 12
-       ●   number
-  11   !   switch
-       ●   number
+       ●   (number)
+  11   ●   switch (number)                  09
   09   !   (number == "42")                 14          [Node RecordSet(M0 v)]
+       ○   (number) "7"
+       ○   no candidate
   02  ❮❮❮
   12  ──!  _                                11, 12
-       ●   ;
-  11   !   switch
-       ○   ;
+       ●   ";"
+  11   ○   switch ";"
   12  ❮❮❮
   12  ──!  _                                11, 12
+       ○   no candidate
   01  ❮❮❮
-       ●   expression_statement
+  01  └‣─  (expression_statement)           02
+       ●   (expression_statement)
   02  └─!  _                                11, 12
-       ●   call_expression
-  11   !   switch
-       ●   call_expression
+       ●   (call_expression)
+  11   ●   switch (call_expression)         08
   08   !   (call_expression)                04
-       ●   call_expression
+       ●   (call_expression)
   04  └‣─  function: (identifier == "wanted")  06       [Node RecordSet(M0 v)]
-       ●   identifier
+       ●   function: (identifier) "wanted"
   06  ─‣┘  _                                14
-       ●   call_expression
+       ●   (call_expression)
   14  ─‣┘² _                                07
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

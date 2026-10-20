@@ -58,20 +58,20 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └‣─  "["                              09
-       ●   [
+       ●   "["
   09  ──!  _                                08, 09
-       ●   identifier
+       ●   (identifier)
   08   !   (identifier)                     04
-       ●   identifier
+       ●   (identifier)
   04  ─•─  (identifier)                     06          [Node RecordSet(M0 last)]
-       ○   ,
-       ●   identifier
+       ○   ","
+       ●   (identifier)
   06  ─‣┘³ _                                07
-       ●   program
+       ●   (program)
   07   ◀   return                           ◼

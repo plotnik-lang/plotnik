@@ -69,16 +69,15 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └─!  _                                12, 13
-       ●   identifier
-  12   !   switch
-       ●   identifier
+       ●   (identifier)
+  12   ●   switch (identifier)              11
   11  -ε-                                   08
   08   !   (identifier)                     15          [Absent RecordSet(M1 x) RecordOpen Node RecordSet(M0 x) RecordClose RecordSet(M2 row)]
-       ●   identifier
+       ●   (identifier)
   15  ─‣┘² _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

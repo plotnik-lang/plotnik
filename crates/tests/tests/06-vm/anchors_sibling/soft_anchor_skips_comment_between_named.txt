@@ -61,19 +61,19 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (binary_expression)              03
-       ●   binary_expression
+       ●   (binary_expression)
   03  └─!  _                                09, 11
-       ●   identifier
+       ●   (identifier)
   09   !   (identifier)                     05          [Node RecordSet(M0 left)]
-       ●   identifier
+       ●   (identifier)
   05  ─•─  (identifier)                     07          [Node RecordSet(M1 right)]
-       ○   +
-       ○   comment
-       ●   identifier
+       ○   "+"
+       ○   (comment)
+       ●   (identifier)
   07  ─‣┘³ _                                08
-       ●   program
+       ●   (program)
   08   ◀   return                           ◼

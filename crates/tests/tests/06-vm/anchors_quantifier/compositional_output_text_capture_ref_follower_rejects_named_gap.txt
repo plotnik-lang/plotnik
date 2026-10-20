@@ -87,98 +87,128 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   03   !   (program)                        04
-       ●   program
+       ●   (program)
   04  └‣─  (expression_statement)           05
-       ●   expression_statement
+       ●   (expression_statement)
   05  └‣─  (array)                          06
-       ●   array
+       ●   (array)
   06  └─!  _                                23, 36
-       ●   [
+       ●   "["
   23   !   "["                              34
-       ●   [
+       ●   "["
   34  -ε-                                   32          [ScalarOpen]
   32  ──!  _                                28, 30, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26          [ScalarMark]
-       ●   identifier
+       ●   (identifier) "a"
   26  -ε-                                   22          [TextClose RecordSet(M1 left) RecordOpen]
   22       (@20)                            20 : 08
        ▶   (@20)
 
 @20:
   20  ─•─  (identifier == "b")              19          [Node RecordSet(M0 self)]
-       ○   ,
+       ○   ","
+       ○   (identifier) "c"
+       ○   no candidate
   32  ❮❮❮
   30   !   (identifier == "x")              24          [ScalarMark]
+       ○   (identifier) "a"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 30, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26          [ScalarMark]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   30   !   (identifier == "x")              24          [ScalarMark]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 30, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26          [ScalarMark]
+       ○   (identifier) "c"
+       ○   no candidate
   32  ❮❮❮
   30   !   (identifier == "x")              24          [ScalarMark]
+       ○   (identifier) "c"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 30, 32
-       ●   ,
+       ●   ","
   28   !   (identifier == "a")              26          [ScalarMark]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   30   !   (identifier == "x")              24          [ScalarMark]
-       ○   ,
+       ○   ","
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 30, 32
-       ●   identifier
+       ●   (identifier)
   28   !   (identifier == "a")              26          [ScalarMark]
+       ○   (identifier) "b"
+       ○   no candidate
   32  ❮❮❮
   30   !   (identifier == "x")              24          [ScalarMark]
+       ○   (identifier) "b"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 30, 32
-       ●   ]
+       ●   "]"
   28   !   (identifier == "a")              26          [ScalarMark]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   30   !   (identifier == "x")              24          [ScalarMark]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   32  ❮❮❮
   32  ──!  _                                28, 30, 32
+       ○   no candidate
   06  ❮❮❮
   36  ──!  _                                23, 36
-       ●   identifier
+       ●   (identifier)
   23   !   "["                              34
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   36  ❮❮❮
   36  ──!  _                                23, 36
-       ●   ,
+       ●   ","
   23   !   "["                              34
-       ○   ,
+       ○   ","
+       ○   no candidate
   36  ❮❮❮
   36  ──!  _                                23, 36
-       ●   identifier
+       ●   (identifier)
   23   !   "["                              34
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   36  ❮❮❮
   36  ──!  _                                23, 36
-       ●   ,
+       ●   ","
   23   !   "["                              34
-       ○   ,
+       ○   ","
+       ○   no candidate
   36  ❮❮❮
   36  ──!  _                                23, 36
-       ●   identifier
+       ●   (identifier)
   23   !   "["                              34
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   36  ❮❮❮
   36  ──!  _                                23, 36
-       ●   ]
+       ●   "]"
   23   !   "["                              34
-       ○   ]
+       ○   "]"
+       ○   no candidate
   36  ❮❮❮
   36  ──!  _                                23, 36
+       ○   no candidate
   05  ❮❮❮
+  05  └‣─  (array)                          06
+       ○   no candidate
   04  ❮❮❮
+  04  └‣─  (expression_statement)           05
+       ○   no candidate

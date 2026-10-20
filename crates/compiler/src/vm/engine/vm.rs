@@ -370,16 +370,14 @@ impl<'s, 't> VM<'s, 't> {
                     } else {
                         entries.iter().find(|entry| u16::from(entry.kind) == kind)
                     };
-                    if let Some(entry) = entry {
-                        if T::ENABLED {
-                            tracer.trace_match_success(node);
-                        }
-                        self.ip = CodeAddr::from(u16::from(entry.target));
+                    let target = entry.map(|entry| CodeAddr::from(u16::from(entry.target)));
+                    if T::ENABLED {
+                        tracer.trace_switch(self.ip, node, target);
+                    }
+                    if let Some(target) = target {
+                        self.ip = target;
                         Ok(())
                     } else {
-                        if T::ENABLED {
-                            tracer.trace_match_failure(node);
-                        }
                         Err(self.backtrack(module, tracer))
                     }
                 }
@@ -481,7 +479,7 @@ impl<'s, 't> VM<'s, 't> {
         }
 
         if T::ENABLED {
-            tracer.trace_match_success(self.engine.node());
+            tracer.trace_match_success(self.engine.node(), self.engine.cursor().field_id());
         }
         if T::ENABLED
             && let Some(field_id) = m.node_field
@@ -552,7 +550,7 @@ impl<'s, 't> VM<'s, 't> {
             NodeKindConstraint::Named(None) => {
                 if !node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
                     }
                     return false;
                 }
@@ -560,7 +558,7 @@ impl<'s, 't> VM<'s, 't> {
             NodeKindConstraint::Named(Some(expected)) => {
                 if node.kind_id() != u16::from(expected) || !node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
                     }
                     return false;
                 }
@@ -568,7 +566,7 @@ impl<'s, 't> VM<'s, 't> {
             NodeKindConstraint::Anonymous(None) => {
                 if node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
                     }
                     return false;
                 }
@@ -576,7 +574,7 @@ impl<'s, 't> VM<'s, 't> {
             NodeKindConstraint::Anonymous(Some(expected)) => {
                 if node.kind_id() != u16::from(expected) || node.is_named() {
                     if T::ENABLED {
-                        tracer.trace_match_failure(node);
+                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
                     }
                     return false;
                 }
@@ -585,7 +583,7 @@ impl<'s, 't> VM<'s, 't> {
 
         if m.missing && !node.is_missing() {
             if T::ENABLED {
-                tracer.trace_match_failure(node);
+                tracer.trace_match_failure(node, self.engine.cursor().field_id());
             }
             return false;
         }
@@ -594,7 +592,7 @@ impl<'s, 't> VM<'s, 't> {
             && self.engine.cursor().field_id() != Some(expected)
         {
             if T::ENABLED {
-                tracer.trace_field_failure(node);
+                tracer.trace_field_failure(node, self.engine.cursor().field_id());
             }
             return false;
         }
@@ -602,7 +600,7 @@ impl<'s, 't> VM<'s, 't> {
         for &field_id in module.decoded().neg_fields(&m) {
             if node.child_by_field_id(u16::from(field_id)).is_some() {
                 if T::ENABLED {
-                    tracer.trace_neg_field_failure(node, field_id);
+                    tracer.trace_neg_field_failure(node, self.engine.cursor().field_id(), field_id);
                 }
                 return false;
             }
@@ -612,7 +610,7 @@ impl<'s, 't> VM<'s, 't> {
             && !self.evaluate_predicate(p, module)
         {
             if T::ENABLED {
-                tracer.trace_predicate_failure(node);
+                tracer.trace_predicate_failure(node, self.engine.cursor().field_id());
             }
             return false;
         }
@@ -716,6 +714,9 @@ impl<'s, 't> VM<'s, 't> {
         }
 
         let Some(field_id) = field else {
+            if T::ENABLED {
+                tracer.trace_match_success(self.engine.node(), self.engine.cursor().field_id());
+            }
             return Ok(Some(policy));
         };
 
@@ -723,12 +724,13 @@ impl<'s, 't> VM<'s, 't> {
         loop {
             if self.engine.cursor().field_id() == Some(field_id) {
                 if T::ENABLED {
+                    tracer.trace_match_success(self.engine.node(), self.engine.cursor().field_id());
                     tracer.trace_field_success(field_id);
                 }
                 return Ok(Some(policy));
             }
             if T::ENABLED {
-                tracer.trace_field_failure(self.engine.node());
+                tracer.trace_field_failure(self.engine.node(), self.engine.cursor().field_id());
             }
             self.advance_or_backtrack(policy, cont_nav, module, tracer)?;
         }
@@ -741,15 +743,19 @@ impl<'s, 't> VM<'s, 't> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         let Some(field_id) = field else {
+            if T::ENABLED {
+                tracer.trace_match_success(self.engine.node(), self.engine.cursor().field_id());
+            }
             return Ok(());
         };
         if self.engine.cursor().field_id() != Some(field_id) {
             if T::ENABLED {
-                tracer.trace_field_failure(self.engine.node());
+                tracer.trace_field_failure(self.engine.node(), self.engine.cursor().field_id());
             }
             return Err(self.backtrack(module, tracer));
         }
         if T::ENABLED {
+            tracer.trace_match_success(self.engine.node(), self.engine.cursor().field_id());
             tracer.trace_field_success(field_id);
         }
         Ok(())
@@ -802,7 +808,16 @@ impl<'s, 't> VM<'s, 't> {
                 }
 
                 Resume::Call(resume) => {
+                    if T::ENABLED {
+                        tracer.trace_instruction(
+                            CodeAddr::from(cp.ip),
+                            &module.decode_instruction(CodeAddr::from(cp.ip)),
+                        );
+                    }
                     if !self.engine.cursor_mut().continue_search(resume.policy) {
+                        if T::ENABLED {
+                            tracer.trace_nav_failure(Nav::Next);
+                        }
                         continue 'unwind;
                     }
                     if T::ENABLED {
@@ -818,9 +833,15 @@ impl<'s, 't> VM<'s, 't> {
                                 break;
                             }
                             if T::ENABLED {
-                                tracer.trace_field_failure(self.engine.node());
+                                tracer.trace_field_failure(
+                                    self.engine.node(),
+                                    self.engine.cursor().field_id(),
+                                );
                             }
                             if !self.engine.cursor_mut().continue_search(resume.policy) {
+                                if T::ENABLED {
+                                    tracer.trace_nav_failure(Nav::Next);
+                                }
                                 continue 'unwind;
                             }
                             if T::ENABLED {
@@ -832,6 +853,12 @@ impl<'s, 't> VM<'s, 't> {
                         }
                     }
 
+                    if T::ENABLED {
+                        tracer.trace_match_success(
+                            self.engine.node(),
+                            self.engine.cursor().field_id(),
+                        );
+                    }
                     let retry = self.call_retry_checkpoint(CodeAddr::from(cp.ip), resume);
                     self.engine.push_checkpoint(retry);
                     if T::ENABLED {
@@ -853,8 +880,17 @@ impl<'s, 't> VM<'s, 't> {
                     else {
                         unreachable!("match-retry checkpoint ip must address a Match");
                     };
+                    if T::ENABLED {
+                        tracer.trace_instruction(
+                            CodeAddr::from(cp.ip),
+                            &module.decode_instruction(CodeAddr::from(cp.ip)),
+                        );
+                    }
                     let policy = m.nav.skip_policy();
                     if !self.engine.cursor_mut().continue_search(policy) {
+                        if T::ENABLED {
+                            tracer.trace_nav_failure(m.nav.sibling_continuation());
+                        }
                         continue 'unwind;
                     }
                     let cont_nav = m.nav.sibling_continuation();
@@ -867,6 +903,9 @@ impl<'s, 't> VM<'s, 't> {
                             break;
                         }
                         if !self.engine.cursor_mut().continue_search(policy) {
+                            if T::ENABLED {
+                                tracer.trace_nav_failure(cont_nav);
+                            }
                             continue 'unwind;
                         }
                         if T::ENABLED {
@@ -875,7 +914,10 @@ impl<'s, 't> VM<'s, 't> {
                     }
 
                     if T::ENABLED {
-                        tracer.trace_match_success(self.engine.node());
+                        tracer.trace_match_success(
+                            self.engine.node(),
+                            self.engine.cursor().field_id(),
+                        );
                     }
                     if T::ENABLED
                         && let Some(field_id) = m.node_field
@@ -902,6 +944,9 @@ impl<'s, 't> VM<'s, 't> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if !self.engine.cursor_mut().continue_search(policy) {
+            if T::ENABLED {
+                tracer.trace_nav_failure(cont_nav);
+            }
             return Err(self.backtrack(module, tracer));
         }
         if T::ENABLED {

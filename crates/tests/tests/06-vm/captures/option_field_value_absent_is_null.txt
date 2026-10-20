@@ -60,17 +60,18 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (lexical_declaration)            02
-       ●   lexical_declaration
+       ●   (lexical_declaration)
   02  └‣─  (variable_declarator)            03
-       ○   let
-       ●   variable_declarator
+       ○   "let"
+       ●   (variable_declarator)
   03  └‣─  name: (identifier)               10, 06      [Node RecordSet(M0 n)]
-       ●   identifier
+       ●   name: (identifier)
   10  ──!  _                                08, 10
+       ○   no candidate
   03  ❮❮❮
   06  -ε-                                   12          [Absent RecordSet(M1 v)]
   12  ─‣┘³ _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

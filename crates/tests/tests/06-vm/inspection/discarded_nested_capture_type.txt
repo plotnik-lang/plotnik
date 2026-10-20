@@ -131,10 +131,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        02          [SpanStart(P0) SpanStartAt(P1) SpanStart(P2)]
-       ●   program
+       ●   (program)
   02  -ε-                                   04          [ScalarOpen SpanStart(P4)]
   04  -ε-                                   21, 14      [SpanStart(P7)]
   21  └─!  _                                16, 19
+       ○   no candidate
   04  ❮❮❮
   14  -ε-                                   11          [SpanEnd(P7) SpanEnd(P4)]
   11  -ε-                                   10          [TextClose RecordSet(M0 outer) SpanEnd(P2) SpanEnd(P1) SpanEnd(P0)]

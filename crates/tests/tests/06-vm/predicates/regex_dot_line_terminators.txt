@@ -44,9 +44,9 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (comment =~ /^\/\*..\*\/$/)       3           [Node RecordSet(M0 comment)]
-      ●   comment
+      ●   (comment) "/*\r\u{2028}*/"
   3  ─‣┘  _                                 4
-      ●   program
+      ●   (program)
   4   ◀   return                            ◼

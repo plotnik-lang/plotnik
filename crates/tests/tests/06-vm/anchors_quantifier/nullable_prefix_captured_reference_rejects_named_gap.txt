@@ -81,69 +81,89 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  └─!  _                                14, 43
-       ●   [
+       ●   "["
   14   !   "["                              40          [RecordOpen]
-       ●   [
+       ●   "["
   40       (@37)                            37 : 08 / 11 / 16
        ▶   (@37)
 
 @37:
   37  -ε-                                   35, 30
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              24, 22      [Node RecordSet(M0 a)]
+       ○   (identifier) "c"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ,
+       ●   ","
   32   !   (identifier == "a")              24, 22      [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   identifier
+       ●   (identifier)
   32   !   (identifier == "a")              24, 22      [Node RecordSet(M0 a)]
+       ○   (identifier) "b"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
-       ●   ]
+       ●   "]"
   32   !   (identifier == "a")              24, 22      [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   35  ❮❮❮
   35  ──!  _                                32, 35
+       ○   no candidate
   37  ❮❮❮
   30  -ε-                                   28, 26      [Absent RecordSet(M0 a)]
   28  ─◦─  (identifier == "x")              19          [Node RecordSet(M1 x)]
+       ○   (identifier) "c"
+       ○   no candidate
   30  ❮❮❮
   26  -ε-                                   21          [Absent RecordSet(M1 x)]
   21   ◀   return p2                        16
 
 Q:
   16  ─◦─  (identifier == "b")              06          [RecordClose RecordSet(M2 prefix) Node RecordSet(M3 b)]
+       ○   (identifier) "c"
+       ○   no candidate
   03  ❮❮❮
   43  ──!  _                                14, 43
-       ●   identifier
+       ●   (identifier)
   14   !   "["                              40          [RecordOpen]
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   43  ❮❮❮
   43  ──!  _                                14, 43
-       ●   ,
+       ●   ","
   14   !   "["                              40          [RecordOpen]
-       ○   ,
+       ○   ","
+       ○   no candidate
   43  ❮❮❮
   43  ──!  _                                14, 43
-       ●   identifier
+       ●   (identifier)
   14   !   "["                              40          [RecordOpen]
-       ○   identifier
+       ○   (identifier)
+       ○   no candidate
   43  ❮❮❮
   43  ──!  _                                14, 43
-       ●   ]
+       ●   "]"
   14   !   "["                              40          [RecordOpen]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   43  ❮❮❮
   43  ──!  _                                14, 43
+       ○   no candidate
   02  ❮❮❮
+  02  └‣─  (array)                          03
+       ○   no candidate
   01  ❮❮❮
+  01  └‣─  (expression_statement)           02
+       ○   no candidate

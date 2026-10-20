@@ -87,59 +87,66 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          03
-       ●   array
+       ●   (array)
   03  -ε-                                   26, 06      [ListOpen]
   26  └─!  _                                22, 24
-       ●   [
+       ●   "["
   22  -ε-                                   14, 20      [RecordOpen]
   14   !   _                                10, 12      [Absent RecordSet(M1 b)]
-       ●   [
+       ●   "["
   10   !   (identifier)                     08          [Node RecordSet(M0 a)]
-       ○   [
+       ○   "["
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
-       ●   identifier
+       ●   (identifier)
   10   !   (identifier)                     08          [Node RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   08  -ε-                                   24, 28      [RecordClose ArrayPush]
   24  ──!  _                                22, 24
-       ●   ,
+       ●   ","
   22  -ε-                                   14, 20      [RecordOpen]
   14   !   _                                10, 12      [Absent RecordSet(M1 b)]
-       ●   ,
+       ●   ","
   10   !   (identifier)                     08          [Node RecordSet(M0 a)]
-       ○   ,
+       ○   ","
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
-       ●   identifier
+       ●   (identifier)
   10   !   (identifier)                     08          [Node RecordSet(M0 a)]
-       ●   identifier
+       ●   (identifier)
   08  -ε-                                   24, 28      [RecordClose ArrayPush]
   24  ──!  _                                22, 24
-       ●   ]
+       ●   "]"
   22  -ε-                                   14, 20      [RecordOpen]
   14   !   _                                10, 12      [Absent RecordSet(M1 b)]
-       ●   ]
+       ●   "]"
   10   !   (identifier)                     08          [Node RecordSet(M0 a)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
+       ○   no candidate
   22  ❮❮❮
   20   !   _                                16, 18      [Absent RecordSet(M0 a)]
-       ●   ]
+       ●   "]"
   16   !   (number)                         08          [Node RecordSet(M1 b)]
-       ○   ]
+       ○   "]"
+       ○   no candidate
   20  ❮❮❮
   18  ──!  _                                16, 18
+       ○   no candidate
   24  ❮❮❮
   24  ──!  _                                22, 24
+       ○   no candidate
   08  ❮❮❮
   28  ─‣┘  _                                30          [ListClose RecordSet(M2 items)]
-       ●   array
+       ●   (array)
   30  ─‣┘² _                                05
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

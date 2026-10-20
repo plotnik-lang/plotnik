@@ -58,19 +58,22 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   18, 04      [ListOpen]
   18  └─!  _                                14, 16
-       ●   expression_statement
+       ●   (expression_statement)
   14  -ε-                                   12          [ScalarOpen]
   12   !   _                                08, 10
-       ●   expression_statement
+       ●   (expression_statement)
   08   !   (comment)                        06          [ScalarMark]
-       ○   expression_statement
+       ○   (expression_statement)
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   18  ❮❮❮
   16  ──!  _                                14, 16
+       ○   no candidate
   01  ❮❮❮
   04  -ε-                                   03          [ListClose RecordSet(M0 comments)]
   03   ◀   return                           ◼

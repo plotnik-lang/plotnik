@@ -60,24 +60,26 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (call_expression)                03
-       ●   call_expression
+       ●   (call_expression)
   03  └‣─  function: _                      12, 14
-       ●   identifier
+       ●   function: (identifier)
   12   !   (identifier)                     10, 05
-       ●   identifier
+       ●   (identifier)
   10  ──!  _                                09, 10
-       ●   arguments
+       ●   (arguments)
   09   !   optional_chain: (optional_chain)  05
-       ○   arguments
+       ○   arguments: (arguments)
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                09, 10
+       ○   no candidate
   12  ❮❮❮
   05  ─•─  arguments: (arguments)           07          [Node RecordSet(M0 args)]
-       ●   arguments
+       ●   arguments: (arguments)
   07  ─‣┘³ _                                08
-       ●   program
+       ●   (program)
   08   ◀   return                           ◼

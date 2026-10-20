@@ -54,17 +54,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   0   !   (program)                         1
-      ●   program
+      ●   (program)
   1  └‣─  (expression_statement)            2
-      ●   expression_statement
+      ●   (expression_statement)
   2  └‣─  (call_expression)                 3
-      ●   call_expression
+      ●   (call_expression)
   3  └‣─  arguments: (arguments)            4
-      ○   identifier
-      ●   arguments
+      ○   function: (identifier)
+      ●   arguments: (arguments)
   4  └•─  (identifier)                      6           [Node RecordSet(M0 arg)]
-      ○   (
-      ●   identifier
+      ○   "("
+      ●   (identifier)
   6  ─‣┘⁴ _                                 7
-      ●   program
+      ●   (program)
   7   ◀   return                            ◼

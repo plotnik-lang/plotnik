@@ -40,11 +40,11 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        08, 10
-       ●   program
+       ●   (program)
   08  └─!  _                                02, 06
-       ●   expression_statement
+       ●   (expression_statement)
   02   !   (expression_statement)           03
-       ●   expression_statement
+       ●   (expression_statement)
   03  ─‣┘  _                                05          [BoolValue(1) RecordSet(M0 has_statement)]
-       ●   program
+       ●   (program)
   05   ◀   return                           ◼

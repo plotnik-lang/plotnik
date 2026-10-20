@@ -47,30 +47,34 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          12, 05
-       ●   array
+       ●   (array)
   12  └─!  _                                08, 10
-       ●   [
+       ●   "["
   08   !   (identifier == "a")              06
-       ○   [
+       ○   "["
+       ○   no candidate
   12  ❮❮❮
   10  ──!  _                                08, 10
-       ●   comment
+       ●   (comment)
   08   !   (identifier == "a")              06
-       ○   comment
+       ○   (comment) "/* comment */"
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
-       ●   ]
+       ●   "]"
   08   !   (identifier == "a")              06
-       ○   ]
+       ○   "]"
+       ○   no candidate
   10  ❮❮❮
   10  ──!  _                                08, 10
+       ○   no candidate
   02  ❮❮❮
   05  └•┘  _                                07
-       ●   array
+       ●   (array)
   07  ─‣┘² _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

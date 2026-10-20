@@ -54,17 +54,18 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └‣─  (expression_statement)           02
-       ●   expression_statement
+       ●   (expression_statement)
   02  └‣─  (array)                          07, 05
-       ●   array
+       ●   (array)
   07  └◦─  ";"                              08
-       ○   [
+       ○   "["
+       ○   no candidate
   02  ❮❮❮
   05  └•─  (identifier)                     10          [Node RecordSet(M0 id)]
-       ○   [
-       ●   identifier
+       ○   "["
+       ●   (identifier)
   10  ─‣┘³ _                                04
-       ●   program
+       ●   (program)
   04   ◀   return                           ◼

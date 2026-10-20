@@ -59,14 +59,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  └─!  _                                14, 16      [ListOpen]
-       ●   debugger_statement
+       ●   (debugger_statement)
   14   !   _                                10, 12      [RecordOpen]
-       ●   debugger_statement
+       ●   (debugger_statement)
   10   !   (expression_statement)           03          [RecordOpen]
-       ○   debugger_statement
+       ○   (debugger_statement)
+       ○   no candidate
   14  ❮❮❮
   12  ──!  _                                10, 12
+       ○   no candidate
   01  ❮❮❮
   16  ──!  _                                14, 16
+       ○   no candidate

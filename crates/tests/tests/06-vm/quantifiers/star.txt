@@ -53,18 +53,19 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00   !   (program)                        01
-       ●   program
+       ●   (program)
   01  -ε-                                   10, 04      [ListOpen]
   10  └─!  _                                06, 08
-       ●   expression_statement
+       ●   (expression_statement)
   06   !   (expression_statement)           08, 12      [Node ArrayPush]
-       ●   expression_statement
+       ●   (expression_statement)
   08  ──!  _                                06, 08
-       ●   expression_statement
+       ●   (expression_statement)
   06   !   (expression_statement)           08, 12      [Node ArrayPush]
-       ●   expression_statement
+       ●   (expression_statement)
   08  ──!  _                                06, 08
+       ○   no candidate
   06  ❮❮❮
   12  ─‣┘  _                                03          [ListClose RecordSet(M0 stmts)]
-       ●   program
+       ●   (program)
   03   ◀   return                           ◼
