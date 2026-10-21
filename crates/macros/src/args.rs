@@ -35,72 +35,20 @@ impl QuerySource {
 
 pub enum LimitArg {
     Auto,
-    Unbounded,
     Of(u64),
 }
 
 pub struct MacroArgs {
     pub grammar: StringArg,
     pub query: QuerySource,
-    pub limits: LimitArgs,
-}
-
-#[derive(Default)]
-pub struct LimitArgs {
-    pub fuel: Option<LimitArg>,
-    pub memory: Option<LimitArg>,
     pub depth: Option<LimitArg>,
-}
-
-impl LimitArgs {
-    fn put(&mut self, key: LimitKey, value: LimitArg, span: Span) -> Result<(), ExpandError> {
-        put(key.slot(self), value, span, key.name())
-    }
-}
-
-#[derive(Clone, Copy)]
-enum LimitKey {
-    Fuel,
-    Memory,
-    Depth,
-}
-
-impl LimitKey {
-    fn parse(name: &str) -> Option<Self> {
-        match name {
-            "fuel" => Some(Self::Fuel),
-            "memory" => Some(Self::Memory),
-            "depth" => Some(Self::Depth),
-            _ => None,
-        }
-    }
-
-    fn name(self) -> &'static str {
-        match self {
-            Self::Fuel => "fuel",
-            Self::Memory => "memory",
-            Self::Depth => "depth",
-        }
-    }
-
-    fn allows_unbounded(self) -> bool {
-        !matches!(self, Self::Depth)
-    }
-
-    fn slot(self, args: &mut LimitArgs) -> &mut Option<LimitArg> {
-        match self {
-            Self::Fuel => &mut args.fuel,
-            Self::Memory => &mut args.memory,
-            Self::Depth => &mut args.depth,
-        }
-    }
 }
 
 #[derive(Default)]
 struct ArgSlots {
     grammar: Option<StringArg>,
     query: Option<QuerySource>,
-    limits: LimitArgs,
+    depth: Option<LimitArg>,
 }
 
 impl ArgSlots {
@@ -134,7 +82,7 @@ impl ArgSlots {
         Ok(MacroArgs {
             grammar,
             query,
-            limits: self.limits,
+            depth: self.depth,
         })
     }
 }
@@ -197,31 +145,22 @@ impl ArgCursor {
         string_value(&token)
     }
 
-    fn take_limit(&mut self, key_span: Span, key: LimitKey) -> Result<LimitArg, ExpandError> {
+    fn take_depth(&mut self, key_span: Span) -> Result<LimitArg, ExpandError> {
         let Some(token) = self.current().cloned() else {
             return Err(ExpandError::new(
                 key_span,
-                format!(
-                    "`{}` needs a value: {}",
-                    key.name(),
-                    accepted_limit_values(key)
-                ),
+                "`depth` needs a value: an unsigned integer or `auto`",
             ));
         };
         self.advance();
         match &token {
             TokenTree::Ident(ident) if ident.to_string() == "auto" => Ok(LimitArg::Auto),
-            TokenTree::Ident(ident) if ident.to_string() == "unbounded" => {
-                if key.allows_unbounded() {
-                    return Ok(LimitArg::Unbounded);
-                }
-                Err(ExpandError::new(
-                    key_span,
-                    "`depth = unbounded` is not supported; use `depth = auto` or an integer",
-                ))
-            }
-            TokenTree::Literal(_) => take_integer_limit(&token, key),
-            other => Err(invalid_limit_value(other.span(), key)),
+            TokenTree::Ident(ident) if ident.to_string() == "unbounded" => Err(ExpandError::new(
+                key_span,
+                "`depth = unbounded` is not supported; use `depth = auto` or an integer",
+            )),
+            TokenTree::Literal(_) => take_integer_limit(&token),
+            other => Err(invalid_limit_value(other.span())),
         }
     }
 }
@@ -251,18 +190,18 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                         let path = cursor.take_string(key_span, &key)?;
                         args.put_query(QuerySource::File { path })?;
                     }
+                    "depth" => {
+                        let value = cursor.take_depth(key_span)?;
+                        put(&mut args.depth, value, key_span, &key)?;
+                    }
                     other => {
-                        let Some(limit_key) = LimitKey::parse(other) else {
-                            return Err(ExpandError::new(
-                                key_span,
-                                format!(
-                                    "unknown argument `{other}`; `query!` accepts `grammar`, \
-                                     `file`, `fuel`, `memory`, `depth`, and the query string"
-                                ),
-                            ));
-                        };
-                        let value = cursor.take_limit(key_span, limit_key)?;
-                        args.limits.put(limit_key, value, key_span)?;
+                        return Err(ExpandError::new(
+                            key_span,
+                            format!(
+                                "unknown argument `{other}`; `query!` accepts `grammar`, \
+                                 `file`, `depth`, and the query string"
+                            ),
+                        ));
                     }
                 }
             }
@@ -304,28 +243,17 @@ fn string_value(token: &TokenTree) -> Result<StringArg, ExpandError> {
     }
 }
 
-fn take_integer_limit(token: &TokenTree, key: LimitKey) -> Result<LimitArg, ExpandError> {
+fn take_integer_limit(token: &TokenTree) -> Result<LimitArg, ExpandError> {
     let text = token.to_string();
     let Ok(lit) = litrs::IntegerLit::parse(text) else {
-        return Err(invalid_limit_value(token.span(), key));
+        return Err(invalid_limit_value(token.span()));
     };
     let Some(value) = lit.value::<u64>() else {
-        return Err(invalid_limit_value(token.span(), key));
+        return Err(invalid_limit_value(token.span()));
     };
     Ok(LimitArg::Of(value))
 }
 
-fn accepted_limit_values(key: LimitKey) -> &'static str {
-    if key.allows_unbounded() {
-        "an unsigned integer, `auto`, or `unbounded`"
-    } else {
-        "an unsigned integer or `auto`"
-    }
-}
-
-fn invalid_limit_value(span: Span, key: LimitKey) -> ExpandError {
-    ExpandError::new(
-        span,
-        format!("`{}` needs {}", key.name(), accepted_limit_values(key)),
-    )
+fn invalid_limit_value(span: Span) -> ExpandError {
+    ExpandError::new(span, "`depth` needs an unsigned integer or `auto`")
 }

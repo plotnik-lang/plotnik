@@ -46,22 +46,6 @@ mod from_file {
     }
 }
 
-mod limited {
-    plotnik::query! {
-        "Q = (program (expression_statement (identifier) @id))",
-        grammar = "tree-sitter-javascript",
-        fuel = 1,
-    }
-}
-
-mod dispatched {
-    plotnik::query! {
-        "Atom = [(identifier) (number)]",
-        grammar = "tree-sitter-javascript",
-        fuel = 2,
-    }
-}
-
 mod depth_limited {
     plotnik::query! {
         r#"
@@ -104,22 +88,6 @@ mod nodes {
     }
 }
 
-mod walk_limited {
-    plotnik::query! {
-        "Probe = (expression_statement) Root = (_)",
-        grammar = "tree-sitter-javascript",
-        fuel = 5,
-    }
-}
-
-mod application_limited {
-    plotnik::query! {
-        "Probe = (_)",
-        grammar = "tree-sitter-javascript",
-        fuel = 2,
-    }
-}
-
 mod skew {
     plotnik::query! {
         "Q = (program (expression_statement (identifier) @id))",
@@ -133,7 +101,7 @@ fn facade_executes_generated_types_from_multiple_expansions() {
     let tree = parse(&js(), source);
 
     let value = plotnik::exec::<queries::Idents>(tree.root_node(), source)
-        .expect("auto limits fit")
+        .expect("execution succeeds")
         .expect("matches");
     let json =
         serde_json::to_string(&plotnik::rt::WithSource::new(&value, source)).expect("serializes");
@@ -194,14 +162,10 @@ fn grammar_packages_and_file_form_resolve() {
 }
 
 #[test]
-fn compiled_limits_reject_work_at_their_distinct_boundaries() {
+fn decode_depth_limit_terminates_execution_and_search() {
     let source = "((x));";
     let tree = parse(&js(), source);
 
-    assert!(matches!(
-        limited::Q::exec(tree.root_node(), source),
-        Err(LimitExceeded::OutOfFuel(1))
-    ));
     assert!(matches!(
         depth_limited::Q::exec(tree.root_node(), source),
         Err(LimitExceeded::DecodeDepth(1))
@@ -431,76 +395,6 @@ fn result_borrows_follow_payload_not_iterator_scratch() {
     drop(each);
     assert_eq!(pair.left.node, node);
     assert_eq!(pair.text, "beta");
-}
-
-#[test]
-fn lazy_search_shares_fuel_and_fuses_after_a_terminal_error() {
-    let source = "alpha; beta; gamma; delta;";
-    let tree = parse(&js(), source);
-    let scope = tree.root_node();
-
-    assert_eq!(
-        application_limited::Probe::exec(scope, source),
-        Ok(Some(scope))
-    );
-    assert_eq!(
-        application_limited::Probe::each(scope, source).next(),
-        Some(Err(LimitExceeded::OutOfFuel(2)))
-    );
-    assert_eq!(walk_limited::Root::find_all(scope, source), Ok(vec![scope]));
-
-    let mut each = walk_limited::Probe::each(scope, source);
-    let first = each.next().unwrap().unwrap();
-    assert_eq!(first, scope.named_child(0).unwrap());
-    assert_eq!(walk_limited::Probe::find(scope, source), Ok(Some(first)));
-    assert_eq!(each.next(), Some(Err(LimitExceeded::OutOfFuel(5))));
-    assert_eq!(each.next(), None);
-    assert_eq!(each.next(), None);
-    drop(each);
-    assert_eq!(first.utf8_text(source.as_bytes()), Ok("alpha;"));
-    assert_eq!(
-        walk_limited::Probe::find_all(scope, source),
-        Err(LimitExceeded::OutOfFuel(5))
-    );
-}
-
-#[test]
-fn switch_entry_fuses_work_within_one_fuel_operation() {
-    use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
-    use plotnik_compiler::{BytecodeConfig, Limit, QueryBuilder, RuntimeLimitSpec, VMBuilder};
-
-    let source = "42;";
-    let tree = parse(&js(), source);
-    let number = tree
-        .root_node()
-        .named_child(0)
-        .unwrap()
-        .named_child(0)
-        .unwrap();
-    let grammar = Grammar::from_raw(
-        &RawGrammar::from_json(include_str!(env!("PLOTNIK_TEST_GRAMMAR_JAVASCRIPT"))).unwrap(),
-    )
-    .unwrap();
-    let module = QueryBuilder::from_inline("Atom = [(identifier) (number)]")
-        .compile(&grammar)
-        .unwrap()
-        .emit(BytecodeConfig::new())
-        .unwrap()
-        .into_artifact()
-        .unwrap();
-
-    let atom = dispatched::Atom::exec(number, source);
-    let vm_result = VMBuilder::at_node(source, number)
-        .limits(RuntimeLimitSpec {
-            fuel_limit: Limit::Of(2),
-            memory: Limit::Auto,
-        })
-        .build()
-        .apply(&module, &module.entrypoint("Atom").unwrap())
-        .map(|result| result.is_some());
-
-    assert_eq!(atom, Ok(Some(number)));
-    assert_eq!(vm_result, Ok(true));
 }
 
 #[test]

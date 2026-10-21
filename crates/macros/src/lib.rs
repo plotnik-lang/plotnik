@@ -34,10 +34,8 @@ mod grammar_source;
 ///     `include_str!` — relative to the invoking file).
 /// - `file = "queries/q.ptk"` — read the query from a file (relative to the
 ///   invoking file) instead of an inline literal.
-/// - `fuel = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`,
-///   `depth = <n> | auto` — the limit policy compiled into the safe entry
-///   points (default `auto`). `fuel` bounds cumulative traversal and matcher work,
-///   `memory` samples live matcher state, `depth` bounds the committed
+/// - `depth = <n> | auto` — the decoder depth policy compiled into entry
+///   points (default `auto`). `depth` bounds the committed
 ///   value's nesting (typed decoding recurses once per nested value, so
 ///   this is its native-stack guard).
 ///

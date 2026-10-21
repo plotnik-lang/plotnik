@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
 use plotnik_compiler::{CompiledQuery, QueryBuilder, RustCodegenConfig, SourceMap, SourcePath};
-use plotnik_runtime::{Limit, RuntimeLimitSpec};
+use plotnik_runtime::Limit;
 
-use crate::args::{self, ExpandError, LimitArg, LimitArgs, QuerySource};
+use crate::args::{self, ExpandError, LimitArg, QuerySource};
 use crate::grammar_source;
 
 struct QueryInput {
@@ -83,8 +83,7 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
     let config = RustCodegenConfig::new()
         .runtime_crate("::plotnik::rt")
         .serde(cfg!(feature = "serde"))
-        .limits(runtime_limits(&args.limits))
-        .decode_depth(decode_depth(&args.limits));
+        .decode_depth(decode_depth(&args.depth));
     let emission = compiled
         .emit(config)
         .map_err(|error| ExpandError::new(query_span, error.to_string()))?;
@@ -187,21 +186,9 @@ fn invoking_dir() -> Option<PathBuf> {
     Some(file.parent()?.to_path_buf())
 }
 
-fn runtime_limits(args: &LimitArgs) -> RuntimeLimitSpec {
-    RuntimeLimitSpec {
-        fuel_limit: limit(&args.fuel),
-        memory: limit(&args.memory),
-    }
-}
-
-fn decode_depth(args: &LimitArgs) -> Limit {
-    limit(&args.depth)
-}
-
-fn limit(arg: &Option<LimitArg>) -> Limit {
+fn decode_depth(arg: &Option<LimitArg>) -> Limit {
     match arg {
         None | Some(LimitArg::Auto) => Limit::Auto,
-        Some(LimitArg::Unbounded) => Limit::Unbounded,
         Some(LimitArg::Of(value)) => Limit::Of(*value),
     }
 }
