@@ -7,7 +7,7 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_compiler::bytecode::Module;
 use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
-use plotnik_compiler::{Colors, Limit, QueryBuilder, RuntimeLimitSpec, VM, materialize_verified};
+use plotnik_compiler::{Colors, QueryBuilder, VM, materialize_verified};
 
 #[path = "../test_support/grammar_loader.rs"]
 mod grammar_loader;
@@ -238,31 +238,6 @@ fn bench_scan_execute(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_backtrack_storm(c: &mut Criterion) {
-    const FUEL_BUDGET: u64 = 50_000;
-    let module = compile("Missing = (program {(_)* (debugger_statement)})");
-    let entry = module
-        .entrypoint("Missing")
-        .expect("bench entrypoint exists");
-    let source: &str = &SMALL;
-    let tree = parse_js(source);
-    let mut group = c.benchmark_group("backtrack_storm");
-    group.throughput(Throughput::Elements(FUEL_BUDGET));
-    group.bench_function("50k_dispatches", |b| {
-        b.iter(|| {
-            let vm = VM::builder(source, &tree)
-                .limits(RuntimeLimitSpec {
-                    fuel_limit: Limit::Of(FUEL_BUDGET),
-                    memory: Limit::Auto,
-                })
-                .build();
-            let outcome = vm.execute(&module, &entry);
-            assert!(outcome.is_err(), "storm query must exhaust its budget");
-        })
-    });
-    group.finish();
-}
-
 fn bench_switch(c: &mut Criterion) {
     let module =
         compile("Items = (program (expression_statement [(number) (identifier) (string)])*)");
@@ -272,21 +247,15 @@ fn bench_switch(c: &mut Criterion) {
         let source = statement.repeat(4096);
         let tree = parse_js(&source);
         group.throughput(Throughput::Elements(4096 * 3));
-        for (policy, fuel_limit) in [("metered", Limit::Auto), ("unbounded", Limit::Unbounded)] {
-            group.bench_function(format!("{name}/{policy}"), |b| {
-                b.iter(|| {
-                    let journal = VM::builder(&source, &tree)
-                        .limits(RuntimeLimitSpec {
-                            fuel_limit,
-                            memory: Limit::Unbounded,
-                        })
-                        .build()
-                        .execute(&module, &entry)
-                        .expect("all expression kinds match");
-                    black_box(journal);
-                })
-            });
-        }
+        group.bench_function(name, |b| {
+            b.iter(|| {
+                let journal = VM::builder(&source, &tree)
+                    .build()
+                    .execute(&module, &entry)
+                    .expect("all expression kinds match");
+                black_box(journal);
+            })
+        });
     }
     group.finish();
 }
@@ -296,7 +265,6 @@ criterion_group!(
     bench_parse,
     bench_scenarios,
     bench_scan_execute,
-    bench_backtrack_storm,
     bench_switch
 );
 criterion_main!(benches);

@@ -148,25 +148,12 @@ impl RustRepresentation {
 struct Generator<'a> {
     config: &'a Config,
     plan: &'a CodegenPlan<'a>,
-    limits: RustLimits,
     rust: RustRepresentation,
     has_calls: bool,
 }
 
-#[derive(Clone, Copy)]
-struct RustLimits {
-    fuel: Limit,
-    memory: Limit,
-    decode_depth: Limit,
-}
-
 impl<'a> Generator<'a> {
     fn new(plan: &'a CodegenPlan<'a>, config: &'a Config) -> Result<Self, String> {
-        let limits = RustLimits {
-            fuel: config.limits.fuel_limit,
-            memory: config.limits.memory,
-            decode_depth: config.decode_depth,
-        };
         let rust = RustRepresentation::from_plan(plan.matcher())?;
         let has_calls = plan
             .matcher()
@@ -176,7 +163,6 @@ impl<'a> Generator<'a> {
         Ok(Self {
             config,
             plan,
-            limits,
             rust,
             has_calls,
         })
@@ -288,23 +274,13 @@ impl<'a> Generator<'a> {
     }
 
     fn mod_header(&self, out: &mut String, decoder_frame_bytes: Option<u64>) {
-        let limits = self.limits;
-        splice(
-            out,
-            "",
-            MOD_HEADER,
-            &[
-                ("RT", self.config.rt_crate_path()),
-                ("FUEL", &limit_expr(limits.fuel)),
-                ("MEMORY", &limit_expr(limits.memory)),
-            ],
-        );
+        splice(out, "", MOD_HEADER, &[("RT", self.config.rt_crate_path())]);
         if let Some(frame_bytes) = decoder_frame_bytes {
             splice(
                 out,
                 "",
                 DECODE_DEPTH_CONST,
-                &[("DEPTH", &depth_expr(limits.decode_depth, frame_bytes))],
+                &[("DEPTH", &depth_expr(self.config.decode_depth, frame_bytes))],
             );
         }
     }
@@ -439,11 +415,6 @@ impl<'a> Generator<'a> {
     }
 
     fn entry_fns(&self, out: &mut String) {
-        let limits = self.limits;
-        let fuel_metered = limits.fuel != Limit::Unbounded;
-        let memory_metered = limits.memory != Limit::Unbounded;
-        let fuel_metered = if fuel_metered { "true" } else { "false" };
-        let memory_metered = if memory_metered { "true" } else { "false" };
         for entry in self.plan.matcher().entrypoints() {
             let def = entry.name.as_str();
             let info = self.state(entry.entry);
@@ -452,15 +423,15 @@ impl<'a> Generator<'a> {
                 EntryBoundary::Node => "EntryBoundary::new(false, true)",
                 EntryBoundary::Record => "EntryBoundary::new(true, false)",
             };
-            let driver = format!("run_at_node::<{fuel_metered}, {memory_metered}>");
+            let driver = "run_at_node";
             let state = &info.const_name;
-            let args = format!("eng, source, {state}, {boundary}, budget");
+            let args = format!("eng, source, {state}, {boundary}");
             let compact = format!("    {driver}({args})");
             let apply_call = if compact.len() + 4 <= 100 && args.len() <= 60 {
                 compact
             } else {
                 format!(
-                    "    {driver}(\n        eng,\n        source,\n        {state},\n        {boundary},\n        budget,\n    )"
+                    "    {driver}(\n        eng,\n        source,\n        {state},\n        {boundary},\n    )"
                 )
             };
             let subs = [
@@ -536,12 +507,10 @@ impl<'a> Generator<'a> {
                             u16::from(action.kind)
                         );
                         for effects in &action.prefix {
-                            self.fused_boundary(out);
                             for effect in effects {
                                 self.effect_stmt(out, effect, "                    ");
                             }
                         }
-                        self.fused_boundary(out);
                         let plan = &action.action;
                         self.render_checks(
                             out,
@@ -593,10 +562,6 @@ impl<'a> Generator<'a> {
             }
         }
         out.push_str(DISPATCH_CLOSE);
-    }
-
-    fn fused_boundary(&self, out: &mut String) {
-        out.push_str("                    if METERED_MEMORY {\n                        budget.account_memory_work();\n                        sample_memory::<METERED_MEMORY>(eng, budget)?;\n                    }\n");
     }
 
     fn epsilon_arm(
@@ -895,7 +860,7 @@ impl<'a> Generator<'a> {
             out,
             "            if let Err(error) = eng.enter_frame({state}) {{"
         );
-        out.push_str("                return Ok(Flow::CallFrameError(error));\n");
+        out.push_str("                return Flow::CallFrameError(error);\n");
         out.push_str("            }\n");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
@@ -909,7 +874,7 @@ impl<'a> Generator<'a> {
             out,
             "            if let Err(error) = eng.enter_frame({state}) {{"
         );
-        out.push_str("                return Ok(Flow::CallFrameError(error));\n");
+        out.push_str("                return Flow::CallFrameError(error);\n");
         out.push_str("            }\n");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
@@ -1185,10 +1150,6 @@ fn render_const_slice(
     out.push_str("];\n");
 }
 
-pub(super) fn limit_expr(limit: Limit) -> String {
-    format!("rt::Limit::{limit:?}")
-}
-
 pub(super) fn depth_expr(limit: Limit, max_decoder_frame_bytes: u64) -> String {
     match limit {
         Limit::Auto => format!("Some(rt::decode_depth_auto({max_decoder_frame_bytes}))"),
@@ -1214,26 +1175,6 @@ const _: () = assert!(
 
 const MOD_HEADER: &str = r#"
 use @RT@ as rt;
-
-/// The limit policy compiled into the safe entrypoints, resolved against
-/// each input's node count. Chosen at generation time, never at the call
-/// site: the query is trusted, the input is not.
-const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
-    fuel_limit: @FUEL@,
-    memory: @MEMORY@,
-};
-
-/// No ceilings — what the unmetered journal entrypoints run under.
-const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
-    fuel_limit: None,
-    max_memory: None,
-};
-
-/// Resolve compiled-in limits once for a supplied application or search scope.
-pub(super) fn execution_budget(scope: rt::Node<'_>) -> rt::ExecutionBudget {
-    let source_nodes = u32::try_from(scope.descendant_count()).unwrap_or(u32::MAX);
-    rt::ExecutionBudget::new(LIMITS.resolve(source_nodes))
-}
 "#;
 
 const DECODE_DEPTH_CONST: &str = r#"
@@ -1311,20 +1252,21 @@ pub(super) fn verify_language(node: rt::Node<'_>) {
 const JOURNAL_ENTRY_FN: &str = r#"
 /// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
 /// match journal — the same event sequence the VM commits for this query.
-pub fn @JOURNAL_FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
+pub fn @JOURNAL_FN@<'t>(
+    tree: &'t rt::Tree,
+    source: &str,
+) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
     let entry = @ENTRY@;
     let boundary = @BOUNDARY@;
-    let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
-    outcome.expect("an unmetered run cannot exceed a limit")
+    run(tree, source, entry, boundary)
 }
 "#;
 
 const APPLY_ENTRY_FN: &str = r#"
-/// Apply one candidate using the operation's cumulative budget.
+/// Apply one candidate at the engine's current node.
 pub(super) fn @APPLY_FN@<'a, 't>(
     eng: &'a mut rt::Engine<'t>,
     source: &str,
-    budget: &mut rt::ExecutionBudget,
 ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
 @APPLY_CALL@
 }
@@ -1378,52 +1320,28 @@ enum Unwound {
 
 /// One dispatch loop serves every entrypoint; `entry` selects the definition
 /// body and `boundary` supplies its root result effects.
-/// The metering constants come from the compiled-in policy. A fully unbounded
-/// policy skips budget accounting. Memory checks read `heap_bytes` only when
-/// memory is bounded. Metered dispatches use the same budget as the VM.
-/// `RECORD_OUTPUT_EVENTS` disables output allocation for match-only entries. (No
-/// let-chains: generated code targets the embedding crate's edition.)
-fn run<
-    't,
-    const METERED_FUEL: bool,
-    const METERED_MEMORY: bool,
-    const RECORD_OUTPUT_EVENTS: bool,
->(
+fn run<'t>(
     tree: &'t rt::Tree,
     source: &str,
     entry: u16,
     boundary: EntryBoundary,
-    limits: rt::ResolvedRuntimeLimits,
 ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    let mut budget = rt::ExecutionBudget::new(limits);
-    let mut eng = if RECORD_OUTPUT_EVENTS {
-        rt::Engine::new(tree.root_node().walk())
-    } else {
-        rt::Engine::new_match_only(tree.root_node().walk())
-    };
+    let mut eng = rt::Engine::new(tree.root_node().walk());
     verify_language(eng.node());
-    let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
-        &mut eng,
-        source,
-        entry,
-        boundary,
-        &mut budget,
-    )?
-    .is_some();
+    let accepted = run_at_node(&mut eng, source, entry, boundary)?.is_some();
     Ok(accepted.then(|| eng.into_journal()))
 }
 
-fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+fn run_at_node<'a, 't>(
     eng: &'a mut rt::Engine<'t>,
     source: &str,
     entry: u16,
     boundary: EntryBoundary,
-    budget: &mut rt::ExecutionBudget,
 ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
     boundary.begin(eng);
     let mut ip = entry;
     loop {
-        match dispatch::<METERED_FUEL, METERED_MEMORY>(eng, source, ip, budget)? {
+        match dispatch(eng, source, ip) {
             Flow::Jump(next) => ip = next,
             Flow::Accept => {
                 boundary.finish(eng);
@@ -1444,38 +1362,12 @@ fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
 
 const DISPATCH_OPEN: &str = r#"
 #[inline]
-fn sample_memory<const METERED_MEMORY: bool>(
-    eng: &rt::Engine<'_>,
-    budget: &mut rt::ExecutionBudget,
-) -> Result<(), rt::LimitExceeded> {
-    if METERED_MEMORY && budget.memory_sample_due() {
-        let used = eng.heap_bytes();
-        match budget.limits().max_memory {
-            Some(max) if used > max => {
-                return Err(rt::LimitExceeded::Memory { used, limit: max });
-            }
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
-#[inline]
-fn dispatch<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
-    eng: &mut rt::Engine<'t>,
-    @SOURCE@: &str,
-    ip: u16,
-    budget: &mut rt::ExecutionBudget,
-) -> Result<Flow, rt::LimitExceeded> {
-    if METERED_FUEL || METERED_MEMORY {
-        budget.charge()?;
-        sample_memory::<METERED_MEMORY>(eng, budget)?;
-    }
-    Ok(match ip {
+fn dispatch<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Flow {
+    match ip {
 "#;
 
 const DISPATCH_CLOSE: &str = "        _ => unreachable!(\"ip {ip} is not a generated state\"),
-    })
+    }
 }
 ";
 

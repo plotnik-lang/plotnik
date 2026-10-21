@@ -7,9 +7,7 @@ mod value;
 mod verify;
 mod vm;
 
-pub use plotnik_runtime::{
-    JournalEvent, Limit, MatchJournal, OutputEvents, ResolvedRuntimeLimits, RuntimeLimitSpec,
-};
+pub use plotnik_runtime::{JournalEvent, Limit, MatchJournal, OutputEvents};
 
 pub use error::RuntimeError;
 pub use execution_trace::{ExecutionTrace, TraceEvent, TraceNode, TraceRecord, TraceRecorder};

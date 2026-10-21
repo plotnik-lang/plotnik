@@ -182,10 +182,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         );
         let _ = writeln!(
             out,
-            "        let mut budget = matcher::execution_budget(node);"
-        );
-        let _ = writeln!(
-            out,
             "        let mut eng = {engine_constructor}(node.walk());"
         );
         let _ = writeln!(out, "        matcher::verify_language(node);");
@@ -195,19 +191,13 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
                 "        let mut scratch = rt::DecoderScratch::default();"
             );
         }
-        let _ = writeln!(
-            out,
-            "        Self::apply(&mut eng, source, &mut budget{scratch_arg})"
-        );
+        let _ = writeln!(out, "        Self::apply(&mut eng, source{scratch_arg})");
         let _ = writeln!(out, "    }}\n");
         let _ = writeln!(
             out,
             "    /// Search inclusively in source-order DFS preorder, skipping descendants of matches."
         );
-        let _ = writeln!(
-            out,
-            "    /// Matching and traversal share compiled-in limits. An error ends iteration."
-        );
+        let _ = writeln!(out, "    /// An error ends iteration.");
         let _ = writeln!(out, "    pub fn each{generics}(");
         let _ = writeln!(out, "        scope: rt::Node<'t>,");
         let _ = writeln!(out, "        source: &'s str,");
@@ -236,25 +226,21 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
                 "        let mut scratch = rt::DecoderScratch::default();"
             );
         }
-        let _ = writeln!(out, "        rt::Traversal::new(");
-        let _ = writeln!(out, "            scope,");
-        let _ = writeln!(out, "            matcher::execution_budget(scope),");
         let _ = writeln!(
             out,
-            "            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {{"
+            "        rt::Traversal::new(scope, move |node: rt::Node<'t>| {{"
         );
-        let _ = writeln!(out, "                if !verified {{");
-        let _ = writeln!(out, "                    matcher::verify_language(node);");
-        let _ = writeln!(out, "                    verified = true;");
-        let _ = writeln!(out, "                }}");
+        let _ = writeln!(out, "            if !verified {{");
+        let _ = writeln!(out, "                matcher::verify_language(node);");
+        let _ = writeln!(out, "                verified = true;");
+        let _ = writeln!(out, "            }}");
         let _ = writeln!(out);
-        let _ = writeln!(out, "                eng.reset(node);");
+        let _ = writeln!(out, "            eng.reset(node);");
         let _ = writeln!(
             out,
-            "                Self::apply(&mut eng, source, budget{scratch_arg})"
+            "            Self::apply(&mut eng, source{scratch_arg})"
         );
-        let _ = writeln!(out, "            }},");
-        let _ = writeln!(out, "        )");
+        let _ = writeln!(out, "        }})");
         let _ = writeln!(out, "    }}\n");
         let _ = writeln!(out, "    /// Consume the first item of `each`.");
         let _ = writeln!(out, "    pub fn find{application_generics}(");
@@ -288,7 +274,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "    fn apply{application_generics}(");
         let _ = writeln!(out, "        eng: &mut {engine_type},");
         let _ = writeln!(out, "        source: {source_ref},");
-        let _ = writeln!(out, "        budget: &mut rt::ExecutionBudget,");
         if item.has_decoder() {
             let _ = writeln!(out, "        scratch: &mut rt::DecoderScratch,");
         }
@@ -300,7 +285,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             let _ = writeln!(out, "        let node = eng.node();");
             let _ = writeln!(
                 out,
-                "        Ok(matcher::{apply_fn}(eng, source, budget)?.map(|_| node))"
+                "        Ok(matcher::{apply_fn}(eng, source)?.map(|_| node))"
             );
         } else {
             self.decode_application(out, item, &apply_fn);
@@ -339,7 +324,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let decoder_fn = self.decoder_fn(item.name);
         let _ = writeln!(
             out,
-            "        let Some(journal) = matcher::{apply_fn}(eng, source, budget)? else {{"
+            "        let Some(journal) = matcher::{apply_fn}(eng, source)? else {{"
         );
         let _ = writeln!(out, "            return Ok(None);");
         let _ = writeln!(out, "        }};");

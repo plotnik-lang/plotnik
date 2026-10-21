@@ -174,7 +174,7 @@ impl<'t> CursorWrapper<'t> {
         self.restore_to_from_moved(current_index, index);
     }
 
-    /// Bytes charged against the VM memory ceiling for pooled cursor snapshots.
+    /// Estimated heap bytes for pooled cursor snapshots.
     #[inline]
     pub fn snapshot_footprint(&self) -> u64 {
         self.snapshots.byte_footprint()

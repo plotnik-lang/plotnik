@@ -215,10 +215,7 @@ fn render_shard(cases: &[(&RustCase<'_>, bool)]) -> String {
             out,
             "    let actual = {module}::Q::exec(tree.root_node(), source)"
         );
-        let _ = writeln!(
-            out,
-            "        .expect(\"snapshot must stay within generated runtime limits\")"
-        );
+        let _ = writeln!(out, "        .expect(\"generated execution succeeds\")");
         if *match_only {
             let _ = writeln!(out, "        .map(|node| {{");
             let _ = writeln!(out, "            assert_eq!(node, tree.root_node());");

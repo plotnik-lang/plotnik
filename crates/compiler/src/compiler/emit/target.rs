@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use plotnik_runtime::{Limit, RuntimeLimitSpec};
+use plotnik_runtime::Limit;
 
 use crate::bytecode::Module;
 use crate::compiler::diagnostics::{Diagnostics, QueryResult};
@@ -131,7 +131,6 @@ pub enum CodegenProvenance {
 pub struct RustCodegenConfig {
     runtime_crate: Cow<'static, str>,
     serde: bool,
-    limits: RuntimeLimitSpec,
     decode_depth: Limit,
     provenance: CodegenProvenance,
 }
@@ -141,10 +140,6 @@ impl Default for RustCodegenConfig {
         Self {
             runtime_crate: Cow::Borrowed("::plotnik_runtime"),
             serde: false,
-            limits: RuntimeLimitSpec {
-                fuel_limit: Limit::Auto,
-                memory: Limit::Auto,
-            },
             decode_depth: Limit::Auto,
             provenance: CodegenProvenance::Omit,
         }
@@ -163,11 +158,6 @@ impl RustCodegenConfig {
 
     pub fn serde(mut self, enabled: bool) -> Self {
         self.serde = enabled;
-        self
-    }
-
-    pub fn limits(mut self, limits: RuntimeLimitSpec) -> Self {
-        self.limits = limits;
         self
     }
 
@@ -202,7 +192,6 @@ impl RustCodegenConfig {
         crate::compiler::emit::targets::rust::Config::new()
             .rt_crate(self.runtime_crate.clone())
             .serde(self.serde)
-            .limits(self.limits)
             .decode_depth(self.decode_depth)
     }
 

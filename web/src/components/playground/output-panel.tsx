@@ -163,9 +163,6 @@ function OutputBody({
       <div className="flex items-center gap-2 border-t px-3 py-1.5">
         {stale && <Badge variant="destructive">stale</Badge>}
         <Badge variant="secondary">
-          {runResult.run_stats.fuel_used.toLocaleString()} fuel
-        </Badge>
-        <Badge variant="secondary">
           {formatBytes(runResult.run_stats.peak_live_heap_bytes)} peak heap
         </Badge>
       </div>

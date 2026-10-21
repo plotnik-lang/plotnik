@@ -61,7 +61,6 @@ impl WasmParser {
 
     /// Parse source with Tree-sitter's usual syntax-error recovery. A tree with
     /// ERROR nodes is still a valid result and can be queried or inspected.
-    /// Plotnik's VM fuel/memory limits apply to matching, not source parsing.
     pub fn parse(&mut self, source: &str) -> Result<Tree, WasmParserError> {
         self.parser
             .parse(source, None)

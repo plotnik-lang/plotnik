@@ -20,7 +20,7 @@
 //!     let source = "x;";
 //!     let tree = parser.parse(source, None).unwrap();
 //!     let q = Q::exec(tree.root_node(), source)
-//!         .expect("auto limits fit")
+//!         .expect("execution succeeds")
 //!         .expect("matches");
 //! }
 //! ```

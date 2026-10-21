@@ -11,7 +11,6 @@ use crate::{
 ///
 /// Instruction pointers stay with the executor, which represents the current
 /// instruction differently (decoded code address vs. generated state id).
-/// The operation's budget lives outside this rollbackable application state.
 pub struct Engine<'t> {
     cursor: CursorWrapper<'t>,
     frames: FrameArena,
@@ -405,7 +404,7 @@ impl<'t> Engine<'t> {
         Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
-    /// Sampled matcher-heap estimate, not a total-memory ceiling. Arena elements
+    /// Matcher-heap estimate for runtime statistics. Arena elements
     /// use length, excluding spare capacity retained across candidate resets.
     /// Pooled cursor estimates stay charged even when recycled. Never allocates.
     pub fn heap_bytes(&self) -> u64 {

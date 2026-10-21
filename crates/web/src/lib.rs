@@ -16,7 +16,7 @@ use langs::Lang;
 use plotnik_compiler::bytecode::{Entrypoint, Module};
 use plotnik_compiler::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
-    RuntimeLimitSpec, RustCodegenConfig, TraceRecorder, VM, dump_tree, tokenize as query_tokenize,
+    RustCodegenConfig, TraceRecorder, VM, dump_tree, tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
 use wasm_bindgen::prelude::*;
@@ -156,9 +156,7 @@ impl Session {
         };
 
         let tree = self.lang.parse_source(source);
-        let vm = VM::builder(source, &tree)
-            .limits(RuntimeLimitSpec::default())
-            .build();
+        let vm = VM::builder(source, &tree).build();
         match trace {
             TraceMode::None => {
                 let mut tracer = NoopTracer;

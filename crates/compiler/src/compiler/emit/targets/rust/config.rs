@@ -1,11 +1,10 @@
 use crate::compiler::emit::targets::rust::TypesConfig as RustTypesConfig;
 use crate::core::grammar::GrammarIdentity;
-use plotnik_runtime::{Limit, RuntimeLimitSpec};
+use plotnik_runtime::Limit;
 
 #[derive(Clone, Debug)]
 pub struct Config {
     pub(crate) rust_types: RustTypesConfig,
-    pub(crate) limits: RuntimeLimitSpec,
     pub(crate) decode_depth: Limit,
     pub(crate) grammar_identity: Option<GrammarIdentity>,
 }
@@ -14,10 +13,6 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             rust_types: RustTypesConfig::new(),
-            limits: RuntimeLimitSpec {
-                fuel_limit: Limit::Auto,
-                memory: Limit::Auto,
-            },
             decode_depth: Limit::Auto,
             grammar_identity: None,
         }
@@ -36,11 +31,6 @@ impl Config {
 
     pub fn serde(mut self, enabled: bool) -> Self {
         self.rust_types = self.rust_types.serde(enabled);
-        self
-    }
-
-    pub fn limits(mut self, limits: RuntimeLimitSpec) -> Self {
-        self.limits = limits;
         self
     }
 

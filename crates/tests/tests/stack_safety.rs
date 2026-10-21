@@ -2,10 +2,7 @@ use std::thread;
 
 use indoc::indoc;
 use plotnik_compiler::bytecode::Module;
-use plotnik_compiler::{
-    BytecodeConfig, Colors, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM,
-    Value,
-};
+use plotnik_compiler::{BytecodeConfig, Colors, NoopTracer, QueryBuilder, RuntimeError, VM, Value};
 
 mod support;
 
@@ -48,19 +45,12 @@ fn deep_backtrack_does_not_overflow_native_stack() {
             .name("deep-backtrack".into())
             .stack_size(STACK_SIZE)
             .spawn_scoped(scope, || {
-                let vm = VM::builder(&source, &tree)
-                    .limits(RuntimeLimitSpec {
-                        fuel_limit: Limit::Unbounded,
-                        memory: Limit::Unbounded,
-                    })
-                    .build();
+                let vm = VM::builder(&source, &tree).build();
                 let mut tracer = NoopTracer;
                 let result = vm.execute_with(&module, &entry, &mut tracer);
                 match result {
                     Ok(_) => "matched",
                     Err(RuntimeError::NoMatch) => "no-match",
-                    Err(RuntimeError::OutOfFuel(_)) => "fuel",
-                    Err(RuntimeError::MemoryLimitExceeded { .. }) => "memory",
                     Err(RuntimeError::CallFrame(_)) => "call-frame",
                 }
             })

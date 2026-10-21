@@ -1,7 +1,7 @@
 //! Shared runtime engine for Plotnik queries.
 //!
 //! The compiler and executors share instruction types, backtracking state,
-//! regex automata, and execution limits. The default `execution` feature adds
+//! regex automata, and decoder depth guards. The default `execution` feature adds
 //! Tree-sitter navigation, match journals, and typed result decoding. Compiler-only
 //! builds disable it to avoid linking Tree-sitter's C runtime.
 
@@ -41,8 +41,7 @@ pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{CallFrameError, Frame, FrameArena, PortId};
 pub use ids::{InvalidNodeKindId, NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
-    DecodeDepth, GENERATED_NODE_VALUE_BYTES, Limit, LimitExceeded, ResolvedRuntimeLimits,
-    RuntimeLimitSpec, decode_depth_auto,
+    DecodeDepth, GENERATED_NODE_VALUE_BYTES, Limit, LimitExceeded, decode_depth_auto,
 };
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
@@ -53,7 +52,7 @@ pub use cursor::CursorWrapper;
 pub use engine::Engine;
 #[cfg(feature = "execution")]
 #[doc(hidden)]
-pub use execution::{ExecutionBudget, Traversal};
+pub use execution::Traversal;
 #[cfg(feature = "execution")]
 pub use journal::{JournalEvent, MatchJournal, OutputEvents, node_text, source_text};
 #[cfg(feature = "execution")]

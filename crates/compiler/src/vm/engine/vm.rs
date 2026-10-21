@@ -9,8 +9,8 @@ use crate::bytecode::{
 use crate::core::{Colors, NodeFieldId};
 
 use plotnik_runtime::{
-    CallResume, Checkpoint, Engine, ExecutionBudget, JournalEvent, LimitExceeded, MatchJournal,
-    PortId, ResolvedRuntimeLimits, Resume, RuntimeLimitSpec, SkipPolicy, Traversal,
+    CallResume, Checkpoint, Engine, JournalEvent, LimitExceeded, MatchJournal, PortId, Resume,
+    SkipPolicy, Traversal,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
@@ -23,9 +23,6 @@ const BINARY_SEARCH_MIN_CASES: usize = 48;
 /// Resource usage observed during one VM run.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct RunStats {
-    /// Fuel consumed by execution. Each execution operation
-    /// consumes one unit; this is not a stable cross-version performance metric.
-    pub fuel_used: u64,
     /// Peak estimated runtime memory for occupied entries, sampled during execution
     /// and at run exit. Excludes spare allocation capacity.
     pub peak_live_heap_bytes: u64,
@@ -36,7 +33,8 @@ trait StatsObserver: Default {
     type Report;
 
     fn observe_heap(&mut self, used: u64);
-    fn finish(self, budget: &ExecutionBudget) -> Self::Report;
+    fn sample_heap(&mut self, engine: &Engine<'_>);
+    fn finish(self) -> Self::Report;
 }
 
 #[derive(Default)]
@@ -48,12 +46,15 @@ impl StatsObserver for NoStats {
 
     fn observe_heap(&mut self, _used: u64) {}
 
-    fn finish(self, _budget: &ExecutionBudget) {}
+    fn sample_heap(&mut self, _engine: &Engine<'_>) {}
+
+    fn finish(self) {}
 }
 
 #[derive(Default)]
 struct CollectStats {
     peak_live_heap_bytes: u64,
+    sample_work: u16,
 }
 
 impl StatsObserver for CollectStats {
@@ -64,9 +65,18 @@ impl StatsObserver for CollectStats {
         self.peak_live_heap_bytes = self.peak_live_heap_bytes.max(used);
     }
 
-    fn finish(self, budget: &ExecutionBudget) -> RunStats {
+    fn sample_heap(&mut self, engine: &Engine<'_>) {
+        self.sample_work += 1;
+        if self.sample_work < 1024 {
+            return;
+        }
+
+        self.sample_work = 0;
+        self.observe_heap(engine.heap_bytes());
+    }
+
+    fn finish(self) -> RunStats {
         RunStats {
-            fuel_used: budget.fuel_used(),
             peak_live_heap_bytes: self.peak_live_heap_bytes,
         }
     }
@@ -77,15 +87,12 @@ pub struct VM<'s, 't> {
     pub(crate) engine: Engine<'t>,
     pub(crate) ip: CodeAddr,
 
-    pub(crate) limits: ResolvedRuntimeLimits,
-
     pub(crate) source: &'s str,
 }
 
 pub struct VMBuilder<'s, 't> {
     source: &'s str,
     node: Node<'t>,
-    spec: RuntimeLimitSpec,
 }
 
 impl<'s, 't> VMBuilder<'s, 't> {
@@ -95,24 +102,11 @@ impl<'s, 't> VMBuilder<'s, 't> {
 
     /// Start at a supplied node. Matching cannot leave this node's subtree.
     pub fn at_node(source: &'s str, node: Node<'t>) -> Self {
-        Self {
-            source,
-            node,
-            spec: RuntimeLimitSpec::default(),
-        }
+        Self { source, node }
     }
 
-    /// Set the runtime limit policy. `Auto` limits are sized from the source
-    /// scope's node count when [`Self::build`] resolves them.
-    pub fn limits(mut self, spec: RuntimeLimitSpec) -> Self {
-        self.spec = spec;
-        self
-    }
-
-    /// Build the VM, resolving `Auto` limits once against the scope's node count.
     pub fn build(self) -> VM<'s, 't> {
-        let source_nodes = u32::try_from(self.node.descendant_count()).unwrap_or(u32::MAX);
-        VM::at_node(self.source, self.node, self.spec.resolve(source_nodes))
+        VM::at_node(self.source, self.node)
     }
 }
 
@@ -133,23 +127,15 @@ impl<'s, 't> Application<'s, 't> {
         }
     }
 
-    fn apply_budgeted<T: Tracer>(
-        &mut self,
-        tracer: &mut T,
-        budget: &mut ExecutionBudget,
-    ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
+    fn apply<T: Tracer>(&mut self, tracer: &mut T) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
         let node = self.vm.engine.node();
         let source = self.vm.source;
-        let (result, _) =
-            self.vm
-                .run_budgeted::<T, NoStats>(self.module, &self.entrypoint, tracer, budget);
+        let (result, _) = self
+            .vm
+            .run::<T, NoStats>(self.module, &self.entrypoint, tracer);
         match result {
             Ok(()) => {}
             Err(RuntimeError::NoMatch) => return Ok(None),
-            Err(RuntimeError::OutOfFuel(limit)) => return Err(LimitExceeded::OutOfFuel(limit)),
-            Err(RuntimeError::MemoryLimitExceeded { used, limit }) => {
-                return Err(LimitExceeded::Memory { used, limit });
-            }
             Err(RuntimeError::CallFrame(error)) => return Err(error.into()),
         }
 
@@ -180,25 +166,20 @@ impl<'s, 't> Application<'s, 't> {
         mut apply: F,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>>
     where
-        F: FnMut(&mut Self, &mut ExecutionBudget) -> Result<Option<Value<'s, 't>>, LimitExceeded>,
+        F: FnMut(&mut Self) -> Result<Option<Value<'s, 't>>, LimitExceeded>,
     {
-        Traversal::new(
-            self.vm.engine.node(),
-            ExecutionBudget::new(self.vm.limits),
-            move |node, budget: &mut ExecutionBudget| {
-                self.vm.engine.reset(node);
-                apply(&mut self, budget)
-            },
-        )
+        Traversal::new(self.vm.engine.node(), move |node| {
+            self.vm.engine.reset(node);
+            apply(&mut self)
+        })
     }
 }
 
 impl<'s, 't> VM<'s, 't> {
-    fn at_node(source: &'s str, node: Node<'t>, limits: ResolvedRuntimeLimits) -> Self {
+    fn at_node(source: &'s str, node: Node<'t>) -> Self {
         VM {
             engine: Engine::new(node.walk()),
             ip: CodeAddr::ZERO,
-            limits,
             source,
         }
     }
@@ -225,22 +206,19 @@ impl<'s, 't> VM<'s, 't> {
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<Option<Value<'s, 't>>, LimitExceeded> {
-        let mut budget = ExecutionBudget::new(self.limits);
-        Application::new(self, module, *entrypoint).apply_budgeted(tracer, &mut budget)
+        Application::new(self, module, *entrypoint).apply(tracer)
     }
 
     /// Lazily return outermost matches in inclusive, source-order DFS preorder.
     /// A successful candidate prunes its descendants from further search.
-    /// All traversal and matching work shares the limits already resolved for
-    /// this VM's scope. Recursive captures and collections remain inside each result.
+    /// Recursive captures and collections remain inside each result.
     pub fn traverse(
         self,
         module: &'s Module,
         entrypoint: Entrypoint,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
         let mut tracer = NoopTracer;
-        Application::new(self, module, entrypoint)
-            .traverse_impl(move |app, budget| app.apply_budgeted(&mut tracer, budget))
+        Application::new(self, module, entrypoint).traverse_impl(move |app| app.apply(&mut tracer))
     }
 
     /// Traverse as in [`Self::traverse`], tracing each attempted candidate, including failures,
@@ -252,8 +230,7 @@ impl<'s, 't> VM<'s, 't> {
         entrypoint: Entrypoint,
         tracer: &mut T,
     ) -> impl std::iter::FusedIterator<Item = Result<Value<'s, 't>, LimitExceeded>> {
-        Application::new(self, module, entrypoint)
-            .traverse_impl(move |app, budget| app.apply_budgeted(tracer, budget))
+        Application::new(self, module, entrypoint).traverse_impl(move |app| app.apply(tracer))
     }
 
     fn call_retry_checkpoint(&self, call_ip: CodeAddr, resume: CallResume) -> Checkpoint {
@@ -303,17 +280,15 @@ impl<'s, 't> VM<'s, 't> {
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, S::Report) {
-        let mut budget = ExecutionBudget::new(self.limits);
-        let (result, report) = self.run_budgeted::<T, S>(module, entrypoint, tracer, &mut budget);
+        let (result, report) = self.run::<T, S>(module, entrypoint, tracer);
         (result.map(|()| self.engine.into_journal()), report)
     }
 
-    fn run_budgeted<T: Tracer, S: StatsObserver>(
+    fn run<T: Tracer, S: StatsObserver>(
         &mut self,
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
-        budget: &mut ExecutionBudget,
     ) -> (Result<(), RuntimeError>, S::Report) {
         self.ip = entrypoint.target();
         if T::ENABLED {
@@ -328,16 +303,7 @@ impl<'s, 't> VM<'s, 't> {
         }
 
         let result = loop {
-            if let Err(error) = budget.charge() {
-                let LimitExceeded::OutOfFuel(limit) = error else {
-                    unreachable!("charging fuel only reports fuel exhaustion");
-                };
-                break Err(RuntimeError::OutOfFuel(limit));
-            }
-
-            if let Err(error) = self.sample_memory(budget, &mut stats) {
-                break Err(error);
-            }
+            stats.sample_heap(&self.engine);
 
             #[cfg(debug_assertions)]
             debug_assert!(
@@ -367,7 +333,7 @@ impl<'s, 't> VM<'s, 't> {
                         tracer.trace_switch(self.ip, node, action.map(|action| action.entry));
                     }
                     if let Some(action) = action {
-                        self.exec_selected(action, node, module, tracer, budget, &mut stats)
+                        self.exec_selected(action, node, module, tracer, &mut stats)
                     } else {
                         Err(self.backtrack(module, tracer))
                     }
@@ -401,29 +367,7 @@ impl<'s, 't> VM<'s, 't> {
             stats.observe_heap(self.engine.heap_bytes());
         }
 
-        (result, stats.finish(budget))
-    }
-
-    fn sample_memory<S: StatsObserver>(
-        &self,
-        budget: &mut ExecutionBudget,
-        stats: &mut S,
-    ) -> Result<(), RuntimeError> {
-        if !(S::ENABLED || self.limits.max_memory.is_some()) || !budget.memory_sample_due() {
-            return Ok(());
-        }
-
-        let used = self.engine.heap_bytes();
-        if S::ENABLED {
-            stats.observe_heap(used);
-        }
-        if let Some(limit) = self.limits.max_memory
-            && used > limit
-        {
-            return Err(RuntimeError::MemoryLimitExceeded { used, limit });
-        }
-
-        Ok(())
+        (result, stats.finish())
     }
 
     #[inline]
@@ -433,14 +377,10 @@ impl<'s, 't> VM<'s, 't> {
         node: Node<'t>,
         module: &Module,
         tracer: &mut T,
-        budget: &mut ExecutionBudget,
         stats: &mut S,
     ) -> Result<(), Signal> {
         for prefix in &action.prefix {
-            if S::ENABLED || self.limits.max_memory.is_some() {
-                budget.account_memory_work();
-                self.sample_memory(budget, stats)?;
-            }
+            stats.sample_heap(&self.engine);
             if T::ENABLED {
                 self.ip = prefix.ip;
                 tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));
@@ -450,10 +390,7 @@ impl<'s, 't> VM<'s, 't> {
             }
         }
 
-        if S::ENABLED || self.limits.max_memory.is_some() {
-            budget.account_memory_work();
-            self.sample_memory(budget, stats)?;
-        }
+        stats.sample_heap(&self.engine);
         self.ip = action.matched_at;
         if T::ENABLED {
             tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));

@@ -73,7 +73,6 @@ export interface GeneratedCode {
 }
 
 export interface RunStats {
-  fuel_used: number;
   peak_live_heap_bytes: number;
 }
 

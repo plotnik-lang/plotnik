@@ -39,15 +39,14 @@ impl<'t> Q<'t> {
         node: rt::Node<'t>,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let mut budget = matcher::execution_budget(node);
         let mut eng = rt::Engine::new(node.walk());
         matcher::verify_language(node);
         let mut scratch = rt::DecoderScratch::default();
-        Self::apply(&mut eng, source, &mut budget, &mut scratch)
+        Self::apply(&mut eng, source, &mut scratch)
     }
 
     /// Search inclusively in source-order DFS preorder, skipping descendants of matches.
-    /// Matching and traversal share compiled-in limits. An error ends iteration.
+    /// An error ends iteration.
     pub fn each<'s>(
         scope: rt::Node<'t>,
         source: &'s str,
@@ -56,19 +55,15 @@ impl<'t> Q<'t> {
         let mut eng = rt::Engine::new(scope.walk());
         let mut verified = false;
         let mut scratch = rt::DecoderScratch::default();
-        rt::Traversal::new(
-            scope,
-            matcher::execution_budget(scope),
-            move |node: rt::Node<'t>, budget: &mut rt::ExecutionBudget| {
-                if !verified {
-                    matcher::verify_language(node);
-                    verified = true;
-                }
+        rt::Traversal::new(scope, move |node: rt::Node<'t>| {
+            if !verified {
+                matcher::verify_language(node);
+                verified = true;
+            }
 
-                eng.reset(node);
-                Self::apply(&mut eng, source, budget, &mut scratch)
-            },
-        )
+            eng.reset(node);
+            Self::apply(&mut eng, source, &mut scratch)
+        })
     }
 
     /// Consume the first item of `each`.
@@ -90,10 +85,9 @@ impl<'t> Q<'t> {
     fn apply(
         eng: &mut rt::Engine<'t>,
         source: &str,
-        budget: &mut rt::ExecutionBudget,
         scratch: &mut rt::DecoderScratch,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let Some(journal) = matcher::q_apply(eng, source, budget)? else {
+        let Some(journal) = matcher::q_apply(eng, source)? else {
             return Ok(None);
         };
 
@@ -199,26 +193,6 @@ pub use self::matcher::q_journal;
 mod matcher {
     use ::plotnik_runtime as rt;
 
-    /// The limit policy compiled into the safe entrypoints, resolved against
-    /// each input's node count. Chosen at generation time, never at the call
-    /// site: the query is trusted, the input is not.
-    const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
-        fuel_limit: rt::Limit::Auto,
-        memory: rt::Limit::Auto,
-    };
-
-    /// No ceilings — what the unmetered journal entrypoints run under.
-    const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
-        fuel_limit: None,
-        max_memory: None,
-    };
-
-    /// Resolve compiled-in limits once for a supplied application or search scope.
-    pub(super) fn execution_budget(scope: rt::Node<'_>) -> rt::ExecutionBudget {
-        let source_nodes = u32::try_from(scope.descendant_count()).unwrap_or(u32::MAX);
-        rt::ExecutionBudget::new(LIMITS.resolve(source_nodes))
-    }
-
     /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
     /// as the generation-time grammar defines them.
     const EXPECTED_KINDS: &[(u16, &str, bool)] = &[
@@ -275,20 +249,21 @@ mod matcher {
 
     /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
-    pub fn q_journal<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
+    pub fn q_journal<'t>(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
         let entry = S02_Q;
         let boundary = EntryBoundary::new(true, false);
-        let outcome = run::<false, false, true>(tree, source, entry, boundary, NO_LIMITS);
-        outcome.expect("an unmetered run cannot exceed a limit")
+        run(tree, source, entry, boundary)
     }
 
-    /// Apply one candidate using the operation's cumulative budget.
+    /// Apply one candidate at the engine's current node.
     pub(super) fn q_apply<'a, 't>(
         eng: &'a mut rt::Engine<'t>,
         source: &str,
-        budget: &mut rt::ExecutionBudget,
     ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        run_at_node::<true, true>(eng, source, S02_Q, EntryBoundary::new(true, false), budget)
+        run_at_node(eng, source, S02_Q, EntryBoundary::new(true, false))
     }
     #[derive(Clone, Copy)]
     struct EntryBoundary {
@@ -337,52 +312,28 @@ mod matcher {
 
     /// One dispatch loop serves every entrypoint; `entry` selects the definition
     /// body and `boundary` supplies its root result effects.
-    /// The metering constants come from the compiled-in policy. A fully unbounded
-    /// policy skips budget accounting. Memory checks read `heap_bytes` only when
-    /// memory is bounded. Metered dispatches use the same budget as the VM.
-    /// `RECORD_OUTPUT_EVENTS` disables output allocation for match-only entries. (No
-    /// let-chains: generated code targets the embedding crate's edition.)
-    fn run<
-        't,
-        const METERED_FUEL: bool,
-        const METERED_MEMORY: bool,
-        const RECORD_OUTPUT_EVENTS: bool,
-    >(
+    fn run<'t>(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
         boundary: EntryBoundary,
-        limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        let mut budget = rt::ExecutionBudget::new(limits);
-        let mut eng = if RECORD_OUTPUT_EVENTS {
-            rt::Engine::new(tree.root_node().walk())
-        } else {
-            rt::Engine::new_match_only(tree.root_node().walk())
-        };
+        let mut eng = rt::Engine::new(tree.root_node().walk());
         verify_language(eng.node());
-        let accepted = run_at_node::<METERED_FUEL, METERED_MEMORY>(
-            &mut eng,
-            source,
-            entry,
-            boundary,
-            &mut budget,
-        )?
-        .is_some();
+        let accepted = run_at_node(&mut eng, source, entry, boundary)?.is_some();
         Ok(accepted.then(|| eng.into_journal()))
     }
 
-    fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+    fn run_at_node<'a, 't>(
         eng: &'a mut rt::Engine<'t>,
         source: &str,
         entry: u16,
         boundary: EntryBoundary,
-        budget: &mut rt::ExecutionBudget,
     ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
         boundary.begin(eng);
         let mut ip = entry;
         loop {
-            match dispatch::<METERED_FUEL, METERED_MEMORY>(eng, source, ip, budget)? {
+            match dispatch(eng, source, ip) {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => {
                     boundary.finish(eng);
@@ -401,34 +352,8 @@ mod matcher {
     }
 
     #[inline]
-    fn sample_memory<const METERED_MEMORY: bool>(
-        eng: &rt::Engine<'_>,
-        budget: &mut rt::ExecutionBudget,
-    ) -> Result<(), rt::LimitExceeded> {
-        if METERED_MEMORY && budget.memory_sample_due() {
-            let used = eng.heap_bytes();
-            match budget.limits().max_memory {
-                Some(max) if used > max => {
-                    return Err(rt::LimitExceeded::Memory { used, limit: max });
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-
-    #[inline]
-    fn dispatch<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
-        eng: &mut rt::Engine<'t>,
-        _source: &str,
-        ip: u16,
-        budget: &mut rt::ExecutionBudget,
-    ) -> Result<Flow, rt::LimitExceeded> {
-        if METERED_FUEL || METERED_MEMORY {
-            budget.charge()?;
-            sample_memory::<METERED_MEMORY>(eng, budget)?;
-        }
-        Ok(match ip {
+    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+        match ip {
             //   01       return
             S01_Q => Flow::Accept,
             //   02   !   (program)                        04
@@ -493,10 +418,6 @@ mod matcher {
                 let node = eng.node();
                 match node.kind_id() {
                     1 => 'state: {
-                        if METERED_MEMORY {
-                            budget.account_memory_work();
-                            sample_memory::<METERED_MEMORY>(eng, budget)?;
-                        }
                         // (_)
                         if !node.is_named() {
                             break 'state Flow::Backtrack;
@@ -508,10 +429,6 @@ mod matcher {
                         Flow::Jump(S05_Q)
                     } // (identifier)
                     114 => 'state: {
-                        if METERED_MEMORY {
-                            budget.account_memory_work();
-                            sample_memory::<METERED_MEMORY>(eng, budget)?;
-                        }
                         // (_)
                         if !node.is_named() {
                             break 'state Flow::Backtrack;
@@ -542,7 +459,7 @@ mod matcher {
                 Flow::Jump(S09_Q)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
-        })
+        }
     }
 
     /// `S02_Q` candidate: `(program)`.

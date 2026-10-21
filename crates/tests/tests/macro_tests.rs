@@ -317,8 +317,8 @@ fn failed_captures_do_not_leak_into_later_nested_results() {
 }
 
 #[test]
-fn vm_nested_results_survive_resume_terminal_error_and_drop() {
-    use plotnik_compiler::{BytecodeConfig, Limit, QueryBuilder, RuntimeLimitSpec, VM};
+fn vm_nested_results_survive_resume_and_drop() {
+    use plotnik_compiler::{BytecodeConfig, QueryBuilder, VM};
 
     let query = indoc::indoc! {r#"
         Q = [
@@ -340,22 +340,14 @@ fn vm_nested_results_survive_resume_terminal_error_and_drop() {
         .expect("query emits")
         .into_artifact()
         .expect("query is valid");
-    let source = format!(
-        "f(alpha, beta); skip(1); g(gamma); {}",
-        "later;".repeat(100)
-    );
-    let tree = parse(&js(), &source);
+    let source = "f(alpha, beta); skip(1); g(gamma);";
+    let tree = parse(&js(), source);
 
-    let mut each = VM::builder(&source, &tree)
-        .limits(RuntimeLimitSpec {
-            fuel_limit: Limit::Of(250),
-            ..Default::default()
-        })
+    let mut each = VM::builder(source, &tree)
         .build()
         .traverse(&module, module.entrypoint("Q").unwrap());
     let first = each.next().unwrap().unwrap();
     let second = each.next().unwrap().unwrap();
-    assert_eq!(each.next(), Some(Err(LimitExceeded::OutOfFuel(250))));
     assert_eq!(each.next(), None);
     assert_eq!(each.next(), None);
     drop(each);
