@@ -18,16 +18,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeEditor } from "./code-editor";
-import type { GeneratedCode, RunResult } from "./protocol";
+import type { GeneratedCode } from "./protocol";
+import type { QueryOutput } from "./use-session";
 
 const JSON_EXTENSIONS = [json()];
 
 interface OutputPanelProps {
   generated: GeneratedCode | null;
   generating: boolean;
-  runResult: RunResult | null;
-
-  stale: boolean;
+  output: QueryOutput;
   tab: OutputTab;
   onTabChange: (tab: OutputTab) => void;
   generatedCopied: boolean;
@@ -105,16 +104,14 @@ function GeneratedBody({
   );
 }
 
-function OutputBody({
-  runResult,
-  stale,
-}: {
-  runResult: RunResult | null;
-  stale: boolean;
-}) {
-  if (!runResult) {
+function OutputBody({ output }: { output: QueryOutput }) {
+  if (output.status === "pending") {
     return (
-      <div className="flex flex-col gap-2 p-4">
+      <div
+        role="status"
+        aria-label="Running query"
+        className="flex flex-col gap-2 p-4"
+      >
         <Skeleton className="h-4 w-2/5" />
         <Skeleton className="h-4 w-3/5" />
         <Skeleton className="h-4 w-1/3" />
@@ -122,6 +119,19 @@ function OutputBody({
     );
   }
 
+  if (output.status === "query-error") {
+    return (
+      <div className="p-4">
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>Query error</AlertTitle>
+          <AlertDescription>{output.message}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  const runResult = output.result;
   if (runResult.error === "no match") {
     return (
       <Empty>
@@ -152,7 +162,7 @@ function OutputBody({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className={stale ? "min-h-0 flex-1 opacity-50" : "min-h-0 flex-1"}>
+      <div className="min-h-0 flex-1">
         <CodeEditor
           value={JSON.stringify(runResult.result, null, 2)}
           readOnly
@@ -161,7 +171,6 @@ function OutputBody({
         />
       </div>
       <div className="flex items-center gap-2 border-t px-3 py-1.5">
-        {stale && <Badge variant="destructive">stale</Badge>}
         <Badge variant="secondary">
           {formatBytes(runResult.run_stats.peak_live_heap_bytes)} peak heap
         </Badge>
@@ -173,8 +182,7 @@ function OutputBody({
 export function OutputPanel({
   generated,
   generating,
-  runResult,
-  stale,
+  output,
   tab,
   onTabChange,
   generatedCopied,
@@ -193,7 +201,7 @@ export function OutputPanel({
         </TabsList>
       </div>
       <TabsContent value="output" className="min-h-0 flex-1">
-        <OutputBody runResult={runResult} stale={stale} />
+        <OutputBody output={output} />
       </TabsContent>
       <TabsContent value="generated" className="min-h-0 flex-1">
         <GeneratedBody

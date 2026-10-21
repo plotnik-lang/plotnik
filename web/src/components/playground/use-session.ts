@@ -19,8 +19,14 @@ export interface SessionInput {
 
 export interface CompileOutcome {
   query: string;
+  lang: string;
   info: SessionInfo;
 }
+
+export type QueryOutput =
+  | { status: "pending" }
+  | { status: "query-error"; message: string }
+  | { status: "complete"; result: RunResult };
 
 export interface TreeSnapshot {
   source: string;
@@ -40,9 +46,7 @@ export interface PlaygroundSession {
   entrypoints: string[];
 
   entry: string | null;
-  runResult: RunResult | null;
-
-  stale: boolean;
+  output: QueryOutput;
   tree: TreeSnapshot | null;
 }
 
@@ -54,11 +58,27 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
 
   const clientRef = useRef<PlotnikClient | null>(null);
   const [ready, setReady] = useState(false);
-  const [fatal, setFatal] = useState<string | null>(null);
-  const [compiled, setCompiled] = useState<CompileOutcome | null>(null);
+  const [failure, setFailure] = useState<{
+    query: string;
+    lang: string;
+    message: string;
+  } | null>(null);
+  const [compilation, setCompiled] = useState<CompileOutcome | null>(null);
   const [generated, setGenerated] = useState<GeneratedCode | null>(null);
-  const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [run, setRun] = useState<{
+    compiled: CompileOutcome;
+    source: string;
+    entry: string | null;
+    result: RunResult;
+  } | null>(null);
   const [tree, setTree] = useState<TreeSnapshot | null>(null);
+
+  const compiled =
+    compilation?.query === query && compilation.lang === lang
+      ? compilation
+      : null;
+  const fatal =
+    failure?.query === query && failure.lang === lang ? failure.message : null;
 
   useEffect(() => {
     const handle = createPlotnikClient();
@@ -82,12 +102,13 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
       const result = await clientRef.current?.compile(query, lang);
       if (!result || !stillCurrent()) return;
       if (result.fatal !== undefined) {
-        setFatal(result.fatal);
+        setFailure({ query, lang, message: result.fatal });
+        setCompiled(null);
         return;
       }
-      setFatal(null);
+      setFailure(null);
       setGenerated(null);
-      setCompiled({ query, info: result.info });
+      setCompiled({ query, lang, info: result.info });
     },
   );
 
@@ -97,7 +118,10 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
       ? entry
       : (entrypoints[entrypoints.length - 1] ?? null);
   const hasModule =
-    compiled !== null && compiled.info.bytecode_size_bytes !== null;
+    compiled !== null &&
+    compiled.info.bytecode_size_bytes !== null &&
+    fatal === null &&
+    !compiling;
 
   const generating = useDebouncedTask(
     ready && generatedOpen && hasModule && generated === null,
@@ -107,7 +131,7 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
       const result = await clientRef.current?.generate();
       if (!result || !stillCurrent()) return;
       if ("fatal" in result) {
-        setFatal(result.fatal);
+        setFailure({ query, lang, message: result.fatal });
         return;
       }
       setGenerated(result);
@@ -119,11 +143,14 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     RUN_DEBOUNCE_MS,
     [compiled, source, effectiveEntry],
     async (stillCurrent) => {
+      if (!compiled) return;
       const result = await clientRef.current?.run(
         source,
         effectiveEntry ?? undefined,
       );
-      if (result && stillCurrent()) setRunResult(result);
+      if (result && stillCurrent()) {
+        setRun({ compiled, source, entry: effectiveEntry, result });
+      }
     },
   );
 
@@ -137,17 +164,34 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     },
   );
 
+  let output: QueryOutput = { status: "pending" };
+  if (fatal !== null) {
+    output = { status: "query-error", message: fatal };
+  } else if (compiled && compiled.info.bytecode_size_bytes === null) {
+    output = {
+      status: "query-error",
+      message: "Fix the query errors to run it against this source.",
+    };
+  } else if (
+    !compiling &&
+    compiled !== null &&
+    run?.compiled === compiled &&
+    run.source === source &&
+    run.entry === effectiveEntry
+  ) {
+    output = { status: "complete", result: run.result };
+  }
+
   return {
     ready,
     compiling,
     fatal,
     compiled,
-    generated,
+    generated: hasModule ? generated : null,
     generating,
     entrypoints,
     entry: effectiveEntry,
-    runResult,
-    stale: runResult !== null && compiled !== null && !hasModule,
+    output,
     tree,
   };
 }

@@ -310,8 +310,7 @@ export default function Playground() {
               <OutputPanel
                 generated={session.generated}
                 generating={session.generating}
-                runResult={session.runResult}
-                stale={session.stale}
+                output={session.output}
                 tab={outputTab}
                 onTabChange={setOutputTab}
                 generatedCopied={generatedCopied}
