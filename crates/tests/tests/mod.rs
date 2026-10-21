@@ -475,7 +475,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let tree = scenario.lang.parse(scenario.source)?;
     let entrypoint = scenario.entry;
 
-    let vm = VM::builder(scenario.source, &tree).build();
+    let vm = VM::new(scenario.source, tree.root_node());
 
     if matches!(scenario.mode, VmMode::StructuredTrace) {
         let mut tracer = TraceRecorder::new(scenario.module, 65_536);
@@ -739,7 +739,7 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
         let tree = lang.parse(source).unwrap();
         for traced in [false, true] {
             let mut tracer = TraceRecorder::new(&module, 65_536);
-            let vm = VM::builder(source, &tree).build();
+            let vm = VM::new(source, tree.root_node());
             let applied = if traced {
                 vm.apply_with(&module, &entry, &mut tracer)
             } else {
@@ -756,7 +756,7 @@ fn public_apply_and_traverse_classify_results_by_type_kind() {
             }
 
             let mut tracer = TraceRecorder::new(&module, 65_536);
-            let vm = VM::builder(source, &tree).build();
+            let vm = VM::new(source, tree.root_node());
             let searched = if traced {
                 vm.traverse_with(&module, entry, &mut tracer)
                     .collect::<Result<Vec<_>, _>>()
@@ -846,8 +846,7 @@ fn one_module_runs_named_and_expression_entrypoints() {
         (expression, serde_json::json!({"expr": {"text": "chosen"}})),
         (a, serde_json::json!({"a": {"text": "chosen"}})),
     ] {
-        let journal = VM::builder(source, &tree)
-            .build()
+        let journal = VM::new(source, tree.root_node())
             .execute(&module, &entry)
             .unwrap();
         let value = materialize_verified(

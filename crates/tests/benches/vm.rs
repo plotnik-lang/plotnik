@@ -204,7 +204,7 @@ fn bench_scenarios(c: &mut Criterion) {
             group.throughput(Throughput::Bytes(source.len() as u64));
             group.bench_function(*size_name, |b| {
                 b.iter(|| {
-                    let vm = VM::builder(source, &tree).build();
+                    let vm = VM::new(source, tree.root_node());
                     let journal = vm.execute(&module, &entry).expect("bench query matches");
                     materialize_verified(
                         source,
@@ -230,7 +230,7 @@ fn bench_scan_execute(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(source.len() as u64));
     group.bench_function("medium", |b| {
         b.iter(|| {
-            let vm = VM::builder(source, &tree).build();
+            let vm = VM::new(source, tree.root_node());
             let journal = vm.execute(&module, &entry).expect("bench query matches");
             black_box(journal.as_slice().len());
         })
@@ -249,8 +249,7 @@ fn bench_switch(c: &mut Criterion) {
         group.throughput(Throughput::Elements(4096 * 3));
         group.bench_function(name, |b| {
             b.iter(|| {
-                let journal = VM::builder(&source, &tree)
-                    .build()
+                let journal = VM::new(&source, tree.root_node())
                     .execute(&module, &entry)
                     .expect("all expression kinds match");
                 black_box(journal);

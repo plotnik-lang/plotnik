@@ -156,7 +156,7 @@ impl Session {
         };
 
         let tree = self.lang.parse_source(source);
-        let vm = VM::builder(source, &tree).build();
+        let vm = VM::new(source, tree.root_node());
         match trace {
             TraceMode::None => {
                 let mut tracer = NoopTracer;

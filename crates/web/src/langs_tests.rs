@@ -17,8 +17,7 @@ fn capture_name(language: &str, source: &str) -> serde_json::Value {
     let tree = lang.parse_source(source);
     assert!(!tree.root_node().has_error());
 
-    let journal = VM::builder(source, &tree)
-        .build()
+    let journal = VM::new(source, tree.root_node())
         .execute(&module, &entry)
         .unwrap();
     let value = materialize_verified(

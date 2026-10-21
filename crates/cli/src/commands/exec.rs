@@ -64,7 +64,7 @@ pub fn run(m: &ArgMatches, command: &str) -> CliResult {
     let tree = parser
         .parse(&source)
         .map_err(|error| CliError::fatal(error.to_string()))?;
-    let vm = VM::builder(&source, &tree).build();
+    let vm = VM::new(&source, tree.root_node());
     let result = if m.get_flag("trace") {
         let verbosity = match m.get_count("verbose") {
             0 => Verbosity::Default,

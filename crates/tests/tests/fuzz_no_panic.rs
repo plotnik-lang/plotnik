@@ -72,8 +72,7 @@ fn run_source_smoke(source: &str) {
     let module = source_smoke_module();
     let tree = parse_js(source);
     let entry = module.entrypoint("Q").expect("Q entrypoint exists");
-    let journal = VM::builder(source, &tree)
-        .build()
+    let journal = VM::new(source, tree.root_node())
         .execute(module, &entry)
         .expect("wildcard root matches every parsed tree");
     let value = materialize_verified(

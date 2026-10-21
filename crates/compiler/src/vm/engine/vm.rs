@@ -1,4 +1,4 @@
-use tree_sitter::{Node, Tree};
+use tree_sitter::Node;
 
 use crate::bytecode::{
     CodeAddr, DecodedAction, DecodedCall, DecodedCandidate, DecodedInstr, DecodedMatch,
@@ -90,26 +90,6 @@ pub struct VM<'s, 't> {
     pub(crate) source: &'s str,
 }
 
-pub struct VMBuilder<'s, 't> {
-    source: &'s str,
-    node: Node<'t>,
-}
-
-impl<'s, 't> VMBuilder<'s, 't> {
-    pub fn new(source: &'s str, tree: &'t Tree) -> Self {
-        Self::at_node(source, tree.root_node())
-    }
-
-    /// Start at a supplied node. Matching cannot leave this node's subtree.
-    pub fn at_node(source: &'s str, node: Node<'t>) -> Self {
-        Self { source, node }
-    }
-
-    pub fn build(self) -> VM<'s, 't> {
-        VM::at_node(self.source, self.node)
-    }
-}
-
 struct Application<'s, 't> {
     vm: VM<'s, 't>,
     module: &'s Module,
@@ -176,16 +156,13 @@ impl<'s, 't> Application<'s, 't> {
 }
 
 impl<'s, 't> VM<'s, 't> {
-    fn at_node(source: &'s str, node: Node<'t>) -> Self {
+    /// Start at a supplied node. Matching cannot leave this node's subtree.
+    pub fn new(source: &'s str, node: Node<'t>) -> Self {
         VM {
             engine: Engine::new(node.walk()),
             ip: CodeAddr::ZERO,
             source,
         }
-    }
-
-    pub fn builder(source: &'s str, tree: &'t Tree) -> VMBuilder<'s, 't> {
-        VMBuilder::new(source, tree)
     }
 
     /// Apply an emitted, independently eligible entry at the supplied node.

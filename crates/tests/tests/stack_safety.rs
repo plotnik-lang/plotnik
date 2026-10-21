@@ -45,7 +45,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
             .name("deep-backtrack".into())
             .stack_size(STACK_SIZE)
             .spawn_scoped(scope, || {
-                let vm = VM::builder(&source, &tree).build();
+                let vm = VM::new(&source, tree.root_node());
                 let mut tracer = NoopTracer;
                 let result = vm.execute_with(&module, &entry, &mut tracer);
                 match result {

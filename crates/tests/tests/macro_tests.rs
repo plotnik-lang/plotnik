@@ -317,6 +317,35 @@ fn failed_captures_do_not_leak_into_later_nested_results() {
 }
 
 #[test]
+fn vm_search_stays_inside_the_supplied_subtree() {
+    use plotnik_compiler::{BytecodeConfig, QueryBuilder, VM};
+
+    let module = QueryBuilder::from_inline("Q = (identifier) @text :: text")
+        .compile(support::javascript_grammar())
+        .unwrap()
+        .emit(BytecodeConfig::new())
+        .unwrap()
+        .into_artifact()
+        .unwrap();
+    let entry = module.entrypoint("Q").unwrap();
+    let source = "before; { alpha; beta; } after;";
+    let tree = parse(&js(), source);
+    let block = tree.root_node().named_child(1).unwrap();
+
+    let applied = VM::new(source, block).apply(&module, &entry).unwrap();
+    let found = VM::new(source, block)
+        .traverse(&module, entry)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert_eq!(applied, None);
+    assert_eq!(
+        serde_json::to_value(found).unwrap(),
+        serde_json::json!([{"text": "alpha"}, {"text": "beta"}])
+    );
+}
+
+#[test]
 fn vm_nested_results_survive_resume_and_drop() {
     use plotnik_compiler::{BytecodeConfig, QueryBuilder, VM};
 
@@ -343,9 +372,8 @@ fn vm_nested_results_survive_resume_and_drop() {
     let source = "f(alpha, beta); skip(1); g(gamma);";
     let tree = parse(&js(), source);
 
-    let mut each = VM::builder(source, &tree)
-        .build()
-        .traverse(&module, module.entrypoint("Q").unwrap());
+    let mut each =
+        VM::new(source, tree.root_node()).traverse(&module, module.entrypoint("Q").unwrap());
     let first = each.next().unwrap().unwrap();
     let second = each.next().unwrap().unwrap();
     assert_eq!(each.next(), None);
