@@ -12,7 +12,7 @@ const MEMORY_SAMPLE_INTERVAL: u64 = 1024;
 pub struct ExecutionBudget {
     limits: ResolvedRuntimeLimits,
     fuel_used: u64,
-    memory_sample_at: u64,
+    memory_work: u64,
 }
 
 impl ExecutionBudget {
@@ -20,7 +20,7 @@ impl ExecutionBudget {
         Self {
             limits,
             fuel_used: 0,
-            memory_sample_at: 0,
+            memory_work: 0,
         }
     }
 
@@ -32,19 +32,22 @@ impl ExecutionBudget {
         self.fuel_used
     }
 
-    /// Preserve the runtime's memory sampling interval across applications.
-    /// Traversal can cross a sample boundary between matcher dispatches, so an
-    /// equality or bitmask check on the cumulative counter can miss it.
+    /// Account for work fused into an execution operation without consuming fuel.
+    pub fn account_memory_work(&mut self) {
+        self.memory_work += 1;
+    }
+
+    /// Preserve the memory sampling interval across traversal and fused operations.
     pub fn memory_sample_due(&mut self) -> bool {
-        if self.fuel_used - self.memory_sample_at < MEMORY_SAMPLE_INTERVAL {
+        if self.memory_work < MEMORY_SAMPLE_INTERVAL {
             return false;
         }
 
-        self.memory_sample_at = self.fuel_used;
+        self.memory_work = 0;
         true
     }
 
-    /// Charge one matcher dispatch or traversal step before doing the work.
+    /// Charge one execution operation or traversal step before doing the work.
     pub fn charge(&mut self) -> Result<(), LimitExceeded> {
         if let Some(limit) = self.limits.fuel_limit
             && self.fuel_used >= limit
@@ -53,6 +56,7 @@ impl ExecutionBudget {
         }
 
         self.fuel_used += 1;
+        self.account_memory_work();
         Ok(())
     }
 }

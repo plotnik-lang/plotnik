@@ -1,8 +1,9 @@
 use tree_sitter::{Node, Tree};
 
 use crate::bytecode::{
-    CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind,
-    EntryBoundary, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp, TypeDefKind, TypeKind,
+    CodeAddr, DecodedAction, DecodedCall, DecodedCandidate, DecodedInstr, DecodedMatch,
+    DecodedPredicate, Effect, EffectKind, EntryBoundary, Entrypoint, Module, Nav, PredicateOp,
+    TypeDefKind, TypeKind,
 };
 
 use crate::core::{Colors, NodeFieldId};
@@ -22,7 +23,7 @@ const BINARY_SEARCH_MIN_CASES: usize = 48;
 /// Resource usage observed during one VM run.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct RunStats {
-    /// Fuel consumed by execution. Each matcher dispatch currently
+    /// Fuel consumed by execution. Each execution operation
     /// consumes one unit; this is not a stable cross-version performance metric.
     pub fuel_used: u64,
     /// Peak estimated runtime memory for occupied entries, sampled during execution
@@ -334,17 +335,8 @@ impl<'s, 't> VM<'s, 't> {
                 break Err(RuntimeError::OutOfFuel(limit));
             }
 
-            if budget.memory_sample_due() && (S::ENABLED || self.limits.max_memory.is_some()) {
-                let used = self.engine.heap_bytes();
-                if S::ENABLED {
-                    stats.observe_heap(used);
-                }
-
-                if let Some(max) = self.limits.max_memory
-                    && used > max
-                {
-                    break Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
-                }
+            if let Err(error) = self.sample_memory(budget, &mut stats) {
+                break Err(error);
             }
 
             #[cfg(debug_assertions)]
@@ -370,13 +362,12 @@ impl<'s, 't> VM<'s, 't> {
                     } else {
                         entries.iter().find(|entry| u16::from(entry.kind) == kind)
                     };
-                    let target = entry.map(|entry| CodeAddr::from(u16::from(entry.target)));
+                    let action = entry.map(|entry| module.decoded().switch_action(entry));
                     if T::ENABLED {
-                        tracer.trace_switch(self.ip, node, target);
+                        tracer.trace_switch(self.ip, node, action.map(|action| action.entry));
                     }
-                    if let Some(target) = target {
-                        self.ip = target;
-                        Ok(())
+                    if let Some(action) = action {
+                        self.exec_selected(action, node, module, tracer, budget, &mut stats)
                     } else {
                         Err(self.backtrack(module, tracer))
                     }
@@ -411,6 +402,77 @@ impl<'s, 't> VM<'s, 't> {
         }
 
         (result, stats.finish(budget))
+    }
+
+    fn sample_memory<S: StatsObserver>(
+        &self,
+        budget: &mut ExecutionBudget,
+        stats: &mut S,
+    ) -> Result<(), RuntimeError> {
+        if !(S::ENABLED || self.limits.max_memory.is_some()) || !budget.memory_sample_due() {
+            return Ok(());
+        }
+
+        let used = self.engine.heap_bytes();
+        if S::ENABLED {
+            stats.observe_heap(used);
+        }
+        if let Some(limit) = self.limits.max_memory
+            && used > limit
+        {
+            return Err(RuntimeError::MemoryLimitExceeded { used, limit });
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn exec_selected<T: Tracer, S: StatsObserver>(
+        &mut self,
+        action: &DecodedAction,
+        node: Node<'t>,
+        module: &Module,
+        tracer: &mut T,
+        budget: &mut ExecutionBudget,
+        stats: &mut S,
+    ) -> Result<(), Signal> {
+        for prefix in &action.prefix {
+            if S::ENABLED || self.limits.max_memory.is_some() {
+                budget.account_memory_work();
+                self.sample_memory(budget, stats)?;
+            }
+            if T::ENABLED {
+                self.ip = prefix.ip;
+                tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));
+            }
+            for &effect in module.decoded().prefix_effects(prefix) {
+                self.emit_effect(effect, tracer);
+            }
+        }
+
+        if S::ENABLED || self.limits.max_memory.is_some() {
+            budget.account_memory_work();
+            self.sample_memory(budget, stats)?;
+        }
+        self.ip = action.matched_at;
+        if T::ENABLED {
+            tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));
+            tracer.trace_nav(Nav::StayExact, node);
+        }
+        if !self.residual_matches(action.matched.candidate, node, module, tracer) {
+            if T::ENABLED {
+                tracer.trace_nav_failure(Nav::StayExact.sibling_continuation());
+            }
+            return Err(self.backtrack(module, tracer));
+        }
+
+        if T::ENABLED {
+            tracer.trace_match_success(node, self.engine.cursor().field_id());
+            if let Some(field) = action.matched.candidate.node_field {
+                tracer.trace_field_success(field);
+            }
+        }
+        self.finish_match(action.matched, module, tracer)
     }
 
     fn begin_entry<T: Tracer>(&mut self, boundary: EntryBoundary, tracer: &mut T) {
@@ -482,7 +544,7 @@ impl<'s, 't> VM<'s, 't> {
             tracer.trace_match_success(self.engine.node(), self.engine.cursor().field_id());
         }
         if T::ENABLED
-            && let Some(field_id) = m.node_field
+            && let Some(field_id) = m.candidate.node_field
         {
             tracer.trace_field_success(field_id);
         }
@@ -545,50 +607,43 @@ impl<'s, 't> VM<'s, 't> {
     ) -> bool {
         let node = self.engine.node();
 
-        match m.node_kind {
-            NodeKindConstraint::Any => {}
-            NodeKindConstraint::Named(None) => {
-                if !node.is_named() {
-                    if T::ENABLED {
-                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
-                    }
-                    return false;
-                }
-            }
-            NodeKindConstraint::Named(Some(expected)) => {
-                if node.kind_id() != u16::from(expected) || !node.is_named() {
-                    if T::ENABLED {
-                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
-                    }
-                    return false;
-                }
-            }
-            NodeKindConstraint::Anonymous(None) => {
-                if node.is_named() {
-                    if T::ENABLED {
-                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
-                    }
-                    return false;
-                }
-            }
-            NodeKindConstraint::Anonymous(Some(expected)) => {
-                if node.kind_id() != u16::from(expected) || node.is_named() {
-                    if T::ENABLED {
-                        tracer.trace_match_failure(node, self.engine.cursor().field_id());
-                    }
-                    return false;
-                }
-            }
-        }
-
-        if m.missing && !node.is_missing() {
+        if let Some(expected) = m.kind
+            && node.kind_id() != u16::from(expected)
+        {
             if T::ENABLED {
                 tracer.trace_match_failure(node, self.engine.cursor().field_id());
             }
             return false;
         }
 
-        if let Some(expected) = m.node_field
+        self.residual_matches(m.candidate, node, module, tracer)
+    }
+
+    #[inline]
+    fn residual_matches<T: Tracer>(
+        &self,
+        candidate: DecodedCandidate,
+        node: Node<'t>,
+        module: &Module,
+        tracer: &mut T,
+    ) -> bool {
+        if let Some(named) = candidate.named
+            && node.is_named() != named
+        {
+            if T::ENABLED {
+                tracer.trace_match_failure(node, self.engine.cursor().field_id());
+            }
+            return false;
+        }
+
+        if candidate.missing && !node.is_missing() {
+            if T::ENABLED {
+                tracer.trace_match_failure(node, self.engine.cursor().field_id());
+            }
+            return false;
+        }
+
+        if let Some(expected) = candidate.node_field
             && self.engine.cursor().field_id() != Some(expected)
         {
             if T::ENABLED {
@@ -597,7 +652,7 @@ impl<'s, 't> VM<'s, 't> {
             return false;
         }
 
-        for &field_id in module.decoded().neg_fields(&m) {
+        for &field_id in module.decoded().neg_fields(&candidate) {
             if node.child_by_field_id(u16::from(field_id)).is_some() {
                 if T::ENABLED {
                     tracer.trace_neg_field_failure(node, self.engine.cursor().field_id(), field_id);
@@ -606,7 +661,7 @@ impl<'s, 't> VM<'s, 't> {
             }
         }
 
-        if let Some(p) = m.predicate
+        if let Some(p) = candidate.predicate
             && !self.evaluate_predicate(p, module)
         {
             if T::ENABLED {
@@ -920,7 +975,7 @@ impl<'s, 't> VM<'s, 't> {
                         );
                     }
                     if T::ENABLED
-                        && let Some(field_id) = m.node_field
+                        && let Some(field_id) = m.candidate.node_field
                     {
                         tracer.trace_field_success(field_id);
                     }

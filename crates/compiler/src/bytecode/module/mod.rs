@@ -21,7 +21,8 @@ mod matcher_verify;
 mod verify;
 
 pub(crate) use decoded::{
-    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedProgram,
+    DecodedAction, DecodedCall, DecodedCandidate, DecodedInstr, DecodedMatch, DecodedPredicate,
+    DecodedProgram,
 };
 pub(crate) use load::ModuleError;
 

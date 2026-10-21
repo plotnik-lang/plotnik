@@ -1770,6 +1770,10 @@ fn malformed_switch_tables_are_rejected() {
         (vec![(44, (size - 1).to_le_bytes().to_vec())], true),
         (vec![(table, second_entry), (table + 4, first_entry)], true),
         (vec![(table + 4, first_kind)], true),
+        (
+            vec![(table + 2, valid[table + 6..table + 8].to_vec())],
+            true,
+        ),
         (vec![(instruction + 4, size.to_le_bytes().to_vec())], false),
         (
             vec![

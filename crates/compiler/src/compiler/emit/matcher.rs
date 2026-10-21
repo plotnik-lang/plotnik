@@ -51,7 +51,7 @@ pub(crate) struct StatePlan {
 
 #[derive(Clone, Debug)]
 pub(crate) enum StatePlanKind {
-    Switch(Vec<(NodeKindId, StateId, String)>),
+    Switch(Vec<SwitchActionPlan>),
     Epsilon {
         effects: Vec<EffectPlan>,
         flow: FlowPlan,
@@ -62,14 +62,28 @@ pub(crate) enum StatePlanKind {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct SwitchActionPlan {
+    pub(crate) kind: NodeKindId,
+    pub(crate) pattern: String,
+    pub(crate) prefix: Vec<Vec<EffectPlan>>,
+    pub(crate) action: MatchActionPlan,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct MatchPlan {
     pub(crate) nav: Nav,
     pub(crate) search: SkipPolicy,
     pub(crate) retry: Option<SkipPolicy>,
+    pub(crate) kind: Option<KindCheck>,
+    pub(crate) action: MatchActionPlan,
+    pub(crate) candidate_pattern: String,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct MatchActionPlan {
     pub(crate) checks: Vec<CheckPlan>,
     pub(crate) effects: Vec<EffectPlan>,
     pub(crate) flow: FlowPlan,
-    pub(crate) candidate_pattern: String,
 }
 
 impl MatchPlan {
@@ -78,17 +92,18 @@ impl MatchPlan {
     }
 
     pub(crate) fn has_candidate_checks(&self) -> bool {
-        !self.checks.is_empty()
+        self.kind.is_some() || !self.action.checks.is_empty()
     }
 
     pub(crate) fn has_predicate(&self) -> bool {
-        self.checks
+        self.action
+            .checks
             .iter()
             .any(|check| matches!(check, CheckPlan::Predicate(_)))
     }
 
     pub(crate) fn needs_node_binding(&self) -> bool {
-        self.checks.iter().any(CheckPlan::reads_node)
+        self.kind.is_some() || self.action.checks.iter().any(CheckPlan::reads_node)
     }
 
     pub(crate) fn can_fail_before_flow(&self) -> bool {
@@ -146,7 +161,7 @@ pub(crate) struct EffectPlan {
 
 #[derive(Clone, Debug)]
 pub(crate) enum CheckPlan {
-    Kind(KindCheck),
+    Class(KindClass),
     Missing,
     Field(FieldPlan),
     NegField(FieldPlan),
@@ -167,9 +182,8 @@ pub(crate) enum KindClass {
 
 #[derive(Clone, Debug)]
 pub(crate) struct KindCheck {
-    pub(crate) class: KindClass,
-    pub(crate) id: Option<NodeKindId>,
-    pub(crate) name: Option<String>,
+    pub(crate) id: NodeKindId,
+    pub(crate) name: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -249,7 +263,7 @@ impl MatcherPlan {
                 (instruction.label(), StateId(raw))
             })
             .collect::<BTreeMap<_, _>>();
-        let entrypoints = graph
+        let entrypoints: Vec<_> = graph
             .entrypoints()
             .iter()
             .map(|(&key, entry)| {
@@ -374,7 +388,16 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
                 self.dumper
                     .switch_cases(switch)
                     .into_iter()
-                    .map(|(kind, target, pattern)| (kind, resolve_state(self.ids, target), pattern))
+                    .map(|(entry, pattern)| SwitchActionPlan {
+                        kind: entry.kind,
+                        pattern,
+                        prefix: entry
+                            .prefix
+                            .iter()
+                            .map(|instruction| self.effects(&instruction.effects))
+                            .collect(),
+                        action: self.match_action(entry.matched),
+                    })
                     .collect(),
             ),
             InstructionIR::Match(instruction) => self.match_state(instruction),
@@ -392,8 +415,6 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
     }
 
     fn match_state(&mut self, instruction: &MatchIR) -> StatePlanKind {
-        let effects = self.effects(&instruction.effects);
-        let flow = self.flow(&instruction.successors);
         if instruction.is_epsilon() {
             assert!(
                 matches!(instruction.node_kind, NodeKindConstraint::Any)
@@ -403,21 +424,30 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
                     && instruction.predicate.is_none(),
                 "epsilon match carries no candidate checks"
             );
-            return StatePlanKind::Epsilon { effects, flow };
+            return StatePlanKind::Epsilon {
+                effects: self.effects(&instruction.effects),
+                flow: self.flow(&instruction.successors),
+            };
         }
 
         let search = instruction.nav.skip_policy();
         let retry = instruction.nav.is_sibling_search().then_some(search);
-        let checks = self.checks(instruction, retry.is_some());
         StatePlanKind::Match(MatchPlan {
             nav: instruction.nav,
             search,
             retry,
-            checks,
-            effects,
-            flow,
+            kind: self.kind_check(instruction.node_kind),
+            action: self.match_action(instruction),
             candidate_pattern: self.dumper.node_pattern(instruction),
         })
+    }
+
+    fn match_action(&mut self, instruction: &MatchIR) -> MatchActionPlan {
+        MatchActionPlan {
+            checks: self.checks(instruction),
+            effects: self.effects(&instruction.effects),
+            flow: self.flow(&instruction.successors),
+        }
     }
 
     fn call_state(&mut self, instruction: &CallIR) -> CallPlan {
@@ -458,10 +488,15 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         }
     }
 
-    fn checks(&mut self, instruction: &MatchIR, retryable: bool) -> Vec<CheckPlan> {
+    fn checks(&mut self, instruction: &MatchIR) -> Vec<CheckPlan> {
         let mut checks = Vec::new();
-        if let Some(kind) = self.kind_check(instruction.node_kind) {
-            checks.push(CheckPlan::Kind(kind));
+        if !instruction.node_kind.is_any() {
+            let class = if instruction.node_kind.is_named() {
+                KindClass::Named
+            } else {
+                KindClass::Anonymous
+            };
+            checks.push(CheckPlan::Class(class));
         }
         if instruction.missing {
             checks.push(CheckPlan::Missing);
@@ -474,32 +509,26 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         }
         if let Some(predicate) = &instruction.predicate {
             self.any_predicate = true;
-            self.any_retry_predicate |= retryable;
+            self.any_retry_predicate |= instruction.nav.is_sibling_search();
             checks.push(CheckPlan::Predicate(self.predicate(predicate)));
         }
         checks
     }
 
     fn kind_check(&mut self, constraint: NodeKindConstraint) -> Option<KindCheck> {
-        let (class, id) = match constraint {
-            NodeKindConstraint::Any => return None,
-            NodeKindConstraint::Named(id) => (KindClass::Named, id),
-            NodeKindConstraint::Anonymous(id) => (KindClass::Anonymous, id),
-        };
-        let name = id.map(|id| self.kind_name(id));
-        if let (Some(id), Some(name)) = (id, &name)
-            && id != NodeKindId::ERROR
-        {
+        let id = constraint.kind_id()?;
+        let name = self.kind_name(id);
+        if id != NodeKindId::ERROR {
             self.expected_kinds.insert(
                 id,
                 ExpectedKind {
                     id,
                     name: name.clone(),
-                    named: class == KindClass::Named,
+                    named: constraint.is_named(),
                 },
             );
         }
-        Some(KindCheck { class, id, name })
+        Some(KindCheck { id, name })
     }
 
     fn record_field(&mut self, field: NodeFieldId) -> FieldPlan {

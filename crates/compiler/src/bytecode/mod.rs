@@ -46,7 +46,10 @@ pub(crate) use instructions::{
     Call, CallOwnership, CalleeContract, Match, MatchCounts, MatchInstr, MatchPredicate, Opcode,
     PREDICATE_SLOTS, Return, SuccessorAddr, Switch, SwitchEntry,
 };
-pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Instruction};
+pub(crate) use module::{
+    DecodedAction, DecodedCall, DecodedCandidate, DecodedInstr, DecodedMatch, DecodedPredicate,
+    Instruction,
+};
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use plotnik_runtime::{Nav, deserialize_dfa};
 pub(crate) use predicate_op::PredicateOp;

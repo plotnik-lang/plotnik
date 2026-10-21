@@ -54,6 +54,14 @@ mod limited {
     }
 }
 
+mod dispatched {
+    plotnik::query! {
+        "Atom = [(identifier) (number)]",
+        grammar = "tree-sitter-javascript",
+        fuel = 2,
+    }
+}
+
 mod depth_limited {
     plotnik::query! {
         r#"
@@ -454,6 +462,45 @@ fn lazy_search_shares_fuel_and_fuses_after_a_terminal_error() {
         walk_limited::Probe::find_all(scope, source),
         Err(LimitExceeded::OutOfFuel(5))
     );
+}
+
+#[test]
+fn switch_entry_fuses_work_within_one_fuel_operation() {
+    use plotnik_compiler::grammar::{Grammar, raw::RawGrammar};
+    use plotnik_compiler::{BytecodeConfig, Limit, QueryBuilder, RuntimeLimitSpec, VMBuilder};
+
+    let source = "42;";
+    let tree = parse(&js(), source);
+    let number = tree
+        .root_node()
+        .named_child(0)
+        .unwrap()
+        .named_child(0)
+        .unwrap();
+    let grammar = Grammar::from_raw(
+        &RawGrammar::from_json(include_str!(env!("PLOTNIK_TEST_GRAMMAR_JAVASCRIPT"))).unwrap(),
+    )
+    .unwrap();
+    let module = QueryBuilder::from_inline("Atom = [(identifier) (number)]")
+        .compile(&grammar)
+        .unwrap()
+        .emit(BytecodeConfig::new())
+        .unwrap()
+        .into_artifact()
+        .unwrap();
+
+    let atom = dispatched::Atom::exec(number, source);
+    let vm_result = VMBuilder::at_node(source, number)
+        .limits(RuntimeLimitSpec {
+            fuel_limit: Limit::Of(2),
+            memory: Limit::Auto,
+        })
+        .build()
+        .apply(&module, &module.entrypoint("Atom").unwrap())
+        .map(|result| result.is_some());
+
+    assert_eq!(atom, Ok(Some(number)));
+    assert_eq!(vm_result, Ok(true));
 }
 
 #[test]

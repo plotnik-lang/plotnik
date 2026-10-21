@@ -526,29 +526,40 @@ impl<'a> Generator<'a> {
                 StatePlanKind::Switch(cases) => {
                     let _ = writeln!(
                         out,
-                        "        {} => match eng.node().kind_id() {{",
+                        "        {} => {{\n            let node = eng.node();\n            match node.kind_id() {{",
                         self.state(state.id).const_name
                     );
-                    let arms = cases
-                        .iter()
-                        .map(|(kind, target, pattern)| {
-                            let arm = format!(
-                                "{} => Flow::Jump({}),",
-                                u16::from(*kind),
-                                self.state(*target).const_name
-                            );
-                            (arm, pattern)
-                        })
-                        .collect::<Vec<_>>();
-                    let width = arms
-                        .iter()
-                        .map(|(arm, _)| arm.len())
-                        .max()
-                        .expect("switch has cases");
-                    for (arm, pattern) in arms {
-                        let _ = writeln!(out, "            {arm:width$} // {pattern}");
+                    for action in cases {
+                        let _ = writeln!(
+                            out,
+                            "                {} => 'state: {{",
+                            u16::from(action.kind)
+                        );
+                        for effects in &action.prefix {
+                            self.fused_boundary(out);
+                            for effect in effects {
+                                self.effect_stmt(out, effect, "                    ");
+                            }
+                        }
+                        self.fused_boundary(out);
+                        let plan = &action.action;
+                        self.render_checks(
+                            out,
+                            self.candidate_checks(&plan.checks),
+                            "                    ",
+                            "break 'state Flow::Backtrack;",
+                        );
+                        self.effects_and_flow(
+                            out,
+                            &plan.effects,
+                            &plan.flow,
+                            "                    ",
+                        );
+                        let _ = writeln!(out, "                }} // {}", action.pattern);
                     }
-                    out.push_str("            _ => Flow::Backtrack,\n        },\n");
+                    out.push_str(
+                        "                _ => Flow::Backtrack,\n            }\n        }\n",
+                    );
                 }
                 StatePlanKind::Epsilon { effects, flow } => {
                     self.epsilon_arm(out, state, effects, flow);
@@ -582,6 +593,10 @@ impl<'a> Generator<'a> {
             }
         }
         out.push_str(DISPATCH_CLOSE);
+    }
+
+    fn fused_boundary(&self, out: &mut String) {
+        out.push_str("                    if METERED_MEMORY {\n                        budget.account_memory_work();\n                        sample_memory::<METERED_MEMORY>(eng, budget)?;\n                    }\n");
     }
 
     fn epsilon_arm(
@@ -628,7 +643,7 @@ impl<'a> Generator<'a> {
         if plan.retry.is_some() {
             let _ = writeln!(out, "            finish_{}(eng)", info.fn_stem);
         } else {
-            self.effects_and_flow(out, &plan.effects, &plan.flow, "            ");
+            self.effects_and_flow(out, &plan.action.effects, &plan.action.flow, "            ");
         }
         out.push_str("        }\n");
     }
@@ -880,7 +895,7 @@ impl<'a> Generator<'a> {
             out,
             "            if let Err(error) = eng.enter_frame({state}) {{"
         );
-        out.push_str("                return Flow::CallFrameError(error);\n");
+        out.push_str("                return Ok(Flow::CallFrameError(error));\n");
         out.push_str("            }\n");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
@@ -894,7 +909,7 @@ impl<'a> Generator<'a> {
             out,
             "            if let Err(error) = eng.enter_frame({state}) {{"
         );
-        out.push_str("                return Flow::CallFrameError(error);\n");
+        out.push_str("                return Ok(Flow::CallFrameError(error));\n");
         out.push_str("            }\n");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
@@ -934,43 +949,45 @@ impl<'a> Generator<'a> {
         if plan.needs_node_binding() {
             out.push_str("    let node = eng.node();\n");
         }
-        for check in self.candidate_checks(&plan.checks) {
+        let kind = plan
+            .kind
+            .iter()
+            .map(|kind| CandidateCheck::new(&kind.name, format!("node.kind_id() != {}", kind.id)));
+        let checks = kind.chain(self.candidate_checks(&plan.action.checks));
+        self.render_checks(out, checks, "    ", "return false;");
+        out.push_str("    true\n}\n");
+    }
+
+    fn render_checks(
+        &self,
+        out: &mut String,
+        checks: impl IntoIterator<Item = CandidateCheck>,
+        indent: &str,
+        failure: &str,
+    ) {
+        for check in checks {
             splice(
                 out,
-                "    ",
+                indent,
                 CHECK,
-                &[("COMMENT", &check.comment), ("FAIL", &check.fail)],
+                &[
+                    ("COMMENT", &check.comment),
+                    ("FAIL", &check.fail),
+                    ("FAILURE", failure),
+                ],
             );
         }
-        out.push_str("    true\n}\n");
     }
 
     fn candidate_checks(&self, plans: &[CheckPlan]) -> Vec<CandidateCheck> {
         plans
             .iter()
             .map(|plan| match plan {
-                CheckPlan::Kind(kind) => {
-                    let (comment, named_failure) = match kind.class {
-                        KindClass::Named => ("(_)", "!node.is_named()"),
-                        KindClass::Anonymous => ("\"_\"", "node.is_named()"),
-                    };
-                    let Some(id) = kind.id else {
-                        return CandidateCheck::new(comment, named_failure);
-                    };
-                    let name = kind
-                        .name
-                        .as_deref()
-                        .expect("specific kind check carries its grammar name");
-                    match kind.class {
-                        KindClass::Named => CandidateCheck::new(
-                            format!("({name})"),
-                            format!("node.kind_id() != {id} || !node.is_named()"),
-                        ),
-                        KindClass::Anonymous => CandidateCheck::new(
-                            format!("\"{name}\""),
-                            format!("node.kind_id() != {id} || node.is_named()"),
-                        ),
-                    }
+                CheckPlan::Class(KindClass::Named) => {
+                    CandidateCheck::new("(_)", "!node.is_named()")
+                }
+                CheckPlan::Class(KindClass::Anonymous) => {
+                    CandidateCheck::new("\"_\"", "node.is_named()")
                 }
                 CheckPlan::Missing => CandidateCheck::new(
                     "(MISSING …): only nodes the parser inserted during error recovery",
@@ -1033,7 +1050,9 @@ impl<'a> Generator<'a> {
                 continue;
             }
             let info = self.state(state.id);
-            let eng = if plan.effects.is_empty() && !matches!(plan.flow, FlowPlan::Fork { .. }) {
+            let eng = if plan.action.effects.is_empty()
+                && !matches!(plan.action.flow, FlowPlan::Fork { .. })
+            {
                 "_eng"
             } else {
                 "eng"
@@ -1049,7 +1068,7 @@ impl<'a> Generator<'a> {
                     ("ENG", eng),
                 ],
             );
-            self.effects_and_flow(out, &plan.effects, &plan.flow, "    ");
+            self.effects_and_flow(out, &plan.action.effects, &plan.action.flow, "    ");
             out.push_str("}\n");
         }
     }
@@ -1404,23 +1423,7 @@ fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
     boundary.begin(eng);
     let mut ip = entry;
     loop {
-        if METERED_FUEL || METERED_MEMORY {
-            // One matcher dispatch consumes one unit of the operation budget.
-            // Memory-only policies still charge to retain the sample cadence.
-            budget.charge()?;
-            // The shared budget schedules live matcher-heap samples.
-            // Unbounded memory policies skip sampling and heap measurement.
-            if METERED_MEMORY && budget.memory_sample_due() {
-                let used = eng.heap_bytes();
-                match budget.limits().max_memory {
-                    Some(max) if used > max => {
-                        return Err(rt::LimitExceeded::Memory { used, limit: max });
-                    }
-                    _ => {}
-                }
-            }
-        }
-        match dispatch(eng, source, ip) {
+        match dispatch::<METERED_FUEL, METERED_MEMORY>(eng, source, ip, budget)? {
             Flow::Jump(next) => ip = next,
             Flow::Accept => {
                 boundary.finish(eng);
@@ -1440,12 +1443,39 @@ fn run_at_node<'a, 't, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
 "#;
 
 const DISPATCH_OPEN: &str = r#"
-fn dispatch<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Flow {
-    match ip {
+#[inline]
+fn sample_memory<const METERED_MEMORY: bool>(
+    eng: &rt::Engine<'_>,
+    budget: &mut rt::ExecutionBudget,
+) -> Result<(), rt::LimitExceeded> {
+    if METERED_MEMORY && budget.memory_sample_due() {
+        let used = eng.heap_bytes();
+        match budget.limits().max_memory {
+            Some(max) if used > max => {
+                return Err(rt::LimitExceeded::Memory { used, limit: max });
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+#[inline]
+fn dispatch<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+    eng: &mut rt::Engine<'t>,
+    @SOURCE@: &str,
+    ip: u16,
+    budget: &mut rt::ExecutionBudget,
+) -> Result<Flow, rt::LimitExceeded> {
+    if METERED_FUEL || METERED_MEMORY {
+        budget.charge()?;
+        sample_memory::<METERED_MEMORY>(eng, budget)?;
+    }
+    Ok(match ip {
 "#;
 
 const DISPATCH_CLOSE: &str = "        _ => unreachable!(\"ip {ip} is not a generated state\"),
-    }
+    })
 }
 ";
 
@@ -1500,7 +1530,7 @@ if @POLICY@.admits(&eng.node()) {
 const CHECK: &str = r#"
 // @COMMENT@
 if @FAIL@ {
-    return false;
+    @FAILURE@
 }
 "#;
 

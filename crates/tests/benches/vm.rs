@@ -263,11 +263,40 @@ fn bench_backtrack_storm(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_switch(c: &mut Criterion) {
+    let module =
+        compile("Items = (program (expression_statement [(number) (identifier) (string)])*)");
+    let entry = module.entrypoint("Items").expect("bench entrypoint exists");
+    let mut group = c.benchmark_group("switch_dispatch");
+    for (name, statement) in [("mixed", "42; x; 's';"), ("skewed", "42; 42; x;")] {
+        let source = statement.repeat(4096);
+        let tree = parse_js(&source);
+        group.throughput(Throughput::Elements(4096 * 3));
+        for (policy, fuel_limit) in [("metered", Limit::Auto), ("unbounded", Limit::Unbounded)] {
+            group.bench_function(format!("{name}/{policy}"), |b| {
+                b.iter(|| {
+                    let journal = VM::builder(&source, &tree)
+                        .limits(RuntimeLimitSpec {
+                            fuel_limit,
+                            memory: Limit::Unbounded,
+                        })
+                        .build()
+                        .execute(&module, &entry)
+                        .expect("all expression kinds match");
+                    black_box(journal);
+                })
+            });
+        }
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_parse,
     bench_scenarios,
     bench_scan_execute,
-    bench_backtrack_storm
+    bench_backtrack_storm,
+    bench_switch
 );
 criterion_main!(benches);

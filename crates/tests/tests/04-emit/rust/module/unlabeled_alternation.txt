@@ -342,23 +342,7 @@ mod matcher {
         boundary.begin(eng);
         let mut ip = entry;
         loop {
-            if METERED_FUEL || METERED_MEMORY {
-                // One matcher dispatch consumes one unit of the operation budget.
-                // Memory-only policies still charge to retain the sample cadence.
-                budget.charge()?;
-                // The shared budget schedules live matcher-heap samples.
-                // Unbounded memory policies skip sampling and heap measurement.
-                if METERED_MEMORY && budget.memory_sample_due() {
-                    let used = eng.heap_bytes();
-                    match budget.limits().max_memory {
-                        Some(max) if used > max => {
-                            return Err(rt::LimitExceeded::Memory { used, limit: max });
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            match dispatch(eng, source, ip) {
+            match dispatch::<METERED_FUEL, METERED_MEMORY>(eng, source, ip, budget)? {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => {
                     boundary.finish(eng);
@@ -376,8 +360,35 @@ mod matcher {
         }
     }
 
-    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
-        match ip {
+    #[inline]
+    fn sample_memory<const METERED_MEMORY: bool>(
+        eng: &rt::Engine<'_>,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<(), rt::LimitExceeded> {
+        if METERED_MEMORY && budget.memory_sample_due() {
+            let used = eng.heap_bytes();
+            match budget.limits().max_memory {
+                Some(max) if used > max => {
+                    return Err(rt::LimitExceeded::Memory { used, limit: max });
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn dispatch<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+        eng: &mut rt::Engine<'t>,
+        _source: &str,
+        ip: u16,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<Flow, rt::LimitExceeded> {
+        if METERED_FUEL || METERED_MEMORY {
+            budget.charge()?;
+            sample_memory::<METERED_MEMORY>(eng, budget)?;
+        }
+        Ok(match ip {
             //   01       return
             S01_Q => Flow::Accept,
             //   02   !   (program)                        04
@@ -437,11 +448,42 @@ mod matcher {
             //   08   !   switch
             //              (identifier)                   06
             //              (number)                       07
-            S08_Q => match eng.node().kind_id() {
-                1 => Flow::Jump(S06_Q),   // (identifier)
-                114 => Flow::Jump(S07_Q), // (number)
-                _ => Flow::Backtrack,
-            },
+            S08_Q => {
+                let node = eng.node();
+                match node.kind_id() {
+                    1 => 'state: {
+                        if METERED_MEMORY {
+                            budget.account_memory_work();
+                            sample_memory::<METERED_MEMORY>(eng, budget)?;
+                        }
+                        // (_)
+                        if !node.is_named() {
+                            break 'state Flow::Backtrack;
+                        }
+                        eng.emit_output_event(|_| rt::JournalEvent::Absent);
+                        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(num)
+                        eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+                        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(id)
+                        Flow::Jump(S05_Q)
+                    } // (identifier)
+                    114 => 'state: {
+                        if METERED_MEMORY {
+                            budget.account_memory_work();
+                            sample_memory::<METERED_MEMORY>(eng, budget)?;
+                        }
+                        // (_)
+                        if !node.is_named() {
+                            break 'state Flow::Backtrack;
+                        }
+                        eng.emit_output_event(|_| rt::JournalEvent::Absent);
+                        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(id)
+                        eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+                        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1)); // RecordSet(num)
+                        Flow::Jump(S05_Q)
+                    } // (number)
+                    _ => Flow::Backtrack,
+                }
+            }
             //   10  ──!  _                                08, 10
             S10_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
@@ -459,15 +501,19 @@ mod matcher {
                 Flow::Jump(S08_Q)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
-        }
+        })
     }
 
     /// `S02_Q` candidate: `(program)`.
     #[inline]
     fn cand_s02_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (program)
-        if node.kind_id() != 134 || !node.is_named() {
+        // program
+        if node.kind_id() != 134 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         true
@@ -477,8 +523,12 @@ mod matcher {
     #[inline]
     fn cand_s04_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (expression_statement)
-        if node.kind_id() != 150 || !node.is_named() {
+        // expression_statement
+        if node.kind_id() != 150 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         true
@@ -488,8 +538,12 @@ mod matcher {
     #[inline]
     fn cand_s06_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (identifier)
-        if node.kind_id() != 1 || !node.is_named() {
+        // identifier
+        if node.kind_id() != 1 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         true
@@ -499,8 +553,12 @@ mod matcher {
     #[inline]
     fn cand_s07_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (number)
-        if node.kind_id() != 114 || !node.is_named() {
+        // number
+        if node.kind_id() != 114 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         true

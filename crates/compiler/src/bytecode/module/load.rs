@@ -140,7 +140,7 @@ impl Module {
         }
         #[cfg(not(debug_assertions))]
         let _ = is_start;
-        module.decoded = decoded::build(&module);
+        module.decoded = decoded::build(&module)?;
         Ok(module)
     }
 

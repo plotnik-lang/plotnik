@@ -65,7 +65,7 @@ A `Match` with `Down` navigation and an identifier constraint first selects `a`.
 
 A `Match` can also offer several successor instructions at one candidate. Their encoded order is their preference order. All successors at the current candidate take preference over retrying a later sibling. Only a complete successful path accepts, so an early local match does not commit its result. `Epsilon` connects paths without moving or testing the cursor, while still allowing effects.
 
-For alternatives with distinct concrete node kinds, such as `[(identifier) (number) (string)]`, the compiler can insert a `Switch` to select a branch by the current node's kind ID. This skips branches whose kinds cannot match. The selected branch still runs its original tests, including the named/anonymous check, and applies its effects.
+A `Switch` selects an alternative by the current node's kind ID.
 
 Calls share a reusable part of the graph, called a body. A body returns through numbered exits called ports. For each port, the call site supplies a continuation: the address at which its own execution resumes. The same body can therefore continue differently for different callers:
 
@@ -300,7 +300,7 @@ String operands are less than `str_table_count`, including the real reserved str
 
 ### Switch
 
-`Switch` jumps to the target for the current node's kind ID, or backtracks if none matches. It does not check namedness, move the cursor, or apply effects. It saves no alternatives: later failure can retry outer choices or choices within the selected branch, but does not try other table entries.
+`Switch` selects a target by the current node's kind ID, or backtracks if none matches. Selection neither moves the cursor nor applies effects. The selected path retains its effects and remaining constraints, including namedness. `Switch` saves no alternatives: later failure can retry existing choices, but never another table entry.
 
 ```text
 byte    0        1        2..3        4..7
@@ -313,7 +313,9 @@ Header bits 4–7 and byte 1 are zero. `count` is a `u16` specifying at least tw
 
 `SwitchTables` consists of four-byte entries, so `switch_tables_size` must be a multiple of four. Each entry stores a `u16` kind ID at byte 0 and a `u16` target at byte 2.
 
-Kind IDs are `1`–`0xfffd` or `0xffff`. Targets are nonzero instruction addresses pointing to an instruction's first word. Every stored entry must have a valid kind and target, including entries not referenced by an instruction.
+Kind IDs are `1`–`0xfffd` or `0xffff`. Targets are nonzero instruction addresses pointing to an instruction's first word.
+
+Every stored target, including those in unreferenced entries, must lead through zero or more single-successor `Epsilon` matches to a `StayExact` match whose concrete kind ID equals the entry's kind ID. This path must be finite.
 
 Kind IDs are strictly increasing within each run. Runs may overlap or be shared.
 

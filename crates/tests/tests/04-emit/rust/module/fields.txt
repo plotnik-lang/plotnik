@@ -325,23 +325,7 @@ mod matcher {
         boundary.begin(eng);
         let mut ip = entry;
         loop {
-            if METERED_FUEL || METERED_MEMORY {
-                // One matcher dispatch consumes one unit of the operation budget.
-                // Memory-only policies still charge to retain the sample cadence.
-                budget.charge()?;
-                // The shared budget schedules live matcher-heap samples.
-                // Unbounded memory policies skip sampling and heap measurement.
-                if METERED_MEMORY && budget.memory_sample_due() {
-                    let used = eng.heap_bytes();
-                    match budget.limits().max_memory {
-                        Some(max) if used > max => {
-                            return Err(rt::LimitExceeded::Memory { used, limit: max });
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            match dispatch(eng, source, ip) {
+            match dispatch::<METERED_FUEL, METERED_MEMORY>(eng, source, ip, budget)? {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => {
                     boundary.finish(eng);
@@ -359,8 +343,35 @@ mod matcher {
         }
     }
 
-    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
-        match ip {
+    #[inline]
+    fn sample_memory<const METERED_MEMORY: bool>(
+        eng: &rt::Engine<'_>,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<(), rt::LimitExceeded> {
+        if METERED_MEMORY && budget.memory_sample_due() {
+            let used = eng.heap_bytes();
+            match budget.limits().max_memory {
+                Some(max) if used > max => {
+                    return Err(rt::LimitExceeded::Memory { used, limit: max });
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn dispatch<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+        eng: &mut rt::Engine<'t>,
+        _source: &str,
+        ip: u16,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<Flow, rt::LimitExceeded> {
+        if METERED_FUEL || METERED_MEMORY {
+            budget.charge()?;
+            sample_memory::<METERED_MEMORY>(eng, budget)?;
+        }
+        Ok(match ip {
             //   1       return
             S1_Q => Flow::Accept,
             //   2   !   (program)                         4
@@ -432,15 +443,19 @@ mod matcher {
                 finish_s8_q(eng)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
-        }
+        })
     }
 
     /// `S2_Q` candidate: `(program)`.
     #[inline]
     fn cand_s2_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (program)
-        if node.kind_id() != 134 || !node.is_named() {
+        // program
+        if node.kind_id() != 134 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         true
@@ -450,8 +465,12 @@ mod matcher {
     #[inline]
     fn cand_s4_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (lexical_declaration)
-        if node.kind_id() != 152 || !node.is_named() {
+        // lexical_declaration
+        if node.kind_id() != 152 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         true
@@ -461,8 +480,12 @@ mod matcher {
     #[inline]
     fn cand_s6_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (variable_declarator)
-        if node.kind_id() != 154 || !node.is_named() {
+        // variable_declarator
+        if node.kind_id() != 154 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         // -value
@@ -476,8 +499,12 @@ mod matcher {
     #[inline]
     fn cand_s8_q(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (identifier)
-        if node.kind_id() != 1 || !node.is_named() {
+        // identifier
+        if node.kind_id() != 1 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         // name:

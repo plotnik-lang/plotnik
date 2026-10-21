@@ -571,14 +571,13 @@ mod debug_impl {
         }
     }
 
-    fn check_labels(instructions: &[InstructionIR]) -> Result<(), String> {
-        let mut index = std::collections::HashMap::with_capacity(instructions.len());
-        for (i, instr) in instructions.iter().enumerate() {
-            if let Some(prev) = index.insert(instr.label(), i) {
-                return Err(format!(
-                    "duplicate label {:?} (instructions[{prev}] and [{i}])",
-                    instr.label()
-                ));
+    fn check_labels(
+        instructions: &[InstructionIR],
+    ) -> Result<HashMap<Label, &InstructionIR>, String> {
+        let mut index = HashMap::with_capacity(instructions.len());
+        for instr in instructions {
+            if index.insert(instr.label(), instr).is_some() {
+                return Err(format!("duplicate label {:?}", instr.label()));
             }
         }
 
@@ -602,7 +601,15 @@ mod debug_impl {
             }
         }
 
-        Ok(())
+        Ok(index)
+    }
+
+    fn check_switches(instructions: &HashMap<Label, &InstructionIR>) {
+        for instruction in instructions.values() {
+            if let InstructionIR::Switch(switch) = instruction {
+                switch.entries(instructions);
+            }
+        }
     }
 
     fn check_depth_neutrality(nfa: &NfaGraph) -> Result<(), String> {
@@ -896,9 +903,9 @@ mod debug_impl {
     }
 
     fn verify_after_pass(name: &str, before: &PassSnapshot, nfa: &NfaGraph, ctx: &LowerInput) {
-        if let Err(e) = check_labels(&nfa.instructions) {
-            panic!("[verify] pass `{name}` produced malformed IR: {e}");
-        }
+        let instructions = check_labels(&nfa.instructions)
+            .unwrap_or_else(|e| panic!("[verify] pass `{name}` produced malformed IR: {e}"));
+        check_switches(&instructions);
         assert_depth_neutrality(nfa, &format!("pass `{name}`"));
         if let Err(e) = check_no_node_on_empty_paths(nfa) {
             panic!("[verify] pass `{name}` produced empty-match Node effect: {e}");
@@ -946,9 +953,9 @@ mod debug_impl {
     }
 
     pub fn verify_constructed(nfa: &NfaGraph) {
-        if let Err(e) = check_labels(&nfa.instructions) {
-            panic!("[verify] construction produced malformed IR: {e}");
-        }
+        let instructions = check_labels(&nfa.instructions)
+            .unwrap_or_else(|e| panic!("[verify] construction produced malformed IR: {e}"));
+        check_switches(&instructions);
         assert_depth_neutrality(nfa, "construction");
         if let Err(e) = check_no_node_on_empty_paths(nfa) {
             panic!("[verify] construction produced empty-match Node effect: {e}");

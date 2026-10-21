@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use crate::bytecode::{
@@ -11,6 +12,7 @@ use crate::compiler::lower::ir::{
     CallEntry, CallIR, DefOutputOrigin, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin,
     MatchIR, NfaGraph, NodeKindConstraint, PredicateValueIR, SemanticNfa, SourceMode, SwitchIR,
 };
+use crate::compiler::lower::switch::SwitchEntry;
 use crate::core::{Colors, NodeFieldId, NodeKind, NodeKindId};
 
 pub(crate) fn dump_nfa(
@@ -31,6 +33,7 @@ pub(crate) fn dump_nfa(
 
 pub(crate) struct NfaDumper<'a> {
     graph: &'a NfaGraph,
+    instructions: HashMap<Label, &'a InstructionIR>,
     artifacts: AnalysisArtifacts<'a>,
     layout: &'a CaptureLayout,
     colors: Colors,
@@ -51,6 +54,11 @@ impl<'a> NfaDumper<'a> {
             .unwrap_or(0);
         Self {
             graph,
+            instructions: graph
+                .instructions()
+                .iter()
+                .map(|instruction| (instruction.label(), instruction))
+                .collect(),
             artifacts,
             layout,
             colors: Colors::new(false),
@@ -80,7 +88,7 @@ impl<'a> NfaDumper<'a> {
     }
 }
 
-impl NfaDumper<'_> {
+impl<'a> NfaDumper<'a> {
     fn dump_entrypoints(&self, out: &mut String) {
         let c = &self.colors;
         writeln!(out, "{}[entrypoints]{}", c.blue, c.reset)
@@ -199,26 +207,27 @@ impl NfaDumper<'_> {
         format!("{} ({})", self.def_name(def_id), modes.join(", "))
     }
 
-    pub(crate) fn switch_cases(&self, switch: &SwitchIR) -> Vec<(NodeKindId, Label, String)> {
+    pub(crate) fn switch_cases(&self, switch: &SwitchIR) -> Vec<(SwitchEntry<'a>, String)> {
         let mut cases = switch
-            .cases()
-            .map(|(kind, target)| {
+            .entries(&self.instructions)
+            .into_iter()
+            .map(|entry| {
                 let anonymous = self
                     .artifacts
                     .grammar
                     .kind_entries()
                     .any(|(node_kind, id)| {
-                        id == kind && matches!(node_kind, NodeKind::Anonymous(_))
+                        id == entry.kind && matches!(node_kind, NodeKind::Anonymous(_))
                     });
                 let constraint = if anonymous {
-                    NodeKindConstraint::Anonymous(Some(kind))
+                    NodeKindConstraint::Anonymous(Some(entry.kind))
                 } else {
-                    NodeKindConstraint::Named(Some(kind))
+                    NodeKindConstraint::Named(Some(entry.kind))
                 };
-                (kind, target, self.node_kind_pattern(constraint))
+                (entry, self.node_kind_pattern(constraint))
             })
             .collect::<Vec<_>>();
-        cases.sort_by_key(|(_, target, _)| *target);
+        cases.sort_by_key(|(entry, _)| entry.target);
         cases
     }
 
@@ -232,8 +241,8 @@ impl NfaDumper<'_> {
             &[],
         );
 
-        for (_, target, kind) in self.switch_cases(switch) {
-            let target = format!("{:0w$}", target.0, w = self.label_width);
+        for (entry, kind) in self.switch_cases(switch) {
+            let target = format!("{:0w$}", entry.target.0, w = self.label_width);
             let row = builder.switch_case(&kind, &target);
             result.push('\n');
             result.push_str(&row);

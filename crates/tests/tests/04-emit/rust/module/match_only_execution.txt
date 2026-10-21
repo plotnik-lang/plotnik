@@ -282,23 +282,7 @@ mod matcher {
         boundary.begin(eng);
         let mut ip = entry;
         loop {
-            if METERED_FUEL || METERED_MEMORY {
-                // One matcher dispatch consumes one unit of the operation budget.
-                // Memory-only policies still charge to retain the sample cadence.
-                budget.charge()?;
-                // The shared budget schedules live matcher-heap samples.
-                // Unbounded memory policies skip sampling and heap measurement.
-                if METERED_MEMORY && budget.memory_sample_due() {
-                    let used = eng.heap_bytes();
-                    match budget.limits().max_memory {
-                        Some(max) if used > max => {
-                            return Err(rt::LimitExceeded::Memory { used, limit: max });
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            match dispatch(eng, source, ip) {
+            match dispatch::<METERED_FUEL, METERED_MEMORY>(eng, source, ip, budget)? {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => {
                     boundary.finish(eng);
@@ -316,8 +300,35 @@ mod matcher {
         }
     }
 
-    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
-        match ip {
+    #[inline]
+    fn sample_memory<const METERED_MEMORY: bool>(
+        eng: &rt::Engine<'_>,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<(), rt::LimitExceeded> {
+        if METERED_MEMORY && budget.memory_sample_due() {
+            let used = eng.heap_bytes();
+            match budget.limits().max_memory {
+                Some(max) if used > max => {
+                    return Err(rt::LimitExceeded::Memory { used, limit: max });
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn dispatch<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool>(
+        eng: &mut rt::Engine<'t>,
+        _source: &str,
+        ip: u16,
+        budget: &mut rt::ExecutionBudget,
+    ) -> Result<Flow, rt::LimitExceeded> {
+        if METERED_FUEL || METERED_MEMORY {
+            budget.charge()?;
+            sample_memory::<METERED_MEMORY>(eng, budget)?;
+        }
+        Ok(match ip {
             //   1       return
             S1_PROBE => Flow::Accept,
             //   2   !   (program)                         1
@@ -328,15 +339,19 @@ mod matcher {
                 Flow::Jump(S1_PROBE)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
-        }
+        })
     }
 
     /// `S2_PROBE` candidate: `(program)`.
     #[inline]
     fn cand_s2_probe(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
-        // (program)
-        if node.kind_id() != 134 || !node.is_named() {
+        // program
+        if node.kind_id() != 134 {
+            return false;
+        }
+        // (_)
+        if !node.is_named() {
             return false;
         }
         true
