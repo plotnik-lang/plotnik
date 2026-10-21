@@ -3,17 +3,10 @@ use std::path::PathBuf;
 use clap::{Arg, Command, value_parser};
 
 use super::args::*;
-use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
 
 fn with_hidden_exec_args(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
-}
-
-fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
-    cmd.arg(fuel_arg().hide(true))
-        .arg(max_memory_arg().hide(true))
-        .arg(limits_preset_arg().hide(true))
 }
 
 pub fn build_cli() -> Command {
@@ -109,7 +102,7 @@ pub fn tree_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_runtime_limit_args(with_hidden_exec_args(cmd))
+    with_hidden_exec_args(cmd)
 }
 
 pub fn check_command() -> Command {
@@ -209,10 +202,6 @@ fn execution_command(name: &'static str, about: &'static str) -> Command {
                 .help("Write the execution trace to stderr"),
         )
         .arg(verbose_arg().requires("trace"))
-        .next_help_heading("Limit options")
-        .arg(fuel_arg())
-        .arg(max_memory_arg())
-        .arg(limits_preset_arg())
         .next_help_heading("Global options")
         .arg(color_arg())
 }

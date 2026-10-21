@@ -12,7 +12,7 @@ use super::{
     language::LanguageOptions,
     query_loader::{QuerySources, load_query},
 };
-use crate::cli::{ColorChoice, runtime_limits};
+use crate::cli::ColorChoice;
 use crate::error::{CliError, CliResult, writeln_stderr, writeln_stdout};
 
 pub fn run(m: &ArgMatches, command: &str) -> CliResult {
@@ -64,9 +64,7 @@ pub fn run(m: &ArgMatches, command: &str) -> CliResult {
     let tree = parser
         .parse(&source)
         .map_err(|error| CliError::fatal(error.to_string()))?;
-    let vm = VM::builder(&source, &tree)
-        .limits(runtime_limits(m))
-        .build();
+    let vm = VM::builder(&source, &tree).build();
     let result = if m.get_flag("trace") {
         let verbosity = match m.get_count("verbose") {
             0 => Verbosity::Default,

@@ -1,8 +1,6 @@
 mod args;
 mod commands;
 mod dispatch;
-mod limits;
-pub use limits::runtime_limits;
 
 pub use commands::build_cli;
 pub use dispatch::{CheckOpts, DumpOpts, GenerateOpts};
