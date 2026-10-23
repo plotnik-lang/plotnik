@@ -458,15 +458,24 @@ impl Solve {
         for &realizer in frozen.realizers_of(kind) {
             self.seed(Key::Sat((pattern, realizer)))?;
         }
-        while let Some(key) = self.dequeue() {
+        loop {
+            self.budget.spend(frozen.realizers_of(kind).len() as u64)?;
+            if frozen
+                .realizers_of(kind)
+                .iter()
+                .any(|&realizer| self.sat_value((pattern, realizer)))
+            {
+                return Ok(true);
+            }
+
+            let Some(key) = self.dequeue() else {
+                return Ok(false);
+            };
+
             if self.recompute(frozen, key)? {
                 self.requeue_dependents(key)?;
             }
         }
-        Ok(frozen
-            .realizers_of(kind)
-            .iter()
-            .any(|&realizer| self.sat_value((pattern, realizer))))
     }
 
     fn sat_value(&self, key: SatKey) -> bool {
@@ -504,7 +513,7 @@ impl Solve {
     }
 
     fn dequeue(&mut self) -> Option<Key> {
-        let key = self.queue.pop_back()?;
+        let key = self.queue.pop_front()?;
         self.queued.remove(&key);
         Some(key)
     }
@@ -545,6 +554,12 @@ impl Solve {
     }
 
     fn recompute(&mut self, frozen: &Frozen, key: Key) -> Result<bool, AnalysisLimit> {
+        if let Key::Sat(k) = key
+            && self.sat_value(k)
+        {
+            return Ok(false);
+        }
+
         let previous = self.current.replace(key);
         let changed = match key {
             Key::Sat(k) => {

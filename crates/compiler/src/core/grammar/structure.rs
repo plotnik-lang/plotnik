@@ -292,7 +292,14 @@ impl StructureTable {
 
         let tokens = (0..ctx.lexical.variables.len())
             .map(Symbol::terminal)
-            .chain((0..ctx.syntax.external_tokens.len()).map(Symbol::external));
+            .chain(
+                ctx.syntax
+                    .external_tokens
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, token)| token.corresponding_internal_token.is_none())
+                    .map(|(index, _)| Symbol::external(index)),
+            );
         for symbol in tokens {
             insert(classify_target(
                 symbol,
