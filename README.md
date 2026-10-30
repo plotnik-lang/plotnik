@@ -12,7 +12,7 @@
   </picture>
 </p>
 
-<p align="center">We outgrew the workbench. Now we build ships.</p>
+<p align="center"><i>We outgrew the workbench. Now we build ships.</i></p>
 
 <br/>
 <br/>
